@@ -1,0 +1,31 @@
+# syntax=docker/dockerfile:1
+FROM mcr.microsoft.com/playwright:v1.64.1-noble@sha256:7852dc5a7d72f5fe458a597d690f6c42fbc8e9e26ddfa95f8e6ef552558d9bbf
+
+ENV VP_HOME=/opt/vite-plus \
+    VP_NODE_VERSION=24.21.0 \
+    RECNRUN_TEST_CONTAINER=1
+ENV PATH="/opt/vite-plus/bin:${PATH}"
+
+RUN curl -fsSL https://vite.plus -o /tmp/install-vp.sh \
+    && CI=true VP_VERSION=1.3.0 VP_NODE_MANAGER=yes VP_PM_MANAGER=yes bash /tmp/install-vp.sh \
+    && rm /tmp/install-vp.sh \
+    && vp env install node@24.21.0 pnpm@12.14.0
+
+WORKDIR /workspace
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/website/package.json ./apps/website/package.json
+COPY apps/extension/package.json ./apps/extension/package.json
+COPY packages/domain/package.json ./packages/domain/package.json
+COPY packages/bridge/package.json ./packages/bridge/package.json
+# Lifecycle scripts need the sources; prepare runs again after they are copied.
+RUN --mount=type=cache,target=/root/.local/share/pnpm/store,sharing=locked \
+    vp install --frozen-lockfile --ignore-scripts
+
+COPY . .
+# pnpm skips "prepare" when node_modules is already current, so generate WXT's types explicitly.
+RUN vp install --frozen-lockfile --offline \
+    && vp run extension#wxt:prepare \
+    && mkdir -p coverage test-results playwright-report
+
+ENTRYPOINT ["xvfb-run", "-a", "--server-args=-screen 0 1920x1440x24 -nolisten tcp", "vp", "run", "--no-cache"]
+CMD ["verify:local"]

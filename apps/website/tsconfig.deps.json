@@ -1,0 +1,6 @@
+{
+  // dependency-cruiser resolves "paths" from the repo root, so they repeat tsconfig.json's from there.
+  "compilerOptions": {
+    "paths": { "@/*": ["apps/website/src/*"], "@build/*": ["apps/website/build/*"] }
+  }
+}

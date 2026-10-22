@@ -1,0 +1,24 @@
+prefix_rule(
+    pattern = ["vp", "check"],
+    decision = "allow",
+)
+
+prefix_rule(
+    pattern = ["vp", "run", "deps"],
+    decision = "allow",
+)
+
+prefix_rule(
+    pattern = ["vp", "run", "test"],
+    decision = "allow",
+)
+
+prefix_rule(
+    pattern = ["vp", "run", ["test:unit", "test:components", "test:e2e", "test:coverage"]],
+    decision = "allow",
+)
+
+prefix_rule(
+    pattern = ["vp", "run", "verify"],
+    decision = "allow",
+)

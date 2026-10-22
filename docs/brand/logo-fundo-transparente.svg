@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="REC n Run">
+
+<defs><clipPath id="circle-clip"><circle cx="259" cy="217" r="162"/></clipPath></defs>
+<g transform="translate(114.560000 43.520000) scale(1.536000000)">
+<circle cx="259" cy="217" r="162" fill="#F3362B"/>
+<path d="M96.5 230 L381 392.5 L96.5 555 Z" fill="#30B050"/>
+<path d="M96.5 230 L381 392.5 L96.5 555 Z" clip-path="url(#circle-clip)" fill="#FECC03"/>
+</g>
+</svg>

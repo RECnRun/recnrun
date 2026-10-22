@@ -1,0 +1,30 @@
+{
+  "name": "extension",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Records and replays browser sessions for developers.",
+  "type": "module",
+  "scripts": {
+    "dev": "wxt",
+    "build": "tsc --noEmit && wxt build",
+    "build:test": "wxt build --mode test",
+    "zip": "wxt zip",
+    "wxt:prepare": "wxt prepare",
+    "test:manifest": "node --test scripts/manifest.checks.mjs"
+  },
+  "dependencies": {
+    "@recnrun/bridge": "workspace:*",
+    "@recnrun/domain": "workspace:*",
+    "preact": "catalog:",
+    "valibot": "catalog:"
+  },
+  "devDependencies": {
+    "@preact/preset-vite": "catalog:",
+    "@vitest/browser-playwright": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vite-plus": "catalog:",
+    "web-ext": "catalog:",
+    "wxt": "catalog:"
+  }
+}

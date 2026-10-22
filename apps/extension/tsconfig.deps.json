@@ -1,0 +1,6 @@
+{
+  // dependency-cruiser resolves "paths" from the repo root, so they repeat WXT's alias from there.
+  "compilerOptions": {
+    "paths": { "@/*": ["apps/extension/src/*"] }
+  }
+}

@@ -1,0 +1,37 @@
+import type { Recording } from "@recnrun/domain";
+import { plural } from "@/ui/plural";
+
+export interface RecordingView {
+  id: string;
+  name: string;
+  startUrl: string;
+  recordedAt: string;
+  duration: string;
+  events: string;
+}
+
+/** Formats in UTC so a recording reads the same on every machine. */
+function formatTimestamp(iso: string): string {
+  return `${new Date(iso).toISOString().slice(0, 16).replace("T", " ")} UTC`;
+}
+
+function formatDuration(durationMs: number): string {
+  const totalSeconds = Math.round(durationMs / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return minutes === 0 ? `${seconds} s` : `${minutes} min ${seconds} s`;
+}
+
+/** Turns recordings into the labels the explorer shows, newest first. */
+export function toRecordingViews(recordings: readonly Recording[]): RecordingView[] {
+  return [...recordings]
+    .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
+    .map((recording) => ({
+      id: recording.id,
+      name: recording.name,
+      startUrl: recording.startUrl,
+      recordedAt: formatTimestamp(recording.createdAt),
+      duration: formatDuration(recording.durationMs),
+      events: plural(recording.eventCount, "event"),
+    }));
+}

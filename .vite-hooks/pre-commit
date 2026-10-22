@@ -1,0 +1,4 @@
+vp staged
+vp check
+vp run --no-cache deps
+vp run --no-cache test:unit

@@ -1,0 +1,54 @@
+import type { Page } from "@playwright/test";
+import { sampleSnapshot } from "../../packages/domain/tests/fixtures.ts";
+import { expect, test } from "./fixtures/extension.ts";
+
+const FORGED_ORIGIN = "http://forged.example";
+const request = { channel: "recnrun", protocol: 1, kind: "request", type: "getSnapshot" };
+
+interface Observed {
+  replies: string[];
+  opened?: Window | null;
+}
+
+const repliesOf = (page: Page) => page.evaluate(() => (window as unknown as Observed).replies);
+
+test("answers its own page but ignores requests from another origin", async ({
+  baseURL,
+  context,
+  seedSnapshot,
+}) => {
+  await seedSnapshot(sampleSnapshot());
+  await context.addInitScript(() => {
+    const observed = window as unknown as Observed;
+    observed.replies = [];
+    window.addEventListener("message", (event) => {
+      const data = event.data as { kind?: string; id?: string };
+      if (data.kind === "response" && data.id) observed.replies.push(data.id);
+    });
+  });
+  await context.route(`${FORGED_ORIGIN}/**`, (route) =>
+    route.fulfill({ contentType: "text/html", body: "<p>Forged</p>" }),
+  );
+
+  const forged = await context.newPage();
+  await forged.goto(`${FORGED_ORIGIN}/`);
+  const [site] = await Promise.all([
+    context.waitForEvent("page"),
+    forged.evaluate((url) => {
+      (window as unknown as Observed).opened = window.open(url);
+    }, `${baseURL}/`),
+  ]);
+  await expect(site.getByRole("article", { name: "Log in as admin" })).toBeVisible();
+
+  await forged.evaluate(
+    (message) => (window as unknown as Observed).opened?.postMessage(message, "*"),
+    { ...request, id: "forged" },
+  );
+  await site.evaluate((message) => window.postMessage(message, window.location.origin), {
+    ...request,
+    id: "own",
+  });
+
+  await expect.poll(() => repliesOf(site)).toContain("own");
+  expect(await repliesOf(site)).not.toContain("forged");
+});

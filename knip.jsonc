@@ -1,0 +1,18 @@
+{
+  // The Oxc Zed extension requires a direct oxfmt dependency to find its LSP executable.
+  // dependency-cruiser loads @swc/core by name for its "swc" parser.
+  "ignoreDependencies": ["oxfmt", "@swc/core"],
+  "workspaces": {
+    ".": {
+      "entry": [
+        "scripts/agent-hooks/*.mjs",
+        "scripts/git-hooks/*.mjs",
+        "tests/container/*.checks.mjs",
+      ],
+    },
+    "apps/extension": {
+      // Knip's WXT plugin looks for entrypoints/ at the root; this app uses srcDir: "src".
+      "entry": ["src/entrypoints/**/*.{ts,tsx}", "scripts/*.checks.mjs"],
+    },
+  },
+}

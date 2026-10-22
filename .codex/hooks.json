@@ -1,0 +1,28 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "^Bash$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$(git rev-parse --show-toplevel)/scripts/agent-hooks/pre-tool-use.mjs\"",
+            "statusMessage": "Checking Git hook policy"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$(git rev-parse --show-toplevel)/scripts/agent-hooks/stop.mjs\"",
+            "timeout": 150,
+            "statusMessage": "Running quality checks"
+          }
+        ]
+      }
+    ]
+  }
+}

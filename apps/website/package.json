@@ -1,0 +1,23 @@
+{
+  "name": "website",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vp dev",
+    "build": "tsc && vp build",
+    "preview": "vp preview"
+  },
+  "dependencies": {
+    "@recnrun/bridge": "workspace:*",
+    "@recnrun/domain": "workspace:*",
+    "preact": "catalog:"
+  },
+  "devDependencies": {
+    "@preact/preset-vite": "catalog:",
+    "@vitest/browser-playwright": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
+  }
+}
