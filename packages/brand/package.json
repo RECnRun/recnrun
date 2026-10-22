@@ -1,0 +1,9 @@
+{
+  "name": "@recnrun/brand",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./mona-sans.css": "./src/mona-sans.css"
+  }
+}

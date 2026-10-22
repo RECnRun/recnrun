@@ -23,7 +23,7 @@
     "test:extension-manifest": "vp run extension#test:manifest",
     "deps": "depcruise packages tests --config .dependency-cruiser.cjs && depcruise apps/website --config .dependency-cruiser.cjs --ts-config apps/website/tsconfig.deps.json && depcruise apps/extension --config .dependency-cruiser.cjs --ts-config apps/extension/tsconfig.deps.json",
     "dead-code": "knip --include files,exports,dependencies,unlisted",
-    "duplication": "jscpd --threshold 4 --fail-on-empty apps/website/src apps/extension/src packages/domain/src packages/bridge/src",
+    "duplication": "jscpd --threshold 4 --fail-on-empty apps/website/src apps/extension/src packages/domain/src packages/bridge/src packages/brand/src",
     "prepare": "vp config && vp run extension#wxt:prepare"
   },
   "devDependencies": {

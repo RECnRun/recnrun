@@ -45,9 +45,8 @@ body {
   margin: 0;
   background: var(--surface);
   color: var(--text);
-  font:
-    16px/1.5 system-ui,
-    sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
 }
 
 .site-header,

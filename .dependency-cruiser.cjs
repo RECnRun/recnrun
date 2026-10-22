@@ -89,6 +89,13 @@ module.exports = {
       },
     },
     {
+      name: "brand-is-leaf",
+      severity: "error",
+      comment: "Brand holds assets shared by both apps; it depends on nothing.",
+      from: { path: "^packages/brand/" },
+      to: { pathNot: "^packages/brand/" },
+    },
+    {
       name: "website-bridge-only-in-services",
       severity: "error",
       comment: "Only src/services talks to the extension; the rest of the site uses its gateway.",

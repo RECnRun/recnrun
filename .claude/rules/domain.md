@@ -8,6 +8,7 @@ paths:
 [docs/ARCHITECTURE.md](../../docs/ARCHITECTURE.md#packages) defines the contracts. Key rules:
 
 - Packages export TypeScript sources directly (`exports` → `./src/index.ts`); there is no package build. `build` only type checks.
+- **Brand.** `packages/brand` holds assets only (`src/mona-sans.css`, `src/fonts/`) and imports nothing; see [BRAND.md](../../docs/BRAND.md#typography).
 - **Domain purity.** `packages/domain/src` imports only Valibot and itself: no Preact, WXT, browser APIs, or `@recnrun/bridge`. It holds data shapes and pure helpers.
 - **Schemas first.** Each concept is a Valibot schema with its type inferred (`v.InferOutput`), never a hand-written interface that can drift. Ids are `IdSchema`; references between entities, when they appear, are ids too (`recordingId`), and the snapshot rejects duplicate ids.
 - **Versioning.** `SnapshotSchema` carries `schemaVersion`. A breaking change to stored data bumps it and adds a migration where the extension reads storage.

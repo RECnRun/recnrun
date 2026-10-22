@@ -17,6 +17,7 @@ COPY apps/website/package.json ./apps/website/package.json
 COPY apps/extension/package.json ./apps/extension/package.json
 COPY packages/domain/package.json ./packages/domain/package.json
 COPY packages/bridge/package.json ./packages/bridge/package.json
+COPY packages/brand/package.json ./packages/brand/package.json
 # Lifecycle scripts need the sources; prepare runs again after they are copied.
 RUN --mount=type=cache,target=/root/.local/share/pnpm/store,sharing=locked \
     vp install --frozen-lockfile --ignore-scripts
