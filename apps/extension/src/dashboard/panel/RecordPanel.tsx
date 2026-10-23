@@ -1,8 +1,12 @@
 import { useEffect } from "preact/hooks";
+import logo from "@/assets/logo.svg?raw";
 import { formatElapsed, useEnded, useRecording } from "@/dashboard/panel/recording";
 import type { Recording, RecordingStore } from "@/dashboard/panel/recording";
 import { useLockHeld } from "@/dashboard/use-lock-held";
 import { DASHBOARD_LOCK, holdLock, PANEL_LOCK } from "@/messaging/view-locks";
+
+// A data URL needs no base URL, so it loads in the blank PiP document as in the panel frame.
+const LOGO_URL = `data:image/svg+xml,${encodeURIComponent(logo)}`;
 
 /** "Recording 00:18" or "Paused 00:18". */
 export function RecordStatus({ recording }: { recording: Recording }) {
@@ -19,6 +23,7 @@ export function RecordPanel(props: { recording: Recording; onStop: () => void })
   const { recording, onStop } = props;
   return (
     <section class="record-panel" aria-label="Recording panel">
+      <img class="record-logo" src={LOGO_URL} alt="RECnRun" />
       <p>
         <RecordStatus recording={recording} />
       </p>

@@ -1,4 +1,4 @@
-// Writes apps/website/icons/favicon.svg: the logo on a transparent background (docs/BRAND.md).
+// Writes the logo as SVG on a transparent background: the website favicon and the extension's copy (docs/BRAND.md).
 import { writeFileSync } from "node:fs";
 import { layers } from "./logo.mjs";
 
@@ -22,4 +22,6 @@ const svg =
   shapes.join("") +
   `</svg>\n`;
 
-writeFileSync(new URL("../apps/website/icons/favicon.svg", import.meta.url), svg);
+for (const path of ["../apps/website/icons/favicon.svg", "../apps/extension/src/assets/logo.svg"]) {
+  writeFileSync(new URL(path, import.meta.url), svg);
+}

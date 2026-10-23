@@ -1,4 +1,4 @@
-import type { BrowserContext, Page, Worker } from "@playwright/test";
+import type { BrowserContext, Locator, Page, Worker } from "@playwright/test";
 import { sampleSnapshot } from "../../packages/domain/tests/fixtures.ts";
 import { expect, test } from "./fixtures/extension.ts";
 
@@ -34,6 +34,15 @@ test.beforeEach(async ({ seedSnapshot }) => {
   await seedSnapshot(sampleSnapshot());
 });
 
+/** The panel's logo has loaded, which a blocked or unresolved image URL would not. */
+async function expectLogo(panel: Locator) {
+  const logo = panel.getByRole("img", { name: "RECnRun" });
+  await expect(logo).toBeVisible();
+  await expect
+    .poll(() => logo.evaluate((img: HTMLImageElement) => img.naturalWidth))
+    .toBeGreaterThan(0);
+}
+
 test("the dashboard tab opens the panel in a PiP window that outlives a tab switch", async ({
   context,
   page,
@@ -45,6 +54,7 @@ test("the dashboard tab opens the panel in a PiP window that outlives a tab swit
   );
   await expect(panelOf(pip)).toContainText("Recording");
   await expect(panelOf(pip)).toContainText("00:01");
+  await expectLogo(panelOf(pip));
 
   const target = await context.newPage();
   await target.goto("/");
@@ -113,6 +123,7 @@ test("the dashboard framed on recnrun.com has the site open the PiP window", asy
   await expect(panelFrame.getByRole("region", { name: "Recording panel" })).toContainText(
     "Recording",
   );
+  await expectLogo(panelFrame.getByRole("region", { name: "Recording panel" }));
   await panelFrame.getByRole("button", { name: "Stop" }).click();
   await expect.poll(() => pip.isClosed()).toBe(true);
 });

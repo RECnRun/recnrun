@@ -9,6 +9,7 @@ The logo is a **record dot over a play triangle**: REC, then Run. `scripts/logo.
 | File                                      | Script                 | Background                       |
 | ----------------------------------------- | ---------------------- | -------------------------------- |
 | `apps/website/icons/favicon.svg`          | `scripts/favicon.mjs`  | Transparent                      |
+| `apps/extension/src/assets/logo.svg`      | `scripts/favicon.mjs`  | Transparent; the recording panel |
 | `apps/extension/public/icon/<size>.png`   | `scripts/logo-png.mjs` | Transparent; 16, 32, 48, 128 px  |
 | `apps/website/icons/favicon.ico`          | `scripts/logo-png.mjs` | Transparent; 16, 32, 48 px       |
 | `apps/website/icons/apple-touch-icon.png` | `scripts/logo-png.mjs` | Transparent; 180 px              |

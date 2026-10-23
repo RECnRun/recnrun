@@ -93,6 +93,8 @@ test("a top-level dashboard renders the panel into its PiP window with its style
   expect(pipDocument.head.querySelector("link")?.getAttribute("href")).toBe(
     `${location.origin}/x.css`,
   );
+  const logo = pipDocument.querySelector<HTMLImageElement>('section img[alt="RECnRun"]');
+  await expect.poll(() => logo?.complete && logo.naturalWidth).toBeGreaterThan(0);
 
   button(pipDocument, "Stop")?.click();
   await expect.poll(() => button(root, "Record")).toBeDefined();
