@@ -1,3 +1,6 @@
+import * as v from "valibot";
+import { ClosePanelMessageSchema } from "@/messaging/frame-protocol";
+
 /** Document Picture-in-Picture, which TypeScript's DOM types do not describe yet. */
 export interface DocumentPictureInPicture {
   readonly window: Window | null;
@@ -25,4 +28,25 @@ export function copyStyles(from: Document, to: Document): void {
     if (sheet instanceof HTMLLinkElement) copy.setAttribute("href", sheet.href);
     to.head.append(copy);
   }
+}
+
+/** Fills a PiP window with a frame of the session page, which closes the window when it ends. */
+export function showSession(pipWindow: Window, sessionUrl: string, extensionOrigin: string): void {
+  const { document } = pipWindow;
+  const iframe = document.createElement("iframe");
+  iframe.title = "RECnRun session";
+  iframe.src = sessionUrl;
+  Object.assign(iframe.style, {
+    position: "fixed",
+    inset: "0",
+    width: "100%",
+    height: "100%",
+    border: "0",
+  });
+  document.body.append(iframe);
+  pipWindow.addEventListener("message", (event) => {
+    if (event.source !== iframe.contentWindow || event.origin !== extensionOrigin) return;
+    if (!v.is(ClosePanelMessageSchema, event.data)) return;
+    pipWindow.close();
+  });
 }

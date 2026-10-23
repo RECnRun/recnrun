@@ -1,7 +1,7 @@
 import type { RecordingSession } from "@recnrun/domain";
 import { sampleSnapshot } from "@recnrun/domain/testing";
-import type { RecordingStore } from "@/dashboard/panel/recording";
 import type { DashboardData } from "@/dashboard/start";
+import type { RecordingStore } from "@/views/recording";
 
 /** Stands in for extension session storage; every view given the same store sees each write. */
 export function memoryRecordingStore(): RecordingStore {
@@ -22,5 +22,5 @@ export function memoryRecordingStore(): RecordingStore {
 
 /** The sample recordings and a fresh shared recording, for a dashboard under test. */
 export function dashboardData(recordings = memoryRecordingStore()): DashboardData {
-  return { loadSnapshot: async () => sampleSnapshot(), recordings };
+  return { loadSnapshot: async () => sampleSnapshot(), recordings, send: () => {} };
 }

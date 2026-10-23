@@ -1,21 +1,21 @@
 import { expect, test } from "vite-plus/test";
-import { elapsedSeconds, formatElapsed, toggled } from "@/dashboard/panel/recording";
+import { elapsedSeconds, formatElapsed, toggled } from "@/views/recording";
 
 test("elapsed time counts only the runs spent recording", () => {
-  const started = { status: "recording" as const, banked: 0, since: 1_000 };
+  const started = { tabId: 3, status: "recording" as const, banked: 0, since: 1_000 };
   expect(elapsedSeconds(started, 4_500)).toBe(3);
 
   const paused = toggled(started, 4_500);
-  expect(paused).toEqual({ status: "paused", banked: 3_500, since: 4_500 });
+  expect(paused).toEqual({ tabId: 3, status: "paused", banked: 3_500, since: 4_500 });
   expect(elapsedSeconds(paused, 60_000)).toBe(3);
 
   const resumed = toggled(paused, 60_000);
-  expect(resumed).toEqual({ status: "recording", banked: 3_500, since: 60_000 });
+  expect(resumed).toEqual({ tabId: 3, status: "recording", banked: 3_500, since: 60_000 });
   expect(elapsedSeconds(resumed, 62_000)).toBe(5);
 });
 
 test("a session another view started a moment ahead shows no negative time", () => {
-  expect(elapsedSeconds({ status: "recording", banked: 0, since: 5_000 }, 4_900)).toBe(0);
+  expect(elapsedSeconds({ tabId: 3, status: "recording", banked: 0, since: 5_000 }, 4_900)).toBe(0);
 });
 
 test("elapsed time reads as minutes and seconds", () => {

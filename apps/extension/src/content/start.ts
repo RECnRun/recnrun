@@ -13,5 +13,5 @@ export function startContentBridge(): void {
   const dashboardUrl = browser.runtime.getURL("/dashboard.html");
   const extensionOrigin = new URL(dashboardUrl).origin;
   const frame = mountDashboardFrame(dashboardUrl, extensionOrigin);
-  servePanelRequests(frame, dashboardUrl, extensionOrigin);
+  servePanelRequests(frame, browser.runtime.getURL("/session.html"), extensionOrigin);
 }

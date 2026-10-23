@@ -1,26 +1,17 @@
-import type { BrowserContext, Locator, Page, Worker } from "@playwright/test";
+import type { BrowserContext, Locator, Page } from "@playwright/test";
 import { sampleSnapshot } from "../../packages/domain/tests/fixtures.ts";
 import { expect, test } from "./fixtures/extension.ts";
+import {
+  chromeTabs,
+  dashboardUrl,
+  recordedTabId,
+  sessionPages,
+  sessionUrl,
+  tabIdOf,
+} from "./fixtures/tabs.ts";
 
 const FRAME = 'iframe[title="RECnRun dashboard"]';
-
-interface ChromeGlobal {
-  chrome: {
-    runtime: { getURL(path: string): string };
-    tabs: { query(filter: { url: string }): Promise<{ active: boolean }[]> };
-  };
-}
-
-const dashboardUrl = (serviceWorker: Worker) => new URL("dashboard.html", serviceWorker.url()).href;
-
-/** Playwright emulates focus, so every page reports "visible"; Chrome's tab state is the truth. */
-function dashboardTabActive(serviceWorker: Worker): Promise<boolean | undefined> {
-  return serviceWorker.evaluate(async () => {
-    const { chrome } = globalThis as unknown as ChromeGlobal;
-    const [tab] = await chrome.tabs.query({ url: chrome.runtime.getURL("dashboard.html") });
-    return tab?.active;
-  });
-}
+const SESSION_FRAME = 'iframe[title="RECnRun session"]';
 
 /** The PiP window is a page of its own in Playwright; this waits for the one a click opens. */
 async function clickToOpenPanel(context: BrowserContext, click: () => Promise<void>) {
@@ -28,7 +19,12 @@ async function clickToOpenPanel(context: BrowserContext, click: () => Promise<vo
   return pip;
 }
 
-const panelOf = (pip: Page) => pip.getByRole("region", { name: "Recording panel" });
+/** The recording panel of the session page that a PiP window frames. */
+const panelIn = (pip: Page) =>
+  pip.locator(SESSION_FRAME).contentFrame().getByRole("region", { name: "Recording panel" });
+
+const tabItem = (scope: Page | ReturnType<Page["frameLocator"]>, url: string) =>
+  scope.getByRole("complementary", { name: "Tabs" }).getByRole("listitem").filter({ hasText: url });
 
 test.beforeEach(async ({ seedSnapshot }) => {
   await seedSnapshot(sampleSnapshot());
@@ -43,53 +39,40 @@ async function expectLogo(panel: Locator) {
     .toBeGreaterThan(0);
 }
 
-test("the dashboard tab opens the panel in a PiP window that outlives a tab switch", async ({
+test("a dashboard tab floats the session over the tab it records", async ({
   context,
   page,
   serviceWorker,
 }) => {
-  await page.goto(dashboardUrl(serviceWorker));
+  await page.goto("/recordings/rec-login");
+  const dashboard = await context.newPage();
+  await dashboard.goto(dashboardUrl(serviceWorker));
+  const site = tabItem(dashboard, page.url());
+
   const pip = await clickToOpenPanel(context, () =>
-    page.getByRole("button", { name: "Record" }).click(),
+    site.getByRole("button", { name: "Float" }).click(),
   );
-  await expect(panelOf(pip)).toContainText("Recording");
-  await expect(panelOf(pip)).toContainText("00:01");
-  await expectLogo(panelOf(pip));
+  await expect(pip.locator(SESSION_FRAME)).toHaveAttribute("src", sessionUrl(serviceWorker));
+  await expect(panelIn(pip)).toContainText("Recording");
+  await expect(panelIn(pip)).toContainText("00:01");
+  await expectLogo(panelIn(pip));
+  const siteId = await tabIdOf(serviceWorker, page.url());
+  expect(await recordedTabId(serviceWorker)).toBe(siteId);
+  await expect
+    .poll(async () => (await chromeTabs(serviceWorker)).find((tab) => tab.active)?.id)
+    .toBe(siteId);
+  expect(sessionPages(context, serviceWorker)).toHaveLength(0);
+  await expect(site).toContainText("The session floats in its own window.");
 
-  const target = await context.newPage();
-  await target.goto("/");
-  await target.bringToFront();
-  await expect.poll(() => dashboardTabActive(serviceWorker)).toBe(false);
-  expect(pip.isClosed()).toBe(false);
+  await panelIn(pip).getByRole("button", { name: "Pause" }).click();
+  await expect(site).toContainText("Paused");
+  await panelIn(pip).getByRole("button", { name: "Resume" }).click();
+  await expect(panelIn(pip)).toContainText("Recording");
 
-  await pip.getByRole("button", { name: "Pause" }).click();
-  await expect(panelOf(pip)).toContainText("Paused");
-  await pip.getByRole("button", { name: "Resume" }).click();
-  await expect(panelOf(pip)).toContainText("Recording");
-
-  await pip.getByRole("button", { name: "Stop" }).click();
+  await panelIn(pip).getByRole("button", { name: "Stop" }).click();
   await expect.poll(() => pip.isClosed()).toBe(true);
-  await expect.poll(() => dashboardTabActive(serviceWorker)).toBe(true);
-  await expect(page.getByRole("button", { name: "Record" })).toBeVisible();
-});
-
-test("closing the PiP window keeps the recording and lets the dashboard reopen it", async ({
-  context,
-  page,
-  serviceWorker,
-}) => {
-  await page.goto(dashboardUrl(serviceWorker));
-  const pip = await clickToOpenPanel(context, () =>
-    page.getByRole("button", { name: "Record" }).click(),
-  );
-  await expect(panelOf(pip)).toContainText("Recording");
-  await pip.close();
-
-  await expect(page.getByRole("banner")).toContainText("Recording");
-  const reopened = await clickToOpenPanel(context, () =>
-    page.getByRole("button", { name: "Show the panel" }).click(),
-  );
-  await expect(panelOf(reopened)).toContainText("Recording");
+  expect(await recordedTabId(serviceWorker)).toBeNull();
+  await expect(site.getByRole("button", { name: "Float" })).toBeVisible();
 });
 
 test("the dashboard framed on recnrun.com has the site open the PiP window", async ({
@@ -113,63 +96,30 @@ test("the dashboard framed on recnrun.com has the site open the PiP window", asy
   expect(direct).toBe("NotAllowedError");
 
   const pip = await clickToOpenPanel(context, () =>
-    dashboard.getByRole("button", { name: "Record" }).click(),
+    tabItem(dashboard, page.url()).getByRole("button", { name: "Float" }).click(),
   );
-  const panelFrame = pip.locator("iframe").contentFrame();
-  await expect(pip.locator("iframe")).toHaveAttribute(
-    "src",
-    `${dashboardUrl(serviceWorker)}?view=panel`,
-  );
-  await expect(panelFrame.getByRole("region", { name: "Recording panel" })).toContainText(
-    "Recording",
-  );
-  await expectLogo(panelFrame.getByRole("region", { name: "Recording panel" }));
-  await panelFrame.getByRole("button", { name: "Stop" }).click();
+  await expect(pip.locator(SESSION_FRAME)).toHaveAttribute("src", sessionUrl(serviceWorker));
+  await expect(panelIn(pip)).toContainText("Recording");
+  await expectLogo(panelIn(pip));
+  expect(await recordedTabId(serviceWorker)).toBe(await tabIdOf(serviceWorker, page.url()));
+  await panelIn(pip).getByRole("button", { name: "Stop" }).click();
   await expect.poll(() => pip.isClosed()).toBe(true);
 });
 
-test("while the dashboard tab is open, the site leaves recording to it", async ({
-  context,
-  page,
-  serviceWorker,
-}) => {
-  const tab = await context.newPage();
-  await tab.goto(dashboardUrl(serviceWorker));
-  await page.goto("/");
-  const site = page.locator(FRAME).contentFrame().getByRole("banner");
-  await expect(site).toContainText("Recording is controlled from the RECnRun tab.");
-  await expect(site.getByRole("button")).toHaveCount(0);
-
-  await tab.bringToFront();
-  const pip = await clickToOpenPanel(context, () =>
-    tab.getByRole("button", { name: "Record" }).click(),
-  );
-  await expect(site).toContainText(/Recording \d\d:\d\d/);
-  await expect(site.getByRole("button")).toHaveCount(0);
-  await panelOf(pip).getByRole("button", { name: "Stop" }).click();
-  await expect.poll(() => pip.isClosed()).toBe(true);
-
-  await tab.close();
-  await expect(site.getByRole("button", { name: "Record" })).toBeVisible();
-});
-
-test("opening the dashboard tab closes the panel the site opened", async ({
+test("stopping the session anywhere closes its PiP window", async ({
   context,
   page,
   serviceWorker,
 }) => {
   await page.goto("/");
-  const site = page.locator(FRAME).contentFrame();
+  const framed = page.locator(FRAME).contentFrame();
   const pip = await clickToOpenPanel(context, () =>
-    site.getByRole("button", { name: "Record" }).click(),
+    tabItem(framed, page.url()).getByRole("button", { name: "Float" }).click(),
   );
-  await expect(pip.locator("iframe").contentFrame().getByRole("region")).toContainText("Recording");
+  await expect(panelIn(pip)).toContainText("Recording");
 
-  const tab = await context.newPage();
-  await tab.goto(dashboardUrl(serviceWorker));
+  const dashboard = await context.newPage();
+  await dashboard.goto(dashboardUrl(serviceWorker));
+  await tabItem(dashboard, page.url()).getByRole("button", { name: "Stop" }).click();
   await expect.poll(() => pip.isClosed()).toBe(true);
-  await expect(tab.getByRole("button", { name: "Show the panel" })).toBeVisible();
-  await expect(site.getByRole("banner")).toContainText(
-    "Recording is controlled from the RECnRun tab.",
-  );
 });

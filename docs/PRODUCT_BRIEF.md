@@ -20,20 +20,21 @@ The events themselves (clicks, inputs, navigations, DOM changes) are not stored 
    - **Recordings:** grouped by workspace, the one with the newest recording first; each recording, newest first, with its start URL, date (in UTC), duration, and event count.
    - **Empty:** it says there are no recordings yet.
    - **Unreadable** (for example, stored data from an incompatible version): it shows the reason.
-4. The toolbar icon, its "Dashboard" context menu item, the page's "Open RECnRun" context menu item, and Alt+Shift+D (MacCtrl+Shift+D on macOS) open the dashboard:
-   - **On a web page, in Chrome with Split View (155+):** beside the page, in a Split View, showing only the page's workspace. If that split already shows it, it gets the focus.
-   - **On a new or blank tab, or a browser page, in Chrome with Split View:** beside it, in a Split View, with every workspace.
-   - **Otherwise, or in Chrome without Split View:** in its own tab, with every workspace, or focused when that tab is already open.
-
-   The browser has one dashboard tab. When it is already open, it moves beside the tab the trigger came from, with that tab's workspace, and keeps any recording panel open. A second dashboard tab, opened from a link, hands its recording link to the first and closes. While a recording panel floats, the triggers do nothing.
+4. The dashboard also lists every open tab. With no recording in progress, each tab offers **Record**, which opens the session beside it, and **Float**, which opens the session in a floating window over it. The recorded tab shows the state and elapsed time with Show, Pause or Resume, and Stop; the other tabs wait until it ends. Any number of dashboards can be open, in tabs or over recnrun.com, and a dashboard tab can be the recorded tab itself.
 
    Each recording has its own link, `dashboard.html#/recordings/<id>`.
 
-5. On recnrun.com, the extension shows the same dashboard over the site, at the site's address: `recnrun.com/recordings/<id>` opens that recording, and Back, Forward, and reload work.
+5. The **session** is the recording in progress, one per Chrome profile. Its page (`session.html`) shows the state, the elapsed time, Pause or Resume, Stop, and a link that opens a new dashboard tab. It lives in one of two places:
+   - **Beside the recorded tab,** in a Split View (Chrome 155+), or in the next tab without Split View. Float moves the controls into a floating window and lets the page fill the window; closing that window without Stop brings the session back beside the page.
+   - **In a floating window** (Document Picture-in-Picture) that a dashboard opened.
 
-   While the dashboard tab is open, recording belongs to it: the dashboard over the site shows a recording in progress but offers no Record, Pause, Resume, or Stop, and a recording panel the site opened closes.
+   The toolbar icon, the page's "Open RECnRun" context menu item, and Alt+Shift+S (MacCtrl+Shift+S on macOS) start recording the current tab, with the session beside it. On another tab while a session runs, they move the session beside that tab, which it then records; while the session floats, they do nothing. Alt+Shift+D (MacCtrl+Shift+D) and the icon's "Dashboard" context menu item open a new dashboard tab.
 
-6. The website's footer links to the privacy policy at `recnrun.com/privacy/`. The extension leaves that page alone, so it stays readable with the extension installed.
+   Stop ends the session and closes its pane and its window; closing the recorded tab ends it too. Typing the session page's address shows that no recording runs.
+
+6. On recnrun.com, the extension shows the same dashboard over the site, at the site's address: `recnrun.com/recordings/<id>` opens that recording, and Back, Forward, and reload work. Float there has the site open the floating window, since a frame cannot.
+
+7. The website's footer links to the privacy policy at `recnrun.com/privacy/`. The extension leaves that page alone, so it stays readable with the extension installed.
 
 The website never sees the user's data: only the extension reads it, in the visitor's own browser, and the site cannot read the dashboard's frame.
 

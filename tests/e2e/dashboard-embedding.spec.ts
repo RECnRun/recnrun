@@ -48,15 +48,20 @@ test.beforeEach(async ({ seedSnapshot }) => {
   await seedSnapshot(sampleSnapshot());
 });
 
-test("another origin cannot frame the dashboard", async ({ context, serviceWorker }) => {
-  const forged = await serveForged(context, "<p>Forged</p>");
-  await appendFrame(forged, `${extensionOrigin(serviceWorker)}/dashboard.html`, "probe");
+for (const [name, path] of [
+  ["the dashboard", "dashboard.html"],
+  ["the session page", "session.html"],
+] as const) {
+  test(`another origin cannot frame ${name}`, async ({ context, serviceWorker }) => {
+    const forged = await serveForged(context, "<p>Forged</p>");
+    await appendFrame(forged, `${extensionOrigin(serviceWorker)}/${path}`, "probe");
 
-  await expect.poll(() => forged.frames().map((frame) => frame.url())).toHaveLength(2);
-  const probe = forged.frames()[1];
-  await probe?.waitForLoadState();
-  expect(probe?.url()).toBe("chrome-error://chromewebdata/");
-});
+    await expect.poll(() => forged.frames().map((frame) => frame.url())).toHaveLength(2);
+    const probe = forged.frames()[1];
+    await probe?.waitForLoadState();
+    expect(probe?.url()).toBe("chrome-error://chromewebdata/");
+  });
+}
 
 test("the site's own script can frame the dashboard under the production CSP", async ({
   page,

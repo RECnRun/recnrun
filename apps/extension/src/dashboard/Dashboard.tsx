@@ -1,13 +1,13 @@
 import type { Snapshot } from "@recnrun/domain";
 import type { ComponentChildren } from "preact";
 import { useEffect, useState } from "preact/hooks";
-import { RecordControls } from "@/dashboard/panel/RecordControls";
-import type { RecordSetup } from "@/dashboard/panel/RecordControls";
 import { RecordingCard } from "@/dashboard/RecordingCard";
 import { toRecordingViews } from "@/dashboard/recording-view";
 import type { RecordingView } from "@/dashboard/recording-view";
 import { recordingPath, selectedRecordingId, titleFor } from "@/dashboard/route";
 import type { DashboardRouter } from "@/dashboard/router";
+import { TabList } from "@/dashboard/TabList";
+import type { SessionSetup } from "@/dashboard/TabList";
 import { groupByWorkspace, workspaceName } from "@/dashboard/workspace";
 
 type Load =
@@ -23,10 +23,8 @@ interface Navigation {
 export interface DashboardProps {
   loadSnapshot: () => Promise<Snapshot>;
   router: DashboardRouter;
-  /** Shows only this workspace, as next to its site in a Split View. */
-  workspace?: string;
-  /** Where the recording panel opens; without it the dashboard offers no Record button. */
-  record?: RecordSetup;
+  /** The tabs and the session; without it the dashboard records nothing. */
+  session?: SessionSetup;
 }
 
 function useSnapshot(loadSnapshot: () => Promise<Snapshot>): Load {
@@ -61,11 +59,10 @@ function RouteLink(props: { path: string; nav: Navigation; children: ComponentCh
   );
 }
 
-function EmptyState(props: { title: string; nested?: boolean; children: ComponentChildren }) {
-  const Heading = props.nested ? "h3" : "h2";
+function EmptyState(props: { title: string; children: ComponentChildren }) {
   return (
     <div class="empty-state" role="status">
-      <Heading>{props.title}</Heading>
+      <h2>{props.title}</h2>
       {props.children}
     </div>
   );
@@ -96,24 +93,6 @@ function RecordingCards({ views, nav }: { views: RecordingView[]; nav: Navigatio
         />
       ))}
     </div>
-  );
-}
-
-function WorkspaceList(props: { snapshot: Snapshot; workspace: string; nav: Navigation }) {
-  const { snapshot, workspace, nav } = props;
-  const views = toRecordingViews(snapshot.recordings).filter(
-    (view) => view.workspace === workspace,
-  );
-  return (
-    <WorkspaceSection workspace={workspace}>
-      {views.length === 0 ? (
-        <EmptyState title="No recordings yet" nested>
-          <p>Start a recording on {workspaceName(workspace)} from the extension.</p>
-        </EmptyState>
-      ) : (
-        <RecordingCards views={views} nav={nav} />
-      )}
-    </WorkspaceSection>
   );
 }
 
@@ -156,8 +135,8 @@ function RecordingDetail(props: { snapshot: Snapshot; id: string; nav: Navigatio
   );
 }
 
-function Content(props: { load: Load; route: string; workspace?: string; nav: Navigation }) {
-  const { load, route, workspace, nav } = props;
+function Content(props: { load: Load; route: string; nav: Navigation }) {
+  const { load, route, nav } = props;
   switch (load.status) {
     case "loading":
       return <p role="status">Loading your recordings…</p>;
@@ -170,43 +149,29 @@ function Content(props: { load: Load; route: string; workspace?: string; nav: Na
     case "ready": {
       const id = selectedRecordingId(route);
       if (id !== undefined) return <RecordingDetail snapshot={load.snapshot} id={id} nav={nav} />;
-      if (workspace === undefined) return <RecordingList snapshot={load.snapshot} nav={nav} />;
-      return <WorkspaceList snapshot={load.snapshot} workspace={workspace} nav={nav} />;
+      return <RecordingList snapshot={load.snapshot} nav={nav} />;
     }
   }
 }
 
-export function Dashboard({ loadSnapshot, router, workspace, record }: DashboardProps) {
+export function Dashboard({ loadSnapshot, router, session }: DashboardProps) {
   const load = useSnapshot(loadSnapshot);
   const [route, setRoute] = useState(router.initialRoute);
   useEffect(() => router.subscribe(setRoute), [router]);
   useEffect(() => {
     const snapshot = load.status === "ready" ? load.snapshot : undefined;
-    router.publish(route, titleFor(snapshot, route, workspace));
-  }, [router, route, load, workspace]);
+    router.publish(route, titleFor(snapshot, route));
+  }, [router, route, load]);
 
   return (
     <>
       <header class="site-header">
         <h1>RECnRun</h1>
-        {record && <RecordControls {...record} />}
       </header>
       <main>
-        <Content
-          load={load}
-          route={route}
-          workspace={workspace}
-          nav={{ router, navigate: setRoute }}
-        />
+        {session && <TabList {...session} />}
+        <Content load={load} route={route} nav={{ router, navigate: setRoute }} />
       </main>
     </>
-  );
-}
-
-export function Refusal({ origin }: { origin: string }) {
-  return (
-    <main>
-      <p role="alert">RECnRun does not run inside {origin}.</p>
-    </main>
   );
 }
