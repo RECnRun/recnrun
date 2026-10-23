@@ -12,13 +12,13 @@ apps/website ──► @recnrun/bridge ──► valibot
 
 ## Packages
 
-| Package           | Holds                                                                                                         | May import                       |
-| ----------------- | ------------------------------------------------------------------------------------------------------------- | -------------------------------- |
-| `packages/domain` | Valibot schemas and inferred types for every concept; `Snapshot`, the versioned document the extension stores | `valibot` only                   |
-| `packages/bridge` | The website ↔ content script protocol, its client, host, and `window` transport                               | `valibot` only                   |
-| `packages/brand`  | Mona Sans, and `base.css`: the palette, semantic tokens, and base layout both apps import first               | nothing                          |
-| `apps/website`    | The Preact SPA                                                                                                | bridge, brand; never extension   |
-| `apps/extension`  | The WXT extension                                                                                             | every package; never the website |
+| Package           | Holds                                                                                                                                                        | May import                       |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------- |
+| `packages/domain` | Valibot schemas and inferred types for every concept; `Snapshot`, the versioned document the extension stores; `RecordingSession`, the recording in progress | `valibot` only                   |
+| `packages/bridge` | The website ↔ content script protocol, its client, host, and `window` transport                                                                              | `valibot` only                   |
+| `packages/brand`  | Mona Sans, and `base.css`: the palette, semantic tokens, and base layout both apps import first                                                              | nothing                          |
+| `apps/website`    | The Preact SPA                                                                                                                                               | bridge, brand; never extension   |
+| `apps/extension`  | The WXT extension                                                                                                                                            | every package; never the website |
 
 - Packages never import apps. Apps never import each other: they meet only at the bridge protocol.
 - Packages export their TypeScript sources (`exports` → `./src/index.ts`); apps bundle them. A package `build` only type checks.
@@ -45,15 +45,16 @@ Components take the gateway or data as props, so component tests use a fake gate
 
 ## Extension
 
-| Folder            | Runs in                | Role                                                                                                           |
-| ----------------- | ---------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `src/entrypoints` | (WXT)                  | Thin wiring: each file calls one `start*` function. Nothing imports an entrypoint.                             |
-| `src/content`     | The RECnRun website    | Bridge host, and the frame that shows the dashboard over the site.                                             |
-| `src/background`  | The service worker     | Validates requests and senders, answers them from storage.                                                     |
-| `src/storage`     | The service worker     | Repositories over WXT `storage`; validates what it reads with the domain schemas.                              |
-| `src/dashboard`   | The dashboard page     | Preact UI at `dashboard.html`. Reads through a function it is given, never through content or background code. |
-| `src/config`      | Build time             | `origins.ts`: the pages the content script runs on and that may frame the dashboard, per build mode.           |
-| `src/messaging`   | Content and background | The content ↔ background and content ↔ dashboard frame message schemas.                                        |
+| Folder            | Runs in               | Role                                                                                                                                            |
+| ----------------- | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/entrypoints` | (WXT)                 | Thin wiring: each file calls one `start*` function. Nothing imports an entrypoint.                                                              |
+| `src/content`     | The RECnRun website   | Bridge host, and the frame that shows the dashboard over the site.                                                                              |
+| `src/background`  | The service worker    | Validates requests and senders, answers them from storage.                                                                                      |
+| `src/storage`     | The service worker    | Repositories over WXT `storage` (`local:` for data, `session:` for the recording in progress); validates what it reads with the domain schemas. |
+| `src/dashboard`   | The dashboard page    | Preact UI at `dashboard.html`. Reads through a function it is given, never through content or background code.                                  |
+| `src/pip`         | Dashboard and content | Typed access to Document Picture-in-Picture and the panel window helpers ([POC 6](POCS.md#poc-6-record-opens-a-pip-window)).                    |
+| `src/config`      | Build time            | `origins.ts`: the pages the content script runs on and that may frame the dashboard, per build mode.                                            |
+| `src/messaging`   | Every extension page  | The content ↔ background, content ↔ dashboard frame, and background → dashboard tab message schemas; the Web Locks the views share.             |
 
 `content` never imports `storage`, and `dashboard` never imports `content` or `background`.
 
@@ -62,13 +63,18 @@ The dashboard opens from the toolbar icon (no popup, so a click fires `action.on
 | The tab                                                 | The dashboard                                                                                           |
 | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
 | A web page, Split View available (Chrome 155+)          | Opens beside it in a Split View (`tabs.create({ splitWithTabId })`), showing only that site's workspace |
-| A web page already in a Split View                      | Focuses the dashboard in that split, if there is one; otherwise as below                                |
-| Hidden address (new tab, `about:blank`, browser pages)  | Replaces the tab with the dashboard of every workspace                                                  |
+| Any tab already in a Split View                         | Focuses the dashboard in that split, if there is one; otherwise as below                                |
+| Any other tab that is not an extension page             | Opens beside it in a Split View, with the dashboard of every workspace                                  |
+| A dashboard tab is already open elsewhere               | Moves it beside the tab instead (`tabs.unsplit`, `tabs.move`, `tabs.createSplit`), without a reload     |
 | No Split View, Chrome refuses the split, or other pages | Focuses an open dashboard tab, or opens one                                                             |
+
+The browser keeps one top-level dashboard tab. A moved tab learns its new workspace from a `show-workspace` runtime message (`messaging/dashboard-protocol.ts`), which it accepts only from its own extension and for its own tab id, and swaps `?workspace=` with `history.replaceState`; staying loaded keeps its PiP window open. A dashboard tab opened another way (a link, a bookmark) yields to the earlier one (`dashboard/dashboard-tab.ts`): it hands over its hash route, which does not reload that tab, focuses it, and closes itself. While a recording panel floats, every trigger does nothing, so the window and the page it records stay where they are.
+
+Views find each other through Web Locks, which the dashboard tab, the dashboard frame, the panel frame, and the service worker share as pages of one extension origin (`messaging/view-locks.ts`). A view with an open PiP window holds `recnrun-panel`, and the top-level dashboard holds `recnrun-dashboard`. Each holder announces itself on a `BroadcastChannel` of the same name; watchers queue a shared request to learn when the lock frees, since exclusive waiters would take it from each other. While `recnrun-panel` is held, the other views say the panel floats instead of offering "Show the panel", and triggers are ignored. While `recnrun-dashboard` is held, the dashboard framed on recnrun.com shows the recording without its controls and points at the tab, and a site panel window closes.
 
 A workspace is the origin a recording starts on, derived when the dashboard renders; nothing stores it. A split dashboard gets it as `dashboard.html?workspace=<origin>`, and ignores any value that is not an `http`/`https` origin. The dashboard keeps its route in the hash (`dashboard.html#/recordings/<id>`), since an extension page has no server to answer other paths.
 
-On recnrun.com the content script covers the site with a full-viewport `<iframe>` of `dashboard.html` (`content/dashboard-frame.ts`), so the dashboard keeps the site's address. They sync the route over `postMessage` on the `recnrun-frame` channel (`messaging/frame-protocol.ts`): the frame starts at `?route=<site path>`, the content script sends a `route` message on Back and Forward, and the dashboard sends a `location` message (`path`, `title`) that the content script applies with `history.pushState` and `document.title`. Inside the frame, the dashboard's links point at the site's own URLs. GitHub Pages answers unknown paths with `404.html`, so the website build copies `index.html` there (`apps/website/build/not-found-page.ts`) and deep links like `/recordings/<id>` load the site.
+On recnrun.com the content script covers the site with a full-viewport `<iframe>` of `dashboard.html` (`content/dashboard-frame.ts`), so the dashboard keeps the site's address. They sync the route over `postMessage` on the `recnrun-frame` channel (`messaging/frame-protocol.ts`): the frame starts at `?route=<site path>`, the content script sends a `route` message on Back and Forward, and the dashboard sends a `location` message (`path`, `title`) that the content script applies with `history.pushState` and `document.title`. Inside the frame, the dashboard's links point at the site's own URLs. A frame cannot open a Document PiP window, so the framed dashboard's Record button posts `open-panel`; the content script opens the window from the site's page with a frame of `dashboard.html?view=panel`, which posts `close-panel` when the recording ends (`content/panel-window.ts`). Every view shares the recording through `storage.session` (POC 6E), not through frame messages. GitHub Pages answers unknown paths with `404.html`, so the website build copies `index.html` there (`apps/website/build/not-found-page.ts`) and deep links like `/recordings/<id>` load the site.
 
 ## Bridge protocol v1
 
@@ -99,7 +105,7 @@ The extension holds the user's data and is the only code that reads or shows it;
 - **Where the content script runs.** Production builds match only `https://recnrun.com/*`, where the website lives. The project also owns recnrun.app, recnrun.io, and recn.run; they only redirect to recnrun.com at the Cloudflare edge and never serve a page, so the extension does not match them. `development` and `test` builds add `http://localhost/*` and `http://127.0.0.1/*` (any port) for the dev server and end-to-end tests. Every build excludes `/privacy/*` on those origins (`exclude_matches`), so the dashboard frame never covers the privacy policy. `vp run test:extension-manifest` fails the build if a production manifest matches or excludes anything else.
 - **Permissions.** Only `storage`, `contextMenus` (the "Dashboard" and "Open RECnRun" items), and `activeTab`; none shows an install warning. `activeTab` lets the extension read the URL of the tab the user just clicked the icon, a menu item, or the shortcut on, to split it with its workspace, and nothing else: no script runs there. No `tabs`, no host permissions, no `externally_connectable`, no access to other sites. The same check enforces it.
 - **Who may frame the dashboard.** `dashboard.html` is the only web-accessible resource, and only for the content script's own matches (`use_dynamic_url: false`, since the matches already scope it); any other page that frames it gets `ERR_BLOCKED_BY_CLIENT`. Pages may frame it regardless of their CSP. If any `location.ancestorOrigins` entry is not an allowed site, for example a page framing recnrun.com to clickjack it, the dashboard renders only a refusal (`tests/e2e/dashboard-embedding.spec.ts`).
-- **What the site sees of the frame.** The site cannot read the frame's document (`contentDocument` is `null`); it sees the frame's `src`, extension id included. Each side accepts frame messages only from the other's window and origin, validates them, and accepts only paths that start with `/`, so script on the site can navigate the dashboard but never read it.
+- **What the site sees of the frame.** The site cannot read the frame's document (`contentDocument` is `null`); it sees the frame's `src`, extension id included. Each side accepts frame messages only from the other's window and origin, validates them, and accepts only paths that start with `/`, so script on the site can navigate the dashboard but never read it. The content script opens a PiP window only for an `open-panel` from the dashboard frame, and closes it only for a `close-panel` from the panel frame inside it.
 - **Who may ask.** The `window` transport accepts only messages whose `source` is the page's own window and whose `origin` is the page's own origin, and replies only to that origin. Pages on other origins, other windows, and frames get no answer (`tests/e2e/origin-guard.spec.ts`).
 - **What they can get.** Only the extension version: `ping` is the only request type, and no bridge message carries the user's data. The content script cannot read storage itself; it can only relay known request types to the background, which checks that the sender is its own extension.
 - **What the dashboard trusts.** Stored data is validated when the extension reads it and rendered as text.

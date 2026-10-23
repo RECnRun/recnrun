@@ -1,9 +1,9 @@
-import { sampleSnapshot } from "@recnrun/domain/testing";
 import { afterEach, expect, test } from "vite-plus/test";
 import { mountDashboardFrame } from "@/content/dashboard-frame";
 import { createFrameRouter } from "@/dashboard/router";
 import { startDashboard } from "@/dashboard/start";
 import { locationMessage, routeMessage } from "@/messaging/frame-protocol";
+import { dashboardData } from "./dashboard-data";
 
 const startPath = location.pathname;
 
@@ -61,7 +61,7 @@ test("the dashboard refuses to render inside a foreign ancestor", () => {
   const page = framedPage({
     location: { ancestorOrigins: [location.origin, "https://evil.example"] },
   });
-  startDashboard(root, async () => sampleSnapshot(), page);
+  startDashboard(root, dashboardData(), page);
   expect(root.querySelector('[role="alert"]')?.textContent).toBe(
     "RECnRun does not run inside https://evil.example.",
   );
@@ -71,7 +71,7 @@ test("the dashboard framed by an allowed site publishes its route to the site", 
   const root = document.createElement("div");
   const page = framedPage({ location: { ancestorOrigins: [location.origin], search: "" } });
   const posted = messagesTo(window);
-  startDashboard(root, async () => sampleSnapshot(), page);
+  startDashboard(root, dashboardData(), page);
   await expect.poll(() => root.querySelectorAll("article")).toHaveLength(2);
   await expect.poll(() => posted).toContainEqual(locationMessage("/", "RECnRun"));
 });
