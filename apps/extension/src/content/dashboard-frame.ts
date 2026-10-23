@@ -21,7 +21,7 @@ export function mountDashboardFrame(
   dashboardUrl: string,
   extensionOrigin: string,
   page: Window = window,
-): void {
+): HTMLIFrameElement {
   const { document, history, location } = page;
   const iframe = document.createElement("iframe");
   iframe.title = "RECnRun dashboard";
@@ -42,4 +42,5 @@ export function mountDashboardFrame(
   page.addEventListener("popstate", () => {
     iframe.contentWindow?.postMessage(routeMessage(currentPath(location)), extensionOrigin);
   });
+  return iframe;
 }

@@ -84,3 +84,40 @@ Every POC 1 trigger, plus an "Open RECnRun" item in the page's context menu, ope
   - The workspace reaches the dashboard as `?workspace=<origin>`, and the dashboard ignores anything that is not an `http`/`https` origin.
   - Playwright can fire the real toolbar action: browser-level CDP `Extensions.triggerAction` on the page's tab target (`Target.getTargets` with `type: "tab"`), reached through `connectOverCDP` on a `--remote-debugging-port`. A page-level CDP session gets "Method not allowed", and a page target gets "Action can only be triggered on a tab target". The action grants `activeTab` as a real click does. The context menus and the shortcut still cannot be fired, so they share the toolbar's handler.
 - **To check by hand.** Which layout Chrome gives an API split when the user has stacked splits on.
+
+## Recording panel in Document Picture-in-Picture (October 2026)
+
+**Problem.** A recording happens in the user's own tab, so its controls (state, elapsed time, Pause, Resume, Stop) must stay visible while another tab has the focus. The implementation plan has the Record click open a [Document Picture-in-Picture](https://developer.chrome.com/docs/web-platform/document-picture-in-picture) window, but the dashboard is an extension page: a tab, a Split View pane, or a frame over recnrun.com.
+
+**Result.** Every place the dashboard runs can open the panel in a PiP window. A top-level dashboard opens it itself; framed on recnrun.com it asks the content script, which opens it from the site's top-level page. The recording itself is still a stand-in clock in the page: the next step moves the session into the extension, since a PiP window dies with the page that opened it.
+
+| POC | Branch             | Idea                                                         | Result                |
+| --- | ------------------ | ------------------------------------------------------------ | --------------------- |
+| 6A  | `poc/document-pip` | The top-level dashboard (tab or Split View) opens the window | Works                 |
+| 6B  | `poc/document-pip` | The dashboard framed on recnrun.com opens the window itself  | Refused by Chrome     |
+| 6C  | `poc/document-pip` | The framed dashboard asks the site's content script to open  | Works                 |
+| 6D  | `poc/document-pip` | No Document PiP API: the controls stay in the tab            | Works; does not float |
+
+### POC 6: Record opens a PiP window
+
+The dashboard header has a Record button (`dashboard/panel/RecordControls.tsx`). `start.tsx` picks where the panel goes:
+
+- **Top-level (6A).** The click handler calls `documentPictureInPicture.requestWindow()` before anything awaits, copies the page's stylesheets into the blank window, and renders the panel there with a Preact portal, so the page and the panel share one state and one connection. Closing the window (`pagehide`) keeps recording and offers "Show the panel". Stop closes the window and refocuses the dashboard tab with `tabs.getCurrent`, `tabs.update`, and `windows.update`, which need no permission from an extension page.
+- **Framed (6C).** The frame posts `open-panel` on the `recnrun-frame` channel; the content script checks the source and origin and opens the window, with a frame of `dashboard.html?view=panel` filling it. Stop posts `close-panel` from that frame, and the content script closes the window.
+- **No API (6D).** The panel renders in the tab and says nothing about floating.
+- `tests/e2e/record-panel.spec.ts` covers 6A (the window outlives a tab switch, Pause and Resume, Stop refocuses the dashboard tab, closing and reopening the window), 6B, and 6C.
+- **Findings.**
+  - A frame gets `NotAllowedError: Opening a PiP window is only allowed from a top-level browsing context`.
+  - A click in the dashboard frame also activates the site's top-level page (user activation propagates to ancestors), so the content script can still open the window after the `postMessage` round trip. It works from the content script's isolated world.
+  - The PiP document is `about:blank` with the opener's origin. The panel frame inside it reports the site as its only ancestor, so the existing ancestor guard and the `dashboard.html` web-accessible resource cover it: no manifest change.
+  - The window outlives its opener tab going to the background, and closes when the opener reloads or navigates, in both 6A and 6C. A recording session must therefore live in the extension, with the panel as one more view of it.
+  - In 6C the panel frame and the dashboard frame are separate documents with separate state; only an extension-owned session can keep them in sync. 6C's Stop cannot refocus the site's tab from the content script; that needs a background message that uses `sender.tab`.
+  - Chrome throttles timers in hidden tabs, so elapsed time comes from timestamps, not from counting ticks.
+  - Playwright sees the PiP window as a new page (`context.waitForEvent("page")`).
+  - Playwright gives every page user activation: `navigator.userActivation.hasBeenActive` is `true` on a fresh page, and `requestWindow()` opens even through CDP `Runtime.evaluate` with `userGesture: false` and after a 6 s wait. Chromium 156 launched without Playwright refuses it on web and extension pages alike (`Document PiP requires user activation`). End-to-end tests cannot catch a lost gesture.
+  - Playwright emulates focus, so tests read Chrome's active tab through `tabs.query` in the service worker.
+- **To check by hand** (Chrome, the extension loaded unpacked):
+  - Record from the dashboard tab, from a Split View pane, and over recnrun.com (localhost in development) opens a floating window.
+  - The window stays on top after switching to another tab and to another Chrome window.
+  - Stop brings back the dashboard tab (6A); note where the focus goes in 6C.
+  - Whether `await`ing storage before `requestWindow()` still opens it, which decides whether Record can wait for the extension before opening the window.

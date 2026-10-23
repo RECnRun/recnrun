@@ -2,8 +2,41 @@ import type { Snapshot } from "@recnrun/domain";
 import { render } from "preact";
 import { disallowedAncestor } from "@/config/origins";
 import { Dashboard, Refusal } from "@/dashboard/Dashboard";
+import { focusCurrentTab } from "@/dashboard/panel/focus-tab";
+import type { RecordSurface } from "@/dashboard/panel/RecordControls";
+import { StandalonePanel } from "@/dashboard/panel/RecordPanel";
 import { createFrameRouter, createHashRouter } from "@/dashboard/router";
 import { workspaceParam } from "@/dashboard/workspace";
+import { closePanelMessage, openPanelMessage } from "@/messaging/frame-protocol";
+import { documentPip } from "@/pip/document-pip";
+
+const isPanelView = (search: string) => new URLSearchParams(search).get("view") === "panel";
+
+/** A top-level page opens its own PiP window; without the API the controls stay in the tab. */
+function topLevelSurface(page: Window): RecordSurface {
+  const pip = documentPip(page);
+  return pip ? { kind: "window", pip, focusTab: focusCurrentTab } : { kind: "inline" };
+}
+
+function startFramed(root: HTMLElement, loadSnapshot: () => Promise<Snapshot>, page: Window) {
+  const parent = page.location.ancestorOrigins[0] ?? "";
+  // The site's content script loads this view into the PiP window it opens.
+  if (isPanelView(page.location.search)) {
+    const close = () => page.parent.postMessage(closePanelMessage(), parent);
+    render(<StandalonePanel onStop={close} />, root);
+    return;
+  }
+  // A frame cannot open a PiP window, so it asks the top-level site to.
+  const requestPanel = () => page.parent.postMessage(openPanelMessage(), parent);
+  render(
+    <Dashboard
+      loadSnapshot={loadSnapshot}
+      router={createFrameRouter(parent, page)}
+      record={{ kind: "parent", requestPanel }}
+    />,
+    root,
+  );
+}
 
 export function startDashboard(
   root: HTMLElement,
@@ -17,18 +50,19 @@ export function startDashboard(
     render(<Refusal origin={blocked} />, root);
     return;
   }
-  const parent = ancestors[0];
-  if (parent !== undefined) {
-    render(
-      <Dashboard loadSnapshot={loadSnapshot} router={createFrameRouter(parent, page)} />,
-      root,
-    );
+  if (ancestors.length > 0) {
+    startFramed(root, loadSnapshot, page);
     return;
   }
   // A Split View tab opens with the workspace of the page beside it.
   const workspace = workspaceParam(page.location.search);
   render(
-    <Dashboard loadSnapshot={loadSnapshot} router={createHashRouter(page)} workspace={workspace} />,
+    <Dashboard
+      loadSnapshot={loadSnapshot}
+      router={createHashRouter(page)}
+      workspace={workspace}
+      record={topLevelSurface(page)}
+    />,
     root,
   );
 }

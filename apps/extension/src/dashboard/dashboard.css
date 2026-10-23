@@ -108,3 +108,58 @@ dd {
     padding-top: 0;
   }
 }
+
+.site-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space);
+}
+
+.record-panel,
+.record-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem var(--space);
+}
+
+/* In the PiP window the panel is the whole page. */
+body > .record-panel,
+#app > .record-panel {
+  padding: var(--space);
+}
+
+.record-panel p,
+.record-status p {
+  margin: 0;
+}
+
+.record-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.record-panel button,
+.record-status button {
+  font: inherit;
+  color: var(--text);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.25rem 0.75rem;
+}
+
+.record-panel time {
+  font-variant-numeric: tabular-nums;
+}
+
+button.record-button {
+  font: inherit;
+  background: var(--accent);
+  color: var(--accent-text);
+  border: 0;
+  border-radius: var(--radius);
+  padding: 0.25rem 0.75rem;
+}

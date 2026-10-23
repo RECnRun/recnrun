@@ -2,6 +2,7 @@ import { createBridgeHost, createWindowTransport } from "@recnrun/bridge";
 import { browser } from "wxt/browser";
 import { mountDashboardFrame } from "@/content/dashboard-frame";
 import { createForwardingHandler } from "@/content/forward";
+import { servePanelRequests } from "@/content/panel-window";
 
 export function startContentBridge(): void {
   createBridgeHost(
@@ -10,5 +11,7 @@ export function startContentBridge(): void {
     browser.runtime.getManifest().version,
   );
   const dashboardUrl = browser.runtime.getURL("/dashboard.html");
-  mountDashboardFrame(dashboardUrl, new URL(dashboardUrl).origin);
+  const extensionOrigin = new URL(dashboardUrl).origin;
+  const frame = mountDashboardFrame(dashboardUrl, extensionOrigin);
+  servePanelRequests(frame, dashboardUrl, extensionOrigin);
 }

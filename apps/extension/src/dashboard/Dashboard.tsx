@@ -1,6 +1,8 @@
 import type { Snapshot } from "@recnrun/domain";
 import type { ComponentChildren } from "preact";
 import { useEffect, useState } from "preact/hooks";
+import { RecordControls } from "@/dashboard/panel/RecordControls";
+import type { RecordSurface } from "@/dashboard/panel/RecordControls";
 import { RecordingCard } from "@/dashboard/RecordingCard";
 import { toRecordingViews } from "@/dashboard/recording-view";
 import type { RecordingView } from "@/dashboard/recording-view";
@@ -23,6 +25,8 @@ export interface DashboardProps {
   router: DashboardRouter;
   /** Shows only this workspace, as next to its site in a Split View. */
   workspace?: string;
+  /** Where the recording panel opens; without it the dashboard offers no Record button. */
+  record?: RecordSurface;
 }
 
 function useSnapshot(loadSnapshot: () => Promise<Snapshot>): Load {
@@ -172,7 +176,7 @@ function Content(props: { load: Load; route: string; workspace?: string; nav: Na
   }
 }
 
-export function Dashboard({ loadSnapshot, router, workspace }: DashboardProps) {
+export function Dashboard({ loadSnapshot, router, workspace, record }: DashboardProps) {
   const load = useSnapshot(loadSnapshot);
   const [route, setRoute] = useState(router.initialRoute);
   useEffect(() => router.subscribe(setRoute), [router]);
@@ -185,6 +189,7 @@ export function Dashboard({ loadSnapshot, router, workspace }: DashboardProps) {
     <>
       <header class="site-header">
         <h1>RECnRun</h1>
+        {record && <RecordControls surface={record} />}
       </header>
       <main>
         <Content
