@@ -16,44 +16,27 @@ afterEach(() => {
 // fakeBrowser's remove looks up a window by the tab's id and throws, so this records the call.
 const spyOnRemove = () => vi.spyOn(fakeBrowser.tabs, "remove").mockImplementation(() => {});
 
-const urls = async () => (await fakeBrowser.tabs.query({})).map((tab) => tab.url);
+test("focus brings the dashboard tab and its window to the front", async () => {
+  const me = await fakeBrowser.tabs.create({ url: DASHBOARD });
+  await fakeBrowser.tabs.create({ url: "https://shop.example/", active: true });
+  const focusWindow = vi.spyOn(fakeBrowser.windows, "update");
 
-test("a later dashboard tab hands its route to the earlier one and closes", async () => {
-  const earlier = await fakeBrowser.tabs.create({
-    url: `${DASHBOARD}?workspace=https%3A%2F%2Fa.example#/`,
-  });
-  const later = await fakeBrowser.tabs.create({
-    url: `${DASHBOARD}#/recordings/rec-login`,
-    active: true,
-  });
-  const remove = spyOnRemove();
-
-  await dashboardTab(async () => later).yieldToEarlier(new URL(later.url ?? ""));
-  expect(remove).toHaveBeenCalledWith(later.id);
-  const kept = await fakeBrowser.tabs.get(earlier.id ?? -1);
-  expect(kept.url).toBe(`${DASHBOARD}?workspace=https%3A%2F%2Fa.example#/recordings/rec-login`);
-  expect(kept.active).toBe(true);
+  await dashboardTab(async () => me).focus();
+  expect((await fakeBrowser.tabs.get(me.id ?? -1)).active).toBe(true);
+  expect(focusWindow).toHaveBeenCalledWith(me.windowId, { focused: true });
 });
 
-test("a later dashboard tab without a route only focuses the earlier one", async () => {
-  const earlier = await fakeBrowser.tabs.create({ url: `${DASHBOARD}#/recordings/rec-login` });
-  const later = await fakeBrowser.tabs.create({ url: DASHBOARD, active: true });
+test("close removes the dashboard tab, and outside a tab neither call does anything", async () => {
+  const me = await fakeBrowser.tabs.create({ url: DASHBOARD });
   const remove = spyOnRemove();
+  const update = vi.spyOn(fakeBrowser.tabs, "update");
 
-  await dashboardTab(async () => later).yieldToEarlier(new URL(DASHBOARD));
-  expect(remove).toHaveBeenCalledWith(later.id);
-  expect(await urls()).toContain(`${DASHBOARD}#/recordings/rec-login`);
-  expect((await fakeBrowser.tabs.get(earlier.id ?? -1)).active).toBe(true);
-});
-
-test("the earliest dashboard tab, or one outside a tab, stays open", async () => {
-  const first = await fakeBrowser.tabs.create({ url: DASHBOARD });
-  await fakeBrowser.tabs.create({ url: `${DASHBOARD}#/` });
-  await fakeBrowser.tabs.create({ url: "https://shop.example/" });
-
-  await dashboardTab(async () => first).yieldToEarlier(new URL(DASHBOARD));
-  await dashboardTab(async () => undefined).yieldToEarlier(new URL(DASHBOARD));
-  expect(await urls()).toHaveLength(4);
+  await dashboardTab(async () => me).close();
+  expect(remove).toHaveBeenCalledWith(me.id);
+  await dashboardTab(async () => undefined).close();
+  await dashboardTab(async () => undefined).focus();
+  expect(remove).toHaveBeenCalledOnce();
+  expect(update).not.toHaveBeenCalled();
 });
 
 test("shows the workspace the background sends to this tab, from this extension only", async () => {

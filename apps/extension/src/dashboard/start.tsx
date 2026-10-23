@@ -9,9 +9,9 @@ import type { RecordSurface } from "@/dashboard/panel/RecordControls";
 import { StandalonePanel } from "@/dashboard/panel/RecordPanel";
 import type { RecordingStore } from "@/dashboard/panel/recording";
 import { createFrameRouter, createHashRouter } from "@/dashboard/router";
+import { claimDashboard } from "@/dashboard/single-dashboard";
 import { workspaceParam } from "@/dashboard/workspace";
 import { workspaceSearch } from "@/messaging/dashboard-protocol";
-import { DASHBOARD_LOCK, holdLock } from "@/messaging/view-locks";
 import { closePanelMessage, openPanelMessage } from "@/messaging/frame-protocol";
 import { documentPip } from "@/pip/document-pip";
 
@@ -37,9 +37,8 @@ function TopLevelDashboard({ data, page }: { data: DashboardData; page: Window }
   const [surface] = useState(() => topLevelSurface(page));
   // A Split View tab opens with the workspace of the page beside it.
   const [workspace, setWorkspace] = useState(() => workspaceParam(page.location.search));
-  useEffect(() => holdLock(DASHBOARD_LOCK), []);
+  useEffect(() => claimDashboard(page, data.tab), [data, page]);
   useEffect(() => {
-    void data.tab?.yieldToEarlier(new URL(page.location.href));
     return data.tab?.onShowWorkspace((next) => {
       setWorkspace(next);
       // A reload keeps the workspace; navigating now would reload and close the PiP panel.

@@ -26,3 +26,14 @@ export const showWorkspaceMessage = (tabId: number, workspace?: string): ShowWor
   workspace === undefined
     ? { type: "show-workspace", tabId }
     : { type: "show-workspace", tabId, workspace };
+
+/** Where a dashboard tab that opens while another is open hands over its route before it closes. */
+export const HAND_OVER_CHANNEL = "recnrun-dashboard-tab";
+
+/** The later tab's hash route, which the open dashboard tab shows instead; empty keeps its own. */
+export const HandOverMessageSchema = v.object({
+  type: v.literal("hand-over"),
+  hash: v.union([v.literal(""), v.pipe(v.string(), v.startsWith("#/"))]),
+});
+
+export const handOverMessage = (hash: string) => ({ type: "hand-over", hash }) as const;

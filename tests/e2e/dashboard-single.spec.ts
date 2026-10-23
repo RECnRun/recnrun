@@ -80,6 +80,50 @@ test("a second dashboard tab hands its route to the first one and closes", async
   expect(dashboardPages(context, serviceWorker)).toHaveLength(1);
 });
 
+test("an older tab that loads the dashboard hands its route to the open one, which takes the focus and keeps its panel", async ({
+  context,
+  page,
+  serviceWorker,
+}) => {
+  // The fixture's page is older than the dashboard tab, so Chrome gave it a lower tab id.
+  // Closing the active page alone would activate its neighbor, not the dashboard.
+  const neighbor = await context.newPage();
+  await neighbor.goto("/");
+  const dashboard = await context.newPage();
+  await dashboard.goto(dashboardUrl(serviceWorker));
+  await mark(dashboard);
+  const [pip] = await Promise.all([
+    context.waitForEvent("page"),
+    dashboard.getByRole("button", { name: "Record" }).click(),
+  ]);
+
+  await page.bringToFront();
+  await expect
+    .poll(async () => (await dashboardSplit(serviceWorker)).dashboard?.active)
+    .toBe(false);
+  page.goto(`${dashboardUrl(serviceWorker)}#/recordings/rec-checkout`).catch(() => {});
+  await expect.poll(() => page.isClosed()).toBe(true);
+  await expect.poll(async () => (await dashboardSplit(serviceWorker)).dashboard?.active).toBe(true);
+  await expect(dashboard.getByRole("article")).toHaveAccessibleName("Checkout with saved card");
+  expect(await marked(dashboard)).toBe(true);
+  expect(pip.isClosed()).toBe(false);
+  expect(dashboardPages(context, serviceWorker)).toHaveLength(1);
+});
+
+test("dashboard tabs that load at once leave one open", async ({
+  context,
+  page,
+  serviceWorker,
+}) => {
+  const pages = [page, await context.newPage(), await context.newPage()];
+  for (const each of pages) each.goto(dashboardUrl(serviceWorker)).catch(() => {});
+
+  await expect.poll(() => pages.filter((each) => !each.isClosed()).length).toBe(1);
+  const [open] = dashboardPages(context, serviceWorker);
+  if (!open) throw new Error("No dashboard tab stayed open.");
+  await expect(open.getByRole("region")).toHaveCount(2);
+});
+
 test("triggers leave the dashboard alone while its PiP panel floats", async ({
   context,
   page,

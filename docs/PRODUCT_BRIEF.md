@@ -25,7 +25,7 @@ The events themselves (clicks, inputs, navigations, DOM changes) are not stored 
    - **On a new or blank tab, or a browser page, in Chrome with Split View:** beside it, in a Split View, with every workspace.
    - **Otherwise, or in Chrome without Split View:** in its own tab, with every workspace, or focused when that tab is already open.
 
-   The browser has one dashboard tab. When it is already open, it moves beside the tab the trigger came from, with that tab's workspace, and keeps any recording panel open. A second dashboard tab, opened from a link, hands its recording link to the first and closes. While a recording panel floats, the triggers do nothing.
+   The browser has one dashboard tab. When it is already open, it moves beside the tab the trigger came from, with that tab's workspace, and keeps any recording panel open. A second dashboard tab, opened from a link or a typed address, hands its recording link to the open one and closes. While a recording panel floats, the triggers do nothing.
 
    Each recording has its own link, `dashboard.html#/recordings/<id>`.
 
