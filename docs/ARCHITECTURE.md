@@ -63,8 +63,8 @@ The dashboard opens from the toolbar icon (no popup, so a click fires `action.on
 | The tab                                                 | The dashboard                                                                                           |
 | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
 | A web page, Split View available (Chrome 155+)          | Opens beside it in a Split View (`tabs.create({ splitWithTabId })`), showing only that site's workspace |
-| A web page already in a Split View                      | Focuses the dashboard in that split, if there is one; otherwise as below                                |
-| Hidden address (new tab, `about:blank`, browser pages)  | Replaces the tab with the dashboard of every workspace                                                  |
+| Any tab already in a Split View                         | Focuses the dashboard in that split, if there is one; otherwise as below                                |
+| Hidden address (new tab, `about:blank`, browser pages)  | Opens beside it in a Split View, with the dashboard of every workspace                                  |
 | No Split View, Chrome refuses the split, or other pages | Focuses an open dashboard tab, or opens one                                                             |
 
 A workspace is the origin a recording starts on, derived when the dashboard renders; nothing stores it. A split dashboard gets it as `dashboard.html?workspace=<origin>`, and ignores any value that is not an `http`/`https` origin. The dashboard keeps its route in the hash (`dashboard.html#/recordings/<id>`), since an extension page has no server to answer other paths.

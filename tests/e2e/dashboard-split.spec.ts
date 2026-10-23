@@ -90,7 +90,7 @@ test("focuses the split dashboard instead of opening another", async ({
   expect(dashboardPages(context, serviceWorker)).toHaveLength(1);
 });
 
-test("turns a blank tab into the dashboard of every workspace", async ({
+test("splits a blank tab with the dashboard of every workspace", async ({
   context,
   page,
   serviceWorker,
@@ -105,10 +105,17 @@ test("turns a blank tab into the dashboard of every workspace", async ({
   );
   await clickToolbarIcon(page);
 
-  await expect(page).toHaveURL(dashboardUrl(serviceWorker));
-  await expect(page.getByRole("region")).toHaveCount(3);
-  await expect(page.getByRole("article")).toHaveCount(3);
-  expect(context.pages()).toHaveLength(1);
+  await expect.poll(() => dashboardPages(context, serviceWorker).length).toBe(1);
+  const [dashboard] = dashboardPages(context, serviceWorker);
+  if (!dashboard) throw new Error("No dashboard page opened.");
+  expect(dashboard.url()).toBe(dashboardUrl(serviceWorker));
+  expect(page.url()).toBe("about:blank");
+  const tabs = await splitTabs(serviceWorker);
+  const split = tabs.find((tab) => tab.dashboard)?.splitViewId;
+  expect(split).not.toBe(-1);
+  expect(tabs.filter((tab) => tab.splitViewId === split)).toHaveLength(2);
+  await expect(dashboard.getByRole("region")).toHaveCount(3);
+  await expect(dashboard.getByRole("article")).toHaveCount(3);
 });
 
 test("recording from the split dashboard leaves the page alone until Stop splits it again", async ({

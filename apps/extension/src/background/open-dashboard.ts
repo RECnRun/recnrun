@@ -19,8 +19,7 @@ export const PAGE_MENU_ITEM = {
 /** Where a trigger from a tab opens the dashboard. */
 export type Placement =
   | { kind: "tab" }
-  | { kind: "here"; tabId: number }
-  | { kind: "split"; tab: Tab; workspace: string }
+  | { kind: "split"; tab: Tab; workspace?: string }
   | { kind: "partner"; splitViewId: number };
 
 /** Focuses the dashboard tab if one is open, otherwise opens it in a new tab. */
@@ -35,22 +34,23 @@ export async function openDashboard(url: string): Promise<void> {
   await browser.windows.update(existing.windowId, { focused: true });
 }
 
-/** Splits a web page with its workspace's dashboard; without Split View, keeps the dedicated tab. */
+/** Splits a tab with the dashboard, of its workspace for a web page; else keeps the dedicated tab. */
 export function placeDashboard(tab: Tab | undefined, splitSupported: boolean): Placement {
   if (!splitSupported || tab?.id === undefined) return { kind: "tab" };
-  // activeTab reveals web pages' URLs only: a new tab, about:blank, and browser pages stay hidden.
-  if (tab.url === undefined) return { kind: "here", tabId: tab.id };
-  const { protocol, origin } = new URL(tab.url);
-  if (protocol !== "http:" && protocol !== "https:") return { kind: "tab" };
   const splitViewId = tab.splitViewId ?? SPLIT_VIEW_ID_NONE;
   if (splitViewId !== SPLIT_VIEW_ID_NONE) return { kind: "partner", splitViewId };
+  // activeTab reveals web pages' URLs only: a new tab, about:blank, and browser pages stay hidden.
+  if (tab.url === undefined) return { kind: "split", tab };
+  const { protocol, origin } = new URL(tab.url);
+  if (protocol !== "http:" && protocol !== "https:") return { kind: "tab" };
   return { kind: "split", tab, workspace: origin };
 }
 
-async function openNextTo(tab: Tab, dashboardUrl: string, workspace: string): Promise<void> {
+async function openNextTo(tab: Tab, dashboardUrl: string, workspace?: string): Promise<void> {
+  const url = workspace ? `${dashboardUrl}?${new URLSearchParams({ workspace })}` : dashboardUrl;
   try {
     await browser.tabs.create({
-      url: `${dashboardUrl}?${new URLSearchParams({ workspace })}`,
+      url,
       splitWithTabId: tab.id,
       windowId: tab.windowId,
       index: tab.index + 1,
@@ -78,9 +78,6 @@ export async function openDashboardFrom(
   switch (placement.kind) {
     case "tab":
       return openDashboard(dashboardUrl);
-    case "here":
-      await browser.tabs.update(placement.tabId, { url: dashboardUrl });
-      return;
     case "split":
       return openNextTo(placement.tab, dashboardUrl, placement.workspace);
     case "partner":

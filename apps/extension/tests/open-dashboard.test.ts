@@ -61,8 +61,13 @@ test("splits a web page's tab with the dashboard of the page's workspace", () =>
   });
 });
 
-test("opens the dashboard in the current tab when its address is hidden", () => {
-  expect(placeDashboard(tab({ url: undefined }), true)).toEqual({ kind: "here", tabId: 7 });
+test("splits a tab whose address is hidden with the dashboard of every workspace", () => {
+  const blank = tab({ url: undefined, splitViewId: -1 });
+  expect(placeDashboard(blank, true)).toEqual({ kind: "split", tab: blank });
+  expect(placeDashboard(tab({ url: undefined, splitViewId: 4 }), true)).toEqual({
+    kind: "partner",
+    splitViewId: 4,
+  });
 });
 
 test("focuses the split's other side when the page is already split", () => {
@@ -94,10 +99,15 @@ test("falls back to the dedicated tab when Chrome refuses the split", async () =
   expect(await dashboardTabs()).toHaveLength(1);
 });
 
-test("turns the current tab into the dashboard when its address is hidden", async () => {
-  const blank = await fakeBrowser.tabs.create({ url: "about:blank" });
-  await openDashboardFrom(tab({ id: blank.id, url: undefined }), DASHBOARD, true);
-  expect((await fakeBrowser.tabs.get(blank.id ?? -1)).url).toBe(DASHBOARD);
+test("creates the dashboard of every workspace next to a tab whose address is hidden", async () => {
+  const create = vi.spyOn(fakeBrowser.tabs, "create");
+  await openDashboardFrom(tab({ url: undefined }), DASHBOARD, true);
+  expect(create).toHaveBeenCalledWith({
+    url: DASHBOARD,
+    splitWithTabId: 7,
+    windowId: 1,
+    index: 3,
+  });
 });
 
 test("opens the dedicated tab when Chrome has no Split View", async () => {

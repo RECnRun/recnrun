@@ -22,7 +22,7 @@ The events themselves (clicks, inputs, navigations, DOM changes) are not stored 
    - **Unreadable** (for example, stored data from an incompatible version): it shows the reason.
 4. The toolbar icon, its "Dashboard" context menu item, the page's "Open RECnRun" context menu item, and Alt+Shift+D (MacCtrl+Shift+D on macOS) open the dashboard:
    - **On a web page, in Chrome with Split View (155+):** beside the page, in a Split View, showing only the page's workspace. If that split already shows it, it gets the focus.
-   - **On a new or blank tab:** in that tab, with every workspace.
+   - **On a new or blank tab, or a browser page, in Chrome with Split View:** beside it, in a Split View, with every workspace.
    - **Otherwise, or in Chrome without Split View:** in its own tab, with every workspace, or focused when that tab is already open.
 
    Each recording has its own link, `dashboard.html#/recordings/<id>`.
