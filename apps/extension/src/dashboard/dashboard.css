@@ -15,7 +15,22 @@ a {
   gap: var(--space);
 }
 
-.recording h2 {
+.workspace {
+  display: grid;
+  gap: var(--space);
+}
+
+.workspace + .workspace {
+  margin-top: calc(var(--space) * 2);
+}
+
+.workspace > h2 {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--muted);
+}
+
+.recording h3 {
   margin: 0;
   font-size: 1.125rem;
 }

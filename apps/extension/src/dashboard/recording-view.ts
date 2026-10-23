@@ -4,6 +4,8 @@ export interface RecordingView {
   id: string;
   name: string;
   startUrl: string;
+  /** The site the recording starts on, as an origin. */
+  workspace: string;
   recordedAt: string;
   duration: string;
   events: string;
@@ -33,6 +35,7 @@ export function toRecordingViews(recordings: readonly Recording[]): RecordingVie
       id: recording.id,
       name: recording.name,
       startUrl: recording.startUrl,
+      workspace: new URL(recording.startUrl).origin,
       recordedAt: formatTimestamp(recording.createdAt),
       duration: formatDuration(recording.durationMs),
       events: plural(recording.eventCount, "event"),

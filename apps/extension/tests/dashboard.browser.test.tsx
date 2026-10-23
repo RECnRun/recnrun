@@ -22,19 +22,26 @@ function memoryRouter(initialRoute = "/") {
   return { router, published, go: (path: string) => listeners.forEach((each) => each(path)) };
 }
 
-function mount(snapshot: Snapshot | Error, router: DashboardRouter = memoryRouter().router) {
+function mount(
+  snapshot: Snapshot | Error,
+  router: DashboardRouter = memoryRouter().router,
+  workspace?: string,
+) {
   const root = document.createElement("div");
   document.body.replaceChildren(root);
   const loadSnapshot = async () => {
     if (snapshot instanceof Error) throw snapshot;
     return snapshot;
   };
-  render(<Dashboard loadSnapshot={loadSnapshot} router={router} />, root);
+  render(<Dashboard loadSnapshot={loadSnapshot} router={router} workspace={workspace} />, root);
   return root;
 }
 
 const headings = (root: HTMLElement) =>
-  [...root.querySelectorAll("article.recording h2")].map((heading) => heading.textContent);
+  [...root.querySelectorAll("article.recording h3")].map((heading) => heading.textContent);
+
+const workspaces = (root: HTMLElement) =>
+  [...root.querySelectorAll("section.workspace > h2")].map((heading) => heading.textContent);
 
 afterEach(() => {
   history.replaceState(null, "", location.pathname);
@@ -46,8 +53,32 @@ test("lists every recording, newest first, linked to its route", async () => {
   expect(root.querySelector("article.recording .start-url")?.textContent).toBe(
     "https://staging.shop.example/cart",
   );
-  expect(root.querySelector("article.recording h2 a")?.getAttribute("href")).toBe(
+  expect(root.querySelector("article.recording h3 a")?.getAttribute("href")).toBe(
     "#/recordings/rec-checkout",
+  );
+});
+
+test("groups the recordings under the site each one starts on", async () => {
+  const root = mount(sampleSnapshot());
+  await expect.poll(() => workspaces(root)).toEqual(["staging.shop.example", "localhost:3000"]);
+});
+
+test("shows only the page's workspace next to it in a Split View", async () => {
+  const { router, published } = memoryRouter();
+  const root = mount(sampleSnapshot(), router, "http://localhost:3000");
+  await expect.poll(() => headings(root)).toEqual(["Log in as admin"]);
+  expect(workspaces(root)).toEqual(["localhost:3000"]);
+  await expect
+    .poll(() => published.at(-1))
+    .toEqual({ path: "/", title: "localhost:3000 · RECnRun" });
+});
+
+test("explains that a workspace has no recordings yet", async () => {
+  const root = mount(sampleSnapshot(), memoryRouter().router, "https://other.example");
+  await expect.poll(() => workspaces(root)).toEqual(["other.example"]);
+  expect(root.querySelector(".empty-state h3")?.textContent).toBe("No recordings yet");
+  expect(root.querySelector(".empty-state p")?.textContent).toBe(
+    "Start a recording on other.example from the extension.",
   );
 });
 

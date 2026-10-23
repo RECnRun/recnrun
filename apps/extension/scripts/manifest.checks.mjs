@@ -24,9 +24,9 @@ test("only the RECnRun site may frame the dashboard", () => {
   ]);
 });
 
-test("the production build requests only storage and contextMenus", () => {
+test("the production build requests only storage, contextMenus, and activeTab", () => {
   const manifest = productionManifest();
-  assert.deepEqual(manifest.permissions, ["storage", "contextMenus"]);
+  assert.deepEqual(manifest.permissions, ["storage", "contextMenus", "activeTab"]);
   assert.equal(manifest.host_permissions, undefined);
   assert.equal(manifest.externally_connectable, undefined);
 });

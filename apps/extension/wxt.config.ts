@@ -15,7 +15,8 @@ export default defineConfig({
   manifest: ({ mode }) => ({
     name: "RECnRun",
     description: "Records and replays browser sessions for developers.",
-    permissions: ["storage", "contextMenus"],
+    // activeTab reveals the URL of the tab a trigger came from, to split it with its workspace.
+    permissions: ["storage", "contextMenus", "activeTab"],
     // No default_popup, so a toolbar click fires action.onClicked and opens the dashboard.
     action: { default_title: "Open the RECnRun dashboard" },
     commands: {

@@ -3,8 +3,10 @@ import type { ComponentChildren } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import { RecordingCard } from "@/dashboard/RecordingCard";
 import { toRecordingViews } from "@/dashboard/recording-view";
+import type { RecordingView } from "@/dashboard/recording-view";
 import { recordingPath, selectedRecordingId, titleFor } from "@/dashboard/route";
 import type { DashboardRouter } from "@/dashboard/router";
+import { groupByWorkspace, workspaceName } from "@/dashboard/workspace";
 
 type Load =
   | { status: "loading" }
@@ -19,6 +21,8 @@ interface Navigation {
 export interface DashboardProps {
   loadSnapshot: () => Promise<Snapshot>;
   router: DashboardRouter;
+  /** Shows only this workspace, as next to its site in a Split View. */
+  workspace?: string;
 }
 
 function useSnapshot(loadSnapshot: () => Promise<Snapshot>): Load {
@@ -53,26 +57,30 @@ function RouteLink(props: { path: string; nav: Navigation; children: ComponentCh
   );
 }
 
-function EmptyState({ title, children }: { title: string; children: ComponentChildren }) {
+function EmptyState(props: { title: string; nested?: boolean; children: ComponentChildren }) {
+  const Heading = props.nested ? "h3" : "h2";
   return (
     <div class="empty-state" role="status">
-      <h2>{title}</h2>
-      {children}
+      <Heading>{props.title}</Heading>
+      {props.children}
     </div>
   );
 }
 
-function RecordingList({ snapshot, nav }: { snapshot: Snapshot; nav: Navigation }) {
-  if (snapshot.recordings.length === 0) {
-    return (
-      <EmptyState title="No recordings yet">
-        <p>Open the page you want to capture and start a recording from the extension.</p>
-      </EmptyState>
-    );
-  }
+function WorkspaceSection(props: { workspace: string; children: ComponentChildren }) {
+  const id = `workspace-${workspaceName(props.workspace)}`;
+  return (
+    <section class="workspace" aria-labelledby={id}>
+      <h2 id={id}>{workspaceName(props.workspace)}</h2>
+      {props.children}
+    </section>
+  );
+}
+
+function RecordingCards({ views, nav }: { views: RecordingView[]; nav: Navigation }) {
   return (
     <div class="recordings">
-      {toRecordingViews(snapshot.recordings).map((recording) => (
+      {views.map((recording) => (
         <RecordingCard
           key={recording.id}
           recording={recording}
@@ -87,6 +95,41 @@ function RecordingList({ snapshot, nav }: { snapshot: Snapshot; nav: Navigation 
   );
 }
 
+function WorkspaceList(props: { snapshot: Snapshot; workspace: string; nav: Navigation }) {
+  const { snapshot, workspace, nav } = props;
+  const views = toRecordingViews(snapshot.recordings).filter(
+    (view) => view.workspace === workspace,
+  );
+  return (
+    <WorkspaceSection workspace={workspace}>
+      {views.length === 0 ? (
+        <EmptyState title="No recordings yet" nested>
+          <p>Start a recording on {workspaceName(workspace)} from the extension.</p>
+        </EmptyState>
+      ) : (
+        <RecordingCards views={views} nav={nav} />
+      )}
+    </WorkspaceSection>
+  );
+}
+
+function RecordingList({ snapshot, nav }: { snapshot: Snapshot; nav: Navigation }) {
+  if (snapshot.recordings.length === 0) {
+    return (
+      <EmptyState title="No recordings yet">
+        <p>Open the page you want to capture and start a recording from the extension.</p>
+      </EmptyState>
+    );
+  }
+  return groupByWorkspace(toRecordingViews(snapshot.recordings)).map(
+    ({ workspace, recordings }) => (
+      <WorkspaceSection key={workspace} workspace={workspace}>
+        <RecordingCards views={recordings} nav={nav} />
+      </WorkspaceSection>
+    ),
+  );
+}
+
 function RecordingDetail(props: { snapshot: Snapshot; id: string; nav: Navigation }) {
   const recording = toRecordingViews(props.snapshot.recordings).find(({ id }) => id === props.id);
   return (
@@ -97,7 +140,9 @@ function RecordingDetail(props: { snapshot: Snapshot; id: string; nav: Navigatio
         </RouteLink>
       </p>
       {recording ? (
-        <RecordingCard recording={recording} title={recording.name} />
+        <WorkspaceSection workspace={recording.workspace}>
+          <RecordingCard recording={recording} title={recording.name} />
+        </WorkspaceSection>
       ) : (
         <EmptyState title="Recording not found">
           <p>This extension has no recording with that link. It may have been deleted.</p>
@@ -107,7 +152,8 @@ function RecordingDetail(props: { snapshot: Snapshot; id: string; nav: Navigatio
   );
 }
 
-function Content({ load, route, nav }: { load: Load; route: string; nav: Navigation }) {
+function Content(props: { load: Load; route: string; workspace?: string; nav: Navigation }) {
+  const { load, route, workspace, nav } = props;
   switch (load.status) {
     case "loading":
       return <p role="status">Loading your recordings…</p>;
@@ -119,19 +165,21 @@ function Content({ load, route, nav }: { load: Load; route: string; nav: Navigat
       );
     case "ready": {
       const id = selectedRecordingId(route);
-      if (id === undefined) return <RecordingList snapshot={load.snapshot} nav={nav} />;
-      return <RecordingDetail snapshot={load.snapshot} id={id} nav={nav} />;
+      if (id !== undefined) return <RecordingDetail snapshot={load.snapshot} id={id} nav={nav} />;
+      if (workspace === undefined) return <RecordingList snapshot={load.snapshot} nav={nav} />;
+      return <WorkspaceList snapshot={load.snapshot} workspace={workspace} nav={nav} />;
     }
   }
 }
 
-export function Dashboard({ loadSnapshot, router }: DashboardProps) {
+export function Dashboard({ loadSnapshot, router, workspace }: DashboardProps) {
   const load = useSnapshot(loadSnapshot);
   const [route, setRoute] = useState(router.initialRoute);
   useEffect(() => router.subscribe(setRoute), [router]);
   useEffect(() => {
-    router.publish(route, titleFor(load.status === "ready" ? load.snapshot : undefined, route));
-  }, [router, route, load]);
+    const snapshot = load.status === "ready" ? load.snapshot : undefined;
+    router.publish(route, titleFor(snapshot, route, workspace));
+  }, [router, route, load, workspace]);
 
   return (
     <>
@@ -139,7 +187,12 @@ export function Dashboard({ loadSnapshot, router }: DashboardProps) {
         <h1>RECnRun</h1>
       </header>
       <main>
-        <Content load={load} route={route} nav={{ router, navigate: setRoute }} />
+        <Content
+          load={load}
+          route={route}
+          workspace={workspace}
+          nav={{ router, navigate: setRoute }}
+        />
       </main>
     </>
   );

@@ -10,7 +10,7 @@ export function RecordingCard({
 }) {
   return (
     <article class="recording" aria-labelledby={`recording-${recording.id}`}>
-      <h2 id={`recording-${recording.id}`}>{title}</h2>
+      <h3 id={`recording-${recording.id}`}>{title}</h3>
       <p class="start-url">{recording.startUrl}</p>
       <dl>
         <dt>Recorded</dt>
