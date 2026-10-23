@@ -15,6 +15,7 @@ Durable decisions live in `docs/`:
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md): packages, layers, the bridge protocol, the security model, and the toolchain.
 - [MILESTONES.md](docs/MILESTONES.md): delivery and acceptance.
 - [BRAND.md](docs/BRAND.md): logo, palette, contrast, typography, and CSS tokens.
+- [POCS.md](docs/POCS.md): proofs of concept behind architecture decisions, and what they found.
 
 Update the relevant doc when a change alters what it describes.
 
