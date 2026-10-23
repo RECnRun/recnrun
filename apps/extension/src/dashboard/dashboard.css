@@ -1,0 +1,43 @@
+/* Hex values live only in this palette; rules use semantic tokens (docs/BRAND.md). */
+:root {
+  color-scheme: light dark;
+  --brand-red: #c62a21;
+  --brand-coral: #ff5c5f;
+  --brand-ink: #1c1d21;
+  --gray-0: #ffffff;
+  --gray-50: #e9eaee;
+  --gray-925: #17181c;
+
+  --surface: var(--gray-0);
+  --text: var(--brand-ink);
+  --link: var(--brand-red);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --surface: var(--gray-925);
+    --text: var(--gray-50);
+    --link: var(--brand-coral);
+  }
+}
+
+body {
+  margin: 0;
+  background: var(--surface);
+  color: var(--text);
+  font:
+    16px/1.5 system-ui,
+    sans-serif;
+}
+
+.dashboard {
+  padding: 1.5rem;
+}
+
+.dashboard a {
+  color: var(--link);
+}
+
+.dashboard a[aria-current="page"] {
+  font-weight: 700;
+}
