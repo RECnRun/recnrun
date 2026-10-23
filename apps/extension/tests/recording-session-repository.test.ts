@@ -11,7 +11,7 @@ test("stores, announces, and clears the recording in progress", async () => {
   const unwatch = recordingSessionRepository.watch(changed);
   expect(await recordingSessionRepository.read()).toBeNull();
 
-  const session = { status: "recording" as const, banked: 0, since: 1_000 };
+  const session = { tabId: 4, status: "recording" as const, banked: 0, since: 1_000 };
   await recordingSessionRepository.write(session);
   expect(await recordingSessionRepository.read()).toEqual(session);
   await expect.poll(() => changed.mock.calls.length).toBe(1);

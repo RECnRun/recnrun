@@ -1,14 +1,6 @@
-import * as v from "valibot";
 import type { RecordingView } from "@/dashboard/recording-view";
-import { WorkspaceSchema } from "@/messaging/dashboard-protocol";
 
 export const workspaceName = (workspace: string) => new URL(workspace).host;
-
-/** The workspace a split dashboard shows, from `?workspace=`, when it is a web origin. */
-export function workspaceParam(search: string): string | undefined {
-  const value = new URLSearchParams(search).get("workspace");
-  return v.is(WorkspaceSchema, value) ? value : undefined;
-}
 
 export interface WorkspaceGroup {
   workspace: string;

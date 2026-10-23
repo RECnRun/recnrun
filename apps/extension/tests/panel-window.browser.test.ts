@@ -3,7 +3,7 @@ import { servePanelRequests } from "@/content/panel-window";
 import { closePanelMessage, openPanelMessage } from "@/messaging/frame-protocol";
 
 const EXTENSION = "chrome-extension://test-id";
-const DASHBOARD = `${EXTENSION}/dashboard.html`;
+const SESSION = `${EXTENSION}/session.html`;
 
 function frame(): Window {
   const iframe = document.createElement("iframe");
@@ -27,7 +27,7 @@ function sitePage(dashboard: HTMLIFrameElement) {
       },
     },
   }) as unknown as Window;
-  servePanelRequests(dashboard, DASHBOARD, EXTENSION, page);
+  servePanelRequests(dashboard, SESSION, EXTENSION, page);
   const send = (data: unknown, origin = EXTENSION, source = dashboard.contentWindow) =>
     page.dispatchEvent(new MessageEvent("message", { data, origin, source }));
   return { opened, send };
@@ -49,13 +49,13 @@ afterEach(() => {
   document.body.replaceChildren();
 });
 
-test("opens a PiP window with the panel view when the dashboard frame asks", async () => {
+test("opens a PiP window with the session page when the dashboard frame asks", async () => {
   const { opened, send } = sitePage(dashboardFrame());
   send(openPanelMessage());
   await expect.poll(() => opened.length).toBe(1);
   const panel = first(opened).window.document.querySelector("iframe");
-  expect(panel?.title).toBe("RECnRun recording panel");
-  expect(panel?.getAttribute("src")).toBe(`${DASHBOARD}?view=panel`);
+  expect(panel?.title).toBe("RECnRun session");
+  expect(panel?.getAttribute("src")).toBe(SESSION);
 });
 
 test("ignores requests from other origins, other windows, and malformed messages", async () => {
@@ -67,7 +67,7 @@ test("ignores requests from other origins, other windows, and malformed messages
   expect(opened).toEqual([]);
 });
 
-test("closes the PiP window only when its own panel asks", async () => {
+test("closes the PiP window only when its own session asks", async () => {
   const { opened, send } = sitePage(dashboardFrame());
   send(openPanelMessage());
   await expect.poll(() => opened.length).toBe(1);

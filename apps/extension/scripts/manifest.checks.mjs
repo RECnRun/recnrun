@@ -19,16 +19,20 @@ test("the production build talks only to the RECnRun domains", () => {
   assert.doesNotMatch(JSON.stringify(manifest), /localhost|127\.0\.0\.1/);
 });
 
-test("only the RECnRun site may frame the dashboard", () => {
+test("only the RECnRun site may frame the dashboard and the session page", () => {
   const manifest = productionManifest();
   assert.deepEqual(manifest.web_accessible_resources, [
-    { resources: ["dashboard.html"], matches: ["https://recnrun.com/*"], use_dynamic_url: false },
+    {
+      resources: ["dashboard.html", "session.html"],
+      matches: ["https://recnrun.com/*"],
+      use_dynamic_url: false,
+    },
   ]);
 });
 
-test("the production build requests only storage, contextMenus, and activeTab", () => {
+test("the production build requests only storage, contextMenus, and tabs", () => {
   const manifest = productionManifest();
-  assert.deepEqual(manifest.permissions, ["storage", "contextMenus", "activeTab"]);
+  assert.deepEqual(manifest.permissions, ["storage", "contextMenus", "tabs"]);
   assert.equal(manifest.host_permissions, undefined);
   assert.equal(manifest.externally_connectable, undefined);
 });

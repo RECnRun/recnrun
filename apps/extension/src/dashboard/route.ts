@@ -1,5 +1,4 @@
 import type { Snapshot } from "@recnrun/domain";
-import { workspaceName } from "@/dashboard/workspace";
 
 const RECORDING_ROUTE = /^\/recordings\/([^/?#]+)/;
 
@@ -16,10 +15,10 @@ export function selectedRecordingId(path: string): string | undefined {
   }
 }
 
-/** The tab title for a route: the open recording's name, the workspace's site, or the product. */
-export function titleFor(snapshot: Snapshot | undefined, path: string, workspace?: string): string {
+/** The tab title for a route: the open recording's name, or the product. */
+export function titleFor(snapshot: Snapshot | undefined, path: string): string {
   const id = selectedRecordingId(path);
   const recording = snapshot?.recordings.find((each) => each.id === id);
   if (recording) return `${recording.name} · RECnRun`;
-  return workspace === undefined ? "RECnRun" : `${workspaceName(workspace)} · RECnRun`;
+  return "RECnRun";
 }

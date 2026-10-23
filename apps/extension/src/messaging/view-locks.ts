@@ -1,7 +1,5 @@
-// Chrome keeps one Document PiP window per browser, so every extension view shares one panel.
+// Chrome keeps one Document PiP window per browser, so the session floats in one at a time.
 export const PANEL_LOCK = "recnrun-panel";
-// The dashboard tab owns the recording controls while it is open; framed views defer to it.
-export const DASHBOARD_LOCK = "recnrun-dashboard";
 
 /** Holds a lock shared by the extension's views until released; Chrome frees it if the holder goes. */
 export function holdLock(name: string): () => void {

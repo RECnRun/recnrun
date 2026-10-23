@@ -15,20 +15,25 @@ export default defineConfig({
   manifest: ({ mode }) => ({
     name: "RECnRun",
     description: "Records and replays browser sessions for developers.",
-    // activeTab reveals the URL of the tab a trigger came from, to split it with its workspace.
-    permissions: ["storage", "contextMenus", "activeTab"],
-    // No default_popup, so a toolbar click fires action.onClicked and opens the dashboard.
-    action: { default_title: "Open the RECnRun dashboard" },
+    // tabs lets the dashboard list every tab, with its title and address, to record one.
+    permissions: ["storage", "contextMenus", "tabs"],
+    // No default_popup, so a toolbar click fires action.onClicked and records the tab.
+    action: { default_title: "Record this tab with RECnRun" },
     commands: {
+      "open-session": {
+        suggested_key: { default: "Alt+Shift+S", mac: "MacCtrl+Shift+S" },
+        description: "Record this tab with RECnRun",
+      },
       "open-dashboard": {
         suggested_key: { default: "Alt+Shift+D", mac: "MacCtrl+Shift+D" },
-        description: "Open the RECnRun dashboard",
+        description: "Open a RECnRun dashboard",
       },
     },
-    // Only the RECnRun site may frame the dashboard; every other page gets ERR_BLOCKED_BY_CLIENT.
+    // Only the RECnRun site may frame these pages: the dashboard over it, the session in its PiP
+    // window. Every other page gets ERR_BLOCKED_BY_CLIENT.
     web_accessible_resources: [
       {
-        resources: ["dashboard.html"],
+        resources: ["dashboard.html", "session.html"],
         matches: contentScriptMatches(mode),
         use_dynamic_url: false,
       },

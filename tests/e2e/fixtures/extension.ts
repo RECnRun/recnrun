@@ -57,7 +57,7 @@ export const test = base.extend<ExtensionFixtures & ExtensionOptions>({
       );
     });
   },
-  // Fires the real action, user gesture and activeTab grant included; Playwright cannot click browser UI.
+  // Fires the real action, user gesture included; Playwright cannot click browser UI.
   clickToolbarIcon: async ({ serviceWorker, remoteDebuggingPort }, use) => {
     let remote: Browser | undefined;
     await use(async (page) => {

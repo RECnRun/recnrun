@@ -1,77 +1,75 @@
 import type { Snapshot } from "@recnrun/domain";
 import { render } from "preact";
-import { useEffect, useState } from "preact/hooks";
+import { useState } from "preact/hooks";
 import { disallowedAncestor } from "@/config/origins";
-import { Dashboard, Refusal } from "@/dashboard/Dashboard";
-import type { DashboardTab } from "@/dashboard/dashboard-tab";
-import { panelTab } from "@/dashboard/panel/panel-tab";
-import type { RecordSurface } from "@/dashboard/panel/RecordControls";
-import { StandalonePanel } from "@/dashboard/panel/RecordPanel";
-import type { RecordingStore } from "@/dashboard/panel/recording";
+import { Dashboard } from "@/dashboard/Dashboard";
+import type { TabSource } from "@/dashboard/open-tabs";
 import { createFrameRouter, createHashRouter } from "@/dashboard/router";
-import { workspaceParam } from "@/dashboard/workspace";
-import { workspaceSearch } from "@/messaging/dashboard-protocol";
-import { DASHBOARD_LOCK, holdLock } from "@/messaging/view-locks";
-import { closePanelMessage, openPanelMessage } from "@/messaging/frame-protocol";
-import { documentPip } from "@/pip/document-pip";
+import type { SessionActions, SessionSetup } from "@/dashboard/TabList";
+import { openPanelMessage } from "@/messaging/frame-protocol";
+import { floatSessionMessage, openSessionMessage } from "@/messaging/session-protocol";
+import type { SessionRequest } from "@/messaging/session-protocol";
+import { documentPip, requestPanelWindow, showSession } from "@/pip/document-pip";
+import type { RecordingStore } from "@/views/recording";
+import { Refusal } from "@/views/Refusal";
 
-/** What the dashboard reads and shares, injected so tests need no extension storage. */
+/** What the dashboard reads and does, injected so tests need no extension APIs. */
 export interface DashboardData {
   loadSnapshot: () => Promise<Snapshot>;
   recordings: RecordingStore;
-  /** The top-level dashboard's tab, absent where tests run without the extension APIs. */
-  tab?: DashboardTab;
+  /** The browser's tabs; without them the dashboard lists no tab to record. */
+  tabs?: TabSource;
+  /** Sends a session request to the background. */
+  send: (request: SessionRequest) => void;
 }
 
-const isPanelView = (search: string) => new URLSearchParams(search).get("view") === "panel";
+const SESSION_PATH = "/session.html";
 
-/** A top-level page opens its own PiP window; without the API the controls stay in the tab. */
-function topLevelSurface(page: Window): RecordSurface {
+/** A top-level dashboard opens the session's PiP window itself, then asks to record the tab. */
+function topLevelActions(page: Window, send: (request: SessionRequest) => void): SessionActions {
   const pip = documentPip(page);
-  return pip ? { kind: "window", pip, tab: panelTab() } : { kind: "inline" };
+  const record = (tabId: number) => send(openSessionMessage(tabId));
+  if (!pip) return { record };
+  const float = async (tabId: number) => {
+    // Nothing may await before this call, or Chrome refuses it for lack of user activation.
+    const pipWindow = await requestPanelWindow(pip);
+    showSession(pipWindow, new URL(SESSION_PATH, page.location.href).href, page.location.origin);
+    send(floatSessionMessage(tabId));
+  };
+  return { record, float };
 }
 
-/** A dashboard tab, which follows the page the background moves it beside. */
+/** A frame cannot open a PiP window, so the site's content script opens it. */
+function framedActions(page: Window, parent: string, send: (request: SessionRequest) => void) {
+  const actions: SessionActions = {
+    record: (tabId) => send(openSessionMessage(tabId)),
+    float: async (tabId) => {
+      page.parent.postMessage(openPanelMessage(), parent);
+      send(floatSessionMessage(tabId));
+    },
+  };
+  return actions;
+}
+
+function sessionSetup(data: DashboardData, actions: SessionActions): SessionSetup | undefined {
+  if (!data.tabs) return undefined;
+  return { tabs: data.tabs, store: data.recordings, actions };
+}
+
 function TopLevelDashboard({ data, page }: { data: DashboardData; page: Window }) {
   const [router] = useState(() => createHashRouter(page));
-  const [surface] = useState(() => topLevelSurface(page));
-  // A Split View tab opens with the workspace of the page beside it.
-  const [workspace, setWorkspace] = useState(() => workspaceParam(page.location.search));
-  useEffect(() => holdLock(DASHBOARD_LOCK), []);
-  useEffect(() => {
-    void data.tab?.yieldToEarlier(new URL(page.location.href));
-    return data.tab?.onShowWorkspace((next) => {
-      setWorkspace(next);
-      // A reload keeps the workspace; navigating now would reload and close the PiP panel.
-      const { pathname, hash } = page.location;
-      page.history.replaceState(null, "", pathname + workspaceSearch(next) + hash);
-    });
-  }, [data, page]);
-  return (
-    <Dashboard
-      loadSnapshot={data.loadSnapshot}
-      router={router}
-      workspace={workspace}
-      record={{ surface, store: data.recordings }}
-    />
-  );
+  const [session] = useState(() => sessionSetup(data, topLevelActions(page, data.send)));
+  return <Dashboard loadSnapshot={data.loadSnapshot} router={router} session={session} />;
 }
 
 function startFramed(root: HTMLElement, data: DashboardData, page: Window) {
   const parent = page.location.ancestorOrigins[0] ?? "";
-  // The site's content script loads this view into the PiP window it opens.
-  if (isPanelView(page.location.search)) {
-    const close = () => page.parent.postMessage(closePanelMessage(), parent);
-    render(<StandalonePanel store={data.recordings} onStop={close} />, root);
-    return;
-  }
-  // A frame cannot open a PiP window, so it asks the top-level site to.
-  const requestPanel = () => page.parent.postMessage(openPanelMessage(), parent);
+  const actions = framedActions(page, parent, data.send);
   render(
     <Dashboard
       loadSnapshot={data.loadSnapshot}
       router={createFrameRouter(parent, page)}
-      record={{ surface: { kind: "parent", requestPanel }, store: data.recordings }}
+      session={sessionSetup(data, actions)}
     />,
     root,
   );

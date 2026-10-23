@@ -1,20 +1,7 @@
 import { sampleSnapshot } from "@recnrun/domain/testing";
 import { expect, test } from "vite-plus/test";
 import { toRecordingViews } from "@/dashboard/recording-view";
-import { groupByWorkspace, workspaceName, workspaceParam } from "@/dashboard/workspace";
-
-test("reads a web origin from the workspace parameter", () => {
-  expect(workspaceParam("?workspace=https%3A%2F%2Fshop.example")).toBe("https://shop.example");
-  expect(workspaceParam("?workspace=http%3A%2F%2Flocalhost%3A3000")).toBe("http://localhost:3000");
-});
-
-test("ignores a missing workspace, or one that is not a web origin", () => {
-  expect(workspaceParam("")).toBeUndefined();
-  expect(workspaceParam("?workspace=not%20a%20url")).toBeUndefined();
-  expect(workspaceParam("?workspace=https%3A%2F%2Fshop.example%2Fcart")).toBeUndefined();
-  expect(workspaceParam("?workspace=file%3A%2F%2F%2Ftmp")).toBeUndefined();
-  expect(workspaceParam("?workspace=javascript%3Aalert(1)")).toBeUndefined();
-});
+import { groupByWorkspace, workspaceName } from "@/dashboard/workspace";
 
 test("names a workspace after its host", () => {
   expect(workspaceName("http://localhost:3000")).toBe("localhost:3000");

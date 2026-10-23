@@ -143,8 +143,23 @@ module.exports = {
     {
       name: "extension-dashboard-isolated",
       severity: "error",
+      comment: "The dashboard starts a session through the background, never through its page.",
       from: { path: "^apps/extension/src/dashboard/" },
-      to: { path: "^apps/extension/src/(content|background)/" },
+      to: { path: "^apps/extension/src/(content|background|session)/" },
+    },
+    {
+      name: "extension-session-isolated",
+      severity: "error",
+      comment: "The session page links to the dashboard by URL; the two pages share only views.",
+      from: { path: "^apps/extension/src/session/" },
+      to: { path: "^apps/extension/src/(content|background|dashboard)/" },
+    },
+    {
+      name: "extension-views-shared",
+      severity: "error",
+      comment: "Views are the components both pages render; they get their data injected.",
+      from: { path: "^apps/extension/src/views/" },
+      to: { path: "^apps/extension/src/(content|background|dashboard|session|storage)/" },
     },
     {
       name: "not-to-entrypoints",

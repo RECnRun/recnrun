@@ -22,18 +22,14 @@ function memoryRouter(initialRoute = "/") {
   return { router, published, go: (path: string) => listeners.forEach((each) => each(path)) };
 }
 
-function mount(
-  snapshot: Snapshot | Error,
-  router: DashboardRouter = memoryRouter().router,
-  workspace?: string,
-) {
+function mount(snapshot: Snapshot | Error, router: DashboardRouter = memoryRouter().router) {
   const root = document.createElement("div");
   document.body.replaceChildren(root);
   const loadSnapshot = async () => {
     if (snapshot instanceof Error) throw snapshot;
     return snapshot;
   };
-  render(<Dashboard loadSnapshot={loadSnapshot} router={router} workspace={workspace} />, root);
+  render(<Dashboard loadSnapshot={loadSnapshot} router={router} />, root);
   return root;
 }
 
@@ -61,25 +57,6 @@ test("lists every recording, newest first, linked to its route", async () => {
 test("groups the recordings under the site each one starts on", async () => {
   const root = mount(sampleSnapshot());
   await expect.poll(() => workspaces(root)).toEqual(["staging.shop.example", "localhost:3000"]);
-});
-
-test("shows only the page's workspace next to it in a Split View", async () => {
-  const { router, published } = memoryRouter();
-  const root = mount(sampleSnapshot(), router, "http://localhost:3000");
-  await expect.poll(() => headings(root)).toEqual(["Log in as admin"]);
-  expect(workspaces(root)).toEqual(["localhost:3000"]);
-  await expect
-    .poll(() => published.at(-1))
-    .toEqual({ path: "/", title: "localhost:3000 · RECnRun" });
-});
-
-test("explains that a workspace has no recordings yet", async () => {
-  const root = mount(sampleSnapshot(), memoryRouter().router, "https://other.example");
-  await expect.poll(() => workspaces(root)).toEqual(["other.example"]);
-  expect(root.querySelector(".empty-state h3")?.textContent).toBe("No recordings yet");
-  expect(root.querySelector(".empty-state p")?.textContent).toBe(
-    "Start a recording on other.example from the extension.",
-  );
 });
 
 test("explains that an empty extension has no recordings yet", async () => {
