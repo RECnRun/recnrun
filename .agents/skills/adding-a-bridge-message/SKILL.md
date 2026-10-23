@@ -1,11 +1,13 @@
 ---
 name: adding-a-bridge-message
-description: Checklist for adding a request the RECnRun website sends to the extension (for example, listing or saving data). Use when a change needs a new bridge message type or a new result shape.
+description: Checklist for adding a request the RECnRun website sends to the extension (today only `ping`, for detection). Use when a change needs a new bridge message type or a new result shape.
 ---
 
 # Adding a bridge message
 
 The website and the extension share no code paths except `@recnrun/domain` and `@recnrun/bridge`. A message touches every layer, in this order. Work red/green at each step.
+
+The extension's dashboard reads and shows the user's data itself, inside a frame the site cannot read. Add a request only for something the website itself needs; a request that returns recordings to the page reverses that decision, so record why in `docs/ARCHITECTURE.md` first.
 
 1. **Domain.** If the result is a new shape, add its Valibot schema and inferred type in `packages/domain/src`, export it from `index.ts`, and extend `packages/domain/tests/fixtures.ts`. Unit test parsing of a valid and an invalid value.
 2. **Protocol.** Add the type and its result schema to `RESULT_SCHEMAS` in `packages/bridge/src/protocol.ts`, and a builder in `messages` if it takes a payload. Extend `packages/bridge/tests/client.test.ts` (result validated, malformed result rejected) and `host.test.ts`.

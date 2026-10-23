@@ -1,0 +1,42 @@
+a {
+  color: var(--link);
+}
+
+.empty-state,
+.recording {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space);
+}
+
+.recordings {
+  display: grid;
+  gap: var(--space);
+}
+
+.recording h2 {
+  margin: 0;
+  font-size: 1.125rem;
+}
+
+.start-url {
+  margin: 0.25rem 0 0.75rem;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.recording dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.25rem var(--space);
+  margin: 0;
+}
+
+.recording dt {
+  color: var(--muted);
+}
+
+.recording dd {
+  margin: 0;
+}

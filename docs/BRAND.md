@@ -1,6 +1,6 @@
 # Brand
 
-The logo, the palette, the typography, and how the website and the extension popup use them.
+The logo, the palette, the typography, and how the website and the extension dashboard use them.
 
 ## Logo
 
@@ -24,27 +24,27 @@ No file has a tile: the three colors read on both light and dark backgrounds, so
 
 ## Palette
 
-| Token               | Hex       | Role                      |
-| ------------------- | --------- | ------------------------- |
-| `--brand-green`     | `#1f883d` | Button fill in light mode |
-| `--brand-green-dim` | `#238636` | Button fill in dark mode  |
-| `--brand-red`       | `#c62a21` | Popup links in light mode |
-| `--brand-coral`     | `#ff5c5f` | Popup links in dark mode  |
-| `--brand-ink`       | `#1c1d21` | Text in light mode        |
-| `--brand-paper`     | `#f6f7f9` | Light page background     |
+| Token               | Hex       | Role                          |
+| ------------------- | --------- | ----------------------------- |
+| `--brand-green`     | `#1f883d` | Button fill in light mode     |
+| `--brand-green-dim` | `#238636` | Button fill in dark mode      |
+| `--brand-red`       | `#c62a21` | Dashboard links in light mode |
+| `--brand-coral`     | `#ff5c5f` | Dashboard links in dark mode  |
+| `--brand-ink`       | `#1c1d21` | Text in light mode            |
+| `--brand-paper`     | `#f6f7f9` | Light page background         |
 
 Grays (`--gray-0` … `--gray-950`) are the neutral surfaces, borders, and secondary text.
 
 ### Where the accent goes
 
-Buttons follow GitHub's primary button: the same greens as [Primer](https://primer.style/) (`#1f883d` light, `#238636` dark) with white text, so a call to action looks like the one developers already click on GitHub. Red is not a button color: it means recording, and a red button reads as stop or delete. Red stays for links in the popup and for the logo. Structure stays neutral: surfaces, cards, borders, and dividers use the grays, and buttons have no border.
+Buttons follow GitHub's primary button: the same greens as [Primer](https://primer.style/) (`#1f883d` light, `#238636` dark) with white text, so a call to action looks like the one developers already click on GitHub. Red is not a button color: it means recording, and a red button reads as stop or delete. Red stays for links in the dashboard and for the logo. Structure stays neutral: surfaces, cards, borders, and dividers use the grays, and buttons have no border.
 
 The logo red `#f3362b` is too light for white text (3.91:1) and too dark for ink text (4.31:1), so links use a deeper red in light mode and the brighter coral in dark mode. Contrast (WCAG 2.2 ratios):
 
-| Use                  | Light mode                 | Dark mode                    |
-| -------------------- | -------------------------- | ---------------------------- |
-| Button fill and text | green with white: 4.52:1   | dim green with white: 4.63:1 |
-| Link                 | red on white popup: 5.59:1 | coral on dark popup: 5.87:1  |
+| Use                  | Light mode               | Dark mode                    |
+| -------------------- | ------------------------ | ---------------------------- |
+| Button fill and text | green with white: 4.52:1 | dim green with white: 4.63:1 |
+| Link                 | red on the page: 5.22:1  | coral on a card: 5.62:1      |
 
 ## Typography
 
@@ -57,16 +57,16 @@ Text follows [GitHub's brand typography](https://brand.github.com/foundations/ty
 | Body     | `body`  | Medium (500)                                         |
 
 - **File.** `MonaSansVF[opsz,wght].woff2` from release v2.0.27, renamed `MonaSansVF.woff2`, with its `OFL.txt`. It is a variable font: weights 200 to 900 and the optical size axis in one 137 kB file. Italics, other widths, and Mona Sans Mono are left out until the UI uses them.
-- **Self-hosted, once.** The website's CSP allows fonts from its own origin only, so the apps bundle the font instead of loading it from a CDN. It lives in `packages/brand/src/fonts/`; `packages/brand/src/mona-sans.css` declares it and sets the body's family, weight, and ligatures, and each app's entry imports that stylesheet before its own, which sets size and line height. `font-display: swap` shows the fallback until the font arrives; the site does not preload it, because `index.html` can name the file only by a path into another package, which the dev server does not serve.
+- **Self-hosted, once.** The website's CSP allows fonts from its own origin only, so the apps bundle the font instead of loading it from a CDN. It lives in `packages/brand/src/fonts/`; `packages/brand/src/mona-sans.css` declares it and sets the body's family, weight, and ligatures, and each app's entry imports it together with `base.css`, which sets size and line height. `font-display: swap` shows the fallback until the font arrives; the site does not preload it, because `index.html` can name the file only by a path into another package, which the dev server does not serve.
 - **No ligatures, no tracking.** Ligatures are off, as GitHub asks for headlines and body copy, and letter spacing is never set: Mona Sans adjusts it by size. Set fonts with longhands: the CSS minifier moves a `font` shorthand after the other declarations, and the shorthand would turn ligatures back on.
 
 `tests/e2e/typography.spec.ts` checks that both apps load the font and keep ligatures off.
 
 ## Tokens
 
-Each stylesheet (`apps/website/src/app/app.css`, `apps/extension/src/popup/popup.css`) opens with a `:root` block in two layers:
+`@recnrun/brand/base.css` (`packages/brand/src/base.css`) holds every token, in a `:root` block with two layers, and the base layout. The website and the dashboard import it before their own stylesheets (`apps/website/src/app/app.css`, `apps/extension/src/dashboard/dashboard.css`), which hold only rules.
 
 1. **Palette:** `--brand-*` and `--gray-*`. The only place a hex color is written.
 2. **Semantic:** `--surface`, `--card`, `--border`, `--text`, `--muted`, `--accent`, `--accent-text`, `--link`. Each points to a palette token, and the `prefers-color-scheme: dark` block repoints them.
 
-Rules use semantic tokens only: never write a hex color in a property, and never reference a palette token outside the `:root` blocks. A new color is a new palette token plus a semantic token for its role. The website and the popup are separate apps that share no code, so each file repeats the palette tokens it uses; keep their values identical to this table.
+Rules use semantic tokens only: never write a hex color in a property, and never reference a palette token outside the `:root` blocks. A new color is a new palette token in `base.css` plus a semantic token for its role; keep the values identical to this table.

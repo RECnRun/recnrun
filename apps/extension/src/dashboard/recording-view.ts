@@ -1,5 +1,4 @@
 import type { Recording } from "@recnrun/domain";
-import { plural } from "@/ui/plural";
 
 export interface RecordingView {
   id: string;
@@ -8,6 +7,10 @@ export interface RecordingView {
   recordedAt: string;
   duration: string;
   events: string;
+}
+
+function plural(count: number, noun: string): string {
+  return `${count} ${noun}${count === 1 ? "" : "s"}`;
 }
 
 /** Formats in UTC so a recording reads the same on every machine. */
@@ -22,7 +25,7 @@ function formatDuration(durationMs: number): string {
   return minutes === 0 ? `${seconds} s` : `${minutes} min ${seconds} s`;
 }
 
-/** Turns recordings into the labels the explorer shows, newest first. */
+/** Turns recordings into the labels the dashboard shows, newest first. */
 export function toRecordingViews(recordings: readonly Recording[]): RecordingView[] {
   return [...recordings]
     .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))

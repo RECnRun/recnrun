@@ -1,26 +1,19 @@
 import type { RequestResult, RequestType } from "@recnrun/bridge";
-import type { Snapshot } from "@recnrun/domain";
 import * as v from "valibot";
 import { BackgroundRequestSchema } from "@/messaging/background-protocol";
 import type { BackgroundReply } from "@/messaging/background-protocol";
 
 interface HandlerDependencies {
   extensionVersion: string;
-  readSnapshot: () => Promise<Snapshot>;
 }
 
 type Handler = (type: RequestType) => Promise<RequestResult<RequestType>>;
 
-export function createRequestHandler({
-  extensionVersion,
-  readSnapshot,
-}: HandlerDependencies): Handler {
+export function createRequestHandler({ extensionVersion }: HandlerDependencies): Handler {
   return async (type) => {
     switch (type) {
       case "ping":
         return { extensionVersion };
-      case "getSnapshot":
-        return readSnapshot();
     }
   };
 }

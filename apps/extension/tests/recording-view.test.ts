@@ -1,6 +1,6 @@
 import { sampleSnapshot } from "@recnrun/domain/testing";
 import { expect, test } from "vite-plus/test";
-import { toRecordingViews } from "@/features/explorer/recording-view";
+import { toRecordingViews } from "@/dashboard/recording-view";
 
 test("labels recordings newest first", () => {
   expect(toRecordingViews(sampleSnapshot().recordings)).toEqual([

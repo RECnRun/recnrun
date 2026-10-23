@@ -1,4 +1,3 @@
-import { SnapshotSchema } from "@recnrun/domain";
 import * as v from "valibot";
 
 const PROTOCOL_VERSION = 1;
@@ -11,7 +10,6 @@ const envelope = {
 /** Result schema per request type. A new request type starts here. */
 export const RESULT_SCHEMAS = {
   ping: v.object({ extensionVersion: v.string() }),
-  getSnapshot: SnapshotSchema,
 } as const;
 
 export type RequestType = keyof typeof RESULT_SCHEMAS;

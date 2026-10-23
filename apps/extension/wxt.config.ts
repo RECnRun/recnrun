@@ -1,5 +1,6 @@
 import preact from "@preact/preset-vite";
 import { defineConfig } from "wxt";
+import { contentScriptMatches } from "./src/config/origins.ts";
 
 export default defineConfig({
   srcDir: "src",
@@ -11,9 +12,25 @@ export default defineConfig({
     // A persistent profile keeps extension storage between dev runs; `vp run clean` resets it.
     chromiumArgs: ["--user-data-dir=./.wxt/chrome-data"],
   },
-  manifest: {
+  manifest: ({ mode }) => ({
     name: "RECnRun",
     description: "Records and replays browser sessions for developers.",
-    permissions: ["storage"],
-  },
+    permissions: ["storage", "contextMenus"],
+    // No default_popup, so a toolbar click fires action.onClicked and opens the dashboard.
+    action: { default_title: "Open the RECnRun dashboard" },
+    commands: {
+      "open-dashboard": {
+        suggested_key: { default: "Alt+Shift+D", mac: "MacCtrl+Shift+D" },
+        description: "Open the RECnRun dashboard",
+      },
+    },
+    // Only the RECnRun site may frame the dashboard; every other page gets ERR_BLOCKED_BY_CLIENT.
+    web_accessible_resources: [
+      {
+        resources: ["dashboard.html"],
+        matches: contentScriptMatches(mode),
+        use_dynamic_url: false,
+      },
+    ],
+  }),
 });

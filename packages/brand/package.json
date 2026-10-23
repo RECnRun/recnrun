@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./mona-sans.css": "./src/mona-sans.css"
+    "./mona-sans.css": "./src/mona-sans.css",
+    "./base.css": "./src/base.css"
   }
 }

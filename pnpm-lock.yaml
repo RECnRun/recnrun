@@ -308,9 +308,6 @@ importers:
       '@recnrun/bridge':
         specifier: workspace:*
         version: link:../../packages/bridge
-      '@recnrun/domain':
-        specifier: workspace:*
-        version: link:../../packages/domain
       preact:
         specifier: 'catalog:'
         version: 11.0.1
@@ -335,9 +332,6 @@ importers:
 
   packages/bridge:
     dependencies:
-      '@recnrun/domain':
-        specifier: workspace:*
-        version: link:../domain
       valibot:
         specifier: 'catalog:'
         version: 1.5.0(typescript@7.0.2)

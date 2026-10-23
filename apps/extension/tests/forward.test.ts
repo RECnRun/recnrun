@@ -11,10 +11,10 @@ test("forwards the request type and unwraps a successful reply", async () => {
 
 test("rethrows the background's error", async () => {
   const handler = createForwardingHandler(async () => ({ ok: false, error: "Quota exceeded" }));
-  await expect(handler("getSnapshot")).rejects.toThrow("Quota exceeded");
+  await expect(handler("ping")).rejects.toThrow("Quota exceeded");
 });
 
 test("rejects a malformed reply", async () => {
   const handler = createForwardingHandler(async () => undefined);
-  await expect(handler("getSnapshot")).rejects.toThrow();
+  await expect(handler("ping")).rejects.toThrow();
 });

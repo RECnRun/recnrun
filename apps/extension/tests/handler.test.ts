@@ -1,20 +1,11 @@
-import { emptySnapshot } from "@recnrun/domain";
-import { sampleSnapshot } from "@recnrun/domain/testing";
 import { describe, expect, test, vi } from "vite-plus/test";
 import { createMessageListener, createRequestHandler } from "@/background/handler";
 
-const handle = createRequestHandler({
-  extensionVersion: "0.1.0",
-  readSnapshot: async () => sampleSnapshot(),
-});
+const handle = createRequestHandler({ extensionVersion: "0.1.0" });
 
 describe("createRequestHandler", () => {
   test("answers ping with the extension version", async () => {
     await expect(handle("ping")).resolves.toEqual({ extensionVersion: "0.1.0" });
-  });
-
-  test("answers getSnapshot from storage", async () => {
-    await expect(handle("getSnapshot")).resolves.toEqual(sampleSnapshot());
   });
 });
 
@@ -41,11 +32,8 @@ describe("createMessageListener", () => {
   });
 
   test("reports handler failures as error replies", async () => {
-    const failing = createRequestHandler({
-      extensionVersion: "0.1.0",
-      readSnapshot: () => Promise.reject(new Error("Quota exceeded")),
-    });
-    const { sendResponse } = listen({ type: "getSnapshot" }, "own-id", failing);
+    const failing = () => Promise.reject(new Error("Quota exceeded"));
+    const { sendResponse } = listen({ type: "ping" }, "own-id", failing);
     await vi.waitFor(() =>
       expect(sendResponse).toHaveBeenCalledWith({ ok: false, error: "Quota exceeded" }),
     );
@@ -61,13 +49,5 @@ describe("createMessageListener", () => {
       expect(keepsChannelOpen).toBe(false);
       expect(sendResponse).not.toHaveBeenCalled();
     }
-  });
-
-  test("returns an empty snapshot unchanged", async () => {
-    const empty = createRequestHandler({
-      extensionVersion: "0.1.0",
-      readSnapshot: async () => emptySnapshot(),
-    });
-    await expect(empty("getSnapshot")).resolves.toEqual(emptySnapshot());
   });
 });

@@ -25,7 +25,7 @@ paths:
 
 - Public commands run in Docker, headed Chromium on an isolated Xvfb display. Keep `headless: false` (extensions need a headed Chromium), and never connect the container display to the host.
 - Browser tests stay serial (`--workers=1`), coverage included.
-- Pass Playwright arguments after `--`, for example `vp run test:e2e -- tests/e2e/explorer.spec.ts -g 'empty'`.
+- Pass Playwright arguments after `--`, for example `vp run test:e2e -- tests/e2e/dashboard-tab.spec.ts -g 'empty'`.
 - On failure, read `.artifacts/docker/<run-id>/` (`run.log`, `test-results`, `playwright-report`).
 - `:local` variants open host windows; use them only for debugging.
 
