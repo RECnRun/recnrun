@@ -24,6 +24,14 @@ test("the production build requests only storage and contextMenus", () => {
   assert.equal(manifest.externally_connectable, undefined);
 });
 
+test("the production build exposes no test hooks on the service worker", () => {
+  const background = readFileSync(
+    new URL("../.output/chrome-mv3/background.js", import.meta.url),
+    "utf8",
+  );
+  assert.doesNotMatch(background, /recnrunOpenDashboard|recnrunOmnibox/);
+});
+
 test("the production build ships the logo as its icons", () => {
   const manifest = productionManifest();
   assert.deepEqual(Object.keys(manifest.icons ?? {}), ["16", "32", "48", "128"]);

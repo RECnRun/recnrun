@@ -17,6 +17,8 @@ export default defineConfig({
     permissions: ["storage", "contextMenus"],
     // No default_popup, so a toolbar click fires action.onClicked and opens the dashboard.
     action: { default_title: "Open the RECnRun dashboard" },
+    // Typing "rr" then Space or Tab in the address bar hands the input to the omnibox listeners.
+    omnibox: { keyword: "rr" },
     commands: {
       "open-dashboard": {
         suggested_key: { default: "Alt+Shift+D", mac: "MacCtrl+Shift+D" },
