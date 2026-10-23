@@ -20,6 +20,7 @@ The events themselves (clicks, inputs, navigations, DOM changes) are not stored 
    - **Installed but empty:** it says there are no recordings yet, rather than asking to install.
    - **Installed but unreadable** (for example, stored data from an incompatible version): it shows the reason.
 3. The extension's dashboard (`dashboard.html`) shows the same recordings in a tab. The toolbar icon, its "Dashboard" context menu item, and Alt+Shift+D (MacCtrl+Shift+D on macOS) open it, or focus it when it is already open. Each recording has its own link, `dashboard.html#/recordings/<id>`.
+4. On recnrun.com, the extension shows the same dashboard over the site, at the site's address: `recnrun.com/recordings/<id>` opens that recording, and Back, Forward, and reload work.
 
 The website never stores the user's data and never sends it anywhere: it reads it from the extension in the visitor's own browser.
 

@@ -20,4 +20,5 @@ paths:
 - Preact with `jsxImportSource: "preact"`; hooks from `preact/hooks`.
 - **CSP.** `build/content-security-policy.ts` adds a strict `<meta>` CSP to production builds (GitHub Pages sends no headers). Keep scripts and styles in files: no inline `<script>`, `style=""` attributes, or `eval`. The end-to-end suite fails on any CSP violation.
 - Any data shown came from the extension and is user content: render it as text, never through `dangerouslySetInnerHTML`.
+- `build/not-found-page.ts` copies the built `index.html` to `404.html`, so GitHub Pages serves the app for deep links like `/recordings/<id>`; do not remove it.
 - `public/CNAME` keeps the custom domain on GitHub Pages; do not remove it.

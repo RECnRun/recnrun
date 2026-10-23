@@ -18,7 +18,7 @@ Experiments that shaped a durable decision. Each ran on its own local branch wit
 ### POC 1: extension dashboard tab
 
 - `dashboard.html` is an extension page; the toolbar popup is gone, so a click on the toolbar icon fires `action.onClicked`.
-- Three triggers open it: the toolbar icon, an "Open dashboard" item in the icon's context menu (`contextMenus`, `contexts: ["action"]`), and a command (`Alt+Shift+D`, `MacCtrl+Shift+D` on macOS).
+- Three triggers open it: the toolbar icon, a "Dashboard" item in the icon's context menu (`contextMenus`, `contexts: ["action"]`), and a command (`Alt+Shift+D`, `MacCtrl+Shift+D` on macOS).
 - An open dashboard tab is focused instead of duplicated. `tabs.query({ url })` finds the extension's own pages without the `tabs` permission.
 - **Findings.**
   - `contextMenus` shows no install warning.

@@ -144,3 +144,11 @@ export function Dashboard({ loadSnapshot, router }: DashboardProps) {
     </>
   );
 }
+
+export function Refusal({ origin }: { origin: string }) {
+  return (
+    <main>
+      <p role="alert">RECnRun does not run inside {origin}.</p>
+    </main>
+  );
+}

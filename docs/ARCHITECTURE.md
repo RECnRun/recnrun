@@ -47,16 +47,18 @@ Components take the gateway or data as props, so component tests use a fake gate
 | Folder            | Runs in                | Role                                                                                                           |
 | ----------------- | ---------------------- | -------------------------------------------------------------------------------------------------------------- |
 | `src/entrypoints` | (WXT)                  | Thin wiring: each file calls one `start*` function. Nothing imports an entrypoint.                             |
-| `src/content`     | The RECnRun website    | Bridge host. Relays known requests to the background and returns its reply.                                    |
+| `src/content`     | The RECnRun website    | Bridge host, and the frame that shows the dashboard over the site.                                             |
 | `src/background`  | The service worker     | Validates requests and senders, answers them from storage.                                                     |
 | `src/storage`     | The service worker     | Repositories over WXT `storage`; validates what it reads with the domain schemas.                              |
 | `src/dashboard`   | The dashboard page     | Preact UI at `dashboard.html`. Reads through a function it is given, never through content or background code. |
-| `src/config`      | Build time             | `origins.ts`: the pages the content script runs on, per build mode.                                            |
-| `src/messaging`   | Content and background | The internal content ↔ background message schema.                                                              |
+| `src/config`      | Build time             | `origins.ts`: the pages the content script runs on and that may frame the dashboard, per build mode.           |
+| `src/messaging`   | Content and background | The content ↔ background and content ↔ dashboard frame message schemas.                                        |
 
 `content` never imports `storage`, and `dashboard` never imports `content` or `background`.
 
 The dashboard opens in a tab from the toolbar icon (no popup, so a click fires `action.onClicked`), the icon's context menu, or the `open-dashboard` command (Alt+Shift+D). `background/open-dashboard.ts` focuses an open dashboard tab instead of opening another. The dashboard keeps its route in the hash (`dashboard.html#/recordings/<id>`), since an extension page has no server to answer other paths.
+
+On recnrun.com the content script covers the site with a full-viewport `<iframe>` of `dashboard.html` (`content/dashboard-frame.ts`), so the dashboard keeps the site's address. They sync the route over `postMessage` on the `recnrun-frame` channel (`messaging/frame-protocol.ts`): the frame starts at `?route=<site path>`, the content script sends a `route` message on Back and Forward, and the dashboard sends a `location` message (`path`, `title`) that the content script applies with `history.pushState` and `document.title`. Inside the frame, the dashboard's links point at the site's own URLs. GitHub Pages answers unknown paths with `404.html`, so the website build copies `index.html` there (`apps/website/build/not-found-page.ts`) and deep links like `/recordings/<id>` load the site.
 
 ## Bridge protocol v1
 
@@ -87,6 +89,8 @@ The extension holds the user's data; the website only displays it.
 
 - **Where the content script runs.** Production builds match only `https://recnrun.com/*`, where the website lives. The project also owns recnrun.app, recnrun.io, and recn.run; they only redirect to recnrun.com at the Cloudflare edge and never serve a page, so the extension does not match them. `development` and `test` builds add `http://localhost/*` and `http://127.0.0.1/*` (any port) for the dev server and end-to-end tests. `vp run test:extension-manifest` fails the build if a production manifest matches anything else.
 - **Permissions.** Only `storage` and `contextMenus` (the toolbar icon's "Dashboard" item; neither shows an install warning): no `tabs`, no host permissions, no `externally_connectable`, no access to other sites. The same check enforces it.
+- **Who may frame the dashboard.** `dashboard.html` is the only web-accessible resource, and only for the content script's own matches (`use_dynamic_url: false`, since the matches already scope it); any other page that frames it gets `ERR_BLOCKED_BY_CLIENT`. Pages may frame it regardless of their CSP. If any `location.ancestorOrigins` entry is not an allowed site, for example a page framing recnrun.com to clickjack it, the dashboard renders only a refusal (`tests/e2e/dashboard-embedding.spec.ts`).
+- **What the site sees of the frame.** The site cannot read the frame's document (`contentDocument` is `null`); it sees the frame's `src`, extension id included. Each side accepts frame messages only from the other's window and origin, validates them, and accepts only paths that start with `/`, so script on the site can navigate the dashboard but never read it.
 - **Who may ask.** The `window` transport accepts only messages whose `source` is the page's own window and whose `origin` is the page's own origin, and replies only to that origin. Pages on other origins, other windows, and frames get no answer (`tests/e2e/origin-guard.spec.ts`).
 - **What they can get.** The bridge is read-only. The content script cannot read storage itself; it can only relay known request types to the background, which checks that the sender is its own extension.
 - **What the website trusts.** Stored data is validated when the extension reads it and again when the website receives it. Data is rendered as text.
