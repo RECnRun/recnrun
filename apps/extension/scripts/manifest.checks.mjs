@@ -12,7 +12,7 @@ function productionManifest() {
 
 test("the production build talks only to the RECnRun domains", () => {
   const manifest = productionManifest();
-  const matches = manifest.content_scripts.flatMap((script) => script.matches);
+  const matches = [...new Set(manifest.content_scripts.flatMap((script) => script.matches))];
   assert.deepEqual(matches, ["https://recnrun.com/*"]);
   assert.doesNotMatch(JSON.stringify(manifest), /localhost|127\.0\.0\.1/);
 });
