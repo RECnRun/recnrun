@@ -1,9 +1,8 @@
 import type { Page } from "@playwright/test";
-import { sampleSnapshot } from "../../packages/domain/tests/fixtures.ts";
 import { expect, test } from "./fixtures/extension.ts";
 
 const FORGED_ORIGIN = "http://forged.example";
-const request = { channel: "recnrun", protocol: 1, kind: "request", type: "getSnapshot" };
+const request = { channel: "recnrun", protocol: 1, kind: "request", type: "ping" };
 
 interface Observed {
   replies: string[];
@@ -15,9 +14,7 @@ const repliesOf = (page: Page) => page.evaluate(() => (window as unknown as Obse
 test("answers its own page but ignores requests from another origin", async ({
   baseURL,
   context,
-  seedSnapshot,
 }) => {
-  await seedSnapshot(sampleSnapshot());
   await context.addInitScript(() => {
     const observed = window as unknown as Observed;
     observed.replies = [];
@@ -38,7 +35,8 @@ test("answers its own page but ignores requests from another origin", async ({
       (window as unknown as Observed).opened = window.open(url);
     }, `${baseURL}/`),
   ]);
-  await expect(site.getByRole("article", { name: "Log in as admin" })).toBeVisible();
+  // The frame proves the content script, and so the bridge host, is running.
+  await expect(site.locator('iframe[title="RECnRun dashboard"]')).toBeVisible();
 
   await forged.evaluate(
     (message) => (window as unknown as Observed).opened?.postMessage(message, "*"),

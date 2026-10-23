@@ -57,16 +57,16 @@ Text follows [GitHub's brand typography](https://brand.github.com/foundations/ty
 | Body     | `body`  | Medium (500)                                         |
 
 - **File.** `MonaSansVF[opsz,wght].woff2` from release v2.0.27, renamed `MonaSansVF.woff2`, with its `OFL.txt`. It is a variable font: weights 200 to 900 and the optical size axis in one 137 kB file. Italics, other widths, and Mona Sans Mono are left out until the UI uses them.
-- **Self-hosted, once.** The website's CSP allows fonts from its own origin only, so the apps bundle the font instead of loading it from a CDN. It lives in `packages/brand/src/fonts/`; `packages/brand/src/mona-sans.css` declares it and sets the body's family, weight, and ligatures, and each app's entry imports that stylesheet before its own, which sets size and line height. `font-display: swap` shows the fallback until the font arrives; the site does not preload it, because `index.html` can name the file only by a path into another package, which the dev server does not serve.
+- **Self-hosted, once.** The website's CSP allows fonts from its own origin only, so the apps bundle the font instead of loading it from a CDN. It lives in `packages/brand/src/fonts/`; `packages/brand/src/mona-sans.css` declares it and sets the body's family, weight, and ligatures, and each app's entry imports it together with `base.css`, which sets size and line height. `font-display: swap` shows the fallback until the font arrives; the site does not preload it, because `index.html` can name the file only by a path into another package, which the dev server does not serve.
 - **No ligatures, no tracking.** Ligatures are off, as GitHub asks for headlines and body copy, and letter spacing is never set: Mona Sans adjusts it by size. Set fonts with longhands: the CSS minifier moves a `font` shorthand after the other declarations, and the shorthand would turn ligatures back on.
 
 `tests/e2e/typography.spec.ts` checks that both apps load the font and keep ligatures off.
 
 ## Tokens
 
-Each stylesheet (`apps/website/src/app/app.css`, `apps/extension/src/dashboard/dashboard.css`) opens with a `:root` block in two layers:
+`@recnrun/brand/base.css` (`packages/brand/src/base.css`) holds every token, in a `:root` block with two layers, and the base layout. The website and the dashboard import it before their own stylesheets (`apps/website/src/app/app.css`, `apps/extension/src/dashboard/dashboard.css`), which hold only rules.
 
 1. **Palette:** `--brand-*` and `--gray-*`. The only place a hex color is written.
 2. **Semantic:** `--surface`, `--card`, `--border`, `--text`, `--muted`, `--accent`, `--accent-text`, `--link`. Each points to a palette token, and the `prefers-color-scheme: dark` block repoints them.
 
-Rules use semantic tokens only: never write a hex color in a property, and never reference a palette token outside the `:root` blocks. A new color is a new palette token plus a semantic token for its role. The website and the dashboard are separate apps that share no code, so each file repeats the palette tokens it uses; keep their values identical to this table.
+Rules use semantic tokens only: never write a hex color in a property, and never reference a palette token outside the `:root` blocks. A new color is a new palette token in `base.css` plus a semantic token for its role; keep the values identical to this table.

@@ -1,4 +1,3 @@
-import { emptySnapshot } from "@recnrun/domain";
 import { describe, expect, test } from "vite-plus/test";
 import { BridgeError, createBridgeClient } from "../src/index.ts";
 import { messages } from "../src/protocol.ts";
@@ -48,27 +47,25 @@ describe("detect", () => {
 describe("request", () => {
   test("resolves with the validated result", async () => {
     const { client, replyWith } = setup();
-    replyWith(messages.success("req-1", emptySnapshot()));
-    await expect(client.request("getSnapshot")).resolves.toEqual(emptySnapshot());
+    replyWith(messages.success("req-1", { extensionVersion: "1.0.0" }));
+    await expect(client.request("ping")).resolves.toEqual({ extensionVersion: "1.0.0" });
   });
 
   test("ignores responses to other requests", async () => {
     const { client, replyWith } = setup();
-    replyWith(messages.success("someone-else", emptySnapshot()));
-    await expect(client.request("getSnapshot")).rejects.toThrow(/Timed out/);
+    replyWith(messages.success("someone-else", { extensionVersion: "1.0.0" }));
+    await expect(client.request("ping")).rejects.toThrow(/Timed out/);
   });
 
   test("rejects with the error the extension reported", async () => {
     const { client, replyWith } = setup();
     replyWith(messages.failure("req-1", "Storage unavailable"));
-    await expect(client.request("getSnapshot")).rejects.toThrow(
-      new BridgeError("Storage unavailable"),
-    );
+    await expect(client.request("ping")).rejects.toThrow(new BridgeError("Storage unavailable"));
   });
 
   test("rejects a result that does not match the schema", async () => {
     const { client, replyWith } = setup();
-    replyWith(messages.success("req-1", { schemaVersion: 1 }));
-    await expect(client.request("getSnapshot")).rejects.toThrow(/invalid getSnapshot result/);
+    replyWith(messages.success("req-1", { extensionVersion: 1 }));
+    await expect(client.request("ping")).rejects.toThrow(/invalid ping result/);
   });
 });

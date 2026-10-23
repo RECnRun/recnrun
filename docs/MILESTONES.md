@@ -1,22 +1,25 @@
 # Milestones
 
-## M0: Bootstrap, detection, and read-only explorer
+## M0: Bootstrap, detection, and read-only dashboard
 
-The monorepo, its quality gates, and the first vertical slice: the website detects the extension and shows its recordings.
+The monorepo, its quality gates, and the first vertical slice: the website detects the extension, and the extension's dashboard shows its recordings in a tab and over recnrun.com.
 
 Acceptance (all automated, run by `vp run verify`):
 
 - [x] Without the extension, the website shows the install banner with a link to the install guide (`tests/e2e/install-banner.spec.ts`).
-- [x] With the extension and seeded data, the website shows each recording, newest first, with its start URL, duration, and event count (`tests/e2e/explorer.spec.ts`).
-- [x] With the extension and no data, the website shows an empty state instead of the banner (`tests/e2e/explorer.spec.ts`).
+- [x] With the extension and seeded data, the dashboard shows each recording, newest first, with its start URL, duration, and event count (`tests/e2e/dashboard-tab.spec.ts`).
+- [x] With the extension and no data, the dashboard shows an empty state (`tests/e2e/dashboard-tab.spec.ts`).
+- [x] The toolbar icon, its context menu, and a command open the dashboard tab, or focus an open one (`tests/e2e/dashboard-tab.spec.ts`).
+- [x] On the website, the extension covers the page with its dashboard instead of the banner, deep links open a recording, and the dashboard's navigation updates the address bar (`tests/e2e/dashboard-frame.spec.ts`).
+- [x] No other origin can frame the dashboard, and it refuses to render under a foreign ancestor (`tests/e2e/dashboard-embedding.spec.ts`).
 - [x] A page on another origin cannot get an answer from the extension by posting bridge messages to the website's window (`tests/e2e/origin-guard.spec.ts`).
 - [x] The production build ships a CSP and loads without violations (`tests/e2e/install-banner.spec.ts`).
-- [x] The production manifest runs the content script only on `https://recnrun.com/*` and asks only for `storage` (`vp run test:extension-manifest`).
+- [x] The production manifest runs the content script only on `https://recnrun.com/*` asks only for `storage` and `contextMenus`, and lets only recnrun.com frame `dashboard.html` (`vp run test:extension-manifest`).
 - [x] Every gate in [AGENTS.md](../AGENTS.md#rules) runs in `vp run verify`, locally and in CI.
 
 Manual, once per release of the extension:
 
-- [ ] Load `apps/extension/.output/chrome-mv3` unpacked in Chrome, open recnrun.com, and see the empty state.
+- [ ] Load `apps/extension/.output/chrome-mv3` unpacked in Chrome, open recnrun.com and `recnrun.com/recordings/<id>`, and see the dashboard; click the toolbar icon and see it in a tab.
 
 ## Next
 

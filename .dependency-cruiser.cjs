@@ -81,11 +81,12 @@ module.exports = {
       },
     },
     {
-      name: "bridge-only-domain",
+      name: "bridge-only-valibot",
       severity: "error",
+      comment: "The bridge carries no domain data; the dashboard reads storage itself.",
       from: { path: "^packages/bridge/src/" },
       to: {
-        pathNot: ["^packages/bridge/src/", "^packages/domain/src/", "/node_modules/valibot/"],
+        pathNot: ["^packages/bridge/src/", "/node_modules/valibot/"],
       },
     },
     {

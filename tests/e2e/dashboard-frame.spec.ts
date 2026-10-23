@@ -32,6 +32,8 @@ test("covers the site with the extension dashboard", async ({ page, serviceWorke
   );
   expect(await frame.boundingBox()).toEqual({ x: 0, y: 0, ...page.viewportSize() });
   await expect(page).toHaveTitle("RECnRun");
+  await expect(page.getByRole("region", { name: "Install the RECnRun extension" })).toHaveCount(0);
+  await expect(page.getByTestId("extension-version")).toHaveText("Extension 0.1.0");
   expect(blocked).toEqual([]);
 });
 

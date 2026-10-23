@@ -1,6 +1,6 @@
 # Product brief
 
-RECnRun records a browser session once and replays it whenever the developer needs it: logging in, filling a long form, reproducing a bug. The browser extension owns the user's data. The website at [recnrun.com](https://recnrun.com) detects the extension and shows that data.
+RECnRun records a browser session once and replays it whenever the developer needs it: logging in, filling a long form, reproducing a bug. The browser extension owns the user's data. The website at [recnrun.com](https://recnrun.com) detects the extension; when it is installed, the extension shows its own dashboard there.
 
 ## Concepts
 
@@ -14,15 +14,15 @@ The events themselves (clicks, inputs, navigations, DOM changes) are not stored 
 ## The website and the extension
 
 1. A visitor opens recnrun.com (or a local dev server).
-2. The website asks whether the extension is installed.
-   - **Missing:** it shows a banner explaining what the extension does, with a link to the install guide.
-   - **Installed:** it reads the extension's data and shows each recording, newest first, with its start URL, date (in UTC), duration, and event count.
-   - **Installed but empty:** it says there are no recordings yet, rather than asking to install.
-   - **Installed but unreadable** (for example, stored data from an incompatible version): it shows the reason.
-3. The extension's dashboard (`dashboard.html`) shows the same recordings in a tab. The toolbar icon, its "Dashboard" context menu item, and Alt+Shift+D (MacCtrl+Shift+D on macOS) open it, or focus it when it is already open. Each recording has its own link, `dashboard.html#/recordings/<id>`.
-4. On recnrun.com, the extension shows the same dashboard over the site, at the site's address: `recnrun.com/recordings/<id>` opens that recording, and Back, Forward, and reload work.
+2. The website asks whether the extension is installed. If it is missing, the website shows a banner explaining what the extension does, with a link to the install guide.
+3. The extension's dashboard (`dashboard.html`) shows its recordings:
+   - **Recordings:** each one, newest first, with its start URL, date (in UTC), duration, and event count.
+   - **Empty:** it says there are no recordings yet.
+   - **Unreadable** (for example, stored data from an incompatible version): it shows the reason.
+4. The dashboard opens in a tab. The toolbar icon, its "Dashboard" context menu item, and Alt+Shift+D (MacCtrl+Shift+D on macOS) open it, or focus it when it is already open. Each recording has its own link, `dashboard.html#/recordings/<id>`.
+5. On recnrun.com, the extension shows the same dashboard over the site, at the site's address: `recnrun.com/recordings/<id>` opens that recording, and Back, Forward, and reload work.
 
-The website never stores the user's data and never sends it anywhere: it reads it from the extension in the visitor's own browser.
+The website never sees the user's data: only the extension reads it, in the visitor's own browser, and the site cannot read the dashboard's frame.
 
 ## Next
 
