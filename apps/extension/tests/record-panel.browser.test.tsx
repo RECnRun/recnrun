@@ -1,12 +1,13 @@
-import { sampleSnapshot } from "@recnrun/domain/testing";
 import { render } from "preact";
 import { afterEach, expect, test, vi } from "vite-plus/test";
 import type { Mock } from "vite-plus/test";
 import { RecordControls } from "@/dashboard/panel/RecordControls";
 import type { RecordSurface } from "@/dashboard/panel/RecordControls";
+import type { RecordingStore } from "@/dashboard/panel/recording";
 import { startDashboard } from "@/dashboard/start";
 import { closePanelMessage, openPanelMessage } from "@/messaging/frame-protocol";
 import type { DocumentPictureInPicture } from "@/pip/document-pip";
+import { dashboardData, memoryRecordingStore } from "./dashboard-data";
 
 /** Stands in for the PiP window with a same-origin frame, whose document Preact can portal into. */
 interface Opened {
@@ -39,10 +40,10 @@ function framePip(): DocumentPictureInPicture & { opened: Opened[] } {
   };
 }
 
-function mount(surface: RecordSurface) {
+function mount(surface: RecordSurface, store: RecordingStore = memoryRecordingStore()) {
   const root = document.createElement("div");
   document.body.append(root);
-  render(<RecordControls surface={surface} />, root);
+  render(<RecordControls surface={surface} store={store} />, root);
   return root;
 }
 
@@ -98,9 +99,7 @@ test("closing the PiP window keeps recording until the panel shows again", async
   await expect.poll(() => pip.opened.length).toBe(1);
 
   nth(pip.opened, 0).window.dispatchEvent(new Event("pagehide"));
-  await expect
-    .poll(() => root.querySelector('[role="status"]')?.textContent)
-    .toBe("The panel is closed. Recording continues.");
+  await expect.poll(() => root.textContent).toContain("Recording 00:00");
   button(root, "Show the panel")?.click();
   await expect.poll(() => pip.opened.length).toBe(2);
   await expect.poll(() => panelText(nth(pip.opened, 1).window.document)).toContain("Recording");
@@ -123,6 +122,24 @@ test("a refused PiP window shows why", async () => {
     .toBe("Document PiP requires user activation");
 });
 
+test("views sharing a store show one recording and stopping it anywhere closes the PiP", async () => {
+  const store = memoryRecordingStore();
+  const pip = framePip();
+  const tab = mount({ kind: "window", pip, focusTab: async () => {} }, store);
+  const requestPanel = vi.fn();
+  const site = mount({ kind: "parent", requestPanel }, store);
+
+  button(site, "Record")?.click();
+  expect(requestPanel).toHaveBeenCalledOnce();
+  await expect.poll(() => tab.textContent).toContain("Recording 00:00");
+  button(tab, "Show the panel")?.click();
+  await expect.poll(() => pip.opened.length).toBe(1);
+
+  button(site, "Stop")?.click();
+  await expect.poll(() => button(tab, "Record")).toBeDefined();
+  await expect.poll(() => nth(pip.opened, 0).close.mock.calls.length).toBe(1);
+});
+
 test("a framed dashboard asks the site for the panel and the panel view asks it to close", async () => {
   const posted: unknown[] = [];
   window.addEventListener("message", (event) => posted.push(event.data));
@@ -132,15 +149,18 @@ test("a framed dashboard asks the site for the panel and the panel view asks it 
       document,
       location: { ancestorOrigins: [location.origin], search },
     }) as unknown as Window;
+  const data = dashboardData();
 
   const dashboard = document.createElement("div");
-  startDashboard(dashboard, async () => sampleSnapshot(), framed(""));
+  startDashboard(dashboard, data, framed(""));
   button(dashboard, "Record")?.click();
   await expect.poll(() => posted).toContainEqual(openPanelMessage());
 
   const panel = document.createElement("div");
-  startDashboard(panel, async () => sampleSnapshot(), framed("?view=panel"));
+  startDashboard(panel, data, framed("?view=panel"));
   await expect.poll(() => panelText(panel)).toContain("Recording");
+  await expect.poll(() => dashboard.textContent).toContain("Recording");
   button(panel, "Stop")?.click();
   await expect.poll(() => posted).toContainEqual(closePanelMessage());
+  await expect.poll(() => button(dashboard, "Record")).toBeDefined();
 });

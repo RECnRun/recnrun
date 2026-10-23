@@ -1,20 +1,27 @@
-import { useEffect } from "preact/hooks";
-import { formatElapsed, useRecording } from "@/dashboard/panel/recording";
-import type { Recording } from "@/dashboard/panel/recording";
+import { formatElapsed, useEnded, useRecording } from "@/dashboard/panel/recording";
+import type { Recording, RecordingStore } from "@/dashboard/panel/recording";
+
+/** "Recording 00:18" or "Paused 00:18". */
+export function RecordStatus({ recording }: { recording: Recording }) {
+  return (
+    <>
+      <strong>{recording.status === "recording" ? "Recording" : "Paused"}</strong>{" "}
+      <time>{formatElapsed(recording.seconds)}</time>
+    </>
+  );
+}
 
 /** The compact controls shown in the PiP window, or in the tab when PiP is missing. */
 export function RecordPanel(props: { recording: Recording; onStop: () => void }) {
   const { recording, onStop } = props;
-  const recordingNow = recording.status === "recording";
   return (
     <section class="record-panel" aria-label="Recording panel">
       <p>
-        <strong>{recordingNow ? "Recording" : "Paused"}</strong>{" "}
-        <time>{formatElapsed(recording.seconds)}</time>
+        <RecordStatus recording={recording} />
       </p>
       <div class="record-actions">
         <button type="button" onClick={recording.toggle}>
-          {recordingNow ? "Pause" : "Resume"}
+          {recording.status === "recording" ? "Pause" : "Resume"}
         </button>
         <button type="button" onClick={onStop}>
           Stop
@@ -24,19 +31,11 @@ export function RecordPanel(props: { recording: Recording; onStop: () => void })
   );
 }
 
-/** The panel page loaded into a PiP window that the site opened; it owns its own recording. */
-export function StandalonePanel(props: { onStop: () => void }) {
-  const recording = useRecording();
-  const { start } = recording;
-  useEffect(start, []);
+/** The panel page loaded into a PiP window that the site opened; it closes once the recording ends. */
+export function StandalonePanel(props: { store: RecordingStore; onStop: () => void }) {
+  const { store, onStop } = props;
+  const recording = useRecording(store);
+  useEnded(recording.status, onStop);
   if (recording.status === "idle") return null;
-  return (
-    <RecordPanel
-      recording={recording}
-      onStop={() => {
-        recording.stop();
-        props.onStop();
-      }}
-    />
-  );
+  return <RecordPanel recording={recording} onStop={recording.stop} />;
 }

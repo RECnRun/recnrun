@@ -75,7 +75,7 @@ test("closing the PiP window keeps the recording and lets the dashboard reopen i
   await expect(panelOf(pip)).toContainText("Recording");
   await pip.close();
 
-  await expect(page.getByRole("status")).toContainText("Recording continues");
+  await expect(page.getByRole("banner")).toContainText("Recording");
   const reopened = await clickToOpenPanel(context, () =>
     page.getByRole("button", { name: "Show the panel" }).click(),
   );
@@ -115,4 +115,25 @@ test("the dashboard framed on recnrun.com has the site open the PiP window", asy
   );
   await panelFrame.getByRole("button", { name: "Stop" }).click();
   await expect.poll(() => pip.isClosed()).toBe(true);
+});
+
+test("a recording started over the site shows in the dashboard tab, which can stop it", async ({
+  context,
+  page,
+  serviceWorker,
+}) => {
+  const tab = await context.newPage();
+  await tab.goto(dashboardUrl(serviceWorker));
+  await page.goto("/");
+  await page.bringToFront();
+  const dashboard = page.locator(FRAME).contentFrame();
+  const pip = await clickToOpenPanel(context, () =>
+    dashboard.getByRole("button", { name: "Record" }).click(),
+  );
+  await expect(dashboard.getByRole("banner")).toContainText("Recording");
+  await expect(tab.getByRole("banner")).toContainText("Recording");
+
+  await tab.getByRole("button", { name: "Stop" }).click();
+  await expect.poll(() => pip.isClosed()).toBe(true);
+  await expect(dashboard.getByRole("button", { name: "Record" })).toBeVisible();
 });

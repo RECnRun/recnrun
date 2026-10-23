@@ -1,37 +1,36 @@
-import { useEffect, useState } from "preact/hooks";
+import type { RecordingSession } from "@recnrun/domain";
+import { useEffect, useRef, useState } from "preact/hooks";
 
-export type RecordingStatus = "idle" | "recording" | "paused";
+export type RecordingStatus = "idle" | RecordingSession["status"];
 
-interface Clock {
-  status: RecordingStatus;
-  /** Milliseconds recorded before the current run. */
-  banked: number;
-  /** When the current run started; meaningful while recording. */
-  since: number;
+/** Where the recording in progress lives, so every dashboard view shows the same one. */
+export interface RecordingStore {
+  read: () => Promise<RecordingSession | null>;
+  write: (session: RecordingSession | null) => Promise<void>;
+  /** Calls back after any view writes; returns the unsubscribe function. */
+  watch: (onChange: () => void) => () => void;
 }
 
 export interface Recording {
   status: RecordingStatus;
   seconds: number;
+  error?: string;
   start: () => void;
   toggle: () => void;
   stop: () => void;
 }
 
-const IDLE: Clock = { status: "idle", banked: 0, since: 0 };
-
 /** Elapsed time from timestamps, since Chrome throttles timers in a hidden opener tab. */
-export function elapsedSeconds(clock: Clock, now: number): number {
-  const running = clock.status === "recording" ? now - clock.since : 0;
-  return Math.floor((clock.banked + running) / 1000);
+export function elapsedSeconds(session: RecordingSession, now: number): number {
+  const running = session.status === "recording" ? now - session.since : 0;
+  return Math.max(0, Math.floor((session.banked + running) / 1000));
 }
 
-export function toggled(clock: Clock, now: number): Clock {
-  if (clock.status === "recording") {
-    return { status: "paused", banked: clock.banked + now - clock.since, since: now };
+export function toggled(session: RecordingSession, now: number): RecordingSession {
+  if (session.status === "recording") {
+    return { status: "paused", banked: session.banked + now - session.since, since: now };
   }
-  if (clock.status === "paused") return { ...clock, status: "recording", since: now };
-  return clock;
+  return { ...session, status: "recording", since: now };
 }
 
 export function formatElapsed(seconds: number): string {
@@ -39,24 +38,57 @@ export function formatElapsed(seconds: number): string {
   return `${pad(Math.floor(seconds / 60))}:${pad(seconds % 60)}`;
 }
 
-/** A stand-in for a recording session; the real one will live in the extension. */
-export function useRecording(): Recording {
-  const [clock, setClock] = useState<Clock>(IDLE);
+export const errorText = (error: unknown) =>
+  error instanceof Error ? error.message : String(error);
+
+function useNow(ticking: boolean): number {
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
-    if (clock.status !== "recording") return;
+    setNow(Date.now());
+    if (!ticking) return;
     const timer = setInterval(() => setNow(Date.now()), 250);
     return () => clearInterval(timer);
-  }, [clock.status]);
+  }, [ticking]);
+  return now;
+}
+
+/** The shared recording in progress, kept current as other views change it. */
+export function useRecording(store: RecordingStore): Recording {
+  const [session, setSession] = useState<RecordingSession | null>(null);
+  const [error, setError] = useState<string>();
+  const now = useNow(session?.status === "recording");
+  useEffect(() => {
+    const refresh = () =>
+      store.read().then(
+        (current) => {
+          setSession(current);
+          setError(undefined);
+        },
+        (caught: unknown) => setError(errorText(caught)),
+      );
+    void refresh();
+    return store.watch(() => void refresh());
+  }, [store]);
+  const write = (next: RecordingSession | null) =>
+    void store.write(next).catch((caught: unknown) => setError(errorText(caught)));
   return {
-    status: clock.status,
-    seconds: elapsedSeconds(clock, now),
-    start: () => {
-      const started = Date.now();
-      setNow(started);
-      setClock({ status: "recording", banked: 0, since: started });
-    },
-    toggle: () => setClock((current) => toggled(current, Date.now())),
-    stop: () => setClock(IDLE),
+    status: session?.status ?? "idle",
+    seconds: session ? elapsedSeconds(session, now) : 0,
+    error,
+    start: () => write({ status: "recording", banked: 0, since: Date.now() }),
+    toggle: () => session && write(toggled(session, Date.now())),
+    stop: () => write(null),
   };
+}
+
+/** Calls onEnd once a recording in progress goes idle, whichever view stopped it. */
+export function useEnded(status: RecordingStatus, onEnd: () => void): void {
+  const active = useRef(false);
+  useEffect(() => {
+    if (status !== "idle") active.current = true;
+    else if (active.current) {
+      active.current = false;
+      onEnd();
+    }
+  }, [status, onEnd]);
 }

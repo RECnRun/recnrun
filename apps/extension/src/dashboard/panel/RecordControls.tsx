@@ -1,7 +1,8 @@
 import { createPortal } from "preact/compat";
 import { useState } from "preact/hooks";
-import { RecordPanel } from "@/dashboard/panel/RecordPanel";
-import { useRecording } from "@/dashboard/panel/recording";
+import { RecordPanel, RecordStatus } from "@/dashboard/panel/RecordPanel";
+import { errorText, useEnded, useRecording } from "@/dashboard/panel/recording";
+import type { Recording, RecordingStore } from "@/dashboard/panel/recording";
 import { copyStyles, requestPanelWindow } from "@/pip/document-pip";
 import type { DocumentPictureInPicture } from "@/pip/document-pip";
 
@@ -11,7 +12,11 @@ export type RecordSurface =
   | { kind: "parent"; requestPanel: () => void }
   | { kind: "inline" };
 
-const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error));
+/** The panel's surface and the recording every view shares. */
+export interface RecordSetup {
+  surface: RecordSurface;
+  store: RecordingStore;
+}
 
 function RecordButton(props: { label?: string; onClick: () => void }) {
   return (
@@ -21,11 +26,40 @@ function RecordButton(props: { label?: string; onClick: () => void }) {
   );
 }
 
-/** A top-level dashboard renders the panel into its own PiP window, sharing its state. */
-function WindowControls(props: { pip: DocumentPictureInPicture; focusTab: () => Promise<void> }) {
-  const recording = useRecording();
+function IdleControls(props: { onRecord: () => void; error?: string }) {
+  return (
+    <>
+      <RecordButton onClick={props.onRecord} />
+      {props.error && <p role="alert">{props.error}</p>}
+    </>
+  );
+}
+
+/** A recording runs while its panel is elsewhere: closed, or in another view's PiP window. */
+function InProgress(props: { recording: Recording; onShow: () => void; onStop: () => void }) {
+  return (
+    <div class="record-status">
+      <p>
+        <RecordStatus recording={props.recording} />
+      </p>
+      <RecordButton label="Show the panel" onClick={props.onShow} />
+      <button type="button" onClick={props.onStop}>
+        Stop
+      </button>
+    </div>
+  );
+}
+
+/** A top-level dashboard renders the panel into its own PiP window. */
+function WindowControls(props: {
+  pip: DocumentPictureInPicture;
+  focusTab: () => Promise<void>;
+  store: RecordingStore;
+}) {
+  const recording = useRecording(props.store);
   const [panel, setPanel] = useState<Window>();
   const [error, setError] = useState<string>();
+  useEnded(recording.status, () => panel?.close());
 
   const showPanel = (onOpen?: () => void) => {
     // Nothing may await before this call, or Chrome refuses it for lack of user activation.
@@ -48,43 +82,44 @@ function WindowControls(props: { pip: DocumentPictureInPicture; focusTab: () => 
 
   if (recording.status === "idle") {
     return (
-      <>
-        <RecordButton onClick={() => showPanel(recording.start)} />
-        {error && <p role="alert">{error}</p>}
-      </>
+      <IdleControls onRecord={() => showPanel(recording.start)} error={error ?? recording.error} />
     );
   }
   if (panel)
     return createPortal(<RecordPanel recording={recording} onStop={stop} />, panel.document.body);
-  return <ClosedPanel onShow={() => showPanel()} onStop={stop} />;
+  return <InProgress recording={recording} onShow={() => showPanel()} onStop={stop} />;
 }
 
-function ClosedPanel(props: { onShow: () => void; onStop: () => void }) {
-  return (
-    <div class="record-status">
-      <p role="status">The panel is closed. Recording continues.</p>
-      <RecordButton label="Show the panel" onClick={props.onShow} />
-      <button type="button" onClick={props.onStop}>
-        Stop
-      </button>
-    </div>
-  );
+/** A framed dashboard asks the site to open the panel, which runs in a frame of its own. */
+function ParentControls(props: { requestPanel: () => void; store: RecordingStore }) {
+  const { requestPanel } = props;
+  const recording = useRecording(props.store);
+  if (recording.status === "idle") {
+    const record = () => {
+      requestPanel();
+      recording.start();
+    };
+    return <IdleControls onRecord={record} error={recording.error} />;
+  }
+  return <InProgress recording={recording} onShow={requestPanel} onStop={recording.stop} />;
 }
 
 /** Without Document PiP, the controls stay in the tab and do not float over other tabs. */
-function InlineControls() {
-  const recording = useRecording();
-  if (recording.status === "idle") return <RecordButton onClick={recording.start} />;
+function InlineControls(props: { store: RecordingStore }) {
+  const recording = useRecording(props.store);
+  if (recording.status === "idle") {
+    return <IdleControls onRecord={recording.start} error={recording.error} />;
+  }
   return <RecordPanel recording={recording} onStop={recording.stop} />;
 }
 
-export function RecordControls({ surface }: { surface: RecordSurface }) {
+export function RecordControls({ surface, store }: RecordSetup) {
   switch (surface.kind) {
     case "window":
-      return <WindowControls pip={surface.pip} focusTab={surface.focusTab} />;
+      return <WindowControls pip={surface.pip} focusTab={surface.focusTab} store={store} />;
     case "parent":
-      return <RecordButton onClick={surface.requestPanel} />;
+      return <ParentControls requestPanel={surface.requestPanel} store={store} />;
     case "inline":
-      return <InlineControls />;
+      return <InlineControls store={store} />;
   }
 }

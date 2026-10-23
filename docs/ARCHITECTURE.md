@@ -12,13 +12,13 @@ apps/website ──► @recnrun/bridge ──► valibot
 
 ## Packages
 
-| Package           | Holds                                                                                                         | May import                       |
-| ----------------- | ------------------------------------------------------------------------------------------------------------- | -------------------------------- |
-| `packages/domain` | Valibot schemas and inferred types for every concept; `Snapshot`, the versioned document the extension stores | `valibot` only                   |
-| `packages/bridge` | The website ↔ content script protocol, its client, host, and `window` transport                               | `valibot` only                   |
-| `packages/brand`  | Mona Sans, and `base.css`: the palette, semantic tokens, and base layout both apps import first               | nothing                          |
-| `apps/website`    | The Preact SPA                                                                                                | bridge, brand; never extension   |
-| `apps/extension`  | The WXT extension                                                                                             | every package; never the website |
+| Package           | Holds                                                                                                                                                        | May import                       |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------- |
+| `packages/domain` | Valibot schemas and inferred types for every concept; `Snapshot`, the versioned document the extension stores; `RecordingSession`, the recording in progress | `valibot` only                   |
+| `packages/bridge` | The website ↔ content script protocol, its client, host, and `window` transport                                                                              | `valibot` only                   |
+| `packages/brand`  | Mona Sans, and `base.css`: the palette, semantic tokens, and base layout both apps import first                                                              | nothing                          |
+| `apps/website`    | The Preact SPA                                                                                                                                               | bridge, brand; never extension   |
+| `apps/extension`  | The WXT extension                                                                                                                                            | every package; never the website |
 
 - Packages never import apps. Apps never import each other: they meet only at the bridge protocol.
 - Packages export their TypeScript sources (`exports` → `./src/index.ts`); apps bundle them. A package `build` only type checks.
@@ -45,16 +45,16 @@ Components take the gateway or data as props, so component tests use a fake gate
 
 ## Extension
 
-| Folder            | Runs in                | Role                                                                                                                         |
-| ----------------- | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `src/entrypoints` | (WXT)                  | Thin wiring: each file calls one `start*` function. Nothing imports an entrypoint.                                           |
-| `src/content`     | The RECnRun website    | Bridge host, and the frame that shows the dashboard over the site.                                                           |
-| `src/background`  | The service worker     | Validates requests and senders, answers them from storage.                                                                   |
-| `src/storage`     | The service worker     | Repositories over WXT `storage`; validates what it reads with the domain schemas.                                            |
-| `src/dashboard`   | The dashboard page     | Preact UI at `dashboard.html`. Reads through a function it is given, never through content or background code.               |
-| `src/pip`         | Dashboard and content  | Typed access to Document Picture-in-Picture and the panel window helpers ([POC 6](POCS.md#poc-6-record-opens-a-pip-window)). |
-| `src/config`      | Build time             | `origins.ts`: the pages the content script runs on and that may frame the dashboard, per build mode.                         |
-| `src/messaging`   | Content and background | The content ↔ background and content ↔ dashboard frame message schemas.                                                      |
+| Folder            | Runs in                | Role                                                                                                                                            |
+| ----------------- | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/entrypoints` | (WXT)                  | Thin wiring: each file calls one `start*` function. Nothing imports an entrypoint.                                                              |
+| `src/content`     | The RECnRun website    | Bridge host, and the frame that shows the dashboard over the site.                                                                              |
+| `src/background`  | The service worker     | Validates requests and senders, answers them from storage.                                                                                      |
+| `src/storage`     | The service worker     | Repositories over WXT `storage` (`local:` for data, `session:` for the recording in progress); validates what it reads with the domain schemas. |
+| `src/dashboard`   | The dashboard page     | Preact UI at `dashboard.html`. Reads through a function it is given, never through content or background code.                                  |
+| `src/pip`         | Dashboard and content  | Typed access to Document Picture-in-Picture and the panel window helpers ([POC 6](POCS.md#poc-6-record-opens-a-pip-window)).                    |
+| `src/config`      | Build time             | `origins.ts`: the pages the content script runs on and that may frame the dashboard, per build mode.                                            |
+| `src/messaging`   | Content and background | The content ↔ background and content ↔ dashboard frame message schemas.                                                                         |
 
 `content` never imports `storage`, and `dashboard` never imports `content` or `background`.
 
@@ -69,7 +69,7 @@ The dashboard opens from the toolbar icon (no popup, so a click fires `action.on
 
 A workspace is the origin a recording starts on, derived when the dashboard renders; nothing stores it. A split dashboard gets it as `dashboard.html?workspace=<origin>`, and ignores any value that is not an `http`/`https` origin. The dashboard keeps its route in the hash (`dashboard.html#/recordings/<id>`), since an extension page has no server to answer other paths.
 
-On recnrun.com the content script covers the site with a full-viewport `<iframe>` of `dashboard.html` (`content/dashboard-frame.ts`), so the dashboard keeps the site's address. They sync the route over `postMessage` on the `recnrun-frame` channel (`messaging/frame-protocol.ts`): the frame starts at `?route=<site path>`, the content script sends a `route` message on Back and Forward, and the dashboard sends a `location` message (`path`, `title`) that the content script applies with `history.pushState` and `document.title`. Inside the frame, the dashboard's links point at the site's own URLs. A frame cannot open a Document PiP window, so the framed dashboard's Record button posts `open-panel`; the content script opens the window from the site's page with a frame of `dashboard.html?view=panel`, which posts `close-panel` on Stop (`content/panel-window.ts`). GitHub Pages answers unknown paths with `404.html`, so the website build copies `index.html` there (`apps/website/build/not-found-page.ts`) and deep links like `/recordings/<id>` load the site.
+On recnrun.com the content script covers the site with a full-viewport `<iframe>` of `dashboard.html` (`content/dashboard-frame.ts`), so the dashboard keeps the site's address. They sync the route over `postMessage` on the `recnrun-frame` channel (`messaging/frame-protocol.ts`): the frame starts at `?route=<site path>`, the content script sends a `route` message on Back and Forward, and the dashboard sends a `location` message (`path`, `title`) that the content script applies with `history.pushState` and `document.title`. Inside the frame, the dashboard's links point at the site's own URLs. A frame cannot open a Document PiP window, so the framed dashboard's Record button posts `open-panel`; the content script opens the window from the site's page with a frame of `dashboard.html?view=panel`, which posts `close-panel` when the recording ends (`content/panel-window.ts`). Every view shares the recording through `storage.session` (POC 6E), not through frame messages. GitHub Pages answers unknown paths with `404.html`, so the website build copies `index.html` there (`apps/website/build/not-found-page.ts`) and deep links like `/recordings/<id>` load the site.
 
 ## Bridge protocol v1
 

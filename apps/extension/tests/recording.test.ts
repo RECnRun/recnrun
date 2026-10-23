@@ -14,10 +14,8 @@ test("elapsed time counts only the runs spent recording", () => {
   expect(elapsedSeconds(resumed, 62_000)).toBe(5);
 });
 
-test("an idle clock does not toggle and shows no time", () => {
-  const idle = { status: "idle" as const, banked: 0, since: 0 };
-  expect(toggled(idle, 5_000)).toBe(idle);
-  expect(elapsedSeconds(idle, 5_000)).toBe(0);
+test("a session another view started a moment ahead shows no negative time", () => {
+  expect(elapsedSeconds({ status: "recording", banked: 0, since: 5_000 }, 4_900)).toBe(0);
 });
 
 test("elapsed time reads as minutes and seconds", () => {

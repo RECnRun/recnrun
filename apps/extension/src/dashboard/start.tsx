@@ -5,10 +5,17 @@ import { Dashboard, Refusal } from "@/dashboard/Dashboard";
 import { focusCurrentTab } from "@/dashboard/panel/focus-tab";
 import type { RecordSurface } from "@/dashboard/panel/RecordControls";
 import { StandalonePanel } from "@/dashboard/panel/RecordPanel";
+import type { RecordingStore } from "@/dashboard/panel/recording";
 import { createFrameRouter, createHashRouter } from "@/dashboard/router";
 import { workspaceParam } from "@/dashboard/workspace";
 import { closePanelMessage, openPanelMessage } from "@/messaging/frame-protocol";
 import { documentPip } from "@/pip/document-pip";
+
+/** What the dashboard reads and shares, injected so tests need no extension storage. */
+export interface DashboardData {
+  loadSnapshot: () => Promise<Snapshot>;
+  recordings: RecordingStore;
+}
 
 const isPanelView = (search: string) => new URLSearchParams(search).get("view") === "panel";
 
@@ -18,21 +25,21 @@ function topLevelSurface(page: Window): RecordSurface {
   return pip ? { kind: "window", pip, focusTab: focusCurrentTab } : { kind: "inline" };
 }
 
-function startFramed(root: HTMLElement, loadSnapshot: () => Promise<Snapshot>, page: Window) {
+function startFramed(root: HTMLElement, data: DashboardData, page: Window) {
   const parent = page.location.ancestorOrigins[0] ?? "";
   // The site's content script loads this view into the PiP window it opens.
   if (isPanelView(page.location.search)) {
     const close = () => page.parent.postMessage(closePanelMessage(), parent);
-    render(<StandalonePanel onStop={close} />, root);
+    render(<StandalonePanel store={data.recordings} onStop={close} />, root);
     return;
   }
   // A frame cannot open a PiP window, so it asks the top-level site to.
   const requestPanel = () => page.parent.postMessage(openPanelMessage(), parent);
   render(
     <Dashboard
-      loadSnapshot={loadSnapshot}
+      loadSnapshot={data.loadSnapshot}
       router={createFrameRouter(parent, page)}
-      record={{ kind: "parent", requestPanel }}
+      record={{ surface: { kind: "parent", requestPanel }, store: data.recordings }}
     />,
     root,
   );
@@ -40,7 +47,7 @@ function startFramed(root: HTMLElement, loadSnapshot: () => Promise<Snapshot>, p
 
 export function startDashboard(
   root: HTMLElement,
-  loadSnapshot: () => Promise<Snapshot>,
+  data: DashboardData,
   page: Window = window,
 ): void {
   const ancestors = [...page.location.ancestorOrigins];
@@ -51,17 +58,17 @@ export function startDashboard(
     return;
   }
   if (ancestors.length > 0) {
-    startFramed(root, loadSnapshot, page);
+    startFramed(root, data, page);
     return;
   }
   // A Split View tab opens with the workspace of the page beside it.
   const workspace = workspaceParam(page.location.search);
   render(
     <Dashboard
-      loadSnapshot={loadSnapshot}
+      loadSnapshot={data.loadSnapshot}
       router={createHashRouter(page)}
       workspace={workspace}
-      record={topLevelSurface(page)}
+      record={{ surface: topLevelSurface(page), store: data.recordings }}
     />,
     root,
   );
