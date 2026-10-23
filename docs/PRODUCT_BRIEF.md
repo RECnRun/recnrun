@@ -19,7 +19,7 @@ The events themselves (clicks, inputs, navigations, DOM changes) are not stored 
    - **Installed:** it reads the extension's data and shows each recording, newest first, with its start URL, date (in UTC), duration, and event count.
    - **Installed but empty:** it says there are no recordings yet, rather than asking to install.
    - **Installed but unreadable** (for example, stored data from an incompatible version): it shows the reason.
-3. The extension popup shows how many recordings are stored and links to the website.
+3. The extension dashboard (`dashboard.html`, opened in a tab from the toolbar icon, its context menu, or Alt+Shift+D) lists the stored recordings.
 
 The website never stores the user's data and never sends it anywhere: it reads it from the extension in the visitor's own browser.
 

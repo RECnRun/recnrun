@@ -11,6 +11,7 @@
   --surface: var(--gray-0);
   --text: var(--brand-ink);
   --link: var(--brand-red);
+  --rule: var(--gray-50);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -18,6 +19,7 @@
     --surface: var(--gray-925);
     --text: var(--gray-50);
     --link: var(--brand-coral);
+    --rule: var(--brand-ink);
   }
 }
 
@@ -30,16 +32,27 @@ body {
     sans-serif;
 }
 
-.popup {
-  min-width: 16rem;
+.dashboard {
+  max-width: 48rem;
+  margin: 0 auto;
   padding: 1rem;
 }
 
-.popup h1 {
-  margin: 0 0 0.5rem;
+.dashboard h1 {
+  margin: 0 0 1rem;
+  font-size: 1.25rem;
+}
+
+.recording {
+  padding: 0.75rem 0;
+  border-top: 1px solid var(--rule);
+}
+
+.recording h2 {
+  margin: 0 0 0.25rem;
   font-size: 1rem;
 }
 
-.popup a {
-  color: var(--link);
+.recording p {
+  margin: 0;
 }

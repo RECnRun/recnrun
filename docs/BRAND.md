@@ -48,7 +48,7 @@ The logo red `#f3362b` is too light for white text (3.91:1) and too dark for ink
 
 ## Tokens
 
-Each stylesheet (`apps/website/src/app/app.css`, `apps/extension/src/popup/popup.css`) opens with a `:root` block in two layers:
+Each stylesheet (`apps/website/src/app/app.css`, `apps/extension/src/dashboard/dashboard.css`) opens with a `:root` block in two layers:
 
 1. **Palette:** `--brand-*` and `--gray-*`. The only place a hex color is written.
 2. **Semantic:** `--surface`, `--card`, `--border`, `--text`, `--muted`, `--accent`, `--accent-text`, `--link`. Each points to a palette token, and the `prefers-color-scheme: dark` block repoints them.
