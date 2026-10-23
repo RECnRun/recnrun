@@ -110,3 +110,37 @@ test("turns a blank tab into the dashboard of every workspace", async ({
   await expect(page.getByRole("article")).toHaveCount(3);
   expect(context.pages()).toHaveLength(1);
 });
+
+test("recording from the split dashboard leaves the page alone until Stop splits it again", async ({
+  context,
+  page,
+  serviceWorker,
+  clickToolbarIcon,
+}) => {
+  await page.goto("/");
+  await clickToolbarIcon(page);
+  await expect.poll(() => dashboardPages(context, serviceWorker).length).toBe(1);
+  const [dashboard] = dashboardPages(context, serviceWorker);
+  if (!dashboard) throw new Error("No dashboard page opened.");
+
+  const [pip] = await Promise.all([
+    context.waitForEvent("page"),
+    dashboard.getByRole("button", { name: "Record" }).click(),
+  ]);
+  await expect
+    .poll(async () => (await splitTabs(serviceWorker)).find((tab) => tab.dashboard))
+    .toMatchObject({ active: false, splitViewId: -1 });
+  const site = (await splitTabs(serviceWorker)).find((tab) => tab.active);
+  expect(site).toMatchObject({ dashboard: false, splitViewId: -1 });
+  await expect(pip.getByRole("region", { name: "Recording panel" })).toContainText("Recording");
+
+  await pip.getByRole("button", { name: "Stop" }).click();
+  await expect.poll(() => pip.isClosed()).toBe(true);
+  await expect
+    .poll(async () => {
+      const tabs = await splitTabs(serviceWorker);
+      const split = tabs.find((tab) => tab.dashboard && tab.active)?.splitViewId ?? -1;
+      return split === -1 ? 0 : tabs.filter((tab) => tab.splitViewId === split).length;
+    })
+    .toBe(2);
+});

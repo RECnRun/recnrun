@@ -2,7 +2,7 @@ import type { Snapshot } from "@recnrun/domain";
 import { render } from "preact";
 import { disallowedAncestor } from "@/config/origins";
 import { Dashboard, Refusal } from "@/dashboard/Dashboard";
-import { focusCurrentTab } from "@/dashboard/panel/focus-tab";
+import { panelTab } from "@/dashboard/panel/panel-tab";
 import type { RecordSurface } from "@/dashboard/panel/RecordControls";
 import { StandalonePanel } from "@/dashboard/panel/RecordPanel";
 import type { RecordingStore } from "@/dashboard/panel/recording";
@@ -22,7 +22,7 @@ const isPanelView = (search: string) => new URLSearchParams(search).get("view") 
 /** A top-level page opens its own PiP window; without the API the controls stay in the tab. */
 function topLevelSurface(page: Window): RecordSurface {
   const pip = documentPip(page);
-  return pip ? { kind: "window", pip, focusTab: focusCurrentTab } : { kind: "inline" };
+  return pip ? { kind: "window", pip, tab: panelTab() } : { kind: "inline" };
 }
 
 function startFramed(root: HTMLElement, data: DashboardData, page: Window) {

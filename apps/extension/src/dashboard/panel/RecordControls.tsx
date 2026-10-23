@@ -3,12 +3,13 @@ import { useState } from "preact/hooks";
 import { RecordPanel, RecordStatus } from "@/dashboard/panel/RecordPanel";
 import { errorText, useEnded, useRecording } from "@/dashboard/panel/recording";
 import type { Recording, RecordingStore } from "@/dashboard/panel/recording";
+import type { PanelTab } from "@/dashboard/panel/panel-tab";
 import { copyStyles, requestPanelWindow } from "@/pip/document-pip";
 import type { DocumentPictureInPicture } from "@/pip/document-pip";
 
 /** Where the recording panel shows, decided by where the dashboard runs. */
 export type RecordSurface =
-  | { kind: "window"; pip: DocumentPictureInPicture; focusTab: () => Promise<void> }
+  | { kind: "window"; pip: DocumentPictureInPicture; tab: PanelTab }
   | { kind: "parent"; requestPanel: () => void }
   | { kind: "inline" };
 
@@ -50,10 +51,10 @@ function InProgress(props: { recording: Recording; onShow: () => void; onStop: (
   );
 }
 
-/** A top-level dashboard renders the panel into its own PiP window. */
+/** A top-level dashboard renders the panel into its own PiP window and steps out of a Split View. */
 function WindowControls(props: {
   pip: DocumentPictureInPicture;
-  focusTab: () => Promise<void>;
+  tab: PanelTab;
   store: RecordingStore;
 }) {
   const recording = useRecording(props.store);
@@ -70,6 +71,7 @@ function WindowControls(props: {
         setPanel(opened);
         setError(undefined);
         onOpen?.();
+        void props.tab.leaveSplit();
       },
       (caught: unknown) => setError(errorText(caught)),
     );
@@ -77,7 +79,7 @@ function WindowControls(props: {
   const stop = () => {
     recording.stop();
     panel?.close();
-    void props.focusTab();
+    void props.tab.focus();
   };
 
   if (recording.status === "idle") {
@@ -116,7 +118,7 @@ function InlineControls(props: { store: RecordingStore }) {
 export function RecordControls({ surface, store }: RecordSetup) {
   switch (surface.kind) {
     case "window":
-      return <WindowControls pip={surface.pip} focusTab={surface.focusTab} store={store} />;
+      return <WindowControls pip={surface.pip} tab={surface.tab} store={store} />;
     case "parent":
       return <ParentControls requestPanel={surface.requestPanel} store={store} />;
     case "inline":

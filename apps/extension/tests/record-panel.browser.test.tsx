@@ -40,6 +40,9 @@ function framePip(): DocumentPictureInPicture & { opened: Opened[] } {
   };
 }
 
+/** A dashboard tab that records what the panel asks of it. */
+const idleTab = () => ({ leaveSplit: vi.fn(async () => {}), focus: vi.fn(async () => {}) });
+
 function mount(surface: RecordSurface, store: RecordingStore = memoryRecordingStore()) {
   const root = document.createElement("div");
   document.body.append(root);
@@ -75,13 +78,14 @@ test("a top-level dashboard renders the panel into its PiP window with its style
   link.dataset.test = "";
   document.head.append(link);
   const pip = framePip();
-  const focusTab = vi.fn(async () => {});
-  const root = mount({ kind: "window", pip, focusTab });
+  const tab = idleTab();
+  const root = mount({ kind: "window", pip, tab });
 
   button(root, "Record")?.click();
   await expect.poll(() => pip.opened.length).toBe(1);
   const pipDocument = nth(pip.opened, 0).window.document;
   await expect.poll(() => panelText(pipDocument)).toContain("Recording");
+  expect(tab.leaveSplit).toHaveBeenCalledOnce();
   expect(pipDocument.head.querySelector("link")?.getAttribute("href")).toBe(
     `${location.origin}/x.css`,
   );
@@ -89,12 +93,12 @@ test("a top-level dashboard renders the panel into its PiP window with its style
   button(pipDocument, "Stop")?.click();
   await expect.poll(() => button(root, "Record")).toBeDefined();
   expect(nth(pip.opened, 0).close).toHaveBeenCalled();
-  expect(focusTab).toHaveBeenCalled();
+  expect(tab.focus).toHaveBeenCalled();
 });
 
 test("closing the PiP window keeps recording until the panel shows again", async () => {
   const pip = framePip();
-  const root = mount({ kind: "window", pip, focusTab: async () => {} });
+  const root = mount({ kind: "window", pip, tab: idleTab() });
   button(root, "Record")?.click();
   await expect.poll(() => pip.opened.length).toBe(1);
 
@@ -115,7 +119,7 @@ test("a refused PiP window shows why", async () => {
     window: null,
     requestWindow: () => Promise.reject(new Error("Document PiP requires user activation")),
   };
-  const root = mount({ kind: "window", pip, focusTab: async () => {} });
+  const root = mount({ kind: "window", pip, tab: idleTab() });
   button(root, "Record")?.click();
   await expect
     .poll(() => root.querySelector('[role="alert"]')?.textContent)
@@ -125,7 +129,7 @@ test("a refused PiP window shows why", async () => {
 test("views sharing a store show one recording and stopping it anywhere closes the PiP", async () => {
   const store = memoryRecordingStore();
   const pip = framePip();
-  const tab = mount({ kind: "window", pip, focusTab: async () => {} }, store);
+  const tab = mount({ kind: "window", pip, tab: idleTab() }, store);
   const requestPanel = vi.fn();
   const site = mount({ kind: "parent", requestPanel }, store);
 
