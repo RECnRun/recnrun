@@ -18,3 +18,10 @@ test("titles a route after its recording, or the product", () => {
   expect(titleFor(undefined, "/recordings/rec-checkout")).toBe("RECnRun");
   expect(titleFor(sampleSnapshot(), "/")).toBe("RECnRun");
 });
+
+test("titles a workspace's list after its site", () => {
+  expect(titleFor(sampleSnapshot(), "/", "http://localhost:3000")).toBe("localhost:3000 · RECnRun");
+  expect(titleFor(sampleSnapshot(), "/recordings/rec-login", "http://localhost:3000")).toBe(
+    "Log in as admin · RECnRun",
+  );
+});

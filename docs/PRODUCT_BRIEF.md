@@ -7,6 +7,7 @@ RECnRun records a browser session once and replays it whenever the developer nee
 | Concept       | Meaning                                                                                                                                |
 | ------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | **Recording** | One captured browser session: a name, the URL where it started, when it was made, how long it lasted, and how many events it holds.    |
+| **Workspace** | The site a recording starts on (its origin, such as `https://shop.example`). The dashboard groups recordings by workspace.             |
 | **Snapshot**  | Everything the extension stores, as one versioned document. Today it holds the list of recordings; recording ids are unique within it. |
 
 The events themselves (clicks, inputs, navigations, DOM changes) are not stored yet; M0 keeps only each recording's summary. See [Next](#next).
@@ -16,10 +17,16 @@ The events themselves (clicks, inputs, navigations, DOM changes) are not stored 
 1. A visitor opens recnrun.com (or a local dev server).
 2. The website asks whether the extension is installed. If it is missing, the website shows a banner explaining what the extension does, with a link to the install guide.
 3. The extension's dashboard (`dashboard.html`) shows its recordings:
-   - **Recordings:** each one, newest first, with its start URL, date (in UTC), duration, and event count.
+   - **Recordings:** grouped by workspace, the one with the newest recording first; each recording, newest first, with its start URL, date (in UTC), duration, and event count.
    - **Empty:** it says there are no recordings yet.
    - **Unreadable** (for example, stored data from an incompatible version): it shows the reason.
-4. The dashboard opens in a tab. The toolbar icon, its "Dashboard" context menu item, and Alt+Shift+D (MacCtrl+Shift+D on macOS) open it, or focus it when it is already open. Each recording has its own link, `dashboard.html#/recordings/<id>`.
+4. The toolbar icon, its "Dashboard" context menu item, the page's "Open RECnRun" context menu item, and Alt+Shift+D (MacCtrl+Shift+D on macOS) open the dashboard:
+   - **On a web page, in Chrome with Split View (155+):** beside the page, in a Split View, showing only the page's workspace. If that split already shows it, it gets the focus.
+   - **On a new or blank tab:** in that tab, with every workspace.
+   - **Otherwise, or in Chrome without Split View:** in its own tab, with every workspace, or focused when that tab is already open.
+
+   Each recording has its own link, `dashboard.html#/recordings/<id>`.
+
 5. On recnrun.com, the extension shows the same dashboard over the site, at the site's address: `recnrun.com/recordings/<id>` opens that recording, and Back, Forward, and reload work.
 
 The website never sees the user's data: only the extension reads it, in the visitor's own browser, and the site cannot read the dashboard's frame.

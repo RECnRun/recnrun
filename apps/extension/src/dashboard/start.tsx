@@ -3,6 +3,7 @@ import { render } from "preact";
 import { disallowedAncestor } from "@/config/origins";
 import { Dashboard, Refusal } from "@/dashboard/Dashboard";
 import { createFrameRouter, createHashRouter } from "@/dashboard/router";
+import { workspaceParam } from "@/dashboard/workspace";
 
 export function startDashboard(
   root: HTMLElement,
@@ -17,6 +18,17 @@ export function startDashboard(
     return;
   }
   const parent = ancestors[0];
-  const router = parent === undefined ? createHashRouter(page) : createFrameRouter(parent, page);
-  render(<Dashboard loadSnapshot={loadSnapshot} router={router} />, root);
+  if (parent !== undefined) {
+    render(
+      <Dashboard loadSnapshot={loadSnapshot} router={createFrameRouter(parent, page)} />,
+      root,
+    );
+    return;
+  }
+  // A Split View tab opens with the workspace of the page beside it.
+  const workspace = workspaceParam(page.location.search);
+  render(
+    <Dashboard loadSnapshot={loadSnapshot} router={createHashRouter(page)} workspace={workspace} />,
+    root,
+  );
 }

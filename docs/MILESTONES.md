@@ -14,7 +14,7 @@ Acceptance (all automated, run by `vp run verify`):
 - [x] No other origin can frame the dashboard, and it refuses to render under a foreign ancestor (`tests/e2e/dashboard-embedding.spec.ts`).
 - [x] A page on another origin cannot get an answer from the extension by posting bridge messages to the website's window (`tests/e2e/origin-guard.spec.ts`).
 - [x] The production build ships a CSP and loads without violations (`tests/e2e/install-banner.spec.ts`).
-- [x] The production manifest runs the content script only on `https://recnrun.com/*` asks only for `storage` and `contextMenus`, and lets only recnrun.com frame `dashboard.html` (`vp run test:extension-manifest`).
+- [x] The production manifest runs the content script only on `https://recnrun.com/*` asks only for `storage`, `contextMenus`, and `activeTab`, and lets only recnrun.com frame `dashboard.html` (`vp run test:extension-manifest`).
 - [x] Every gate in [AGENTS.md](../AGENTS.md#rules) runs in `vp run verify`, locally and in CI.
 
 Manual, once per release of the extension:

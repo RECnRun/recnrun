@@ -14,6 +14,7 @@ Experiments that shaped a durable decision. Each ran on its own local branch wit
 | 2   | `poc/site-redirect`       | recnrun.com redirects the tab to the extension's dashboard   | Works; kept as a fallback |
 | 3   | `poc/site-iframe`         | recnrun.com shows the extension's dashboard in a frame       | Adopted                   |
 | 4   | `poc/omnibox-rr`          | Type `rr` in the address bar to open or search the dashboard | Works with caveats        |
+| 5   | `poc/split-view`          | Open the dashboard beside the current page in a Split View   | Works; see findings       |
 
 ### POC 1: extension dashboard tab
 
@@ -66,3 +67,20 @@ The content script covers the page with a full-viewport `<iframe>` of `dashboard
   - Chrome does not fire `omnibox.onInputEntered` for empty input, so `rr` followed by Enter does nothing. The end-to-end test called the handler directly and could not catch this; omnibox tests must go through the real address bar.
   - Suggestions are read asynchronously per keystroke, so an older read can overwrite a newer one ("tes" shown after typing "test"). Drop stale results.
   - Descriptions are XML: an unescaped `<` or `&` in a recording name fails with "Invalid XML".
+
+## The dashboard beside the page (October 2026)
+
+### POC 5: Split View
+
+Every POC 1 trigger, plus an "Open RECnRun" item in the page's context menu, opens the dashboard from the tab it came from. On a web page in Chrome 155+, the dashboard opens beside it in a Split View and shows only that site's workspace; on a blank tab, it replaces the tab; anywhere else, and in Chrome without Split View, POC 1's dedicated tab is unchanged. [ARCHITECTURE.md](ARCHITECTURE.md#extension) has the full table.
+
+- **API.** `tabs.create({ url, splitWithTabId, index })` and `tabs.createSplit([a, b])` (Chrome 155+) split tabs; `tabs.unsplit` separates them; `Tab.splitViewId` and `tabs.query({ splitViewId })` (Chrome 140+) read them. `"createSplit" in browser.tabs` detects support, and a rejected split falls back to the dedicated tab, for example when a flag or policy turns Split View off.
+- **Findings.**
+  - The API has no orientation or size. In Chrome 156 an API split was side by side, two 677 px tabs in a 1,400 px window. Stacked (top and bottom) splits exist only in Chrome's own UI, behind the "Stacked Split Views" flag when this POC ran. `Tab.width` and `Tab.height` report each side's size, and the dashboard sees its own through `window.innerWidth` and `innerHeight`.
+  - Dragging the divider shrank the dashboard's pane to about 140 CSS pixels wide side by side, or 64 tall when stacked. Below 30rem in either direction the dashboard tightens its spacing and type, stacks each recording's details, and wraps long hosts and URLs; `tests/e2e/dashboard-compact.spec.ts` checks that 140 px has no sideways scroll and that 64 px still shows the brand and the workspace.
+  - Reading the page's URL needs `activeTab`, which shows no install warning. A click on the icon, a menu item, or the shortcut grants it for that tab: `tab.url` is set for web pages and missing for a new tab, `about:blank`, and `chrome://` pages alike. Telling those apart would need `tabs` ("Read your browsing history"), so a hidden address counts as a blank tab, and a `chrome://settings` tab is replaced too (Back returns to it).
+  - The split dashboard's workspace is fixed when it opens. If the page then moves to another site, following it would need `tabs` or host permissions.
+  - Chrome never shows extension context menu items on its own pages, the New Tab page included; the icon and the shortcut still work there. In a frame, `documentUrlPatterns` matches the frame's URL, so an `http(s)` pattern hid "Open RECnRun" over the dashboard frame on recnrun.com. The item has the `page` and `frame` contexts and no URL patterns.
+  - The workspace reaches the dashboard as `?workspace=<origin>`, and the dashboard ignores anything that is not an `http`/`https` origin.
+  - Playwright can fire the real toolbar action: browser-level CDP `Extensions.triggerAction` on the page's tab target (`Target.getTargets` with `type: "tab"`), reached through `connectOverCDP` on a `--remote-debugging-port`. A page-level CDP session gets "Method not allowed", and a page target gets "Action can only be triggered on a tab target". The action grants `activeTab` as a real click does. The context menus and the shortcut still cannot be fired, so they share the toolbar's handler.
+- **To check by hand.** Which layout Chrome gives an API split when the user has stacked splits on.

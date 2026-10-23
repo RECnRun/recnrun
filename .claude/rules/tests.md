@@ -31,7 +31,7 @@ paths:
 
 ## Writing end-to-end tests
 
-- Import `test` and `expect` from `tests/e2e/fixtures/extension.ts` when the extension must be loaded; it launches a persistent Chromium context with `apps/extension/.output/chrome-mv3-test` and exposes `serviceWorker` and `seedSnapshot(snapshot)`. Import from `@playwright/test` for a browser without the extension.
+- Import `test` and `expect` from `tests/e2e/fixtures/extension.ts` when the extension must be loaded; it launches a persistent Chromium context with `apps/extension/.output/chrome-mv3-test` and exposes `serviceWorker` and `seedSnapshot(snapshot)`. With `test.use({ remoteDebuggingPort })`, `clickToolbarIcon(page)` fires the real toolbar action on that page's tab (browser-level CDP `Extensions.triggerAction`), `activeTab` grant included. Import from `@playwright/test` for a browser without the extension.
 - Seed data through `seedSnapshot` with fixtures from `@recnrun/domain/testing`; never drive the website into a state the extension could not produce.
 - Locate by role and accessible name (`getByRole("article", { name })`, `getByRole("region", { name })`), not CSS classes.
 - Prefer locator auto-waiting and `expect.poll` over fixed sleeps.
