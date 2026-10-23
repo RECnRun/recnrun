@@ -5,6 +5,16 @@
   gap: var(--space);
 }
 
+.site-footer {
+  max-width: 56rem;
+  margin: 0 auto;
+  padding: var(--space);
+}
+
+a:not(.button) {
+  color: var(--link);
+}
+
 .muted {
   color: var(--muted);
 }

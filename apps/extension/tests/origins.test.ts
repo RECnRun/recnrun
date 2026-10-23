@@ -1,5 +1,10 @@
 import { expect, test } from "vite-plus/test";
-import { contentScriptMatches, disallowedAncestor, isAllowedEmbedder } from "@/config/origins";
+import {
+  contentScriptExcludes,
+  contentScriptMatches,
+  disallowedAncestor,
+  isAllowedEmbedder,
+} from "@/config/origins";
 
 test("an embedder must match a pattern's scheme and host, on any port", () => {
   expect(isAllowedEmbedder("https://recnrun.com", "production")).toBe(true);
@@ -36,4 +41,13 @@ test("development and test builds also match local servers on any port", () => {
       "http://127.0.0.1/*",
     ]);
   }
+});
+
+test("the content script skips the privacy policy on every origin it runs on", () => {
+  expect(contentScriptExcludes("production")).toEqual(["https://recnrun.com/privacy/*"]);
+  expect(contentScriptExcludes("test")).toEqual([
+    "https://recnrun.com/privacy/*",
+    "http://localhost/privacy/*",
+    "http://127.0.0.1/privacy/*",
+  ]);
 });

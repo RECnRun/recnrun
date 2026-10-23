@@ -29,6 +29,8 @@ The events themselves (clicks, inputs, navigations, DOM changes) are not stored 
 
 5. On recnrun.com, the extension shows the same dashboard over the site, at the site's address: `recnrun.com/recordings/<id>` opens that recording, and Back, Forward, and reload work.
 
+6. The website's footer links to the privacy policy at `recnrun.com/privacy/`. The extension leaves that page alone, so it stays readable with the extension installed.
+
 The website never sees the user's data: only the extension reads it, in the visitor's own browser, and the site cannot read the dashboard's frame.
 
 ## Next

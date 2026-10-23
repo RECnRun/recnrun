@@ -7,6 +7,11 @@ export function contentScriptMatches(mode: string): string[] {
   return LOCAL_MODES.has(mode) ? [...PRODUCTION_MATCHES, ...LOCAL_MATCHES] : PRODUCTION_MATCHES;
 }
 
+/** The privacy policy stays readable: the store links to it, and the dashboard would cover it. */
+export function contentScriptExcludes(mode: string): string[] {
+  return contentScriptMatches(mode).map((pattern) => pattern.replace(/\*$/, "privacy/*"));
+}
+
 /** Whether an origin is covered by a `scheme://host/*` match pattern, which ignores the port. */
 function originMatches(origin: string, pattern: string): boolean {
   const target = URL.parse(origin);
