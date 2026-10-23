@@ -37,3 +37,9 @@ test("leaves the page to the extension's dashboard when it is installed", async 
   );
   expect(root.querySelector(".banner, article")).toBeNull();
 });
+
+test("links to the privacy policy", () => {
+  const root = mount(missingGateway);
+  const link = [...root.querySelectorAll("a")].find((a) => a.textContent === "Privacy policy");
+  expect(link?.getAttribute("href")).toBe("/privacy/");
+});

@@ -30,6 +30,9 @@ export function App({ gateway }: { gateway: ExtensionGateway }) {
       <main>
         <Content state={state} />
       </main>
+      <footer class="site-footer">
+        <a href="/privacy/">Privacy policy</a>
+      </footer>
     </>
   );
 }
