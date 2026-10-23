@@ -1,6 +1,6 @@
 # Brand
 
-The logo, the palette, and how the website and the extension popup use them.
+The logo, the palette, the typography, and how the website and the extension popup use them.
 
 ## Logo
 
@@ -45,6 +45,22 @@ The logo red `#f3362b` is too light for white text (3.91:1) and too dark for ink
 | -------------------- | -------------------------- | ---------------------------- |
 | Button fill and text | green with white: 4.52:1   | dim green with white: 4.63:1 |
 | Link                 | red on white popup: 5.59:1 | coral on dark popup: 5.87:1  |
+
+## Typography
+
+Text follows [GitHub's brand typography](https://brand.github.com/foundations/typography): [Mona Sans](https://github.com/github/mona-sans), in its default width, which GitHub uses for everything outside special events.
+
+| Role     | Element | Style                                                |
+| -------- | ------- | ---------------------------------------------------- |
+| Title    | `h1`    | Bold; the optical size axis gives it the display cut |
+| Headline | `h2`    | Bold                                                 |
+| Body     | `body`  | Medium (500)                                         |
+
+- **File.** `MonaSansVF[opsz,wght].woff2` from release v2.0.27, renamed `MonaSansVF.woff2`, with its `OFL.txt`. It is a variable font: weights 200 to 900 and the optical size axis in one 137 kB file. Italics, other widths, and Mona Sans Mono are left out until the UI uses them.
+- **Self-hosted, once.** The website's CSP allows fonts from its own origin only, so the apps bundle the font instead of loading it from a CDN. It lives in `packages/brand/src/fonts/`; `packages/brand/src/mona-sans.css` declares it and sets the body's family, weight, and ligatures, and each app's entry imports that stylesheet before its own, which sets size and line height. `font-display: swap` shows the fallback until the font arrives; the site does not preload it, because `index.html` can name the file only by a path into another package, which the dev server does not serve.
+- **No ligatures, no tracking.** Ligatures are off, as GitHub asks for headlines and body copy, and letter spacing is never set: Mona Sans adjusts it by size. Set fonts with longhands: the CSS minifier moves a `font` shorthand after the other declarations, and the shorthand would turn ligatures back on.
+
+`tests/e2e/typography.spec.ts` checks that both apps load the font and keep ligatures off.
 
 ## Tokens
 

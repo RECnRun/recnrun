@@ -5,7 +5,7 @@ Record a browser session once, replay it whenever you need it: log in, fill long
 - [Product brief](docs/PRODUCT_BRIEF.md): concepts (recordings and what comes next).
 - [Architecture](docs/ARCHITECTURE.md): packages, layers, the website ↔ extension protocol, and the security model.
 - [Milestones](docs/MILESTONES.md): what is done and what comes next.
-- [Brand](docs/BRAND.md): logo, colors, and CSS tokens.
+- [Brand](docs/BRAND.md): logo, colors, typography, and CSS tokens.
 - [AGENTS.md](AGENTS.md): rules for contributors, human or AI.
 
 ## Install the extension

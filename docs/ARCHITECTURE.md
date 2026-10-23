@@ -6,19 +6,23 @@
 apps/website ──► @recnrun/bridge ──► @recnrun/domain ──► valibot
 apps/extension ─┘                    ▲
         └────────────────────────────┘
+
+apps/website, apps/extension ──► @recnrun/brand (CSS and fonts)
 ```
 
 ## Packages
 
-| Package           | Holds                                                                                                         | May import                         |
-| ----------------- | ------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
-| `packages/domain` | Valibot schemas and inferred types for every concept; `Snapshot`, the versioned document the extension stores | `valibot` only                     |
-| `packages/bridge` | The website ↔ content script protocol, its client, host, and `window` transport                               | `@recnrun/domain`, `valibot`       |
-| `apps/website`    | The Preact SPA                                                                                                | both packages; never the extension |
-| `apps/extension`  | The WXT extension                                                                                             | both packages; never the website   |
+| Package           | Holds                                                                                                         | May import                        |
+| ----------------- | ------------------------------------------------------------------------------------------------------------- | --------------------------------- |
+| `packages/domain` | Valibot schemas and inferred types for every concept; `Snapshot`, the versioned document the extension stores | `valibot` only                    |
+| `packages/bridge` | The website ↔ content script protocol, its client, host, and `window` transport                               | `@recnrun/domain`, `valibot`      |
+| `packages/brand`  | Brand assets both apps style themselves with: Mona Sans and the stylesheet that loads it                      | nothing                           |
+| `apps/website`    | The Preact SPA                                                                                                | all packages; never the extension |
+| `apps/extension`  | The WXT extension                                                                                             | all packages; never the website   |
 
 - Packages never import apps. Apps never import each other: they meet only at the bridge protocol.
 - Packages export their TypeScript sources (`exports` → `./src/index.ts`); apps bundle them. A package `build` only type checks.
+- `@recnrun/brand` holds no code: it exports `mona-sans.css`, which each app's entry imports, so the font and its license exist once instead of once per app. It imports nothing (`brand-is-leaf`).
 - `@recnrun/domain/testing` exports fixtures for tests; no `src/` file imports a test file.
 - Every module is reachable from an entrypoint, a test, or a config (`no-orphans`), and there are no import cycles (`no-circular`).
 

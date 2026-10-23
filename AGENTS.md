@@ -6,6 +6,7 @@ RECnRun records and replays browser sessions for developers. The extension store
 - `apps/website`: Preact SPA at recnrun.com, deployed to GitHub Pages. It is also the extension's UI.
 - `packages/domain`: `@recnrun/domain`, Valibot schemas and types for Recording and the stored Snapshot.
 - `packages/bridge`: `@recnrun/bridge`, the versioned `window.postMessage` protocol between the website and the extension's content script.
+- `packages/brand`: `@recnrun/brand`, the Mona Sans font and the stylesheet both apps import.
 - `tests/`: Playwright end-to-end tests (`tests/e2e`) and Docker runner checks (`tests/container`).
 
 Durable decisions live in `docs/`:
@@ -13,7 +14,7 @@ Durable decisions live in `docs/`:
 - [PRODUCT_BRIEF.md](docs/PRODUCT_BRIEF.md): concepts and product rules.
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md): packages, layers, the bridge protocol, the security model, and the toolchain.
 - [MILESTONES.md](docs/MILESTONES.md): delivery and acceptance.
-- [BRAND.md](docs/BRAND.md): logo, palette, contrast, and CSS tokens.
+- [BRAND.md](docs/BRAND.md): logo, palette, contrast, typography, and CSS tokens.
 
 Update the relevant doc when a change alters what it describes.
 
