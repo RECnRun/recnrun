@@ -1,33 +1,8 @@
-import type { BrowserContext, Worker } from "@playwright/test";
 import { sampleSnapshot } from "../../packages/domain/tests/fixtures.ts";
 import { expect, test } from "./fixtures/extension.ts";
-
-interface ChromeGlobal {
-  chrome: {
-    tabs: {
-      query(filter: object): Promise<{ url?: string; active: boolean; splitViewId?: number }[]>;
-    };
-  };
-}
+import { dashboardPages, dashboardUrl, splitTabs } from "./fixtures/tabs.ts";
 
 test.use({ remoteDebuggingPort: 9333 });
-
-const dashboardUrl = (serviceWorker: Worker) => new URL("dashboard.html", serviceWorker.url()).href;
-
-const dashboardPages = (context: BrowserContext, serviceWorker: Worker) =>
-  context.pages().filter((page) => page.url().startsWith(dashboardUrl(serviceWorker)));
-
-/** Every tab's Split View id, and whether it shows the dashboard. */
-function splitTabs(serviceWorker: Worker) {
-  return serviceWorker.evaluate(async (dashboard) => {
-    const tabs = await (globalThis as unknown as ChromeGlobal).chrome.tabs.query({});
-    return tabs.map((tab) => ({
-      dashboard: tab.url?.startsWith(dashboard) ?? false,
-      active: tab.active,
-      splitViewId: tab.splitViewId,
-    }));
-  }, dashboardUrl(serviceWorker));
-}
 
 test.beforeEach(async ({ seedSnapshot }) => {
   const snapshot = sampleSnapshot();

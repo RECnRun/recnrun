@@ -42,7 +42,10 @@ export function panelTab(
     focus: async () => {
       const tab = await currentTab();
       if (tab?.id === undefined) return;
-      await splitAgain(partnerId, tab.id);
+      // The background may have moved the dashboard beside another page meanwhile.
+      if ((tab.splitViewId ?? SPLIT_VIEW_ID_NONE) === SPLIT_VIEW_ID_NONE) {
+        await splitAgain(partnerId, tab.id);
+      }
       partnerId = undefined;
       await browser.tabs.update(tab.id, { active: true });
       await browser.windows.update(tab.windowId, { focused: true });

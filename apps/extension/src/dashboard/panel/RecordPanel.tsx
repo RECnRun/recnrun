@@ -1,5 +1,8 @@
+import { useEffect } from "preact/hooks";
 import { formatElapsed, useEnded, useRecording } from "@/dashboard/panel/recording";
 import type { Recording, RecordingStore } from "@/dashboard/panel/recording";
+import { useLockHeld } from "@/dashboard/use-lock-held";
+import { DASHBOARD_LOCK, holdLock, PANEL_LOCK } from "@/messaging/view-locks";
 
 /** "Recording 00:18" or "Paused 00:18". */
 export function RecordStatus({ recording }: { recording: Recording }) {
@@ -31,10 +34,16 @@ export function RecordPanel(props: { recording: Recording; onStop: () => void })
   );
 }
 
-/** The panel page loaded into a PiP window that the site opened; it closes once the recording ends. */
+/** The panel page in a PiP window the site opened; it closes when recording ends or moves to the tab. */
 export function StandalonePanel(props: { store: RecordingStore; onStop: () => void }) {
   const { store, onStop } = props;
   const recording = useRecording(store);
+  const dashboardOpen = useLockHeld(DASHBOARD_LOCK);
+  useEffect(() => holdLock(PANEL_LOCK), []);
+  // The site's panel gives way once the dashboard tab, which owns recording, opens.
+  useEffect(() => {
+    if (dashboardOpen) onStop();
+  }, [dashboardOpen, onStop]);
   useEnded(recording.status, onStop);
   if (recording.status === "idle") return null;
   return <RecordPanel recording={recording} onStop={recording.stop} />;

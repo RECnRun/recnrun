@@ -117,7 +117,7 @@ test("the dashboard framed on recnrun.com has the site open the PiP window", asy
   await expect.poll(() => pip.isClosed()).toBe(true);
 });
 
-test("a recording started over the site shows in the dashboard tab, which can stop it", async ({
+test("while the dashboard tab is open, the site leaves recording to it", async ({
   context,
   page,
   serviceWorker,
@@ -125,15 +125,40 @@ test("a recording started over the site shows in the dashboard tab, which can st
   const tab = await context.newPage();
   await tab.goto(dashboardUrl(serviceWorker));
   await page.goto("/");
-  await page.bringToFront();
-  const dashboard = page.locator(FRAME).contentFrame();
-  const pip = await clickToOpenPanel(context, () =>
-    dashboard.getByRole("button", { name: "Record" }).click(),
-  );
-  await expect(dashboard.getByRole("banner")).toContainText("Recording");
-  await expect(tab.getByRole("banner")).toContainText("Recording");
+  const site = page.locator(FRAME).contentFrame().getByRole("banner");
+  await expect(site).toContainText("Recording is controlled from the RECnRun tab.");
+  await expect(site.getByRole("button")).toHaveCount(0);
 
-  await tab.getByRole("button", { name: "Stop" }).click();
+  await tab.bringToFront();
+  const pip = await clickToOpenPanel(context, () =>
+    tab.getByRole("button", { name: "Record" }).click(),
+  );
+  await expect(site).toContainText(/Recording \d\d:\d\d/);
+  await expect(site.getByRole("button")).toHaveCount(0);
+  await panelOf(pip).getByRole("button", { name: "Stop" }).click();
   await expect.poll(() => pip.isClosed()).toBe(true);
-  await expect(dashboard.getByRole("button", { name: "Record" })).toBeVisible();
+
+  await tab.close();
+  await expect(site.getByRole("button", { name: "Record" })).toBeVisible();
+});
+
+test("opening the dashboard tab closes the panel the site opened", async ({
+  context,
+  page,
+  serviceWorker,
+}) => {
+  await page.goto("/");
+  const site = page.locator(FRAME).contentFrame();
+  const pip = await clickToOpenPanel(context, () =>
+    site.getByRole("button", { name: "Record" }).click(),
+  );
+  await expect(pip.locator("iframe").contentFrame().getByRole("region")).toContainText("Recording");
+
+  const tab = await context.newPage();
+  await tab.goto(dashboardUrl(serviceWorker));
+  await expect.poll(() => pip.isClosed()).toBe(true);
+  await expect(tab.getByRole("button", { name: "Show the panel" })).toBeVisible();
+  await expect(site.getByRole("banner")).toContainText(
+    "Recording is controlled from the RECnRun tab.",
+  );
 });

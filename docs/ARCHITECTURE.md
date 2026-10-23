@@ -45,16 +45,16 @@ Components take the gateway or data as props, so component tests use a fake gate
 
 ## Extension
 
-| Folder            | Runs in                | Role                                                                                                                                            |
-| ----------------- | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/entrypoints` | (WXT)                  | Thin wiring: each file calls one `start*` function. Nothing imports an entrypoint.                                                              |
-| `src/content`     | The RECnRun website    | Bridge host, and the frame that shows the dashboard over the site.                                                                              |
-| `src/background`  | The service worker     | Validates requests and senders, answers them from storage.                                                                                      |
-| `src/storage`     | The service worker     | Repositories over WXT `storage` (`local:` for data, `session:` for the recording in progress); validates what it reads with the domain schemas. |
-| `src/dashboard`   | The dashboard page     | Preact UI at `dashboard.html`. Reads through a function it is given, never through content or background code.                                  |
-| `src/pip`         | Dashboard and content  | Typed access to Document Picture-in-Picture and the panel window helpers ([POC 6](POCS.md#poc-6-record-opens-a-pip-window)).                    |
-| `src/config`      | Build time             | `origins.ts`: the pages the content script runs on and that may frame the dashboard, per build mode.                                            |
-| `src/messaging`   | Content and background | The content ↔ background and content ↔ dashboard frame message schemas.                                                                         |
+| Folder            | Runs in               | Role                                                                                                                                            |
+| ----------------- | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/entrypoints` | (WXT)                 | Thin wiring: each file calls one `start*` function. Nothing imports an entrypoint.                                                              |
+| `src/content`     | The RECnRun website   | Bridge host, and the frame that shows the dashboard over the site.                                                                              |
+| `src/background`  | The service worker    | Validates requests and senders, answers them from storage.                                                                                      |
+| `src/storage`     | The service worker    | Repositories over WXT `storage` (`local:` for data, `session:` for the recording in progress); validates what it reads with the domain schemas. |
+| `src/dashboard`   | The dashboard page    | Preact UI at `dashboard.html`. Reads through a function it is given, never through content or background code.                                  |
+| `src/pip`         | Dashboard and content | Typed access to Document Picture-in-Picture and the panel window helpers ([POC 6](POCS.md#poc-6-record-opens-a-pip-window)).                    |
+| `src/config`      | Build time            | `origins.ts`: the pages the content script runs on and that may frame the dashboard, per build mode.                                            |
+| `src/messaging`   | Every extension page  | The content ↔ background, content ↔ dashboard frame, and background → dashboard tab message schemas; the Web Locks the views share.             |
 
 `content` never imports `storage`, and `dashboard` never imports `content` or `background`.
 
@@ -64,8 +64,13 @@ The dashboard opens from the toolbar icon (no popup, so a click fires `action.on
 | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
 | A web page, Split View available (Chrome 155+)          | Opens beside it in a Split View (`tabs.create({ splitWithTabId })`), showing only that site's workspace |
 | Any tab already in a Split View                         | Focuses the dashboard in that split, if there is one; otherwise as below                                |
-| Hidden address (new tab, `about:blank`, browser pages)  | Opens beside it in a Split View, with the dashboard of every workspace                                  |
+| Any other tab that is not an extension page             | Opens beside it in a Split View, with the dashboard of every workspace                                  |
+| A dashboard tab is already open elsewhere               | Moves it beside the tab instead (`tabs.unsplit`, `tabs.move`, `tabs.createSplit`), without a reload     |
 | No Split View, Chrome refuses the split, or other pages | Focuses an open dashboard tab, or opens one                                                             |
+
+The browser keeps one top-level dashboard tab. A moved tab learns its new workspace from a `show-workspace` runtime message (`messaging/dashboard-protocol.ts`), which it accepts only from its own extension and for its own tab id, and swaps `?workspace=` with `history.replaceState`; staying loaded keeps its PiP window open. A dashboard tab opened another way (a link, a bookmark) yields to the earlier one (`dashboard/dashboard-tab.ts`): it hands over its hash route, which does not reload that tab, focuses it, and closes itself. While a recording panel floats, every trigger does nothing, so the window and the page it records stay where they are.
+
+Views find each other through Web Locks, which the dashboard tab, the dashboard frame, the panel frame, and the service worker share as pages of one extension origin (`messaging/view-locks.ts`). A view with an open PiP window holds `recnrun-panel`, and the top-level dashboard holds `recnrun-dashboard`. Each holder announces itself on a `BroadcastChannel` of the same name; watchers queue a shared request to learn when the lock frees, since exclusive waiters would take it from each other. While `recnrun-panel` is held, the other views say the panel floats instead of offering "Show the panel", and triggers are ignored. While `recnrun-dashboard` is held, the dashboard framed on recnrun.com shows the recording without its controls and points at the tab, and a site panel window closes.
 
 A workspace is the origin a recording starts on, derived when the dashboard renders; nothing stores it. A split dashboard gets it as `dashboard.html?workspace=<origin>`, and ignores any value that is not an `http`/`https` origin. The dashboard keeps its route in the hash (`dashboard.html#/recordings/<id>`), since an extension page has no server to answer other paths.
 

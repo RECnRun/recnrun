@@ -1,13 +1,17 @@
 import type { Snapshot } from "@recnrun/domain";
 import { render } from "preact";
+import { useEffect, useState } from "preact/hooks";
 import { disallowedAncestor } from "@/config/origins";
 import { Dashboard, Refusal } from "@/dashboard/Dashboard";
+import type { DashboardTab } from "@/dashboard/dashboard-tab";
 import { panelTab } from "@/dashboard/panel/panel-tab";
 import type { RecordSurface } from "@/dashboard/panel/RecordControls";
 import { StandalonePanel } from "@/dashboard/panel/RecordPanel";
 import type { RecordingStore } from "@/dashboard/panel/recording";
 import { createFrameRouter, createHashRouter } from "@/dashboard/router";
 import { workspaceParam } from "@/dashboard/workspace";
+import { workspaceSearch } from "@/messaging/dashboard-protocol";
+import { DASHBOARD_LOCK, holdLock } from "@/messaging/view-locks";
 import { closePanelMessage, openPanelMessage } from "@/messaging/frame-protocol";
 import { documentPip } from "@/pip/document-pip";
 
@@ -15,6 +19,8 @@ import { documentPip } from "@/pip/document-pip";
 export interface DashboardData {
   loadSnapshot: () => Promise<Snapshot>;
   recordings: RecordingStore;
+  /** The top-level dashboard's tab, absent where tests run without the extension APIs. */
+  tab?: DashboardTab;
 }
 
 const isPanelView = (search: string) => new URLSearchParams(search).get("view") === "panel";
@@ -23,6 +29,32 @@ const isPanelView = (search: string) => new URLSearchParams(search).get("view") 
 function topLevelSurface(page: Window): RecordSurface {
   const pip = documentPip(page);
   return pip ? { kind: "window", pip, tab: panelTab() } : { kind: "inline" };
+}
+
+/** A dashboard tab, which follows the page the background moves it beside. */
+function TopLevelDashboard({ data, page }: { data: DashboardData; page: Window }) {
+  const [router] = useState(() => createHashRouter(page));
+  const [surface] = useState(() => topLevelSurface(page));
+  // A Split View tab opens with the workspace of the page beside it.
+  const [workspace, setWorkspace] = useState(() => workspaceParam(page.location.search));
+  useEffect(() => holdLock(DASHBOARD_LOCK), []);
+  useEffect(() => {
+    void data.tab?.yieldToEarlier(new URL(page.location.href));
+    return data.tab?.onShowWorkspace((next) => {
+      setWorkspace(next);
+      // A reload keeps the workspace; navigating now would reload and close the PiP panel.
+      const { pathname, hash } = page.location;
+      page.history.replaceState(null, "", pathname + workspaceSearch(next) + hash);
+    });
+  }, [data, page]);
+  return (
+    <Dashboard
+      loadSnapshot={data.loadSnapshot}
+      router={router}
+      workspace={workspace}
+      record={{ surface, store: data.recordings }}
+    />
+  );
 }
 
 function startFramed(root: HTMLElement, data: DashboardData, page: Window) {
@@ -61,15 +93,5 @@ export function startDashboard(
     startFramed(root, data, page);
     return;
   }
-  // A Split View tab opens with the workspace of the page beside it.
-  const workspace = workspaceParam(page.location.search);
-  render(
-    <Dashboard
-      loadSnapshot={data.loadSnapshot}
-      router={createHashRouter(page)}
-      workspace={workspace}
-      record={{ surface: topLevelSurface(page), store: data.recordings }}
-    />,
-    root,
-  );
+  render(<TopLevelDashboard data={data} page={page} />, root);
 }

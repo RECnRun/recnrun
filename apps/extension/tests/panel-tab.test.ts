@@ -38,10 +38,12 @@ test("leaves the Split View for the page beside it, and splits with it again on 
   const { unsplit, createSplit } = fakeSplitView();
   const site = await theOtherTab();
   const dashboard = { ...(await fakeBrowser.tabs.create({ url: DASHBOARD })), splitViewId: 7 };
-  const tab = panelTab(async () => dashboard);
+  let current = dashboard;
+  const tab = panelTab(async () => current);
 
   await tab.leaveSplit();
   expect(unsplit).toHaveBeenCalledWith(7);
+  current = { ...dashboard, splitViewId: -1 };
   expect((await fakeBrowser.tabs.get(site.id ?? -1)).active).toBe(true);
 
   await tab.focus();
@@ -57,6 +59,19 @@ test("still focuses the dashboard when splitting again fails", async () => {
 
   await tab.leaveSplit();
   await tab.focus();
+  expect((await fakeBrowser.tabs.get(dashboard.id ?? -1)).active).toBe(true);
+});
+
+test("does not split again once the dashboard moved into another Split View", async () => {
+  const { createSplit } = fakeSplitView();
+  const dashboard = { ...(await fakeBrowser.tabs.create({ url: DASHBOARD })), splitViewId: 7 };
+  let current = dashboard;
+  const tab = panelTab(async () => current);
+
+  await tab.leaveSplit();
+  current = { ...dashboard, splitViewId: 8 };
+  await tab.focus();
+  expect(createSplit).not.toHaveBeenCalled();
   expect((await fakeBrowser.tabs.get(dashboard.id ?? -1)).active).toBe(true);
 });
 

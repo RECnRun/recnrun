@@ -1,12 +1,14 @@
-import { beforeEach, expect, test, vi } from "vite-plus/test";
+import { afterEach, beforeEach, expect, test, vi } from "vite-plus/test";
 import type { Browser } from "wxt/browser";
 import { fakeBrowser } from "wxt/testing/fake-browser";
 import {
   openDashboard,
   openDashboardFrom,
+  openForTrigger,
   PAGE_MENU_ITEM,
   placeDashboard,
 } from "@/background/open-dashboard";
+import { showWorkspaceMessage } from "@/messaging/dashboard-protocol";
 
 const DASHBOARD = "chrome-extension://test-id/dashboard.html";
 
@@ -14,9 +16,15 @@ beforeEach(() => {
   fakeBrowser.reset();
 });
 
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
 const dashboardTabs = () => fakeBrowser.tabs.query({ url: DASHBOARD });
 
-function tab(properties: Pick<Browser.tabs.Tab, "id" | "url" | "splitViewId">): Browser.tabs.Tab {
+function tab(
+  properties: Partial<Pick<Browser.tabs.Tab, "id" | "url" | "splitViewId" | "index" | "windowId">>,
+): Browser.tabs.Tab {
   return {
     id: 7,
     index: 2,
@@ -79,7 +87,25 @@ test("keeps the dedicated dashboard tab without Split View, a tab, or a web page
   expect(placeDashboard(tab({ url: "https://shop.example/" }), false)).toEqual({ kind: "tab" });
   expect(placeDashboard(undefined, true)).toEqual({ kind: "tab" });
   expect(placeDashboard(tab({ url: `${DASHBOARD}#/` }), true)).toEqual({ kind: "tab" });
-  expect(placeDashboard(tab({ url: "file:///tmp/a.html" }), true)).toEqual({ kind: "tab" });
+});
+
+test("splits a browser page, such as a new tab, with the dashboard of every workspace", () => {
+  for (const url of ["chrome://newtab/", "about:blank", "file:///tmp/a.html"]) {
+    const page = tab({ url, splitViewId: -1 });
+    expect(placeDashboard(page, true)).toEqual({ kind: "split", tab: page });
+  }
+});
+
+test("focuses the open dashboard whatever workspace its address shows", async () => {
+  const open = await fakeBrowser.tabs.create({
+    url: `${DASHBOARD}?workspace=https%3A%2F%2Fa.example`,
+  });
+  await fakeBrowser.tabs.create({ url: "https://example.com/", active: true });
+  const create = vi.spyOn(fakeBrowser.tabs, "create");
+
+  await openDashboard(DASHBOARD);
+  expect(create).not.toHaveBeenCalled();
+  expect((await fakeBrowser.tabs.get(open.id ?? -1)).active).toBe(true);
 });
 
 test("creates the split dashboard next to the page, with its workspace", async () => {
@@ -110,8 +136,71 @@ test("creates the dashboard of every workspace next to a tab whose address is hi
   });
 });
 
+/** fakeBrowser has no Split View or tab moves, so these stand in for Chrome's. */
+function fakeTabMoves() {
+  const unsplit = vi.fn(async (_splitViewId: number) => {});
+  const createSplit = vi.fn(async (_tabIds: [number, number]) => 9);
+  const move = vi.fn(async (_tabId: number, _properties: object) => ({}));
+  Object.assign(fakeBrowser.tabs, { unsplit, createSplit, move });
+  const sendMessage = vi.spyOn(fakeBrowser.runtime, "sendMessage").mockResolvedValue(undefined);
+  return { unsplit, createSplit, move, sendMessage };
+}
+
+/** The open dashboard tab as Chrome reports it, split with another page when splitViewId is set. */
+async function openDashboardTab(properties: Partial<Browser.tabs.Tab>) {
+  const { id = -1 } = await fakeBrowser.tabs.create({
+    url: `${DASHBOARD}?workspace=https%3A%2F%2Fa.example`,
+  });
+  // fakeBrowser keeps whatever an update passes, so this sets Chrome's read-only tab state.
+  await fakeBrowser.tabs.update(id, properties as Browser.tabs.UpdateProperties);
+  return id;
+}
+
+test("moves the open dashboard beside the page and tells it the page's workspace", async () => {
+  const { unsplit, createSplit, move, sendMessage } = fakeTabMoves();
+  const dashboard = await openDashboardTab({ index: 0, windowId: 1, splitViewId: 4 });
+  const create = vi.spyOn(fakeBrowser.tabs, "create");
+
+  await openDashboardFrom(tab({ id: 30, url: "https://b.example/x", index: 5 }), DASHBOARD, true);
+  expect(create).not.toHaveBeenCalled();
+  expect(unsplit).toHaveBeenCalledWith(4);
+  expect(move).toHaveBeenCalledWith(dashboard, { windowId: 1, index: 5 });
+  expect(createSplit).toHaveBeenCalledWith([30, dashboard]);
+  expect(sendMessage).toHaveBeenCalledWith(showWorkspaceMessage(dashboard, "https://b.example"));
+  expect((await fakeBrowser.tabs.get(dashboard)).active).toBe(true);
+});
+
+test("moves the dashboard from another window to the right of the page", async () => {
+  const { unsplit, move, sendMessage } = fakeTabMoves();
+  const dashboard = await openDashboardTab({ index: 0, windowId: 1, splitViewId: -1 });
+
+  await openDashboardFrom(tab({ id: 30, url: undefined, index: 0, windowId: 2 }), DASHBOARD, true);
+  expect(unsplit).not.toHaveBeenCalled();
+  expect(move).toHaveBeenCalledWith(dashboard, { windowId: 2, index: 1 });
+  expect(sendMessage).toHaveBeenCalledWith(showWorkspaceMessage(dashboard));
+});
+
+test("still focuses the open dashboard when Chrome refuses to move it", async () => {
+  const { move } = fakeTabMoves();
+  move.mockRejectedValue(new Error("Tabs cannot be edited right now"));
+  const dashboard = await openDashboardTab({ index: 0, windowId: 1, splitViewId: -1 });
+  const focusWindow = vi.spyOn(fakeBrowser.windows, "update");
+
+  await openDashboardFrom(tab({ id: 30, url: "https://b.example/" }), DASHBOARD, true);
+  expect((await fakeBrowser.tabs.get(dashboard)).active).toBe(true);
+  expect(focusWindow).toHaveBeenCalledWith(1, { focused: true });
+});
+
 test("opens the dedicated tab when Chrome has no Split View", async () => {
   await openDashboardFrom(tab({ url: "https://shop.example/" }), DASHBOARD, false);
+  expect(await dashboardTabs()).toHaveLength(1);
+});
+
+test("a trigger opens nothing while a PiP recording panel floats", async () => {
+  const create = vi.spyOn(fakeBrowser.tabs, "create");
+  await openForTrigger(tab({ url: "https://shop.example/" }), DASHBOARD, async () => true);
+  expect(create).not.toHaveBeenCalled();
+  await openForTrigger(undefined, DASHBOARD, async () => false);
   expect(await dashboardTabs()).toHaveLength(1);
 });
 
