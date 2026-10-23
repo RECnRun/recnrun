@@ -56,7 +56,7 @@ Components take the gateway or data as props, so component tests use a fake gate
 
 `content` never imports `storage`, and `dashboard` never imports `content` or `background`.
 
-The dashboard opens from the toolbar icon (no popup, so a click fires `action.onClicked`), the icon's "Dashboard" context menu item, the page's "Open RECnRun" context menu item (web pages only), or the `open-dashboard` command (Alt+Shift+D). Every trigger goes through `openDashboardFrom` in `background/open-dashboard.ts`, which places it by the tab it came from (`placeDashboard`):
+The dashboard opens from the toolbar icon (no popup, so a click fires `action.onClicked`), the icon's "Dashboard" context menu item, the page's "Open RECnRun" context menu item (any page or frame Chrome lets extensions add items to, which excludes `chrome://` pages and the New Tab page), or the `open-dashboard` command (Alt+Shift+D). Every trigger goes through `openDashboardFrom` in `background/open-dashboard.ts`, which places it by the tab it came from (`placeDashboard`):
 
 | The tab                                                 | The dashboard                                                                                           |
 | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |

@@ -8,6 +8,14 @@ const OPEN_RECNRUN = "open-recnrun";
 // browser.tabs.SPLIT_VIEW_ID_NONE, which Chrome before 140 and fakeBrowser lack.
 const SPLIT_VIEW_ID_NONE = -1;
 
+// No documentUrlPatterns: in a frame Chrome matches the frame's URL, which hides the item over
+// the dashboard frame on recnrun.com. Chrome never shows extension items on chrome:// pages.
+export const PAGE_MENU_ITEM = {
+  id: OPEN_RECNRUN,
+  title: "Open RECnRun",
+  contexts: ["page", "frame"],
+} satisfies Browser.contextMenus.CreateProperties;
+
 /** Where a trigger from a tab opens the dashboard. */
 export type Placement =
   | { kind: "tab" }
@@ -93,12 +101,7 @@ export function registerDashboardTriggers(): (tab?: Tab) => Promise<void> {
   // Menu items persist across service worker restarts, so create them once per install or update.
   browser.runtime.onInstalled.addListener(() => {
     browser.contextMenus.create({ id: OPEN_DASHBOARD, title: "Dashboard", contexts: ["action"] });
-    browser.contextMenus.create({
-      id: OPEN_RECNRUN,
-      title: "Open RECnRun",
-      contexts: ["page"],
-      documentUrlPatterns: ["http://*/*", "https://*/*"],
-    });
+    browser.contextMenus.create(PAGE_MENU_ITEM);
   });
   return open;
 }

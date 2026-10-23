@@ -1,7 +1,12 @@
 import { beforeEach, expect, test, vi } from "vite-plus/test";
 import type { Browser } from "wxt/browser";
 import { fakeBrowser } from "wxt/testing/fake-browser";
-import { openDashboard, openDashboardFrom, placeDashboard } from "@/background/open-dashboard";
+import {
+  openDashboard,
+  openDashboardFrom,
+  PAGE_MENU_ITEM,
+  placeDashboard,
+} from "@/background/open-dashboard";
 
 const DASHBOARD = "chrome-extension://test-id/dashboard.html";
 
@@ -98,4 +103,12 @@ test("turns the current tab into the dashboard when its address is hidden", asyn
 test("opens the dedicated tab when Chrome has no Split View", async () => {
   await openDashboardFrom(tab({ url: "https://shop.example/" }), DASHBOARD, false);
   expect(await dashboardTabs()).toHaveLength(1);
+});
+
+test("offers Open RECnRun on every page and frame, the dashboard frame on recnrun.com included", () => {
+  expect(PAGE_MENU_ITEM).toEqual({
+    id: "open-recnrun",
+    title: "Open RECnRun",
+    contexts: ["page", "frame"],
+  });
 });
