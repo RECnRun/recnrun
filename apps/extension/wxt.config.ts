@@ -14,6 +14,14 @@ export default defineConfig({
   manifest: {
     name: "RECnRun",
     description: "Records and replays browser sessions for developers.",
-    permissions: ["storage"],
+    permissions: ["storage", "contextMenus"],
+    // No default_popup, so a toolbar click fires action.onClicked and opens the dashboard.
+    action: { default_title: "Open the RECnRun dashboard" },
+    commands: {
+      "open-dashboard": {
+        suggested_key: { default: "Alt+Shift+D", mac: "MacCtrl+Shift+D" },
+        description: "Open the RECnRun dashboard",
+      },
+    },
   },
 });

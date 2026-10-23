@@ -140,9 +140,9 @@ module.exports = {
       to: { path: "^apps/extension/src/storage/" },
     },
     {
-      name: "extension-popup-isolated",
+      name: "extension-dashboard-isolated",
       severity: "error",
-      from: { path: "^apps/extension/src/popup/" },
+      from: { path: "^apps/extension/src/dashboard/" },
       to: { path: "^apps/extension/src/(content|background)/" },
     },
     {

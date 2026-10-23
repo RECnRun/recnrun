@@ -2,7 +2,7 @@
 
 RECnRun records and replays browser sessions for developers. The extension stores the user's data; the website at recnrun.com detects the extension, asks to install it when it is missing, and otherwise reads and shows that data. It is a Vite+ monorepo:
 
-- `apps/extension`: WXT Chromium (MV3) extension with a Preact popup. It owns the data.
+- `apps/extension`: WXT Chromium (MV3) extension with a Preact dashboard page. It owns the data.
 - `apps/website`: Preact SPA at recnrun.com, deployed to GitHub Pages. It is also the extension's UI.
 - `packages/domain`: `@recnrun/domain`, Valibot schemas and types for Recording and the stored Snapshot.
 - `packages/bridge`: `@recnrun/bridge`, the versioned `window.postMessage` protocol between the website and the extension's content script.

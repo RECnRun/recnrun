@@ -44,17 +44,19 @@ Components take the gateway or data as props, so component tests use a fake gate
 
 ## Extension
 
-| Folder            | Runs in                | Role                                                                                       |
-| ----------------- | ---------------------- | ------------------------------------------------------------------------------------------ |
-| `src/entrypoints` | (WXT)                  | Thin wiring: each file calls one `start*` function. Nothing imports an entrypoint.         |
-| `src/content`     | The RECnRun website    | Bridge host. Relays known requests to the background and returns its reply.                |
-| `src/background`  | The service worker     | Validates requests and senders, answers them from storage.                                 |
-| `src/storage`     | The service worker     | Repositories over WXT `storage`; validates what it reads with the domain schemas.          |
-| `src/popup`       | The toolbar popup      | Preact UI. Reads through a function it is given, never through content or background code. |
-| `src/config`      | Build time             | `origins.ts`: the pages the content script runs on, per build mode.                        |
-| `src/messaging`   | Content and background | The internal content ↔ background message schema.                                          |
+| Folder            | Runs in                | Role                                                                                                           |
+| ----------------- | ---------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `src/entrypoints` | (WXT)                  | Thin wiring: each file calls one `start*` function. Nothing imports an entrypoint.                             |
+| `src/content`     | The RECnRun website    | Bridge host. Relays known requests to the background and returns its reply.                                    |
+| `src/background`  | The service worker     | Validates requests and senders, answers them from storage.                                                     |
+| `src/storage`     | The service worker     | Repositories over WXT `storage`; validates what it reads with the domain schemas.                              |
+| `src/dashboard`   | The dashboard page     | Preact UI at `dashboard.html`. Reads through a function it is given, never through content or background code. |
+| `src/config`      | Build time             | `origins.ts`: the pages the content script runs on, per build mode.                                            |
+| `src/messaging`   | Content and background | The internal content ↔ background message schema.                                                              |
 
-`content` never imports `storage`, and `popup` never imports `content` or `background`.
+`content` never imports `storage`, and `dashboard` never imports `content` or `background`.
+
+The dashboard opens in a tab from the toolbar icon (no popup, so a click fires `action.onClicked`), the icon's context menu, or the `open-dashboard` command (Alt+Shift+D). `background/open-dashboard.ts` focuses an open dashboard tab instead of opening another. The dashboard keeps its route in the hash (`dashboard.html#/recordings/<id>`), since an extension page has no server to answer other paths.
 
 ## Bridge protocol v1
 
@@ -84,7 +86,7 @@ Inside the extension, the content script forwards `{ type }` with `browser.runti
 The extension holds the user's data; the website only displays it.
 
 - **Where the content script runs.** Production builds match only `https://recnrun.com/*`, where the website lives. The project also owns recnrun.app, recnrun.io, and recn.run; they only redirect to recnrun.com at the Cloudflare edge and never serve a page, so the extension does not match them. `development` and `test` builds add `http://localhost/*` and `http://127.0.0.1/*` (any port) for the dev server and end-to-end tests. `vp run test:extension-manifest` fails the build if a production manifest matches anything else.
-- **Permissions.** Only `storage`: no host permissions, no `externally_connectable`, no access to other sites. The same check enforces it.
+- **Permissions.** Only `storage` and `contextMenus` (the toolbar icon's "Dashboard" item; neither shows an install warning): no `tabs`, no host permissions, no `externally_connectable`, no access to other sites. The same check enforces it.
 - **Who may ask.** The `window` transport accepts only messages whose `source` is the page's own window and whose `origin` is the page's own origin, and replies only to that origin. Pages on other origins, other windows, and frames get no answer (`tests/e2e/origin-guard.spec.ts`).
 - **What they can get.** The bridge is read-only. The content script cannot read storage itself; it can only relay known request types to the background, which checks that the sender is its own extension.
 - **What the website trusts.** Stored data is validated when the extension reads it and again when the website receives it. Data is rendered as text.

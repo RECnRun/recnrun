@@ -24,7 +24,7 @@ test("the website renders text in Mona Sans under its CSP", async ({ page }) => 
   await expect.poll(() => brandFont(page)).toEqual(expected);
 });
 
-test("the popup renders text in Mona Sans", async ({ page, serviceWorker }) => {
-  await page.goto(`chrome-extension://${new URL(serviceWorker.url()).host}/popup.html`);
+test("the dashboard renders text in Mona Sans", async ({ page, serviceWorker }) => {
+  await page.goto(`chrome-extension://${new URL(serviceWorker.url()).host}/dashboard.html`);
   await expect.poll(() => brandFont(page)).toEqual(expected);
 });

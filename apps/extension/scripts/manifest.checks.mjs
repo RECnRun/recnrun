@@ -17,9 +17,9 @@ test("the production build talks only to the RECnRun domains", () => {
   assert.doesNotMatch(JSON.stringify(manifest), /localhost|127\.0\.0\.1/);
 });
 
-test("the production build requests no permission beyond storage", () => {
+test("the production build requests only storage and contextMenus", () => {
   const manifest = productionManifest();
-  assert.deepEqual(manifest.permissions, ["storage"]);
+  assert.deepEqual(manifest.permissions, ["storage", "contextMenus"]);
   assert.equal(manifest.host_permissions, undefined);
   assert.equal(manifest.externally_connectable, undefined);
 });
