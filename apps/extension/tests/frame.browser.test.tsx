@@ -124,14 +124,24 @@ const orphanNotice = () =>
     (each) => each.textContent === ORPHANED_NOTICE,
   );
 
+/** The site page, with its reloads counted instead of made. */
 function watchedFrame(connect: () => SitePort) {
   const frame = document.body.appendChild(document.createElement("iframe"));
   let connected = 0;
-  watchForOrphaning(frame, () => {
-    connected += 1;
-    return connect();
-  });
-  return { frame, connections: () => connected };
+  let reloads = 0;
+  const page = Object.assign(new EventTarget(), {
+    document,
+    location: { reload: () => (reloads += 1) },
+  }) as unknown as Window;
+  watchForOrphaning(
+    frame,
+    () => {
+      connected += 1;
+      return connect();
+    },
+    page,
+  );
+  return { frame, page, connections: () => connected, reloads: () => reloads };
 }
 
 test("once its frame loads, the site holds a port, and asks for a reload when it drops", async () => {
@@ -155,4 +165,20 @@ test("a site whose frame loads after RECnRun unloaded asks for a reload at once"
   frame.dispatchEvent(new Event("load"));
   expect(orphanNotice()).toBeDefined();
   expect(document.querySelector("iframe")).toBeNull();
+});
+
+test("an orphaned site reloads once the user comes back to it, as from chrome://extensions", () => {
+  const { port, disconnect } = fakePort();
+  const { frame, page, reloads } = watchedFrame(() => port);
+  frame.dispatchEvent(new Event("load"));
+  page.dispatchEvent(new Event("focus"));
+  expect(reloads()).toBe(0);
+
+  disconnect();
+  expect(reloads()).toBe(0);
+  page.dispatchEvent(new Event("focus"));
+  expect(reloads()).toBe(1);
+  expect(document.visibilityState).toBe("visible");
+  document.dispatchEvent(new Event("visibilitychange"));
+  expect(reloads()).toBe(2);
 });
