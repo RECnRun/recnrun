@@ -1,6 +1,7 @@
 import type { BrowserContext, Page, Worker } from "@playwright/test";
 import { expect, test } from "./fixtures/extension.ts";
 import {
+  clickInDashboard,
   clickToOpenPanel,
   dashboardOf,
   openSite,
@@ -54,7 +55,7 @@ test.describe("with incognito access", () => {
   }) => {
     const site = await openSite(context, "/");
     await expect(tabsOf(site)).not.toContainText("Allow in Incognito");
-    await tabsOf(site).getByRole("button", { name: "New incognito window" }).click();
+    await clickInDashboard(tabsOf(site).getByRole("button", { name: "New incognito window" }));
 
     await expect
       .poll(async () => (await chromeTabs(serviceWorker)).filter((tab) => tab.incognito).length)
