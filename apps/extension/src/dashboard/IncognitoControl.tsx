@@ -25,17 +25,27 @@ function IncognitoBanner({ access, onError }: IncognitoProps) {
   );
 }
 
-/** Opens an incognito window when RECnRun may see it, or leads to where to allow that. */
-export function IncognitoControl(props: IncognitoProps) {
-  const [allowed, setAllowed] = useState<boolean>();
+/** Whether RECnRun may see incognito tabs; `undefined` until Chrome answers. */
+type IncognitoState = boolean | "unknown" | undefined;
+
+export function useIncognitoAccess(access: IncognitoAccess | undefined): IncognitoState {
+  const [allowed, setAllowed] = useState<IncognitoState>();
   useEffect(() => {
     // A failed read says nothing about the toggle, so it shows neither the banner nor the button.
-    void props.access.allowed().then(setAllowed, () => {});
-  }, [props.access]);
-  if (allowed === undefined) return null;
-  if (!allowed) return <IncognitoBanner {...props} />;
-  const open = () =>
-    props.access.openWindow().catch((caught: unknown) => props.onError(errorText(caught)));
+    void access?.allowed().then(setAllowed, () => setAllowed("unknown"));
+  }, [access]);
+  return access ? allowed : "unknown";
+}
+
+/** Opens an incognito window when RECnRun may see it, or leads to where to allow that. */
+export function IncognitoControl({
+  access,
+  allowed,
+  onError,
+}: Omit<IncognitoProps, "access"> & { access?: IncognitoAccess; allowed: IncognitoState }) {
+  if (!access || typeof allowed !== "boolean") return null;
+  if (!allowed) return <IncognitoBanner access={access} onError={onError} />;
+  const open = () => access.openWindow().catch((caught: unknown) => onError(errorText(caught)));
   return (
     <button type="button" class="tab-new-window" onClick={() => void open()}>
       New incognito window
