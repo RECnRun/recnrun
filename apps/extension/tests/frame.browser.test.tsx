@@ -1,5 +1,6 @@
 import { afterEach, expect, test } from "vite-plus/test";
 import { mountDashboardFrame } from "@/content/dashboard-frame";
+import { showIncognitoNotice } from "@/content/incognito-notice";
 import { createFrameRouter } from "@/dashboard/router";
 import { startDashboard } from "@/dashboard/start";
 import { locationMessage, routeMessage } from "@/messaging/frame-protocol";
@@ -96,4 +97,12 @@ test("the content script frames the dashboard and syncs the route both ways", as
   const routes = messagesTo(frame);
   history.back();
   await expect.poll(() => routes).toContainEqual(routeMessage("/recordings/rec-login?view=events"));
+});
+
+test("in an incognito tab, the site is covered by where to record from instead of the frame", () => {
+  showIncognitoNotice();
+  const notice = document.querySelector<HTMLElement>('[role="status"]');
+  expect(notice?.textContent).toContain("Open recnrun.com there to record incognito tabs.");
+  expect(notice?.style.position).toBe("fixed");
+  expect(document.querySelector("iframe")).toBeNull();
 });

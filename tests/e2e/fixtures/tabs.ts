@@ -4,12 +4,24 @@ interface ChromeTab {
   id?: number;
   url?: string;
   active: boolean;
+  incognito: boolean;
+  windowId: number;
 }
 
 interface ChromeGlobal {
   chrome: {
-    tabs: { query(filter: object): Promise<ChromeTab[]> };
-    storage: { session: { get(key: string): Promise<Record<string, unknown>> } };
+    tabs: {
+      query(filter: object): Promise<ChromeTab[]>;
+      update(tabId: number, properties: object): Promise<ChromeTab>;
+    };
+    windows: {
+      create(data: object): Promise<{ id?: number; tabs?: ChromeTab[] }>;
+      update(windowId: number, properties: object): Promise<unknown>;
+    };
+    storage: Record<
+      "local" | "session",
+      { get(key: string | null): Promise<Record<string, unknown>> }
+    >;
   };
 }
 
@@ -20,7 +32,13 @@ export const sessionUrl = (serviceWorker: Worker) =>
 export function chromeTabs(serviceWorker: Worker) {
   return serviceWorker.evaluate(async () => {
     const tabs = await (globalThis as unknown as ChromeGlobal).chrome.tabs.query({});
-    return tabs.map((tab) => ({ id: tab.id, url: tab.url ?? "", active: tab.active }));
+    return tabs.map(({ id, url = "", active, incognito, windowId }) => ({
+      id,
+      url,
+      active,
+      incognito,
+      windowId,
+    }));
   });
 }
 
@@ -44,4 +62,34 @@ export function storedSession(serviceWorker: Worker): Promise<unknown> {
 export async function recordedTabId(serviceWorker: Worker): Promise<number | null> {
   const session = (await storedSession(serviceWorker)) as { tabId?: number } | null;
   return session?.tabId ?? null;
+}
+
+/** Opens `url` in a new incognito window, as the user would, and returns its tab's id. */
+export function openIncognitoTab(serviceWorker: Worker, url: string): Promise<number | undefined> {
+  return serviceWorker.evaluate(async (address) => {
+    const { chrome } = globalThis as unknown as ChromeGlobal;
+    const created = await chrome.windows.create({ incognito: true, url: address });
+    return created.tabs?.[0]?.id;
+  }, url);
+}
+
+/** Activates the tab and focuses its window, as a click on it would. */
+export function focusTab(serviceWorker: Worker, tabId: number): Promise<void> {
+  return serviceWorker.evaluate(async (id) => {
+    const { chrome } = globalThis as unknown as ChromeGlobal;
+    const tab = await chrome.tabs.update(id, { active: true });
+    await chrome.windows.update(tab.windowId, { focused: true });
+  }, tabId);
+}
+
+/** Everything the extension stores, local and session storage alike, as one string. */
+export function storedText(serviceWorker: Worker): Promise<string> {
+  return serviceWorker.evaluate(async () => {
+    const { chrome } = globalThis as unknown as ChromeGlobal;
+    const [local, session] = await Promise.all([
+      chrome.storage.local.get(null),
+      chrome.storage.session.get(null),
+    ]);
+    return JSON.stringify({ local, session });
+  });
 }

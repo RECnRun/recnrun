@@ -1,6 +1,5 @@
 import { render } from "preact";
 import { afterEach, expect, test } from "vite-plus/test";
-import type { OpenTab, TabSource } from "@/dashboard/open-tabs";
 import { startDashboard } from "@/dashboard/start";
 import type { DashboardData } from "@/dashboard/start";
 import { openPanelMessage, panelClosedMessage } from "@/messaging/frame-protocol";
@@ -8,28 +7,8 @@ import { returnToDashboardMessage, startSessionMessage } from "@/messaging/sessi
 import type { SessionRequest } from "@/messaging/session-protocol";
 import { CONTROL_LOCK, tryHoldLock } from "@/messaging/view-locks";
 import { dashboardData, memoryRecordingStore } from "./dashboard-data";
+import { DOCS, PRIVATE, SHOP, fakeIncognito, fakeTabs } from "./fake-tabs";
 import { button } from "./queries";
-
-const SHOP: OpenTab = { id: 7, title: "Shop", url: "https://shop.example/" };
-const DOCS: OpenTab = { id: 8, title: "Docs", url: "https://docs.example/" };
-
-/** Browser tabs the test can change, as the tabs API events would. */
-function fakeTabs(initial: OpenTab[]) {
-  let tabs = initial;
-  const listeners = new Set<() => void>();
-  const source: TabSource = {
-    list: async () => tabs,
-    watch: (onChange) => {
-      listeners.add(onChange);
-      return () => listeners.delete(onChange);
-    },
-  };
-  const change = (next: OpenTab[]) => {
-    tabs = next;
-    for (const listener of listeners) listener();
-  };
-  return { source, change };
-}
 
 /** A dashboard frame stand-in whose parent, the site, is this test page. */
 function framedPage() {
@@ -51,7 +30,7 @@ const closePanel = (page: Window) =>
   );
 
 function mount(data: Partial<DashboardData> = {}) {
-  const tabs = fakeTabs([SHOP, DOCS]);
+  const tabs = fakeTabs({ tabs: [SHOP, DOCS] });
   const sent: SessionRequest[] = [];
   const page = framedPage();
   const full = { ...dashboardData(), tabs: tabs.source, send: (r: SessionRequest) => sent.push(r) };
@@ -95,7 +74,7 @@ test("lists the browser's tabs as they change, each able to start a session", as
   expect(root.querySelector("aside h2")?.textContent).toBe("Tabs");
   expect(item(root, "Shop")?.textContent).toContain("https://shop.example/");
 
-  tabs.change([DOCS]);
+  tabs.change({ tabs: [DOCS] });
   await expect.poll(() => item(root, "Shop")).toBeUndefined();
   expect(buttons(item(root, "Docs"))).toEqual(["Record"]);
 });
@@ -182,6 +161,50 @@ test("of two dashboards starting at once, only one takes the control", async () 
   expect(second.sent).toEqual([]);
   closePanel(first.page);
   await expectControlFree();
+});
+
+test("marks incognito tabs, shows only the icons it may load, and records them alike", async () => {
+  const shop = { ...SHOP, favicon: "data:image/png;base64,AA==" };
+  const { root, sent, page } = mount({ tabs: fakeTabs({ tabs: [shop, PRIVATE] }).source });
+  await expect.poll(() => buttons(item(root, "Private"))).toEqual(["Record"]);
+  expect(item(root, "Private")?.textContent).toContain("Incognito");
+  expect(item(root, "Shop")?.textContent).not.toContain("Incognito");
+  expect(item(root, "Shop")?.querySelector("img")?.getAttribute("src")).toBe(shop.favicon);
+  expect(item(root, "Private")?.querySelector("img")).toBeNull();
+  expect(item(root, "Private")?.querySelector("[title]")?.getAttribute("title")).toBe(PRIVATE.url);
+
+  button(item(root, "Private") ?? root, "Record")?.click();
+  await expect.poll(() => sent).toEqual([startSessionMessage(PRIVATE.id)]);
+  closePanel(page);
+  await expectControlFree();
+});
+
+test("without incognito access, the list says how to allow it and offers no window", async () => {
+  const { root } = mount({ incognito: fakeIncognito(false).access });
+  await expect
+    .poll(() => root.querySelector(".tab-hint")?.textContent)
+    .toContain("Allow in Incognito");
+  expect(button(root, "New incognito window")).toBeUndefined();
+});
+
+test("with incognito access, a new incognito window opens without starting a session", async () => {
+  const incognito = fakeIncognito(true);
+  const { root, sent } = mount({ incognito: incognito.access });
+  await expect.poll(() => button(root, "New incognito window")).toBeDefined();
+  expect(root.querySelector(".tab-hint")).toBeNull();
+  button(root, "New incognito window")?.click();
+  await expect.poll(() => incognito.opened).toHaveLength(1);
+  expect(sent).toEqual([]);
+});
+
+test("a window Chrome refuses to open is an alert", async () => {
+  const refused = fakeIncognito(true, async () => {
+    throw new Error("Incognito mode is disabled.");
+  });
+  const { root } = mount({ incognito: refused.access });
+  await expect.poll(() => button(root, "New incognito window")).toBeDefined();
+  button(root, "New incognito window")?.click();
+  await expect.poll(() => alertText(root)).toContain("Incognito mode is disabled.");
 });
 
 test("without the tabs API the dashboard lists no tab", async () => {

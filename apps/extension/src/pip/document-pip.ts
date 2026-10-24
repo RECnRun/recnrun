@@ -8,7 +8,7 @@ export interface DocumentPictureInPicture {
 }
 
 // Chrome treats the size as a hint and keeps the window above a minimum.
-const PANEL_WINDOW_SIZE = { width: 320, height: 180 };
+const PANEL_WINDOW_SIZE = { width: 360, height: 300 };
 
 /** The page's PiP API, missing outside Chromium and in frames' types. */
 export function documentPip(page: Window): DocumentPictureInPicture | undefined {

@@ -2,8 +2,7 @@ import type { Page, Worker } from "@playwright/test";
 import type { Snapshot } from "../../packages/domain/src/index.ts";
 import { sampleSnapshot } from "../../packages/domain/tests/fixtures.ts";
 import { expect, test } from "./fixtures/extension.ts";
-
-const FRAME = 'iframe[title="RECnRun dashboard"]';
+import { FRAME } from "./fixtures/session.ts";
 
 const extensionOrigin = (worker: Worker) => `chrome-extension://${new URL(worker.url()).host}`;
 

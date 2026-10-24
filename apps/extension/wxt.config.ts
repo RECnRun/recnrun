@@ -17,6 +17,9 @@ export default defineConfig({
     description: "Records and replays browser sessions for developers.",
     // tabs lets the dashboard list every tab, with its title and address, to record one.
     permissions: ["storage", "tabs"],
+    // One extension context spans normal and incognito windows, so the dashboard and the PiP
+    // window see incognito tabs once the user turns on "Allow in Incognito".
+    incognito: "spanning",
     // The toolbar icon has no popup and no listener, so a click does nothing: the site is the way in.
     action: { default_title: "RECnRun" },
     // Only the RECnRun site may frame these pages: the dashboard over it, the session in its PiP

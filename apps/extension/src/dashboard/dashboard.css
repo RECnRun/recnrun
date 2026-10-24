@@ -104,3 +104,13 @@
   justify-content: space-between;
   gap: var(--space);
 }
+
+.tab-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.tab-new-window {
+  justify-self: start;
+}

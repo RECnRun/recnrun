@@ -162,6 +162,13 @@ module.exports = {
       to: { path: "^apps/extension/src/(content|background|dashboard|session|storage)/" },
     },
     {
+      name: "extension-tabs-is-model",
+      severity: "error",
+      comment: "src/tabs is the one tab model and watcher the dashboard and the PiP both read.",
+      from: { path: "^apps/extension/src/tabs/" },
+      to: { path: "^apps/extension/src/(content|background|dashboard|session|storage|views)/" },
+    },
+    {
       name: "not-to-entrypoints",
       severity: "error",
       comment: "Entrypoints are thin wiring; nothing imports them.",

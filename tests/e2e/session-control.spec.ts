@@ -1,41 +1,17 @@
-import type { BrowserContext, FrameLocator, Locator, Page, Worker } from "@playwright/test";
+import type { BrowserContext, Page } from "@playwright/test";
 import { sampleSnapshot } from "../../packages/domain/tests/fixtures.ts";
 import { expect, test } from "./fixtures/extension.ts";
-import { chromeTabs, recordedTabId, sessionUrl, storedSession, tabIdOf } from "./fixtures/tabs.ts";
-
-const FRAME = 'iframe[title="RECnRun dashboard"]';
-const SESSION_FRAME = 'iframe[title="RECnRun session"]';
-const FLOATING = "The session floats in its own window.";
-
-const dashboardOf = (site: Page) => site.locator(FRAME).contentFrame();
-
-/** The recording panel of the session page that a PiP window frames. */
-const panelIn = (pip: Page) =>
-  pip.locator(SESSION_FRAME).contentFrame().getByRole("region", { name: "Recording panel" });
-
-const tabItem = (dashboard: FrameLocator, url: string) =>
-  dashboard
-    .getByRole("complementary", { name: "Tabs" })
-    .getByRole("listitem")
-    .filter({ hasText: url });
-
-/** A site tab, at its own path so each dashboard's own row has a distinct address. */
-async function openSite(context: BrowserContext, path: string): Promise<Page> {
-  const site = await context.newPage();
-  await site.goto(path);
-  await expect(dashboardOf(site).getByRole("heading", { name: "Tabs" })).toBeVisible();
-  return site;
-}
-
-/** The PiP window is a page of its own in Playwright; this waits for the one a click opens. */
-async function clickToOpenPanel(context: BrowserContext, button: Locator): Promise<Page> {
-  const [pip] = await Promise.all([context.waitForEvent("page"), button.click()]);
-  return pip;
-}
-
-/** Playwright emulates focus, so Chrome's active tab is read from the service worker. */
-const activeTabId = async (serviceWorker: Worker) =>
-  (await chromeTabs(serviceWorker)).find((tab) => tab.active)?.id;
+import {
+  activeTabId,
+  clickToOpenPanel,
+  dashboardOf,
+  FLOATING,
+  openSite,
+  panelIn,
+  SESSION_FRAME,
+  tabItem,
+} from "./fixtures/session.ts";
+import { recordedTabId, sessionUrl, storedSession, tabIdOf } from "./fixtures/tabs.ts";
 
 // The privacy policy has no dashboard frame, so it stands in for the user's own application.
 const APP = "/privacy/";

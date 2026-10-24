@@ -2,8 +2,10 @@ import { render } from "preact";
 import { afterEach, expect, test } from "vite-plus/test";
 import { closePanelMessage } from "@/messaging/frame-protocol";
 import { startSession } from "@/session/start";
+import type { TabSource } from "@/tabs/open-tabs";
 import type { RecordingStore } from "@/views/recording";
 import { memoryRecordingStore } from "./dashboard-data";
+import { DOCS, PRIVATE, SHOP, fakeTabs } from "./fake-tabs";
 import { button, panelText } from "./queries";
 
 async function runningStore(): Promise<RecordingStore> {
@@ -21,9 +23,13 @@ function framedPage(ancestors: string[]) {
   }) as unknown as Window;
 }
 
-function mount(store: RecordingStore, ancestors = [location.origin]) {
+function mount(store: RecordingStore, ancestors = [location.origin], tabs?: TabSource) {
   const root = document.body.appendChild(document.createElement("div"));
-  startSession(root, { recordings: store }, framedPage(ancestors));
+  startSession(
+    root,
+    tabs ? { recordings: store, tabs } : { recordings: store },
+    framedPage(ancestors),
+  );
   return root;
 }
 
@@ -77,4 +83,54 @@ test("opened on its own, the session page points to the site", async () => {
     "Open recnrun.com to use RECnRun.",
   );
   expect(panelText(root)).toBeUndefined();
+});
+
+const region = (root: HTMLElement, name: string) =>
+  root.querySelector<HTMLElement>(`section[aria-label="${name}"]`)?.textContent ?? undefined;
+
+test("shows the tab in focus apart from the recorded one, and never retargets the session", async () => {
+  const store = await runningStore();
+  const tabs = fakeTabs({ tabs: [SHOP, DOCS, PRIVATE], currentId: SHOP.id });
+  const root = mount(store, [location.origin], tabs.source);
+  await expect.poll(() => region(root, "Current tab")).toContain("Recorded");
+  expect(region(root, "Current tab")).toContain("https://shop.example/");
+  expect(region(root, "Recorded tab")).toBeUndefined();
+
+  tabs.change({ tabs: [SHOP, DOCS, PRIVATE], currentId: PRIVATE.id });
+  await expect.poll(() => region(root, "Current tab")).toContain("Private");
+  expect(region(root, "Current tab")).toContain("Incognito");
+  expect(region(root, "Current tab")).not.toContain("Recorded");
+  expect(region(root, "Recorded tab")).toContain("Shop");
+  expect((await store.read())?.tabId).toBe(SHOP.id);
+
+  tabs.change({ tabs: [DOCS, PRIVATE], currentId: PRIVATE.id });
+  await expect
+    .poll(() => region(root, "Recorded tab"))
+    .toBe("Recorded tabThe recorded tab was closed.");
+});
+
+test("with the focus outside the browser, the last tab shown stays until it closes", async () => {
+  const tabs = fakeTabs({ tabs: [SHOP, DOCS], currentId: DOCS.id });
+  const root = mount(await runningStore(), [location.origin], tabs.source);
+  await expect.poll(() => region(root, "Current tab")).toContain("Docs");
+  expect(region(root, "Current tab")).not.toContain("Not in focus");
+
+  tabs.change({ tabs: [SHOP, DOCS] });
+  await expect.poll(() => region(root, "Current tab")).toContain("Not in focus");
+  expect(region(root, "Current tab")).toContain("Docs");
+
+  tabs.change({ tabs: [SHOP] });
+  await expect.poll(() => region(root, "Current tab")).toBe("Current tabNo tab in focus.");
+});
+
+test("a burst of tab events reads the tabs once more, not once per event", async () => {
+  const tabs = fakeTabs({ tabs: [SHOP], currentId: SHOP.id });
+  const root = mount(await runningStore(), [location.origin], tabs.source);
+  await expect.poll(() => region(root, "Current tab")).toContain("Shop");
+  const before = tabs.reads();
+  for (let event = 0; event < 5; event += 1)
+    tabs.change({ tabs: [SHOP, DOCS], currentId: SHOP.id });
+  await expect.poll(() => tabs.reads() - before).toBe(2);
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  expect(tabs.reads() - before).toBe(2);
 });

@@ -3,13 +3,13 @@ import { render } from "preact";
 import * as v from "valibot";
 import { disallowedAncestor } from "@/config/origins";
 import { Dashboard } from "@/dashboard/Dashboard";
-import type { TabSource } from "@/dashboard/open-tabs";
 import { createFrameRouter } from "@/dashboard/router";
 import type { TakeControl } from "@/dashboard/TabList";
 import { openPanelMessage, PanelClosedMessageSchema } from "@/messaging/frame-protocol";
 import { returnToDashboardMessage, startSessionMessage } from "@/messaging/session-protocol";
 import type { SessionRequest } from "@/messaging/session-protocol";
 import { CONTROL_LOCK, tryHoldLock } from "@/messaging/view-locks";
+import type { IncognitoAccess, TabSource } from "@/tabs/open-tabs";
 import type { RecordingStore } from "@/views/recording";
 import { Refusal, SiteOnly } from "@/views/Refusal";
 
@@ -19,6 +19,7 @@ export interface DashboardData {
   recordings: RecordingStore;
   /** The browser's tabs; without them the dashboard lists no tab to record. */
   tabs?: TabSource;
+  incognito?: IncognitoAccess;
   /** Sends a session request to the background. */
   send: (request: SessionRequest) => void;
 }
@@ -54,6 +55,7 @@ function startFramed(root: HTMLElement, data: DashboardData, page: Window) {
     tabs: data.tabs,
     store: data.recordings,
     take: controlFrom(page, parent, data.send),
+    incognito: data.incognito,
   };
   render(
     <Dashboard

@@ -1,5 +1,9 @@
 import { chromium, test as base } from "@playwright/test";
 import type { Browser, BrowserContext, Page, Worker } from "@playwright/test";
+import { createHash } from "node:crypto";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Snapshot } from "../../../packages/domain/src/index.ts";
 
@@ -14,6 +18,8 @@ interface ChromeGlobal {
 interface ExtensionOptions {
   /** Opens a DevTools port so `clickToolbarIcon` can reach browser-level CDP. */
   remoteDebuggingPort: number | undefined;
+  /** Turns on "Allow in Incognito" for the extension, as the user would in its details. */
+  incognitoAccess: boolean;
 }
 
 interface ExtensionFixtures {
@@ -27,13 +33,37 @@ interface TargetInfo {
   url: string;
 }
 
+/** Chrome's id for an unpacked extension: the path's SHA-256, its first 32 hex digits as a–p. */
+const unpackedId = (path: string) =>
+  createHash("sha256")
+    .update(path)
+    .digest("hex")
+    .slice(0, 32)
+    .replaceAll(/./g, (digit) => String.fromCharCode(97 + Number.parseInt(digit, 16)));
+
+/**
+ * A profile that already allows the extension in Incognito. Toggling it in chrome://extensions
+ * reloads the extension, which Chromium disables as an unpacked one while Developer mode is off.
+ */
+function incognitoProfile(): string {
+  const dir = mkdtempSync(join(tmpdir(), "recnrun-incognito-"));
+  mkdirSync(join(dir, "Default"));
+  const settings = {
+    extensions: { settings: { [unpackedId(extensionPath)]: { incognito: true } } },
+  };
+  writeFileSync(join(dir, "Default", "Preferences"), JSON.stringify(settings));
+  return dir;
+}
+
 /** A Chromium profile with the test build of the extension loaded. */
 export const test = base.extend<ExtensionFixtures & ExtensionOptions>({
   remoteDebuggingPort: [undefined, { option: true }],
-  context: async ({ headless, remoteDebuggingPort }, use) => {
+  incognitoAccess: [false, { option: true }],
+  context: async ({ headless, remoteDebuggingPort, incognitoAccess }, use) => {
     const port =
       remoteDebuggingPort === undefined ? [] : [`--remote-debugging-port=${remoteDebuggingPort}`];
-    const context: BrowserContext = await chromium.launchPersistentContext("", {
+    const profile = incognitoAccess ? incognitoProfile() : "";
+    const context: BrowserContext = await chromium.launchPersistentContext(profile, {
       headless,
       args: [
         `--disable-extensions-except=${extensionPath}`,
@@ -43,6 +73,7 @@ export const test = base.extend<ExtensionFixtures & ExtensionOptions>({
     });
     await use(context);
     await context.close();
+    if (profile) rmSync(profile, { recursive: true, force: true });
   },
   serviceWorker: async ({ context }, use) => {
     const [running] = context.serviceWorkers();

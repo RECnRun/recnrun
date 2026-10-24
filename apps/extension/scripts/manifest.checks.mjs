@@ -39,6 +39,10 @@ test("the production build requests only storage and tabs", () => {
   assert.equal(manifest.externally_connectable, undefined);
 });
 
+test("one extension context spans normal and incognito windows", () => {
+  assert.equal(productionManifest().incognito, "spanning");
+});
+
 test("the production build ships the logo as its icons", () => {
   const manifest = productionManifest();
   assert.deepEqual(Object.keys(manifest.icons ?? {}), ["16", "32", "48", "128"]);

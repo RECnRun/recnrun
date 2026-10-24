@@ -1,9 +1,12 @@
-import { useEffect, useState } from "preact/hooks";
-import type { OpenTab, TabSource } from "@/dashboard/open-tabs";
+import { useState } from "preact/hooks";
+import { IncognitoControl } from "@/dashboard/IncognitoControl";
 import { CONTROL_LOCK } from "@/messaging/view-locks";
+import type { IncognitoAccess, OpenTab, TabSource } from "@/tabs/open-tabs";
 import { RecordStatus } from "@/views/RecordPanel";
 import { errorText, useRecording } from "@/views/recording";
 import type { Recording, RecordingStore } from "@/views/recording";
+import { TabSummary } from "@/views/TabSummary";
+import { useBrowserTabs } from "@/views/use-browser-tabs";
 import { useLockHeld } from "@/views/use-lock-held";
 
 /**
@@ -18,17 +21,8 @@ export interface SessionSetup {
   tabs: TabSource;
   store: RecordingStore;
   take: TakeControl;
-}
-
-/** The open tabs, or `undefined` until they are first listed. */
-function useOpenTabs(source: TabSource): OpenTab[] | undefined {
-  const [tabs, setTabs] = useState<OpenTab[]>();
-  useEffect(() => {
-    const refresh = () => void source.list().then(setTabs);
-    refresh();
-    return source.watch(refresh);
-  }, [source]);
-  return tabs;
+  /** Without it, as outside the extension, the dashboard says nothing about incognito tabs. */
+  incognito?: IncognitoAccess;
 }
 
 interface TabProps {
@@ -76,8 +70,7 @@ function TabItem({ tab, recording, controlled, take }: TabProps) {
   const idle = recording.loaded && recording.status === "idle" && !controlled;
   return (
     <li class="tab" aria-label={tab.title}>
-      <span class="tab-title">{tab.title}</span>
-      <span class="tab-url">{tab.url}</span>
+      <TabSummary tab={tab} />
       <div class="tab-actions">
         {recorded && <SessionControls recording={recording} controlled={controlled} take={take} />}
         {idle && (
@@ -104,8 +97,8 @@ function ClosedTabItem({ recording, controlled }: Omit<TabProps, "tab" | "take">
 }
 
 /** Every open tab; with no session each can start one, and the recorded tab shows the session. */
-export function TabList({ tabs, store, take }: SessionSetup) {
-  const openTabs = useOpenTabs(tabs);
+export function TabList({ tabs, store, take, incognito }: SessionSetup) {
+  const openTabs = useBrowserTabs(tabs)?.tabs;
   const recording = useRecording(store);
   const controlled = useLockHeld(CONTROL_LOCK);
   const [error, setError] = useState<string>();
@@ -120,6 +113,7 @@ export function TabList({ tabs, store, take }: SessionSetup) {
   return (
     <aside class="tabs" aria-labelledby="tabs-heading">
       <h2 id="tabs-heading">Tabs</h2>
+      {incognito && <IncognitoControl access={incognito} onError={setError} />}
       <ul>
         {openTabs?.map((tab) => (
           <TabItem

@@ -38,7 +38,8 @@ dd {
 }
 
 .record-panel button,
-.tab-actions button {
+.tab-actions button,
+.tab-new-window {
   font: inherit;
   color: var(--text);
   background: var(--card);
@@ -58,4 +59,55 @@ button.record-button {
   border: 0;
   border-radius: var(--radius);
   padding: 0.25rem 0.75rem;
+}
+
+.tab-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.5rem;
+}
+
+.tab-favicon {
+  width: 1rem;
+  height: 1rem;
+}
+
+.tab-badge {
+  font-size: 0.75rem;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0 0.375rem;
+}
+
+/* In a PiP window the tabs follow the panel, compact, one line per address. */
+#app > .session-tabs {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0 var(--space) var(--space);
+}
+
+.session-tab {
+  display: grid;
+  gap: 0.125rem;
+  min-width: 0;
+}
+
+.session-tab h2 {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.session-tab p {
+  margin: 0;
+}
+
+.session-tab .tab-url {
+  overflow: hidden;
+  font-size: 0.875rem;
+  color: var(--muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
