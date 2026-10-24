@@ -10,7 +10,7 @@ export interface SessionStore {
   write: (session: RecordingSession | null) => Promise<void>;
 }
 
-async function focus(tabId: number): Promise<void> {
+export async function focus(tabId: number): Promise<void> {
   const tab = await browser.tabs.update(tabId, { active: true });
   if (tab?.windowId !== undefined) await browser.windows.update(tab.windowId, { focused: true });
 }

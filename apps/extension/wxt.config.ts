@@ -1,9 +1,18 @@
 import preact from "@preact/preset-vite";
 import { defineConfig } from "wxt";
-import { contentScriptMatches } from "./src/config/origins.ts";
+import { contentScriptMatches, peersEnabled } from "./src/config/origins.ts";
+
+const POC_PAGES = new Set(["offscreen", "pairing"]);
 
 export default defineConfig({
   srcDir: "src",
+  hooks: {
+    // The cross-profile POC pages never ship in a production build.
+    "entrypoints:found": (wxt, infos) => {
+      if (peersEnabled(wxt.config.mode)) return;
+      infos.splice(0, infos.length, ...infos.filter(({ name }) => !POC_PAGES.has(name)));
+    },
+  },
   // Explicit imports keep dependency-cruiser and Knip aware of every edge.
   imports: false,
   vite: () => ({ plugins: [preact()] }),
@@ -16,7 +25,8 @@ export default defineConfig({
     name: "RECnRun",
     description: "Records and replays browser sessions for developers.",
     // tabs lets the dashboard list every tab, with its title and address, to record one.
-    permissions: ["storage", "tabs"],
+    // offscreen hosts the cross-profile POC's WebRTC link, in development and test builds only.
+    permissions: ["storage", "tabs", ...(peersEnabled(mode) ? ["offscreen"] : [])],
     // One extension context spans normal and incognito windows, so the dashboard and the PiP
     // window see incognito tabs once the user turns on "Allow in Incognito".
     incognito: "spanning",

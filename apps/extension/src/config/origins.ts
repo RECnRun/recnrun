@@ -29,3 +29,6 @@ export function isAllowedEmbedder(origin: string, mode: string): boolean {
 export function disallowedAncestor(ancestors: readonly string[], mode: string): string | undefined {
   return ancestors.find((origin) => !isAllowedEmbedder(origin, mode));
 }
+
+/** The cross-profile POC runs only in development and test builds, never in a published one. */
+export const peersEnabled = (mode: string) => LOCAL_MODES.has(mode);

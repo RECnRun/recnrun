@@ -169,6 +169,36 @@ module.exports = {
       to: { path: "^apps/extension/src/(content|background|dashboard|session|storage|views)/" },
     },
     {
+      name: "extension-p2p-transport",
+      severity: "error",
+      comment: "src/p2p is the WebRTC transport and its wire format; it knows no page or storage.",
+      from: { path: "^apps/extension/src/p2p/" },
+      to: { path: "^apps/extension/src/", pathNot: "^apps/extension/src/p2p/" },
+    },
+    {
+      name: "extension-offscreen-link-only",
+      severity: "error",
+      comment: "The offscreen document holds the link and forwards frames; the background decides.",
+      from: { path: "^apps/extension/src/offscreen/" },
+      to: {
+        path: "^apps/extension/src/(content|background|dashboard|session|storage|views|tabs|pairing)/",
+      },
+    },
+    {
+      name: "extension-pairing-isolated",
+      severity: "error",
+      comment: "The pairing page drives the peer through the background, never the link itself.",
+      from: { path: "^apps/extension/src/pairing/" },
+      to: { path: "^apps/extension/src/(content|background|dashboard|session|offscreen|p2p)/" },
+    },
+    {
+      name: "extension-content-not-to-peers",
+      severity: "error",
+      comment: "Site pages never reach the other profile: no page content crosses the link.",
+      from: { path: "^apps/extension/src/content/" },
+      to: { path: "^apps/extension/src/(p2p|offscreen|pairing)/|peer" },
+    },
+    {
       name: "not-to-entrypoints",
       severity: "error",
       comment: "Entrypoints are thin wiring; nothing imports them.",
