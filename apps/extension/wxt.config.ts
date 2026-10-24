@@ -1,6 +1,9 @@
+import { fileURLToPath } from "node:url";
 import preact from "@preact/preset-vite";
 import { defineConfig } from "wxt";
 import { contentScriptMatches } from "./src/config/origins.ts";
+
+const chromiumProfile = fileURLToPath(new URL("./.wxt/chrome-data", import.meta.url));
 
 export default defineConfig({
   srcDir: "src",
@@ -10,7 +13,15 @@ export default defineConfig({
   webExt: {
     startUrls: ["http://localhost:5173/"],
     // A persistent profile keeps extension storage between dev runs; `vp run clean` resets it.
-    chromiumArgs: ["--user-data-dir=./.wxt/chrome-data"],
+    chromiumProfile,
+    keepProfileChanges: true,
+  },
+  hooks: {
+    "server:started": async () => {
+      // Chrome protects this preference on macOS and Windows; let Chrome save it itself.
+      const { prepareDevChrome } = await import("../../scripts/dev-chrome.ts");
+      await prepareDevChrome(chromiumProfile);
+    },
   },
   manifest: ({ mode }) => ({
     name: "RECnRun",
