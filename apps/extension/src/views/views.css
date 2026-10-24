@@ -10,8 +10,7 @@ dd {
   overflow-wrap: anywhere;
 }
 
-.record-panel,
-.record-status {
+.record-panel {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -19,19 +18,8 @@ dd {
 }
 
 /* In a PiP window the panel is the whole page. */
-body > .record-panel,
 #app > .record-panel {
   padding: var(--space);
-}
-
-.session {
-  display: grid;
-  gap: var(--space);
-  align-content: start;
-}
-
-.session > button {
-  justify-self: start;
 }
 
 .record-logo {
@@ -39,8 +27,7 @@ body > .record-panel,
   height: 1.25rem;
 }
 
-.record-panel p,
-.record-status p {
+.record-panel p {
   margin: 0;
 }
 
@@ -51,8 +38,6 @@ body > .record-panel,
 }
 
 .record-panel button,
-.record-status button,
-.session > button,
 .tab-actions button {
   font: inherit;
   color: var(--text);

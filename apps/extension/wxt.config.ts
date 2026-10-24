@@ -16,19 +16,9 @@ export default defineConfig({
     name: "RECnRun",
     description: "Records and replays browser sessions for developers.",
     // tabs lets the dashboard list every tab, with its title and address, to record one.
-    permissions: ["storage", "contextMenus", "tabs"],
-    // No default_popup, so a toolbar click fires action.onClicked and records the tab.
-    action: { default_title: "Record this tab with RECnRun" },
-    commands: {
-      "open-session": {
-        suggested_key: { default: "Alt+Shift+S", mac: "MacCtrl+Shift+S" },
-        description: "Record this tab with RECnRun",
-      },
-      "open-dashboard": {
-        suggested_key: { default: "Alt+Shift+D", mac: "MacCtrl+Shift+D" },
-        description: "Open a RECnRun dashboard",
-      },
-    },
+    permissions: ["storage", "tabs"],
+    // The toolbar icon has no popup and no listener, so a click does nothing: the site is the way in.
+    action: { default_title: "RECnRun" },
     // Only the RECnRun site may frame these pages: the dashboard over it, the session in its PiP
     // window. Every other page gets ERR_BLOCKED_BY_CLIENT.
     web_accessible_resources: [

@@ -150,7 +150,7 @@ module.exports = {
     {
       name: "extension-session-isolated",
       severity: "error",
-      comment: "The session page links to the dashboard by URL; the two pages share only views.",
+      comment: "The session page and the dashboard share only views; the site frames each of them.",
       from: { path: "^apps/extension/src/session/" },
       to: { path: "^apps/extension/src/(content|background|dashboard)/" },
     },

@@ -15,18 +15,18 @@ export interface TabSource {
   watch: (onChange: () => void) => () => void;
 }
 
-/** Every tab but the session's pane, which records nothing itself. */
-export function toOpenTabs(tabs: readonly Browser.tabs.Tab[], sessionUrl: string): OpenTab[] {
+/** Every tab with an id, titled by its address when it has no title. */
+export function toOpenTabs(tabs: readonly Browser.tabs.Tab[]): OpenTab[] {
   return tabs.flatMap(({ id, title, url = "" }) =>
-    id === undefined || url.startsWith(sessionUrl) ? [] : [{ id, title: title || url, url }],
+    id === undefined ? [] : [{ id, title: title || url, url }],
   );
 }
 
 const TAB_EVENTS = ["onCreated", "onUpdated", "onRemoved", "onMoved", "onAttached"] as const;
 
-export function browserTabs(sessionUrl = browser.runtime.getURL("/session.html")): TabSource {
+export function browserTabs(): TabSource {
   return {
-    list: async () => toOpenTabs(await browser.tabs.query({}), sessionUrl),
+    list: async () => toOpenTabs(await browser.tabs.query({})),
     watch: (onChange) => {
       const listener = () => onChange();
       for (const event of TAB_EVENTS) browser.tabs[event].addListener(listener);

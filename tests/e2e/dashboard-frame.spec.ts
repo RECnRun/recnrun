@@ -1,4 +1,5 @@
 import type { Page, Worker } from "@playwright/test";
+import type { Snapshot } from "../../packages/domain/src/index.ts";
 import { sampleSnapshot } from "../../packages/domain/tests/fixtures.ts";
 import { expect, test } from "./fixtures/extension.ts";
 
@@ -25,7 +26,14 @@ test("covers the site with the extension dashboard", async ({ page, serviceWorke
   const blocked = blockedLoads(page);
   await page.goto("/");
   const frame = page.locator(FRAME);
-  await expect(frame.contentFrame().getByRole("article")).toHaveCount(2);
+  const recordings = frame.contentFrame().getByRole("article");
+  await expect(recordings).toHaveCount(2);
+  await expect(recordings.first()).toHaveAccessibleName("Checkout with saved card");
+  await expect(recordings.first()).toContainText("https://staging.shop.example/cart");
+  await expect(recordings.first()).toContainText("31 events");
+  await expect(
+    frame.contentFrame().getByRole("article", { name: "Log in as admin" }),
+  ).toContainText("12 s");
   await expect(frame).toHaveAttribute(
     "src",
     `${extensionOrigin(serviceWorker)}/dashboard.html?route=%2F`,
@@ -79,3 +87,25 @@ test("routes deep links into the dashboard and its navigation to the address bar
     "Log in as admin",
   );
 });
+
+test("explains an empty extension and unreadable data", async ({ page, seedSnapshot }) => {
+  await seedSnapshot({ ...sampleSnapshot(), recordings: [] });
+  await page.goto("/");
+  const dashboard = page.locator(FRAME).contentFrame();
+  await expect(dashboard.getByRole("heading", { name: "No recordings yet" })).toBeVisible();
+
+  await seedSnapshot({ schemaVersion: 99 } as unknown as Snapshot);
+  await page.reload();
+  await expect(
+    page.locator(FRAME).contentFrame().getByRole("heading", { name: "Could not read your data" }),
+  ).toBeVisible();
+});
+
+for (const path of ["dashboard.html", "session.html"]) {
+  test(`opened on its own, ${path} points to the site`, async ({ context, serviceWorker }) => {
+    const page = await context.newPage();
+    await page.goto(`${extensionOrigin(serviceWorker)}/${path}`);
+    await expect(page.getByRole("status")).toHaveText("Open recnrun.com to use RECnRun.");
+    await expect(page.getByRole("article")).toHaveCount(0);
+  });
+}
