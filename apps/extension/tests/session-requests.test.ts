@@ -1,7 +1,7 @@
 import type { RecordingSession } from "@recnrun/domain";
 import { beforeEach, expect, test } from "vite-plus/test";
 import { fakeBrowser } from "wxt/testing/fake-browser";
-import { createSessionListener, endSessionOf, startSession } from "@/background/session-requests";
+import { createSessionListener, startSession } from "@/background/session-requests";
 import type { SessionStore } from "@/background/session-requests";
 import { returnToDashboardMessage, startSessionMessage } from "@/messaging/session-protocol";
 
@@ -62,15 +62,6 @@ test("replaces an unreadable session with a new one", async () => {
   const store = memoryStore(null, true);
   await startSession(shop.id ?? -1, store, 5);
   expect(await store.read()).toMatchObject({ tabId: shop.id, status: "recording" });
-});
-
-test("ends the session only when the tab it records closes", async () => {
-  const store = memoryStore(running(7));
-  await endSessionOf(8, store);
-  expect(await store.read()).toEqual(running(7));
-  await endSessionOf(7, store);
-  expect(await store.read()).toBeNull();
-  await expect(endSessionOf(7, memoryStore(null, true))).resolves.toBeUndefined();
 });
 
 function listen(message: unknown, sender: { id?: string; url?: string; tab?: { id?: number } }) {

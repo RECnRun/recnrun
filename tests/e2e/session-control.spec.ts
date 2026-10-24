@@ -219,16 +219,40 @@ test("reloading the dashboards keeps the session", async ({ context, page, servi
   expect(await storedSession(serviceWorker)).toEqual(started);
 });
 
-test("closing the recorded tab ends the session and closes its window", async ({
+test("closing the recorded tab keeps the session until the PiP window stops it", async ({
+  context,
+  page,
+  serviceWorker,
+}) => {
+  const { pip, site } = await recordFrom(context, page);
+  const started = await storedSession(serviceWorker);
+  await page.close();
+
+  const closed = dashboardOf(site).getByRole("listitem", { name: "Closed tab" });
+  await expect(closed).toContainText(FLOATING);
+  expect(pip.isClosed()).toBe(false);
+  await expect(panelIn(pip)).toContainText("Recording");
+  expect(await storedSession(serviceWorker)).toEqual(started);
+
+  await panelIn(pip).getByRole("button", { name: "Stop" }).click();
+  await expect.poll(() => recordedTabId(serviceWorker)).toBeNull();
+  await expect.poll(() => pip.isClosed()).toBe(true);
+  await expect(closed).toHaveCount(0);
+});
+
+test("a session whose tab closed, left without control, is stopped from a dashboard", async ({
   context,
   page,
   serviceWorker,
 }) => {
   const { pip, site } = await recordFrom(context, page);
   await page.close();
+  await pip.close();
+
+  const closed = dashboardOf(site).getByRole("listitem", { name: "Closed tab" });
+  await expect(closed.getByRole("button")).toHaveText(["Stop"]);
+  expect(await recordedTabId(serviceWorker)).not.toBeNull();
+  await closed.getByRole("button", { name: "Stop" }).click();
   await expect.poll(() => recordedTabId(serviceWorker)).toBeNull();
-  await expect.poll(() => pip.isClosed()).toBe(true);
-  await expect
-    .poll(() => activeTabId(serviceWorker))
-    .toBe(await tabIdOf(serviceWorker, site.url()));
+  await expect(closed).toHaveCount(0);
 });

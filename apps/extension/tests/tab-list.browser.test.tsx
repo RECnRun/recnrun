@@ -150,6 +150,26 @@ test("a session left without control can be continued or stopped from any dashbo
   expect(await recordings.read()).toBeNull();
 });
 
+test("a session whose tab closed stays until stopped, and only floats while controlled", async () => {
+  const recordings = memoryRecordingStore();
+  await recordings.write(running(99));
+  const release = await tryHoldLock(CONTROL_LOCK);
+  const { root } = mount({ recordings });
+  await expect
+    .poll(() => item(root, "Closed tab")?.textContent)
+    .toContain("The session floats in its own window.");
+  expect(buttons(item(root, "Closed tab"))).toEqual([]);
+  expect(buttons(item(root, "Shop"))).toEqual([]);
+
+  release?.();
+  await expect.poll(() => buttons(item(root, "Closed tab"))).toEqual(["Stop"]);
+  expect(item(root, "Closed tab")?.textContent).toContain("Recording");
+  button(item(root, "Closed tab") ?? root, "Stop")?.click();
+  await expect.poll(() => item(root, "Closed tab")).toBeUndefined();
+  expect(await recordings.read()).toBeNull();
+  expect(buttons(item(root, "Shop"))).toEqual(["Record"]);
+});
+
 test("of two dashboards starting at once, only one takes the control", async () => {
   const first = mount();
   const second = mount();

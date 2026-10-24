@@ -9,7 +9,7 @@ Acceptance (all automated, run by `vp run verify`):
 - [x] Without the extension, the website shows the install banner with a link to the install guide (`tests/e2e/install-banner.spec.ts`).
 - [x] With the extension and seeded data, the dashboard shows each recording, newest first, with its start URL, duration, and event count (`tests/e2e/dashboard-frame.spec.ts`).
 - [x] With the extension and no data, the dashboard shows an empty state (`tests/e2e/dashboard-frame.spec.ts`).
-- [x] Record on a tab in the site's dashboard opens the session in a PiP window and focuses the tab; one dashboard controls it at a time, closing the window or the controlling tab keeps the session for Continue or Stop from any dashboard, and Stop ends it (`tests/e2e/session-control.spec.ts`).
+- [x] Record on a tab in the site's dashboard opens the session in a PiP window and focuses the tab; one dashboard controls it at a time, closing the window or the controlling tab keeps the session for Continue or Stop from any dashboard, closing the recorded tab keeps it too, and only Stop ends it (`tests/e2e/session-control.spec.ts`).
 - [x] The toolbar icon does nothing, and the extension has no popup, keyboard commands, or context menu (`tests/e2e/toolbar-action.spec.ts`).
 - [x] On the website, the extension covers the page with its dashboard instead of the banner, deep links open a recording, and the dashboard's navigation updates the address bar (`tests/e2e/dashboard-frame.spec.ts`).
 - [x] No other origin can frame the dashboard or the session page, and they refuse to render under a foreign ancestor (`tests/e2e/dashboard-embedding.spec.ts`).

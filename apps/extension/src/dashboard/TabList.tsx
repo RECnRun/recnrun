@@ -20,8 +20,9 @@ export interface SessionSetup {
   take: TakeControl;
 }
 
-function useOpenTabs(source: TabSource): OpenTab[] {
-  const [tabs, setTabs] = useState<OpenTab[]>([]);
+/** The open tabs, or `undefined` until they are first listed. */
+function useOpenTabs(source: TabSource): OpenTab[] | undefined {
+  const [tabs, setTabs] = useState<OpenTab[]>();
   useEffect(() => {
     const refresh = () => void source.list().then(setTabs);
     refresh();
@@ -38,8 +39,15 @@ interface TabProps {
   take: () => void;
 }
 
-/** The session on the tab it records; its controls are in the PiP window while one is open. */
-function SessionControls({ recording, controlled, take }: Omit<TabProps, "tab">) {
+/**
+ * The session on the tab it records; its controls are in the PiP window while one is open. With
+ * no `take`, as when the recorded tab closed, the session can only be stopped.
+ */
+function SessionControls({
+  recording,
+  controlled,
+  take,
+}: Omit<TabProps, "tab" | "take"> & { take?: () => void }) {
   return (
     <>
       <p>
@@ -49,9 +57,11 @@ function SessionControls({ recording, controlled, take }: Omit<TabProps, "tab">)
         <p>The session floats in its own window.</p>
       ) : (
         <>
-          <button type="button" onClick={take}>
-            Continue
-          </button>
+          {take && (
+            <button type="button" onClick={take}>
+              Continue
+            </button>
+          )}
           <button type="button" onClick={recording.stop}>
             Stop
           </button>
@@ -80,12 +90,29 @@ function TabItem({ tab, recording, controlled, take }: TabProps) {
   );
 }
 
+/** The session outlives the tab it records, which only an explicit Stop ends. */
+function ClosedTabItem({ recording, controlled }: Omit<TabProps, "tab" | "take">) {
+  return (
+    <li class="tab" aria-label="Closed tab">
+      <span class="tab-title">Closed tab</span>
+      <span class="tab-url">The tab this session records was closed.</span>
+      <div class="tab-actions">
+        <SessionControls recording={recording} controlled={controlled} />
+      </div>
+    </li>
+  );
+}
+
 /** Every open tab; with no session each can start one, and the recorded tab shows the session. */
 export function TabList({ tabs, store, take }: SessionSetup) {
   const openTabs = useOpenTabs(tabs);
   const recording = useRecording(store);
   const controlled = useLockHeld(CONTROL_LOCK);
   const [error, setError] = useState<string>();
+  const closed =
+    openTabs !== undefined &&
+    recording.status !== "idle" &&
+    !openTabs.some((tab) => tab.id === recording.tabId);
   const takeOn = (tabId: number) => () => {
     setError(undefined);
     take(tabId).catch((caught: unknown) => setError(errorText(caught)));
@@ -94,7 +121,7 @@ export function TabList({ tabs, store, take }: SessionSetup) {
     <aside class="tabs" aria-labelledby="tabs-heading">
       <h2 id="tabs-heading">Tabs</h2>
       <ul>
-        {openTabs.map((tab) => (
+        {openTabs?.map((tab) => (
           <TabItem
             key={tab.id}
             tab={tab}
@@ -103,6 +130,7 @@ export function TabList({ tabs, store, take }: SessionSetup) {
             take={takeOn(tab.id)}
           />
         ))}
+        {closed && <ClosedTabItem recording={recording} controlled={controlled} />}
       </ul>
       {(error ?? recording.error) && <p role="alert">{error ?? recording.error}</p>}
     </aside>

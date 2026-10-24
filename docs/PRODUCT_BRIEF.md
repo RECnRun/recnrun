@@ -27,7 +27,7 @@ The events themselves (clicks, inputs, navigations, DOM changes) are not stored 
 
 5. Closing the floating window without Stop keeps the session, gives up the control, and brings the controlling site tab back to the front. So does closing or reloading the controlling site tab. Any dashboard then shows the recorded tab with **Continue**, which reopens the floating window for the same session and takes the control, and **Stop**.
 
-   Stop ends the session, closes its window, and brings the site tab back; closing the recorded tab ends it too.
+   Only Stop, in a dashboard or the floating window, ends the session; it closes the window and brings the site tab back. Closing tabs never ends it: once the recorded tab closes, every dashboard shows the session as a closed tab, which can only be stopped.
 
 6. Only recording exists today; running a recording again comes later ([Next](#next)).
 

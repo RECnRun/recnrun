@@ -28,12 +28,6 @@ export async function startSession(
   await focus(session.tabId);
 }
 
-/** Ends the session when the tab it records closes. */
-export async function endSessionOf(tabId: number, store: SessionStore): Promise<void> {
-  const current = await store.read().catch(() => null);
-  if (current?.tabId === tabId) await store.write(null);
-}
-
 const focusSender = ({ tab }: Browser.runtime.MessageSender) =>
   tab?.id === undefined ? Promise.resolve() : focus(tab.id);
 
