@@ -3,6 +3,7 @@ import { sampleSnapshot } from "../../packages/domain/tests/fixtures.ts";
 import { expect, test } from "./fixtures/extension.ts";
 import {
   activeTabId,
+  clickInDashboard,
   clickToOpenPanel,
   dashboardOf,
   FLOATING,
@@ -150,7 +151,9 @@ test("another dashboard ends a session left without control, without a PiP windo
   await expect.poll(() => pip.isClosed()).toBe(true);
 
   const pages = context.pages().length;
-  await tabItem(dashboardOf(other), page.url()).getByRole("button", { name: "Stop" }).click();
+  await clickInDashboard(
+    tabItem(dashboardOf(other), page.url()).getByRole("button", { name: "Stop" }),
+  );
   await expect.poll(() => recordedTabId(serviceWorker)).toBeNull();
   await expect(tabItem(dashboardOf(other), page.url()).getByRole("button")).toHaveText(["Record"]);
   expect(context.pages()).toHaveLength(pages);
@@ -228,7 +231,7 @@ test("a session whose tab closed, left without control, is stopped from a dashbo
   const closed = dashboardOf(site).getByRole("listitem", { name: "Closed tab" });
   await expect(closed.getByRole("button")).toHaveText(["Stop"]);
   expect(await recordedTabId(serviceWorker)).not.toBeNull();
-  await closed.getByRole("button", { name: "Stop" }).click();
+  await clickInDashboard(closed.getByRole("button", { name: "Stop" }));
   await expect.poll(() => recordedTabId(serviceWorker)).toBeNull();
   await expect(closed).toHaveCount(0);
 });

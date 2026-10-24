@@ -38,15 +38,19 @@ export function fakeTabs(initial: BrowserTabs) {
   return { source, change, reads: () => reads };
 }
 
-/** Incognito access as Chrome would grant it, with each window it opens counted. */
+/** Incognito access as Chrome would grant it, with each window and details page it opens counted. */
 export function fakeIncognito(allowed: boolean, openWindow = async () => {}) {
   const opened: unknown[] = [];
+  const settings: unknown[] = [];
   const access: IncognitoAccess = {
     allowed: async () => allowed,
+    openSettings: async () => {
+      settings.push(true);
+    },
     openWindow: async () => {
       opened.push(true);
       await openWindow();
     },
   };
-  return { access, opened };
+  return { access, opened, settings };
 }

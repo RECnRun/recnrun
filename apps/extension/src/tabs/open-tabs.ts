@@ -25,9 +25,11 @@ export interface TabSource {
   watch: (onChange: () => void) => () => void;
 }
 
-/** Whether the user allowed RECnRun in Incognito, and a way to open an incognito window. */
+/** Whether the user allowed RECnRun in Incognito, where to allow it, and an incognito window. */
 export interface IncognitoAccess {
   allowed: () => Promise<boolean>;
+  /** Opens RECnRun's details in chrome://extensions, where "Allow in Incognito" is. */
+  openSettings: () => Promise<void>;
   openWindow: () => Promise<void>;
 }
 
@@ -91,6 +93,9 @@ export function browserTabs(): TabSource {
 
 export const browserIncognito: IncognitoAccess = {
   allowed: () => browser.extension.isAllowedIncognitoAccess(),
+  openSettings: async () => {
+    await browser.tabs.create({ url: `chrome://extensions/?id=${browser.runtime.id}` });
+  },
   openWindow: async () => {
     await browser.windows.create({ incognito: true });
   },

@@ -16,6 +16,7 @@ Durable decisions live in `docs/`:
 - [MILESTONES.md](docs/MILESTONES.md): delivery and acceptance.
 - [BRAND.md](docs/BRAND.md): logo, palette, contrast, typography, and CSS tokens.
 - [POCS.md](docs/POCS.md): proofs of concept behind architecture decisions, and what they found.
+- [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md): problems that took investigation, their causes, and their solutions.
 
 Update the relevant doc when a change alters what it describes.
 

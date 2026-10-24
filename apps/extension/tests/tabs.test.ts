@@ -133,3 +133,9 @@ test("asks Chrome whether RECnRun may see incognito tabs, and opens an incognito
   await browserIncognito.openWindow();
   expect(create).toHaveBeenCalledWith({ incognito: true });
 });
+
+test("opens RECnRun's own details in chrome://extensions, by its runtime id", async () => {
+  const create = vi.spyOn(fakeBrowser.tabs, "create").mockResolvedValue({} as never);
+  await browserIncognito.openSettings();
+  expect(create).toHaveBeenCalledWith({ url: `chrome://extensions/?id=${fakeBrowser.runtime.id}` });
+});

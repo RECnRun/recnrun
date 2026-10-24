@@ -1,5 +1,5 @@
 import { useState } from "preact/hooks";
-import { IncognitoControl } from "@/dashboard/IncognitoControl";
+import { IncognitoControl, useIncognitoAccess } from "@/dashboard/IncognitoControl";
 import { CONTROL_LOCK } from "@/messaging/view-locks";
 import type { IncognitoAccess, OpenTab, TabSource } from "@/tabs/open-tabs";
 import { RecordStatus } from "@/views/RecordPanel";
@@ -101,6 +101,7 @@ export function TabList({ tabs, store, take, incognito }: SessionSetup) {
   const openTabs = useBrowserTabs(tabs)?.tabs;
   const recording = useRecording(store);
   const controlled = useLockHeld(CONTROL_LOCK);
+  const allowed = useIncognitoAccess(incognito);
   const [error, setError] = useState<string>();
   const closed =
     openTabs !== undefined &&
@@ -113,19 +114,22 @@ export function TabList({ tabs, store, take, incognito }: SessionSetup) {
   return (
     <aside class="tabs" aria-labelledby="tabs-heading">
       <h2 id="tabs-heading">Tabs</h2>
-      {incognito && <IncognitoControl access={incognito} onError={setError} />}
-      <ul>
-        {openTabs?.map((tab) => (
-          <TabItem
-            key={tab.id}
-            tab={tab}
-            recording={recording}
-            controlled={controlled}
-            take={takeOn(tab.id)}
-          />
-        ))}
-        {closed && <ClosedTabItem recording={recording} controlled={controlled} />}
-      </ul>
+      <IncognitoControl allowed={allowed} access={incognito} onError={setError} />
+      {/* Tabs wait for the access, so a late banner never moves a button under the pointer. */}
+      {allowed !== undefined && (
+        <ul>
+          {openTabs?.map((tab) => (
+            <TabItem
+              key={tab.id}
+              tab={tab}
+              recording={recording}
+              controlled={controlled}
+              take={takeOn(tab.id)}
+            />
+          ))}
+          {closed && <ClosedTabItem recording={recording} controlled={controlled} />}
+        </ul>
+      )}
       {(error ?? recording.error) && <p role="alert">{error ?? recording.error}</p>}
     </aside>
   );

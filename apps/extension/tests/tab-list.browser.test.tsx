@@ -179,11 +179,58 @@ test("marks incognito tabs, shows only the icons it may load, and records them a
   await expectControlFree();
 });
 
-test("without incognito access, the list says how to allow it and offers no window", async () => {
-  const { root } = mount({ incognito: fakeIncognito(false).access });
-  await expect
-    .poll(() => root.querySelector(".tab-hint")?.textContent)
-    .toContain("Allow in Incognito");
+const banner = (root: HTMLElement) =>
+  root.querySelector<HTMLElement>('section[aria-labelledby="incognito-heading"]') ?? undefined;
+
+test("without incognito access, a banner opens RECnRun's details and no window is offered", async () => {
+  const incognito = fakeIncognito(false);
+  const { root } = mount({ incognito: incognito.access });
+  await expect.poll(() => banner(root)?.textContent).toContain("Enable Incognito Mode");
+  expect(banner(root)?.textContent).toContain(
+    "Open the extension settings and enable “Allow in Incognito”.",
+  );
+  expect(button(root, "New incognito window")).toBeUndefined();
+  button(root, "Open Extension Config")?.click();
+  await expect.poll(() => incognito.settings).toHaveLength(1);
+});
+
+test("the tabs wait for the incognito access, so the banner never pushes a Record button away", async () => {
+  let report = (_allowed: boolean) => {};
+  const access = {
+    ...fakeIncognito(false).access,
+    allowed: () => new Promise<boolean>((resolve) => (report = resolve)),
+  };
+  const { root } = mount({ incognito: access });
+  await expect.poll(() => root.querySelector("aside h2")?.textContent).toBe("Tabs");
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  expect(item(root, "Shop")).toBeUndefined();
+
+  report(false);
+  await expect.poll(() => buttons(item(root, "Shop"))).toEqual(["Record"]);
+  expect(banner(root)).toBeDefined();
+});
+
+test("details Chrome refuses to open are an alert", async () => {
+  const access = {
+    ...fakeIncognito(false).access,
+    openSettings: async () => {
+      throw new Error("Cannot open chrome://extensions.");
+    },
+  };
+  const { root } = mount({ incognito: access });
+  await expect.poll(() => button(root, "Open Extension Config")).toBeDefined();
+  button(root, "Open Extension Config")?.click();
+  await expect.poll(() => alertText(root)).toContain("Cannot open chrome://extensions.");
+});
+
+test("an access Chrome fails to report shows neither the banner nor the window", async () => {
+  const access = {
+    ...fakeIncognito(false).access,
+    allowed: async () => Promise.reject(new Error("Extension context invalidated.")),
+  };
+  const { root } = mount({ incognito: access });
+  await expect.poll(() => item(root, "Shop")).toBeDefined();
+  expect(banner(root)).toBeUndefined();
   expect(button(root, "New incognito window")).toBeUndefined();
 });
 
@@ -191,7 +238,7 @@ test("with incognito access, a new incognito window opens without starting a ses
   const incognito = fakeIncognito(true);
   const { root, sent } = mount({ incognito: incognito.access });
   await expect.poll(() => button(root, "New incognito window")).toBeDefined();
-  expect(root.querySelector(".tab-hint")).toBeNull();
+  expect(banner(root)).toBeUndefined();
   button(root, "New incognito window")?.click();
   await expect.poll(() => incognito.opened).toHaveLength(1);
   expect(sent).toEqual([]);
