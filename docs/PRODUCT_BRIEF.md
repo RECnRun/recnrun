@@ -16,23 +16,24 @@ The events themselves (clicks, inputs, navigations, DOM changes) are not stored 
 
 1. A visitor opens recnrun.com (or a local dev server).
 2. The website asks whether the extension is installed. If it is missing, the website shows a banner explaining what the extension does, with a link to the install guide.
-3. The extension's dashboard (`dashboard.html`) shows its recordings:
+3. With the extension installed, the website is the only way in: the extension shows its dashboard over the site, at the site's address. `recnrun.com/recordings/<id>` opens that recording, and Back, Forward, and reload work. The dashboard shows its recordings:
    - **Recordings:** grouped by workspace, the one with the newest recording first; each recording, newest first, with its start URL, date (in UTC), duration, and event count.
    - **Empty:** it says there are no recordings yet.
    - **Unreadable** (for example, stored data from an incompatible version): it shows the reason.
-4. The dashboard also lists every open tab. With no recording in progress, each tab offers **Record**, which opens the session beside it, and **Float**, which opens the session in a floating window over it. The recorded tab shows the state and elapsed time with Show, Pause or Resume, and Stop; the other tabs wait until it ends. Any number of dashboards can be open, in tabs or over recnrun.com, and a dashboard tab can be the recorded tab itself.
 
-   Each recording has its own link, `dashboard.html#/recordings/<id>`.
+   Opened on their own, outside the site, the extension's pages only point to recnrun.com. The toolbar icon has no menu and does nothing; the extension has no keyboard shortcuts or context menu items.
 
-5. The **session** is the recording in progress, one per Chrome profile. Its page (`session.html`) shows the state, the elapsed time, Pause or Resume, Stop, and a link that opens a new dashboard tab. It lives in one of two places:
-   - **Beside the recorded tab,** in a Split View (Chrome 155+), or in the next tab without Split View. Float moves the controls into a floating window and lets the page fill the window; closing that window without Stop brings the session back beside the page.
-   - **In a floating window** (Document Picture-in-Picture) that a dashboard opened.
+4. The dashboard also lists every open tab. With no recording in progress, each tab offers **Record**. Record starts the **session**, the recording in progress, one per Chrome profile: the session opens in a floating window (Document Picture-in-Picture) with the state, the elapsed time, Pause or Resume, and Stop, and the recorded tab comes to the front. The site tab that started it **controls** the session. Any number of site tabs can be open; they all show the same session, but only one controls it at a time. While one does, the recorded tab shows the state and elapsed time in every dashboard, and the other tabs offer nothing.
 
-   The toolbar icon, the page's "Open RECnRun" context menu item, and Alt+Shift+S (MacCtrl+Shift+S on macOS) start recording the current tab, with the session beside it. On another tab while a session runs, they move the session beside that tab, which it then records; while the session floats, they do nothing. Alt+Shift+D (MacCtrl+Shift+D) and the icon's "Dashboard" context menu item open a new dashboard tab.
+   The floating window also shows the **current tab**, the one in focus, apart from the recorded tab: its icon, title, address, and whether it is incognito or recorded. Switching tabs changes only what it shows; the session keeps recording the tab it started on. When the focus leaves the browser, the window keeps the last tab, marked as not in focus.
 
-   Stop ends the session and closes its pane and its window; closing the recorded tab ends it too. Typing the session page's address shows that no recording runs.
+   With "Allow in Incognito" on in RECnRun's extension details, the dashboard also lists incognito tabs, marked Incognito, records them like any other, and offers **New incognito window**, which opens one without starting a session. Without it, the dashboard lists normal tabs and says how to allow it. RECnRun never stores incognito titles or addresses and never closes an incognito window. The dashboard opens only from recnrun.com in a normal window; in an incognito window, the site says so.
 
-6. On recnrun.com, the extension shows the same dashboard over the site, at the site's address: `recnrun.com/recordings/<id>` opens that recording, and Back, Forward, and reload work. Float there has the site open the floating window, since a frame cannot.
+5. Closing the floating window without Stop keeps the session, gives up the control, and brings the controlling site tab back to the front. So does closing or reloading the controlling site tab. Any dashboard then shows the recorded tab with **Continue**, which reopens the floating window for the same session and takes the control, and **Stop**.
+
+   Only Stop, in a dashboard or the floating window, ends the session; it closes the window and brings the site tab back. Closing tabs never ends it: once the recorded tab closes, every dashboard shows the session as a closed tab, which can only be stopped.
+
+6. Only recording exists today; running a recording again comes later ([Next](#next)).
 
 7. The website's footer links to the privacy policy at `recnrun.com/privacy/`. The extension leaves that page alone, so it stays readable with the extension installed.
 

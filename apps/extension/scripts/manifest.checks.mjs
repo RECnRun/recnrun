@@ -30,11 +30,17 @@ test("only the RECnRun site may frame the dashboard and the session page", () =>
   ]);
 });
 
-test("the production build requests only storage, contextMenus, and tabs", () => {
+test("the production build requests only storage and tabs", () => {
   const manifest = productionManifest();
-  assert.deepEqual(manifest.permissions, ["storage", "contextMenus", "tabs"]);
+  assert.deepEqual(manifest.permissions, ["storage", "tabs"]);
+  assert.equal(manifest.commands, undefined);
+  assert.equal(manifest.action?.default_popup, undefined);
   assert.equal(manifest.host_permissions, undefined);
   assert.equal(manifest.externally_connectable, undefined);
+});
+
+test("one extension context spans normal and incognito windows", () => {
+  assert.equal(productionManifest().incognito, "spanning");
 });
 
 test("the production build ships the logo as its icons", () => {

@@ -150,7 +150,7 @@ module.exports = {
     {
       name: "extension-session-isolated",
       severity: "error",
-      comment: "The session page links to the dashboard by URL; the two pages share only views.",
+      comment: "The session page and the dashboard share only views; the site frames each of them.",
       from: { path: "^apps/extension/src/session/" },
       to: { path: "^apps/extension/src/(content|background|dashboard)/" },
     },
@@ -160,6 +160,13 @@ module.exports = {
       comment: "Views are the components both pages render; they get their data injected.",
       from: { path: "^apps/extension/src/views/" },
       to: { path: "^apps/extension/src/(content|background|dashboard|session|storage)/" },
+    },
+    {
+      name: "extension-tabs-is-model",
+      severity: "error",
+      comment: "src/tabs is the one tab model and watcher the dashboard and the PiP both read.",
+      from: { path: "^apps/extension/src/tabs/" },
+      to: { path: "^apps/extension/src/(content|background|dashboard|session|storage|views)/" },
     },
     {
       name: "not-to-entrypoints",

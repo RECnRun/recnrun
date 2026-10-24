@@ -1,24 +1,43 @@
-// Chrome keeps one Document PiP window per browser, so the session floats in one at a time.
-export const PANEL_LOCK = "recnrun-panel";
+// Held by the dashboard that controls the session, from taking control until its PiP window closes.
+export const CONTROL_LOCK = "recnrun-control";
 
-/** Holds a lock shared by the extension's views until released; Chrome frees it if the holder goes. */
-export function holdLock(name: string): () => void {
-  let release = () => {};
-  const held = new Promise<void>((resolve) => (release = resolve));
-  void navigator.locks.request(name, () => {
-    const channel = new BroadcastChannel(name);
-    channel.postMessage("held");
-    channel.close();
-    return held;
-  });
-  return release;
+function announce(name: string): void {
+  const channel = new BroadcastChannel(name);
+  channel.postMessage("held");
+  channel.close();
 }
 
 /** Whether any extension view, or the service worker, holds the lock. */
-export async function isHeld(name: string): Promise<boolean> {
+async function isHeld(name: string): Promise<boolean> {
   const { held = [] } = await navigator.locks.query();
   // Watchers wait in shared mode, so only an exclusive holder counts.
   return held.some((lock) => lock.name === name && lock.mode === "exclusive");
+}
+
+async function holdIfAvailable(name: string): Promise<(() => void) | undefined> {
+  let release = () => {};
+  const held = new Promise<void>((resolve) => (release = resolve));
+  const taken = await new Promise<boolean>((resolve) => {
+    void navigator.locks.request(name, { ifAvailable: true }, (lock) => {
+      resolve(lock !== null);
+      if (lock === null) return undefined;
+      announce(name);
+      return held;
+    });
+  });
+  return taken ? release : undefined;
+}
+
+/**
+ * Takes the lock unless any extension page holds it, atomically across them, and holds it until
+ * released; Chrome frees it when the holder's page goes, as when its tab closes or reloads.
+ */
+export async function tryHoldLock(name: string): Promise<(() => void) | undefined> {
+  for (;;) {
+    const release = await holdIfAvailable(name);
+    if (release || (await isHeld(name))) return release;
+    // Only watchers had it, passing through in shared mode as it freed; they let go at once.
+  }
 }
 
 /** Calls back with whether the lock is held, each time a view takes it and once it frees. */

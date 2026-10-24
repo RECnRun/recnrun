@@ -3,9 +3,9 @@ import { LocationMessageSchema, routeMessage } from "@/messaging/frame-protocol"
 
 const currentPath = (location: Location) => location.pathname + location.search + location.hash;
 
-function coverViewport(iframe: HTMLIFrameElement): void {
+export function coverViewport(element: HTMLElement): void {
   // CSSOM writes are not inline style attributes, so the page's `style-src 'self'` allows them.
-  Object.assign(iframe.style, {
+  Object.assign(element.style, {
     position: "fixed",
     inset: "0",
     width: "100%",

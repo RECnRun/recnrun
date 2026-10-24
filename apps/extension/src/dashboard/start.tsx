@@ -1,17 +1,17 @@
 import type { Snapshot } from "@recnrun/domain";
 import { render } from "preact";
-import { useState } from "preact/hooks";
+import * as v from "valibot";
 import { disallowedAncestor } from "@/config/origins";
 import { Dashboard } from "@/dashboard/Dashboard";
-import type { TabSource } from "@/dashboard/open-tabs";
-import { createFrameRouter, createHashRouter } from "@/dashboard/router";
-import type { SessionActions, SessionSetup } from "@/dashboard/TabList";
-import { openPanelMessage } from "@/messaging/frame-protocol";
-import { floatSessionMessage, openSessionMessage } from "@/messaging/session-protocol";
+import { createFrameRouter } from "@/dashboard/router";
+import type { TakeControl } from "@/dashboard/TabList";
+import { openPanelMessage, PanelClosedMessageSchema } from "@/messaging/frame-protocol";
+import { returnToDashboardMessage, startSessionMessage } from "@/messaging/session-protocol";
 import type { SessionRequest } from "@/messaging/session-protocol";
-import { documentPip, requestPanelWindow, showSession } from "@/pip/document-pip";
+import { CONTROL_LOCK, tryHoldLock } from "@/messaging/view-locks";
+import type { IncognitoAccess, TabSource } from "@/tabs/open-tabs";
 import type { RecordingStore } from "@/views/recording";
-import { Refusal } from "@/views/Refusal";
+import { Refusal, SiteOnly } from "@/views/Refusal";
 
 /** What the dashboard reads and does, injected so tests need no extension APIs. */
 export interface DashboardData {
@@ -19,57 +19,49 @@ export interface DashboardData {
   recordings: RecordingStore;
   /** The browser's tabs; without them the dashboard lists no tab to record. */
   tabs?: TabSource;
+  incognito?: IncognitoAccess;
   /** Sends a session request to the background. */
   send: (request: SessionRequest) => void;
 }
 
-const SESSION_PATH = "/session.html";
+const CONTROLLED_ELSEWHERE = "Another RECnRun tab controls the session.";
 
-/** A top-level dashboard opens the session's PiP window itself, then asks to record the tab. */
-function topLevelActions(page: Window, send: (request: SessionRequest) => void): SessionActions {
-  const pip = documentPip(page);
-  const record = (tabId: number) => send(openSessionMessage(tabId));
-  if (!pip) return { record };
-  const float = async (tabId: number) => {
-    // Nothing may await before this call, or Chrome refuses it for lack of user activation.
-    const pipWindow = await requestPanelWindow(pip);
-    showSession(pipWindow, new URL(SESSION_PATH, page.location.href).href, page.location.origin);
-    send(floatSessionMessage(tabId));
+/**
+ * The control lock, taken atomically across every dashboard, makes this one the only one with a
+ * PiP window. A frame cannot open that window, so the site's content script opens it, and says
+ * when it closes; the lock then frees, and the site tab gets the focus back.
+ */
+function controlFrom(page: Window, parent: string, send: DashboardData["send"]): TakeControl {
+  let release: (() => void) | undefined;
+  page.addEventListener("message", (event) => {
+    if (event.source !== page.parent || event.origin !== parent) return;
+    if (!release || !v.is(PanelClosedMessageSchema, event.data)) return;
+    release();
+    release = undefined;
+    send(returnToDashboardMessage());
+  });
+  return async (tabId) => {
+    if (release) return;
+    release = await tryHoldLock(CONTROL_LOCK);
+    if (!release) throw new Error(CONTROLLED_ELSEWHERE);
+    page.parent.postMessage(openPanelMessage(), parent);
+    send(startSessionMessage(tabId));
   };
-  return { record, float };
-}
-
-/** A frame cannot open a PiP window, so the site's content script opens it. */
-function framedActions(page: Window, parent: string, send: (request: SessionRequest) => void) {
-  const actions: SessionActions = {
-    record: (tabId) => send(openSessionMessage(tabId)),
-    float: async (tabId) => {
-      page.parent.postMessage(openPanelMessage(), parent);
-      send(floatSessionMessage(tabId));
-    },
-  };
-  return actions;
-}
-
-function sessionSetup(data: DashboardData, actions: SessionActions): SessionSetup | undefined {
-  if (!data.tabs) return undefined;
-  return { tabs: data.tabs, store: data.recordings, actions };
-}
-
-function TopLevelDashboard({ data, page }: { data: DashboardData; page: Window }) {
-  const [router] = useState(() => createHashRouter(page));
-  const [session] = useState(() => sessionSetup(data, topLevelActions(page, data.send)));
-  return <Dashboard loadSnapshot={data.loadSnapshot} router={router} session={session} />;
 }
 
 function startFramed(root: HTMLElement, data: DashboardData, page: Window) {
   const parent = page.location.ancestorOrigins[0] ?? "";
-  const actions = framedActions(page, parent, data.send);
+  const session = data.tabs && {
+    tabs: data.tabs,
+    store: data.recordings,
+    take: controlFrom(page, parent, data.send),
+    incognito: data.incognito,
+  };
   render(
     <Dashboard
       loadSnapshot={data.loadSnapshot}
       router={createFrameRouter(parent, page)}
-      session={sessionSetup(data, actions)}
+      session={session}
     />,
     root,
   );
@@ -87,9 +79,10 @@ export function startDashboard(
     render(<Refusal origin={blocked} />, root);
     return;
   }
-  if (ancestors.length > 0) {
-    startFramed(root, data, page);
+  // The site is the only way in: it frames the dashboard and opens the session's PiP window.
+  if (ancestors.length === 0) {
+    render(<SiteOnly />, root);
     return;
   }
-  render(<TopLevelDashboard data={data} page={page} />, root);
+  startFramed(root, data, page);
 }

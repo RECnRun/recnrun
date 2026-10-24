@@ -6,3 +6,12 @@ export function Refusal({ origin }: { origin: string }) {
     </main>
   );
 }
+
+/** What an extension page shows when opened on its own, outside the site that frames it. */
+export function SiteOnly() {
+  return (
+    <main>
+      <p role="status">Open recnrun.com to use RECnRun.</p>
+    </main>
+  );
+}

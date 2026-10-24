@@ -24,6 +24,12 @@ export const OpenPanelMessageSchema = v.object({
   type: v.literal("open-panel"),
 });
 
+/** The content script tells the dashboard frame that the PiP window it asked for closed or failed. */
+export const PanelClosedMessageSchema = v.object({
+  channel: v.literal(CHANNEL),
+  type: v.literal("panel-closed"),
+});
+
 /** The panel inside the PiP window asks the content script to close that window. */
 export const ClosePanelMessageSchema = v.object({
   channel: v.literal(CHANNEL),
@@ -34,12 +40,18 @@ type RouteMessage = v.InferOutput<typeof RouteMessageSchema>;
 type LocationMessage = v.InferOutput<typeof LocationMessageSchema>;
 type OpenPanelMessage = v.InferOutput<typeof OpenPanelMessageSchema>;
 type ClosePanelMessage = v.InferOutput<typeof ClosePanelMessageSchema>;
+type PanelClosedMessage = v.InferOutput<typeof PanelClosedMessageSchema>;
 
 export const openPanelMessage = (): OpenPanelMessage => ({ channel: CHANNEL, type: "open-panel" });
 
 export const closePanelMessage = (): ClosePanelMessage => ({
   channel: CHANNEL,
   type: "close-panel",
+});
+
+export const panelClosedMessage = (): PanelClosedMessage => ({
+  channel: CHANNEL,
+  type: "panel-closed",
 });
 
 export const routeMessage = (path: string): RouteMessage => ({

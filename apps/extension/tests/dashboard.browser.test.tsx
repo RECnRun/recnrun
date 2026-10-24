@@ -4,7 +4,6 @@ import { sampleSnapshot } from "@recnrun/domain/testing";
 import { render } from "preact";
 import { afterEach, expect, test } from "vite-plus/test";
 import { Dashboard } from "@/dashboard/Dashboard";
-import { createHashRouter } from "@/dashboard/router";
 import type { DashboardRouter } from "@/dashboard/router";
 
 function memoryRouter(initialRoute = "/") {
@@ -104,22 +103,4 @@ test("says when a linked recording does not exist", async () => {
   await expect
     .poll(() => root.querySelector(".empty-state h2")?.textContent)
     .toBe("Recording not found");
-});
-
-test("keeps the route in the tab's hash", async () => {
-  history.replaceState(null, "", "#/recordings/rec-login");
-  const router = createHashRouter();
-  expect(router.initialRoute).toBe("/recordings/rec-login");
-  expect(router.href("/")).toBe("#/");
-
-  const seen: string[] = [];
-  const stop = router.subscribe((path) => seen.push(path));
-  router.publish("/recordings/rec-checkout", "Checkout with saved card · RECnRun");
-  expect(location.hash).toBe("#/recordings/rec-checkout");
-  expect(document.title).toBe("Checkout with saved card · RECnRun");
-  await expect.poll(() => seen).toEqual(["/recordings/rec-checkout"]);
-  stop();
-
-  history.replaceState(null, "", location.pathname);
-  expect(createHashRouter().initialRoute).toBe("/");
 });

@@ -1,6 +1,10 @@
 import { afterEach, expect, test, vi } from "vite-plus/test";
 import { servePanelRequests } from "@/content/panel-window";
-import { closePanelMessage, openPanelMessage } from "@/messaging/frame-protocol";
+import {
+  closePanelMessage,
+  openPanelMessage,
+  panelClosedMessage,
+} from "@/messaging/frame-protocol";
 
 const EXTENSION = "chrome-extension://test-id";
 const SESSION = `${EXTENSION}/session.html`;
@@ -12,20 +16,19 @@ function frame(): Window {
   return iframe.contentWindow;
 }
 
-/** A site page whose PiP API hands out same-origin frames instead of PiP windows. */
-function sitePage(dashboard: HTMLIFrameElement) {
+/** A site page whose PiP API hands out same-origin frames instead of PiP windows, or refuses. */
+function sitePage(dashboard: HTMLIFrameElement, pip: "frames" | "refuses" | "missing" = "frames") {
   const opened: { window: Window; close: () => void }[] = [];
+  const requestWindow = async () => {
+    if (pip === "refuses") throw new Error("Document PiP requires user activation");
+    const pipWindow = frame();
+    const close = vi.fn();
+    pipWindow.close = close;
+    opened.push({ window: pipWindow, close });
+    return pipWindow;
+  };
   const page = Object.assign(new EventTarget(), {
-    documentPictureInPicture: {
-      window: null,
-      requestWindow: async () => {
-        const pipWindow = frame();
-        const close = vi.fn();
-        pipWindow.close = close;
-        opened.push({ window: pipWindow, close });
-        return pipWindow;
-      },
-    },
+    documentPictureInPicture: pip === "missing" ? undefined : { window: null, requestWindow },
   }) as unknown as Window;
   servePanelRequests(dashboard, SESSION, EXTENSION, page);
   const send = (data: unknown, origin = EXTENSION, source = dashboard.contentWindow) =>
@@ -87,3 +90,35 @@ test("closes the PiP window only when its own session asks", async () => {
   close(panel);
   expect(closeSpy).toHaveBeenCalledOnce();
 });
+
+/** The messages the content script posts to the dashboard frame, with their target origin. */
+function toDashboard(dashboard: HTMLIFrameElement): unknown[][] {
+  const seen: unknown[][] = [];
+  const target = dashboard.contentWindow;
+  if (!target) throw new Error("The frame did not load.");
+  vi.spyOn(target, "postMessage").mockImplementation((...args: unknown[]) => void seen.push(args));
+  return seen;
+}
+
+test("tells the dashboard once its PiP window closes", async () => {
+  const dashboard = dashboardFrame();
+  const told = toDashboard(dashboard);
+  const { opened, send } = sitePage(dashboard);
+  send(openPanelMessage());
+  await expect.poll(() => opened.length).toBe(1);
+  expect(told).toEqual([]);
+
+  first(opened).window.dispatchEvent(new Event("pagehide"));
+  await expect.poll(() => told).toEqual([[panelClosedMessage(), EXTENSION]]);
+});
+
+for (const pip of ["refuses", "missing"] as const) {
+  test(`tells the dashboard when the PiP window ${pip === "refuses" ? "is refused" : "API is missing"}`, async () => {
+    const dashboard = dashboardFrame();
+    const told = toDashboard(dashboard);
+    const { opened, send } = sitePage(dashboard, pip);
+    send(openPanelMessage());
+    await expect.poll(() => told).toEqual([[panelClosedMessage(), EXTENSION]]);
+    expect(opened).toEqual([]);
+  });
+}

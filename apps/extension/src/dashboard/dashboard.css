@@ -97,55 +97,20 @@
   margin: 0;
 }
 
-/* A Split View pane can be about 140px wide or 64px tall (docs/POCS.md, POC 5). */
-@media (max-width: 30rem) {
-  :root {
-    --space: 0.5rem;
-  }
-
-  .site-header h1 {
-    margin: 0;
-    font-size: 1.25rem;
-  }
-
-  .empty-state h2 {
-    margin-top: 0;
-    font-size: 1.125rem;
-  }
-
-  .recording h3 {
-    font-size: 1rem;
-  }
-
-  .recording dl {
-    grid-template-columns: 1fr;
-    gap: 0;
-  }
-
-  .recording dd + dt {
-    margin-top: 0.25rem;
-  }
-}
-
-@media (max-height: 30rem) {
-  .site-header {
-    padding-block: 0.25rem;
-  }
-
-  .site-header h1 {
-    margin: 0;
-    font-size: 1rem;
-  }
-
-  main {
-    padding-top: 0;
-  }
-}
-
 .site-header {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--space);
+}
+
+.tab-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.tab-new-window {
+  justify-self: start;
 }
