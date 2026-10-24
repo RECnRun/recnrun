@@ -1,14 +1,15 @@
 import { coverViewport } from "@/content/dashboard-frame";
 
-const NOTICE =
+export const INCOGNITO_NOTICE =
   "RECnRun opens from a normal window. Open recnrun.com there to record incognito tabs.";
+export const ORPHANED_NOTICE = "RECnRun was reloaded or turned off. Reload this page to use it.";
 
-/** Covers the site in an incognito tab, where the dashboard cannot load, with where to go instead. */
-export function showIncognitoNotice(page: Window = window): void {
+/** Covers the site with `text`, where the dashboard cannot show. */
+export function showNotice(text: string, page: Window = window): void {
   const { document } = page;
   const notice = document.createElement("p");
   notice.setAttribute("role", "status");
-  notice.textContent = NOTICE;
+  notice.textContent = text;
   coverViewport(notice);
   // CSSOM writes, like the frame's, which the site's `style-src 'self'` allows.
   Object.assign(notice.style, {

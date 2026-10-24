@@ -1,6 +1,8 @@
 import { afterEach, expect, test } from "vite-plus/test";
 import { mountDashboardFrame } from "@/content/dashboard-frame";
-import { showIncognitoNotice } from "@/content/incognito-notice";
+import { INCOGNITO_NOTICE, ORPHANED_NOTICE, showNotice } from "@/content/notice";
+import { watchForOrphaning } from "@/content/orphan-watch";
+import type { SitePort } from "@/messaging/site-port";
 import { createFrameRouter } from "@/dashboard/router";
 import { startDashboard } from "@/dashboard/start";
 import { locationMessage, routeMessage } from "@/messaging/frame-protocol";
@@ -100,9 +102,57 @@ test("the content script frames the dashboard and syncs the route both ways", as
 });
 
 test("in an incognito tab, the site is covered by where to record from instead of the frame", () => {
-  showIncognitoNotice();
+  showNotice(INCOGNITO_NOTICE);
   const notice = document.querySelector<HTMLElement>('[role="status"]');
   expect(notice?.textContent).toContain("Open recnrun.com there to record incognito tabs.");
   expect(notice?.style.position).toBe("fixed");
+  expect(document.querySelector("iframe")).toBeNull();
+});
+
+/** A port to the dashboard frames that the test disconnects, as Chrome does when RECnRun unloads. */
+function fakePort() {
+  const listeners: (() => void)[] = [];
+  const port: SitePort = {
+    name: "recnrun-site",
+    onDisconnect: { addListener: (listener) => listeners.push(listener) },
+  };
+  return { port, disconnect: () => listeners.forEach((listener) => listener()) };
+}
+
+const orphanNotice = () =>
+  [...document.querySelectorAll('[role="status"]')].find(
+    (each) => each.textContent === ORPHANED_NOTICE,
+  );
+
+function watchedFrame(connect: () => SitePort) {
+  const frame = document.body.appendChild(document.createElement("iframe"));
+  let connected = 0;
+  watchForOrphaning(frame, () => {
+    connected += 1;
+    return connect();
+  });
+  return { frame, connections: () => connected };
+}
+
+test("once its frame loads, the site holds a port, and asks for a reload when it drops", async () => {
+  const { port, disconnect } = fakePort();
+  const { frame, connections } = watchedFrame(() => port);
+  expect(connections()).toBe(0);
+  frame.dispatchEvent(new Event("load"));
+  frame.dispatchEvent(new Event("load"));
+  expect(connections()).toBe(1);
+  expect(orphanNotice()).toBeUndefined();
+
+  disconnect();
+  expect(orphanNotice()).toBeDefined();
+  expect(document.querySelector("iframe")).toBeNull();
+});
+
+test("a site whose frame loads after RECnRun unloaded asks for a reload at once", () => {
+  const { frame } = watchedFrame(() => {
+    throw new Error("Extension context invalidated.");
+  });
+  frame.dispatchEvent(new Event("load"));
+  expect(orphanNotice()).toBeDefined();
   expect(document.querySelector("iframe")).toBeNull();
 });

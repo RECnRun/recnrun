@@ -1,4 +1,5 @@
 import { browser } from "wxt/browser";
+import { holdSitePorts } from "@/dashboard/site-ports";
 import { startDashboard } from "@/dashboard/start";
 import { recordingSessionRepository } from "@/storage/recording-session-repository";
 import { readSnapshot } from "@/storage/snapshot-repository";
@@ -15,6 +16,7 @@ if (root) {
     recordings: recordingSessionRepository,
     tabs: browserTabs(),
     incognito: browserIncognito,
+    holdSitePorts,
     send: (request) => void browser.runtime.sendMessage(request),
   });
 }
