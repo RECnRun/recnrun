@@ -207,6 +207,13 @@ test("a window Chrome refuses to open is an alert", async () => {
   await expect.poll(() => alertText(root)).toContain("Incognito mode is disabled.");
 });
 
+test("only a framed dashboard holds the site tabs' ports", async () => {
+  let held = 0;
+  const { root } = mount({ holdSitePorts: () => (held += 1) });
+  await expect.poll(() => root.querySelector("main")).not.toBeNull();
+  expect(held).toBe(1);
+});
+
 test("without the tabs API the dashboard lists no tab", async () => {
   const { root } = mount({ tabs: undefined });
   await expect.poll(() => root.querySelector("main")).not.toBeNull();

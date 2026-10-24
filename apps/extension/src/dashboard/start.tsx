@@ -20,6 +20,8 @@ export interface DashboardData {
   /** The browser's tabs; without them the dashboard lists no tab to record. */
   tabs?: TabSource;
   incognito?: IncognitoAccess;
+  /** Keeps the site tabs' ports open, so a site tab learns when RECnRun unloads. */
+  holdSitePorts?: () => void;
   /** Sends a session request to the background. */
   send: (request: SessionRequest) => void;
 }
@@ -50,6 +52,7 @@ function controlFrom(page: Window, parent: string, send: DashboardData["send"]):
 }
 
 function startFramed(root: HTMLElement, data: DashboardData, page: Window) {
+  data.holdSitePorts?.();
   const parent = page.location.ancestorOrigins[0] ?? "";
   const session = data.tabs && {
     tabs: data.tabs,
