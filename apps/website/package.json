@@ -15,7 +15,6 @@
   },
   "devDependencies": {
     "@preact/preset-vite": "catalog:",
-    "@vitest/browser-playwright": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vite-plus": "catalog:"

@@ -28,9 +28,11 @@
   },
   "devDependencies": {
     "@playwright/test": "catalog:",
+    "@preact/preset-vite": "catalog:",
     "@recnrun/domain": "workspace:*",
     "@swc/core": "catalog:",
     "@types/node": "catalog:",
+    "@vitest/browser-playwright": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "dependency-cruiser": "catalog:",
     "eslint-plugin-sonarjs": "catalog:",

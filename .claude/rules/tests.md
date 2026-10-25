@@ -19,6 +19,7 @@ paths:
 | End-to-end | `tests/e2e/*.spec.ts`, headed Playwright, built website + test extension | `vp run test:e2e`        |
 
 - Keep schemas, protocol handling, handlers, and view models in Node unit tests; extract pure functions when that makes a rule testable.
+- Both apps' `vitest.browser.config.ts` call `browserProject(name, dir)` from the root `vitest.browser.shared.ts`; change the Browser Mode setup there, once.
 - Prove detection, the install banner, data display, origin checks, and CSP end to end, with the real extension loaded.
 
 ## Running
