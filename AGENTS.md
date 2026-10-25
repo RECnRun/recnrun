@@ -65,7 +65,7 @@ Test commands and `verify` run in Docker, so start Docker Desktop first. If Dock
   - architecture boundaries;
   - all test layers;
   - container and hook checks;
-  - coverage (at least 90% lines, statements, and functions; 85% branches), and a check that the measured files are every `.ts`/`.tsx` under `apps/*/src` and `packages/*/src` except tests, the entrypoints, and `main.tsx`;
+  - coverage (at least 90% lines, statements, and functions; 85% branches overall, and at least 80% lines, statements, and functions; 75% branches in every file that has executable code), and a check that the measured files are every `.ts`/`.tsx` under `apps/*/src` and `packages/*/src` except tests, the entrypoints, and `main.tsx`;
   - Knip and jscpd (at most 4% duplication);
   - workspace builds and the production manifest guard.
 - When a gate fails, fix the cause. Never lower thresholds, delete or skip tests, exclude code from analysis, add `@ts-ignore`/`@ts-nocheck`, disable lint rules, or loosen `.dependency-cruiser.cjs` to pass.
