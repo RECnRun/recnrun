@@ -5,10 +5,14 @@ import { browserToolbarPin } from "@/dashboard/toolbar-pin";
 import { recordingSessionRepository } from "@/storage/recording-session-repository";
 import { readSnapshot } from "@/storage/snapshot-repository";
 import { browserTabs } from "@/tabs/open-tabs";
+import { peerServices } from "@/peers/page-services";
 import "@recnrun/brand/base.css";
 import "@recnrun/brand/mona-sans.css";
 import "@/views/views.css";
 import "@/dashboard/dashboard.css";
+
+// Spelled out, so the production build can drop the cross-profile POC.
+const PEERS = import.meta.env.MODE === "development" || import.meta.env.MODE === "test";
 
 const root = document.getElementById("app");
 if (root) {
@@ -19,5 +23,6 @@ if (root) {
     incognito: browserIncognito,
     toolbar: browserToolbarPin,
     send: (request) => browser.runtime.sendMessage(request),
+    peers: PEERS ? peerServices() : undefined,
   });
 }

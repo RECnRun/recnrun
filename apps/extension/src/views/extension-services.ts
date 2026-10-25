@@ -3,6 +3,7 @@ import type { SessionRequest } from "@/messaging/session-protocol";
 import type { RecordingStore } from "@/ports/recording-store";
 import type { IncognitoAccess, TabSource } from "@/ports/tabs";
 import type { ToolbarPin } from "@/ports/toolbar";
+import type { PeerServices } from "@/views/remote-peer";
 
 /** Sends a session request to the background and resolves with its reply, which the caller validates. */
 export type SendRequest = (request: SessionRequest) => Promise<unknown>;
@@ -15,4 +16,6 @@ export interface ExtensionServices {
   incognito: IncognitoAccess;
   toolbar: ToolbarPin;
   send: SendRequest;
+  /** The paired Chrome profile, in builds with the cross-profile POC. */
+  peers?: PeerServices;
 }

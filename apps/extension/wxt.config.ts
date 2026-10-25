@@ -1,6 +1,10 @@
 import { fileURLToPath } from "node:url";
 import preact from "@preact/preset-vite";
 import { defineConfig } from "wxt";
+import { peersEnabled } from "./src/config/origins.ts";
+
+/** The cross-profile POC's pages, left out of every build that has no cross-profile link. */
+const PEER_ENTRYPOINTS = new Set(["offscreen", "pairing"]);
 
 const chromiumProfile = fileURLToPath(new URL("./.wxt/chrome-data", import.meta.url));
 
@@ -21,12 +25,18 @@ export default defineConfig({
       const { prepareDevChrome } = await import("./scripts/dev-chrome.ts");
       await prepareDevChrome(chromiumProfile);
     },
+    "entrypoints:resolved": (wxt, entrypoints) => {
+      if (peersEnabled(wxt.config.mode)) return;
+      const kept = entrypoints.filter((entrypoint) => !PEER_ENTRYPOINTS.has(entrypoint.name));
+      entrypoints.splice(0, entrypoints.length, ...kept);
+    },
   },
-  manifest: () => ({
+  manifest: ({ mode }) => ({
     name: "RECnRun",
     description: "Records and replays browser sessions for developers.",
     // tabs lets the dashboard list every tab, with its title and address, to record one.
-    permissions: ["storage", "tabs"],
+    // offscreen hosts the cross-profile POC's WebRTC link, in development and test builds only.
+    permissions: peersEnabled(mode) ? ["storage", "tabs", "offscreen"] : ["storage", "tabs"],
     // One extension context spans normal and incognito windows, so the dashboard and the PiP
     // window see incognito tabs once the user turns on "Allow in Incognito".
     incognito: "spanning",

@@ -154,7 +154,9 @@ module.exports = {
       comment:
         "Views are what the dashboard and its PiP window render; they get their data injected.",
       from: { path: "^apps/extension/src/views/" },
-      to: { path: "^apps/extension/src/(content|background|dashboard|storage)/" },
+      to: {
+        path: "^apps/extension/src/(content|background|dashboard|storage|peers|pairing|offscreen)/",
+      },
     },
     {
       name: "extension-tabs-is-model",
@@ -177,6 +179,47 @@ module.exports = {
       comment: "Ports are types: import them with `import type`, so no runtime code hides in them.",
       from: {},
       to: { path: "^apps/extension/src/ports/", dependencyTypesNot: ["type-only"] },
+    },
+    {
+      name: "extension-p2p-is-protocol",
+      severity: "error",
+      comment:
+        "Cross-profile POC: src/p2p is the peer protocol, pairing codes, and the WebRTC link, with no extension state.",
+      from: { path: "^apps/extension/src/p2p/" },
+      to: {
+        path: "^apps/extension/src/(content|background|dashboard|session|storage|views|peers|pairing|offscreen|messaging)/",
+      },
+    },
+    {
+      name: "extension-offscreen-holds-only-the-link",
+      severity: "error",
+      comment:
+        "Cross-profile POC: the offscreen document carries frames; the background alone decides and stores.",
+      from: { path: "^apps/extension/src/offscreen/" },
+      to: {
+        path: [
+          "^apps/extension/src/(content|background|dashboard|session|storage|views|peers|pairing)/",
+          "node_modules/wxt/.*storage",
+        ],
+      },
+    },
+    {
+      name: "extension-pairing-page-isolated",
+      severity: "error",
+      comment:
+        "Cross-profile POC: the pairing page reaches the link only through the background, as the dashboard does.",
+      from: { path: "^apps/extension/src/pairing/" },
+      to: {
+        path: "^apps/extension/src/(content|background|dashboard|session|storage|offscreen|peers)/",
+      },
+    },
+    {
+      name: "extension-poc-stays-out-of-the-main-flow",
+      severity: "error",
+      comment:
+        "Cross-profile POC: the content script and the session page never load it; entrypoints inject it.",
+      from: { path: "^apps/extension/src/(content|session|dashboard|tabs|ports)/" },
+      to: { path: "^apps/extension/src/(offscreen|pairing|peers)/" },
     },
     {
       name: "not-to-entrypoints",

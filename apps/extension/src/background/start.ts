@@ -2,8 +2,12 @@ import { browser } from "wxt/browser";
 import { chromeDashboardBrowser } from "@/background/chrome-dashboard-browser";
 import { createDashboardOpener } from "@/background/dashboard-opener";
 import { createBackgroundListener } from "@/background/listener";
+import { startPeers } from "@/background/peers";
 import { createRoutes } from "@/background/routes";
 import { recordingSessionRepository } from "@/storage/recording-session-repository";
+
+// Spelled out, not peersEnabled(), so the production build can drop the POC's background code.
+const PEERS = import.meta.env.MODE === "development" || import.meta.env.MODE === "test";
 
 /** Keeps a dashboard in front of the user: on the toolbar icon, on install, and as the profile opens. */
 function openDashboardOnDemand() {
@@ -28,6 +32,7 @@ export function startBackground(): void {
     extensionVersion: browser.runtime.getManifest().version,
     store: recordingSessionRepository,
     showDashboard: opener.show,
+    peers: PEERS ? startPeers() : undefined,
   });
   const identity = { extensionId: browser.runtime.id, extensionUrl: browser.runtime.getURL("/") };
   browser.runtime.onMessage.addListener(createBackgroundListener(routes, identity));

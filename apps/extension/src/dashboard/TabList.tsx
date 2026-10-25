@@ -22,6 +22,10 @@ interface TabListProps {
   tabs: TabSource;
   store: RecordingStore;
   take: TakeControl;
+  /** Which browser profile the tabs belong to, when the dashboard lists two. */
+  heading?: { id: string; text: string };
+  /** Brings a tab to the front, for tabs of another profile, whose window is out of sight. */
+  activate?: (tabId: number) => Promise<void>;
 }
 
 interface TabProps {
@@ -30,6 +34,7 @@ interface TabProps {
   /** Whether a dashboard has the control, so the session floats in its PiP window. */
   controlled: boolean;
   take: () => void;
+  show?: () => void;
 }
 
 /**
@@ -64,7 +69,7 @@ function SessionControls({
   );
 }
 
-function TabItem({ tab, recording, controlled, take }: TabProps) {
+function TabItem({ tab, recording, controlled, take, show }: TabProps) {
   const recorded = recording.status !== "idle" && recording.tabId === tab.id;
   const idle = recording.loaded && recording.status === "idle" && !controlled;
   return (
@@ -77,13 +82,18 @@ function TabItem({ tab, recording, controlled, take }: TabProps) {
             Record
           </button>
         )}
+        {show && (
+          <button type="button" onClick={show}>
+            Show tab
+          </button>
+        )}
       </div>
     </li>
   );
 }
 
 /** The session outlives the tab it records, which only an explicit Stop ends. */
-function ClosedTabItem({ recording, controlled }: Omit<TabProps, "tab" | "take">) {
+function ClosedTabItem({ recording, controlled }: Omit<TabProps, "tab" | "take" | "show">) {
   return (
     <li class="tab" aria-label="Closed tab">
       <span class="tab-title">Closed tab</span>
@@ -96,22 +106,28 @@ function ClosedTabItem({ recording, controlled }: Omit<TabProps, "tab" | "take">
 }
 
 /** Every open tab; with no session each can start one, and the recorded tab shows the session. */
-export function TabList({ tabs, store, take }: TabListProps) {
+function recordedTabClosed(openTabs: OpenTab[] | undefined, recording: Recording): boolean {
+  if (openTabs === undefined || recording.status === "idle") return false;
+  return !openTabs.some((tab) => tab.id === recording.tabId);
+}
+
+const LOCAL_HEADING = { id: "tabs-heading", text: "Tabs" };
+
+export function TabList({ tabs, store, take, heading = LOCAL_HEADING, activate }: TabListProps) {
   const openTabs = useBrowserTabs(tabs)?.tabs;
   const recording = useRecording(store);
   const controlled = useLockHeld(CONTROL_LOCK);
   const [error, setError] = useState<string>();
-  const closed =
-    openTabs !== undefined &&
-    recording.status !== "idle" &&
-    !openTabs.some((tab) => tab.id === recording.tabId);
-  const takeOn = (tabId: number) => () => {
+  const closed = recordedTabClosed(openTabs, recording);
+  const attempt = (action: (tabId: number) => Promise<void>) => (tabId: number) => () => {
     setError(undefined);
-    take(tabId).catch((caught: unknown) => setError(errorMessage(caught)));
+    action(tabId).catch((caught: unknown) => setError(errorMessage(caught)));
   };
+  const takeOn = attempt(take);
+  const showOn = activate && attempt(activate);
   return (
-    <aside class="tabs" aria-labelledby="tabs-heading">
-      <h2 id="tabs-heading">Tabs</h2>
+    <aside class="tabs" aria-labelledby={heading.id}>
+      <h2 id={heading.id}>{heading.text}</h2>
       <ul>
         {openTabs?.map((tab) => (
           <TabItem
@@ -120,6 +136,7 @@ export function TabList({ tabs, store, take }: TabListProps) {
             recording={recording}
             controlled={controlled}
             take={takeOn(tab.id)}
+            show={showOn?.(tab.id)}
           />
         ))}
         {closed && <ClosedTabItem recording={recording} controlled={controlled} />}
