@@ -5,7 +5,7 @@ import { watchForOrphaning } from "@/content/orphan-watch";
 import type { SitePort } from "@/messaging/site-port";
 import { createFrameRouter } from "@/dashboard/router";
 import { startDashboard } from "@/dashboard/start";
-import { locationMessage, routeMessage } from "@/messaging/frame-protocol";
+import { locationMessage, navigateMessage, routeMessage } from "@/messaging/frame-protocol";
 import { dashboardData } from "./dashboard-data";
 
 const startPath = location.pathname;
@@ -25,6 +25,20 @@ function messagesTo(target: Window): unknown[] {
   return seen;
 }
 
+/** Posts from the frame's own script, so the message's source is the frame. */
+function postFromFrame(frame: Window, message: unknown) {
+  const script = frame.document.createElement("script");
+  script.textContent = `parent.postMessage(${JSON.stringify(message)}, "*")`;
+  frame.document.body.append(script);
+}
+
+function mountedFrame(): Window {
+  mountDashboardFrame("about:blank", location.origin);
+  const frame = document.querySelector<HTMLIFrameElement>("iframe")?.contentWindow;
+  if (!frame) throw new Error("The dashboard frame did not load.");
+  return frame;
+}
+
 afterEach(() => {
   history.replaceState(null, "", startPath);
   document.body.replaceChildren();
@@ -38,8 +52,14 @@ test("the frame router starts at the site path and reports navigation to the sit
   expect(router.href("/")).toBe(`${location.origin}/`);
 
   const posted = messagesTo(window);
-  router.publish("/", "RECnRun");
-  await expect.poll(() => posted).toContainEqual(locationMessage("/", "RECnRun"));
+  router.navigate("/recordings/rec-checkout");
+  router.publish("/recordings/rec-checkout", "Checkout");
+  await expect
+    .poll(() => posted)
+    .toEqual([
+      navigateMessage("/recordings/rec-checkout"),
+      locationMessage("/recordings/rec-checkout", "Checkout"),
+    ]);
 });
 
 test("the frame router ignores bad routes and messages from anyone but the site", () => {
@@ -81,24 +101,34 @@ test("the dashboard framed by an allowed site publishes its route to the site", 
 
 test("the content script frames the dashboard and syncs the route both ways", async () => {
   history.replaceState(null, "", "/recordings/rec-login?view=events");
-  mountDashboardFrame("about:blank", location.origin);
-  const iframe = document.querySelector<HTMLIFrameElement>('iframe[title="RECnRun dashboard"]');
-  expect(iframe?.src).toBe(
+  const frame = mountedFrame();
+  expect(document.querySelector("iframe")?.src).toBe(
     `about:blank?route=${encodeURIComponent("/recordings/rec-login?view=events")}`,
   );
-  const frame = iframe?.contentWindow;
-  if (!frame) throw new Error("The dashboard frame did not load.");
 
-  // The frame's own script must post, so the message's source is the frame.
-  const script = frame.document.createElement("script");
-  script.textContent = `parent.postMessage(${JSON.stringify(locationMessage("/recordings/rec-checkout", "Checkout"))}, "*")`;
-  frame.document.body.append(script);
-  await expect.poll(() => location.pathname).toBe("/recordings/rec-checkout");
-  expect(document.title).toBe("Checkout");
+  postFromFrame(frame, navigateMessage("/recordings/rec-checkout"));
+  postFromFrame(frame, locationMessage("/recordings/rec-checkout", "Checkout"));
+  await expect.poll(() => document.title).toBe("Checkout");
+  expect(location.pathname).toBe("/recordings/rec-checkout");
 
   const routes = messagesTo(frame);
   history.back();
   await expect.poll(() => routes).toContainEqual(routeMessage("/recordings/rec-login?view=events"));
+});
+
+test("a location the address bar has moved past adds no history entry and no title", async () => {
+  history.replaceState(null, "", "/recordings/rec-login");
+  const frame = mountedFrame();
+  const entries = history.length;
+  const title = document.title;
+
+  // The frame's answer to an earlier Back, arriving after the next one.
+  postFromFrame(frame, locationMessage("/", "Stale"));
+  postFromFrame(frame, locationMessage("/recordings/rec-login", "Log in"));
+  await expect.poll(() => document.title).not.toBe(title);
+  expect(document.title).toBe("Log in");
+  expect(location.pathname).toBe("/recordings/rec-login");
+  expect(history.length).toBe(entries);
 });
 
 test("in an incognito tab, the site is covered by where to record from instead of the frame", () => {
