@@ -1,5 +1,6 @@
 import { afterEach, expect, test, vi } from "vite-plus/test";
 import { servePanelRequests } from "@/content/panel-window";
+import { subscribeFrame } from "@/messaging/frame-channel";
 import {
   closePanelMessage,
   openPanelMessage,
@@ -16,15 +17,23 @@ function frame(): Window {
   return iframe.contentWindow;
 }
 
+/** Counts the `message` listeners a window holds, as added and removed from now on. */
+function messageListeners(target: Window): () => number {
+  const added = vi.spyOn(target, "addEventListener");
+  const removed = vi.spyOn(target, "removeEventListener");
+  const messages = (calls: unknown[][]) => calls.filter(([type]) => type === "message").length;
+  return () => messages(added.mock.calls) - messages(removed.mock.calls);
+}
+
 /** A site page whose PiP API hands out same-origin frames instead of PiP windows, or refuses. */
 function sitePage(dashboard: HTMLIFrameElement, pip: "frames" | "refuses" | "missing" = "frames") {
-  const opened: { window: Window; close: () => void }[] = [];
+  const opened: { window: Window; close: () => void; listeners: () => number }[] = [];
   const requestWindow = async () => {
     if (pip === "refuses") throw new Error("Document PiP requires user activation");
     const pipWindow = frame();
     const close = vi.fn();
     pipWindow.close = close;
-    opened.push({ window: pipWindow, close });
+    opened.push({ window: pipWindow, close, listeners: messageListeners(pipWindow) });
     return pipWindow;
   };
   const page = Object.assign(new EventTarget(), {
@@ -89,6 +98,21 @@ test("closes the PiP window only when its own session asks", async () => {
   expect(closeSpy).not.toHaveBeenCalled();
   close(panel);
   expect(closeSpy).toHaveBeenCalledOnce();
+});
+
+test("the PiP window listens to its session through the frame channel, with one listener", async () => {
+  const { opened, send } = sitePage(dashboardFrame());
+  send(openPanelMessage());
+  await expect.poll(() => opened.length).toBe(1);
+  const { window: pipWindow, listeners } = first(opened);
+  const panel = pipWindow.document.querySelector("iframe")?.contentWindow ?? null;
+  expect(listeners()).toBe(1);
+
+  // A second subscriber of the same window shares the channel's listener instead of adding one.
+  const stop = subscribeFrame(pipWindow, panel, EXTENSION, {});
+  expect(listeners()).toBe(1);
+  stop();
+  expect(listeners()).toBe(1);
 });
 
 /** The messages the content script posts to the dashboard frame, with their target origin. */
