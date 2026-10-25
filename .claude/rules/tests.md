@@ -29,6 +29,7 @@ paths:
 - The Node projects run with `isolate: false`, so files of one project share a worker: reset module state in `beforeEach` (as `fakeBrowser.reset()` does) instead of relying on a fresh module per file.
 - Pass Playwright arguments after `--`, for example `vp run test:e2e -- tests/e2e/dashboard-frame.spec.ts -g 'empty'`.
 - On failure, read `.artifacts/docker/<run-id>/` (`run.log`, `test-results`, `playwright-report`).
+- `vp run test:coverage` also fails when the measured file set differs from the source tree minus the configured excludes (`scripts/coverage.checks.mjs`); a new source folder outside `apps/*/src` or `packages/*/src` needs that script and `coverage.include` updated together.
 - `:local` variants open host windows; use them only for debugging.
 
 ## Writing end-to-end tests

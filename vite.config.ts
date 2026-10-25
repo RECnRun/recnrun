@@ -103,8 +103,16 @@ export default defineConfig({
     ],
     coverage: {
       provider: "v8",
+      // scripts/coverage.checks.mjs reads the json-summary to compare the measured files with the tree.
+      reporter: ["text", "html", "json-summary"],
       include: ["apps/*/src/**/*.{ts,tsx}", "packages/*/src/**/*.{ts,tsx}"],
-      exclude: ["**/*.test.{ts,tsx}", "**/*.d.ts"],
+      // The entrypoints and main.tsx only call a start* function; the end-to-end suite runs them.
+      exclude: [
+        "**/*.test.{ts,tsx}",
+        "**/*.d.ts",
+        "apps/*/src/entrypoints/**",
+        "apps/*/src/main.tsx",
+      ],
       thresholds: {
         lines: 90,
         statements: 90,

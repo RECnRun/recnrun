@@ -160,6 +160,10 @@ test("public tests route through Docker while local variants and the hooks retai
     assert.ok(manifest.scripts[`test:${layer}:local`]);
   }
   assert.match(manifest.scripts["test:container"], /runner\.checks\.mjs/);
+  assert.equal(
+    manifest.scripts["test:coverage:local"],
+    "vp test --coverage && node --test scripts/coverage.checks.mjs",
+  );
   assert.equal(manifest.scripts.ready, "vp run verify");
   assert.match(
     readFileSync(join(root, ".vite-hooks/pre-commit"), "utf8"),

@@ -17,7 +17,7 @@
     "test:e2e": "node scripts/test-container.mjs test:e2e:local",
     "test:e2e:local": "vp run --no-cache website#build && vp run --no-cache extension#build:test && playwright test --workers=1",
     "test:coverage": "node scripts/test-container.mjs test:coverage:local",
-    "test:coverage:local": "vp test --coverage",
+    "test:coverage:local": "vp test --coverage && node --test scripts/coverage.checks.mjs",
     "test:container": "node --test tests/container/runner.checks.mjs",
     "test:hooks": "node --test scripts/agent-hooks/*.checks.mjs scripts/git-hooks/*.checks.mjs",
     "test:extension-manifest": "vp run extension#test:manifest",
