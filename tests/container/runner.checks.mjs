@@ -180,6 +180,14 @@ test("the Docker image runs the Node major that engines.node requires", () => {
   assert.equal(enginesNode, dockerNode);
 });
 
+test("the Docker image installs the Vite+ version the catalog pins", () => {
+  const catalog = readFileSync(join(root, "pnpm-workspace.yaml"), "utf8");
+  const dockerfile = readFileSync(join(root, "Dockerfile.tests"), "utf8");
+  const [, catalogVersion] = catalog.match(/^ {2}vite-plus: (\S+)$/m);
+  const [, dockerVersion] = dockerfile.match(/VP_VERSION=(\S+)/);
+  assert.equal(dockerVersion, catalogVersion);
+});
+
 test("verify runs Vitest once, under coverage, and keeps test:local for vp run test", () => {
   const config = readFileSync(join(root, "vite.config.ts"), "utf8");
   const task = (name) => config.match(new RegExp(`"${name}": \\{[^}]*command: \\[([^\\]]*)\\]`))[1];
