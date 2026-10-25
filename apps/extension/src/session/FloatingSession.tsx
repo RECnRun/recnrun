@@ -1,8 +1,8 @@
+import type { RecordingStore } from "@/ports/recording-store";
+import type { TabSource } from "@/ports/tabs";
 import { SessionTabs } from "@/session/SessionTabs";
-import type { TabSource } from "@/tabs/open-tabs";
 import { RecordPanel } from "@/views/RecordPanel";
 import { useEnded, useRecording } from "@/views/recording";
-import type { RecordingStore } from "@/views/recording";
 
 interface FloatingSessionProps {
   store: RecordingStore;

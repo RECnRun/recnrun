@@ -1,9 +1,9 @@
 import { render } from "preact";
 import { afterEach, expect, test } from "vite-plus/test";
 import { closePanelMessage } from "@/messaging/frame-protocol";
+import type { RecordingStore } from "@/ports/recording-store";
+import type { TabSource } from "@/ports/tabs";
 import { startSession } from "@/session/start";
-import type { TabSource } from "@/tabs/open-tabs";
-import type { RecordingStore } from "@/views/recording";
 import { memoryRecordingStore } from "./dashboard-data";
 import { DOCS, PRIVATE, SHOP, fakeTabs } from "./fake-tabs";
 import { button, panelText } from "./queries";

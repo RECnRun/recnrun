@@ -1,12 +1,13 @@
 import { useState } from "preact/hooks";
 import { IncognitoControl, useIncognitoAccess } from "@/dashboard/IncognitoControl";
-import { CONTROL_LOCK } from "@/messaging/view-locks";
-import type { IncognitoAccess, OpenTab, TabSource } from "@/tabs/open-tabs";
+import type { RecordingStore } from "@/ports/recording-store";
+import type { IncognitoAccess, OpenTab, TabSource } from "@/ports/tabs";
 import { RecordStatus } from "@/views/RecordPanel";
 import { errorText, useRecording } from "@/views/recording";
-import type { Recording, RecordingStore } from "@/views/recording";
+import type { Recording } from "@/views/recording";
 import { TabSummary } from "@/views/TabSummary";
 import { useBrowserTabs } from "@/views/use-browser-tabs";
+import { CONTROL_LOCK } from "@/views/view-locks";
 import { useLockHeld } from "@/views/use-lock-held";
 
 /**

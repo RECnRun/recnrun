@@ -5,7 +5,7 @@ import type { DashboardData } from "@/dashboard/start";
 import { openPanelMessage, panelClosedMessage } from "@/messaging/frame-protocol";
 import { returnToDashboardMessage, startSessionMessage } from "@/messaging/session-protocol";
 import type { SessionRequest } from "@/messaging/session-protocol";
-import { CONTROL_LOCK, tryHoldLock } from "@/messaging/view-locks";
+import { CONTROL_LOCK, tryHoldLock } from "@/views/view-locks";
 import { dashboardData, memoryRecordingStore } from "./dashboard-data";
 import { DOCS, PRIVATE, SHOP, fakeIncognito, fakeTabs } from "./fake-tabs";
 import { button } from "./queries";

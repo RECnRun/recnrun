@@ -5,7 +5,7 @@ import { subscribeFrame } from "@/messaging/frame-channel";
 import { openPanelMessage } from "@/messaging/frame-protocol";
 import { returnToDashboardMessage, startSessionMessage } from "@/messaging/session-protocol";
 import type { SessionRequest } from "@/messaging/session-protocol";
-import { CONTROL_LOCK, tryHoldLock } from "@/messaging/view-locks";
+import { CONTROL_LOCK, tryHoldLock } from "@/views/view-locks";
 
 /** Sends a session request to the background and resolves with its reply, validated here. */
 export type SendRequest = (request: SessionRequest) => Promise<unknown>;

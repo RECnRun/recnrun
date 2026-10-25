@@ -3,10 +3,10 @@ import { mountDashboardFrame } from "@/content/dashboard-frame";
 import { INCOGNITO_NOTICE, ORPHANED_NOTICE, showNotice } from "@/content/notice";
 import { watchForOrphaning } from "@/content/orphan-watch";
 import { servePanelRequests } from "@/content/panel-window";
-import type { SitePort } from "@/messaging/site-port";
 import { createFrameRouter } from "@/dashboard/router";
 import { startDashboard } from "@/dashboard/start";
 import { locationMessage, navigateMessage, routeMessage } from "@/messaging/frame-protocol";
+import type { SitePort } from "@/ports/site-port";
 import { dashboardData } from "./dashboard-data";
 
 const startPath = location.pathname;

@@ -3,9 +3,9 @@ import { controlFrom } from "@/dashboard/control";
 import type { SendRequest } from "@/dashboard/control";
 import { Dashboard } from "@/dashboard/Dashboard";
 import { createFrameRouter } from "@/dashboard/router";
-import type { IncognitoAccess, TabSource } from "@/tabs/open-tabs";
+import type { RecordingStore } from "@/ports/recording-store";
+import type { IncognitoAccess, TabSource } from "@/ports/tabs";
 import { renderFramed } from "@/views/framed";
-import type { RecordingStore } from "@/views/recording";
 
 /** What the dashboard reads and does, injected so tests need no extension APIs. */
 export interface DashboardData {

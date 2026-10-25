@@ -1,11 +1,11 @@
 import type { RequestResult } from "@recnrun/bridge";
 import type { Route, Routes, Sender } from "@/background/listener";
 import { focusTab, startSession } from "@/background/session-requests";
-import type { SessionStore } from "@/background/session-requests";
+import type { RecordingStore } from "@/ports/recording-store";
 
 interface RouteDependencies {
   extensionVersion: string;
-  store: SessionStore;
+  store: RecordingStore;
 }
 
 const ANY: readonly Sender[] = ["contentScript", "ownPage"];

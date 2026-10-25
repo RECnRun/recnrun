@@ -1,29 +1,15 @@
-import type { RecordingSession } from "@recnrun/domain";
 import { beforeEach, describe, expect, test, vi } from "vite-plus/test";
 import { fakeBrowser } from "wxt/testing/fake-browser";
 import { createBackgroundListener } from "@/background/listener";
 import { createRoutes } from "@/background/routes";
-import type { SessionStore } from "@/background/session-requests";
 import type { BackgroundReply } from "@/messaging/background-messages";
 import { returnToDashboardMessage, startSessionMessage } from "@/messaging/session-protocol";
+import { memoryRecordingStore } from "./dashboard-data";
 
 const EXTENSION_URL = "chrome-extension://own-id/";
 const identity = { extensionId: "own-id", extensionUrl: EXTENSION_URL };
 const ownPage = { id: "own-id", url: `${EXTENSION_URL}dashboard.html` };
 const contentScript = { id: "own-id", url: "https://recnrun.com/" };
-
-function memoryStore(initial: RecordingSession | null = null, unreadable = false): SessionStore {
-  let session = initial;
-  return {
-    read: async () => {
-      if (unreadable) throw new Error("Stored session is invalid");
-      return session;
-    },
-    write: async (next) => {
-      session = next;
-    },
-  };
-}
 
 interface Sender {
   id?: string;
@@ -31,7 +17,7 @@ interface Sender {
   tab?: { id?: number };
 }
 
-function listen(message: unknown, sender: Sender, store = memoryStore()) {
+function listen(message: unknown, sender: Sender, store = memoryRecordingStore()) {
   const routes = createRoutes({ extensionVersion: "0.1.0", store });
   const replies: BackgroundReply[] = [];
   const listener = createBackgroundListener(routes, identity);
@@ -105,7 +91,7 @@ describe("session requests", () => {
   test("an unreadable stored session is an error reply", async () => {
     const shop = await fakeBrowser.tabs.create({ url: "https://shop.example/" });
     const request = startSessionMessage(shop.id ?? -1);
-    const { replies } = listen(request, ownPage, memoryStore(null, true));
+    const { replies } = listen(request, ownPage, memoryRecordingStore(null, true));
     await vi.waitFor(() =>
       expect(replies).toEqual([{ ok: false, error: "Stored session is invalid" }]),
     );

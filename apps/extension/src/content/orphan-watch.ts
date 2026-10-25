@@ -1,5 +1,5 @@
 import { ORPHANED_NOTICE, showNotice } from "@/content/notice";
-import type { SitePort } from "@/messaging/site-port";
+import type { SitePort } from "@/ports/site-port";
 
 /**
  * Reloads the site once the user comes back to it, as from chrome://extensions after a toggle such

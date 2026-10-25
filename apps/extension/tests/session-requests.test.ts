@@ -2,20 +2,7 @@ import type { RecordingSession } from "@recnrun/domain";
 import { beforeEach, expect, test } from "vite-plus/test";
 import { fakeBrowser } from "wxt/testing/fake-browser";
 import { startSession } from "@/background/session-requests";
-import type { SessionStore } from "@/background/session-requests";
-
-function memoryStore(initial: RecordingSession | null = null, unreadable = false): SessionStore {
-  let session = initial;
-  return {
-    read: async () => {
-      if (unreadable) throw new Error("Stored session is invalid");
-      return session;
-    },
-    write: async (next) => {
-      session = next;
-    },
-  };
-}
+import { memoryRecordingStore } from "./dashboard-data";
 
 const running = (tabId: number): RecordingSession => ({
   tabId,
@@ -36,7 +23,7 @@ beforeEach(() => {
 test("records the tab when no session runs, and focuses it", async () => {
   const shop = await fakeBrowser.tabs.create({ url: "https://shop.example/" });
   await fakeBrowser.tabs.create({ url: "https://recnrun.com/", active: true });
-  const store = memoryStore();
+  const store = memoryRecordingStore();
   await startSession(shop.id ?? -1, store, 5);
   expect(await store.read()).toEqual({ tabId: shop.id, status: "recording", banked: 0, since: 5 });
   expect(await activeTabId()).toBe(shop.id);
@@ -46,7 +33,7 @@ test("keeps the running session and focuses the tab it records", async () => {
   const shop = await fakeBrowser.tabs.create({ url: "https://shop.example/" });
   const docs = await fakeBrowser.tabs.create({ url: "https://docs.example/", active: true });
   const session = { ...running(shop.id ?? -1), status: "paused" as const, banked: 42 };
-  const store = memoryStore(session);
+  const store = memoryRecordingStore(session);
   await startSession(docs.id ?? -1, store);
   expect(await store.read()).toEqual(session);
   expect(await activeTabId()).toBe(shop.id);
@@ -54,13 +41,13 @@ test("keeps the running session and focuses the tab it records", async () => {
 
 test("leaves an unreadable session as it is and reports it", async () => {
   const shop = await fakeBrowser.tabs.create({ url: "https://shop.example/" });
-  const store = memoryStore(null, true);
+  const store = memoryRecordingStore(null, true);
   await expect(startSession(shop.id ?? -1, store, 5)).rejects.toThrow("Stored session is invalid");
   await expect(store.read()).rejects.toThrow("Stored session is invalid");
 });
 
 test("starts no session on a tab that is gone", async () => {
-  const store = memoryStore();
+  const store = memoryRecordingStore();
   await expect(startSession(999, store)).rejects.toThrow("The tab to record was closed.");
   expect(await store.read()).toBeNull();
 });

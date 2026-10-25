@@ -1,5 +1,5 @@
 import { useEffect, useState } from "preact/hooks";
-import type { IncognitoAccess } from "@/tabs/open-tabs";
+import type { IncognitoAccess } from "@/ports/tabs";
 import { errorText } from "@/views/recording";
 
 interface IncognitoProps {

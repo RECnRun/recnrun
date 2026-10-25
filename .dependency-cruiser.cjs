@@ -169,6 +169,21 @@ module.exports = {
       to: { path: "^apps/extension/src/(content|background|dashboard|session|storage|views)/" },
     },
     {
+      name: "extension-ports-are-contracts",
+      severity: "error",
+      comment:
+        "src/ports holds the contracts every extension folder may import; it depends on the domain alone.",
+      from: { path: "^apps/extension/src/ports/" },
+      to: { pathNot: ["^apps/extension/src/ports/", "^packages/domain/src/"] },
+    },
+    {
+      name: "extension-ports-type-only",
+      severity: "error",
+      comment: "Ports are types: import them with `import type`, so no runtime code hides in them.",
+      from: {},
+      to: { path: "^apps/extension/src/ports/", dependencyTypesNot: ["type-only"] },
+    },
+    {
       name: "not-to-entrypoints",
       severity: "error",
       comment: "Entrypoints are thin wiring; nothing imports them.",

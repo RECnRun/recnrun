@@ -1,5 +1,5 @@
+import { formatElapsed } from "@recnrun/domain";
 import logo from "@/assets/logo.svg?raw";
-import { formatElapsed } from "@/views/recording";
 import type { Recording } from "@/views/recording";
 
 // A data URL needs no base URL, whichever document the panel renders in.

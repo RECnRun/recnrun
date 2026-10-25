@@ -1,8 +1,8 @@
 import { closePanelMessage } from "@/messaging/frame-protocol";
+import type { RecordingStore } from "@/ports/recording-store";
+import type { TabSource } from "@/ports/tabs";
 import { FloatingSession } from "@/session/FloatingSession";
-import type { TabSource } from "@/tabs/open-tabs";
 import { renderFramed } from "@/views/framed";
-import type { RecordingStore } from "@/views/recording";
 
 /** What the session page reads, injected so tests need no extension APIs. */
 export interface SessionData {

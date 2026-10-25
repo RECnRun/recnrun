@@ -1,11 +1,5 @@
-import type { RecordingSession } from "@recnrun/domain";
 import { browser } from "wxt/browser";
-
-/** The session storage the background reads and writes; the extension keeps one session. */
-export interface SessionStore {
-  read: () => Promise<RecordingSession | null>;
-  write: (session: RecordingSession | null) => Promise<void>;
-}
+import type { RecordingStore } from "@/ports/recording-store";
 
 /** Shows the tab: active in its window, and that window focused. */
 export async function focusTab(tabId: number): Promise<void> {
@@ -22,7 +16,7 @@ async function ensureOpen(tabId: number): Promise<void> {
 /** Records the tab unless a session runs, which it keeps, then shows the tab the session records. */
 export async function startSession(
   tabId: number,
-  store: SessionStore,
+  store: RecordingStore,
   now = Date.now(),
 ): Promise<void> {
   // An unreadable stored session is the caller's error to show, never one to overwrite.
