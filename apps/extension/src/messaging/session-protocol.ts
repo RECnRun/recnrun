@@ -20,14 +20,6 @@ export const SessionRequestSchema = v.variant("type", [
 
 export type SessionRequest = v.InferOutput<typeof SessionRequestSchema>;
 
-/** The background's answer: done, or why the request failed, so the page can show it. */
-export const SessionReplySchema = v.variant("ok", [
-  v.object({ ok: v.literal(true) }),
-  v.object({ ok: v.literal(false), error: v.string() }),
-]);
-
-export type SessionReply = v.InferOutput<typeof SessionReplySchema>;
-
 export const startSessionMessage = (tabId: number): SessionRequest => ({
   type: "start-session",
   tabId,

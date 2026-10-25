@@ -17,11 +17,14 @@ export type RequestResult<T extends RequestType> = v.InferOutput<(typeof RESULT_
 
 const REQUEST_TYPES = Object.keys(RESULT_SCHEMAS) as RequestType[];
 
+/** The request types the extension answers; the background validates forwarded types with it. */
+export const RequestTypeSchema = v.picklist(REQUEST_TYPES);
+
 export const RequestSchema = v.object({
   ...envelope,
   kind: v.literal("request"),
   id: v.string(),
-  type: v.picklist(REQUEST_TYPES),
+  type: RequestTypeSchema,
 });
 
 export const ResponseSchema = v.variant("ok", [
@@ -75,7 +78,3 @@ export const messages = {
     extensionVersion,
   }),
 };
-
-export function isRequestType(value: unknown): value is RequestType {
-  return (REQUEST_TYPES as unknown[]).includes(value);
-}

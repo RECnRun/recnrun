@@ -5,12 +5,9 @@ import { disallowedAncestor } from "@/config/origins";
 import { Dashboard } from "@/dashboard/Dashboard";
 import { createFrameRouter } from "@/dashboard/router";
 import type { TakeControl } from "@/dashboard/TabList";
+import { BackgroundReplySchema } from "@/messaging/background-messages";
 import { openPanelMessage, PanelClosedMessageSchema } from "@/messaging/frame-protocol";
-import {
-  returnToDashboardMessage,
-  SessionReplySchema,
-  startSessionMessage,
-} from "@/messaging/session-protocol";
+import { returnToDashboardMessage, startSessionMessage } from "@/messaging/session-protocol";
 import type { SessionRequest } from "@/messaging/session-protocol";
 import { CONTROL_LOCK, tryHoldLock } from "@/messaging/view-locks";
 import type { IncognitoAccess, TabSource } from "@/tabs/open-tabs";
@@ -34,7 +31,7 @@ const CONTROLLED_ELSEWHERE = "Another RECnRun tab controls the session.";
 
 /** Rejects with the background's error, or when the reply is not one. */
 async function ask(send: DashboardData["send"], request: SessionRequest): Promise<void> {
-  const reply = v.parse(SessionReplySchema, await send(request));
+  const reply = v.parse(BackgroundReplySchema, await send(request));
   if (!reply.ok) throw new Error(reply.error);
 }
 
