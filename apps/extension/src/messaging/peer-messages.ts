@@ -14,6 +14,8 @@ export const LinkStateSchema = v.picklist([
   "failed",
 ]);
 
+export type LinkState = v.InferOutput<typeof LinkStateSchema>;
+
 const kind = <T extends string, P extends v.ObjectEntries>(type: T, payload: P) =>
   v.strictObject({ type: v.literal(type), ...payload });
 

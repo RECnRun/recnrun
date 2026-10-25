@@ -64,6 +64,8 @@ const PeerMessageSchema = v.variant("type", [
   message("SESSION_STATUS", { requestId: v.optional(MessageIdSchema), ...sessionStatus }),
   message("COMMAND_RESULT", { ...reply, ok: v.boolean(), reason: v.optional(text(200)) }),
   message("ERROR", { requestId: v.optional(MessageIdSchema), reason: text(200) }),
+  // The sender closes the link on purpose next; without it, a close looks like a failure.
+  message("BYE", {}),
 ]);
 
 export type PeerMessage = v.InferOutput<typeof PeerMessageSchema>;

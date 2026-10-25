@@ -1,6 +1,7 @@
 import { expect } from "./fixtures/extension.ts";
 import { framesOf, pair, test } from "./fixtures/profiles.ts";
 import type { Profile } from "./fixtures/profiles.ts";
+import { dashboardOf } from "./fixtures/session.ts";
 
 interface ChromeGlobal {
   chrome: {
@@ -111,7 +112,7 @@ test("a profile that quits drops the link, and after a restart pairs again as it
   await profileB.context.close();
   // No close message comes from a browser that quits; ICE consent checks find it gone.
   await expect(profileA.pairing.getByRole("status")).toHaveText(
-    /^(Disconnected|Connection failed) — Profile B$/,
+    /^(Disconnected|Not reachable) — Profile B$/,
     { timeout: 45_000 },
   );
 
@@ -129,12 +130,24 @@ test("a profile that quits drops the link, and after a restart pairs again as it
 test("disconnect and forget end the link on both sides", async ({ profileA, profileB }) => {
   await pair(profileA, profileB);
   await profileA.pairing.getByRole("button", { name: "Disconnect" }).click();
-  await expect(profileA.pairing.getByRole("status")).toHaveText(
-    /^(Disconnected|Not connected) — Profile B$/,
-  );
-  await expect(profileB.pairing.getByRole("status")).toHaveText(
-    /^(Disconnected|Connection failed) — Profile A$/,
-  );
+  await expect(profileA.pairing.getByRole("status")).toHaveText("Disconnected — Profile B");
+  await expect(profileB.pairing.getByRole("status")).toHaveText("Disconnected by Profile A");
   await profileB.pairing.getByRole("button", { name: "Forget the other profile" }).click();
   await expect(profileB.pairing.getByRole("status")).toHaveText("Not paired");
+});
+
+test("a profile that disconnects tells the other, whose dashboard says so instead of an error", async ({
+  profileA,
+  profileB,
+}) => {
+  await pair(profileA, profileB);
+  const site = await profileB.context.newPage();
+  await site.goto("/");
+  const dashboard = dashboardOf(site);
+  const heading = (state: string) =>
+    dashboard.getByRole("heading", { name: `Chrome — Profile A (${state})` });
+  await expect(heading("Connected")).toBeVisible();
+  await profileA.pairing.getByRole("button", { name: "Disconnect" }).click();
+  await expect(heading("Disconnected by Profile A")).toBeVisible();
+  await expect(profileB.pairing.getByRole("status")).toHaveText("Disconnected by Profile A");
 });

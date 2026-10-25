@@ -7,15 +7,21 @@ import type { PeerClient } from "@/views/peer-client";
 export const ALICE = { profileId: "11111111-1111-4111-8111-111111111111", displayName: "Alice" };
 export const BOB = { profileId: "22222222-2222-4222-8222-222222222222", displayName: "Bob" };
 
-type LinkState = PeerStatus["link"]["state"];
+type Link = PeerStatus["link"];
 
 /** This profile as Alice, paired with Bob unless `state` is undefined. */
-export function statusOf(state?: LinkState, verified = state === "connected"): PeerStatus {
+export function statusOf(state?: Link["state"], verified = state === "connected"): PeerStatus {
   return {
     identity: ALICE,
     peer: state ? { ...BOB, fingerprint: "AB:CD:EF" } : null,
     link: { state: state ?? "idle", verified },
   };
+}
+
+/** A link that went down for `reason`. */
+export function closedFor(state: Link["state"], reason: NonNullable<Link["reason"]>): PeerStatus {
+  const status = statusOf(state, false);
+  return { ...status, link: { ...status.link, reason } };
 }
 
 /** A real pairing code, so the folder can name its file after the code's own fields. */

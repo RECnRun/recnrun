@@ -45,6 +45,11 @@ describe("peerMessage", () => {
     });
     expect(parsePeerFrame(frameOf(status))).toEqual(status);
   });
+
+  test("says goodbye with no payload", () => {
+    const bye = peerMessage("BYE", route, {});
+    expect(parsePeerFrame(frameOf(bye))).toEqual(bye);
+  });
 });
 
 describe("parsePeerFrame", () => {

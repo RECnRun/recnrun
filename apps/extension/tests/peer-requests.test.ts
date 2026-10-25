@@ -6,7 +6,7 @@ import { peerMessage } from "@/p2p/protocol";
 import type { PeerMessage, PeerType, SharedTabs } from "@/p2p/protocol";
 import type { AuthorizedPeer, PeerLink, RemoteRecording } from "@/storage/peer-repository";
 import { memoryRecordingStore } from "./fake-extension";
-import { FINGERPRINT, ME, PEER, fromPeer, memoryRepository } from "./fake-peer";
+import { FINGERPRINT, ME, PEER, fromPeer, memoryRepository, recordingChannel } from "./fake-peer";
 
 const identity = { profileId: ME, displayName: "Laptop" };
 const peer: AuthorizedPeer = { profileId: PEER, displayName: "Desk", fingerprint: FINGERPRINT };
@@ -25,7 +25,10 @@ function requests(link: PeerLink | null = VERIFIED, reply: PeerMessage = result(
     accept: vi.fn(async () => "accepted"),
   } as unknown as PairingFlow;
   const deps = {
-    channel: { request: vi.fn(async (_type: PeerType, _payload: unknown) => reply) },
+    channel: {
+      request: vi.fn(async (_type: PeerType, _payload: unknown) => reply),
+      send: recordingChannel().channel.send,
+    },
     hello: vi.fn(async () => {}),
     pairing,
     askLink: vi.fn(async () => "link"),

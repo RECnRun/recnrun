@@ -6,6 +6,7 @@ import { signalFileOf } from "@/pairing/folder-signaling";
 import type { pickFolder } from "@/pairing/folder-signaling";
 import { FolderStep, useFolderPairing } from "@/pairing/FolderStep";
 import { ImportStep, OfferStep } from "@/pairing/PairingSteps";
+import { linkLabel } from "@/views/link-label";
 import { useAction, usePeerStatus } from "@/views/use-peer";
 import type { Action } from "@/views/use-peer";
 import type { PeerClient } from "@/views/peer-client";
@@ -17,21 +18,15 @@ interface PairingPageProps {
   pick?: typeof pickFolder;
 }
 
-const STATES = {
-  idle: "Not connected",
-  connecting: "Connecting",
-  connected: "Connected",
-  disconnected: "Disconnected",
-  failed: "Connection failed",
-} as const;
-
 /** The link in words: connected names the peer, since only a verified link counts. */
 function linkText(status: PeerStatus | undefined): string {
   if (!status) return "Loading";
   if (!status.peer) return "Not paired";
-  const { state, verified } = status.link;
-  if (state === "connected" && !verified) return "Checking the other profile";
-  return `${STATES[state]} — ${status.peer.displayName}`;
+  const { link, peer } = status;
+  if (link.state === "connected" && !link.verified) return "Checking the other profile";
+  const label = linkLabel(link, peer.displayName);
+  // "Disconnected by <name>" names the peer already.
+  return link.reason === "closed-by-peer" ? label : `${label} — ${peer.displayName}`;
 }
 
 function Identity({

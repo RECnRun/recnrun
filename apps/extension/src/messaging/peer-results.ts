@@ -20,6 +20,8 @@ export const PeerLinkSchema = v.strictObject({
   state: LinkStateSchema,
   /** Set once the link's certificate matches the authorized peer's. */
   verified: v.boolean(),
+  /** Why a link went down, when it is known; a new attempt clears it. */
+  reason: v.optional(v.picklist(["closed-here", "closed-by-peer", "certificate"])),
 });
 
 /** What a page learns about this profile and its link, as the background answers `status`. */

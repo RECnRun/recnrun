@@ -12,7 +12,7 @@ import type {
 } from "@/storage/peer-repository";
 
 export interface PeerRequestDependencies {
-  channel: Pick<PeerChannel, "request">;
+  channel: Pick<PeerChannel, "request" | "send">;
   /** Introduces this profile to the peer, as on every new link. */
   hello: () => Promise<void>;
   pairing: PairingFlow;
@@ -20,7 +20,7 @@ export interface PeerRequestDependencies {
   identity: () => Promise<ProfileIdentity>;
   rename: (identity: ProfileIdentity) => Promise<void>;
   authorized: Pick<Repository<AuthorizedPeer>, "read" | "write">;
-  link: Pick<Repository<PeerLink>, "read">;
+  link: Pick<Repository<PeerLink>, "read" | "write">;
   mirror: Pick<Repository<RemoteRecording>, "read" | "write">;
   localSession: Pick<RecordingStore, "read">;
   /** The peer's tabs as last reported, kept in memory only. */
@@ -70,11 +70,19 @@ async function ping(deps: Deps) {
   return { latencyMs: Math.round(performance.now() - sent) };
 }
 
+/** Tells a verified peer the close is intended, so it does not report a failure, then closes. */
+async function close(deps: Deps) {
+  // The channel sends only over a verified link; a peer already gone hears nothing.
+  await deps.channel.send("BYE", {}).catch(() => {});
+  await deps.link.write({ state: "disconnected", verified: false, reason: "closed-here" });
+  await deps.askLink({ type: "close" });
+}
+
 async function forget(deps: Deps) {
+  await close(deps);
   await deps.authorized.write(null);
   await deps.mirror.write(null);
   deps.tabs.write(undefined);
-  await deps.askLink({ type: "close" });
 }
 
 async function rename(deps: Deps, displayName: string) {
@@ -94,7 +102,7 @@ const HANDLERS: Handlers = {
   "create-offer": (deps) => deps.pairing.createOffer(),
   inspect: (deps, { code }) => deps.pairing.inspect(code),
   accept: (deps, { code }) => deps.pairing.accept(code),
-  disconnect: (deps) => deps.askLink({ type: "close" }),
+  disconnect: (deps) => close(deps),
   forget: (deps) => forget(deps),
   ping: (deps) => ping(deps),
   diagnostics: (deps) => deps.askLink({ type: "info" }),

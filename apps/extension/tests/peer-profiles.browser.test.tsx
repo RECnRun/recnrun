@@ -10,7 +10,7 @@ import type { OpenTab } from "@/ports/tabs";
 import type { PeerServices } from "@/views/remote-peer";
 import { CONTROL_LOCK, tryHoldLock } from "@/views/view-locks";
 import { fakeExtension, memoryRecordingStore } from "./fake-extension";
-import { fakePeerClient, statusOf } from "./fake-peer-client";
+import { closedFor, fakePeerClient, statusOf } from "./fake-peer-client";
 import { SHOP, fakeTabs } from "./fake-tabs";
 import {
   alertText,
@@ -95,7 +95,11 @@ test("the paired profile's tabs follow under its name and the link's state", asy
     [statusOf("connected", false), "Connecting"],
     [statusOf("connected"), "Connected"],
     [statusOf("disconnected"), "Disconnected"],
-    [statusOf("failed"), "Error"],
+    [closedFor("disconnected", "closed-here"), "Disconnected"],
+    [closedFor("disconnected", "closed-by-peer"), "Disconnected by Bob"],
+    [closedFor("failed", "closed-by-peer"), "Disconnected by Bob"],
+    [statusOf("failed"), "Not reachable"],
+    [closedFor("failed", "certificate"), "Error"],
   ];
   for (const [status, state] of states) {
     peer.change(status);

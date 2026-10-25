@@ -10,7 +10,7 @@ import { handlePeerRequest } from "@/background/peer-requests";
 import type { PeerRequestDependencies } from "@/background/peer-requests";
 import type { PeerRoutes } from "@/background/routes";
 import { peerNotice } from "@/messaging/peer-messages";
-import type { LinkCommand, LinkEvent } from "@/messaging/peer-messages";
+import type { LinkCommand, LinkEvent, LinkState } from "@/messaging/peer-messages";
 import type { PeerMessage, SharedTabs } from "@/p2p/protocol";
 import {
   authorizedPeerRepository,
@@ -84,8 +84,10 @@ async function hello(channel: PeerChannel): Promise<void> {
   });
 }
 
-async function linkDown(state: LinkEvent & { type: "state" }, channel: PeerChannel) {
-  await peerLinkRepository.write({ state: state.state, verified: false });
+async function linkDown(state: LinkState, channel: PeerChannel) {
+  // The reason for an intended close or a refused certificate outlives the states that follow.
+  const reason = (await peerLinkRepository.read().catch(() => null))?.reason;
+  await peerLinkRepository.write({ state, verified: false, ...(reason && { reason }) });
   channel.failAll();
   // The last report stays, marked unknown: only the executor may say a session ended.
   const mirror = await remoteRecordingRepository.read().catch(() => null);
@@ -98,13 +100,24 @@ async function linkUp(remoteFingerprint: string | undefined, channel: PeerChanne
   // DTLS proved the other side holds this certificate; only the one the user accepted may talk.
   if (!peer || remoteFingerprint !== peer.fingerprint) {
     log("closed a link whose certificate is not the accepted one");
-    await peerLinkRepository.write({ state: "failed", verified: false });
+    await peerLinkRepository.write({ state: "failed", verified: false, reason: "certificate" });
     await askLink({ type: "close" });
     return;
   }
   await peerLinkRepository.write({ state: "connected", verified: true });
   await hello(channel);
   notifyPages();
+}
+
+/** The peer said it closes the link on purpose, so this side closes too, without waiting for ICE. */
+async function closedByPeer(channel: PeerChannel) {
+  await peerLinkRepository.write({
+    state: "disconnected",
+    verified: false,
+    reason: "closed-by-peer",
+  });
+  await linkDown("disconnected", channel);
+  await askLink({ type: "close" });
 }
 
 function createLinkHandler(channel: PeerChannel, executor: ExecutorDependencies, tabs: TabsCache) {
@@ -118,13 +131,14 @@ function createLinkHandler(channel: PeerChannel, executor: ExecutorDependencies,
         await channel.send("ERROR", { reason: "Invalid message." }).catch(() => {});
       return;
     }
+    if (received.message.type === "BYE") return closedByPeer(channel);
     await execute(received.message, executor);
     await observe(received.message, tabs);
   };
   return async (event: LinkEvent) => {
     if (event.type === "frame") return onFrame(event.frame);
     if (event.state === "connected") return linkUp(event.remoteFingerprint, channel);
-    if (event.state !== "connecting") return linkDown(event, channel);
+    if (event.state !== "connecting") return linkDown(event.state, channel);
     await peerLinkRepository.write({ state: "connecting", verified: false });
     notifyPages();
   };

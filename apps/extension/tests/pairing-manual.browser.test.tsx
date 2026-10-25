@@ -2,7 +2,7 @@ import { render } from "preact";
 import { afterEach, beforeEach, expect, test, vi } from "vite-plus/test";
 import type { PairingPreview, PeerStatus } from "@/messaging/peer-results";
 import { startPairing } from "@/pairing/start";
-import { ALICE, BOB, fakePeerClient, statusOf } from "./fake-peer-client";
+import { ALICE, BOB, closedFor, fakePeerClient, statusOf } from "./fake-peer-client";
 import { alerts, check, disabled, field, previewOf, statusText, type } from "./pairing-page";
 import { button } from "./queries";
 
@@ -170,8 +170,11 @@ test("the link's state names the peer only once its certificate is checked", asy
     [statusOf("connected", false), "Checking the other profile"],
     [statusOf("connected"), "Connected — Bob"],
     [statusOf("disconnected"), "Disconnected — Bob"],
-    [statusOf("failed"), "Connection failed — Bob"],
-    [statusOf("idle"), "Not connected — Bob"],
+    [closedFor("disconnected", "closed-here"), "Disconnected — Bob"],
+    [closedFor("disconnected", "closed-by-peer"), "Disconnected by Bob"],
+    [statusOf("failed"), "Not reachable — Bob"],
+    [closedFor("failed", "certificate"), "Error — Bob"],
+    [statusOf("idle"), "Disconnected — Bob"],
   ];
   for (const [status, text] of states) {
     peer.change(status);

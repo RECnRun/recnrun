@@ -3,6 +3,7 @@ import type { PeerStatus } from "@/messaging/peer-results";
 import { TabList } from "@/dashboard/TabList";
 import type { TakeControl } from "@/dashboard/TabList";
 import type { ExtensionServices } from "@/views/extension-services";
+import { linkLabel } from "@/views/link-label";
 import type { PeerServices } from "@/views/remote-peer";
 import { usePeerStatus } from "@/views/use-peer";
 
@@ -12,19 +13,6 @@ interface PeerProfilesProps {
   take: TakeControl;
   /** Takes the control of a session in the other profile. */
   takeRemote: TakeControl;
-}
-
-const STATES = {
-  idle: "Disconnected",
-  connecting: "Connecting",
-  connected: "Connected",
-  disconnected: "Disconnected",
-  failed: "Error",
-} as const;
-
-/** The other profile's state in a word; a link whose certificate is unchecked is still connecting. */
-function peerState(link: PeerStatus["link"]): string {
-  return link.state === "connected" && !link.verified ? STATES.connecting : STATES[link.state];
 }
 
 /** The tabs of the paired Chrome profile, which this dashboard can show and record. */
@@ -47,7 +35,7 @@ function RemoteProfile({
       activate={activate}
       heading={{
         id: "remote-tabs-heading",
-        text: `Chrome — ${status.peer.displayName} (${peerState(status.link)})`,
+        text: `Chrome — ${status.peer.displayName} (${linkLabel(status.link, status.peer.displayName)})`,
       }}
     />
   );

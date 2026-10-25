@@ -10,6 +10,7 @@ import { ME, PEER, STRANGER, fromPeer } from "./fake-peer";
 import { peerBackground, tappedFrames } from "./peer-background";
 
 const session = { tabId: 4, status: "recording" as const, banked: 0, since: 1 };
+const MISMATCH = { state: "failed", verified: false, reason: "certificate" };
 
 beforeEach(() => {
   fakeBrowser.reset();
@@ -24,7 +25,7 @@ describe("a new link", () => {
     const { connect, link } = await peerBackground();
     for (const fingerprint of ["00:11:22", null]) {
       await connect(fingerprint);
-      expect(await peerLinkRepository.read()).toEqual({ state: "failed", verified: false });
+      expect(await peerLinkRepository.read()).toEqual(MISMATCH);
     }
     expect(link.commands).toEqual([{ type: "close" }, { type: "close" }]);
     expect(link.sentTypes()).toEqual([]);
@@ -33,7 +34,7 @@ describe("a new link", () => {
   test("closes any link before a peer is authorized", async () => {
     const { connect, link } = await peerBackground({ authorized: false });
     await connect();
-    expect(await peerLinkRepository.read()).toEqual({ state: "failed", verified: false });
+    expect(await peerLinkRepository.read()).toEqual(MISMATCH);
     expect(link.commands).toEqual([{ type: "close" }]);
   });
 
@@ -113,6 +114,45 @@ describe("a link that went down", () => {
       remoteRecording: "unreadable",
     });
     expect(await peerLinkRepository.read()).toEqual({ state: "failed", verified: false });
+  });
+});
+
+describe("an intended close", () => {
+  test("a BYE from the verified peer closes the link as closed by the peer, until it reconnects", async () => {
+    const { routes, connect, receive, link } = await peerBackground();
+    await connect();
+    await receive(fromPeer("BYE", {}));
+    const closed = { state: "disconnected", verified: false, reason: "closed-by-peer" };
+    expect(await peerLinkRepository.read()).toEqual(closed);
+    expect(link.commands.at(-1)).toEqual({ type: "close" });
+    await routes.link({ type: "state", state: "failed" });
+    expect(await peerLinkRepository.read()).toEqual({ ...closed, state: "failed" });
+    await routes.link({ type: "state", state: "connecting" });
+    expect(await peerLinkRepository.read()).toEqual({ state: "connecting", verified: false });
+  });
+
+  test.each(["disconnect", "forget"] as const)(
+    "%s says BYE to the verified peer before closing, and marks the close as this profile's",
+    async (type) => {
+      const { routes, connect, link } = await peerBackground();
+      await connect();
+      await routes.request({ type });
+      expect(link.sentTypes()).toEqual(["HELLO", "BYE"]);
+      expect(link.commands.at(-1)).toEqual({ type: "close" });
+      await routes.link({ type: "state", state: "disconnected" });
+      expect(await peerLinkRepository.read()).toEqual({
+        state: "disconnected",
+        verified: false,
+        reason: "closed-here",
+      });
+    },
+  );
+
+  test("disconnect says nothing over a link that is not verified", async () => {
+    const { routes, link } = await peerBackground();
+    await routes.request({ type: "disconnect" });
+    expect(link.sentTypes()).toEqual([]);
+    expect(link.commands).toEqual([{ type: "close" }]);
   });
 });
 
