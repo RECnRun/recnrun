@@ -1,0 +1,83 @@
+# POC: cross-profile control over WebRTC
+
+Branch `poc/cross-profile-webrtc-v2`, from `master` at `44c154d`. Not for merge as is.
+
+**Question.** Can RECnRun control the tabs of several independent Chrome profiles from one dashboard and one PiP window, with no backend and no helper app?
+
+**Answer.** Yes, for two profiles on the same machine, for listing tabs, bringing one to the front, and running a session's lifecycle (record, pause, stop): one WebRTC DataChannel between the two installations' offscreen documents, with no ICE server, paired by copying two codes by hand or through a shared folder. Recording page events and Run cannot be judged yet, because `master` has no capture or replay engine (tests E and F). The link does not survive a browser restart without pairing again, since there is no signaling channel to reconnect through.
+
+## Design
+
+```text
+Profile A                                                Profile B
+pairing.html ─┐                                          ┌─ pairing.html
+dashboard ────┼─► background ◄─► offscreen.html ═══════► offscreen.html ◄─► background
+PiP session ──┘   (decides, stores)  (RTCPeerConnection)  DataChannel     (executor: tabs, session)
+```
+
+- The **offscreen document** (`chrome.offscreen`, reason `WEB_RTC`) holds the one `RTCPeerConnection`, created with `iceServers: []`, so only host candidates exist: no STUN, no TURN, no server of any kind. It relays frames and states to the background and decides nothing.
+- **Pairing** is manual, with ICE fully gathered before a code is shown (no trickle ICE). A code is one line, `RECNRUN-PAIR-1.<base64url JSON>`: `kind`, `pairingId`, `profileId`, `displayName`, `expiresAt` (five minutes), `sdp`. B shows who made A's offer and six digits derived from both DTLS certificate fingerprints; B's user accepts, which answers. A checks that the answer is for its own pending offer and shows the same six digits; A's user confirms.
+- **Identity** is `{ profileId: crypto.randomUUID(), displayName }` in `storage.local`, never the extension id (which is the same in every profile that loads the same unpacked folder). Each profile keeps one DTLS certificate in the offscreen document's IndexedDB, so its fingerprint is stable across restarts.
+- **Authorization.** The accepted peer is pinned as `{ profileId, displayName, fingerprint }`. When the channel opens, the background checks that the DTLS-proven remote fingerprint is the pinned one, or closes the link. Every frame is parsed with one closed schema (envelope `recnrun-peer`, protocol 1, ≤256 KB) and accepted only if `from` is the pinned peer and `to` is this profile. A malformed frame from the verified peer gets one `ERROR`; anything else gets nothing.
+- **Protocol 1.** `HELLO`, `PING`/`PONG`, `GET_TABS`/`TABS_SNAPSHOT`, `TABS_CHANGED`, `ACTIVATE_TAB`, `SESSION_START`, `SESSION_SET_STATUS`, `SESSION_STOP`, `SESSION_STATUS`, `COMMAND_RESULT`, `ERROR`. No message runs code, reads a page, or reads storage.
+- **Executor and controller.** The profile that owns a tab runs every command on it, refuses tabs it does not list, a second session, and a session another profile controls, and reports its session on every change. The controller's dashboard lists the peer's tabs under "Chrome — Profile B (Connected)" with Show tab and Record; Record opens the existing PiP window, whose session page shows the local session or else the one it controls in B. The session is stored only in B.
+- **Shared folder** (phase 5). The pairing page, a top-level extension page, asks for a folder with `showDirectoryPicker` (the framed dashboard cannot). Each profile writes only `recnrun-signaling/<its profileId>/{offer|answer}-<pairingId>.json`, atomically through `createWritable`, reads only other profiles' subfolders, ignores files whose `profileId` does not match their folder, that expired, or that exceed 128 KB, polls once a second only while it waits, and removes only its own files: expired ones when the folder is chosen, all of them once connected. The files hold the same codes as manual pairing, so the user still checks the digits and accepts on both sides. Manual pairing stays.
+- **Builds.** All of it exists only in `development` and `test` builds. The production build has no `offscreen` permission, no `offscreen.html` or `pairing.html`, and no `createDocument` or `RTCPeerConnection` in `background.js` (`apps/extension/scripts/manifest.checks.mjs`).
+
+## How to try it
+
+1. `vp install`, then `vp run extension#build:test` (builds `apps/extension/.output/chrome-mv3-test`). The `test` build also keeps every frame in the service worker as `globalThis.recnrunPeerFrames`, for inspection.
+2. Start the website: `vp run dev:website` (http://localhost:5173).
+3. Create two Chrome profiles (or start Chrome twice with `--user-data-dir=<dir>`; never use your own profile). In each, open `chrome://extensions`, turn on Developer mode, and **Load unpacked** `apps/extension/.output/chrome-mv3-test`.
+4. In each profile, open http://localhost:5173/ and click **Pair another profile** in the dashboard (or open `chrome-extension://<id>/pairing.html`). Set a name for each profile and click **Save name**.
+5. **Manual pairing.** In A: **Create offer**, **Copy offer**. In B: paste it into "Code from the other profile", **Import code**, check the name and the six digits, **Accept and create answer**, **Copy answer**. In A: paste, **Import code**, check that both pages show the same six digits, **Confirm and connect**. Both pages show "Connected — <other name>".
+6. **Folder pairing.** In both profiles: **Choose shared folder**, the same folder (any local folder both can reach). In A: **Publish offer to the folder**. In B: **Find an offer in the folder**; the offer is imported as if pasted; check and accept. A finds the answer, checks the digits, and confirms.
+7. **Tabs.** Open tabs in B: they appear in A's dashboard under "Chrome — B (Connected)", and leave when closed. **Show tab** brings B's tab to the front in B.
+8. **Session.** **Record** on one of B's tabs in A's dashboard opens the PiP window in A; Pause, Continue, and Stop act on B's session. B's own dashboard shows the session too.
+9. **Logs.** **Show diagnostics** on the pairing page lists the link's states and candidate types (never addresses or payloads). The service worker's console has `[RECnRun peer]` lines: message types and verdicts, never payloads.
+10. **Failures and disconnects.** **Disconnect** closes the link on both sides; **Forget the other profile** also removes the pinned peer. Quitting one browser shows "Disconnected" in the other within about 7 s. After a restart, pair again (the digits are the same, and A's page notes "This is the profile already paired."). A session in B keeps running while the link is down; A shows its last state as unknown and refuses to stop it until the link is back.
+
+## Test report
+
+Automated tests run in Docker: two `chromium.launchPersistentContext` calls on separate temporary user data directories (`tests/e2e/fixtures/profiles.ts`), never the user's profile and never `browser.newContext()`. Each automated test was also seen failing against a broken implementation (red/green).
+
+| Test | Scenario                                   | Result     | Evidence                                                                                                                                                         | Limitations                                                                                                         |
+| ---- | ------------------------------------------ | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| A    | Independent profiles, own ids and storage  | Met        | `cross-profile-link.spec.ts` "each profile has its own id…": different UUIDs, neither the extension id, the same after a restart                                 | Separate user data directories, a stronger isolation than two profiles of one Chrome; the latter was not automated. |
+| B    | PING/PONG both ways                        | Met        | "two profiles pair by hand and answer each other's ping": "Pong in N ms" on both sides; connection in ~0.4 s over a host UDP candidate                           | Same machine only.                                                                                                  |
+| C    | B's tabs open and close in A's dashboard   | Met        | `cross-profile-tabs.spec.ts` "the dashboard lists the other profile's tabs…"                                                                                     | One report per 150 ms burst of tab events.                                                                          |
+| D    | Activate B's tab from A                    | Met (tab)  | "Show tab brings the other profile's tab to the front there": B's active tab checked through B's service worker                                                  | Window focus at the OS level was not observable (Playwright emulates focus); not checked by hand.                   |
+| E    | REC in B started from A                    | Partial    | "A records, pauses, and stops a session that runs in B…": status reaches A's PiP; the session is stored only in B; A stores none                                 | `master` has no event capture, so no events exist to arrive or duplicate. Only the lifecycle is proven.             |
+| F    | Remote Run                                 | Not met    | —                                                                                                                                                                | `master` has no Run engine. Nothing to call remotely.                                                               |
+| G    | A's PiP controls B's tab                   | Met (auto) | Same test as E: Record, Pause, Stop from A's PiP window                                                                                                          | Not checked by hand in a real Chrome (floating over B's windows, focus).                                            |
+| H    | Disconnect while browsing and in a session | Met        | "disconnect and forget…", "a session in B outlives the link…", "a profile that quits drops the link…": ICE `disconnected` after ~6.7 s; re-pairing works         | No automatic reconnection: a restart or a dropped link needs a new pairing, as no signaling channel remains.        |
+| I    | Shared folder, revoke permission           | Partial    | See "Exercised" below                                                                                                                                            | The native directory picker cannot be driven by Playwright; revoking the folder permission was not exercised.       |
+| J    | Data isolation, no auth data transmitted   | Met        | `cross-profile-isolation.spec.ts`: two users signed in to one site; cookies, localStorage, IndexedDB, Cache separate; no token in frames or in extension storage | The pairing code and the signal files contain the machine's host IP addresses (see below).                          |
+| K    | Regressions, local use with no peer        | See below  | Full suite                                                                                                                                                       |                                                                                                                     |
+
+Negative controls run on the end-to-end tests (each failed as expected, then the source was restored): skipping the focus in the executor failed D; putting the token in a tab URL failed J; a stale offer left on screen made H's re-pairing fail ("This answer is not for the offer this profile made."), which was a real bug, fixed by clearing the offer and the preview before each request.
+
+## Architectural assessment
+
+- **Is WebRTC adequate?** For two profiles on one machine, yes: host candidates connect in under half a second with no server, DTLS gives an authenticated, encrypted channel, and the certificate fingerprint is a usable identity. Without STUN or TURN, two machines connect only on the same reachable network, and not across NATs; that is the price of "no server".
+- **Is the offscreen document enough?** Yes. It is the only place an MV3 extension can hold an `RTCPeerConnection`; with reason `WEB_RTC` it stayed alive for every test, and the service worker wakes for its messages. The background stays the only decision maker; the offscreen document only relays.
+- **The PiP window with a remote tab.** It works unchanged: the session page reads a store, and the remote store's writes are commands to B. Chrome keeps one PiP window per browser, so one controller PiP at a time.
+- **Does the folder simplify pairing?** It removes copy and paste, not the check: both users still compare digits and accept. It needs the same folder on both sides and a picker per profile, polling once a second, and writes into a user's folder; for two profiles on one machine, copying two codes is about as fast.
+- **Complexity added.** Four folders (`p2p`, `offscreen`, `pairing`, `peers`), six new storage keys (`local:profileIdentity`, `local:authorizedPeer`, and `session:` `peerLink`, `pendingOffer`, `remoteRecording`, `remoteController`), a second message family with its own versioning, one permission, and two pages, about 2,400 added lines of extension source, plus tests. The dashboard and session pages change little, because the remote side reuses the `TabSource` and `RecordingStore` ports.
+- **Can it integrate cleanly?** Yes: dependency-cruiser keeps the POC out of the content script, the views, and the tab model; the entrypoints inject it. It hides behind one mode check, and the production build provably leaves it out.
+- **Before production.**
+  - Reconnection without pairing again, which needs some rendezvous: a folder watched while disconnected, or a server, which the brief rules out.
+  - The pairing code and the signal files carry host IP addresses: in the Docker runs, Chromium gave the offscreen document plain host candidates (`172.17.0.2`), not mDNS `.local` names (macOS Chrome not checked). Treat a code as private, or strip addresses and resolve them another way.
+  - More than one peer, and a controller shown which profile a PiP session belongs to.
+  - Event capture and Run over the link (tests E and F), with flow control for large event streams (`bufferedAmount`).
+  - A Chrome Web Store review of the `offscreen` permission; its justification is user facing.
+  - Folder permission loss: errors surface as text today; a real flow would ask again.
+
+## Change summary
+
+- **Created** (`apps/extension/src`): `p2p/` (`protocol.ts`, `pairing-code.ts`, `peer-link.ts`, `certificate-store.ts`), `offscreen/start.ts`, `pairing/` (`PairingPage.tsx`, `PairingSteps.tsx`, `FolderStep.tsx`, `folder-signaling.ts`, `start.tsx`, `pairing.css`), `peers/page-services.ts`, `background/` (`peers.ts`, `peer-channel.ts`, `pairing.ts`, `executor.ts`, `peer-requests.ts`, `link.ts`), `messaging/` (`peer-messages.ts`, `peer-results.ts`, `background-reply.ts`), `storage/peer-repository.ts`, `views/` (`peer-client.ts`, `remote-peer.ts`, `use-peer.ts`), `dashboard/PeerProfiles.tsx`, `entrypoints/offscreen/`, `entrypoints/pairing/`.
+- **Modified**: `background/{listener,routes,start}.ts`, `config/origins.ts`, `content/forward.ts`, `dashboard/{Dashboard,TabList}.tsx`, `dashboard/{control.ts,start.tsx}`, `entrypoints/{dashboard,session}/main.tsx`, `messaging/background-messages.ts`, `views/extension-services.ts`, `wxt.config.ts`, `scripts/manifest.checks.mjs`, `.dependency-cruiser.cjs` (four rules), `docs/ARCHITECTURE.md`, `docs/POCS.md`, `.claude/rules/extension.md`.
+- **Tests**: unit tests for every new background and protocol module, component tests for the pages, and `tests/e2e/cross-profile-{link,tabs,isolation}.spec.ts` with `tests/e2e/fixtures/profiles.ts`.
+- **Permissions**: `offscreen`, in `development` and `test` builds only. No host permission, no `externally_connectable`.
+- **Dependencies**: none added.
+- **Document PiP**: unchanged; the session page receives a second store.

@@ -149,3 +149,19 @@ A throwaway Playwright spec on a test build that logged the service worker's eve
   - **`runtime.getContexts({ contextTypes: ["TAB"] })`** lists the open dashboard tab with `tabId` and `windowId`, and no tab once its window closes.
   - **`action.getUserSettings()`** answers `{ isOnToolbar: false }` in the test browser, so the pin hint is testable.
   - **Not checked here.** Whether focusing the dashboard on every visit to recnrun.com's root is acceptable: that is the user's manual check after task 8.
+
+## Cross-profile control over WebRTC (October 2026)
+
+**Problem.** A developer often tests one application in several Chrome profiles at once (two users, two roles). RECnRun runs once per profile, so each profile has its own dashboard and its own PiP window. The question was whether one dashboard and one PiP window can list and control another profile's tabs with no backend, no helper app, and no STUN or TURN server.
+
+**Result.** It works for two profiles on one machine: one WebRTC DataChannel between the two installations' offscreen documents (`iceServers: []`, host candidates only), paired by copying two codes by hand, or through a folder both profiles choose. The controller lists the other profile's tabs, brings one to the front there, and records, pauses, and stops a session that runs and is stored in the other profile, from its own PiP window. Event capture and Run could not be tried, since neither exists yet. Branch `poc/cross-profile-webrtc-v2` keeps the code, behind development and test builds only, and its `POC-CROSS-PROFILE-WEBRTC.md` has the test report; the design is in [ARCHITECTURE.md](ARCHITECTURE.md#cross-profile-poc-development-and-test-builds-only).
+
+- **Findings.**
+  - An MV3 service worker cannot hold an `RTCPeerConnection`; an offscreen document with reason `WEB_RTC` can, and stayed alive through every test. The background stays the one place that decides and stores.
+  - The extension id is the same in every profile that loads the same unpacked folder, so each installation generates its own `profileId`.
+  - The DTLS certificate fingerprint, pinned at pairing, identifies the peer: the background compares it with the one the handshake proved. A certificate kept in the offscreen document's IndexedDB keeps the fingerprint across restarts.
+  - Six digits derived from both fingerprints let both users check, by eye, that nobody swapped a certificate between the two codes.
+  - Host candidates connect in about 0.4 s. When the other browser quits, ICE reports `disconnected` after about 7 s. Nothing reconnects by itself: with no signaling channel left, the users pair again.
+  - In Docker, Chromium gave the offscreen document plain host candidates (`172.17.0.2`), not mDNS `.local` names, so a pairing code reveals the machine's addresses.
+  - The folder picker (`showDirectoryPicker`) must run in a top-level page: the pairing page, not the dashboard frame. Playwright cannot drive the native picker; the end-to-end tests pair by hand, and the folder logic is tested over the origin private file system.
+  - A stale offer left on screen while a new one is created is copied, answered, and then refused as an answer to another offer; the pairing page clears the offer and the previous digits before each request.
