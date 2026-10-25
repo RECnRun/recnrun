@@ -22,7 +22,7 @@
     "test:hooks": "node --test scripts/agent-hooks/*.checks.mjs scripts/git-hooks/*.checks.mjs",
     "test:extension-manifest": "vp run extension#test:manifest",
     "deps": "depcruise packages tests --config .dependency-cruiser.cjs && depcruise apps/website --config .dependency-cruiser.cjs --ts-config apps/website/tsconfig.deps.json && depcruise apps/extension --config .dependency-cruiser.cjs --ts-config apps/extension/tsconfig.deps.json",
-    "dead-code": "knip --include files,exports,dependencies,unlisted",
+    "dead-code": "knip",
     "duplication": "jscpd --threshold 1 --fail-on-empty apps/website/src apps/extension/src packages/domain/src packages/bridge/src packages/brand/src",
     "prepare": "vp config && vp run extension#wxt:prepare"
   },
