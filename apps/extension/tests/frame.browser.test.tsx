@@ -79,6 +79,36 @@ test("the frame router ignores bad routes and messages from anyone but the site"
   expect(seen).toEqual(["/recordings/rec-checkout"]);
 });
 
+test("the frame router treats a protocol-relative path as no route at all", () => {
+  const page = framedPage({ location: { search: "?route=//evil.example/x" } });
+  const router = createFrameRouter(location.origin, page);
+  expect(router.initialRoute).toBe("/");
+
+  const seen: string[] = [];
+  router.subscribe((path) => seen.push(path));
+  page.dispatchEvent(
+    new MessageEvent("message", {
+      data: routeMessage("//evil.example/x"),
+      origin: location.origin,
+      source: window,
+    }),
+  );
+  expect(seen).toEqual([]);
+});
+
+test("the content script never pushes a protocol-relative path from the dashboard", async () => {
+  history.replaceState(null, "", "/recordings/rec-login");
+  const frame = mountedFrame();
+  const entries = history.length;
+
+  postFromFrame(frame, navigateMessage("//evil.example/x"));
+  postFromFrame(frame, locationMessage("/recordings/rec-login", "Log in"));
+  await expect.poll(() => document.title).toBe("Log in");
+  expect(location.pathname).toBe("/recordings/rec-login");
+  expect(location.host).toBe(new URL(location.origin).host);
+  expect(history.length).toBe(entries);
+});
+
 test("the dashboard refuses to render inside a foreign ancestor", () => {
   const root = document.createElement("div");
   const page = framedPage({
