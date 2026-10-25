@@ -28,6 +28,7 @@
   },
   "devDependencies": {
     "@playwright/test": "catalog:",
+    "@recnrun/domain": "workspace:*",
     "@swc/core": "catalog:",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",

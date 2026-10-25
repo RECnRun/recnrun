@@ -1,5 +1,5 @@
 import type { BrowserContext, Page } from "@playwright/test";
-import { sampleSnapshot } from "../../packages/domain/tests/fixtures.ts";
+import { sampleSnapshot } from "@recnrun/domain/testing";
 import { expect, test } from "./fixtures/extension.ts";
 import {
   activeTabId,

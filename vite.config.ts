@@ -45,6 +45,24 @@ export default defineConfig({
         },
       },
       {
+        // tests/ belongs to no workspace, so the root depends on @recnrun/domain for it.
+        files: ["tests/**"],
+        rules: {
+          "no-restricted-imports": [
+            "error",
+            {
+              patterns: [
+                {
+                  regex: "^(\\.\\./)+(packages|apps)/[^/]+/(src|tests)/",
+                  message:
+                    "Import workspace packages by name (@recnrun/domain, @recnrun/domain/testing).",
+                },
+              ],
+            },
+          ],
+        },
+      },
+      {
         // describe/test callbacks group many cases; production code keeps the stricter caps.
         files: testFiles,
         rules: {

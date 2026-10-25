@@ -1,6 +1,6 @@
 import type { BrowserContext, Page, Worker } from "@playwright/test";
 import { createServer } from "node:http";
-import { sampleSnapshot } from "../../packages/domain/tests/fixtures.ts";
+import { sampleSnapshot } from "@recnrun/domain/testing";
 import { expect, test } from "./fixtures/extension.ts";
 
 // A real loopback server: Chrome's Local Network Access check blocks a routed (public)

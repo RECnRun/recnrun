@@ -1,6 +1,6 @@
 import type { Page, Worker } from "@playwright/test";
-import type { Snapshot } from "../../packages/domain/src/index.ts";
-import { sampleSnapshot } from "../../packages/domain/tests/fixtures.ts";
+import type { Snapshot } from "@recnrun/domain";
+import { sampleSnapshot } from "@recnrun/domain/testing";
 import { expect, test } from "./fixtures/extension.ts";
 import { clickInDashboard, FRAME } from "./fixtures/session.ts";
 
