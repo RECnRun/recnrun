@@ -10,7 +10,14 @@ export const RouteMessageSchema = v.object({
   path: PathSchema,
 });
 
-/** The dashboard asks the content script to reflect its route and title in the site tab. */
+/** The dashboard asks the content script to add one of its own routes to the tab's history. */
+export const NavigateMessageSchema = v.object({
+  channel: v.literal(CHANNEL),
+  type: v.literal("navigate"),
+  path: PathSchema,
+});
+
+/** The dashboard tells the content script the title of the route it shows. */
 export const LocationMessageSchema = v.object({
   channel: v.literal(CHANNEL),
   type: v.literal("location"),
@@ -37,6 +44,7 @@ export const ClosePanelMessageSchema = v.object({
 });
 
 type RouteMessage = v.InferOutput<typeof RouteMessageSchema>;
+type NavigateMessage = v.InferOutput<typeof NavigateMessageSchema>;
 type LocationMessage = v.InferOutput<typeof LocationMessageSchema>;
 type OpenPanelMessage = v.InferOutput<typeof OpenPanelMessageSchema>;
 type ClosePanelMessage = v.InferOutput<typeof ClosePanelMessageSchema>;
@@ -57,6 +65,12 @@ export const panelClosedMessage = (): PanelClosedMessage => ({
 export const routeMessage = (path: string): RouteMessage => ({
   channel: CHANNEL,
   type: "route",
+  path,
+});
+
+export const navigateMessage = (path: string): NavigateMessage => ({
+  channel: CHANNEL,
+  type: "navigate",
   path,
 });
 

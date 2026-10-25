@@ -158,6 +158,10 @@ export function Dashboard({ loadSnapshot, router, session }: DashboardProps) {
   const load = useSnapshot(loadSnapshot);
   const [route, setRoute] = useState(router.initialRoute);
   useEffect(() => router.subscribe(setRoute), [router]);
+  const navigate = (path: string) => {
+    router.navigate(path);
+    setRoute(path);
+  };
   useEffect(() => {
     const snapshot = load.status === "ready" ? load.snapshot : undefined;
     router.publish(route, titleFor(snapshot, route));
@@ -170,7 +174,7 @@ export function Dashboard({ loadSnapshot, router, session }: DashboardProps) {
       </header>
       <main>
         {session && <TabList {...session} />}
-        <Content load={load} route={route} nav={{ router, navigate: setRoute }} />
+        <Content load={load} route={route} nav={{ router, navigate }} />
       </main>
     </>
   );

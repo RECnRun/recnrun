@@ -12,10 +12,10 @@ Ruled out on the way: a lock request that never settles (the click never reached
 
 **Solution.** `clickInDashboard(locator)` in `tests/e2e/fixtures/session.ts` moves the mouse over the element until a `mousemove` reaches it inside the frame, then clicks. That waits for the condition Chromium needs, as Chromium's own tests do with `WaitForHitTestData`; it retries no click and weakens no assertion. Every click in a dashboard frame goes through it, `clickToOpenPanel` included. With it, 18 full suites in a row lost no click, and the traces show some clicks waiting a few seconds, each a click that would have failed before.
 
-## After two Back steps, a reload shows the wrong route (open)
+## After two Back steps, a reload shows the wrong route
 
-**Symptom.** `dashboard-frame.spec.ts` "routes deep links…" fails at its last step, rarely: after two `page.goBack()` the dashboard shows "Log in as admin", but after `page.reload()` it shows the list of recordings.
+**Symptom.** `dashboard-frame.spec.ts` "routes deep links…" failed at its last step, rarely (once in 18 full suites): after two `page.goBack()` the dashboard showed "Log in as admin", but after `page.reload()` it showed the list of recordings.
 
-**Likely cause.** Each popstate sends the route to the frame, and the frame publishes the route it shows back to the content script, which calls `history.pushState` whenever that path differs from the address bar (`content/dashboard-frame.ts`). A late publish of the first Back's route (`/`) arrives after the second Back, so the content script pushes `/` and then the second route again; a reload between those two pushes reloads `/`. Seen before the incognito work, too.
+**Cause.** Each popstate sends the route to the frame, and the frame published the route it shows back in a `location` message, which the content script applied with `history.pushState` whenever that path differed from the address bar. Preact publishes in an effect, after paint, so the answer to the first Back (`/`) could arrive after the second Back: the content script pushed `/`, then the second route again, and a reload between those two pushes reloaded `/`.
 
-**Next step.** Let the frame say whether a route comes from its own navigation, so the content script pushes only those and never echoes a route the address bar has already moved past. That changes the frame protocol, so it needs its own change and tests.
+**Solution.** The frame says which routes come from its own navigation: a link click sends a `navigate` message, the only one the content script turns into `history.pushState`. `location` only sets the title, and only while its path is still in the address bar, so a late answer to a Back changes nothing (`frame.browser.test.tsx`, "a location the address bar has moved past…").

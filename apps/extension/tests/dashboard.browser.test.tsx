@@ -9,6 +9,7 @@ import type { DashboardRouter } from "@/dashboard/router";
 function memoryRouter(initialRoute = "/") {
   const listeners = new Set<(path: string) => void>();
   const published: { path: string; title: string }[] = [];
+  const navigated: string[] = [];
   const router: DashboardRouter = {
     initialRoute,
     href: (path) => `#${path}`,
@@ -16,9 +17,15 @@ function memoryRouter(initialRoute = "/") {
       listeners.add(listener);
       return () => listeners.delete(listener);
     },
+    navigate: (path) => navigated.push(path),
     publish: (path, title) => published.push({ path, title }),
   };
-  return { router, published, go: (path: string) => listeners.forEach((each) => each(path)) };
+  return {
+    router,
+    published,
+    navigated,
+    go: (path: string) => listeners.forEach((each) => each(path)),
+  };
 }
 
 function mount(snapshot: Snapshot | Error, router: DashboardRouter = memoryRouter().router) {
@@ -71,7 +78,7 @@ test("reports why the data could not be read", async () => {
 });
 
 test("opens a recording and goes back to the list", async () => {
-  const { router, published } = memoryRouter();
+  const { router, published, navigated } = memoryRouter();
   const root = mount(sampleSnapshot(), router);
   await expect.poll(() => headings(root)).toHaveLength(2);
 
@@ -88,14 +95,18 @@ test("opens a recording and goes back to the list", async () => {
   root.querySelector<HTMLAnchorElement>('a[href="#/"]')?.click();
   await expect.poll(() => headings(root)).toHaveLength(2);
   await expect.poll(() => published.at(-1)).toEqual({ path: "/", title: "RECnRun" });
+  expect(navigated).toEqual(["/recordings/rec-login", "/"]);
 });
 
 test("follows routes the host changes, such as the Back button", async () => {
-  const { router, go } = memoryRouter("/recordings/rec-checkout");
+  const { router, published, navigated, go } = memoryRouter("/recordings/rec-checkout");
   const root = mount(sampleSnapshot(), router);
   await expect.poll(() => headings(root)).toEqual(["Checkout with saved card"]);
   go("/");
   await expect.poll(() => headings(root)).toHaveLength(2);
+  await expect.poll(() => published.at(-1)).toEqual({ path: "/", title: "RECnRun" });
+  // The host already moved its address bar, so the dashboard adds no history entry.
+  expect(navigated).toEqual([]);
 });
 
 test("says when a linked recording does not exist", async () => {
