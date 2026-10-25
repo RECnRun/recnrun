@@ -1,13 +1,9 @@
 {
+  // Root-level files run under Node (Playwright, scripts, configs); the workspaces have their own tsconfig.
+  "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    "strict": true,
-    "noEmit": true,
     "module": "nodenext",
     "moduleResolution": "nodenext",
-    "allowImportingTsExtensions": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "lib": ["ES2023", "DOM"],
-    "jsx": "preserve"
+    "lib": ["ES2023", "DOM"]
   }
 }

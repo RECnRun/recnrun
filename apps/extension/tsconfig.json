@@ -1,4 +1,6 @@
 {
+  // WXT generates the base (strict, noUncheckedIndexedAccess, verbatimModuleSyntax, ...); only the
+  // options it does not set are added here, mirroring tsconfig.base.json.
   "extends": "./.wxt/tsconfig.json",
   "compilerOptions": {
     "jsx": "react-jsx",
