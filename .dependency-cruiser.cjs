@@ -138,7 +138,7 @@ module.exports = {
       comment:
         "Content scripts run inside web pages; they reach data only by messaging the background.",
       from: { path: "^apps/extension/src/content/" },
-      to: { path: "^apps/extension/src/storage/" },
+      to: { path: ["^apps/extension/src/storage/", "node_modules/wxt/.*storage"] },
     },
     {
       name: "extension-dashboard-isolated",
@@ -169,6 +169,21 @@ module.exports = {
       to: { path: "^apps/extension/src/(content|background|dashboard|session|storage|views)/" },
     },
     {
+      name: "extension-ports-are-contracts",
+      severity: "error",
+      comment:
+        "src/ports holds the contracts every extension folder may import; it depends on the domain alone.",
+      from: { path: "^apps/extension/src/ports/" },
+      to: { pathNot: ["^apps/extension/src/ports/", "^packages/domain/src/"] },
+    },
+    {
+      name: "extension-ports-type-only",
+      severity: "error",
+      comment: "Ports are types: import them with `import type`, so no runtime code hides in them.",
+      from: {},
+      to: { path: "^apps/extension/src/ports/", dependencyTypesNot: ["type-only"] },
+    },
+    {
       name: "not-to-entrypoints",
       severity: "error",
       comment: "Entrypoints are thin wiring; nothing imports them.",
@@ -178,8 +193,10 @@ module.exports = {
   ],
   options: {
     parser: "swc",
+    // npm packages stay in the graph as leaves, so rules can name them; only the workspaces' build
+    // output is left out (a package's own dist/ must stay in).
     doNotFollow: { path: "node_modules" },
-    exclude: { path: "(^|/)(node_modules|\\.output|\\.wxt|dist)/" },
+    exclude: { path: "^(apps|packages)/[^/]+/(\\.output|\\.wxt|dist)/" },
     enhancedResolveOptions: {
       exportsFields: ["exports"],
       conditionNames: ["import", "require", "node", "default", "types"],

@@ -1,12 +1,13 @@
+import { errorMessage } from "@recnrun/domain";
 import { useState } from "preact/hooks";
-import { IncognitoControl, useIncognitoAccess } from "@/dashboard/IncognitoControl";
-import { CONTROL_LOCK } from "@/messaging/view-locks";
-import type { IncognitoAccess, OpenTab, TabSource } from "@/tabs/open-tabs";
+import type { RecordingStore } from "@/ports/recording-store";
+import type { OpenTab, TabSource } from "@/ports/tabs";
 import { RecordStatus } from "@/views/RecordPanel";
-import { errorText, useRecording } from "@/views/recording";
-import type { Recording, RecordingStore } from "@/views/recording";
+import { useRecording } from "@/views/recording";
+import type { Recording } from "@/views/recording";
 import { TabSummary } from "@/views/TabSummary";
 import { useBrowserTabs } from "@/views/use-browser-tabs";
+import { CONTROL_LOCK } from "@/views/view-locks";
 import { useLockHeld } from "@/views/use-lock-held";
 
 /**
@@ -17,12 +18,10 @@ import { useLockHeld } from "@/views/use-lock-held";
 export type TakeControl = (tabId: number) => Promise<void>;
 
 /** The browser's tabs and the one session, which a dashboard shows and starts. */
-export interface SessionSetup {
+interface TabListProps {
   tabs: TabSource;
   store: RecordingStore;
   take: TakeControl;
-  /** Without it, as outside the extension, the dashboard says nothing about incognito tabs. */
-  incognito?: IncognitoAccess;
 }
 
 interface TabProps {
@@ -97,11 +96,10 @@ function ClosedTabItem({ recording, controlled }: Omit<TabProps, "tab" | "take">
 }
 
 /** Every open tab; with no session each can start one, and the recorded tab shows the session. */
-export function TabList({ tabs, store, take, incognito }: SessionSetup) {
+export function TabList({ tabs, store, take }: TabListProps) {
   const openTabs = useBrowserTabs(tabs)?.tabs;
   const recording = useRecording(store);
   const controlled = useLockHeld(CONTROL_LOCK);
-  const allowed = useIncognitoAccess(incognito);
   const [error, setError] = useState<string>();
   const closed =
     openTabs !== undefined &&
@@ -109,27 +107,23 @@ export function TabList({ tabs, store, take, incognito }: SessionSetup) {
     !openTabs.some((tab) => tab.id === recording.tabId);
   const takeOn = (tabId: number) => () => {
     setError(undefined);
-    take(tabId).catch((caught: unknown) => setError(errorText(caught)));
+    take(tabId).catch((caught: unknown) => setError(errorMessage(caught)));
   };
   return (
     <aside class="tabs" aria-labelledby="tabs-heading">
       <h2 id="tabs-heading">Tabs</h2>
-      <IncognitoControl allowed={allowed} access={incognito} onError={setError} />
-      {/* Tabs wait for the access, so a late banner never moves a button under the pointer. */}
-      {allowed !== undefined && (
-        <ul>
-          {openTabs?.map((tab) => (
-            <TabItem
-              key={tab.id}
-              tab={tab}
-              recording={recording}
-              controlled={controlled}
-              take={takeOn(tab.id)}
-            />
-          ))}
-          {closed && <ClosedTabItem recording={recording} controlled={controlled} />}
-        </ul>
-      )}
+      <ul>
+        {openTabs?.map((tab) => (
+          <TabItem
+            key={tab.id}
+            tab={tab}
+            recording={recording}
+            controlled={controlled}
+            take={takeOn(tab.id)}
+          />
+        ))}
+        {closed && <ClosedTabItem recording={recording} controlled={controlled} />}
+      </ul>
       {(error ?? recording.error) && <p role="alert">{error ?? recording.error}</p>}
     </aside>
   );

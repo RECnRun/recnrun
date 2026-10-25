@@ -64,13 +64,13 @@ Test commands and `verify` run in Docker, so start Docker Desktop first. If Dock
   - architecture boundaries;
   - all test layers;
   - container and hook checks;
-  - coverage (at least 80% lines, statements, and functions; 75% branches);
+  - coverage (at least 90% lines, statements, and functions; 85% branches overall, and at least 80% lines, statements, and functions; 75% branches in every file that has executable code), and a check that the measured files are every `.ts`/`.tsx` under `apps/*/src` and `packages/*/src` except tests, the entrypoints, and `main.tsx`;
   - Knip and jscpd (at most 4% duplication);
   - workspace builds and the production manifest guard.
 - When a gate fails, fix the cause. Never lower thresholds, delete or skip tests, exclude code from analysis, add `@ts-ignore`/`@ts-nocheck`, disable lint rules, or loosen `.dependency-cruiser.cjs` to pass.
 - An architecture change (a new layer, package, or allowed dependency) updates `docs/ARCHITECTURE.md` and `.dependency-cruiser.cjs` in the same change, with the reason.
 - Never bypass Git hooks: no `--no-verify`/`-n`, `VP_GIT_HOOKS=0`, `HUSKY=0`, `core.hooksPath` changes, or `vp hooks disable`. Agent hooks in `scripts/agent-hooks/` deny these and run `vp check` and `vp run deps` when you stop (after three consecutive failures they let you stop with a warning; Git hooks still gate the commit).
-- Keep TypeScript strict and prefer `unknown` with narrowing over `any`. Lint caps `complexity` at 10, `sonarjs/cognitive-complexity` at 15, nesting depth at 3, functions at 50 lines, files at 300 lines, and parameters at 4, and requires `vite-plus` imports over `vite`/`vitest`.
+- Keep TypeScript strict and prefer `unknown` with narrowing over `any`. Lint caps `complexity` at 10, `sonarjs/cognitive-complexity` at 15, nesting depth at 3, functions at 50 lines and 15 statements (150 lines and 30 statements in tests), files at 300 lines, and parameters at 4; it rejects identical functions, a string literal repeated three times in `apps/*/src` or `packages/*/src`, and conditions the types already decide (`typescript/no-unnecessary-condition`), and requires `vite-plus` imports over `vite`/`vitest`.
 - In app source and tests, import from `src` through the `@/` alias, never with `../` paths (lint rejects them). `./` imports are fine.
 - Validate every message and stored value with the `@recnrun/domain` or `@recnrun/bridge` schemas at the boundary where it enters; the content script never touches storage.
 - Write code, comments, docs, UI copy, and diagnostics in English.

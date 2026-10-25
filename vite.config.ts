@@ -18,7 +18,9 @@ export default defineConfig({
     rules: {
       complexity: ["error", 10],
       "sonarjs/cognitive-complexity": ["error", 15],
+      "sonarjs/no-identical-functions": "error",
       "max-depth": ["error", 3],
+      "max-statements": ["error", 15],
       "max-lines-per-function": ["error", { max: 50, skipBlankLines: true, skipComments: true }],
       "max-lines": ["error", { max: 300, skipBlankLines: true, skipComments: true }],
       "max-params": ["error", 4],
@@ -30,9 +32,17 @@ export default defineConfig({
       "typescript/consistent-type-imports": "error",
       "typescript/switch-exhaustiveness-check": "error",
       "typescript/ban-ts-comment": "error",
+      "typescript/no-unnecessary-condition": "error",
       "vite-plus/prefer-vite-plus-imports": "error",
     },
     overrides: [
+      {
+        // Production code names a repeated string once; tests repeat titles, selectors, and fixtures freely.
+        files: ["apps/*/src/**", "packages/*/src/**"],
+        rules: {
+          "sonarjs/no-duplicate-string": ["error", { threshold: 3 }],
+        },
+      },
       {
         files: ["apps/*/src/**", "apps/*/tests/**"],
         rules: {
@@ -45,6 +55,38 @@ export default defineConfig({
         },
       },
       {
+        // The content script runs inside web pages; it reaches stored data only through the background.
+        files: ["apps/extension/src/content/**"],
+        rules: {
+          "no-restricted-properties": [
+            "error",
+            {
+              object: "browser",
+              property: "storage",
+              message: "The content script never touches storage; ask the background.",
+            },
+          ],
+        },
+      },
+      {
+        // tests/ belongs to no workspace, so the root depends on @recnrun/domain for it.
+        files: ["tests/**"],
+        rules: {
+          "no-restricted-imports": [
+            "error",
+            {
+              patterns: [
+                {
+                  regex: "^(\\.\\./)+(packages|apps)/[^/]+/(src|tests)/",
+                  message:
+                    "Import workspace packages by name (@recnrun/domain, @recnrun/domain/testing).",
+                },
+              ],
+            },
+          ],
+        },
+      },
+      {
         // describe/test callbacks group many cases; production code keeps the stricter caps.
         files: testFiles,
         rules: {
@@ -52,6 +94,7 @@ export default defineConfig({
             "error",
             { max: 150, skipBlankLines: true, skipComments: true },
           ],
+          "max-statements": ["error", 30],
           "max-nested-callbacks": ["error", 4],
         },
       },
@@ -71,13 +114,21 @@ export default defineConfig({
     ],
     coverage: {
       provider: "v8",
+      // scripts/coverage.checks.mjs reads the json-summary to compare the measured files with the tree.
+      reporter: ["text", "html", "json-summary"],
       include: ["apps/*/src/**/*.{ts,tsx}", "packages/*/src/**/*.{ts,tsx}"],
-      exclude: ["**/*.test.{ts,tsx}", "**/*.d.ts"],
+      // The entrypoints and main.tsx only call a start* function; the end-to-end suite runs them.
+      exclude: [
+        "**/*.test.{ts,tsx}",
+        "**/*.d.ts",
+        "apps/*/src/entrypoints/**",
+        "apps/*/src/main.tsx",
+      ],
       thresholds: {
-        lines: 80,
-        statements: 80,
-        functions: 80,
-        branches: 75,
+        lines: 90,
+        statements: 90,
+        functions: 90,
+        branches: 85,
       },
     },
   },
@@ -106,10 +157,10 @@ export default defineConfig({
           "vp check",
           "vp lint --deny-warnings",
           "vp run --no-cache deps",
-          "vp run --no-cache test:local",
+          "vp run --no-cache test:coverage:local",
+          "vp run --no-cache test:e2e:local",
           "vp run --no-cache test:container",
           "vp run --no-cache test:hooks",
-          "vp run --no-cache test:coverage:local",
           "vp run --no-cache dead-code",
           "vp run --no-cache duplication",
           "vp run -r --no-cache build",

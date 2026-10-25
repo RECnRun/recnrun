@@ -1,4 +1,4 @@
-import type { OpenTab } from "@/tabs/open-tabs";
+import type { OpenTab } from "@/ports/tabs";
 
 /** A tab's icon, title, and address, with an Incognito badge and any other `badges`. */
 export function TabSummary({ tab, badges = [] }: { tab: OpenTab; badges?: string[] }) {

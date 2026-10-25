@@ -1,15 +1,16 @@
+import { errorMessage } from "@recnrun/domain";
+import type { ComponentChildren } from "preact";
 import { useEffect, useState } from "preact/hooks";
-import type { IncognitoAccess } from "@/tabs/open-tabs";
-import { errorText } from "@/views/recording";
+import type { IncognitoAccess } from "@/ports/tabs";
 
 interface IncognitoProps {
   access: IncognitoAccess;
-  onError: (text: string) => void;
+  onError: (caught: unknown) => void;
 }
 
 /** Leads to RECnRun's details, since only Chrome may turn on "Allow in Incognito". */
 function IncognitoBanner({ access, onError }: IncognitoProps) {
-  const open = () => access.openSettings().catch((caught: unknown) => onError(errorText(caught)));
+  const open = () => access.openSettings().catch(onError);
   return (
     <section class="incognito-banner" aria-labelledby="incognito-heading">
       <h3 id="incognito-heading">Enable Incognito Mode</h3>
@@ -28,27 +29,40 @@ function IncognitoBanner({ access, onError }: IncognitoProps) {
 /** Whether RECnRun may see incognito tabs; `undefined` until Chrome answers. */
 type IncognitoState = boolean | "unknown" | undefined;
 
-export function useIncognitoAccess(access: IncognitoAccess | undefined): IncognitoState {
+function useIncognitoAccess(access: IncognitoAccess): IncognitoState {
   const [allowed, setAllowed] = useState<IncognitoState>();
   useEffect(() => {
     // A failed read says nothing about the toggle, so it shows neither the banner nor the button.
-    void access?.allowed().then(setAllowed, () => setAllowed("unknown"));
+    void access.allowed().then(setAllowed, () => setAllowed("unknown"));
   }, [access]);
-  return access ? allowed : "unknown";
+  return allowed;
 }
 
-/** Opens an incognito window when RECnRun may see it, or leads to where to allow that. */
-export function IncognitoControl({
-  access,
-  allowed,
-  onError,
-}: Omit<IncognitoProps, "access"> & { access?: IncognitoAccess; allowed: IncognitoState }) {
-  if (!access || typeof allowed !== "boolean") return null;
-  if (!allowed) return <IncognitoBanner access={access} onError={onError} />;
-  const open = () => access.openWindow().catch((caught: unknown) => onError(errorText(caught)));
+interface ControlProps {
+  access: IncognitoAccess;
+  children: ComponentChildren;
+}
+
+/**
+ * Opens an incognito window when RECnRun may see it, or leads to where to allow that, above
+ * its children. They wait for Chrome's answer, so the banner never moves a Record button.
+ */
+export function IncognitoControl({ access, children }: ControlProps) {
+  const allowed = useIncognitoAccess(access);
+  const [error, setError] = useState<string>();
+  const onError = (caught: unknown) => setError(errorMessage(caught));
+  if (allowed === undefined) return null;
+  const open = () => access.openWindow().catch(onError);
   return (
-    <button type="button" class="tab-new-window" onClick={() => void open()}>
-      New incognito window
-    </button>
+    <>
+      {allowed === true && (
+        <button type="button" class="tab-new-window" onClick={() => void open()}>
+          New incognito window
+        </button>
+      )}
+      {allowed === false && <IncognitoBanner access={access} onError={onError} />}
+      {error && <p role="alert">{error}</p>}
+      {children}
+    </>
   );
 }

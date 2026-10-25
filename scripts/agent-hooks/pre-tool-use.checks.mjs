@@ -16,7 +16,7 @@ function decision(command) {
     : undefined;
 }
 
-test("blocks obvious Git hook bypasses", () => {
+await test("blocks obvious Git hook bypasses", () => {
   for (const command of [
     "git commit --no-verify -m update",
     "git commit -n -m update",
@@ -30,7 +30,7 @@ test("blocks obvious Git hook bypasses", () => {
   }
 });
 
-test("allows ordinary Git commands and read-only hook inspection", () => {
+await test("allows ordinary Git commands and read-only hook inspection", () => {
   for (const command of ["git commit -m update", "git push", "git config --get core.hooksPath"]) {
     assert.equal(decision(command), undefined, command);
   }

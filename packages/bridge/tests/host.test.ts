@@ -1,5 +1,6 @@
+import * as v from "valibot";
 import { describe, expect, test, vi } from "vite-plus/test";
-import { createBridgeClient, createBridgeHost, isRequestType } from "../src/index.ts";
+import { createBridgeClient, createBridgeHost, RequestTypeSchema } from "../src/index.ts";
 import { messages } from "../src/protocol.ts";
 import { memoryTransport } from "./memory-transport.ts";
 
@@ -57,10 +58,11 @@ describe("createBridgeHost", () => {
   });
 });
 
-describe("isRequestType", () => {
+describe("RequestTypeSchema", () => {
   test("accepts only request types the protocol defines", () => {
-    expect(isRequestType("ping")).toBe(true);
+    expect(v.is(RequestTypeSchema, "ping")).toBe(true);
     // The dashboard reads storage itself, so no page can ask for the user's recordings.
-    expect([undefined, "", "getSnapshot", "deleteEverything", 1].some(isRequestType)).toBe(false);
+    const others = [undefined, "", "getSnapshot", "deleteEverything", 1];
+    expect(others.some((value) => v.is(RequestTypeSchema, value))).toBe(false);
   });
 });

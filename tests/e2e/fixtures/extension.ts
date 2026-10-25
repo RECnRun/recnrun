@@ -5,7 +5,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { Snapshot } from "../../../packages/domain/src/index.ts";
+import type { Snapshot } from "@recnrun/domain";
 
 const extensionPath = fileURLToPath(
   new URL("../../../apps/extension/.output/chrome-mv3-test", import.meta.url),

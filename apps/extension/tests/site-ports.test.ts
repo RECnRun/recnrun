@@ -8,22 +8,28 @@ beforeEach(() => {
   fakeBrowser.reset();
 });
 
-/** A connecting port that records whether the dashboard watches it drop. */
+/** A connecting port that the test drops, as Chrome does when its site tab closes or navigates. */
 function connecting(name: string) {
-  const onDrop = vi.fn();
-  const port = { name, onDisconnect: { addListener: onDrop } } as unknown as Browser.runtime.Port;
-  return { port, onDrop };
+  const drops: (() => void)[] = [];
+  const port = {
+    name,
+    onDisconnect: { addListener: (listener: () => void) => drops.push(listener) },
+  } as unknown as Browser.runtime.Port;
+  return { port, drop: () => drops.forEach((listener) => listener()), watched: () => drops.length };
 }
 
-test("the dashboard frame accepts only site tab ports, and lets each go once it drops", () => {
+test("the dashboard frame holds only site tab ports, and lets each go once it drops", () => {
   // fakeBrowser implements no in-memory runtime.onConnect.
   const add = vi.spyOn(fakeBrowser.runtime.onConnect, "addListener").mockImplementation(() => {});
-  holdSitePorts();
+  const held = holdSitePorts();
   const [[accept] = []] = add.mock.calls;
   const site = connecting(SITE_PORT);
   const other = connecting("another");
   accept?.(site.port);
   accept?.(other.port);
-  expect(site.onDrop).toHaveBeenCalledTimes(1);
-  expect(other.onDrop).not.toHaveBeenCalled();
+  expect([...held]).toEqual([site.port]);
+  expect(other.watched()).toBe(0);
+
+  site.drop();
+  expect(held.size).toBe(0);
 });

@@ -10,6 +10,7 @@ export default defineConfig({
   plugins: [WxtVitest({ root })],
   test: {
     name: "extension",
+    isolate: false,
     include: ["tests/**/*.test.ts"],
     exclude: ["**/*.browser.test.{ts,tsx}", "**/node_modules/**"],
   },

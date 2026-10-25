@@ -36,12 +36,12 @@ function stopHook(bin, state, stopHookActive) {
   return JSON.parse(result.stdout);
 }
 
-test("allows the stop when vp check passes", () => {
+await test("allows the stop when vp check passes", () => {
   const output = stopHook(fakeVp(0), mkdtempSync(join(tmpdir(), "stop-state-")), false);
   assert.equal(output.decision, undefined);
 });
 
-test("allows the stop after three consecutive blocks so an agent cannot loop", () => {
+await test("allows the stop after three consecutive blocks so an agent cannot loop", () => {
   const bin = fakeVp(1);
   const state = mkdtempSync(join(tmpdir(), "stop-state-"));
   for (const active of [false, true, true]) {
@@ -55,13 +55,13 @@ test("allows the stop after three consecutive blocks so an agent cannot loop", (
   assert.equal(stopHook(bin, state, false).decision, "block", "a new turn starts counting again");
 });
 
-test("reports the diagnostics, not only the summary", () => {
+await test("reports the diagnostics, not only the summary", () => {
   const output = stopHook(fakeVp(1), mkdtempSync(join(tmpdir(), "stop-state-")), false);
   assert.match(output.reason, /fake vp check diagnostic/);
   assert.match(output.reason, /fake vp check failure/);
 });
 
-test("blocks the stop when dependency rules fail", () => {
+await test("blocks the stop when dependency rules fail", () => {
   const output = stopHook(fakeVp(1, "deps"), mkdtempSync(join(tmpdir(), "stop-state-")), false);
   assert.equal(output.decision, "block");
   assert.match(output.reason, /vp run --no-cache deps failed/);

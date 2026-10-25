@@ -1,5 +1,6 @@
 import { useEffect, useState } from "preact/hooks";
-import type { BrowserTabs, TabSource } from "@/tabs/open-tabs";
+import type { BrowserTabs, TabSource } from "@/ports/tabs";
+import { coalesceReads } from "@/views/coalesce-reads";
 
 /**
  * The browser's tabs, or `undefined` until first read. A burst of tab events reads them once more
@@ -8,36 +9,20 @@ import type { BrowserTabs, TabSource } from "@/tabs/open-tabs";
 export function useBrowserTabs(source: TabSource): BrowserTabs | undefined {
   const [state, setState] = useState<BrowserTabs>();
   useEffect(() => {
-    let live = true;
-    let reading = false;
-    let again = false;
     let shown = "";
-    const show = (next: BrowserTabs) => {
-      const key = JSON.stringify(next);
-      if (!live || key === shown) return;
-      shown = key;
-      setState(next);
-    };
-    const refresh = (): void => {
-      if (reading) {
-        again = true;
-        return;
-      }
-      reading = true;
-      void source
-        .read()
-        .then(show, () => {})
-        .finally(() => {
-          reading = false;
-          if (!again || !live) return;
-          again = false;
-          refresh();
-        });
-    };
-    refresh();
-    const unwatch = source.watch(refresh);
+    const reads = coalesceReads(
+      () => source.read(),
+      (next) => {
+        const key = JSON.stringify(next);
+        if (key === shown) return;
+        shown = key;
+        setState(next);
+      },
+    );
+    reads.refresh();
+    const unwatch = source.watch(reads.refresh);
     return () => {
-      live = false;
+      reads.stop();
       unwatch();
     };
   }, [source]);

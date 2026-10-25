@@ -1,4 +1,4 @@
-import type { BrowserTabs, IncognitoAccess, OpenTab, TabSource } from "@/tabs/open-tabs";
+import type { BrowserTabs, IncognitoAccess, OpenTab, TabSource } from "@/ports/tabs";
 
 export const SHOP: OpenTab = {
   id: 7,

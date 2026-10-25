@@ -19,6 +19,7 @@ export default defineConfig({
   },
   test: {
     name: "website",
+    isolate: false,
     include: ["tests/**/*.test.{ts,tsx}"],
     exclude: ["**/*.browser.test.{ts,tsx}", "**/node_modules/**"],
   },

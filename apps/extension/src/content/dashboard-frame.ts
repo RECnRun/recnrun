@@ -1,9 +1,5 @@
-import * as v from "valibot";
-import {
-  LocationMessageSchema,
-  NavigateMessageSchema,
-  routeMessage,
-} from "@/messaging/frame-protocol";
+import { subscribeFrame } from "@/messaging/frame-channel";
+import { routeMessage } from "@/messaging/frame-protocol";
 
 const currentPath = (location: Location) => location.pathname + location.search + location.hash;
 
@@ -34,16 +30,14 @@ export function mountDashboardFrame(
   document.documentElement.style.overflow = "hidden";
   document.body.append(iframe);
 
-  page.addEventListener("message", (event) => {
-    if (event.source !== iframe.contentWindow || event.origin !== extensionOrigin) return;
-    const path = currentPath(location);
-    if (v.is(NavigateMessageSchema, event.data) && event.data.path !== path) {
-      history.pushState(null, "", event.data.path);
-    }
+  subscribeFrame(page, iframe.contentWindow, extensionOrigin, {
+    navigate({ path }) {
+      if (path !== currentPath(location)) history.pushState(null, "", path);
+    },
     // A location for a route the address bar has moved past, by Back or Forward, is stale.
-    if (v.is(LocationMessageSchema, event.data) && event.data.path === path) {
-      document.title = event.data.title;
-    }
+    location({ path, title }) {
+      if (path === currentPath(location)) document.title = title;
+    },
   });
   page.addEventListener("popstate", () => {
     iframe.contentWindow?.postMessage(routeMessage(currentPath(location)), extensionOrigin);

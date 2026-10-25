@@ -7,7 +7,7 @@ ENV VP_HOME=/opt/vite-plus \
 ENV PATH="/opt/vite-plus/bin:${PATH}"
 
 RUN curl -fsSL https://vite.plus -o /tmp/install-vp.sh \
-    && CI=true VP_VERSION=1.3.0 VP_NODE_MANAGER=yes VP_PM_MANAGER=yes bash /tmp/install-vp.sh \
+    && CI=true VP_VERSION=1.4.0 VP_NODE_MANAGER=yes VP_PM_MANAGER=yes bash /tmp/install-vp.sh \
     && rm /tmp/install-vp.sh \
     && vp env install node@24.21.0 pnpm@12.14.0
 

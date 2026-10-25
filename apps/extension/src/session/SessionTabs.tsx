@@ -1,6 +1,6 @@
 import { useRef } from "preact/hooks";
+import type { TabSource } from "@/ports/tabs";
 import { currentTab } from "@/tabs/open-tabs";
-import type { TabSource } from "@/tabs/open-tabs";
 import { TabSummary } from "@/views/TabSummary";
 import { useBrowserTabs } from "@/views/use-browser-tabs";
 

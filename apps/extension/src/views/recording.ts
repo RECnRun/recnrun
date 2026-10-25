@@ -1,15 +1,9 @@
+import { elapsedSeconds, errorMessage, toggled } from "@recnrun/domain";
 import type { RecordingSession } from "@recnrun/domain";
 import { useEffect, useRef, useState } from "preact/hooks";
+import type { RecordingStore } from "@/ports/recording-store";
 
 export type RecordingStatus = "idle" | RecordingSession["status"];
-
-/** Where the recording in progress lives, so every extension view shows the same one. */
-export interface RecordingStore {
-  read: () => Promise<RecordingSession | null>;
-  write: (session: RecordingSession | null) => Promise<void>;
-  /** Calls back after any view writes; returns the unsubscribe function. */
-  watch: (onChange: () => void) => () => void;
-}
 
 export interface Recording {
   /** False until the first read, so views do not flash an idle state. */
@@ -22,32 +16,6 @@ export interface Recording {
   toggle: () => void;
   stop: () => void;
 }
-
-/** Elapsed time from timestamps, since Chrome throttles timers in a hidden opener tab. */
-export function elapsedSeconds(session: RecordingSession, now: number): number {
-  const running = session.status === "recording" ? now - session.since : 0;
-  return Math.max(0, Math.floor((session.banked + running) / 1000));
-}
-
-export function toggled(session: RecordingSession, now: number): RecordingSession {
-  if (session.status === "recording") {
-    return {
-      ...session,
-      status: "paused",
-      banked: session.banked + now - session.since,
-      since: now,
-    };
-  }
-  return { ...session, status: "recording", since: now };
-}
-
-export function formatElapsed(seconds: number): string {
-  const pad = (value: number) => String(value).padStart(2, "0");
-  return `${pad(Math.floor(seconds / 60))}:${pad(seconds % 60)}`;
-}
-
-export const errorText = (error: unknown) =>
-  error instanceof Error ? error.message : String(error);
 
 function useNow(ticking: boolean): number {
   const [now, setNow] = useState(Date.now);
@@ -74,13 +42,13 @@ export function useRecording(store: RecordingStore): Recording {
           setLoaded(true);
           setError(undefined);
         },
-        (caught: unknown) => setError(errorText(caught)),
+        (caught: unknown) => setError(errorMessage(caught)),
       );
     void refresh();
     return store.watch(() => void refresh());
   }, [store]);
   const write = (next: RecordingSession | null) =>
-    void store.write(next).catch((caught: unknown) => setError(errorText(caught)));
+    void store.write(next).catch((caught: unknown) => setError(errorMessage(caught)));
   return {
     loaded,
     status: session?.status ?? "idle",

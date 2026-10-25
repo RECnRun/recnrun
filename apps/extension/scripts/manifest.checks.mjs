@@ -10,7 +10,7 @@ function productionManifest() {
   return JSON.parse(readFileSync(manifestPath, "utf8"));
 }
 
-test("the production build talks only to the RECnRun domains", () => {
+await test("the production build talks only to the RECnRun domains", () => {
   const manifest = productionManifest();
   const matches = manifest.content_scripts.flatMap((script) => script.matches);
   assert.deepEqual(matches, ["https://recnrun.com/*"]);
@@ -19,7 +19,15 @@ test("the production build talks only to the RECnRun domains", () => {
   assert.doesNotMatch(JSON.stringify(manifest), /localhost|127\.0\.0\.1/);
 });
 
-test("only the RECnRun site may frame the dashboard and the session page", () => {
+await test("the content script runs only in the top frame of a real document", () => {
+  for (const script of productionManifest().content_scripts) {
+    assert.equal(script.all_frames, undefined);
+    assert.equal(script.match_about_blank, undefined);
+    assert.equal(script.match_origin_as_fallback, undefined);
+  }
+});
+
+await test("only the RECnRun site may frame the dashboard and the session page", () => {
   const manifest = productionManifest();
   assert.deepEqual(manifest.web_accessible_resources, [
     {
@@ -30,20 +38,23 @@ test("only the RECnRun site may frame the dashboard and the session page", () =>
   ]);
 });
 
-test("the production build requests only storage and tabs", () => {
+await test("the production build requests only storage and tabs", () => {
   const manifest = productionManifest();
   assert.deepEqual(manifest.permissions, ["storage", "tabs"]);
   assert.equal(manifest.commands, undefined);
   assert.equal(manifest.action?.default_popup, undefined);
   assert.equal(manifest.host_permissions, undefined);
+  assert.equal(manifest.optional_permissions, undefined);
+  assert.equal(manifest.optional_host_permissions, undefined);
   assert.equal(manifest.externally_connectable, undefined);
+  assert.equal(manifest.content_security_policy, undefined);
 });
 
-test("one extension context spans normal and incognito windows", () => {
+await test("one extension context spans normal and incognito windows", () => {
   assert.equal(productionManifest().incognito, "spanning");
 });
 
-test("the production build ships the logo as its icons", () => {
+await test("the production build ships the logo as its icons", () => {
   const manifest = productionManifest();
   assert.deepEqual(Object.keys(manifest.icons ?? {}), ["16", "32", "48", "128"]);
   for (const icon of Object.values(manifest.icons)) {

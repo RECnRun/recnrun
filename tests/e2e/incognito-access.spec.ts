@@ -29,14 +29,15 @@ test("without incognito access, the banner opens RECnRun's details, and every si
   serviceWorker,
 }) => {
   const id = new URL(serviceWorker.url()).host;
-  const sites = [await openSite(context, "/"), await openSite(context, "/recordings")];
+  const first = await openSite(context, "/");
+  const second = await openSite(context, "/recordings");
+  const sites = [first, second];
   for (const site of sites) {
     await expect(banner(site)).toContainText(
       "Open the extension settings and enable “Allow in Incognito”.",
     );
     await expect(newWindow(site)).toHaveCount(0);
   }
-  const [first, second] = sites;
   await expect(
     tabItem(dashboardOf(first), second.url()).getByRole("button", { name: "Record" }),
   ).toBeVisible();

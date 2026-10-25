@@ -1,6 +1,6 @@
 import type { RequestHandler } from "@recnrun/bridge";
 import * as v from "valibot";
-import { BackgroundReplySchema } from "@/messaging/background-protocol";
+import { BackgroundReplySchema } from "@/messaging/background-messages";
 
 /** Forwards page requests to the background, which owns storage access. */
 export function createForwardingHandler(

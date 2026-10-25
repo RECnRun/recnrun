@@ -19,7 +19,7 @@ export default defineConfig({
   hooks: {
     "server:started": async () => {
       // Chrome protects this preference on macOS and Windows; let Chrome save it itself.
-      const { prepareDevChrome } = await import("../../scripts/dev-chrome.ts");
+      const { prepareDevChrome } = await import("./scripts/dev-chrome.ts");
       await prepareDevChrome(chromiumProfile);
     },
   },

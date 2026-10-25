@@ -1,7 +1,12 @@
 import * as v from "valibot";
 
 const CHANNEL = "recnrun-frame";
-export const PathSchema = v.pipe(v.string(), v.startsWith("/"));
+// A second slash would make the path a protocol-relative URL to another host.
+export const PathSchema = v.pipe(
+  v.string(),
+  v.startsWith("/"),
+  v.check((path) => !path.startsWith("//"), "A path starts with one slash"),
+);
 
 /** The content script tells the dashboard which site path the address bar shows. */
 export const RouteMessageSchema = v.object({

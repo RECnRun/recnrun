@@ -1,5 +1,4 @@
-import * as v from "valibot";
-import { ClosePanelMessageSchema } from "@/messaging/frame-protocol";
+import { subscribeFrame } from "@/messaging/frame-channel";
 
 /** Document Picture-in-Picture, which TypeScript's DOM types do not describe yet. */
 export interface DocumentPictureInPicture {
@@ -35,9 +34,7 @@ export function showSession(pipWindow: Window, sessionUrl: string, extensionOrig
     border: "0",
   });
   document.body.append(iframe);
-  pipWindow.addEventListener("message", (event) => {
-    if (event.source !== iframe.contentWindow || event.origin !== extensionOrigin) return;
-    if (!v.is(ClosePanelMessageSchema, event.data)) return;
-    pipWindow.close();
+  subscribeFrame(pipWindow, iframe.contentWindow, extensionOrigin, {
+    "close-panel": () => pipWindow.close(),
   });
 }
