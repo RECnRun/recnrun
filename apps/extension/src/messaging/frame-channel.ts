@@ -9,7 +9,7 @@ import {
 } from "@/messaging/frame-protocol";
 
 /** Every message on the `recnrun-frame` channel, told apart by `type`. */
-export const FrameMessageSchema = v.variant("type", [
+const FrameMessageSchema = v.variant("type", [
   RouteMessageSchema,
   NavigateMessageSchema,
   LocationMessageSchema,
@@ -18,7 +18,7 @@ export const FrameMessageSchema = v.variant("type", [
   ClosePanelMessageSchema,
 ]);
 
-export type FrameMessage = v.InferOutput<typeof FrameMessageSchema>;
+type FrameMessage = v.InferOutput<typeof FrameMessageSchema>;
 
 type Messages = { [T in FrameMessage["type"]]: Extract<FrameMessage, { type: T }> };
 
