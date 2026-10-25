@@ -1,27 +1,20 @@
 import { errorMessage } from "@recnrun/domain";
 import type { Snapshot } from "@recnrun/domain";
-import type { ComponentChildren } from "preact";
 import { useEffect, useState } from "preact/hooks";
-import { RecordingCard } from "@/dashboard/RecordingCard";
-import { toRecordingViews } from "@/dashboard/recording-view";
-import type { RecordingView } from "@/dashboard/recording-view";
-import { recordingPath, selectedRecordingId, titleFor } from "@/dashboard/route";
-import type { DashboardRouter } from "@/dashboard/router";
 import { IncognitoControl } from "@/dashboard/IncognitoControl";
+import { RecordingDetail } from "@/dashboard/RecordingDetail";
+import { EmptyState, RecordingList } from "@/dashboard/RecordingList";
+import { selectedRecordingId, titleFor } from "@/dashboard/route";
+import type { DashboardRouter } from "@/dashboard/router";
+import type { Navigation } from "@/dashboard/RouteLink";
 import { TabList } from "@/dashboard/TabList";
 import type { TakeControl } from "@/dashboard/TabList";
-import { groupByWorkspace, workspaceName } from "@/dashboard/workspace";
 import type { ExtensionServices } from "@/views/extension-services";
 
 type Load =
   | { status: "loading" }
   | { status: "ready"; snapshot: Snapshot }
   | { status: "failed"; message: string };
-
-interface Navigation {
-  router: DashboardRouter;
-  navigate: (path: string) => void;
-}
 
 export interface DashboardProps {
   services: ExtensionServices;
@@ -38,99 +31,6 @@ function useSnapshot(loadSnapshot: () => Promise<Snapshot>): Load {
     );
   }, [loadSnapshot]);
   return load;
-}
-
-function RouteLink(props: { path: string; nav: Navigation; children: ComponentChildren }) {
-  const { path, nav, children } = props;
-  return (
-    <a
-      href={nav.router.href(path)}
-      onClick={(event) => {
-        // Modified clicks keep the browser's behavior, such as opening the link in a new tab.
-        if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey) return;
-        event.preventDefault();
-        nav.navigate(path);
-      }}
-    >
-      {children}
-    </a>
-  );
-}
-
-function EmptyState(props: { title: string; children: ComponentChildren }) {
-  return (
-    <div class="empty-state" role="status">
-      <h2>{props.title}</h2>
-      {props.children}
-    </div>
-  );
-}
-
-function WorkspaceSection(props: { workspace: string; children: ComponentChildren }) {
-  const id = `workspace-${workspaceName(props.workspace)}`;
-  return (
-    <section class="workspace" aria-labelledby={id}>
-      <h2 id={id}>{workspaceName(props.workspace)}</h2>
-      {props.children}
-    </section>
-  );
-}
-
-function RecordingCards({ views, nav }: { views: RecordingView[]; nav: Navigation }) {
-  return (
-    <div class="recordings">
-      {views.map((recording) => (
-        <RecordingCard
-          key={recording.id}
-          recording={recording}
-          title={
-            <RouteLink path={recordingPath(recording.id)} nav={nav}>
-              {recording.name}
-            </RouteLink>
-          }
-        />
-      ))}
-    </div>
-  );
-}
-
-function RecordingList({ snapshot, nav }: { snapshot: Snapshot; nav: Navigation }) {
-  if (snapshot.recordings.length === 0) {
-    return (
-      <EmptyState title="No recordings yet">
-        <p>Open the page you want to capture and start a recording from the extension.</p>
-      </EmptyState>
-    );
-  }
-  return groupByWorkspace(toRecordingViews(snapshot.recordings)).map(
-    ({ workspace, recordings }) => (
-      <WorkspaceSection key={workspace} workspace={workspace}>
-        <RecordingCards views={recordings} nav={nav} />
-      </WorkspaceSection>
-    ),
-  );
-}
-
-function RecordingDetail(props: { snapshot: Snapshot; id: string; nav: Navigation }) {
-  const recording = toRecordingViews(props.snapshot.recordings).find(({ id }) => id === props.id);
-  return (
-    <>
-      <p>
-        <RouteLink path="/" nav={props.nav}>
-          All recordings
-        </RouteLink>
-      </p>
-      {recording ? (
-        <WorkspaceSection workspace={recording.workspace}>
-          <RecordingCard recording={recording} title={recording.name} />
-        </WorkspaceSection>
-      ) : (
-        <EmptyState title="Recording not found">
-          <p>This extension has no recording with that link. It may have been deleted.</p>
-        </EmptyState>
-      )}
-    </>
-  );
 }
 
 function Content(props: { load: Load; route: string; nav: Navigation }) {
