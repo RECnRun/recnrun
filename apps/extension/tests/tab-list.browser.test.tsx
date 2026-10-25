@@ -33,7 +33,11 @@ function mount(data: Partial<DashboardData> = {}) {
   const tabs = fakeTabs({ tabs: [SHOP, DOCS] });
   const sent: SessionRequest[] = [];
   const page = framedPage();
-  const full = { ...dashboardData(), tabs: tabs.source, send: (r: SessionRequest) => sent.push(r) };
+  const send = async (request: SessionRequest) => {
+    sent.push(request);
+    return { ok: true };
+  };
+  const full = { ...dashboardData(), tabs: tabs.source, send };
   const root = document.body.appendChild(document.createElement("div"));
   startDashboard(root, { ...full, ...data }, page);
   return { root, sent, tabs, page };
@@ -93,6 +97,17 @@ test("Record takes the control, asks the site for the PiP window, and records th
   closePanel(page);
   await expect.poll(() => sent.at(-1)).toEqual(returnToDashboardMessage());
   await expectControlFree();
+});
+
+test("a session the background cannot start frees the control and shows the error", async () => {
+  const send = async () => ({ ok: false as const, error: "Quota exceeded" });
+  const { root } = mount({ send });
+  await expect.poll(() => button(item(root, "Shop") ?? root, "Record")).toBeDefined();
+  button(item(root, "Shop") ?? root, "Record")?.click();
+
+  await expectControlFree();
+  expect(alertText(root)).toBe("Quota exceeded");
+  expect(buttons(item(root, "Shop"))).toEqual(["Record"]);
 });
 
 test("while another dashboard has the control, the recorded tab only shows the session", async () => {

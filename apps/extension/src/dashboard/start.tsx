@@ -6,7 +6,11 @@ import { Dashboard } from "@/dashboard/Dashboard";
 import { createFrameRouter } from "@/dashboard/router";
 import type { TakeControl } from "@/dashboard/TabList";
 import { openPanelMessage, PanelClosedMessageSchema } from "@/messaging/frame-protocol";
-import { returnToDashboardMessage, startSessionMessage } from "@/messaging/session-protocol";
+import {
+  returnToDashboardMessage,
+  SessionReplySchema,
+  startSessionMessage,
+} from "@/messaging/session-protocol";
 import type { SessionRequest } from "@/messaging/session-protocol";
 import { CONTROL_LOCK, tryHoldLock } from "@/messaging/view-locks";
 import type { IncognitoAccess, TabSource } from "@/tabs/open-tabs";
@@ -22,11 +26,17 @@ export interface DashboardData {
   incognito?: IncognitoAccess;
   /** Keeps the site tabs' ports open, so a site tab learns when RECnRun unloads. */
   holdSitePorts?: () => void;
-  /** Sends a session request to the background. */
-  send: (request: SessionRequest) => void;
+  /** Sends a session request to the background and resolves with its reply, validated here. */
+  send: (request: SessionRequest) => Promise<unknown>;
 }
 
 const CONTROLLED_ELSEWHERE = "Another RECnRun tab controls the session.";
+
+/** Rejects with the background's error, or when the reply is not one. */
+async function ask(send: DashboardData["send"], request: SessionRequest): Promise<void> {
+  const reply = v.parse(SessionReplySchema, await send(request));
+  if (!reply.ok) throw new Error(reply.error);
+}
 
 /**
  * The control lock, taken atomically across every dashboard, makes this one the only one with a
@@ -40,14 +50,22 @@ function controlFrom(page: Window, parent: string, send: DashboardData["send"]):
     if (!release || !v.is(PanelClosedMessageSchema, event.data)) return;
     release();
     release = undefined;
-    send(returnToDashboardMessage());
+    // The focus either moves back or not; the dashboard has nothing to show about it.
+    void ask(send, returnToDashboardMessage()).catch(() => {});
   });
   return async (tabId) => {
     if (release) return;
     release = await tryHoldLock(CONTROL_LOCK);
     if (!release) throw new Error(CONTROLLED_ELSEWHERE);
     page.parent.postMessage(openPanelMessage(), parent);
-    send(startSessionMessage(tabId));
+    try {
+      await ask(send, startSessionMessage(tabId));
+    } catch (error) {
+      // No session started, so this dashboard controls nothing; the error reaches the tab list.
+      release();
+      release = undefined;
+      throw error;
+    }
   };
 }
 

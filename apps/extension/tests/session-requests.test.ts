@@ -4,6 +4,7 @@ import { fakeBrowser } from "wxt/testing/fake-browser";
 import { createSessionListener, startSession } from "@/background/session-requests";
 import type { SessionStore } from "@/background/session-requests";
 import { returnToDashboardMessage, startSessionMessage } from "@/messaging/session-protocol";
+import type { SessionReply } from "@/messaging/session-protocol";
 
 const EXTENSION_URL = "chrome-extension://own-id/";
 
@@ -57,27 +58,39 @@ test("keeps the running session and focuses the tab it records", async () => {
   expect(await activeTabId()).toBe(shop.id);
 });
 
-test("replaces an unreadable session with a new one", async () => {
+test("leaves an unreadable session as it is and reports it", async () => {
   const shop = await fakeBrowser.tabs.create({ url: "https://shop.example/" });
   const store = memoryStore(null, true);
-  await startSession(shop.id ?? -1, store, 5);
-  expect(await store.read()).toMatchObject({ tabId: shop.id, status: "recording" });
+  await expect(startSession(shop.id ?? -1, store, 5)).rejects.toThrow("Stored session is invalid");
+  await expect(store.read()).rejects.toThrow("Stored session is invalid");
 });
 
-function listen(message: unknown, sender: { id?: string; url?: string; tab?: { id?: number } }) {
-  const store = memoryStore();
+function listen(
+  message: unknown,
+  sender: { id?: string; url?: string; tab?: { id?: number } },
+  store = memoryStore(),
+) {
+  const replies: SessionReply[] = [];
   const listener = createSessionListener(store, EXTENSION_URL);
-  const answered = listener(message, sender as never);
-  return { store, answered };
+  const answered = listener(message, sender as never, (reply) => replies.push(reply));
+  return { store, answered, replies };
 }
 
 const ownPage = { id: fakeBrowser.runtime.id, url: `${EXTENSION_URL}dashboard.html` };
 
-test("starts a session for the extension's own pages, replying nothing", async () => {
+test("starts a session for the extension's own pages and replies once it runs", async () => {
   const shop = await fakeBrowser.tabs.create({ url: "https://shop.example/" });
-  const { store, answered } = listen(startSessionMessage(shop.id ?? -1), ownPage);
-  expect(answered).toBe(false);
-  await expect.poll(() => store.read()).toMatchObject({ tabId: shop.id });
+  const { store, answered, replies } = listen(startSessionMessage(shop.id ?? -1), ownPage);
+  expect(answered).toBe(true);
+  await expect.poll(() => replies).toEqual([{ ok: true }]);
+  expect(await store.read()).toMatchObject({ tabId: shop.id });
+});
+
+test("an unreadable stored session is an error reply", async () => {
+  const shop = await fakeBrowser.tabs.create({ url: "https://shop.example/" });
+  const request = startSessionMessage(shop.id ?? -1);
+  const { replies } = listen(request, ownPage, memoryStore(null, true));
+  await expect.poll(() => replies).toEqual([{ ok: false, error: "Stored session is invalid" }]);
 });
 
 test("ignores content scripts, other extensions, and invalid requests", async () => {
@@ -94,8 +107,9 @@ test("ignores content scripts, other extensions, and invalid requests", async ()
     listen({ type: "open-dashboard" }, ownPage),
   ];
   await new Promise((resolve) => setTimeout(resolve, 10));
-  for (const { store, answered } of ignored) {
+  for (const { store, answered, replies } of ignored) {
     expect(answered).toBe(false);
+    expect(replies).toEqual([]);
     expect(await store.read()).toBeNull();
   }
 });
@@ -103,13 +117,15 @@ test("ignores content scripts, other extensions, and invalid requests", async ()
 test("gives the focus back to the tab framing the dashboard that asks", async () => {
   const site = await fakeBrowser.tabs.create({ url: "https://recnrun.com/" });
   await fakeBrowser.tabs.create({ url: "https://shop.example/", active: true });
-  listen(returnToDashboardMessage(), { ...ownPage, tab: { id: site.id } });
+  const { replies } = listen(returnToDashboardMessage(), { ...ownPage, tab: { id: site.id } });
   await expect.poll(activeTabId).toBe(site.id);
-  expect(listen(returnToDashboardMessage(), ownPage).answered).toBe(false);
+  await expect.poll(() => replies).toEqual([{ ok: true }]);
+  const noTab = listen(returnToDashboardMessage(), ownPage);
+  await expect.poll(() => noTab.replies).toEqual([{ ok: true }]);
 });
 
-test("a tab that closed meanwhile fails quietly", async () => {
-  const { answered } = listen(startSessionMessage(999), ownPage);
-  expect(answered).toBe(false);
-  await new Promise((resolve) => setTimeout(resolve, 10));
+test("a tab that closed meanwhile is an error reply", async () => {
+  const { answered, replies } = listen(startSessionMessage(999), ownPage);
+  expect(answered).toBe(true);
+  await expect.poll(() => replies).toEqual([{ ok: false, error: "Tab not found" }]);
 });

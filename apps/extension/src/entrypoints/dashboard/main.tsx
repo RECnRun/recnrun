@@ -17,6 +17,6 @@ if (root) {
     tabs: browserTabs(),
     incognito: browserIncognito,
     holdSitePorts,
-    send: (request) => void browser.runtime.sendMessage(request),
+    send: (request) => browser.runtime.sendMessage(request),
   });
 }

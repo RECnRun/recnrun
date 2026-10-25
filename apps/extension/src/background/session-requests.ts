@@ -3,6 +3,7 @@ import * as v from "valibot";
 import { browser } from "wxt/browser";
 import type { Browser } from "wxt/browser";
 import { SessionRequestSchema } from "@/messaging/session-protocol";
+import type { SessionReply } from "@/messaging/session-protocol";
 
 /** The session storage the background reads and writes; the extension keeps one session. */
 export interface SessionStore {
@@ -21,8 +22,8 @@ export async function startSession(
   store: SessionStore,
   now = Date.now(),
 ): Promise<void> {
-  // A stored session that no longer matches the schema gives way to the new one.
-  const current = await store.read().catch(() => null);
+  // An unreadable stored session is the caller's error to show, never one to overwrite.
+  const current = await store.read();
   const session = current ?? { tabId, status: "recording", banked: 0, since: now };
   if (current === null) await store.write(session);
   await focus(session.tabId);
@@ -36,7 +37,11 @@ const focusSender = ({ tab }: Browser.runtime.MessageSender) =>
  * dashboard sending them is framed in a site tab, which is the tab it gets the focus back to.
  */
 export function createSessionListener(store: SessionStore, extensionUrl: string) {
-  return (message: unknown, sender: Browser.runtime.MessageSender) => {
+  return (
+    message: unknown,
+    sender: Browser.runtime.MessageSender,
+    sendResponse: (reply: SessionReply) => void,
+  ) => {
     const request = v.safeParse(SessionRequestSchema, message);
     // A content script shares the extension id but runs in a web page that may be compromised.
     if (sender.id !== browser.runtime.id || !sender.url?.startsWith(extensionUrl)) return false;
@@ -45,8 +50,11 @@ export function createSessionListener(store: SessionStore, extensionUrl: string)
       request.output.type === "start-session"
         ? startSession(request.output.tabId, store)
         : focusSender(sender);
-    // The tab may have closed meanwhile; the next dashboard view shows where things stand.
-    void done.catch(() => {});
-    return false;
+    done.then(
+      () => sendResponse({ ok: true }),
+      (error: unknown) =>
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) }),
+    );
+    return true;
   };
 }

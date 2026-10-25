@@ -22,5 +22,9 @@ export function memoryRecordingStore(): RecordingStore {
 
 /** The sample recordings and a fresh shared recording, for a dashboard under test. */
 export function dashboardData(recordings = memoryRecordingStore()): DashboardData {
-  return { loadSnapshot: async () => sampleSnapshot(), recordings, send: () => {} };
+  return {
+    loadSnapshot: async () => sampleSnapshot(),
+    recordings,
+    send: async () => ({ ok: true }),
+  };
 }
