@@ -175,3 +175,15 @@ test("while B records a session of its own, neither dashboard offers Record", as
   await expect(inA.getByText("Recording in Profile B")).toHaveCount(2);
   await expect(records(inB)).toHaveCount(0);
 });
+
+test("neither profile lists RECnRun's own pages, such as its pairing tab", async ({
+  profileA,
+  profileB,
+}) => {
+  await pair(profileA, profileB);
+  const { site, dashboard } = await dashboardIn(profileA);
+  const app = await openInB(profileB, "app");
+  await expect(remoteTab(dashboard, app.url())).toBeVisible();
+  await expect(remoteTab(dashboard, site.url(), LOCAL)).toBeVisible();
+  await expect(dashboard.getByText("RECnRun pairing")).toHaveCount(0);
+});
