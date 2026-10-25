@@ -124,8 +124,10 @@ test("gives the focus back to the tab framing the dashboard that asks", async ()
   await expect.poll(() => noTab.replies).toEqual([{ ok: true }]);
 });
 
-test("a tab that closed meanwhile is an error reply", async () => {
-  const { answered, replies } = listen(startSessionMessage(999), ownPage);
+test("a tab that closed meanwhile is an error reply, and no session", async () => {
+  const { store, answered, replies } = listen(startSessionMessage(999), ownPage);
   expect(answered).toBe(true);
-  await expect.poll(() => replies).toEqual([{ ok: false, error: "Tab not found" }]);
+  await expect.poll(() => replies.length).toBe(1);
+  expect(await store.read()).toBeNull();
+  expect(replies).toEqual([{ ok: false, error: "The tab to record was closed." }]);
 });
