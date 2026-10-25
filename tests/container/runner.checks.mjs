@@ -168,6 +168,14 @@ test("public tests route through Docker while local variants and the hooks retai
   assert.equal(readFileSync(join(root, ".vite-hooks/pre-push"), "utf8").trim(), "vp run verify");
 });
 
+test("the Docker image runs the Node major that engines.node requires", () => {
+  const manifest = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
+  const dockerfile = readFileSync(join(root, "Dockerfile.tests"), "utf8");
+  const [, dockerNode] = dockerfile.match(/VP_NODE_VERSION=(\d+)\./);
+  const [, enginesNode] = manifest.engines.node.match(/^>=(\d+)\.\d+\.\d+$/);
+  assert.equal(enginesNode, dockerNode);
+});
+
 test("verify runs Vitest once, under coverage, and keeps test:local for vp run test", () => {
   const config = readFileSync(join(root, "vite.config.ts"), "utf8");
   const task = (name) => config.match(new RegExp(`"${name}": \\{[^}]*command: \\[([^\\]]*)\\]`))[1];
