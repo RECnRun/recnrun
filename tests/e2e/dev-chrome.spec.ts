@@ -2,7 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { chromium, expect, test } from "@playwright/test";
-import { prepareDevChrome } from "../../scripts/dev-chrome.ts";
+import { prepareDevChrome } from "../../apps/extension/scripts/dev-chrome.ts";
 
 test("dev Chrome enables Developer mode and preserves the profile across restarts", async () => {
   const profile = await mkdtemp(join(tmpdir(), "recnrun-dev-chrome-"));
