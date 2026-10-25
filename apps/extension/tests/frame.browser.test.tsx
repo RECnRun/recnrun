@@ -109,6 +109,56 @@ test("the content script never pushes a protocol-relative path from the dashboar
   expect(history.length).toBe(entries);
 });
 
+/** Resolves once this window handled every message posted to it so far. */
+function postedMessagesHandled(): Promise<void> {
+  const marker = `handled-${Math.random()}`;
+  return new Promise((resolve) => {
+    const onMessage = (event: MessageEvent) => {
+      if (event.data !== marker) return;
+      window.removeEventListener("message", onMessage);
+      resolve();
+    };
+    window.addEventListener("message", onMessage);
+    window.postMessage(marker, "*");
+  });
+}
+
+/** A mounted frame on a titled route, with what a forged message must leave alone. */
+async function titledFrame() {
+  history.replaceState(null, "", "/recordings/rec-login");
+  const frame = mountedFrame();
+  const entries = history.length;
+  postFromFrame(frame, locationMessage("/recordings/rec-login", "Log in"));
+  await expect.poll(() => document.title).toBe("Log in");
+  return { frame, entries };
+}
+
+function expectUntouched(entries: number) {
+  expect(location.pathname).toBe("/recordings/rec-login");
+  expect(document.title).toBe("Log in");
+  expect(history.length).toBe(entries);
+}
+
+test("the content script ignores frame messages posted by the site's own window", async () => {
+  const { entries } = await titledFrame();
+  // Script on the site posting what the dashboard frame would.
+  window.postMessage(navigateMessage("/recordings/rec-checkout"), "*");
+  window.postMessage(locationMessage("/recordings/rec-login", "Forged"), "*");
+  await postedMessagesHandled();
+  expectUntouched(entries);
+});
+
+test("the content script ignores frame messages from a foreign origin", async () => {
+  const { frame, entries } = await titledFrame();
+  const forged = (data: unknown) =>
+    window.dispatchEvent(
+      new MessageEvent("message", { data, origin: "https://evil.example", source: frame }),
+    );
+  forged(navigateMessage("/recordings/rec-checkout"));
+  forged(locationMessage("/recordings/rec-login", "Forged"));
+  expectUntouched(entries);
+});
+
 test("the dashboard refuses to render inside a foreign ancestor", () => {
   const root = document.createElement("div");
   const page = framedPage({
