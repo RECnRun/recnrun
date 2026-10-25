@@ -50,7 +50,14 @@ function siteSession(connect: () => SitePort, pipWindow: Window | null = null) {
 afterEach(() => {
   document.body.replaceChildren();
   document.documentElement.style.overflow = "";
+  Reflect.deleteProperty(document, "visibilityState");
 });
+
+/** Hides or shows the page as the browser would, without moving the real window. */
+function setVisibility(state: DocumentVisibilityState) {
+  Object.defineProperty(document, "visibilityState", { value: state, configurable: true });
+  document.dispatchEvent(new Event("visibilitychange"));
+}
 
 test("once its frame loads, the site holds a port, and asks for a reload when it drops", () => {
   const { port, disconnect } = fakePort();
@@ -89,6 +96,18 @@ test("an orphaned site reloads once the user comes back to it, as from chrome://
   expect(document.visibilityState).toBe("visible");
   document.dispatchEvent(new Event("visibilitychange"));
   expect(reloads()).toBe(2);
+});
+
+test("an orphaned site in a hidden tab waits to reload until the user can see it", () => {
+  const { port, disconnect } = fakePort();
+  const { frame, reloads } = siteSession(() => port);
+  frame.dispatchEvent(new Event("load"));
+  disconnect();
+
+  setVisibility("hidden");
+  expect(reloads()).toBe(0);
+  setVisibility("visible");
+  expect(reloads()).toBe(1);
 });
 
 test("orphaning closes the PiP window along with the frame, since RECnRun blanked both", () => {

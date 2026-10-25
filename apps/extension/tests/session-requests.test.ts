@@ -1,5 +1,5 @@
 import type { RecordingSession } from "@recnrun/domain";
-import { beforeEach, expect, test } from "vite-plus/test";
+import { afterEach, beforeEach, expect, test, vi } from "vite-plus/test";
 import { fakeBrowser } from "wxt/testing/fake-browser";
 import { startSession } from "@/background/session-requests";
 import { memoryRecordingStore } from "./fake-extension";
@@ -18,6 +18,11 @@ async function activeTabId() {
 
 beforeEach(() => {
   fakeBrowser.reset();
+});
+
+// The Node projects share a worker, so a spy left on the fake browser would reach other files.
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 test("records the tab when no session runs, and focuses it", async () => {
@@ -47,6 +52,13 @@ test("leaves an unreadable session as it is and reports it", async () => {
 });
 
 test("starts no session on a tab that is gone", async () => {
+  const store = memoryRecordingStore();
+  await expect(startSession(999, store)).rejects.toThrow("The tab to record was closed.");
+  expect(await store.read()).toBeNull();
+});
+
+test("starts no session on a tab Chrome rejects as unknown, and says so in its own words", async () => {
+  vi.spyOn(fakeBrowser.tabs, "get").mockRejectedValue(new Error("No tab with id: 999."));
   const store = memoryRecordingStore();
   await expect(startSession(999, store)).rejects.toThrow("The tab to record was closed.");
   expect(await store.read()).toBeNull();
