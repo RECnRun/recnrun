@@ -1,4 +1,4 @@
-import { elapsedSeconds, toggled } from "@recnrun/domain";
+import { elapsedSeconds, errorMessage, toggled } from "@recnrun/domain";
 import type { RecordingSession } from "@recnrun/domain";
 import { useEffect, useRef, useState } from "preact/hooks";
 import type { RecordingStore } from "@/ports/recording-store";
@@ -16,9 +16,6 @@ export interface Recording {
   toggle: () => void;
   stop: () => void;
 }
-
-export const errorText = (error: unknown) =>
-  error instanceof Error ? error.message : String(error);
 
 function useNow(ticking: boolean): number {
   const [now, setNow] = useState(Date.now);
@@ -45,13 +42,13 @@ export function useRecording(store: RecordingStore): Recording {
           setLoaded(true);
           setError(undefined);
         },
-        (caught: unknown) => setError(errorText(caught)),
+        (caught: unknown) => setError(errorMessage(caught)),
       );
     void refresh();
     return store.watch(() => void refresh());
   }, [store]);
   const write = (next: RecordingSession | null) =>
-    void store.write(next).catch((caught: unknown) => setError(errorText(caught)));
+    void store.write(next).catch((caught: unknown) => setError(errorMessage(caught)));
   return {
     loaded,
     status: session?.status ?? "idle",

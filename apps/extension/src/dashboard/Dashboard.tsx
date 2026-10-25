@@ -1,3 +1,4 @@
+import { errorMessage } from "@recnrun/domain";
 import type { Snapshot } from "@recnrun/domain";
 import type { ComponentChildren } from "preact";
 import { useEffect, useState } from "preact/hooks";
@@ -32,11 +33,7 @@ function useSnapshot(loadSnapshot: () => Promise<Snapshot>): Load {
   useEffect(() => {
     loadSnapshot().then(
       (snapshot) => setLoad({ status: "ready", snapshot }),
-      (error: unknown) =>
-        setLoad({
-          status: "failed",
-          message: error instanceof Error ? error.message : String(error),
-        }),
+      (error: unknown) => setLoad({ status: "failed", message: errorMessage(error) }),
     );
   }, [loadSnapshot]);
   return load;

@@ -1,3 +1,4 @@
+export { errorMessage } from "./error-message.ts";
 export { type Recording } from "./recording.ts";
 export {
   elapsedSeconds,

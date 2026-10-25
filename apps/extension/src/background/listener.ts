@@ -1,3 +1,4 @@
+import { errorMessage } from "@recnrun/domain";
 import * as v from "valibot";
 import type { Browser } from "wxt/browser";
 import { BackgroundMessageSchema } from "@/messaging/background-messages";
@@ -44,8 +45,7 @@ export function createBackgroundListener(routes: Routes, identity: Identity) {
     if (!route.from.includes(from)) return false;
     route.run(sender).then(
       (result) => sendResponse({ ok: true, result }),
-      (error: unknown) =>
-        sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) }),
+      (error: unknown) => sendResponse({ ok: false, error: errorMessage(error) }),
     );
     return true;
   };

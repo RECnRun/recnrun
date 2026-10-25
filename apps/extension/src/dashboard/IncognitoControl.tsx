@@ -1,6 +1,6 @@
+import { errorMessage } from "@recnrun/domain";
 import { useEffect, useState } from "preact/hooks";
 import type { IncognitoAccess } from "@/ports/tabs";
-import { errorText } from "@/views/recording";
 
 interface IncognitoProps {
   access: IncognitoAccess;
@@ -9,7 +9,8 @@ interface IncognitoProps {
 
 /** Leads to RECnRun's details, since only Chrome may turn on "Allow in Incognito". */
 function IncognitoBanner({ access, onError }: IncognitoProps) {
-  const open = () => access.openSettings().catch((caught: unknown) => onError(errorText(caught)));
+  const open = () =>
+    access.openSettings().catch((caught: unknown) => onError(errorMessage(caught)));
   return (
     <section class="incognito-banner" aria-labelledby="incognito-heading">
       <h3 id="incognito-heading">Enable Incognito Mode</h3>
@@ -45,7 +46,7 @@ export function IncognitoControl({
 }: Omit<IncognitoProps, "access"> & { access?: IncognitoAccess; allowed: IncognitoState }) {
   if (!access || typeof allowed !== "boolean") return null;
   if (!allowed) return <IncognitoBanner access={access} onError={onError} />;
-  const open = () => access.openWindow().catch((caught: unknown) => onError(errorText(caught)));
+  const open = () => access.openWindow().catch((caught: unknown) => onError(errorMessage(caught)));
   return (
     <button type="button" class="tab-new-window" onClick={() => void open()}>
       New incognito window

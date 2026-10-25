@@ -1,9 +1,10 @@
+import { errorMessage } from "@recnrun/domain";
 import { useState } from "preact/hooks";
 import { IncognitoControl, useIncognitoAccess } from "@/dashboard/IncognitoControl";
 import type { RecordingStore } from "@/ports/recording-store";
 import type { IncognitoAccess, OpenTab, TabSource } from "@/ports/tabs";
 import { RecordStatus } from "@/views/RecordPanel";
-import { errorText, useRecording } from "@/views/recording";
+import { useRecording } from "@/views/recording";
 import type { Recording } from "@/views/recording";
 import { TabSummary } from "@/views/TabSummary";
 import { useBrowserTabs } from "@/views/use-browser-tabs";
@@ -110,7 +111,7 @@ export function TabList({ tabs, store, take, incognito }: SessionSetup) {
     !openTabs.some((tab) => tab.id === recording.tabId);
   const takeOn = (tabId: number) => () => {
     setError(undefined);
-    take(tabId).catch((caught: unknown) => setError(errorText(caught)));
+    take(tabId).catch((caught: unknown) => setError(errorMessage(caught)));
   };
   return (
     <aside class="tabs" aria-labelledby="tabs-heading">
