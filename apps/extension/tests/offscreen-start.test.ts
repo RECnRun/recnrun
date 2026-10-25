@@ -1,0 +1,216 @@
+import { afterEach, beforeEach, describe, expect, test, vi } from "vite-plus/test";
+import { fakeBrowser } from "wxt/testing/fake-browser";
+import { linkCommandMessage } from "@/messaging/peer-messages";
+import type { LinkCommand } from "@/messaging/peer-messages";
+import { startOffscreen } from "@/offscreen/start";
+import { answering } from "./fake-peer";
+
+const LOCAL_SDP = "v=0\r\na=fingerprint:sha-256 11:22\r\n";
+const REMOTE_SDP = "v=0\r\na=fingerprint:sha-256 aa:bb\r\n";
+const certificate = {
+  expires: Number.MAX_SAFE_INTEGER,
+  getFingerprints: () => [
+    { algorithm: "sha-1", value: "00:00" },
+    { algorithm: "sha-256", value: "ab:cd" },
+  ],
+} as unknown as RTCCertificate;
+
+class FakeChannel extends EventTarget {
+  readyState: RTCDataChannelState = "connecting";
+  readonly sent: string[] = [];
+  send(frame: string) {
+    this.sent.push(frame);
+  }
+  close() {
+    this.readyState = "closed";
+  }
+  open() {
+    this.readyState = "open";
+    this.dispatchEvent(new Event("open"));
+  }
+}
+
+/** Just what the link calls of an RTCPeerConnection, gathering at once; Node has no WebRTC. */
+class FakeConnection extends EventTarget {
+  static made: FakeConnection[] = [];
+  iceGatheringState: RTCIceGatheringState = "new";
+  signalingState: RTCSignalingState = "stable";
+  localDescription: { sdp: string } | null = null;
+  remoteDescription: { sdp: string } | null = null;
+  channel: FakeChannel | undefined;
+  readonly config: RTCConfiguration;
+  constructor(config: RTCConfiguration) {
+    super();
+    this.config = config;
+    FakeConnection.made.push(this);
+  }
+  createDataChannel() {
+    this.channel = new FakeChannel();
+    return this.channel;
+  }
+  async setLocalDescription() {
+    this.signalingState = this.remoteDescription ? "stable" : "have-local-offer";
+    this.localDescription = { sdp: LOCAL_SDP };
+    this.iceGatheringState = "complete";
+  }
+  async setRemoteDescription({ sdp }: { sdp: string }) {
+    this.remoteDescription = { sdp };
+  }
+  close() {}
+  /** The other side's channel arriving, as the answering side receives it. */
+  receiveChannel() {
+    this.channel = new FakeChannel();
+    this.dispatchEvent(Object.assign(new Event("datachannel"), { channel: this.channel }));
+    return this.channel;
+  }
+}
+
+const background = () => ({
+  id: fakeBrowser.runtime.id,
+  url: fakeBrowser.runtime.getURL("/background.js"),
+});
+
+/** The offscreen document, through the default sender, its events to the background recorded. */
+function offscreen(cert: () => Promise<RTCCertificate> = async () => certificate) {
+  const events: unknown[] = [];
+  vi.spyOn(fakeBrowser.runtime, "sendMessage").mockImplementation(
+    answering((message) => void events.push((message as { event: unknown }).event)),
+  );
+  startOffscreen({ certificate: cert });
+  return { events };
+}
+
+async function run(command: LinkCommand, sender: object = background()) {
+  const reply = vi.fn();
+  const [answered] = await fakeBrowser.runtime.onMessage.trigger(
+    linkCommandMessage(command),
+    sender,
+    reply,
+  );
+  expect(answered).toBe(true);
+  await vi.waitFor(() => expect(reply).toHaveBeenCalledOnce(), { interval: 1 });
+  return reply.mock.calls[0]?.[0] as unknown;
+}
+
+const state = (name: string, remoteFingerprint?: string) => ({
+  type: "state",
+  state: name,
+  ...(remoteFingerprint ? { remoteFingerprint } : {}),
+});
+
+beforeEach(() => {
+  fakeBrowser.reset();
+  FakeConnection.made = [];
+  vi.stubGlobal("RTCPeerConnection", FakeConnection);
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
+
+describe("commands", () => {
+  test("ignores anything but a valid command from the service worker", async () => {
+    offscreen();
+    const reply = vi.fn();
+    const from = background();
+    const ignored: [unknown, object][] = [
+      [linkCommandMessage({ type: "info" }), { ...from, id: "another-extension" }],
+      [
+        linkCommandMessage({ type: "info" }),
+        { ...from, url: fakeBrowser.runtime.getURL("/dashboard.html") },
+      ],
+      [{ target: "offscreen", command: { type: "erase" } }, from],
+      [{ type: "peer-changed" }, from],
+    ];
+    for (const [message, sender] of ignored) {
+      expect(await fakeBrowser.runtime.onMessage.trigger(message, sender, reply)).toEqual([false]);
+    }
+    expect(reply).not.toHaveBeenCalled();
+  });
+
+  test("tells the profile certificate's fingerprint, and the idle link's state", async () => {
+    offscreen();
+    expect(await run({ type: "fingerprint" })).toEqual({
+      ok: true,
+      result: { fingerprint: "AB:CD" },
+    });
+    expect(await run({ type: "info" })).toEqual({
+      ok: true,
+      result: { state: "idle", diagnostics: [] },
+    });
+    expect(await run({ type: "send", frame: "{}" })).toEqual({ ok: true, result: { sent: false } });
+  });
+
+  test("replies with the error of a command that fails, and reports the failed link", async () => {
+    const { events } = offscreen();
+    expect(await run({ type: "accept-answer", sdp: REMOTE_SDP })).toEqual({
+      ok: false,
+      error: "Create an offer first.",
+    });
+    expect(events).toStrictEqual([state("failed")]);
+  });
+
+  test("answers every command with the error when the certificate cannot load", async () => {
+    offscreen(async () => {
+      throw new Error("IndexedDB is unavailable.");
+    });
+    expect(await run({ type: "info" })).toEqual({ ok: false, error: "IndexedDB is unavailable." });
+  });
+});
+
+describe("the link", () => {
+  test("offers, takes the answer, and carries frames both ways", async () => {
+    const { events } = offscreen();
+    expect(await run({ type: "offer" })).toEqual({ ok: true, result: { sdp: LOCAL_SDP } });
+    const [pc] = FakeConnection.made;
+    expect(pc?.config).toEqual({ iceServers: [], certificates: [certificate] });
+    expect(await run({ type: "accept-answer", sdp: REMOTE_SDP })).toEqual({ ok: true });
+    pc?.channel?.open();
+    expect(await run({ type: "send", frame: "to peer" })).toEqual({
+      ok: true,
+      result: { sent: true },
+    });
+    expect(pc?.channel?.sent).toEqual(["to peer"]);
+    pc?.channel?.dispatchEvent(new MessageEvent("message", { data: "from peer" }));
+    expect(await run({ type: "close" })).toEqual({ ok: true });
+    expect(events).toStrictEqual([
+      state("connecting"),
+      state("connected", "AA:BB"),
+      { type: "frame", frame: "from peer" },
+      state("disconnected", "AA:BB"),
+    ]);
+  });
+
+  test("answers an offer and reports the channel the offer opened", async () => {
+    const { events } = offscreen();
+    expect(await run({ type: "answer", sdp: REMOTE_SDP })).toEqual({
+      ok: true,
+      result: { sdp: LOCAL_SDP },
+    });
+    FakeConnection.made[0]?.receiveChannel().open();
+    expect(events).toStrictEqual([state("connecting"), state("connected", "AA:BB")]);
+    const info = (await run({ type: "info" })) as { result: { state: string } };
+    expect(info.result.state).toBe("connected");
+  });
+
+  test("keeps working when the service worker is not there to hear a report", async () => {
+    // A plain function, since a spy handles the promises its mock returns.
+    const events: unknown[] = [];
+    let reachable = false;
+    const send = async (message: unknown) => {
+      if (!reachable) throw new Error("Receiving end does not exist.");
+      events.push((message as { event: unknown }).event);
+    };
+    const unhandled = vi.fn();
+    process.on("unhandledRejection", unhandled);
+    startOffscreen({ send, certificate: async () => certificate });
+    expect(await run({ type: "offer" })).toEqual({ ok: true, result: { sdp: LOCAL_SDP } });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    process.off("unhandledRejection", unhandled);
+    expect(unhandled).not.toHaveBeenCalled();
+    reachable = true;
+    FakeConnection.made[0]?.channel?.open();
+    expect(events).toStrictEqual([state("connected")]);
+  });
+});
