@@ -2,9 +2,6 @@ import { browser } from "wxt/browser";
 import type { Browser } from "wxt/browser";
 import type { BrowserTabs, OpenTab, TabSource } from "@/ports/tabs";
 
-// Kept for views/use-browser-tabs.ts until it imports the port itself.
-export type { BrowserTabs, TabSource } from "@/ports/tabs";
-
 function faviconOf(url: string | undefined, incognito: boolean): string | undefined {
   if (url?.startsWith("data:image/")) return url;
   // Fetching it from the extension's normal context would tie the incognito tab to its cookies.

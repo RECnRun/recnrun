@@ -1,5 +1,5 @@
 import { useEffect, useState } from "preact/hooks";
-import type { BrowserTabs, TabSource } from "@/tabs/open-tabs";
+import type { BrowserTabs, TabSource } from "@/ports/tabs";
 import { coalesceReads } from "@/views/coalesce-reads";
 
 /**
