@@ -1,0 +1,18 @@
+<!doctype html>
+<html>
+  <head>
+    <script>
+      // The page's first script: is the prelude already in place?
+      window.firstScript = {
+        patched: !/\[native code\]/.test(Storage.prototype.getItem.toString()),
+        b2: window.__b2 ?? null,
+        b4: window.__b4 ?? null,
+      };
+    </script>
+    <title>APIs</title>
+  </head>
+  <body>
+    <p id="user">…</p>
+    <script src="/apis.js"></script>
+  </body>
+</html>

@@ -161,6 +161,7 @@ export default defineConfig({
           "vp run --no-cache test:e2e:local",
           "vp run --no-cache test:container",
           "vp run --no-cache test:hooks",
+          "vp run --no-cache test:containers-lab",
           "vp run --no-cache dead-code",
           "vp run --no-cache duplication",
           "vp run -r --no-cache build",

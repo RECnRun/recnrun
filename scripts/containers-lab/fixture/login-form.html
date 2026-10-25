@@ -1,0 +1,17 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Sign in</title>
+<form method="post" action="/login">
+  <input name="user" />
+  <button>Sign in</button>
+</form>
+<a id="idp" href="http://idp.localhost:4319/authorize">Sign in with the identity provider</a>
+<button id="popup" type="button">Sign in in a popup</button>
+<script>
+  const user = new URLSearchParams(location.search).get("user") ?? "";
+  document.querySelector("input").value = user;
+  const authorize = `http://idp.localhost:4319/authorize?user=${encodeURIComponent(user)}`;
+  document.querySelector("#idp").href = authorize;
+  document.querySelector("#popup").onclick = () =>
+    window.open(`${authorize}&popup=1`, "idp", "popup");
+</script>

@@ -1,0 +1,9 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>…</title>
+<p id="user">…</p>
+<script type="module">
+  const { user } = await (await fetch("/me")).json();
+  document.querySelector("#user").textContent = user ?? "signed out";
+  document.title = user ?? "signed out";
+</script>
