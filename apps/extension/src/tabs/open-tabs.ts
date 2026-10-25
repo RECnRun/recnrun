@@ -1,6 +1,6 @@
 import { browser } from "wxt/browser";
 import type { Browser } from "wxt/browser";
-import type { BrowserTabs, IncognitoAccess, OpenTab, TabSource } from "@/ports/tabs";
+import type { BrowserTabs, OpenTab, TabSource } from "@/ports/tabs";
 
 // Kept for views/use-browser-tabs.ts until it imports the port itself.
 export type { BrowserTabs, TabSource } from "@/ports/tabs";
@@ -62,13 +62,3 @@ export function browserTabs(): TabSource {
     },
   };
 }
-
-export const browserIncognito: IncognitoAccess = {
-  allowed: () => browser.extension.isAllowedIncognitoAccess(),
-  openSettings: async () => {
-    await browser.tabs.create({ url: `chrome://extensions/?id=${browser.runtime.id}` });
-  },
-  openWindow: async () => {
-    await browser.windows.create({ incognito: true });
-  },
-};

@@ -1,12 +1,12 @@
 import { render } from "preact";
 import { afterEach, expect, test, vi } from "vite-plus/test";
 import { startDashboard } from "@/dashboard/start";
-import type { DashboardData } from "@/dashboard/start";
 import { openPanelMessage, panelClosedMessage } from "@/messaging/frame-protocol";
 import { returnToDashboardMessage, startSessionMessage } from "@/messaging/session-protocol";
 import type { SessionRequest } from "@/messaging/session-protocol";
+import type { ExtensionServices } from "@/views/extension-services";
 import { CONTROL_LOCK, tryHoldLock } from "@/views/view-locks";
-import { dashboardData, memoryRecordingStore } from "./dashboard-data";
+import { fakeExtension, memoryRecordingStore } from "./fake-extension";
 import { DOCS, PRIVATE, SHOP, fakeIncognito, fakeTabs } from "./fake-tabs";
 import { button } from "./queries";
 
@@ -29,7 +29,7 @@ const closePanel = (page: Window) =>
     }),
   );
 
-function mount(data: Partial<DashboardData> = {}) {
+function mount(services: Partial<ExtensionServices> = {}) {
   const tabs = fakeTabs({ tabs: [SHOP, DOCS] });
   const sent: SessionRequest[] = [];
   const page = framedPage();
@@ -37,9 +37,8 @@ function mount(data: Partial<DashboardData> = {}) {
     sent.push(request);
     return { ok: true };
   };
-  const full = { ...dashboardData(), tabs: tabs.source, send };
   const root = document.body.appendChild(document.createElement("div"));
-  startDashboard(root, { ...full, ...data }, page);
+  startDashboard(root, fakeExtension({ tabs: tabs.source, send, ...services }), page);
   return { root, sent, tabs, page };
 }
 
@@ -103,7 +102,7 @@ test("the dashboard listens to the frame channel once for its route and its cont
   const page = framedPage();
   const added = vi.spyOn(page, "addEventListener");
   const root = document.body.appendChild(document.createElement("div"));
-  startDashboard(root, { ...dashboardData(), tabs: fakeTabs({ tabs: [SHOP] }).source }, page);
+  startDashboard(root, fakeExtension({ tabs: fakeTabs({ tabs: [SHOP] }).source }), page);
   await expect.poll(() => button(item(root, "Shop") ?? root, "Record")).toBeDefined();
   expect(added.mock.calls.filter(([type]) => type === "message")).toHaveLength(1);
 });
@@ -218,20 +217,23 @@ test("without incognito access, a banner opens RECnRun's details and no window i
   await expect.poll(() => incognito.settings).toHaveLength(1);
 });
 
-test("the tabs wait for the incognito access, so the banner never pushes a Record button away", async () => {
+test("Record waits for no incognito answer, and a late banner lands below the tabs, moving none", async () => {
   let report = (_allowed: boolean) => {};
   const access = {
     ...fakeIncognito(false).access,
     allowed: () => new Promise<boolean>((resolve) => (report = resolve)),
   };
   const { root } = mount({ incognito: access });
-  await expect.poll(() => root.querySelector("aside h2")?.textContent).toBe("Tabs");
-  await new Promise((resolve) => setTimeout(resolve, 50));
-  expect(item(root, "Shop")).toBeUndefined();
+  await expect.poll(() => buttons(item(root, "Shop"))).toEqual(["Record"]);
+  expect(banner(root)).toBeUndefined();
 
   report(false);
-  await expect.poll(() => buttons(item(root, "Shop"))).toEqual(["Record"]);
-  expect(banner(root)).toBeDefined();
+  await expect.poll(() => banner(root)).toBeDefined();
+  const list = root.querySelector("aside ul");
+  expect(list && banner(root)?.compareDocumentPosition(list)).toBe(
+    Node.DOCUMENT_POSITION_PRECEDING,
+  );
+  expect(buttons(item(root, "Shop"))).toEqual(["Record"]);
 });
 
 test("details Chrome refuses to open are an alert", async () => {
@@ -285,19 +287,13 @@ test("only a framed dashboard holds the site tabs' ports", async () => {
   expect(held).toBe(1);
 });
 
-test("without the tabs API the dashboard lists no tab", async () => {
-  const { root } = mount({ tabs: undefined });
-  await expect.poll(() => root.querySelector("main")).not.toBeNull();
-  expect(root.querySelector("aside")).toBeNull();
-});
-
 test("opened on its own, outside the site, the dashboard points to the site", () => {
   const root = document.body.appendChild(document.createElement("div"));
   const page = Object.assign(new EventTarget(), {
     document,
     location: { ancestorOrigins: [], search: "" },
   }) as unknown as Window;
-  startDashboard(root, dashboardData(), page);
+  startDashboard(root, fakeExtension(), page);
   expect(root.querySelector('[role="status"]')?.textContent).toBe(
     "Open recnrun.com to use RECnRun.",
   );

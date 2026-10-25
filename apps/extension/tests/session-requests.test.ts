@@ -2,7 +2,7 @@ import type { RecordingSession } from "@recnrun/domain";
 import { beforeEach, expect, test } from "vite-plus/test";
 import { fakeBrowser } from "wxt/testing/fake-browser";
 import { startSession } from "@/background/session-requests";
-import { memoryRecordingStore } from "./dashboard-data";
+import { memoryRecordingStore } from "./fake-extension";
 
 const running = (tabId: number): RecordingSession => ({
   tabId,

@@ -5,10 +5,8 @@ import { subscribeFrame } from "@/messaging/frame-channel";
 import { openPanelMessage } from "@/messaging/frame-protocol";
 import { returnToDashboardMessage, startSessionMessage } from "@/messaging/session-protocol";
 import type { SessionRequest } from "@/messaging/session-protocol";
+import type { SendRequest } from "@/views/extension-services";
 import { CONTROL_LOCK, tryHoldLock } from "@/views/view-locks";
-
-/** Sends a session request to the background and resolves with its reply, validated here. */
-export type SendRequest = (request: SessionRequest) => Promise<unknown>;
 
 const CONTROLLED_ELSEWHERE = "Another RECnRun tab controls the session.";
 

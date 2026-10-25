@@ -6,8 +6,8 @@ import { useEnded, useRecording } from "@/views/recording";
 
 interface FloatingSessionProps {
   store: RecordingStore;
-  /** The browser's tabs, to show the current and the recorded one; none outside the extension. */
-  tabs?: TabSource;
+  /** The browser's tabs, to show the current and the recorded one. */
+  tabs: TabSource;
   onEnd: () => void;
 }
 
@@ -20,7 +20,7 @@ export function FloatingSession(props: FloatingSessionProps) {
   return (
     <>
       <RecordPanel recording={recording} />
-      {props.tabs && <SessionTabs source={props.tabs} recordedId={recording.tabId} />}
+      <SessionTabs source={props.tabs} recordedId={recording.tabId} />
     </>
   );
 }

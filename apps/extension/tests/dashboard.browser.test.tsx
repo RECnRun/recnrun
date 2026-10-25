@@ -5,6 +5,7 @@ import { render } from "preact";
 import { afterEach, expect, test } from "vite-plus/test";
 import { Dashboard } from "@/dashboard/Dashboard";
 import type { DashboardRouter } from "@/dashboard/router";
+import { fakeExtension } from "./fake-extension";
 
 function memoryRouter(initialRoute = "/") {
   const listeners = new Set<(path: string) => void>();
@@ -35,7 +36,8 @@ function mount(snapshot: Snapshot | Error, router: DashboardRouter = memoryRoute
     if (snapshot instanceof Error) throw snapshot;
     return snapshot;
   };
-  render(<Dashboard loadSnapshot={loadSnapshot} router={router} />, root);
+  const services = fakeExtension({ loadSnapshot });
+  render(<Dashboard services={services} router={router} take={async () => {}} />, root);
   return root;
 }
 
@@ -47,6 +49,8 @@ const workspaces = (root: HTMLElement) =>
 
 afterEach(() => {
   history.replaceState(null, "", location.pathname);
+  // Unmounting stops the tab list's lock and tabs watchers.
+  for (const root of document.body.children) render(null, root);
 });
 
 test("lists every recording, newest first, linked to its route", async () => {

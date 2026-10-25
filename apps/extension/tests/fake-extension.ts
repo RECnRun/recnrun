@@ -1,7 +1,8 @@
 import type { RecordingSession } from "@recnrun/domain";
 import { sampleSnapshot } from "@recnrun/domain/testing";
-import type { DashboardData } from "@/dashboard/start";
 import type { RecordingStore } from "@/ports/recording-store";
+import type { ExtensionServices } from "@/views/extension-services";
+import { DOCS, SHOP, fakeIncognito, fakeTabs } from "./fake-tabs";
 
 /** Stands in for extension session storage; every view given the same store sees each write. */
 export function memoryRecordingStore(
@@ -26,11 +27,15 @@ export function memoryRecordingStore(
   };
 }
 
-/** The sample recordings and a fresh shared recording, for a dashboard under test. */
-export function dashboardData(recordings = memoryRecordingStore()): DashboardData {
+/** The extension's services for a page under test: the sample recordings, two tabs, incognito allowed. */
+export function fakeExtension(overrides: Partial<ExtensionServices> = {}): ExtensionServices {
   return {
     loadSnapshot: async () => sampleSnapshot(),
-    recordings,
+    recordings: memoryRecordingStore(),
+    tabs: fakeTabs({ tabs: [SHOP, DOCS] }).source,
+    incognito: fakeIncognito(true).access,
+    holdSitePorts: () => {},
     send: async () => ({ ok: true }),
+    ...overrides,
   };
 }

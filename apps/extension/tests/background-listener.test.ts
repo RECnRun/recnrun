@@ -4,7 +4,7 @@ import { createBackgroundListener } from "@/background/listener";
 import { createRoutes } from "@/background/routes";
 import type { BackgroundReply } from "@/messaging/background-messages";
 import { returnToDashboardMessage, startSessionMessage } from "@/messaging/session-protocol";
-import { memoryRecordingStore } from "./dashboard-data";
+import { memoryRecordingStore } from "./fake-extension";
 
 const EXTENSION_URL = "chrome-extension://own-id/";
 const identity = { extensionId: "own-id", extensionUrl: EXTENSION_URL };

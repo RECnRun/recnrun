@@ -20,9 +20,13 @@
   margin-top: calc(var(--space) * 2);
 }
 
+.session-panel,
 .tabs {
   display: grid;
   gap: var(--space);
+}
+
+.session-panel {
   margin-bottom: calc(var(--space) * 2);
 }
 

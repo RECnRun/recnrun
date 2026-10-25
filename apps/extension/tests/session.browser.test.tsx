@@ -4,7 +4,7 @@ import { closePanelMessage } from "@/messaging/frame-protocol";
 import type { RecordingStore } from "@/ports/recording-store";
 import type { TabSource } from "@/ports/tabs";
 import { startSession } from "@/session/start";
-import { memoryRecordingStore } from "./dashboard-data";
+import { fakeExtension, memoryRecordingStore } from "./fake-extension";
 import { DOCS, PRIVATE, SHOP, fakeTabs } from "./fake-tabs";
 import { button, panelText } from "./queries";
 
@@ -25,11 +25,8 @@ function framedPage(ancestors: string[]) {
 
 function mount(store: RecordingStore, ancestors = [location.origin], tabs?: TabSource) {
   const root = document.body.appendChild(document.createElement("div"));
-  startSession(
-    root,
-    tabs ? { recordings: store, tabs } : { recordings: store },
-    framedPage(ancestors),
-  );
+  const services = fakeExtension(tabs ? { recordings: store, tabs } : { recordings: store });
+  startSession(root, services, framedPage(ancestors));
   return root;
 }
 

@@ -7,9 +7,11 @@ import { toRecordingViews } from "@/dashboard/recording-view";
 import type { RecordingView } from "@/dashboard/recording-view";
 import { recordingPath, selectedRecordingId, titleFor } from "@/dashboard/route";
 import type { DashboardRouter } from "@/dashboard/router";
+import { IncognitoControl } from "@/dashboard/IncognitoControl";
 import { TabList } from "@/dashboard/TabList";
-import type { SessionSetup } from "@/dashboard/TabList";
+import type { TakeControl } from "@/dashboard/TabList";
 import { groupByWorkspace, workspaceName } from "@/dashboard/workspace";
+import type { ExtensionServices } from "@/views/extension-services";
 
 type Load =
   | { status: "loading" }
@@ -22,10 +24,9 @@ interface Navigation {
 }
 
 export interface DashboardProps {
-  loadSnapshot: () => Promise<Snapshot>;
+  services: ExtensionServices;
   router: DashboardRouter;
-  /** The tabs and the session; without it the dashboard records nothing. */
-  session?: SessionSetup;
+  take: TakeControl;
 }
 
 function useSnapshot(loadSnapshot: () => Promise<Snapshot>): Load {
@@ -151,8 +152,8 @@ function Content(props: { load: Load; route: string; nav: Navigation }) {
   }
 }
 
-export function Dashboard({ loadSnapshot, router, session }: DashboardProps) {
-  const load = useSnapshot(loadSnapshot);
+export function Dashboard({ services, router, take }: DashboardProps) {
+  const load = useSnapshot(services.loadSnapshot);
   const [route, setRoute] = useState(router.initialRoute);
   useEffect(() => router.subscribe(setRoute), [router]);
   const navigate = (path: string) => {
@@ -170,7 +171,11 @@ export function Dashboard({ loadSnapshot, router, session }: DashboardProps) {
         <h1>RECnRun</h1>
       </header>
       <main>
-        {session && <TabList {...session} />}
+        {/* The control comes after the list, so its late arrival moves no Record button. */}
+        <div class="session-panel">
+          <TabList tabs={services.tabs} store={services.recordings} take={take} />
+          <IncognitoControl access={services.incognito} />
+        </div>
         <Content load={load} route={route} nav={{ router, navigate }} />
       </main>
     </>
