@@ -95,6 +95,37 @@ test("a malformed or forged frame runs nothing and gets no answer it could use",
   await expect(profileB.pairing.getByRole("status")).toHaveText("Connected — Profile A");
 });
 
+const pinnedPeer = (profile: Profile) =>
+  profile.serviceWorker.evaluate(async () => {
+    const { chrome } = globalThis as unknown as ChromeGlobal;
+    return (await chrome.storage.local.get("authorizedPeer")).authorizedPeer;
+  });
+
+test("a profile that quits drops the link, and after a restart pairs again as itself", async ({
+  profileA,
+  profileB,
+  launch,
+}) => {
+  await pair(profileA, profileB);
+  const pinned = await pinnedPeer(profileA);
+  await profileB.context.close();
+  // No close message comes from a browser that quits; ICE consent checks find it gone.
+  await expect(profileA.pairing.getByRole("status")).toHaveText(
+    /^(Disconnected|Connection failed) — Profile B$/,
+    { timeout: 45_000 },
+  );
+
+  // Without a signaling server nothing reconnects on its own: the users pair again.
+  const context = await launch(profileB.dir);
+  const serviceWorker =
+    context.serviceWorkers()[0] ?? (await context.waitForEvent("serviceworker"));
+  const pairing = await context.newPage();
+  await pairing.goto(`chrome-extension://${new URL(serviceWorker.url()).host}/pairing.html`);
+  await pair(profileA, { ...profileB, context, serviceWorker, pairing });
+  // The same certificate after the restart: the pinned peer is unchanged.
+  expect(await pinnedPeer(profileA)).toEqual(pinned);
+});
+
 test("disconnect and forget end the link on both sides", async ({ profileA, profileB }) => {
   await pair(profileA, profileB);
   await profileA.pairing.getByRole("button", { name: "Disconnect" }).click();

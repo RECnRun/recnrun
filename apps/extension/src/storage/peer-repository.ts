@@ -1,33 +1,16 @@
 import { RecordingSessionSchema } from "@recnrun/domain";
 import * as v from "valibot";
 import { storage } from "wxt/utils/storage";
-import { LinkStateSchema } from "@/messaging/peer-messages";
-import { DisplayNameSchema } from "@/p2p/pairing-code";
+// The schemas pages validate with live in messaging, so a page never defines storage items.
+import {
+  AuthorizedPeerSchema,
+  PeerLinkSchema,
+  ProfileIdentitySchema,
+} from "@/messaging/peer-results";
 import { ProfileIdSchema } from "@/p2p/protocol";
 
-/** Who this installation is to its peers: generated once, never the extension id. */
-export const ProfileIdentitySchema = v.strictObject({
-  profileId: ProfileIdSchema,
-  displayName: DisplayNameSchema,
-});
-
 export type ProfileIdentity = v.InferOutput<typeof ProfileIdentitySchema>;
-
-/** The one peer the user confirmed, pinned to its DTLS certificate fingerprint. */
-export const AuthorizedPeerSchema = v.strictObject({
-  profileId: ProfileIdSchema,
-  displayName: DisplayNameSchema,
-  fingerprint: v.pipe(v.string(), v.regex(/^[0-9A-F:]+$/)),
-});
-
 export type AuthorizedPeer = v.InferOutput<typeof AuthorizedPeerSchema>;
-
-export const PeerLinkSchema = v.strictObject({
-  state: LinkStateSchema,
-  /** Set once the link's certificate matches the authorized peer's. */
-  verified: v.boolean(),
-});
-
 export type PeerLink = v.InferOutput<typeof PeerLinkSchema>;
 
 /** The offer this profile waits an answer for. */

@@ -38,6 +38,8 @@ export function OfferStep({ client, action, copy }: StepProps) {
   const [offer, setOffer] = useState<string>();
   const create = () =>
     action.run(async () => {
+      // A stale offer left on screen would be copied and answered, and then refused.
+      setOffer(undefined);
       setOffer((await client.ask({ type: "create-offer" }, PairingCodeResultSchema)).code);
     });
   return (
@@ -107,6 +109,8 @@ export function ImportStep({ client, action, copy, incoming, onAccepted }: Impor
   const inspect = (pasted = code) =>
     action.run(async () => {
       setAnswer(undefined);
+      // The previous code's digits must not stand in for this one's while it is checked.
+      setPreview(undefined);
       setPreview(await client.ask({ type: "inspect", code: pasted.trim() }, PairingPreviewSchema));
     });
   useEffect(() => {

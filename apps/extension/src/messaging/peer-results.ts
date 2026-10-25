@@ -1,11 +1,26 @@
 import * as v from "valibot";
 import { LinkStateSchema } from "@/messaging/peer-messages";
 import { ProfileIdSchema } from "@/p2p/protocol";
-import {
-  AuthorizedPeerSchema,
-  PeerLinkSchema,
-  ProfileIdentitySchema,
-} from "@/storage/peer-repository";
+import { DisplayNameSchema } from "@/p2p/pairing-code";
+
+/** Who this installation is to its peers: generated once, never the extension id. */
+export const ProfileIdentitySchema = v.strictObject({
+  profileId: ProfileIdSchema,
+  displayName: DisplayNameSchema,
+});
+
+/** The one peer the user confirmed, pinned to its DTLS certificate fingerprint. */
+export const AuthorizedPeerSchema = v.strictObject({
+  profileId: ProfileIdSchema,
+  displayName: DisplayNameSchema,
+  fingerprint: v.pipe(v.string(), v.regex(/^[0-9A-F:]+$/)),
+});
+
+export const PeerLinkSchema = v.strictObject({
+  state: LinkStateSchema,
+  /** Set once the link's certificate matches the authorized peer's. */
+  verified: v.boolean(),
+});
 
 /** What a page learns about this profile and its link, as the background answers `status`. */
 export const PeerStatusSchema = v.object({

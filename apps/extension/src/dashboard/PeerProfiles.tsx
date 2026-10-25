@@ -34,11 +34,9 @@ function RemoteProfile({
   take,
 }: {
   peers: PeerServices;
-  status: PeerStatus;
+  status: PeerStatus & { peer: NonNullable<PeerStatus["peer"]> };
   take: TakeControl;
 }) {
-  const peer = status.peer;
-  if (!peer) return null;
   const activate = (tabId: number) =>
     peers.client.ask({ type: "activate", tabId }, v.unknown()).then(() => {});
   return (
@@ -49,28 +47,42 @@ function RemoteProfile({
       activate={activate}
       heading={{
         id: "remote-tabs-heading",
-        text: `Chrome — ${peer.displayName} (${peerState(status.link)})`,
+        text: `Chrome — ${status.peer.displayName} (${peerState(status.link)})`,
       }}
     />
   );
 }
 
-/** This profile's tabs, then the paired profile's, each under the profile's name. */
+/**
+ * Unpaired, the dashboard is the local one plus a way to pair; paired, this profile's tabs and
+ * the other profile's, each under the profile's name.
+ */
 export function PeerProfiles({ services, peers, take, takeRemote }: PeerProfilesProps) {
   const { status } = usePeerStatus(peers.client);
-  const name = status?.identity.displayName ?? "This profile";
+  const paired = status?.peer ? { ...status, peer: status.peer } : undefined;
+  const pairButton = (
+    <button type="button" onClick={() => void peers.openPairing()}>
+      {paired ? "Manage pairing" : "Pair another profile"}
+    </button>
+  );
+  if (!paired) {
+    return (
+      <>
+        <TabList tabs={services.tabs} store={services.recordings} take={take} />
+        {pairButton}
+      </>
+    );
+  }
   return (
     <>
       <TabList
         tabs={services.tabs}
         store={services.recordings}
         take={take}
-        heading={{ id: "tabs-heading", text: `Chrome — ${name} (Local)` }}
+        heading={{ id: "tabs-heading", text: `Chrome — ${paired.identity.displayName} (Local)` }}
       />
-      {status && <RemoteProfile peers={peers} status={status} take={takeRemote} />}
-      <button type="button" onClick={() => void peers.openPairing()}>
-        {status?.peer ? "Manage pairing" : "Pair another profile"}
-      </button>
+      <RemoteProfile peers={peers} status={paired} take={takeRemote} />
+      {pairButton}
     </>
   );
 }
