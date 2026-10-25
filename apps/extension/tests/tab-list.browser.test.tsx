@@ -1,5 +1,5 @@
 import { render } from "preact";
-import { afterEach, expect, test } from "vite-plus/test";
+import { afterEach, expect, test, vi } from "vite-plus/test";
 import { startDashboard } from "@/dashboard/start";
 import type { DashboardData } from "@/dashboard/start";
 import { openPanelMessage, panelClosedMessage } from "@/messaging/frame-protocol";
@@ -97,6 +97,15 @@ test("Record takes the control, asks the site for the PiP window, and records th
   closePanel(page);
   await expect.poll(() => sent.at(-1)).toEqual(returnToDashboardMessage());
   await expectControlFree();
+});
+
+test("the dashboard listens to the frame channel once for its route and its control", async () => {
+  const page = framedPage();
+  const added = vi.spyOn(page, "addEventListener");
+  const root = document.body.appendChild(document.createElement("div"));
+  startDashboard(root, { ...dashboardData(), tabs: fakeTabs({ tabs: [SHOP] }).source }, page);
+  await expect.poll(() => button(item(root, "Shop") ?? root, "Record")).toBeDefined();
+  expect(added.mock.calls.filter(([type]) => type === "message")).toHaveLength(1);
 });
 
 test("a session the background cannot start frees the control and shows the error", async () => {

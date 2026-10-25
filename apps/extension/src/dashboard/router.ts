@@ -1,10 +1,6 @@
 import * as v from "valibot";
-import {
-  locationMessage,
-  navigateMessage,
-  PathSchema,
-  RouteMessageSchema,
-} from "@/messaging/frame-protocol";
+import { subscribeFrame } from "@/messaging/frame-channel";
+import { locationMessage, navigateMessage, PathSchema } from "@/messaging/frame-protocol";
 
 /** Where the dashboard keeps its route, so links, reloads, and Back work. */
 export interface DashboardRouter {
@@ -27,15 +23,8 @@ export function createFrameRouter(parentOrigin: string, page: Window = window): 
   return {
     initialRoute: frameRoute(page.location.search),
     href: (path) => parentOrigin + path,
-    subscribe(listener) {
-      const onMessage = (event: MessageEvent) => {
-        if (event.source !== page.parent || event.origin !== parentOrigin) return;
-        const parsed = v.safeParse(RouteMessageSchema, event.data);
-        if (parsed.success) listener(parsed.output.path);
-      };
-      page.addEventListener("message", onMessage);
-      return () => page.removeEventListener("message", onMessage);
-    },
+    subscribe: (listener) =>
+      subscribeFrame(page, page.parent, parentOrigin, { route: ({ path }) => listener(path) }),
     navigate(path) {
       page.parent.postMessage(navigateMessage(path), parentOrigin);
     },

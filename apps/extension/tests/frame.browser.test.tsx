@@ -1,7 +1,8 @@
-import { afterEach, expect, test } from "vite-plus/test";
+import { afterEach, expect, test, vi } from "vite-plus/test";
 import { mountDashboardFrame } from "@/content/dashboard-frame";
 import { INCOGNITO_NOTICE, ORPHANED_NOTICE, showNotice } from "@/content/notice";
 import { watchForOrphaning } from "@/content/orphan-watch";
+import { servePanelRequests } from "@/content/panel-window";
 import type { SitePort } from "@/messaging/site-port";
 import { createFrameRouter } from "@/dashboard/router";
 import { startDashboard } from "@/dashboard/start";
@@ -209,6 +210,19 @@ test("a location the address bar has moved past adds no history entry and no tit
   expect(document.title).toBe("Log in");
   expect(location.pathname).toBe("/recordings/rec-login");
   expect(history.length).toBe(entries);
+});
+
+test("the content script listens to the frame channel once for the dashboard and the panel", () => {
+  const page = Object.assign(new EventTarget(), {
+    document,
+    history,
+    location,
+    documentPictureInPicture: undefined,
+  }) as unknown as Window;
+  const added = vi.spyOn(page, "addEventListener");
+  const frame = mountDashboardFrame("about:blank", location.origin, page);
+  servePanelRequests(frame, "about:blank", location.origin, page);
+  expect(added.mock.calls.filter(([type]) => type === "message")).toHaveLength(1);
 });
 
 test("in an incognito tab, the site is covered by where to record from instead of the frame", () => {
