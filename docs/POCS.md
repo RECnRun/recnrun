@@ -128,3 +128,16 @@ The dashboard header has a Record button (`dashboard/panel/RecordControls.tsx`).
   - The window stays on top after switching to another tab and to another Chrome window.
   - Stop brings back the dashboard tab (6A); note where the focus goes in 6C.
   - Whether `await`ing storage before `requestWindow()` still opens it, which decides whether Record can wait for the extension before opening the window.
+
+## Isolated sessions per tab group (October 2026)
+
+**Problem.** A developer wants to be signed in to the same site as several users at once, one per tab group, in their own Chrome profile. Chrome has no container API, so the extension would have to emulate one.
+
+**Result.** CONDITIONAL. Branch `poc/tab-group-containers`; the full report is [poc-tab-group-containers-results.md](poc-tab-group-containers-results.md). Four identities worked side by side with `chrome.debugger` on each container tab (Fetch writes the exact `Cookie` header) and a page prelude that namespaces every storage API before the page's first script. Without the debugger, rules update after a login `302`, so the next request leaves signed out.
+
+- **Findings.**
+  - declarativeNetRequest can set `Cookie` and strip `Set-Cookie` per tab, and webRequest still sees the stripped header, but rule updates are asynchronous.
+  - The HTTP cache is keyed by URL, so one container's private response reached another until every request to the app's hosts sent `cache-control: no-cache`.
+  - A shared worker gets one instance per container and isolated storage, but its requests carry the profile's own cookies: Fetch never pauses them.
+  - Service workers are disabled in containers; a registration belongs to an origin, not a container.
+  - The debugger session outlives the extension's service worker, and a restarted worker must adopt it. Requests made while the extension reloads carry the profile's cookies.

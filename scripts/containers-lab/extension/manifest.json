@@ -1,0 +1,38 @@
+{
+  "manifest_version": 3,
+  "name": "RECnRun containers lab",
+  "description": "Lab only: isolates cookies and storage per tab group. Never a RECnRun build.",
+  "version": "0.0.1",
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "permissions": [
+    "cookies",
+    "debugger",
+    "declarativeNetRequestWithHostAccess",
+    "scripting",
+    "sessions",
+    "storage",
+    "tabGroups",
+    "tabs",
+    "webNavigation",
+    "webRequest"
+  ],
+  "host_permissions": [
+    "http://app.localhost/*",
+    "http://idp.localhost/*",
+    "ws://app.localhost/*",
+    "ws://idp.localhost/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["http://app.localhost/*", "http://idp.localhost/*"],
+      "js": ["prelude.js", "prelude-identity.js", "control-start.js"],
+      "world": "MAIN",
+      "run_at": "document_start",
+      "all_frames": true,
+      "match_origin_as_fallback": true
+    }
+  ]
+}

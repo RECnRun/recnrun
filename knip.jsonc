@@ -8,6 +8,10 @@
         "scripts/agent-hooks/*.mjs",
         "scripts/git-hooks/*.mjs",
         "tests/container/*.checks.mjs",
+        // The tab-group containers lab: harnesses, an unpacked extension, and fixture pages' scripts.
+        "scripts/containers-lab/*.mjs",
+        "scripts/containers-lab/extension/{background,control-start,prelude,prelude-identity,b2-probe}.js",
+        "scripts/containers-lab/fixture/*.js",
       ],
     },
     "apps/extension": {
