@@ -14,12 +14,15 @@ import { storedSession, tabIdOf } from "./fixtures/tabs.ts";
 const LOCAL = "Chrome — Profile A (Local)";
 const REMOTE = "Chrome — Profile B (Connected)";
 
-/** A's site tab, whose dashboard lists both profiles. */
-async function dashboardIn(profile: Profile): Promise<{ site: Page; dashboard: FrameLocator }> {
+/** A site tab in a profile, A by default, whose dashboard lists both profiles. */
+async function dashboardIn(
+  profile: Profile,
+  local = LOCAL,
+): Promise<{ site: Page; dashboard: FrameLocator }> {
   const site = await profile.context.newPage();
   await site.goto("/");
   const dashboard = dashboardOf(site);
-  await expect(dashboard.getByRole("heading", { name: LOCAL })).toBeVisible();
+  await expect(dashboard.getByRole("heading", { name: local })).toBeVisible();
   return { site, dashboard };
 }
 
@@ -150,4 +153,25 @@ test("a session in B outlives the link, and A shows B's tabs read only, as last 
   await readOnly();
   // Only an explicit Stop ends a session; B's keeps recording.
   expect(await storedSession(profileB.serviceWorker)).toMatchObject({ status: "recording" });
+});
+
+test("while B records a session of its own, neither dashboard offers Record", async ({
+  profileA,
+  profileB,
+}) => {
+  await pair(profileA, profileB);
+  const inA = (await dashboardIn(profileA)).dashboard;
+  const inB = (await dashboardIn(profileB, "Chrome — Profile B (Local)")).dashboard;
+  const app = await openInB(profileB, "app");
+  const records = (dashboard: FrameLocator) => dashboard.getByRole("button", { name: "Record" });
+  await expect(remoteTab(inA, app.url()).getByRole("button", { name: "Record" })).toBeVisible();
+
+  const local = remoteTab(inB, app.url(), "Chrome — Profile B (Local)");
+  await clickToOpenPanel(profileB.context, local.getByRole("button", { name: "Record" }));
+  await expect
+    .poll(() => storedSession(profileB.serviceWorker))
+    .toMatchObject({ status: "recording" });
+  await expect(records(inA)).toHaveCount(0);
+  await expect(inA.getByText("Recording in Profile B")).toHaveCount(2);
+  await expect(records(inB)).toHaveCount(0);
 });

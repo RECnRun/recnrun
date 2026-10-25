@@ -16,6 +16,7 @@ export function statusOf(state?: Link["state"], verified = state === "connected"
     peer: state ? { ...BOB, fingerprint: "AB:CD:EF" } : null,
     link: { state: state ?? "idle", verified },
     peerSession: null,
+    controlledByPeer: false,
   };
 }
 

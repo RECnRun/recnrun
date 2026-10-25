@@ -5,6 +5,7 @@ import { TabList } from "@/dashboard/TabList";
 import type { TakeControl } from "@/dashboard/TabList";
 import type { ExtensionServices } from "@/views/extension-services";
 import { linkLabel } from "@/views/link-label";
+import { useRecording } from "@/views/recording";
 import type { PeerServices } from "@/views/remote-peer";
 import { usePeerStatus } from "@/views/use-peer";
 
@@ -51,6 +52,7 @@ function RemoteProfile({
  */
 export function PeerProfiles({ services, peers, take, takeRemote }: PeerProfilesProps) {
   const { status } = usePeerStatus(peers.client);
+  const localRunning = useRecording(services.recordings).status !== "idle";
   const paired = status?.peer ? { ...status, peer: status.peer } : undefined;
   const pairButton = (
     <button type="button" onClick={() => void peers.openPairing()}>
@@ -65,7 +67,7 @@ export function PeerProfiles({ services, peers, take, takeRemote }: PeerProfiles
       </>
     );
   }
-  const blocks = peerBlocks(paired);
+  const blocks = peerBlocks(paired, localRunning);
   return (
     <>
       <TabList

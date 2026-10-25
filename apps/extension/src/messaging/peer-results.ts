@@ -38,6 +38,8 @@ export const PeerStatusSchema = v.object({
   peer: v.nullable(AuthorizedPeerSchema),
   link: PeerLinkSchema,
   peerSession: v.nullable(PeerSessionSchema),
+  /** Whether the session that runs here was started by the peer, over a link that still holds. */
+  controlledByPeer: v.boolean(),
 });
 
 export type PeerStatus = v.InferOutput<typeof PeerStatusSchema>;

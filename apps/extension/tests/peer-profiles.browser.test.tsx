@@ -38,7 +38,7 @@ function peerServices(peer: ReturnType<typeof fakePeerClient>) {
 }
 
 /** A framed dashboard in Alice's profile, with Bob's profile as `peer` answers for it. */
-function mount(peer: ReturnType<typeof fakePeerClient>) {
+function mount(peer: ReturnType<typeof fakePeerClient>, recordings = memoryRecordingStore()) {
   const { peers, opened } = peerServices(peer);
   const sent: SessionRequest[] = [];
   const send = async (request: SessionRequest) => {
@@ -49,7 +49,7 @@ function mount(peer: ReturnType<typeof fakePeerClient>) {
   const root = document.body.appendChild(document.createElement("div"));
   startDashboard(
     root,
-    fakeExtension({ tabs: fakeTabs({ tabs: [SHOP] }).source, send, peers }),
+    fakeExtension({ tabs: fakeTabs({ tabs: [SHOP] }).source, send, peers, recordings }),
     page,
   );
   return { root, sent, page, opened };
@@ -132,6 +132,33 @@ test("while the link is down, the other profile's tabs are read only, as last se
   peer.change(withPeerSession(statusOf("disconnected"), recording));
   await expect.poll(() => note(remote(root))).toBe("Not connected. Last seen recording.");
   expect(buttons(item(root, "Shop"))).toEqual(["Record"]);
+});
+
+test("one session across the pair: each list says why it offers no Record", async () => {
+  const local = memoryRecordingStore();
+  const peer = fakePeerClient(statusOf("connected"));
+  const { root } = mount(peer, local);
+  await expect.poll(() => buttons(item(root, "Shop"))).toEqual(["Record"]);
+
+  peer.change(
+    withPeerSession(statusOf("connected"), { status: "recording", mine: false, live: true }),
+  );
+  await expect.poll(() => buttons(item(root, "Shop"))).toEqual([]);
+  expect(buttons(item(remote(root) ?? root, "Mail"))).toEqual(["Show tab"]);
+  expect([...root.querySelectorAll(".tab-note")].map((each) => each.textContent)).toEqual([
+    "Recording in Bob",
+    "Recording in Bob",
+  ]);
+
+  // Bob controls the session that runs here: no Continue or Stop, only its state.
+  await local.write({ tabId: SHOP.id, status: "recording", banked: 0, since: Date.now() });
+  peer.change({ ...statusOf("connected"), controlledByPeer: true });
+  await expect
+    .poll(() => note(root.querySelector("aside") ?? undefined))
+    .toBe("Controlled from Bob");
+  expect(buttons(item(root, "Shop"))).toEqual([]);
+  expect(item(root, "Shop")?.textContent).toContain("Recording");
+  expect(note(remote(root))).toBe("Recording in Alice");
 });
 
 test("Show tab brings the other profile's tab to the front, or shows why it cannot", async () => {

@@ -42,6 +42,7 @@ function requests(link: PeerLink | null = VERIFIED, reply: PeerMessage = result(
       connected: true,
     }),
     localSession: memoryRecordingStore(),
+    controller: memoryRepository<{ profileId: string }>(),
     tabs: memoryRepository<SharedTabs>(),
   } satisfies PeerRequestDependencies;
   const asked = () => deps.channel.request.mock.calls;
@@ -56,9 +57,27 @@ describe("the link and its peer", () => {
       peer,
       link: { state: "idle", verified: false },
       peerSession: null,
+      controlledByPeer: false,
     });
     await deps.link.write(VERIFIED);
     expect(await handlePeerRequest(deps, { type: "status" })).toMatchObject({ link: VERIFIED });
+  });
+
+  test("reports whether the peer controls the session that runs here", async () => {
+    const { deps } = requests();
+    await deps.link.write(VERIFIED);
+    await deps.controller.write({ profileId: PEER });
+    expect(await handlePeerRequest(deps, { type: "status" })).toMatchObject({
+      controlledByPeer: false,
+    });
+    await deps.localSession.write({ tabId: 1, status: "recording", banked: 0, since: 1 });
+    expect(await handlePeerRequest(deps, { type: "status" })).toMatchObject({
+      controlledByPeer: true,
+    });
+    await deps.link.write({ state: "failed", verified: false });
+    expect(await handlePeerRequest(deps, { type: "status" })).toMatchObject({
+      controlledByPeer: false,
+    });
   });
 
   test("reports the peer's session from its last report, live only over a verified link", async () => {

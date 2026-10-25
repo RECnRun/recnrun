@@ -7,6 +7,7 @@ import type {
   AuthorizedPeer,
   PeerLink,
   ProfileIdentity,
+  RemoteController,
   RemoteRecording,
   Repository,
 } from "@/storage/peer-repository";
@@ -23,6 +24,8 @@ export interface PeerRequestDependencies {
   link: Pick<Repository<PeerLink>, "read" | "write">;
   mirror: Pick<Repository<RemoteRecording>, "read" | "write">;
   localSession: Pick<RecordingStore, "read">;
+  /** The peer that started the session running here, if one did. */
+  controller: Pick<Repository<RemoteController>, "read">;
   /** The peer's tabs as last reported. */
   tabs: Pick<Repository<SharedTabs>, "read" | "write">;
 }
@@ -63,14 +66,18 @@ function peerSession(mirror: RemoteRecording | null, link: PeerLink) {
 }
 
 async function status(deps: Deps) {
-  const [identity, peer, stored, mirror] = await Promise.all([
+  const [identity, peer, stored, mirror, controller, local] = await Promise.all([
     deps.identity(),
     deps.authorized.read(),
     deps.link.read(),
     deps.mirror.read(),
+    deps.controller.read(),
+    deps.localSession.read(),
   ]);
   const link = stored ?? { state: "idle" as const, verified: false };
-  return { identity, peer, link, peerSession: peerSession(mirror, link) };
+  // Without the link the peer cannot stop it, so this profile's user gets the controls back.
+  const controlledByPeer = link.verified && controller !== null && local !== null;
+  return { identity, peer, link, peerSession: peerSession(mirror, link), controlledByPeer };
 }
 
 async function ping(deps: Deps) {

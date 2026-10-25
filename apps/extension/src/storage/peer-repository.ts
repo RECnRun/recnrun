@@ -36,6 +36,7 @@ export type RemoteRecording = v.InferOutput<typeof RemoteRecordingSchema>;
 
 /** On the executor: the peer whose dashboard started the session that runs here. */
 const RemoteControllerSchema = v.strictObject({ profileId: ProfileIdSchema });
+export type RemoteController = v.InferOutput<typeof RemoteControllerSchema>;
 
 function repository<T>(key: `local:${string}` | `session:${string}`, schema: v.GenericSchema<T>) {
   const item = storage.defineItem<unknown>(key);

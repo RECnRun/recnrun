@@ -173,6 +173,7 @@ function watchExecutor(channel: PeerChannel, executor: ExecutorDependencies) {
   const sessionChanged = async () => {
     const status = await sessionStatus(executor);
     if (!status.session) await remoteControllerRepository.write(null);
+    notifyPages();
     if (await linked()) await channel.send("SESSION_STATUS", status);
   };
   recordingSessionRepository.watch(() => void sessionChanged().catch(() => {}));
@@ -196,6 +197,7 @@ function requestDependencies(channel: PeerChannel, tabs: TabsCache): PeerRequest
     link: peerLinkRepository,
     mirror: remoteRecordingRepository,
     localSession: recordingSessionRepository,
+    controller: remoteControllerRepository,
     tabs,
   };
 }
