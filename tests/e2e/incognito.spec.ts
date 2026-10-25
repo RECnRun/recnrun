@@ -19,6 +19,10 @@ import {
 
 const tabsOf = (site: Page) => dashboardOf(site).getByRole("complementary", { name: "Tabs" });
 
+/** The incognito control sits above the tab list, so it is found in the dashboard, not the list. */
+const incognitoWindowButton = (site: Page) =>
+  dashboardOf(site).getByRole("button", { name: "New incognito window" });
+
 /** What the session page in the PiP window shows of a tab: the current one, or the recorded one. */
 const tabRegion = (pip: Page, name: "Current tab" | "Recorded tab") =>
   pip.locator(SESSION_FRAME).contentFrame().getByRole("region", { name });
@@ -40,8 +44,8 @@ async function idOf(serviceWorker: Worker, url: string): Promise<number> {
 test.describe("without incognito access", () => {
   test("lists the normal tabs and says how to allow incognito ones", async ({ context }) => {
     const site = await openSite(context, "/");
-    await expect(tabsOf(site)).toContainText("Allow in Incognito");
-    await expect(tabsOf(site).getByRole("button", { name: "New incognito window" })).toHaveCount(0);
+    await expect(dashboardOf(site).locator("body")).toContainText("Allow in Incognito");
+    await expect(incognitoWindowButton(site)).toHaveCount(0);
     await expect(tabItem(dashboardOf(site), site.url())).not.toContainText("Incognito");
   });
 });
@@ -54,8 +58,8 @@ test.describe("with incognito access", () => {
     serviceWorker,
   }) => {
     const site = await openSite(context, "/");
-    await expect(tabsOf(site)).not.toContainText("Allow in Incognito");
-    await clickInDashboard(tabsOf(site).getByRole("button", { name: "New incognito window" }));
+    await expect(dashboardOf(site).locator("body")).not.toContainText("Allow in Incognito");
+    await clickInDashboard(incognitoWindowButton(site));
 
     await expect
       .poll(async () => (await chromeTabs(serviceWorker)).filter((tab) => tab.incognito).length)

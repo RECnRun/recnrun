@@ -71,10 +71,10 @@ export function Dashboard({ services, router, take }: DashboardProps) {
         <h1>RECnRun</h1>
       </header>
       <main>
-        {/* The control comes after the list, so its late arrival moves no Record button. */}
         <div class="session-panel">
-          <TabList tabs={services.tabs} store={services.recordings} take={take} />
-          <IncognitoControl access={services.incognito} />
+          <IncognitoControl access={services.incognito}>
+            <TabList tabs={services.tabs} store={services.recordings} take={take} />
+          </IncognitoControl>
         </div>
         <Content load={load} route={route} nav={{ router, navigate }} />
       </main>

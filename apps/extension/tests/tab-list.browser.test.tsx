@@ -217,23 +217,23 @@ test("without incognito access, a banner opens RECnRun's details and no window i
   await expect.poll(() => incognito.settings).toHaveLength(1);
 });
 
-test("Record waits for no incognito answer, and a late banner lands below the tabs, moving none", async () => {
+test("the tabs wait for the incognito answer, and the banner lands above them", async () => {
   let report = (_allowed: boolean) => {};
   const access = {
     ...fakeIncognito(false).access,
     allowed: () => new Promise<boolean>((resolve) => (report = resolve)),
   };
   const { root } = mount({ incognito: access });
-  await expect.poll(() => buttons(item(root, "Shop"))).toEqual(["Record"]);
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  expect(root.querySelector("aside ul")).toBeNull();
   expect(banner(root)).toBeUndefined();
 
   report(false);
-  await expect.poll(() => banner(root)).toBeDefined();
+  await expect.poll(() => buttons(item(root, "Shop"))).toEqual(["Record"]);
   const list = root.querySelector("aside ul");
   expect(list && banner(root)?.compareDocumentPosition(list)).toBe(
-    Node.DOCUMENT_POSITION_PRECEDING,
+    Node.DOCUMENT_POSITION_FOLLOWING,
   );
-  expect(buttons(item(root, "Shop"))).toEqual(["Record"]);
 });
 
 test("details Chrome refuses to open are an alert", async () => {

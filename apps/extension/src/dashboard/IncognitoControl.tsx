@@ -1,4 +1,5 @@
 import { errorMessage } from "@recnrun/domain";
+import type { ComponentChildren } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import type { IncognitoAccess } from "@/ports/tabs";
 
@@ -37,23 +38,31 @@ function useIncognitoAccess(access: IncognitoAccess): IncognitoState {
   return allowed;
 }
 
-/** Opens an incognito window when RECnRun may see it, or leads to where to allow that. */
-export function IncognitoControl({ access }: { access: IncognitoAccess }) {
+interface ControlProps {
+  access: IncognitoAccess;
+  children: ComponentChildren;
+}
+
+/**
+ * Opens an incognito window when RECnRun may see it, or leads to where to allow that, above
+ * its children. They wait for Chrome's answer, so the banner never moves a Record button.
+ */
+export function IncognitoControl({ access, children }: ControlProps) {
   const allowed = useIncognitoAccess(access);
   const [error, setError] = useState<string>();
   const onError = (caught: unknown) => setError(errorMessage(caught));
-  if (typeof allowed !== "boolean") return null;
+  if (allowed === undefined) return null;
   const open = () => access.openWindow().catch(onError);
   return (
     <>
-      {allowed ? (
+      {allowed === true && (
         <button type="button" class="tab-new-window" onClick={() => void open()}>
           New incognito window
         </button>
-      ) : (
-        <IncognitoBanner access={access} onError={onError} />
       )}
+      {allowed === false && <IncognitoBanner access={access} onError={onError} />}
       {error && <p role="alert">{error}</p>}
+      {children}
     </>
   );
 }
