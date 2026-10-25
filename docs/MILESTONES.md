@@ -27,7 +27,7 @@ Manual, once per release of the extension:
 
 ## Next
 
-- M1: capture. A spike evaluates rrweb in the extension, then the extension records the current tab's timeline and stores it with its summary ([PRODUCT_BRIEF.md](PRODUCT_BRIEF.md#next)).
+- M1: capture. A spike evaluates rrweb in the extension, then the extension records the current tab's timeline and stores it with its summary ([PRODUCT_BRIEF.md](PRODUCT_BRIEF.md#next)). Its first task gives the background the whole `RecordingSession` lifecycle, controller included, in `storage.session`: pages send `start`, `continue`, `pause`, `stop`, and `release-control` and only read and watch; the worker clears the controller on `tabs.onRemoved` and `tabs.onUpdated(status: loading)` of its tab, and `controlled` derives from the same watch. That deletes `view-locks.ts`, `use-lock-held.ts`, the `BroadcastChannel`, and the `panel-closed` → `return-to-dashboard` chain. Capture must live in the same owner, since a session exists only while capture runs. Accepted when [ARCHITECTURE.md](ARCHITECTURE.md) "Control" describes one owner, `tests/e2e/session-control.spec.ts` passes, and no page imports `navigator.locks`.
 - M2: replay a recording.
 - M3: extract re-runnable steps from a recording and run them.
 - Publish the extension to the Chrome Web Store, and point the install banner at the listing.
