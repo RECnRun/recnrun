@@ -12,12 +12,12 @@ const trailer = "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>";
 const evidence =
   "Red: vp run test:unit failed: expected 1 recording.\nGreen: vp run test:unit passes.";
 
-test("accepts a capitalized imperative subject under 72 characters", () => {
+await test("accepts a capitalized imperative subject under 72 characters", () => {
   assert.deepEqual(commitMessageErrors("Add source aliases for workspace packages", []), []);
   assert.deepEqual(commitMessageErrors(`${"A".repeat(71)}\n`, ["docs/ARCHITECTURE.md"]), []);
 });
 
-test("rejects subject format violations", () => {
+await test("rejects subject format violations", () => {
   for (const subject of [
     "feat: add source aliases",
     "fix(feed)!: stop the scroll",
@@ -30,12 +30,12 @@ test("rejects subject format violations", () => {
   assert.notDeepEqual(commitMessageErrors("", []), []);
 });
 
-test("requires a blank line between subject and body", () => {
+await test("requires a blank line between subject and body", () => {
   assert.notDeepEqual(commitMessageErrors("Add aliases\nBecause imports broke", []), []);
   assert.deepEqual(commitMessageErrors("Add aliases\n\nBecause imports broke", []), []);
 });
 
-test("source changes need red/green evidence and a staged test", () => {
+await test("source changes need red/green evidence and a staged test", () => {
   const source = ["apps/website/src/features/explorer/explorer.ts"];
   const withTest = [...source, "apps/website/tests/explorer.browser.test.tsx"];
   assert.notDeepEqual(commitMessageErrors(`Fix the explorer list\n\n${trailer}`, withTest), []);
@@ -60,7 +60,7 @@ test("source changes need red/green evidence and a staged test", () => {
   }
 });
 
-test("an explicit no-behavior-change line exempts source changes", () => {
+await test("an explicit no-behavior-change line exempts source changes", () => {
   const message = "Rename the recording helper\n\nNo-behavior-change: mechanical rename.";
   assert.deepEqual(commitMessageErrors(message, ["packages/domain/src/recording.ts"]), []);
   assert.notDeepEqual(
@@ -69,7 +69,7 @@ test("an explicit no-behavior-change line exempts source changes", () => {
   );
 });
 
-test("ignores Git comments, verbose diffs, and generated merge or fixup subjects", () => {
+await test("ignores Git comments, verbose diffs, and generated merge or fixup subjects", () => {
   const verbose = `Add aliases\n# Please enter the commit message\n# ------------------------ >8 ------------------------\nfeat: diff text`;
   assert.deepEqual(commitMessageErrors(verbose, []), []);
   for (const subject of ["Merge branch 'master' into feature", "fixup! Add aliases", "squash! x"]) {
@@ -77,7 +77,7 @@ test("ignores Git comments, verbose diffs, and generated merge or fixup subjects
   }
 });
 
-test("the hook rejects a bad message for staged source in a real commit", () => {
+await test("the hook rejects a bad message for staged source in a real commit", () => {
   const repo = mkdtempSync(join(tmpdir(), "commit-msg-"));
   const git = (...args) => execFileSync("git", ["-C", repo, ...args], { encoding: "utf8" });
   git("init", "-q");

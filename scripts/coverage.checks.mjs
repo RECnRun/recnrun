@@ -27,7 +27,7 @@ function measuredFiles() {
     .sort(byPath);
 }
 
-test("coverage measures every source file that the configured excludes do not name", async () => {
+await test("coverage measures every source file that the configured excludes do not name", async () => {
   const excludes = await configuredExcludes();
   const expected = globSync(SOURCE, { cwd: root })
     .filter((file) => !excludes.some((pattern) => matchesGlob(file, pattern)))

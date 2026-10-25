@@ -12,7 +12,7 @@ function hookScripts(config) {
     .sort((a, b) => a.localeCompare(b));
 }
 
-test("Codex and Claude Code run the same existing hook scripts", () => {
+await test("Codex and Claude Code run the same existing hook scripts", () => {
   const codex = hookScripts(".codex/hooks.json");
   assert.deepEqual(codex, ["scripts/agent-hooks/pre-tool-use.mjs", "scripts/agent-hooks/stop.mjs"]);
   assert.deepEqual(hookScripts(".claude/settings.json"), codex);

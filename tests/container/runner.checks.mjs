@@ -60,7 +60,7 @@ function readCalls(directory) {
   }
 }
 
-test("forwards arguments literally and runs the current workspace in an isolated container", async (context) => {
+await test("forwards arguments literally and runs the current workspace in an isolated container", async (context) => {
   const grep = "round with spaces; $(touch SHOULD_NOT_EXIST)";
   const result = await launch(context, "success", ["--", "--grep", grep]);
   assert.equal(result.code, 0, result.output);
@@ -79,7 +79,7 @@ test("forwards arguments literally and runs the current workspace in an isolated
   assert.equal(result.calls.at(-1)[0], "rm");
 });
 
-test("preserves a failing test's exit code and copies evidence before removing the container", async (context) => {
+await test("preserves a failing test's exit code and copies evidence before removing the container", async (context) => {
   const result = await launch(context, "test-failure");
   assert.equal(result.code, 7, result.output);
   const copies = result.calls.filter(([command]) => command === "cp");
@@ -93,7 +93,7 @@ test("preserves a failing test's exit code and copies evidence before removing t
   assert.equal(result.calls.at(-1)[0], "rm");
 });
 
-test("reports unavailable Docker without falling back to local browsers", async (context) => {
+await test("reports unavailable Docker without falling back to local browsers", async (context) => {
   const result = await launch(context, "unavailable");
   assert.equal(result.code, 1, result.output);
   assert.match(result.output, /Docker.*available|Docker Desktop/);
@@ -103,34 +103,34 @@ test("reports unavailable Docker without falling back to local browsers", async 
   );
 });
 
-test("does not start tests after a failed image build", async (context) => {
+await test("does not start tests after a failed image build", async (context) => {
   const result = await launch(context, "build-failure");
   assert.equal(result.code, 3, result.output);
   assert.ok(!result.calls.some(([command]) => command === "create"));
 });
 
-test("reports a missing Docker executable with a normal failure exit code", async (context) => {
+await test("reports a missing Docker executable with a normal failure exit code", async (context) => {
   const result = await launch(context, "missing-cli");
   assert.equal(result.code, 1, result.output);
   assert.match(result.output, /Docker is not available/);
   assert.deepEqual(result.calls, []);
 });
 
-test("rejects missing test exit status and still cleans up the container", async (context) => {
+await test("rejects missing test exit status and still cleans up the container", async (context) => {
   const result = await launch(context, "empty-exit");
   assert.equal(result.code, 1, result.output);
   assert.match(result.output, /invalid test exit code/);
   assert.equal(result.calls.at(-1)[0], "rm");
 });
 
-test("fails if successful tests cannot export their artifacts", async (context) => {
+await test("fails if successful tests cannot export their artifacts", async (context) => {
   const result = await launch(context, "copy-failure");
   assert.equal(result.code, 1, result.output);
   assert.match(result.output, /artifact/i);
   assert.equal(result.calls.at(-1)[0], "rm");
 });
 
-test("removes the container even if an artifact destination cannot be created", async (context) => {
+await test("removes the container even if an artifact destination cannot be created", async (context) => {
   const result = await launch(context, "blocked-export");
   assert.equal(result.code, 1, result.output);
   assert.match(result.output, /artifact/i);
@@ -138,7 +138,7 @@ test("removes the container even if an artifact destination cannot be created", 
   assert.equal(result.calls.at(-1)[0], "rm");
 });
 
-test(
+await test(
   "stops interrupted tests, exports evidence and removes the container",
   { timeout: 10_000 },
   async (context) => {
@@ -150,7 +150,7 @@ test(
   },
 );
 
-test("public tests route through Docker while local variants and the hooks retain every gate", () => {
+await test("public tests route through Docker while local variants and the hooks retain every gate", () => {
   const manifest = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
   for (const layer of ["unit", "components", "e2e", "coverage"]) {
     assert.equal(
@@ -172,7 +172,7 @@ test("public tests route through Docker while local variants and the hooks retai
   assert.equal(readFileSync(join(root, ".vite-hooks/pre-push"), "utf8").trim(), "vp run verify");
 });
 
-test("the Docker image runs the Node major that engines.node requires", () => {
+await test("the Docker image runs the Node major that engines.node requires", () => {
   const manifest = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
   const dockerfile = readFileSync(join(root, "Dockerfile.tests"), "utf8");
   const [, dockerNode] = dockerfile.match(/VP_NODE_VERSION=(\d+)\./);
@@ -180,7 +180,7 @@ test("the Docker image runs the Node major that engines.node requires", () => {
   assert.equal(enginesNode, dockerNode);
 });
 
-test("the Docker image installs the Vite+ version the catalog pins", () => {
+await test("the Docker image installs the Vite+ version the catalog pins", () => {
   const catalog = readFileSync(join(root, "pnpm-workspace.yaml"), "utf8");
   const dockerfile = readFileSync(join(root, "Dockerfile.tests"), "utf8");
   const [, catalogVersion] = catalog.match(/^ {2}vite-plus: (\S+)$/m);
@@ -188,7 +188,7 @@ test("the Docker image installs the Vite+ version the catalog pins", () => {
   assert.equal(dockerVersion, catalogVersion);
 });
 
-test("verify runs Vitest once, under coverage, and keeps test:local for vp run test", () => {
+await test("verify runs Vitest once, under coverage, and keeps test:local for vp run test", () => {
   const config = readFileSync(join(root, "vite.config.ts"), "utf8");
   const task = (name) => config.match(new RegExp(`"${name}": \\{[^}]*command: \\[([^\\]]*)\\]`))[1];
   const verifyRuns = task("verify:local").match(/test:(?:[a-z0-9]+:)?local/g);
