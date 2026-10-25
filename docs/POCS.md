@@ -162,6 +162,6 @@ A throwaway Playwright spec on a test build that logged the service worker's eve
   - The DTLS certificate fingerprint, pinned at pairing, identifies the peer: the background compares it with the one the handshake proved. A certificate kept in the offscreen document's IndexedDB keeps the fingerprint across restarts.
   - Six digits derived from both fingerprints let both users check, by eye, that nobody swapped a certificate between the two codes.
   - Host candidates connect in about 0.4 s. When the other browser quits, ICE reports `disconnected` after about 7 s. Nothing reconnects by itself: with no signaling channel left, the users pair again.
-  - In Docker, Chromium gave the offscreen document plain host candidates (`172.17.0.2`), not mDNS `.local` names, so a pairing code reveals the machine's addresses.
+  - Chromium gave the offscreen document plain host candidates, not mDNS `.local` names: `172.17.0.2` in Docker, IPv4 and IPv6 ULA addresses on macOS. A pairing code reveals the machine's addresses.
   - The folder picker (`showDirectoryPicker`) must run in a top-level page: the pairing page, not the dashboard frame. Playwright cannot drive the native picker; the end-to-end tests pair by hand, and the folder logic is tested over the origin private file system.
   - A stale offer left on screen while a new one is created is copied, answered, and then refused as an answer to another offer; the pairing page clears the offer and the previous digits before each request.
