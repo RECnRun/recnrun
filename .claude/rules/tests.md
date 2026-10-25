@@ -26,6 +26,7 @@ paths:
 
 - Public commands run in Docker, headed Chromium on an isolated Xvfb display. Keep `headless: false` (extensions need a headed Chromium), and never connect the container display to the host.
 - Browser tests stay serial (`--workers=1`), coverage included.
+- The Node projects run with `isolate: false`, so files of one project share a worker: reset module state in `beforeEach` (as `fakeBrowser.reset()` does) instead of relying on a fresh module per file.
 - Pass Playwright arguments after `--`, for example `vp run test:e2e -- tests/e2e/dashboard-frame.spec.ts -g 'empty'`.
 - On failure, read `.artifacts/docker/<run-id>/` (`run.log`, `test-results`, `playwright-report`).
 - `:local` variants open host windows; use them only for debugging.
