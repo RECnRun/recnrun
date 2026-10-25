@@ -10,7 +10,7 @@ import type { OpenTab } from "@/ports/tabs";
 import type { PeerServices } from "@/views/remote-peer";
 import { CONTROL_LOCK, tryHoldLock } from "@/views/view-locks";
 import { fakeExtension, memoryRecordingStore } from "./fake-extension";
-import { closedFor, fakePeerClient, statusOf } from "./fake-peer-client";
+import { closedFor, fakePeerClient, statusOf, withPeerSession } from "./fake-peer-client";
 import { SHOP, fakeTabs } from "./fake-tabs";
 import {
   alertText,
@@ -60,6 +60,8 @@ const headings = (root: HTMLElement) =>
 const remote = (root: HTMLElement) =>
   root.querySelector<HTMLElement>('aside[aria-labelledby="remote-tabs-heading"]') ?? undefined;
 
+const note = (scope: HTMLElement | undefined) => scope?.querySelector(".tab-note")?.textContent;
+
 const posted: unknown[] = [];
 const onMessage = (event: MessageEvent) => posted.push(event.data);
 
@@ -107,9 +109,29 @@ test("the paired profile's tabs follow under its name and the link's state", asy
       .poll(() => headings(root))
       .toEqual(["Chrome — Alice (Local)", `Chrome — Bob (${state})`]);
   }
-  expect(buttons(item(remote(root) ?? root, "Mail"))).toEqual(["Record", "Show tab"]);
+  peer.change(statusOf("connected"));
+  await expect
+    .poll(() => buttons(item(remote(root) ?? root, "Mail")))
+    .toEqual(["Record", "Show tab"]);
   expect(buttons(item(root, "Shop"))).toEqual(["Record"]);
   expect(button(root, "Manage pairing")).toBeDefined();
+});
+
+test("while the link is down, the other profile's tabs are read only, as last seen", async () => {
+  const peer = fakePeerClient(statusOf("connected"));
+  const { root } = mount(peer);
+  await expect
+    .poll(() => buttons(item(remote(root) ?? root, "Mail")))
+    .toEqual(["Record", "Show tab"]);
+  expect(note(remote(root))).toBeUndefined();
+
+  peer.change(statusOf("disconnected"));
+  await expect.poll(() => buttons(item(remote(root) ?? root, "Mail"))).toEqual([]);
+  expect(note(remote(root))).toBe("Not connected. These tabs are as last seen.");
+  const recording = { status: "recording" as const, mine: true, live: false };
+  peer.change(withPeerSession(statusOf("disconnected"), recording));
+  await expect.poll(() => note(remote(root))).toBe("Not connected. Last seen recording.");
+  expect(buttons(item(root, "Shop"))).toEqual(["Record"]);
 });
 
 test("Show tab brings the other profile's tab to the front, or shows why it cannot", async () => {

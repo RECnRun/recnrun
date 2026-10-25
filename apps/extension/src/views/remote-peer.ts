@@ -15,7 +15,11 @@ export interface PeerServices {
 
 /** The background's copy of the executor's last report, as session storage keeps it. */
 interface Mirror {
-  read: () => Promise<{ session: RecordingSession | null; mine: boolean } | null>;
+  read: () => Promise<{
+    session: RecordingSession | null;
+    mine: boolean;
+    connected: boolean;
+  } | null>;
   watch: (onChange: () => void) => () => void;
 }
 
@@ -30,13 +34,15 @@ export function remoteTabs(client: PeerClient): TabSource {
 }
 
 /**
- * The session this profile runs in the other one, from the executor's last report; a write is a
- * command to the executor, which alone changes it, and the next report shows the outcome.
+ * The session this profile runs in the other one, from the executor's last report while the link
+ * carries reports; a write is a command to the executor, which alone changes it, and the next
+ * report shows the outcome.
  */
 export function remoteRecordings(client: PeerClient, mirror: Mirror): RecordingStore {
   const read = async () => {
     const remote = await mirror.read();
-    return remote?.mine ? remote.session : null;
+    // A copy from a link that went down is no session to show or to control.
+    return remote?.mine && remote.connected ? remote.session : null;
   };
   const write = async (next: RecordingSession | null) => {
     if (next === null) return void (await client.ask({ type: "session-stop" }, ignored));

@@ -18,7 +18,6 @@ const result = (ok: boolean, reason?: string) =>
 
 /** Every dependency in memory; the channel answers each request with `reply`. */
 function requests(link: PeerLink | null = VERIFIED, reply: PeerMessage = result(true)) {
-  let tabs: SharedTabs | undefined;
   const pairing = {
     createOffer: vi.fn(async () => ({ code: "offer" })),
     inspect: vi.fn(async () => "preview"),
@@ -43,7 +42,7 @@ function requests(link: PeerLink | null = VERIFIED, reply: PeerMessage = result(
       connected: true,
     }),
     localSession: memoryRecordingStore(),
-    tabs: { read: () => tabs, write: vi.fn((next: SharedTabs | undefined) => (tabs = next)) },
+    tabs: memoryRepository<SharedTabs>(),
   } satisfies PeerRequestDependencies;
   const asked = () => deps.channel.request.mock.calls;
   return { deps, pairing, asked };
@@ -56,9 +55,28 @@ describe("the link and its peer", () => {
       identity,
       peer,
       link: { state: "idle", verified: false },
+      peerSession: null,
     });
     await deps.link.write(VERIFIED);
     expect(await handlePeerRequest(deps, { type: "status" })).toMatchObject({ link: VERIFIED });
+  });
+
+  test("reports the peer's session from its last report, live only over a verified link", async () => {
+    const session = { tabId: 3, status: "paused" as const, banked: 0, since: 1 };
+    const { deps } = requests();
+    await deps.mirror.write({ profileId: PEER, session, mine: true, connected: true });
+    expect(await handlePeerRequest(deps, { type: "status" })).toMatchObject({
+      peerSession: { status: "paused", mine: true, live: true },
+    });
+    await deps.mirror.write({ profileId: PEER, session, mine: false, connected: false });
+    expect(await handlePeerRequest(deps, { type: "status" })).toMatchObject({
+      peerSession: { status: "paused", mine: false, live: false },
+    });
+    await deps.mirror.write({ profileId: PEER, session, mine: true, connected: true });
+    await deps.link.write({ state: "disconnected", verified: false });
+    expect(await handlePeerRequest(deps, { type: "status" })).toMatchObject({
+      peerSession: { live: false },
+    });
   });
 
   test("renames this profile, and tells a verified peer at once", async () => {
@@ -90,11 +108,11 @@ describe("the link and its peer", () => {
 
   test("forgets the peer, its session copy, and its tabs, and closes the link", async () => {
     const { deps } = requests();
-    deps.tabs.write({ tabs: [TAB] });
+    await deps.tabs.write({ tabs: [TAB] });
     await handlePeerRequest(deps, { type: "forget" });
     expect(await deps.authorized.read()).toBeNull();
     expect(await deps.mirror.read()).toBeNull();
-    expect(deps.tabs.read()).toBeUndefined();
+    expect(await deps.tabs.read()).toBeNull();
     expect(deps.askLink).toHaveBeenCalledWith({ type: "close" });
   });
 
@@ -111,7 +129,7 @@ describe("the link and its peer", () => {
 describe("the peer's tabs", () => {
   test("keeps the last report, even while disconnected, and asks nothing", async () => {
     const { deps, asked } = requests({ state: "disconnected", verified: false });
-    deps.tabs.write({ tabs: [TAB], currentId: 3 });
+    await deps.tabs.write({ tabs: [TAB], currentId: 3 });
     expect(await handlePeerRequest(deps, { type: "tabs" })).toEqual({ tabs: [TAB], currentId: 3 });
     expect(asked()).toEqual([]);
   });
@@ -129,7 +147,7 @@ describe("the peer's tabs", () => {
       const { deps, asked } = requests(VERIFIED, answer);
       const expected = currentId === undefined ? { tabs: [TAB] } : { tabs: [TAB], currentId };
       expect(await handlePeerRequest(deps, { type: "tabs" })).toStrictEqual(expected);
-      expect(deps.tabs.read()).toStrictEqual(expected);
+      expect(await deps.tabs.read()).toStrictEqual(expected);
       expect(asked()[0]?.[0]).toBe("GET_TABS");
     }
   });

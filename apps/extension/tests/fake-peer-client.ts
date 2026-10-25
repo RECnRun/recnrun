@@ -15,7 +15,16 @@ export function statusOf(state?: Link["state"], verified = state === "connected"
     identity: ALICE,
     peer: state ? { ...BOB, fingerprint: "AB:CD:EF" } : null,
     link: { state: state ?? "idle", verified },
+    peerSession: null,
   };
+}
+
+/** Bob's session as Alice last heard of it. */
+export function withPeerSession(
+  status: PeerStatus,
+  peerSession: NonNullable<PeerStatus["peerSession"]>,
+): PeerStatus {
+  return { ...status, peerSession };
 }
 
 /** A link that went down for `reason`. */

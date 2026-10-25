@@ -16,6 +16,7 @@ import {
   authorizedPeerRepository,
   identityRepository,
   peerLinkRepository,
+  peerTabsRepository,
   pendingOfferRepository,
   readIdentity,
   remoteControllerRepository,
@@ -36,13 +37,12 @@ function tappedAskLink(command: LinkCommand): Promise<unknown> {
   return askLink(command);
 }
 
-/** The peer's tabs as last reported, in this worker's memory only, as the dashboard keeps its own. */
+/** The peer's tabs as last reported; every change reaches the pages. */
 function createTabsCache() {
-  let tabs: SharedTabs | undefined;
   return {
-    read: () => tabs,
-    write: (next: SharedTabs | undefined) => {
-      tabs = next;
+    read: () => peerTabsRepository.read(),
+    write: async (next: SharedTabs | null) => {
+      await peerTabsRepository.write(next);
       notifyPages();
     },
   };
@@ -54,13 +54,13 @@ type TabsCache = ReturnType<typeof createTabsCache>;
 async function observe(message: PeerMessage, tabs: TabsCache): Promise<void> {
   if (message.type === "TABS_CHANGED" || message.type === "TABS_SNAPSHOT") {
     const { tabs: list, currentId } = message;
-    tabs.write(currentId === undefined ? { tabs: list } : { tabs: list, currentId });
+    await tabs.write(currentId === undefined ? { tabs: list } : { tabs: list, currentId });
   }
   if (message.type === "HELLO") {
     const peer = await authorizedPeerRepository.read();
     if (peer && peer.displayName !== message.displayName)
       await authorizedPeerRepository.write({ ...peer, displayName: message.displayName });
-    tabs.write(undefined);
+    await tabs.write(null);
   }
   if (message.type === "SESSION_STATUS") {
     const me = await readIdentity();
@@ -72,6 +72,7 @@ async function observe(message: PeerMessage, tabs: TabsCache): Promise<void> {
       mine,
       connected: true,
     });
+    notifyPages();
   }
   if (message.type === "ERROR") log(`peer reported ${message.reason}`);
 }

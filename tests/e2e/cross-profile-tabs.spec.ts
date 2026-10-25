@@ -98,24 +98,56 @@ test("A records, pauses, and stops a session that runs in B, from its PiP window
   await expect.poll(() => storedSession(profileB.serviceWorker)).toBeNull();
 });
 
-test("a session in B outlives the link, and A shows the other profile disconnected", async ({
+interface WorkerVersions {
+  versions: { scriptURL: string; runningStatus: string }[];
+}
+
+/**
+ * Stops the profile's service worker, as Chrome does when it idles, and waits until it stopped.
+ * Playwright reports no close for an extension's worker, so the DevTools protocol says when.
+ */
+async function stopServiceWorker(profile: Profile): Promise<void> {
+  const cdp = await profile.context.newCDPSession(profile.pairing);
+  const stopped = new Promise<void>((resolve) =>
+    cdp.on("ServiceWorker.workerVersionUpdated", ({ versions }: WorkerVersions) => {
+      if (versions.some((each) => each.runningStatus === "stopped")) resolve();
+    }),
+  );
+  await cdp.send("ServiceWorker.enable");
+  await cdp.send("ServiceWorker.stopAllWorkers");
+  await stopped;
+  await cdp.detach();
+}
+
+test("a session in B outlives the link, and A shows B's tabs read only, as last seen", async ({
   profileA,
   profileB,
 }) => {
   await pair(profileA, profileB);
-  const { dashboard } = await dashboardIn(profileA);
+  const { site, dashboard } = await dashboardIn(profileA);
   const app = await openInB(profileB, "app");
   const record = remoteTab(dashboard, app.url()).getByRole("button", { name: "Record" });
   const pip = await clickToOpenPanel(profileA.context, record);
   await expect(panelIn(pip)).toContainText("Recording");
 
+  // The PiP window floats only a session the link still reports, so it closes with the link.
+  const closed = pip.waitForEvent("close");
   await profileA.pairing.getByRole("button", { name: "Disconnect" }).click();
-  await expect(
-    dashboard.getByRole("heading", { name: /^Chrome — Profile B \((Disconnected|Error)\)$/ }),
-  ).toBeVisible();
+  await closed;
+  const down = "Chrome — Profile B (Disconnected)";
+  const remote = dashboard.getByRole("complementary", { name: down });
+  const readOnly = async () => {
+    await expect(remote).toContainText("Not connected. Last seen recording.");
+    await expect(remoteTab(dashboard, app.url(), down)).toBeVisible();
+    await expect(remote.getByRole("button")).toHaveCount(0);
+    await expect(remote.getByText("Closed tab")).toHaveCount(0);
+  };
+  await readOnly();
+
+  // A worker that sleeps and wakes again still has the tabs last seen.
+  await stopServiceWorker(profileA);
+  await site.reload();
+  await readOnly();
   // Only an explicit Stop ends a session; B's keeps recording.
-  expect(await storedSession(profileB.serviceWorker)).toMatchObject({ status: "recording" });
-  await panelIn(pip).getByRole("button", { name: "Stop" }).click();
-  await expect(panelIn(pip).getByRole("button", { name: "Stop" })).toBeVisible();
   expect(await storedSession(profileB.serviceWorker)).toMatchObject({ status: "recording" });
 });

@@ -7,7 +7,7 @@ import {
   PeerLinkSchema,
   ProfileIdentitySchema,
 } from "@/messaging/peer-results";
-import { ProfileIdSchema } from "@/p2p/protocol";
+import { ProfileIdSchema, SharedTabsSchema } from "@/p2p/protocol";
 
 export type ProfileIdentity = v.InferOutput<typeof ProfileIdentitySchema>;
 export type AuthorizedPeer = v.InferOutput<typeof AuthorizedPeerSchema>;
@@ -64,6 +64,8 @@ export const remoteRecordingRepository = repository(
   "session:remoteRecording",
   RemoteRecordingSchema,
 );
+/** On the controller: the peer's tabs as last reported, so they outlive a sleeping worker. */
+export const peerTabsRepository = repository("session:peerTabs", SharedTabsSchema);
 export const remoteControllerRepository = repository(
   "session:remoteController",
   RemoteControllerSchema,

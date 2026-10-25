@@ -24,11 +24,20 @@ export const PeerLinkSchema = v.strictObject({
   reason: v.optional(v.picklist(["closed-here", "closed-by-peer", "certificate"])),
 });
 
+/** The session that runs in the peer, from its last report; `live` while the link carries reports. */
+const PeerSessionSchema = v.strictObject({
+  status: v.picklist(["recording", "paused"]),
+  /** Whether this profile's dashboard started it, so it may control it. */
+  mine: v.boolean(),
+  live: v.boolean(),
+});
+
 /** What a page learns about this profile and its link, as the background answers `status`. */
 export const PeerStatusSchema = v.object({
   identity: ProfileIdentitySchema,
   peer: v.nullable(AuthorizedPeerSchema),
   link: PeerLinkSchema,
+  peerSession: v.nullable(PeerSessionSchema),
 });
 
 export type PeerStatus = v.InferOutput<typeof PeerStatusSchema>;

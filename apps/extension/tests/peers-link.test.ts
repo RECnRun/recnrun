@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vite-plus/test";
 import { fakeBrowser } from "wxt/testing/fake-browser";
 import { NOT_CONNECTED } from "@/background/peer-channel";
+import { startPeers } from "@/background/peers";
 import {
   identityRepository,
   peerLinkRepository,
@@ -153,6 +154,23 @@ describe("an intended close", () => {
     await routes.request({ type: "disconnect" });
     expect(link.sentTypes()).toEqual([]);
     expect(link.commands).toEqual([{ type: "close" }]);
+  });
+});
+
+describe("the peer's tabs", () => {
+  test("are kept in session storage, so a worker that wakes again still lists them", async () => {
+    const tab = { id: 3, windowId: 1, incognito: false as const, title: "Shop", url: "https://s/" };
+    const { routes, connect, receive } = await peerBackground();
+    await connect();
+    await receive(fromPeer("TABS_CHANGED", { tabs: [tab], currentId: 3 }));
+    await routes.link({ type: "state", state: "disconnected" });
+    // A worker that slept starts again with nothing in memory and the same storage.
+    const woken = startPeers();
+    expect(await woken.request({ type: "tabs" })).toEqual({ tabs: [tab], currentId: 3 });
+    // A new link starts from the peer's next report.
+    await connect();
+    await receive(fromPeer("HELLO", { displayName: "Desk", extensionVersion: "0.1.0" }));
+    expect(await fakeBrowser.storage.session.get("peerTabs")).toEqual({});
   });
 });
 

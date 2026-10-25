@@ -23,8 +23,8 @@ export interface PeerRequestDependencies {
   link: Pick<Repository<PeerLink>, "read" | "write">;
   mirror: Pick<Repository<RemoteRecording>, "read" | "write">;
   localSession: Pick<RecordingStore, "read">;
-  /** The peer's tabs as last reported, kept in memory only. */
-  tabs: { read: () => SharedTabs | undefined; write: (tabs: SharedTabs | undefined) => void };
+  /** The peer's tabs as last reported. */
+  tabs: Pick<Repository<SharedTabs>, "read" | "write">;
 }
 
 type Deps = PeerRequestDependencies;
@@ -38,14 +38,14 @@ async function command(reply: Promise<PeerMessage>): Promise<void> {
 }
 
 async function peerTabs(deps: Deps): Promise<SharedTabs> {
-  const known = deps.tabs.read();
-  // The last report outlives a disconnect, so a remote session keeps showing its tab.
+  const known = await deps.tabs.read();
+  // The last report outlives a disconnect, and the pages show it read only.
   if (known || !(await verified(deps))) return known ?? { tabs: [] };
   const reply = await deps.channel.request("GET_TABS", {});
   if (reply.type !== "TABS_SNAPSHOT") return { tabs: [] };
   const { tabs, currentId } = reply;
   const snapshot = currentId === undefined ? { tabs } : { tabs, currentId };
-  deps.tabs.write(snapshot);
+  await deps.tabs.write(snapshot);
   return snapshot;
 }
 
@@ -55,13 +55,22 @@ async function startRemote(deps: Deps, tabId: number) {
   await command(deps.channel.request("SESSION_START", { tabId }));
 }
 
+/** The peer's session as its last report has it; the report is current only over a verified link. */
+function peerSession(mirror: RemoteRecording | null, link: PeerLink) {
+  if (!mirror?.session) return null;
+  const { session, mine, connected } = mirror;
+  return { status: session.status, mine, live: connected && link.verified };
+}
+
 async function status(deps: Deps) {
-  const [identity, peer, link] = await Promise.all([
+  const [identity, peer, stored, mirror] = await Promise.all([
     deps.identity(),
     deps.authorized.read(),
     deps.link.read(),
+    deps.mirror.read(),
   ]);
-  return { identity, peer, link: link ?? { state: "idle", verified: false } };
+  const link = stored ?? { state: "idle" as const, verified: false };
+  return { identity, peer, link, peerSession: peerSession(mirror, link) };
 }
 
 async function ping(deps: Deps) {
@@ -82,7 +91,7 @@ async function forget(deps: Deps) {
   await close(deps);
   await deps.authorized.write(null);
   await deps.mirror.write(null);
-  deps.tabs.write(undefined);
+  await deps.tabs.write(null);
 }
 
 async function rename(deps: Deps, displayName: string) {

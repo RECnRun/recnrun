@@ -24,7 +24,9 @@ function recordingClient(answer: unknown = {}) {
   return { client, requests, unwatch };
 }
 
-function mirrorOf(remote: { session: RecordingSession | null; mine: boolean } | null) {
+function mirrorOf(
+  remote: { session: RecordingSession | null; mine: boolean; connected: boolean } | null,
+) {
   const unwatch = vi.fn();
   return { read: async () => remote, watch: vi.fn(() => unwatch), unwatch };
 }
@@ -58,8 +60,13 @@ describe("remoteTabs", () => {
 
 describe("remoteRecordings", () => {
   test.each([
-    ["the session this profile controls", { session, mine: true }, session],
-    ["nothing for a session the peer's own user runs", { session, mine: false }, null],
+    ["the session this profile controls", { session, mine: true, connected: true }, session],
+    ["nothing for it while the link is down", { session, mine: true, connected: false }, null],
+    [
+      "nothing for a session the peer's own user runs",
+      { session, mine: false, connected: true },
+      null,
+    ],
     ["nothing before any report", null, null],
   ])("reads %s", async (_, remote, expected) => {
     const store = remoteRecordings(recordingClient().client, mirrorOf(remote));

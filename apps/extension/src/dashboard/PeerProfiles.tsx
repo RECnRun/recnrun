@@ -1,5 +1,6 @@
 import * as v from "valibot";
-import type { PeerStatus } from "@/messaging/peer-results";
+import { peerBlocks } from "@/dashboard/peer-blocks";
+import type { PairedStatus } from "@/dashboard/peer-blocks";
 import { TabList } from "@/dashboard/TabList";
 import type { TakeControl } from "@/dashboard/TabList";
 import type { ExtensionServices } from "@/views/extension-services";
@@ -20,10 +21,12 @@ function RemoteProfile({
   peers,
   status,
   take,
+  blocked,
 }: {
   peers: PeerServices;
-  status: PeerStatus & { peer: NonNullable<PeerStatus["peer"]> };
+  status: PairedStatus;
   take: TakeControl;
+  blocked?: string;
 }) {
   const activate = (tabId: number) =>
     peers.client.ask({ type: "activate", tabId }, v.unknown()).then(() => {});
@@ -32,7 +35,8 @@ function RemoteProfile({
       tabs={peers.tabs}
       store={peers.recordings}
       take={take}
-      activate={activate}
+      activate={status.link.verified ? activate : undefined}
+      blocked={blocked}
       heading={{
         id: "remote-tabs-heading",
         text: `Chrome — ${status.peer.displayName} (${linkLabel(status.link, status.peer.displayName)})`,
@@ -61,6 +65,7 @@ export function PeerProfiles({ services, peers, take, takeRemote }: PeerProfiles
       </>
     );
   }
+  const blocks = peerBlocks(paired);
   return (
     <>
       <TabList
@@ -68,8 +73,9 @@ export function PeerProfiles({ services, peers, take, takeRemote }: PeerProfiles
         store={services.recordings}
         take={take}
         heading={{ id: "tabs-heading", text: `Chrome — ${paired.identity.displayName} (Local)` }}
+        blocked={blocks.local}
       />
-      <RemoteProfile peers={peers} status={paired} take={takeRemote} />
+      <RemoteProfile peers={peers} status={paired} take={takeRemote} blocked={blocks.remote} />
       {pairButton}
     </>
   );
