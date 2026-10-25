@@ -167,3 +167,15 @@ test("public tests route through Docker while local variants and the hooks retai
   );
   assert.equal(readFileSync(join(root, ".vite-hooks/pre-push"), "utf8").trim(), "vp run verify");
 });
+
+test("verify runs Vitest once, under coverage, and keeps test:local for vp run test", () => {
+  const config = readFileSync(join(root, "vite.config.ts"), "utf8");
+  const task = (name) => config.match(new RegExp(`"${name}": \\{[^}]*command: \\[([^\\]]*)\\]`))[1];
+  const verifyRuns = task("verify:local").match(/test:(?:[a-z0-9]+:)?local/g);
+  assert.deepEqual(verifyRuns, ["test:coverage:local", "test:e2e:local"]);
+  assert.deepEqual(task("test:local").match(/test:(?:[a-z0-9]+:)?local/g), [
+    "test:unit:local",
+    "test:components:local",
+    "test:e2e:local",
+  ]);
+});
