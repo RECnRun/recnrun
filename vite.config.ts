@@ -18,7 +18,9 @@ export default defineConfig({
     rules: {
       complexity: ["error", 10],
       "sonarjs/cognitive-complexity": ["error", 15],
+      "sonarjs/no-identical-functions": "error",
       "max-depth": ["error", 3],
+      "max-statements": ["error", 15],
       "max-lines-per-function": ["error", { max: 50, skipBlankLines: true, skipComments: true }],
       "max-lines": ["error", { max: 300, skipBlankLines: true, skipComments: true }],
       "max-params": ["error", 4],
@@ -30,9 +32,17 @@ export default defineConfig({
       "typescript/consistent-type-imports": "error",
       "typescript/switch-exhaustiveness-check": "error",
       "typescript/ban-ts-comment": "error",
+      "typescript/no-unnecessary-condition": "error",
       "vite-plus/prefer-vite-plus-imports": "error",
     },
     overrides: [
+      {
+        // Production code names a repeated string once; tests repeat titles, selectors, and fixtures freely.
+        files: ["apps/*/src/**", "packages/*/src/**"],
+        rules: {
+          "sonarjs/no-duplicate-string": ["error", { threshold: 3 }],
+        },
+      },
       {
         files: ["apps/*/src/**", "apps/*/tests/**"],
         rules: {
@@ -84,6 +94,7 @@ export default defineConfig({
             "error",
             { max: 150, skipBlankLines: true, skipComments: true },
           ],
+          "max-statements": ["error", 30],
           "max-nested-callbacks": ["error", 4],
         },
       },

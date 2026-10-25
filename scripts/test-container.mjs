@@ -149,6 +149,20 @@ async function executeTests() {
   return startTests(image.stdout);
 }
 
+async function finish(code) {
+  await stopping;
+  if (created) {
+    const exported = await collectArtifacts();
+    const removed = await docker(["rm", "--force", container], { quiet: true });
+    if (removed.code !== 0) message(`Could not remove test container ${container}.`);
+    code ||= exported || removed.code;
+  }
+  process.exitCode = interrupted || code;
+  process.removeListener("SIGINT", interrupt);
+  process.removeListener("SIGTERM", interrupt);
+  await new Promise((done) => log.end(done));
+}
+
 async function run() {
   if (!tasks.has(task)) throw new Error(`Unknown container test task: ${task}`);
   if (process.env.RECNRUN_TEST_CONTAINER === "1") {
@@ -163,17 +177,7 @@ async function run() {
     message(`Running ${task} in Docker. Artifacts: ${artifacts}`);
     code = await executeTests();
   } finally {
-    await stopping;
-    if (created) {
-      const exported = await collectArtifacts();
-      const removed = await docker(["rm", "--force", container], { quiet: true });
-      if (removed.code !== 0) message(`Could not remove test container ${container}.`);
-      code ||= exported || removed.code;
-    }
-    process.exitCode = interrupted || code;
-    process.removeListener("SIGINT", interrupt);
-    process.removeListener("SIGTERM", interrupt);
-    await new Promise((done) => log.end(done));
+    await finish(code);
   }
 }
 
