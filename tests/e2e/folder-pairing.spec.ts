@@ -94,6 +94,17 @@ test("two profiles pair through one RECnRun folder on disk", async ({
 const extensionPages = (profile: Pick<Profile, "context">) =>
   profile.context.pages().filter((page) => page.url().startsWith("chrome-extension://"));
 
+/** Answers Chrome's restore prompt from the folder window, then waits until `watching` sees the link. */
+async function allowOnEveryVisit(profile: Profile, watching: Page, native: Native) {
+  const window = await extensionPage(profile, "pairing.html#folder");
+  const dialogs = await native.dialogs(window);
+  await window.getByRole("button", { name: "Allow folder" }).click();
+  await dialogs.answerRestorePrompt("every-visit");
+  await expect(watching.getByRole("status")).toHaveText(`Connected — ${profile.name}`, {
+    timeout: 120_000,
+  });
+}
+
 test("a restarted profile allows the folder once more, keeps it with no page open, and reconnects with no click after later restarts", async ({
   profileA,
   profileB,
@@ -105,13 +116,7 @@ test("a restarted profile allows the folder once more, keeps it with no page ope
   const watching = profileA.pairing;
   // H1: after the first restart, Chrome asks once more; "Allow on every visit" ends that.
   let restarted = await restart(profileB, watching, launch);
-  const window = await extensionPage(restarted, "pairing.html#folder");
-  const dialogs = await native.dialogs(window);
-  await window.getByRole("button", { name: "Allow folder" }).click();
-  await dialogs.answerRestorePrompt("every-visit");
-  await expect(watching.getByRole("status")).toHaveText(`Connected — ${profileB.name}`, {
-    timeout: 120_000,
-  });
+  await allowOnEveryVisit(restarted, watching, native);
   // "Allow on every visit" outlives B's pages: B refreshes its presence with none open.
   for (const page of extensionPages(restarted)) await page.close();
   expect(extensionPages(restarted)).toEqual([]);
@@ -210,4 +215,42 @@ test("the folder window says so when Chrome refuses the folder after a restart",
     "Chrome did not allow RECnRun to use the folder.",
   );
   await expect(window.getByRole("button", { name: "Allow folder" })).toBeEnabled();
+});
+
+/** Removes the extension's folder grant with its trash button in Chrome's settings. */
+async function revokeInSettings(profile: Pick<Profile, "context" | "serviceWorker">) {
+  // URL.origin is "null" for chrome-extension: URLs.
+  const origin = `chrome-extension://${new URL(profile.serviceWorker.url()).host}`;
+  const settings = await profile.context.newPage();
+  await settings.goto("chrome://settings/content/filesystem");
+  const entry = settings.getByText(`${origin}/`);
+  await expect(entry).toHaveCount(1);
+  await settings.getByRole("button", { name: /remove|delete/i }).click();
+  await expect(entry).toHaveCount(0);
+  await settings.close();
+}
+
+test("a profile whose folder grant the user revokes in Chrome's settings allows the folder again after a restart and reconnects", async ({
+  profileA,
+  profileB,
+  native,
+  launch,
+}) => {
+  test.setTimeout(300_000);
+  await pairThroughFolder(profileA, profileB, native);
+  const watching = profileA.pairing;
+  let restarted = await restart(profileB, watching, launch);
+  await allowOnEveryVisit(restarted, watching, native);
+  await revokeInSettings(restarted);
+  restarted = await restart(restarted, watching, launch);
+  const window = await extensionPage(restarted, "pairing.html#folder");
+  const allow = window.getByRole("button", { name: "Allow folder" });
+  await expect(allow).toBeVisible({ timeout: 30_000 });
+  const dialogs = await native.dialogs(window);
+  await allow.click();
+  // With the kept grant gone, Chrome shows its write prompt, not the restore prompt.
+  await dialogs.answerWritePrompt("allow");
+  await expect(watching.getByRole("status")).toHaveText(`Connected — ${profileB.name}`, {
+    timeout: 120_000,
+  });
 });
