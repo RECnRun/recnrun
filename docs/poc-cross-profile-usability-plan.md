@@ -49,6 +49,7 @@ Record each as PASS, FAIL, BLOCKED, or NOT TESTED, with the Chromium build, befo
 
 Results so far:
 
+- **H4: FAIL** (2026-10-26, Playwright's Chromium 156.0.8078.4 in Docker, one try). `showDirectoryPicker` in `pairing.html` rejects at once with `AbortError: Failed to execute 'showDirectoryPicker' on 'Window': Intercepted by Page.setInterceptFileChooserDialog().`, and no `filechooser` event fires. The e2e tests use the injected rendezvous port.
 - **H5: PASS** (2026-10-26, Google Chrome 156.0.8078.47 (arm64) on macOS 27.0.1, two profiles of one user data directory). Each profile records its own session in its own PiP window, but Chrome shows one at a time: opening B's PiP closes A's, and A's dashboard falls back to Continue and Stop, as for a session with no controller. Both sessions keep running.
 
 If H1 fails, reconnection after a restart costs one click ("Reconnect to <name>"), not zero. If H2 fails, polling needs a page (the pinned dashboard or an `pairing.html` tab), which is worse. Report it plainly.
