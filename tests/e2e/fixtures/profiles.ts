@@ -90,8 +90,16 @@ async function importCode(page: Page, code: string): Promise<string> {
     .innerText();
 }
 
+/** Unfolds the manual steps, which the page keeps under the folder. */
+async function byHand(page: Page) {
+  const details = page.locator("details", { hasText: "Pair by hand instead" });
+  if ((await details.getAttribute("open")) === null) await details.locator("summary").click();
+}
+
 /** The manual pairing, as two users do it: offer in A, accept in B, confirm in A. */
 export async function pair(a: Profile, b: Profile): Promise<string> {
+  await byHand(a.pairing);
+  await byHand(b.pairing);
   await a.pairing.getByRole("button", { name: "Create offer" }).click();
   const offer = await codeOf(a.pairing, "Offer");
   const digitsB = await importCode(b.pairing, offer);

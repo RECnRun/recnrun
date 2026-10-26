@@ -212,6 +212,16 @@ describe("the folder", () => {
     );
   });
 
+  test("tells the pages when this profile starts waiting in the folder, until it forgets", async () => {
+    const { routes, link } = await peerBackground();
+    await routes.request({ type: "folder-pair" });
+    expect(await folderPairingRepository.read()).toEqual({});
+    expect(link.notices).toEqual([{ target: "pages", type: "peer-changed" }]);
+    await routes.request({ type: "forget" });
+    expect(await folderPairingRepository.read()).toBeNull();
+    expect(link.commands).toContainEqual({ type: "folder-stop" });
+  });
+
   test("acts on what the folder holds, and stops waiting once the link is verified", async () => {
     const { routes, connect, link } = await peerBackground({ authorized: false });
     await folderPairingRepository.write({});

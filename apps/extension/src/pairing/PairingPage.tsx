@@ -1,10 +1,8 @@
 import * as v from "valibot";
-import { useCallback, useEffect, useState } from "preact/hooks";
+import { useState } from "preact/hooks";
 import { DiagnosticsSchema, PingResultSchema } from "@/messaging/peer-results";
 import type { PeerStatus } from "@/messaging/peer-results";
-import { signalFileOf } from "@/pairing/folder-signaling";
-import type { pickFolder } from "@/pairing/folder-signaling";
-import { FolderStep, useFolderPairing } from "@/pairing/FolderStep";
+import { FolderSection } from "@/pairing/FolderSection";
 import { ImportStep, OfferStep } from "@/pairing/PairingSteps";
 import { linkLabel } from "@/views/link-label";
 import { useAction, usePeerStatus } from "@/views/use-peer";
@@ -14,8 +12,8 @@ import type { PeerClient } from "@/views/peer-client";
 interface PairingPageProps {
   client: PeerClient;
   copy: (text: string) => Promise<void>;
-  /** Asks for the shared folder; tests pass one of their own. */
-  pick?: typeof pickFolder;
+  /** Asks for the RECnRun folder; tests pass one of their own. */
+  pick?: () => Promise<FileSystemDirectoryHandle>;
 }
 
 /** The link in words: connected names the peer, since only a verified link counts. */
@@ -95,39 +93,24 @@ function LinkActions({ client, action, connected }: Props & { connected: boolean
 }
 
 /**
- * Pairs this profile with RECnRun in another Chrome profile by hand: no server carries the codes,
- * and both users accept the other profile before any command crosses.
+ * Pairs this profile with RECnRun in another Chrome profile: through the RECnRun folder, or by
+ * hand with codes no server carries, where both users accept the other profile.
  */
 export function PairingPage({ client, copy, pick }: PairingPageProps) {
   const { status } = usePeerStatus(client);
   const action = useAction();
   const connected = status?.link.verified === true;
-  const [incoming, setIncoming] = useState<{ code: string }>();
-  const onFound = useCallback((code: string) => setIncoming({ code }), []);
-  const me = status?.identity.profileId ?? "";
-  const folder = useFolderPairing({ client, action, me, onFound, pick });
-  const shared = folder.folder;
-  const onAccepted = (answer: string | undefined) => {
-    if (shared && answer) void action.run(() => shared.publish(signalFileOf(answer)));
-  };
-  useEffect(() => {
-    // A pairing that connected leaves nothing of this profile's behind in the folder.
-    if (connected) void shared?.clean(true).catch(() => {});
-  }, [connected, shared]);
   return (
     <main class="pairing">
-      <h1>Pair another Chrome profile</h1>
+      <h1>RECnRun folder and pairing</h1>
       <p role="status">{linkText(status)}</p>
+      {status && <FolderSection status={status} client={client} action={action} pick={pick} />}
       {status && <Identity status={status} client={client} action={action} />}
-      <OfferStep client={client} action={action} copy={copy} />
-      {status && <FolderStep pairing={folder} busy={action.busy} />}
-      <ImportStep
-        client={client}
-        action={action}
-        copy={copy}
-        incoming={incoming}
-        onAccepted={onAccepted}
-      />
+      <details>
+        <summary>Pair by hand instead</summary>
+        <OfferStep client={client} action={action} copy={copy} />
+        <ImportStep client={client} action={action} copy={copy} />
+      </details>
       {status?.peer && <LinkActions client={client} action={action} connected={connected} />}
       {action.error && <p role="alert">{action.error}</p>}
     </main>

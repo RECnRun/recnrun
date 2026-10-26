@@ -61,6 +61,8 @@ const remote = (root: HTMLElement) =>
   root.querySelector<HTMLElement>('aside[aria-labelledby="remote-tabs-heading"]') ?? undefined;
 
 const note = (scope: HTMLElement | undefined) => scope?.querySelector(".tab-note")?.textContent;
+const banner = (root: HTMLElement) =>
+  root.querySelector('section[aria-labelledby="folder-banner-heading"]')?.textContent ?? undefined;
 
 const posted: unknown[] = [];
 const onMessage = (event: MessageEvent) => posted.push(event.data);
@@ -86,6 +88,22 @@ test("before the background answers, the dashboard is the local one", async () =
   const { root } = mount(fakePeerClient(statusOf(), { status: () => new Promise(() => {}) }));
   await expect.poll(() => headings(root)).toEqual(["Tabs"]);
   expect(button(root, "Pair another profile")).toBeDefined();
+  expect(banner(root)).toBeUndefined();
+});
+
+test("until Chrome grants the RECnRun folder, a banner leads to the page that chooses it", async () => {
+  const peer = fakePeerClient({ ...statusOf(), folder: "none" });
+  const { root, opened } = mount(peer);
+  await expect.poll(() => banner(root)).toContain("Choose the RECnRun folder");
+  // Recording needs no folder.
+  expect(buttons(item(root, "Shop"))).toEqual(["Record"]);
+  button(root, "Choose folder")?.click();
+  await expect.poll(() => opened).toHaveLength(1);
+  peer.change({ ...statusOf(), folder: "prompt" });
+  await expect.poll(() => peer.asked("status")).toHaveLength(2);
+  expect(banner(root)).toContain("Choose the RECnRun folder");
+  peer.change(statusOf());
+  await expect.poll(() => banner(root)).toBeUndefined();
 });
 
 test("the paired profile's tabs follow under its name and the link's state", async () => {

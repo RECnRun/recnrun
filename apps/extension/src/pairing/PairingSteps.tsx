@@ -1,4 +1,4 @@
-import { useEffect, useState } from "preact/hooks";
+import { useState } from "preact/hooks";
 import { PairingCodeResultSchema, PairingPreviewSchema } from "@/messaging/peer-results";
 import type { PairingPreview } from "@/messaging/peer-results";
 import type { Action } from "@/views/use-peer";
@@ -94,31 +94,18 @@ function AcceptCheck({ preview, accepted, busy, accept }: CheckProps) {
   );
 }
 
-interface ImportProps extends StepProps {
-  /** A code found in the shared folder, imported as if pasted; a new object is a new code. */
-  incoming?: { code: string };
-  /** Hears the accepted code's answer, if any, so the folder can carry it back. */
-  onAccepted?: (answer: string | undefined) => void;
-}
-
 /** Steps two and three: import the other profile's code, check it, and accept it. */
-export function ImportStep({ client, action, copy, incoming, onAccepted }: ImportProps) {
+export function ImportStep({ client, action, copy }: StepProps) {
   const [code, setCode] = useState("");
   const [preview, setPreview] = useState<PairingPreview>();
   const [answer, setAnswer] = useState<string>();
-  const inspect = (pasted = code) =>
+  const inspect = () =>
     action.run(async () => {
       setAnswer(undefined);
       // The previous code's digits must not stand in for this one's while it is checked.
       setPreview(undefined);
-      setPreview(await client.ask({ type: "inspect", code: pasted.trim() }, PairingPreviewSchema));
+      setPreview(await client.ask({ type: "inspect", code: code.trim() }, PairingPreviewSchema));
     });
-  useEffect(() => {
-    if (!incoming) return;
-    setCode(incoming.code);
-    void inspect(incoming.code);
-    // Only a new code from the folder imports; typing never does.
-  }, [incoming]);
   const accept = () =>
     action.run(async () => {
       const result = await client.ask(
@@ -129,7 +116,6 @@ export function ImportStep({ client, action, copy, incoming, onAccepted }: Impor
       // Confirming an answer returns no code, and still ends this pairing.
       setAnswer(result.code ?? "");
       setCode("");
-      onAccepted?.(result.code);
     });
   return (
     <section aria-labelledby="import-heading">

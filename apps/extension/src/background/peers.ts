@@ -225,7 +225,7 @@ function requestDependencies(
       access: async () =>
         v.parse(FolderStatusSchema, await askLink({ type: "folder-status" })).access,
       waiting: async () => (await folderPairingRepository.read()) !== null,
-      start: folder.start,
+      start: () => folder.start().then(notifyPages),
       stop: folder.stop,
     },
   };

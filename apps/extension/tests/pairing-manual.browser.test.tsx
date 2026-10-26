@@ -43,7 +43,7 @@ test("before the background answers, or when it cannot, the page only offers to 
     expect(statusText(root)).toBe("Loading");
     expect(button(root, "Create offer")).toBeDefined();
     expect(button(root, "Save name")).toBeUndefined();
-    expect(button(root, "Choose shared folder")).toBeUndefined();
+    expect(button(root, "Choose folder")).toBeUndefined();
   }
 });
 

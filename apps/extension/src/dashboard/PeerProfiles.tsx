@@ -46,6 +46,19 @@ function RemoteProfile({
   );
 }
 
+/** Leads to the folder page, since the framed dashboard cannot show Chrome's folder picker. */
+function FolderBanner({ peers }: { peers: PeerServices }) {
+  return (
+    <section class="folder-banner" aria-labelledby="folder-banner-heading">
+      <h3 id="folder-banner-heading">Choose the RECnRun folder</h3>
+      <p>Your Chrome profiles pair through a folder named RECnRun in Documents.</p>
+      <button type="button" onClick={() => void peers.openPairing()}>
+        Choose folder
+      </button>
+    </section>
+  );
+}
+
 /**
  * Unpaired, the dashboard is the local one plus a way to pair; paired, this profile's tabs and
  * the other profile's, each under the profile's name.
@@ -59,9 +72,11 @@ export function PeerProfiles({ services, peers, take, takeRemote }: PeerProfiles
       {paired ? "Manage pairing" : "Pair another profile"}
     </button>
   );
+  const banner = status && status.folder !== "granted" && <FolderBanner peers={peers} />;
   if (!paired) {
     return (
       <>
+        {banner}
         <TabList tabs={services.tabs} store={services.recordings} take={take} />
         {pairButton}
       </>
@@ -70,6 +85,7 @@ export function PeerProfiles({ services, peers, take, takeRemote }: PeerProfiles
   const blocks = peerBlocks(paired, localRunning);
   return (
     <>
+      {banner}
       <TabList
         tabs={services.tabs}
         store={services.recordings}
