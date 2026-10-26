@@ -17,6 +17,8 @@ export function statusOf(state?: Link["state"], verified = state === "connected"
     link: { state: state ?? "idle", verified },
     peerSession: null,
     controlledByPeer: false,
+    folder: "granted",
+    folderPairing: false,
   };
 }
 

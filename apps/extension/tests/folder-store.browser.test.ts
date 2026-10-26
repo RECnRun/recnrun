@@ -23,13 +23,13 @@ beforeEach(async () => {
 describe("chooseFolder", () => {
   test("keeps the chosen folder, with its pairing and recordings folders", async () => {
     expect(await loadFolder()).toBeUndefined();
-    expect(await folderAccess()).toBe("none");
+    expect(await folderAccess(undefined)).toBe("none");
     const picked = await privateFolder("RECnRun");
     await chooseFolder(async () => picked);
     expect(await names(picked)).toEqual(["pairing", "recordings"]);
     const loaded = await loadFolder();
     expect(await loaded?.isSameEntry(picked)).toBe(true);
-    expect(await folderAccess()).toBe("granted");
+    expect(await folderAccess(loaded)).toBe("granted");
   });
 });
 

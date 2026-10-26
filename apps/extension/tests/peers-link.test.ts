@@ -3,11 +3,13 @@ import { fakeBrowser } from "wxt/testing/fake-browser";
 import { NOT_CONNECTED } from "@/background/peer-channel";
 import { startPeers } from "@/background/peers";
 import {
+  authorizedPeerRepository,
+  folderPairingRepository,
   identityRepository,
   peerLinkRepository,
   remoteRecordingRepository,
 } from "@/storage/peer-repository";
-import { ME, PEER, STRANGER, fromPeer } from "./fake-peer";
+import { FINGERPRINT, ME, PEER, STRANGER, fromPeer } from "./fake-peer";
 import { peerBackground, tappedFrames } from "./peer-background";
 
 const session = { tabId: 4, status: "recording" as const, banked: 0, since: 1 };
@@ -186,5 +188,39 @@ describe("page requests", () => {
     await routes.request({ type: "rename", displayName: "Studio" });
     expect(await identityRepository.read()).toEqual({ profileId: ME, displayName: "Studio" });
     expect(link.frames().at(-1)).toMatchObject({ type: "HELLO", displayName: "Studio" });
+  });
+});
+
+describe("the folder", () => {
+  const presence = {
+    profileId: PEER,
+    displayName: "Desk",
+    fingerprint: FINGERPRINT,
+    createdAt: 1,
+    expiresAt: Date.now() + 60_000,
+  };
+
+  test("waits in the folder again when the worker starts, if it waited before", async () => {
+    await folderPairingRepository.write({});
+    const { link } = await peerBackground();
+    await vi.waitFor(() =>
+      expect(link.commands).toContainEqual({
+        type: "folder-watch",
+        profileId: ME,
+        displayName: "Laptop",
+      }),
+    );
+  });
+
+  test("acts on what the folder holds, and stops waiting once the link is verified", async () => {
+    const { routes, connect, link } = await peerBackground({ authorized: false });
+    await folderPairingRepository.write({});
+    await routes.link({ type: "folder", presences: [presence], signals: [] });
+    expect(link.commands).toContainEqual({ type: "offer" });
+    const { displayName, fingerprint } = presence;
+    await authorizedPeerRepository.write({ profileId: PEER, displayName, fingerprint });
+    await connect();
+    expect(await folderPairingRepository.read()).toBeNull();
+    expect(link.commands.at(-1)).toEqual({ type: "folder-stop" });
   });
 });

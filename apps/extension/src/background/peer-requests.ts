@@ -1,6 +1,7 @@
 import type { PeerChannel } from "@/background/peer-channel";
 import type { PairingFlow } from "@/background/pairing";
 import type { LinkCommand, PeerRequest } from "@/messaging/peer-messages";
+import type { FolderAccess } from "@/p2p/folder-store";
 import type { PeerMessage, SharedTabs } from "@/p2p/protocol";
 import type { RecordingStore } from "@/ports/recording-store";
 import type {
@@ -28,6 +29,13 @@ export interface PeerRequestDependencies {
   controller: Pick<Repository<RemoteController>, "read">;
   /** The peer's tabs as last reported. */
   tabs: Pick<Repository<SharedTabs>, "read" | "write">;
+  /** The RECnRun folder, and waiting in it for another profile to pair with. */
+  folder: {
+    access: () => Promise<FolderAccess>;
+    waiting: () => Promise<boolean>;
+    start: () => Promise<void>;
+    stop: () => Promise<void>;
+  };
 }
 
 type Deps = PeerRequestDependencies;
@@ -77,7 +85,11 @@ async function status(deps: Deps) {
   const link = stored ?? { state: "idle" as const, verified: false };
   // Without the link the peer cannot stop it, so this profile's user gets the controls back.
   const controlledByPeer = link.verified && controller !== null && local !== null;
-  return { identity, peer, link, peerSession: peerSession(mirror, link), controlledByPeer };
+  // A folder the offscreen document cannot read is one the user has to choose again.
+  const folder = await deps.folder.access().catch((): FolderAccess => "none");
+  const folderPairing = await deps.folder.waiting();
+  const session = peerSession(mirror, link);
+  return { identity, peer, link, peerSession: session, controlledByPeer, folder, folderPairing };
 }
 
 async function ping(deps: Deps) {
@@ -95,6 +107,8 @@ async function close(deps: Deps) {
 }
 
 async function forget(deps: Deps) {
+  // Forget stops waiting even when the folder's own files cannot be removed.
+  await deps.folder.stop().catch(() => {});
   await close(deps);
   await deps.authorized.write(null);
   await deps.mirror.write(null);
@@ -120,6 +134,7 @@ const HANDLERS: Handlers = {
   accept: (deps, { code }) => deps.pairing.accept(code),
   disconnect: (deps) => close(deps),
   forget: (deps) => forget(deps),
+  "folder-pair": (deps) => deps.folder.start(),
   ping: (deps) => ping(deps),
   diagnostics: (deps) => deps.askLink({ type: "info" }),
   tabs: (deps) => peerTabs(deps),

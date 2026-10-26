@@ -1,6 +1,7 @@
 import * as v from "valibot";
+import { PresenceSchema, SignalFileSchema } from "@/p2p/folder-rendezvous";
 import { DisplayNameSchema } from "@/p2p/pairing-code";
-import { MAX_FRAME_LENGTH } from "@/p2p/protocol";
+import { MAX_FRAME_LENGTH, ProfileIdSchema } from "@/p2p/protocol";
 
 const TabIdSchema = v.pipe(v.number(), v.integer(), v.minValue(0));
 const CodeSchema = v.pipe(v.string(), v.nonEmpty(), v.maxLength(128 * 1024));
@@ -28,6 +29,7 @@ export const PeerRequestSchema = v.variant("type", [
   kind("accept", { code: CodeSchema }),
   kind("disconnect", {}),
   kind("forget", {}),
+  kind("folder-pair", {}),
   kind("ping", {}),
   kind("diagnostics", {}),
   kind("tabs", {}),
@@ -43,6 +45,8 @@ export type PeerRequest = v.InferOutput<typeof PeerRequestSchema>;
 export const LinkEventSchema = v.variant("type", [
   kind("frame", { frame: FrameSchema }),
   kind("state", { state: LinkStateSchema, remoteFingerprint: v.optional(v.string()) }),
+  /** What the other profiles left in the RECnRun folder for this one. */
+  kind("folder", { presences: v.array(PresenceSchema), signals: v.array(SignalFileSchema) }),
 ]);
 
 export type LinkEvent = v.InferOutput<typeof LinkEventSchema>;
@@ -56,6 +60,10 @@ const LinkCommandSchema = v.variant("type", [
   kind("send", { frame: FrameSchema }),
   kind("close", {}),
   kind("info", {}),
+  kind("folder-status", {}),
+  kind("folder-watch", { profileId: ProfileIdSchema, displayName: DisplayNameSchema }),
+  kind("folder-publish", { signal: SignalFileSchema }),
+  kind("folder-stop", {}),
 ]);
 
 export type LinkCommand = v.InferOutput<typeof LinkCommandSchema>;

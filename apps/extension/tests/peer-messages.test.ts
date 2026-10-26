@@ -53,3 +53,21 @@ test("builds the notice every page listens for", () => {
   expect(accepts(PeerNoticeSchema, peerNotice())).toBe(true);
   expect(accepts(PeerNoticeSchema, { target: "pages", type: "other" })).toBe(false);
 });
+
+test("carries what the folder holds, and folder commands, only in their own shapes", () => {
+  const profileId = "11111111-1111-4111-8111-111111111111";
+  const presence = {
+    profileId,
+    displayName: "Desk",
+    fingerprint: "AB:CD",
+    createdAt: 1,
+    expiresAt: 2,
+  };
+  const sighting = (presences: unknown[]) => ({ type: "folder", presences, signals: [] });
+  expect(accepts(LinkEventSchema, sighting([presence]))).toBe(true);
+  expect(accepts(LinkEventSchema, sighting([{ ...presence, fingerprint: "ab:cd" }]))).toBe(false);
+  const watch = { type: "folder-watch" as const, profileId, displayName: "Desk" };
+  expect(accepts(LinkCommandMessageSchema, linkCommandMessage(watch))).toBe(true);
+  const stranger = linkCommandMessage({ ...watch, profileId: "not-a-profile" });
+  expect(accepts(LinkCommandMessageSchema, stranger)).toBe(false);
+});

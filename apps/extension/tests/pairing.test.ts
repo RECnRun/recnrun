@@ -14,6 +14,7 @@ const sdpWith = (fingerprint: string) => `v=0\r\na=fingerprint:sha-256 ${fingerp
 interface PendingOffer {
   pairingId: string;
   expiresAt: number;
+  to?: string;
 }
 
 function memory<T>(initial: T | null = null) {
@@ -80,6 +81,17 @@ describe("a full pairing", () => {
     expect((await b.inspect(offer)).known).toBe(false);
     await b.authorized.write({ ...B, fingerprint: FP_A });
     expect((await b.inspect(offer)).known).toBe(false);
+  });
+
+  test("remembers whom an offer through the folder is for", async () => {
+    const a = side(A, FP_A);
+    const { code } = await a.createOffer(B.profileId);
+    const { pairingId } = decodePairing(code, NOW);
+    expect(await a.pending.read()).toEqual({
+      pairingId,
+      expiresAt: NOW + PAIRING_TTL_MS,
+      to: B.profileId,
+    });
   });
 
   test("dates codes from the real clock by default", async () => {

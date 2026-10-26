@@ -1,9 +1,13 @@
 import { errorMessage } from "@recnrun/domain";
+import * as v from "valibot";
 import { browser } from "wxt/browser";
 import { execute, sessionStatus, sharedTabs } from "@/background/executor";
 import type { ExecutorDependencies } from "@/background/executor";
+import { createFolderPairing } from "@/background/folder-pairing";
+import type { FolderPairingFlow } from "@/background/folder-pairing";
 import { askLink } from "@/background/link";
 import { createPairing } from "@/background/pairing";
+import type { PairingFlow } from "@/background/pairing";
 import { createPeerChannel } from "@/background/peer-channel";
 import type { PeerChannel } from "@/background/peer-channel";
 import { handlePeerRequest } from "@/background/peer-requests";
@@ -11,9 +15,11 @@ import type { PeerRequestDependencies } from "@/background/peer-requests";
 import type { PeerRoutes } from "@/background/routes";
 import { peerNotice } from "@/messaging/peer-messages";
 import type { LinkCommand, LinkEvent, LinkState } from "@/messaging/peer-messages";
+import { FolderAccessSchema } from "@/messaging/peer-results";
 import type { PeerMessage, SharedTabs } from "@/p2p/protocol";
 import {
   authorizedPeerRepository,
+  folderPairingRepository,
   identityRepository,
   peerLinkRepository,
   peerTabsRepository,
@@ -96,7 +102,11 @@ async function linkDown(state: LinkState, channel: PeerChannel) {
   notifyPages();
 }
 
-async function linkUp(remoteFingerprint: string | undefined, channel: PeerChannel) {
+async function linkUp(
+  remoteFingerprint: string | undefined,
+  channel: PeerChannel,
+  folder: FolderPairingFlow,
+) {
   const peer = await authorizedPeerRepository.read();
   // DTLS proved the other side holds this certificate; only the one the user accepted may talk.
   if (!peer || remoteFingerprint !== peer.fingerprint) {
@@ -107,6 +117,7 @@ async function linkUp(remoteFingerprint: string | undefined, channel: PeerChanne
   }
   await peerLinkRepository.write({ state: "connected", verified: true });
   await hello(channel);
+  await folder.paired().catch((error: unknown) => log(errorMessage(error)));
   notifyPages();
 }
 
@@ -121,7 +132,12 @@ async function closedByPeer(channel: PeerChannel) {
   await askLink({ type: "close" });
 }
 
-function createLinkHandler(channel: PeerChannel, executor: ExecutorDependencies, tabs: TabsCache) {
+function createLinkHandler(
+  channel: PeerChannel,
+  executor: ExecutorDependencies,
+  tabs: TabsCache,
+  folder: FolderPairingFlow,
+) {
   const onFrame = async (frame: string) => {
     tap?.push(frame);
     const received = await channel.receive(frame);
@@ -138,7 +154,8 @@ function createLinkHandler(channel: PeerChannel, executor: ExecutorDependencies,
   };
   return async (event: LinkEvent) => {
     if (event.type === "frame") return onFrame(event.frame);
-    if (event.state === "connected") return linkUp(event.remoteFingerprint, channel);
+    if (event.type === "folder") return folder.seen(event);
+    if (event.state === "connected") return linkUp(event.remoteFingerprint, channel, folder);
     if (event.state !== "connecting") return linkDown(event.state, channel);
     await peerLinkRepository.write({ state: "connecting", verified: false });
     notifyPages();
@@ -179,13 +196,18 @@ function watchExecutor(channel: PeerChannel, executor: ExecutorDependencies) {
   recordingSessionRepository.watch(() => void sessionChanged().catch(() => {}));
 }
 
-function requestDependencies(channel: PeerChannel, tabs: TabsCache): PeerRequestDependencies {
-  const pairing = createPairing({
-    askLink,
-    identity: readIdentity,
-    authorized: authorizedPeerRepository,
-    pending: pendingOfferRepository,
-  });
+const FolderStatusSchema = v.object({ access: FolderAccessSchema });
+
+interface Pairings {
+  pairing: PairingFlow;
+  folder: FolderPairingFlow;
+}
+
+function requestDependencies(
+  channel: PeerChannel,
+  tabs: TabsCache,
+  { pairing, folder }: Pairings,
+): PeerRequestDependencies {
   return {
     channel,
     hello: () => hello(channel),
@@ -199,7 +221,34 @@ function requestDependencies(channel: PeerChannel, tabs: TabsCache): PeerRequest
     localSession: recordingSessionRepository,
     controller: remoteControllerRepository,
     tabs,
+    folder: {
+      access: async () =>
+        v.parse(FolderStatusSchema, await askLink({ type: "folder-status" })).access,
+      waiting: async () => (await folderPairingRepository.read()) !== null,
+      start: folder.start,
+      stop: folder.stop,
+    },
   };
+}
+
+function createPairings(): Pairings {
+  const pairing = createPairing({
+    askLink,
+    identity: readIdentity,
+    authorized: authorizedPeerRepository,
+    pending: pendingOfferRepository,
+  });
+  const folder = createFolderPairing({
+    askLink,
+    identity: readIdentity,
+    pairing,
+    authorized: authorizedPeerRepository,
+    pending: pendingOfferRepository,
+    link: peerLinkRepository,
+    state: folderPairingRepository,
+    log,
+  });
+  return { pairing, folder };
 }
 
 /**
@@ -222,9 +271,11 @@ export function startPeers(): PeerRoutes {
   };
   const tabs = createTabsCache();
   watchExecutor(channel, executor);
-  const deps = requestDependencies(channel, tabs);
+  const pairings = createPairings();
+  void pairings.folder.resume().catch((error: unknown) => log(errorMessage(error)));
+  const deps = requestDependencies(channel, tabs, pairings);
   return {
     request: (request) => handlePeerRequest(deps, request),
-    link: createLinkHandler(channel, executor, tabs),
+    link: createLinkHandler(channel, executor, tabs, pairings.folder),
   };
 }

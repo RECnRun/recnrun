@@ -2,6 +2,7 @@ import { describe, expect, test, vi } from "vite-plus/test";
 import type { PairingFlow } from "@/background/pairing";
 import { handlePeerRequest } from "@/background/peer-requests";
 import type { PeerRequestDependencies } from "@/background/peer-requests";
+import type { FolderAccess } from "@/p2p/folder-store";
 import { peerMessage } from "@/p2p/protocol";
 import type { PeerMessage, PeerType, SharedTabs } from "@/p2p/protocol";
 import type { AuthorizedPeer, PeerLink, RemoteRecording } from "@/storage/peer-repository";
@@ -44,6 +45,12 @@ function requests(link: PeerLink | null = VERIFIED, reply: PeerMessage = result(
     localSession: memoryRecordingStore(),
     controller: memoryRepository<{ profileId: string }>(),
     tabs: memoryRepository<SharedTabs>(),
+    folder: {
+      access: vi.fn(async (): Promise<FolderAccess> => "granted"),
+      waiting: vi.fn(async () => false),
+      start: vi.fn(async () => {}),
+      stop: vi.fn(async () => {}),
+    },
   } satisfies PeerRequestDependencies;
   const asked = () => deps.channel.request.mock.calls;
   return { deps, pairing, asked };
@@ -58,6 +65,8 @@ describe("the link and its peer", () => {
       link: { state: "idle", verified: false },
       peerSession: null,
       controlledByPeer: false,
+      folder: "granted",
+      folderPairing: false,
     });
     await deps.link.write(VERIFIED);
     expect(await handlePeerRequest(deps, { type: "status" })).toMatchObject({ link: VERIFIED });
@@ -133,6 +142,20 @@ describe("the link and its peer", () => {
     expect(await deps.mirror.read()).toBeNull();
     expect(await deps.tabs.read()).toBeNull();
     expect(deps.askLink).toHaveBeenCalledWith({ type: "close" });
+    expect(deps.folder.stop).toHaveBeenCalledOnce();
+  });
+
+  test("reports the folder, as none when it cannot be asked, and starts waiting in it", async () => {
+    const { deps } = requests();
+    deps.folder.waiting.mockResolvedValue(true);
+    expect(await handlePeerRequest(deps, { type: "status" })).toMatchObject({
+      folder: "granted",
+      folderPairing: true,
+    });
+    deps.folder.access.mockRejectedValue(new Error("No offscreen document."));
+    expect(await handlePeerRequest(deps, { type: "status" })).toMatchObject({ folder: "none" });
+    await handlePeerRequest(deps, { type: "folder-pair" });
+    expect(deps.folder.start).toHaveBeenCalledOnce();
   });
 
   test("measures a ping's round trip", async () => {

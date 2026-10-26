@@ -32,6 +32,9 @@ const PeerSessionSchema = v.strictObject({
   live: v.boolean(),
 });
 
+/** Whether this profile may use the RECnRun folder: none chosen, Chrome asks again, or granted. */
+export const FolderAccessSchema = v.picklist(["none", "prompt", "granted"]);
+
 /** What a page learns about this profile and its link, as the background answers `status`. */
 export const PeerStatusSchema = v.object({
   identity: ProfileIdentitySchema,
@@ -40,6 +43,9 @@ export const PeerStatusSchema = v.object({
   peerSession: v.nullable(PeerSessionSchema),
   /** Whether the session that runs here was started by the peer, over a link that still holds. */
   controlledByPeer: v.boolean(),
+  folder: FolderAccessSchema,
+  /** Whether this profile waits in the folder for another profile to pair with. */
+  folderPairing: v.boolean(),
 });
 
 export type PeerStatus = v.InferOutput<typeof PeerStatusSchema>;

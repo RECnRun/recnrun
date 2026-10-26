@@ -3,7 +3,8 @@ import { fakeBrowser } from "wxt/testing/fake-browser";
 import { linkCommandMessage } from "@/messaging/peer-messages";
 import type { LinkCommand } from "@/messaging/peer-messages";
 import { startOffscreen } from "@/offscreen/start";
-import { answering } from "./fake-peer";
+import { ME, PEER, answering } from "./fake-peer";
+import { MemoryDirectory } from "./memory-directory";
 
 const LOCAL_SDP = "v=0\r\na=fingerprint:sha-256 11:22\r\n";
 const REMOTE_SDP = "v=0\r\na=fingerprint:sha-256 aa:bb\r\n";
@@ -71,12 +72,16 @@ const background = () => ({
 });
 
 /** The offscreen document, through the default sender, its events to the background recorded. */
-function offscreen(cert: () => Promise<RTCCertificate> = async () => certificate) {
+function offscreen(
+  cert: () => Promise<RTCCertificate> = async () => certificate,
+  chosen?: MemoryDirectory,
+) {
   const events: unknown[] = [];
   vi.spyOn(fakeBrowser.runtime, "sendMessage").mockImplementation(
     answering((message) => void events.push((message as { event: unknown }).event)),
   );
-  startOffscreen({ certificate: cert });
+  const folder = async () => chosen as unknown as FileSystemDirectoryHandle | undefined;
+  startOffscreen({ certificate: cert, folder });
   return { events };
 }
 
@@ -156,6 +161,45 @@ describe("commands", () => {
       throw new Error("IndexedDB is unavailable.");
     });
     expect(await run({ type: "info" })).toEqual({ ok: false, error: "IndexedDB is unavailable." });
+  });
+});
+
+describe("the folder", () => {
+  test.each([
+    ["none", undefined],
+    ["prompt", Object.assign(new MemoryDirectory(), { permission: "prompt" as const })],
+  ])("tells whether a folder is chosen and may be edited: %s", async (access, chosen) => {
+    offscreen(undefined, chosen);
+    expect(await run({ type: "folder-status" })).toEqual({ ok: true, result: { access } });
+  });
+
+  test("waits in the folder with the certificate's fingerprint, publishes, and stops", async () => {
+    const chosen = new MemoryDirectory();
+    const { events } = offscreen(undefined, chosen);
+    const own = () => [...chosen.folder("pairing", ME).files.keys()];
+    expect(await run({ type: "folder-watch", profileId: ME, displayName: "Laptop" })).toEqual({
+      ok: true,
+    });
+    expect(events).toEqual([{ type: "folder", presences: [], signals: [] }]);
+    expect(JSON.parse(chosen.folder("pairing", ME).files.get("presence.json") ?? "")).toEqual({
+      profileId: ME,
+      displayName: "Laptop",
+      fingerprint: "AB:CD",
+      createdAt: expect.any(Number),
+      expiresAt: expect.any(Number),
+    });
+    const signal = {
+      kind: "offer" as const,
+      pairingId: "44444444-4444-4444-8444-444444444444",
+      profileId: ME,
+      to: PEER,
+      expiresAt: Date.now() + 60_000,
+      code: "RECNRUN-PAIR-1.code",
+    };
+    await run({ type: "folder-publish", signal });
+    expect(own()).toHaveLength(2);
+    await run({ type: "folder-stop" });
+    expect(own()).toEqual([]);
   });
 });
 

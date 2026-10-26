@@ -12,6 +12,8 @@ const connected: PairedStatus = {
   link: { state: "connected", verified: true },
   peerSession: null,
   controlledByPeer: false,
+  folder: "granted",
+  folderPairing: false,
 };
 const down: PairedStatus = { ...connected, link: { state: "disconnected", verified: false } };
 const recording = (mine: boolean, live = true) => ({ status: "recording" as const, mine, live });

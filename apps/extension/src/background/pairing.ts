@@ -7,12 +7,12 @@ import {
   shortAuthenticationString,
 } from "@/p2p/pairing-code";
 import type { Pairing } from "@/p2p/pairing-code";
-import type { AuthorizedPeer, ProfileIdentity, Repository } from "@/storage/peer-repository";
-
-interface PendingOffer {
-  pairingId: string;
-  expiresAt: number;
-}
+import type {
+  AuthorizedPeer,
+  PendingOffer,
+  ProfileIdentity,
+  Repository,
+} from "@/storage/peer-repository";
 
 export interface PairingDependencies {
   askLink: (command: LinkCommand) => Promise<unknown>;
@@ -60,10 +60,11 @@ export function createPairing(deps: PairingDependencies) {
     const me = await deps.identity();
     return encodePairing({ kind, pairingId, ...me, expiresAt: now() + PAIRING_TTL_MS, sdp });
   };
-  const createOffer = async () => {
+  /** An offer for whoever imports it, or through the folder, for the profile `to`. */
+  const createOffer = async (to?: string) => {
     const pairingId = crypto.randomUUID();
     const sdp = sdpOf(await deps.askLink({ type: "offer" }));
-    await deps.pending.write({ pairingId, expiresAt: now() + PAIRING_TTL_MS });
+    await deps.pending.write({ pairingId, expiresAt: now() + PAIRING_TTL_MS, ...(to && { to }) });
     return { code: await half("offer", pairingId, sdp) };
   };
   const inspect = async (code: string): Promise<PairingPreview> => {

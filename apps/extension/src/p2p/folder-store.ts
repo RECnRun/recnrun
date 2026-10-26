@@ -27,10 +27,11 @@ export async function loadFolder(): Promise<FileSystemDirectoryHandle | undefine
   return stored instanceof FileSystemDirectoryHandle ? stored : undefined;
 }
 
-export async function folderAccess(folder?: FileSystemDirectoryHandle): Promise<FolderAccess> {
-  const chosen = folder ?? (await loadFolder());
-  if (!chosen) return "none";
-  const state = await (chosen as unknown as PermissionHandle).queryPermission({
+export async function folderAccess(
+  folder: FileSystemDirectoryHandle | undefined,
+): Promise<FolderAccess> {
+  if (!folder) return "none";
+  const state = await (folder as unknown as PermissionHandle).queryPermission({
     mode: "readwrite",
   });
   return state === "granted" ? "granted" : "prompt";

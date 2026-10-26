@@ -13,11 +13,23 @@ export type ProfileIdentity = v.InferOutput<typeof ProfileIdentitySchema>;
 export type AuthorizedPeer = v.InferOutput<typeof AuthorizedPeerSchema>;
 export type PeerLink = v.InferOutput<typeof PeerLinkSchema>;
 
-/** The offer this profile waits an answer for. */
+const PairingIdSchema = v.pipe(v.string(), v.uuid());
+
+/** The offer this profile waits an answer for, and through the folder, whom it is for. */
 const PendingOfferSchema = v.strictObject({
-  pairingId: v.pipe(v.string(), v.uuid()),
+  pairingId: PairingIdSchema,
   expiresAt: v.number(),
+  to: v.optional(ProfileIdSchema),
 });
+
+export type PendingOffer = v.InferOutput<typeof PendingOfferSchema>;
+
+/** Present while this profile waits in the folder; `acted` is its last answer or accepted answer. */
+const FolderPairingSchema = v.strictObject({
+  acted: v.optional(v.strictObject({ pairingId: PairingIdSchema, at: v.number() })),
+});
+
+export type FolderPairing = v.InferOutput<typeof FolderPairingSchema>;
 
 /**
  * On the controller: its copy of the session the peer runs, written only from the peer's reports.
@@ -58,6 +70,8 @@ export type Repository<T> = ReturnType<typeof repository<T>>;
 
 export const identityRepository = repository("local:profileIdentity", ProfileIdentitySchema);
 export const authorizedPeerRepository = repository("local:authorizedPeer", AuthorizedPeerSchema);
+// Local, so waiting in the folder survives a restart of the browser.
+export const folderPairingRepository = repository("local:folderPairing", FolderPairingSchema);
 // Session storage ends with the browser, as the link and anything it carried do.
 export const peerLinkRepository = repository("session:peerLink", PeerLinkSchema);
 export const pendingOfferRepository = repository("session:pendingOffer", PendingOfferSchema);

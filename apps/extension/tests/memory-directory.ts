@@ -4,6 +4,12 @@ const notFound = () => new DOMException("Not found", "NotFoundError");
 export class MemoryDirectory {
   readonly folders = new Map<string, MemoryDirectory>();
   readonly files = new Map<string, string>();
+  /** What Chrome answers when asked whether RECnRun may still edit the folder. */
+  permission: PermissionState = "granted";
+
+  async queryPermission() {
+    return this.permission;
+  }
 
   async getDirectoryHandle(name: string, options?: { create?: boolean }) {
     let folder = this.folders.get(name);
