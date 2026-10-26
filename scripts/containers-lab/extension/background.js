@@ -6,6 +6,7 @@ import { commitsOf, startDocuments } from "./documents.js";
 import { clearEvents, events, record } from "./events.js";
 import { clearJar, jarOf, onJarChanged } from "./jar-store.js";
 import { isAttached, startN2, syncN2 } from "./n2.js";
+import { startNetworkIdle } from "./network-idle.js";
 import { knownTabs, refresh, startRegistry } from "./registry.js";
 import { jarChanged, startRules, syncRules } from "./rules.js";
 import { activate, failNext, isManaged, sessions, startSessions } from "./sessions.js";
@@ -145,6 +146,7 @@ chrome.runtime.onMessage.addListener(({ lab: method, args }, sender, reply) => {
 });
 startRules();
 startDocuments();
+startNetworkIdle();
 startSessions();
 chrome.tabs.onRemoved.addListener((tabId) => lastClass.delete(tabId));
 startN2(() => ready);

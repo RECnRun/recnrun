@@ -1,4 +1,5 @@
-// The transition itself: pending requests keep their identity, queued switches run in order, a
+// The transition itself: pending requests keep their identity (the swap mode waits for the tab's
+// network to drain, within a timeout), queued switches run in order, a
 // failed reconfiguration blocks the tab until a switch succeeds, a lost debugger session is
 // re-established before the app loads, the identity provider's redirect stays with one identity,
 // and a cached private response never crosses identities.
@@ -8,24 +9,14 @@ import * as lab from "./harness.mjs";
 
 const HOME = `${lab.APP}/home`;
 const late = (jar) => jar.find(({ name }) => name === "late")?.value ?? null;
+/** The last network-settled event: how long the swap mode waited for the tab's requests. */
+const settledEvent = async () => (await lab.eventsMatching(handle, /network-settled/)).at(-1);
 
 const handle = await lab.launchSingleTab();
 const evidence = {};
 
-await test("switch transitions", async (t) => {
-  t.after(async () => {
-    lab.writeEvidence(`single-tab-transitions-${lab.MODE}`, {
-      mode: lab.MODE,
-      chromium: handle.version,
-      ...evidence,
-    });
-    await handle.close();
-  });
-  await lab.activate(handle, "A", { url: HOME });
-  await lab.signIn(handle, "Admin");
-  await lab.activate(handle, "B", { url: HOME });
-  await lab.signIn(handle, "Requester");
-
+/** Requests of the old document still in flight when the switch starts. */
+async function pendingCases(t) {
   await t.test("a request pending across the switch keeps the identity that made it", async () => {
     await lab.activate(handle, "A", { url: HOME });
     const since = Date.now();
@@ -41,20 +32,102 @@ await test("switch transitions", async (t) => {
       handle,
       /set-cookie-dropped|request-blocked|request-gone/,
     );
+    const settled = await settledEvent();
     evidence.pending = {
       request: pending,
       receipt,
       late: { a: late(jars.a), b: late(jars.b) },
       events,
+      settled,
     };
     assert.equal(pending?.user, "Admin");
     assert.equal(late(jars.b), null);
     assert.equal(await lab.whoAmI(handle.page), "Requester");
-    // Debugger: the late Set-Cookie reached the jar of the identity that made the request. Swap: A's
-    // jar was saved before the response, so the cookie fell into the store B now uses (out of scope).
-    assert.equal(late(jars.a), lab.SWAP ? null : "Admin");
-    if (lab.SWAP) assert.ok((await lab.realCookieNames(handle)).includes("late"));
+    // Debugger: the late Set-Cookie reached the jar of the identity that made the request. Swap: the
+    // switch waited for the tab's network to drain before it saved A's cookies, so the jar has it.
+    assert.equal(late(jars.a), "Admin");
+    if (lab.SWAP) {
+      assert.equal(settled?.timedOut, false);
+      assert.equal(settled?.awaited.length, 1);
+      assert.ok(settled.ms >= 1000);
+      assert.equal((await lab.realCookieNames(handle)).includes("late"), false);
+    }
   });
+
+  await t.test("every request of a burst pending across the switch is waited for", async () => {
+    await lab.activate(handle, "A", { url: HOME });
+    const since = Date.now();
+    await handle.page.evaluate(() => {
+      for (const ms of [300, 900, 1500]) {
+        void fetch(`/slow?ms=${ms}&tag=burst-${ms}`, { keepalive: true }).catch(() => {});
+      }
+      // Without keepalive the request dies with its document; the switch must not wait for it.
+      void fetch("/slow?ms=1200&tag=plain").catch(() => {});
+    });
+    const receipt = await lab.activate(handle, "B", { url: HOME });
+    await handle.page.waitForTimeout(2500);
+    const requests = lab.requestsSince(handle, since).filter(({ tag }) => typeof tag === "string");
+    const settled = await settledEvent();
+    const jars = { a: await handle.lab.jar("a"), b: await handle.lab.jar("b") };
+    evidence.burst = { requests, receipt, settled, late: { a: late(jars.a), b: late(jars.b) } };
+    assert.deepEqual(requests.map(({ tag, user }) => `${tag}:${user}`).toSorted(), [
+      "burst-1500:Admin",
+      "burst-300:Admin",
+      "burst-900:Admin",
+      "plain:Admin",
+    ]);
+    assert.equal(late(jars.a), "Admin");
+    assert.equal(late(jars.b), null);
+    assert.equal(await lab.whoAmI(handle.page), "Requester");
+    if (lab.SWAP) {
+      assert.equal(settled?.timedOut, false);
+      assert.equal(settled?.awaited.length, 4);
+      assert.ok(settled.ms >= 1000 && settled.ms < 3000, `settled in ${settled.ms} ms`);
+    }
+  });
+
+  await t.test(
+    "a request that outlives the idle timeout lets the switch go on and is reported",
+    { skip: !lab.SWAP && "the debugger mode attributes pending requests by document" },
+    async () => {
+      await lab.activate(handle, "A", { url: HOME });
+      await handle.page.evaluate(() => {
+        void fetch("/slow?ms=3000&tag=stuck", { keepalive: true }).catch(() => {});
+      });
+      const receipt = await lab.activate(handle, "B", { url: HOME, idleTimeoutMs: 500 });
+      const settled = await settledEvent();
+      const before = await lab.realCookieNames(handle);
+      await handle.page.waitForTimeout(3500);
+      const after = await lab.realCookieNames(handle);
+      evidence.stuck = { receipt, settled, cookies: { before, after } };
+      assert.equal(settled?.timedOut, true);
+      assert.deepEqual(
+        settled.pending.map(({ url }) => url),
+        [`${lab.APP}/slow?ms=3000&tag=stuck`],
+      );
+      assert.equal(await lab.whoAmI(handle.page), "Requester");
+      // The late cookie of a request the switch gave up on lands in the next identity's store.
+      assert.equal(before.includes("late"), false);
+      assert.equal(after.includes("late"), true);
+    },
+  );
+}
+
+await test("switch transitions", async (t) => {
+  t.after(async () => {
+    lab.writeEvidence(`single-tab-transitions-${lab.MODE}`, {
+      mode: lab.MODE,
+      chromium: handle.version,
+      ...evidence,
+    });
+    await handle.close();
+  });
+  await lab.activate(handle, "A", { url: HOME });
+  await lab.signIn(handle, "Admin");
+  await lab.activate(handle, "B", { url: HOME });
+  await lab.signIn(handle, "Requester");
+
+  await pendingCases(t);
 
   await t.test("queued switches run in order and the last one wins", async () => {
     const started = Date.now();
@@ -145,8 +218,9 @@ await test("switch transitions", async (t) => {
         [],
       );
       assert.equal(await lab.whoAmI(handle.page), "Admin");
-      assert.deepEqual(await lab.realCookieNames(handle), lab.SWAP ? ["__rnr", "sid"] : []);
-      // Swap: the late cookie of the pending case fell into the store B used, so it is in B's jar now.
+      // Swap: the store holds A's jar, late cookie of the pending cases included.
+      assert.deepEqual(await lab.realCookieNames(handle), lab.SWAP ? ["__rnr", "late", "sid"] : []);
+      // Swap: the late cookie of the stuck request fell into the store B used, so it is in B's jar now.
       if (lab.SWAP) assert.equal(late(await handle.lab.jar("b")), "Admin");
     },
   );
