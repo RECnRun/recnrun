@@ -2,23 +2,29 @@
 // evaluates it); the variant is "off", "N1", "N1r", "N2", or "N2B1" (N2 with the B1 prelude).
 import { setB1, startB1 } from "./b1.js";
 import { setProbes, startProbes, syncProbes } from "./bootstraps.js";
+import { commitsOf, startDocuments } from "./documents.js";
 import { clearEvents, events, record } from "./events.js";
 import { clearJar, jarOf, onJarChanged } from "./jar-store.js";
 import { isAttached, startN2, syncN2 } from "./n2.js";
 import { knownTabs, refresh, startRegistry } from "./registry.js";
 import { jarChanged, startRules, syncRules } from "./rules.js";
+import { activate, failNext, isManaged, sessions, startSessions } from "./sessions.js";
 
 let variant = "off";
 let assignments = new Map();
 
 const lastClass = new Map();
 
-/** Tabs classified under another container (or the control) than last time: their documents hold its prelude. */
+/**
+ * Tabs classified under another container (or the control) than last time: their documents hold
+ * its prelude. A managed tab switches through its own transition instead of a reload.
+ */
 function movedTabs(next, classified) {
   const moved = [];
   for (const tabId of classified) {
     const now = next.get(tabId) ?? "";
-    if (lastClass.has(tabId) && lastClass.get(tabId) !== now) moved.push(tabId);
+    if (lastClass.has(tabId) && lastClass.get(tabId) !== now && !isManaged(tabId))
+      moved.push(tabId);
     lastClass.set(tabId, now);
   }
   return moved;
@@ -83,6 +89,7 @@ globalThis.lab = {
   clearJar,
   assignments: () => [...assignments],
   realCookies: () => chrome.cookies.getAll({}),
+  setRealCookie: (details) => chrome.cookies.set(details),
   targets: () => chrome.debugger.getTargets(),
   evaluateIn: async (title, expression) => {
     const target = (await chrome.debugger.getTargets()).find(
@@ -117,6 +124,13 @@ globalThis.lab = {
     chrome.sessions.restore().then((session) => session.tab?.id ?? session.window?.id),
   reloadExtension: () => setTimeout(() => chrome.runtime.reload(), 100),
   startedAt: () => startedAt,
+  // Single-tab sessions: identities take turns in one tab (sessions.js).
+  activate,
+  failNext,
+  sessions,
+  commits: commitsOf,
+  tabUrl: (tabId) => chrome.tabs.get(tabId).then(({ url }) => url),
+  sessionRules: () => chrome.declarativeNetRequest.getSessionRules(),
 };
 const startedAt = Date.now();
 
@@ -130,6 +144,8 @@ chrome.runtime.onMessage.addListener(({ lab: method, args }, sender, reply) => {
   return true;
 });
 startRules();
+startDocuments();
+startSessions();
 chrome.tabs.onRemoved.addListener((tabId) => lastClass.delete(tabId));
 startN2(() => ready);
 startB1();

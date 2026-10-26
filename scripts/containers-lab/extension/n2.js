@@ -2,12 +2,15 @@
 // header of every request. Fetch hides Set-Cookie from paused responses and Chrome stores it
 // anyway, so the session rules strip it and the webRequest observer captures it (rules.js).
 // Auto-attach adds the tab's out-of-process frames and workers, which have their own sessions.
+import { decide } from "./documents.js";
 import { record } from "./events.js";
 import { jarOf, settled } from "./jar-store.js";
 import { cookieHeader } from "./jar.js";
 import { containerOf } from "./registry.js";
 
 const attached = new Map();
+// Child sessions (frames, workers) keep the container of the document that created them.
+const children = new Map();
 const setups = [];
 const WEB = /^(https?:|blob:|about:|data:)/;
 const AUTO_ATTACH = { autoAttach: true, waitForDebuggerOnStart: true, flatten: true };
@@ -85,7 +88,17 @@ async function detach(tabId) {
   await chrome.debugger.detach({ tabId }).catch(() => {});
 }
 
+/** Ends the tab's session and forgets it, as a browser-side detach would. */
+export const detachTab = detach;
+
 export const isAttached = (tabId) => attached.has(tabId);
+
+/** Changes the container of an attached tab in place, without detaching: sessions.js switches. */
+export function rebind(tabId, container) {
+  const state = attached.get(tabId);
+  if (!state) throw new Error(`Tab ${tabId} has no debugger session to rebind`);
+  state.container = container;
+}
 
 /** Attaches to every assigned tab and detaches from the rest; `on` false detaches from all. */
 export async function syncN2(assignments, on) {
@@ -123,13 +136,26 @@ async function onRequest(source, state, params) {
   return send(source, "Fetch.continueRequest", { requestId: params.requestId, headers });
 }
 
-function onPaused(source, params) {
+function block(source, params, reason) {
+  record("request-blocked", { tabId: source.tabId, url: params.request.url, reason });
+  const fail = { requestId: params.requestId, errorReason: "BlockedByClient" };
+  // A request of a destroyed document is already gone by the time it is refused.
+  return send(source, "Fetch.failRequest", fail).catch((error) => {
+    if (!String(error).includes("Invalid InterceptionId")) throw error;
+    record("request-gone", { tabId: source.tabId, url: params.request.url });
+  });
+}
+
+async function onPaused(source, params) {
   if (source.targetId) return onRequest(source, sharedWorkers.get(source.targetId), params);
   const state = attached.get(source.tabId);
   if (!state || containerOf(source.tabId) !== state.container) {
     return send(source, "Fetch.continueRequest", { requestId: params.requestId });
   }
-  return onRequest(source, state, params);
+  const childContainer = children.get(source.sessionId);
+  const decision = await decide(source, { ...state, childContainer }, params);
+  if (decision.block) return block(source, params, decision.block);
+  return onRequest(source, { ...state, container: decision.container }, params);
 }
 
 /** A child target waits for the debugger, so its first request is intercepted too. */
@@ -140,6 +166,7 @@ async function onChild(source, { sessionId, targetInfo }) {
     // workers, which are off in containers (S1) and must not get a container's prelude.
     const web = WEB.test(targetInfo.url) && targetInfo.type !== "service_worker";
     const state = web ? attached.get(source.tabId) : undefined;
+    if (state) children.set(sessionId, state.container);
     if (state) await intercept(child);
     for (const setup of state ? setups : []) await setup(child, state.container, targetInfo.type);
     record("n2-child", { tabId: source.tabId, targetType: targetInfo.type, url: targetInfo.url });
@@ -148,7 +175,11 @@ async function onChild(source, { sessionId, targetInfo }) {
   }
 }
 
-const handlers = { "Fetch.requestPaused": onPaused, "Target.attachedToTarget": onChild };
+const handlers = {
+  "Fetch.requestPaused": onPaused,
+  "Target.attachedToTarget": onChild,
+  "Target.detachedFromTarget": (source, { sessionId }) => children.delete(sessionId),
+};
 
 /** `whenReady()` resolves once the tabs are classified: a restarted worker gets paused requests first. */
 export function startN2(whenReady) {

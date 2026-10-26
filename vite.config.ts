@@ -1,6 +1,12 @@
 import { defineConfig } from "vite-plus";
 
-const testFiles = ["**/tests/**", "**/*.test.{ts,tsx}", "**/*.spec.ts", "**/*.checks.mjs"];
+const testFiles = [
+  "**/tests/**",
+  "**/*.test.{ts,tsx}",
+  "**/*.spec.ts",
+  "**/*.spec.mjs",
+  "**/*.checks.mjs",
+];
 
 export default defineConfig({
   staged: {

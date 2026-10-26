@@ -4,6 +4,8 @@
 import { record } from "./events.js";
 
 const inherited = new Map();
+// Single-tab sessions (sessions.js) pin a tab to a container regardless of its group.
+const pinned = new Map();
 let assignments = new Map();
 let known = new Set();
 let queue = Promise.resolve();
@@ -25,7 +27,8 @@ async function scan() {
   );
   for (const tab of tabs) {
     const fromGroup = tab.groupId === -1 ? undefined : titles.get(tab.groupId);
-    const container = fromGroup ?? (tab.groupId === -1 ? inherited.get(tab.id) : undefined);
+    const container =
+      pinned.get(tab.id) ?? fromGroup ?? (tab.groupId === -1 ? inherited.get(tab.id) : undefined);
     if (container) next.set(tab.id, container);
   }
   return next;
@@ -43,6 +46,12 @@ export function refresh() {
 }
 
 export const containerOf = (tabId) => assignments.get(tabId);
+
+/** Pins `tabId` to `container` (undefined unpins); the next `refresh()` applies it. */
+export function pin(tabId, container) {
+  if (container === undefined) pinned.delete(tabId);
+  else pinned.set(tabId, container);
+}
 
 /** Every tab the last scan classified, as a container's or as a control tab. */
 export const knownTabs = () => known;
@@ -71,6 +80,7 @@ export function startRegistry(sync) {
   });
   chrome.tabs.onRemoved.addListener((tabId) => {
     inherited.delete(tabId);
+    pinned.delete(tabId);
     void refresh();
   });
   chrome.tabGroups.onUpdated.addListener(() => void refresh());

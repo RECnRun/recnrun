@@ -1,6 +1,7 @@
 // Probes for bootstraps B2 and B4, measured against the page's first inline script. They only
 // record what the page could know; the prelude itself comes from B1 or the control script.
 const FIRST_ID = 10000;
+const LAST_ID = 19999;
 let on = false;
 /** @type {(tabId: number) => string | undefined} */
 let probeContainer = () => undefined;
@@ -16,7 +17,7 @@ const tagRule = (container, tabIds, index) => ({
 });
 
 /** Session rule ids the network rules must leave alone. */
-export const isProbeRule = (id) => id >= FIRST_ID;
+export const isProbeRule = (id) => id >= FIRST_ID && id <= LAST_ID;
 
 export async function syncProbes(assignments) {
   const byContainer = new Map();

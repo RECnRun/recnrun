@@ -1,0 +1,43 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Order</title>
+<p>Signed in as <span id="user">…</span></p>
+<p>Order <span id="id"></span>: <span id="state">…</span></p>
+<ol id="history"></ol>
+<button id="create">Create</button>
+<button id="submit">Submit</button>
+<button id="approve">Approve</button>
+<p id="result"></p>
+<script type="module">
+  // The page asks the backend for the order on every load and after every action.
+  const id = new URLSearchParams(location.search).get("id");
+  document.querySelector("#id").textContent = id;
+  async function refresh() {
+    const { user } = await (await fetch("/me")).json();
+    const order = await (await fetch(`/workflow?id=${id}`)).json();
+    document.querySelector("#user").textContent = user ?? "signed out";
+    document.querySelector("#state").textContent = order?.state ?? "none";
+    document.querySelector("#history").replaceChildren(
+      ...(order?.history ?? []).map(({ step, user: by }) => {
+        const item = document.createElement("li");
+        item.textContent = `${step} by ${by}`;
+        return item;
+      }),
+    );
+  }
+  for (const step of ["create", "submit", "approve"]) {
+    document.querySelector(`#${step}`).onclick = async () => {
+      const response = await fetch("/workflow", {
+        method: "POST",
+        body: JSON.stringify({ step, id }),
+      });
+      const result = await response.json();
+      document.querySelector("#result").textContent = result.ok
+        ? `${step}: ok`
+        : `${step}: refused`;
+      await refresh();
+    };
+  }
+  await refresh();
+  window.orderLoaded = true;
+</script>
