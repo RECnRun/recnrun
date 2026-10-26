@@ -34,6 +34,8 @@ beforeEach(async () => {
 });
 
 afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
   for (const root of document.body.children) render(null, root);
   document.body.replaceChildren();
 });
@@ -72,9 +74,22 @@ test("a folder Chrome does not allow is an alert, and the window stays", async (
   expect(peer.asked("folder-pair")).toEqual([]);
 });
 
-test("the pairing page opened for the folder shows only the folder", async () => {
+test("the pairing page opened for the folder shows only the folder, with Chrome's prompts", async () => {
+  const picked = await privateFolder();
+  vi.stubGlobal("showDirectoryPicker", async () => picked);
+  const close = vi.spyOn(window, "close").mockImplementation(() => {});
+  const peer = fakePeerClient(withFolder("none"));
   const root = document.body.appendChild(document.createElement("div"));
-  startPairing(root, fakePeerClient(withFolder("none")).client, "#folder");
+  startPairing(root, peer.client, "#folder");
   await expect.poll(() => root.querySelector("h1")?.textContent).toBe("RECnRun folder");
   expect(root.textContent).not.toContain("Pair by hand instead");
+  await expect.poll(() => button(root, "Choose folder")?.disabled).toBe(false);
+  button(root, "Choose folder")?.click();
+  await expect.poll(() => close.mock.calls).toHaveLength(1);
+  // After a restart, the kept folder is asked for again; Chrome grants a private one at once.
+  peer.change(withFolder("prompt"));
+  await expect.poll(() => button(root, "Allow folder")?.disabled).toBe(false);
+  button(root, "Allow folder")?.click();
+  await expect.poll(() => close.mock.calls).toHaveLength(2);
+  expect(peer.asked("folder-pair")).toHaveLength(2);
 });
