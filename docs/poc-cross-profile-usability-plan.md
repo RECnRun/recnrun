@@ -34,13 +34,28 @@ Recorded risk: whoever can write to the folder and reach this machine over the l
 
 Reconnecting to the pinned peer needs no click (phase 3), and its fingerprint proves who it is.
 
+## Decision: one RECnRun folder, set up from a banner
+
+On 2026-10-26 the user chose one folder per machine for everything RECnRun keeps on disk, set up from a dashboard banner like "Enable Incognito Mode".
+
+- **The banner** shows while no folder is chosen or Chrome does not grant `readwrite` on it, and cannot be dismissed. Record works without a folder. The framed dashboard cannot open the picker, so the banner's button opens an extension page in a tab (the pairing page, renamed for the folder), where **Choose folder** opens it.
+- **Layout.** Each profile writes only below its own `profileId` and reads the others':
+  ```text
+  ~/RECnRun/
+    pairing/<profileId>/        presence, offers, answers
+    recordings/<profileId>/     reserved for M1
+  ```
+- **Recordings are one library.** Every profile that chose the folder reads every profile's recordings, so one dashboard lists them all. Recorded risk: a recording holds the pages of logged-in apps, so it crosses profiles through the folder, which test J keeps from crossing the link; and a folder synced through iCloud or Dropbox uploads it. Revisit when M1 defines what a recording holds.
+- **Scope.** This POC builds the banner, the folder page, and pairing in `pairing/`, all behind `peersEnabled`. `recordings/` is only reserved and documented; writing and reading recordings is M1, and moving the folder out of the POC into the product is its own change to the product brief and the milestones.
+- **H1 now matters before phase 3:** without a lasting permission, the banner returns after each restart. Measure it with H6.
+
 ## Hypotheses to measure first
 
 Record each as PASS, FAIL, BLOCKED, or NOT TESTED, with the Chromium build, before designing around it. The manual ones need the user; prepare the steps, ask, and wait for the answer.
 
 | Id  | Hypothesis                                                                                                                                                           | How                                                                                                          |
 | --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| H1  | A `FileSystemDirectoryHandle` stored in IndexedDB keeps `readwrite` permission after a browser restart for the `chrome-extension://` origin ("Allow on every visit") | Manual, in branded Chrome with a disposable profile                                                          |
+| H1  | A `FileSystemDirectoryHandle` stored in IndexedDB keeps `readwrite` permission after a browser restart for the `chrome-extension://` origin ("Allow on every visit") | Manual, in branded Chrome with a disposable profile, together with H6                                        |
 | H2  | The offscreen document can read the stored handle and poll the folder, so no visible page is needed after pairing                                                    | Automated where possible; otherwise a manual check with logs                                                 |
 | H3  | When permission falls back to `prompt`, `requestPermission` works after one click in `pairing.html`, and fails in the dashboard framed on the site                   | Manual; record the exact errors                                                                              |
 | H4  | Playwright can drive `showDirectoryPicker`                                                                                                                           | One try. If not, e2e tests use the injected rendezvous port below                                            |
@@ -78,9 +93,9 @@ Tests:
 
 ## Phase 2 — Pairing by choosing a folder (F1)
 
-1. **One button.**
-   - The pairing page opens on **Pair with another profile**. That button calls `showDirectoryPicker({ id: "recnrun-pairing", mode: "readwrite", startIn: "documents" })`, then Chrome's "Allow this site to edit files?" prompt.
-   - The handle is stored in IndexedDB beside the certificate.
+1. **One folder, then pairing on its own.**
+   - The banner's button opens the folder page, whose **Choose folder** calls `showDirectoryPicker({ id: "recnrun-folder", mode: "readwrite", startIn: "documents" })`, then Chrome's "Allow this site to edit files?" prompt. Once the folder is chosen, pairing starts with no other button.
+   - The handle is stored in IndexedDB beside the certificate, and the page creates `pairing/` and `recordings/` in it.
    - The manual code flow moves under "Pair by hand instead" as the fallback.
    - **The default folder is `~/RECnRun`, as close as a browser allows.** An extension cannot create a folder or preselect a path without the picker, and `startIn` accepts only well-known folders (`documents`, `downloads`, `desktop`, and so on) or an existing handle, not the home folder. Chrome blocks choosing the home folder itself, but allows folders inside it. So the page says "Choose or create the RECnRun folder in your home folder". The picker opens in Documents, where the user goes up one level and uses New Folder; the second profile picks the same folder.
    - Measure H6 before building this. Alternatives, if the picker steps are too many: start in Documents and suggest `Documents/RECnRun` (Documents may sync through iCloud, see the risk above). Or create `~/Downloads/RECnRun` first with `chrome.downloads`, so the folder already exists in the picker. That costs the `downloads` permission ("Manage your downloads") and a visible download, so prefer the home folder unless H6 shows it is clumsy.
@@ -88,7 +103,7 @@ Tests:
 3. **Who offers.** When both presences are in the folder, the profile with the lower `profileId` writes the offer, and the other answers. This replaces **Publish offer** and **Find an offer**.
 4. **Acceptance** follows the decision above: no click. Each profile pairs with the first other presence it finds, the oldest by `createdAt`, and ignores the rest once a peer is pinned. The offerer still accepts only an answer to its own pending offer, and `linkUp` still checks the DTLS fingerprint against the one in that answer.
 5. **Polling** runs from the moment a folder is chosen until a peer is pinned, in the offscreen document (H2), so the pairing tab can close. It stops on success or on **Forget**. Clean up only the profile's own files, as today.
-6. **The dashboard entry.** "Pair another profile" in the dashboard opens `pairing.html` in a tab, because the framed dashboard cannot show the picker. When pairing succeeds, the tab says "Paired with <name>", and the dashboard updates on its own.
+6. **The dashboard entry** is the banner while no folder is set, and "Manage pairing" once one is. Both open the folder page in a tab, because the framed dashboard cannot show the picker. When pairing succeeds, the tab says "Paired with <name>", and the dashboard updates on its own.
 
 Tests:
 
