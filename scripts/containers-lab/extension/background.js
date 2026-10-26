@@ -10,6 +10,7 @@ import { startNetworkIdle } from "./network-idle.js";
 import { knownTabs, refresh, startRegistry } from "./registry.js";
 import { jarChanged, startRules, syncRules } from "./rules.js";
 import { activate, failNext, isManaged, sessions, startSessions } from "./sessions.js";
+import { setDomains } from "./swap.js";
 
 let variant = "off";
 let assignments = new Map();
@@ -132,6 +133,7 @@ globalThis.lab = {
   commits: commitsOf,
   tabUrl: (tabId) => chrome.tabs.get(tabId).then(({ url }) => url),
   sessionRules: () => chrome.declarativeNetRequest.getSessionRules(),
+  setDomains,
 };
 const startedAt = Date.now();
 

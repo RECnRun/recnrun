@@ -65,13 +65,13 @@ In both modes storage is preserved because nothing is copied: the jar of contain
 | ---------------------------------------------------------------------------------- | ----- | -------------------------------------------------------------------------------------------------------------------- |
 | `scripts/containers-lab/extension/sessions.js`                                     | 214   | Session manager, both modes (new)                                                                                    |
 | `scripts/containers-lab/extension/network-idle.js`                                 | 53    | Pending requests per tab, from `webRequest` (new)                                                                    |
-| `scripts/containers-lab/extension/swap.js`                                         | 85    | Cookie save, empty, and restore with `chrome.cookies` (new)                                                          |
+| `scripts/containers-lab/extension/swap.js`                                         | 92    | Cookie save, empty, and restore with `chrome.cookies` (new)                                                          |
 | `scripts/containers-lab/extension/control-start.js`                                | 13    | The content-script prelude takes the identity from the `__rnr` cookie (changed)                                      |
 | `scripts/containers-lab/extension/documents.js`                                    | 156   | Document ↔ identity attribution (new)                                                                                |
 | `scripts/containers-lab/extension/sessions-block.js`                               | 45    | Block rule for failed tabs (new)                                                                                     |
 | `scripts/containers-lab/extension/{registry,n2,b1,rules,bootstraps,background}.js` |       | Pinning, rebinding, prelude switch, Set-Cookie ownership, lab handle (changed)                                       |
 | `scripts/containers-lab/single-tab/harness.mjs`                                    | 113   | One managed tab, sign-in, order page, fixture log queries                                                            |
-| `scripts/containers-lab/single-tab/manual.mjs`                                     | 62    | Headed Chromium and a prompt to switch identities by hand (new)                                                      |
+| `scripts/containers-lab/single-tab/manual.mjs`                                     | 101   | Headed Chromium and a prompt to switch identities by hand (new)                                                      |
 | `scripts/containers-lab/single-tab/flow.spec.mjs`                                  | 101   | A → B → A → C → A, three rounds                                                                                      |
 | `scripts/containers-lab/single-tab/storage.spec.mjs`                               | 92    | Page APIs across suspend, resume, and reset                                                                          |
 | `scripts/containers-lab/single-tab/transitions.spec.mjs`                           | 274   | Pending requests (one, a burst, one past the idle timeout), queued switches, injected failures, IdP redirects, cache |
@@ -82,6 +82,18 @@ In both modes storage is preserved because nothing is copied: the jar of contain
 ### Manual run
 
 `node scripts/containers-lab/single-tab/manual.mjs` (`SINGLE_TAB_MODE=debugger` for the other mode) starts the fixture, opens a headed Chromium with the lab extension and one tab, and reads commands from the terminal: `A`, `B`, `C` switch (Start or Resume decided by the manager, `/home` for a first Start), `A /order?id=1` switches and opens that path, `reset B` starts B afresh, `login Admin` signs the active identity in through the fixture's form, and `sessions`, `jar a`, and `events` show the manager's state. The fixture's pages (`/home`, `/order?id=1`, `/apis`) show who the backend sees and what each storage API holds.
+
+Against a real site, `--url` and `--domains` make the run cover it: the script copies the extension into a temporary directory whose manifest adds `*://*.<domain>/*` to the host permissions and to the prelude's matches, the swap moves every cookie of the disposable profile (partitioned ones included) rather than the lab's hosts', and the identity cookie is set on each listed domain (`--cookies-only` leaves the prelude out, so only cookies are per identity). For two Gmail accounts:
+
+```sh
+node scripts/containers-lab/single-tab/manual.mjs --url https://mail.google.com \
+  --domains google.com,youtube.com,googleusercontent.com,googleapis.com,gstatic.com
+> A              # sign account 1 in by hand in the window
+> B              # an empty store: Google asks for an account; sign account 2 in
+> A              # account 1's inbox, no sign-in
+```
+
+Checked by the same drive against `https://httpbin.org/cookies`: A set `sid=admin`, B set `sid=requester`, and A resumed seeing `sid=admin` while jar `b` held B's cookie; with the swap restricted to the lab's hosts (the red control) A resumed seeing B's cookie. Expect on a real site: a switch is as slow as the slowest keepalive request left by the page, a service worker registered by the site stays shared across identities (out of scope), and the site receives the `__rnr` cookie.
 
 ## 3. Tests and results
 
@@ -187,4 +199,4 @@ Specific to save and restore in one tab:
 - **Swap mode and workers.** Content scripts do not run in workers, so a dedicated or shared worker uses the origin's unprefixed storage.
 - **`sessionStorage`** is preserved per identity because the prelude namespaces it; without the prelude Chrome keeps one `sessionStorage` per tab across identities.
 - **The debugger infobar** stays on the managed tab in the debugger mode; the swap mode has none.
-- **Manual checks** (DevTools on the managed tab, branded Chrome, idle suspension) were not done.
+- **Manual checks** (DevTools on the managed tab, branded Chrome, idle suspension) were not done; a real sign-in flow (Google's) was not run, only a cookie round trip through httpbin.org.

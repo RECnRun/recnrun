@@ -5,8 +5,8 @@
 // keeps its namespace per identity; workers and pending requests are out of scope here.
 import { jarOf, replaceJar } from "./jar-store.js";
 
-/** The domains whose cookies belong to an identity: the lab's hosts. */
-const DOMAINS = ["app.localhost", "idp.localhost"];
+/** The domains the identity cookie is set on: the lab's hosts, or a real site's (`setDomains`). */
+let domains = ["app.localhost", "idp.localhost"];
 /** The cookie that tells the prelude which identity is active. */
 const IDENTITY_COOKIE = "__rnr";
 /** The jar that keeps what the profile held before the first switch. */
@@ -30,6 +30,7 @@ function toJar(cookie) {
     httpOnly: cookie.httpOnly,
     sameSite: SAME_SITE_TO_JAR[cookie.sameSite],
     expires: cookie.expirationDate === undefined ? undefined : cookie.expirationDate * 1000,
+    partitionKey: cookie.partitionKey,
   };
 }
 
@@ -45,13 +46,15 @@ function toChrome(cookie) {
     httpOnly: cookie.httpOnly,
     sameSite: cookie.sameSite === undefined ? undefined : SAME_SITE_TO_CHROME[cookie.sameSite],
     expirationDate: cookie.expires === undefined ? undefined : cookie.expires / 1000,
+    partitionKey: cookie.partitionKey,
   };
 }
 
-async function allCookies() {
-  const lists = await Promise.all(DOMAINS.map((domain) => chrome.cookies.getAll({ domain })));
-  return lists.flat();
-}
+/** Every cookie of the profile, partitioned ones included: the profile is disposable and is the tab's. */
+const allCookies = () => chrome.cookies.getAll({ partitionKey: {} });
+
+/** The domains a real site's pages run on, so the prelude finds the identity cookie there. */
+export const setDomains = (list) => (domains = list);
 
 /** Saves the store's cookies as `container`'s jar (the identity cookie excluded). */
 export async function save(container) {
@@ -64,7 +67,8 @@ export async function save(container) {
 export async function empty(limit = Infinity) {
   const cookies = (await allCookies()).slice(0, limit);
   for (const cookie of cookies) {
-    await chrome.cookies.remove({ url: urlOf(cookie), name: cookie.name });
+    const { name, partitionKey } = cookie;
+    await chrome.cookies.remove({ url: urlOf(cookie), name, partitionKey });
   }
   return cookies.length;
 }
@@ -73,12 +77,15 @@ export async function empty(limit = Infinity) {
 export async function restore(container) {
   const jar = await jarOf(container);
   for (const cookie of jar) await chrome.cookies.set(toChrome(cookie));
-  for (const domain of DOMAINS) {
+  for (const domain of domains) {
+    const scheme = domain.endsWith("localhost") ? "http" : "https";
     await chrome.cookies.set({
-      url: `http://${domain}/`,
+      url: `${scheme}://${domain}/`,
+      domain: domain.endsWith("localhost") ? undefined : domain,
       name: IDENTITY_COOKIE,
       value: container,
       path: "/",
+      secure: scheme === "https",
     });
   }
   return jar.length;

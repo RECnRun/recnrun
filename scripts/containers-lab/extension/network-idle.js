@@ -3,7 +3,7 @@
 // late Set-Cookie lands in the jar of the identity that asked for it. A request counts from
 // onBeforeRequest to onCompleted or onErrorOccurred; a keepalive request outlives its document
 // and still completes here, a plain one is aborted with its document.
-const URLS = ["http://app.localhost/*", "http://idp.localhost/*"];
+const URLS = ["<all_urls>"];
 const pending = new Map();
 const waiters = new Set();
 
