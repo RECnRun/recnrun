@@ -4,7 +4,7 @@ import { DiagnosticsSchema, PingResultSchema } from "@/messaging/peer-results";
 import type { PeerStatus } from "@/messaging/peer-results";
 import { FolderSection } from "@/pairing/FolderSection";
 import { ImportStep, OfferStep } from "@/pairing/PairingSteps";
-import { linkLabel } from "@/views/link-label";
+import { linkText } from "@/views/link-label";
 import { useAction, usePeerStatus } from "@/views/use-peer";
 import type { Action } from "@/views/use-peer";
 import type { PeerClient } from "@/views/peer-client";
@@ -14,17 +14,6 @@ interface PairingPageProps {
   copy: (text: string) => Promise<void>;
   /** Asks for the RECnRun folder; tests pass one of their own. */
   pick?: () => Promise<FileSystemDirectoryHandle>;
-}
-
-/** The link in words: connected names the peer, since only a verified link counts. */
-function linkText(status: PeerStatus | undefined): string {
-  if (!status) return "Loading";
-  if (!status.peer) return "Not paired";
-  const { link, peer } = status;
-  if (link.state === "connected" && !link.verified) return "Checking the other profile";
-  const label = linkLabel(link, peer.displayName);
-  // "Disconnected by <name>" names the peer already.
-  return link.reason === "closed-by-peer" ? label : `${label} — ${peer.displayName}`;
 }
 
 function Identity({
