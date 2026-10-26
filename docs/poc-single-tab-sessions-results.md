@@ -71,12 +71,17 @@ In both modes storage is preserved because nothing is copied: the jar of contain
 | `scripts/containers-lab/extension/sessions-block.js`                               | 45    | Block rule for failed tabs (new)                                                                                     |
 | `scripts/containers-lab/extension/{registry,n2,b1,rules,bootstraps,background}.js` |       | Pinning, rebinding, prelude switch, Set-Cookie ownership, lab handle (changed)                                       |
 | `scripts/containers-lab/single-tab/harness.mjs`                                    | 113   | One managed tab, sign-in, order page, fixture log queries                                                            |
+| `scripts/containers-lab/single-tab/manual.mjs`                                     | 62    | Headed Chromium and a prompt to switch identities by hand (new)                                                      |
 | `scripts/containers-lab/single-tab/flow.spec.mjs`                                  | 101   | A → B → A → C → A, three rounds                                                                                      |
 | `scripts/containers-lab/single-tab/storage.spec.mjs`                               | 92    | Page APIs across suspend, resume, and reset                                                                          |
 | `scripts/containers-lab/single-tab/transitions.spec.mjs`                           | 274   | Pending requests (one, a burst, one past the idle timeout), queued switches, injected failures, IdP redirects, cache |
 | `scripts/containers-lab/sessions.checks.mjs`                                       | 50    | Unit checks for `containerIdOf` and `decide`                                                                         |
 | `scripts/containers-lab/network-idle.checks.mjs`                                   | 54    | Unit checks for `waitForIdle` (new)                                                                                  |
 | `scripts/containers-lab/fixture/order.html`, `fixture-server.mjs`                  |       | Order page and a `/slow` route (changed)                                                                             |
+
+### Manual run
+
+`node scripts/containers-lab/single-tab/manual.mjs` (`SINGLE_TAB_MODE=debugger` for the other mode) starts the fixture, opens a headed Chromium with the lab extension and one tab, and reads commands from the terminal: `A`, `B`, `C` switch (Start or Resume decided by the manager, `/home` for a first Start), `A /order?id=1` switches and opens that path, `reset B` starts B afresh, `login Admin` signs the active identity in through the fixture's form, and `sessions`, `jar a`, and `events` show the manager's state. The fixture's pages (`/home`, `/order?id=1`, `/apis`) show who the backend sees and what each storage API holds.
 
 ## 3. Tests and results
 
