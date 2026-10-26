@@ -69,6 +69,9 @@ Results so far:
 - **H2: PASS** (2026-10-26, automated, Playwright's Chromium in Docker, `tests/e2e/folder-pairing.spec.ts`). A chose the folder and its pairing tab closed before B chose it; A's offscreen document kept polling, and both profiles connected within seconds. The picker was replaced by a folder in each profile's private file system, mirrored between the two (H4).
 - **H5: PASS** (2026-10-26, Google Chrome 156.0.8078.47 (arm64) on macOS 27.0.1, two profiles of one user data directory). Each profile records its own session in its own PiP window, but Chrome shows one at a time: opening B's PiP closes A's, and A's dashboard falls back to Continue and Stop, as for a session with no controller. Both sessions keep running.
 
+- **H1: PASS after one prompt** (2026-10-26, Google Chrome 156.0.8078.47 arm64, macOS 27.0.1, checked by the user). After the first restart the pairing page showed Chrome's "RECnRun wants to — View and edit files from the last time you visited this site: RECnRun", with **Allow this time**, **Allow on every visit**, and **Don't allow**, and the page said "Chrome asks again before RECnRun may use the folder." The user answered it and chose the folder again; after the next restart Chrome still granted it and no banner showed.
+- **H3: the framed half holds** (2026-10-26, Playwright's Chromium in Docker, a throwaway probe). `showDirectoryPicker` in the dashboard frame on the site rejects with `NotAllowedError: Failed to execute 'showDirectoryPicker' on 'Window': Third party iframes are not allowed to show a file picker.` `requestPermission` in the frame was not tried. The banner opens a popup window of `pairing.html#folder`, whose **Allow folder** calls `requestPermission` after one click; not yet checked in branded Chrome.
+
 If H1 fails, reconnection after a restart costs one click ("Reconnect to <name>"), not zero. If H2 fails, polling needs a page (the pinned dashboard or an `pairing.html` tab), which is worse. Report it plainly.
 
 ## Phase 1 — Link-down states and one session across the pair (F2–F6)
@@ -106,7 +109,7 @@ Tests:
 3. **Who offers.** When both presences are in the folder, the profile with the lower `profileId` writes the offer, and the other answers. This replaces **Publish offer** and **Find an offer**.
 4. **Acceptance** follows the decision above: no click. Each profile pairs with the first other presence it finds, the oldest by `createdAt`, and ignores the rest once a peer is pinned. The offerer still accepts only an answer to its own pending offer, and `linkUp` still checks the DTLS fingerprint against the one in that answer.
 5. **Polling** runs from the moment a folder is chosen until a peer is pinned, in the offscreen document (H2), so the pairing tab can close. It stops on success or on **Forget**. Clean up only the profile's own files, as today.
-6. **The dashboard entry** is the banner while no folder is set, and "Manage pairing" once one is. Both open the folder page in a tab, because the framed dashboard cannot show the picker. When pairing succeeds, the tab says "Paired with <name>", and the dashboard updates on its own.
+6. **The dashboard entry** is the banner while no folder is set, and "Manage pairing" once one is. Both open the folder page in a tab, because the framed dashboard cannot show the picker. When pairing succeeds, the tab says "Paired with <name>", and the dashboard updates on its own. Superseded in phase 3: the user wanted pairing to stay on the dashboard, so the banner opens a small popup window that only grants the folder and closes itself, and the dashboard shows the wait and **Pair with another profile** or **Reconnect**.
 
 Tests:
 
@@ -115,6 +118,8 @@ Tests:
 - E2E: a rendezvous port injected by the test build stands in for the picker, unless H4 passes. Each profile gets only **Pair**, and both reach `Connected`. Say plainly in the report that the native picker was not driven.
 
 ## Phase 3 — Reconnect without the user (from the reconnect plan)
+
+**Built differently (2026-10-26).** No reconnect codes and no backoff: a profile stays in the folder once paired, with only its pinned peer as partner, so the phase 2 codes, the vouched fingerprint, and `linkUp`'s check carry reconnection too. The service worker starts with the browser (a `runtime.onStartup` listener) and resumes polling. **Disconnect** stops waiting, as **Forget** does; the dashboard's **Reconnect** starts again. The dashboard shows the wait and that one button, and the folder window asks Chrome again with `requestPermission` when the grant fell back to `prompt`. Tested by `folder-pairing.spec.ts` "a paired profile that restarts reconnects through the folder with no click". The list below is the earlier design, kept for the record.
 
 1. **The rendezvous port** has `publish`, `find`, and `clean`. The stored folder handle implements it, and so does the test adapter.
 2. **Reconnect codes** use a new kind, `reconnect-offer` and `reconnect-answer`, with the pairing envelope, a 60 s expiry, and a fresh `pairingId` per attempt.
