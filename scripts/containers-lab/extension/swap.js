@@ -53,15 +53,20 @@ async function allCookies() {
   return lists.flat();
 }
 
-/** Moves the store's cookies into `container`'s jar; the store is empty afterwards. */
-export async function stash(container) {
-  const cookies = await allCookies();
-  const jar = cookies.filter(({ name }) => name !== IDENTITY_COOKIE).map(toJar);
+/** Saves the store's cookies as `container`'s jar (the identity cookie excluded). */
+export async function save(container) {
+  const jar = (await allCookies()).filter(({ name }) => name !== IDENTITY_COOKIE).map(toJar);
   await replaceJar(container, jar);
+  return jar.length;
+}
+
+/** Removes the store's cookies, at most `limit` of them; returns how many were removed. */
+export async function empty(limit = Infinity) {
+  const cookies = (await allCookies()).slice(0, limit);
   for (const cookie of cookies) {
     await chrome.cookies.remove({ url: urlOf(cookie), name: cookie.name });
   }
-  return jar.length;
+  return cookies.length;
 }
 
 /** Writes `container`'s jar into the store and marks the identity for the prelude. */

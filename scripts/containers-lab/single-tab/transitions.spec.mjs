@@ -183,6 +183,39 @@ await test("switch transitions", async (t) => {
   );
 
   await t.test(
+    "a failure while the store is emptied keeps the jar saved just before it",
+    { skip: !lab.SWAP && "the debugger mode has no store to empty" },
+    async () => {
+      await lab.activate(handle, "A", { url: HOME });
+      await handle.lab.failNext("empty");
+      await assert.rejects(
+        handle.lab.activate(handle.tabId, "B", { url: HOME }),
+        /Injected failure/,
+      );
+      const failed = (await handle.lab.sessions()).tabs[0];
+      const leftovers = await lab.realCookieNames(handle);
+      await lab.activate(handle, "B", { url: HOME });
+      const userB = await lab.whoAmI(handle.page);
+      await lab.activate(handle, "A", { url: HOME });
+      const userA = await lab.whoAmI(handle.page);
+      const jarA = (await handle.lab.jar("a")).map(({ name }) => name);
+      evidence.empty = {
+        failed: { phase: failed.phase, store: failed.store },
+        leftovers,
+        userB,
+        userA,
+        jarA,
+      };
+      assert.equal(failed.phase, "failed");
+      // One cookie was removed before the failure; the next switch must not save the rest over the jar.
+      assert.ok(leftovers.length < 3, `left ${leftovers}`);
+      assert.equal(userB, "Requester");
+      assert.equal(userA, "Admin");
+      assert.ok(jarA.includes("sid"), `jar a holds ${jarA}`);
+    },
+  );
+
+  await t.test(
     "a lost debugger session is re-established before the app document loads",
     { skip: lab.SWAP && "the swap mode has no debugger session" },
     async () => {

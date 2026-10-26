@@ -15,7 +15,7 @@ import { detachTab, isAttached, rebind } from "./n2.js";
 import { waitForIdle } from "./network-idle.js";
 import { pin, refresh } from "./registry.js";
 import { blockTab, unblockTab } from "./sessions-block.js";
-import { PROFILE_JAR, restore, stash } from "./swap.js";
+import { PROFILE_JAR, empty, restore, save } from "./swap.js";
 
 const NEUTRAL = "about:blank";
 const identities = new Map();
@@ -27,10 +27,15 @@ let fault;
 export const containerIdOf = (id, generation) =>
   generation === 1 ? id.toLowerCase() : `${id.toLowerCase()}.${generation}`;
 
-/** The tab's state; its mode is fixed by the first activation and later calls may omit it. */
+/**
+ * The tab's state; its mode is fixed by the first activation and later calls may omit it. In the
+ * swap mode `store` names the jar whose cookies Chrome's store holds in full (the profile's own at
+ * first), or null while the store holds nothing worth saving: leftovers, or a partial restore.
+ */
 function tabOf(tabId, mode = "debugger") {
   if (!tabs.has(tabId)) {
-    tabs.set(tabId, { identity: null, phase: "idle", mode, store: null, switches: [] });
+    const store = mode === "swap" ? PROFILE_JAR : null;
+    tabs.set(tabId, { identity: null, phase: "idle", mode, store, switches: [] });
   }
   const tab = tabs.get(tabId);
   if (tab.mode !== mode) throw new Error(`Tab ${tabId} runs in mode ${tab.mode}, not ${mode}`);
@@ -65,22 +70,30 @@ async function neutralize(tabId) {
 }
 
 /**
- * Saves the store once the old document's requests are done (within `idleTimeoutMs`). The store
- * holds the cookies of the jar last written into it (a failed switch included), or the profile's
- * own before the first switch.
+ * Saves the store once the old document's requests are done (within `idleTimeoutMs`), then empties
+ * it. The jar is the snapshot as soon as it is saved: a failure while emptying leaves leftovers
+ * that the next switch removes without saving them over the jar.
  */
 async function settle(tabId, tab, idleTimeoutMs) {
   const settled = await waitForIdle(tabId, idleTimeoutMs);
   record("network-settled", { tabId, ...settled });
-  const jar = tab.store ?? PROFILE_JAR;
-  record("cookies-stashed", { tabId, jar, saved: await stash(jar) });
-  tab.store = null;
+  if (tab.store !== null) {
+    record("cookies-saved", { tabId, jar: tab.store, saved: await save(tab.store) });
+    tab.store = null;
+  }
+  if (fault === "empty") {
+    fault = undefined;
+    await empty(1);
+    throw new Error("Injected failure: the store could not be emptied");
+  }
+  record("cookies-removed", { tabId, removed: await empty() });
 }
 
 /** Writes `container`'s cookies into the store; the prelude reads the identity cookie from it. */
 async function bindSwap(tabId, container) {
-  tabs.get(tabId).store = container;
   const restored = await restore(container);
+  // Only a complete restore makes the store worth saving back into the jar.
+  tabs.get(tabId).store = container;
   record("cookies-restored", { tabId, container, restored });
   if (fault === "reconfigure") {
     fault = undefined;
