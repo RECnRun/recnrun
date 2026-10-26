@@ -1,6 +1,8 @@
+import { useEffect, useState } from "preact/hooks";
 import * as v from "valibot";
+import type { PeerStatus } from "@/messaging/peer-results";
 import { allowFolder, chooseFolder, pickFolder } from "@/p2p/folder-store";
-import { FOLDER_HINT } from "@/pairing/FolderSection";
+import { FOLDER_HINT, FOLDER_WAIT } from "@/pairing/FolderSection";
 import type { PeerClient } from "@/views/peer-client";
 import { useAction, usePeerStatus } from "@/views/use-peer";
 
@@ -13,9 +15,27 @@ interface FolderPageProps {
   close?: () => void;
 }
 
+const isPaired = (status: PeerStatus | undefined) =>
+  status !== undefined && status.peer !== null && status.link.verified;
+
+/** Whether the window waits for the pair; once paired, it closes itself. */
+function useWait(status: PeerStatus | undefined, close: () => void) {
+  const [waiting, setWaiting] = useState(false);
+  const paired = isPaired(status);
+  useEffect(() => {
+    // A page the user opened by hand ignores close(), so it shows the folder again.
+    if (waiting && paired) {
+      setWaiting(false);
+      close();
+    }
+  }, [waiting, paired, close]);
+  return { waiting, wait: () => setWaiting(true) };
+}
+
 /**
  * The window the dashboard opens, since a framed page cannot show Chrome's folder picker or its
- * prompt: one click grants the folder, pairing starts, and the window closes.
+ * prompt: one click grants the folder and pairing starts. Chrome keeps the grant only while a
+ * page of the extension is open, so the window waits and closes itself once the profiles pair.
  */
 export function FolderPage({
   client,
@@ -25,12 +45,13 @@ export function FolderPage({
 }: FolderPageProps) {
   const { status } = usePeerStatus(client);
   const action = useAction();
+  const { waiting, wait } = useWait(status, close);
   const again = status?.folder === "prompt";
   const grant = () =>
     action.run(async () => {
       await (again ? allow() : chooseFolder(pick));
       await client.ask({ type: "folder-pair" }, v.unknown());
-      close();
+      wait();
     });
   return (
     <main class="pairing">
@@ -40,9 +61,16 @@ export function FolderPage({
           ? "After a restart, Chrome asks once more before RECnRun may use the folder. Choose Allow on every visit."
           : FOLDER_HINT}
       </p>
-      <button type="button" disabled={!status || action.busy} onClick={() => void grant()}>
-        {again ? "Allow folder" : "Choose folder"}
-      </button>
+      {waiting ? (
+        <p>
+          {FOLDER_WAIT} Keep this window open: Chrome keeps the folder only while it is open. It
+          closes by itself once the profiles pair.
+        </p>
+      ) : (
+        <button type="button" disabled={!status || action.busy} onClick={() => void grant()}>
+          {again ? "Allow folder" : "Choose folder"}
+        </button>
+      )}
       {action.error && <p role="alert">{action.error}</p>}
     </main>
   );

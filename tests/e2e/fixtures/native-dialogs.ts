@@ -4,13 +4,17 @@ import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "n
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
+import { pixelAt, until } from "./display.ts";
+import type { Rgb } from "./display.ts";
 import { test as base } from "./profiles.ts";
 
 /*
  * Chrome's folder picker is a GTK window of its own on the container's Xvfb display, and its
  * two File System Access prompts are bubbles drawn inside the browser window; xdotool drives
  * all three. The picker is found by its title, the browser window by a title the driver gives
- * its page. There is no window manager, so every window gets focus explicitly.
+ * its page, and each bubble by what it does to the display: the write prompt dims the page,
+ * and the restore prompt's buttons are light blue. There is no window manager, so every window
+ * gets focus explicitly.
  */
 
 const exec = promisify(execFile);
@@ -18,6 +22,10 @@ const PICKER_TITLE = "^Select (a folder|where) this site";
 /** Where the restore prompt's buttons sit, from the browser window's corner, at its default size. */
 const RESTORE_BUTTON_X = 290;
 const RESTORE_BUTTON_Y = { "this-time": 268, "every-visit": 310, deny: 353 } as const;
+/** A spot of page background under the toolbar, which the write prompt dims. */
+const PAGE_CORNER = { x: 30, y: 140 };
+const dimmed = ([red]: Rgb) => red < 160;
+const lightBlue = ([red, green, blue]: Rgb) => blue > 240 && green < 240 && red < 230;
 
 type RestoreAnswer = keyof typeof RESTORE_BUTTON_Y;
 
@@ -46,14 +54,11 @@ async function xdotool(...args: string[]): Promise<string> {
 }
 
 /** Resolves once no visible window matches the title; `search` exits 1 for no match. */
-async function windowGone(title: string) {
-  for (let left = 50; left > 0; left--) {
-    const found = await xdotool("search", "--onlyvisible", "--name", title).catch(() => "");
-    if (!found) return;
-    await pause(200);
-  }
-  throw new Error(`The window "${title}" stays open.`);
-}
+const windowGone = (title: string) =>
+  until(
+    async () => !(await xdotool("search", "--onlyvisible", "--name", title).catch(() => "")),
+    `the window "${title}" to close`,
+  );
 
 async function pickerWindow(): Promise<string> {
   return xdotool("search", "--sync", "--onlyvisible", "--name", PICKER_TITLE);
@@ -63,6 +68,16 @@ async function windowOrigin(id: string): Promise<{ x: number; y: number }> {
   const geometry = await xdotool("getwindowgeometry", "--shell", id);
   const at = (axis: "X" | "Y") => Number(new RegExp(`^${axis}=(\\d+)$`, "m").exec(geometry)?.[1]);
   return { x: at("X"), y: at("Y") };
+}
+
+/** Waits until the pixel at the window's offset looks (or no longer looks) like `shown`. */
+async function bubble(id: string, at: { x: number; y: number }, shown: (rgb: Rgb) => boolean) {
+  const origin = await windowOrigin(id);
+  const check = async () => shown(await pixelAt(origin.x + at.x, origin.y + at.y));
+  return {
+    appears: () => until(check, "Chrome's prompt to show"),
+    closes: () => until(async () => !(await check()), "Chrome's prompt to close"),
+  };
 }
 
 let windows = 0;
@@ -102,25 +117,28 @@ async function driverOf(page: Page): Promise<NativeDialogs> {
       await windowGone(PICKER_TITLE);
     },
     async answerWritePrompt(answer) {
-      await pause(500);
-      await xdotool("windowfocus", "--sync", await browserWindow());
-      if (answer === "deny") {
-        await xdotool("key", "Return");
-        return;
+      const id = await browserWindow();
+      const prompt = await bubble(id, PAGE_CORNER, dimmed);
+      await prompt.appears();
+      await xdotool("windowfocus", "--sync", id);
+      if (answer === "deny") await xdotool("key", "Return");
+      else {
+        await xdotool("key", "Tab");
+        await pause(200);
+        await xdotool("key", "space");
       }
-      await xdotool("key", "Tab");
-      await pause(200);
-      await xdotool("key", "space");
+      await prompt.closes();
     },
     async answerRestorePrompt(answer) {
-      await pause(700);
       const id = await browserWindow();
       await xdotool("windowraise", id);
+      const at = { x: RESTORE_BUTTON_X, y: RESTORE_BUTTON_Y[answer] };
+      const prompt = await bubble(id, at, lightBlue);
+      await prompt.appears();
       const { x, y } = await windowOrigin(id);
-      const atX = String(x + RESTORE_BUTTON_X);
-      const atY = String(y + RESTORE_BUTTON_Y[answer]);
-      await xdotool("mousemove", "--sync", atX, atY);
+      await xdotool("mousemove", "--sync", String(x + at.x), String(y + at.y));
       await xdotool("click", "1");
+      await prompt.closes();
     },
   };
 }

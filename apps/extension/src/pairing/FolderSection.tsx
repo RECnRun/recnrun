@@ -17,10 +17,12 @@ export const FOLDER_HINT =
   "In Documents, create a folder named RECnRun, or choose it if another profile already did. " +
   "Profiles that choose the same folder pair on their own.";
 
+export const FOLDER_WAIT = "Waiting for another profile in the folder…";
+
 /** Where pairing through the folder stands, if anywhere. */
 function folderText(status: PeerStatus): string | undefined {
   if (status.peer && status.link.verified) return `Paired with ${status.peer.displayName}`;
-  if (status.folderPairing) return "Waiting for another profile in the folder…";
+  if (status.folderPairing) return FOLDER_WAIT;
   if (status.folder === "prompt") return "Chrome asks again before RECnRun may use the folder.";
   return undefined;
 }

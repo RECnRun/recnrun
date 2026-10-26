@@ -129,25 +129,33 @@ async function chooseFromDashboard(profile: Profile, native: Native) {
   const window = await opened;
   await window.waitForLoadState();
   await expect(window.getByRole("heading", { name: "RECnRun folder" })).toBeVisible();
-  const closed = window.waitForEvent("close");
   await chooseFolder(window, native);
-  // The window closes once the folder is granted and pairing started.
-  await closed;
-  return dashboard;
+  // The window waits, open, since Chrome keeps the folder only while a page is open (H2).
+  await expect(window.getByText("Keep this window open")).toBeVisible();
+  return { dashboard, window };
 }
 
-test("the dashboard's banner opens a window that chooses the folder and closes itself", async ({
+test("two profiles pair from their dashboards, each in a folder window that closes once paired", async ({
   profileA,
+  profileB,
   native,
 }) => {
-  const dashboard = await chooseFromDashboard(profileA, native);
+  // With the fixture's pairing pages closed, the folder window is each profile's only page.
+  await profileA.pairing.close();
+  await profileB.pairing.close();
+  const a = await chooseFromDashboard(profileA, native);
   await expect(
-    dashboard.getByText("Waiting for another profile in the RECnRun folder…"),
+    a.dashboard.getByText("Waiting for another profile in the RECnRun folder…"),
   ).toBeVisible();
-  // Pairing goes no further from here: the window's close ends Chrome's session grant (H2).
-  await expect
-    .poll(() => existsSync(join(native.folder, "pairing")), { timeout: 10_000 })
-    .toBe(true);
+  const b = await chooseFromDashboard(profileB, native);
+  await expect(
+    b.dashboard.getByRole("heading", { name: `Chrome — ${profileA.name} (Connected)` }),
+  ).toBeVisible({ timeout: 30_000 });
+  await expect(
+    a.dashboard.getByRole("heading", { name: `Chrome — ${profileB.name} (Connected)` }),
+  ).toBeVisible();
+  for (const window of [a.window, b.window])
+    await expect.poll(() => window.isClosed(), { timeout: 10_000 }).toBe(true);
 });
 
 test("a profile stays unpaired when the user cancels the picker or Chrome may not edit the folder", async ({
