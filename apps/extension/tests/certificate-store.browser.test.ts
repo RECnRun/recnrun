@@ -53,8 +53,19 @@ describe("persistentCertificate", () => {
     expect(await persistentCertificate()).toBeInstanceOf(RTCCertificate);
   });
 
+  test("keeps the certificate, and so the pairing, when the folder store arrives", async () => {
+    const first = await persistentCertificate();
+    const db = await settled(indexedDB.open(DB_NAME));
+    const version = db.version;
+    db.close();
+    await settled(indexedDB.deleteDatabase(DB_NAME));
+    await seed(1, first);
+    expect(fingerprint(await persistentCertificate())).toBe(fingerprint(first));
+    expect(version).toBe(2);
+  });
+
   test("rejects when the database cannot open", async () => {
-    await seed(2);
+    await seed(3);
     await expect(persistentCertificate()).rejects.toMatchObject({ name: "VersionError" });
   });
 });
