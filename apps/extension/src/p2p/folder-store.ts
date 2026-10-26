@@ -11,6 +11,7 @@ export type FolderAccess = "none" | "prompt" | "granted";
 
 interface PermissionHandle {
   queryPermission: (descriptor: { mode: "readwrite" }) => Promise<PermissionState>;
+  requestPermission: (descriptor: { mode: "readwrite" }) => Promise<PermissionState>;
 }
 
 interface PickerWindow {
@@ -55,4 +56,14 @@ export async function chooseFolder(pick: () => Promise<FileSystemDirectoryHandle
   await folder.getDirectoryHandle(PAIRING_FOLDER, { create: true });
   await folder.getDirectoryHandle(RECORDINGS_FOLDER, { create: true });
   await writeStored(STORE, KEY, folder);
+}
+
+/** Asks Chrome again for the folder chosen before, as it does once after a restart. */
+export async function allowFolder(load: typeof loadFolder = loadFolder): Promise<void> {
+  const folder = await load();
+  if (!folder) throw new Error("Choose the RECnRun folder first.");
+  const state = await (folder as unknown as PermissionHandle).requestPermission({
+    mode: "readwrite",
+  });
+  if (state !== "granted") throw new Error("Chrome did not allow RECnRun to use the folder.");
 }

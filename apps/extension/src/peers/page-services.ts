@@ -16,5 +16,9 @@ export function peerServices(): PeerServices {
       const url = new URL("pairing.html", browser.runtime.getURL("/")).href;
       await browser.tabs.create({ url });
     },
+    openFolder: async () => {
+      const url = new URL("pairing.html#folder", browser.runtime.getURL("/")).href;
+      await browser.windows.create({ url, type: "popup", width: 480, height: 360 });
+    },
   };
 }

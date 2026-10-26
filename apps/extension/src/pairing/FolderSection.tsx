@@ -12,6 +12,11 @@ interface FolderSectionProps {
   pick?: () => Promise<FileSystemDirectoryHandle>;
 }
 
+/** How the user finds the folder, which the folder window says too. */
+export const FOLDER_HINT =
+  "In Documents, create a folder named RECnRun, or choose it if another profile already did. " +
+  "Profiles that choose the same folder pair on their own.";
+
 /** Where pairing through the folder stands, if anywhere. */
 function folderText(status: PeerStatus): string | undefined {
   if (status.peer && status.link.verified) return `Paired with ${status.peer.displayName}`;
@@ -39,10 +44,7 @@ export function FolderSection({
   return (
     <section aria-labelledby="folder-heading">
       <h2 id="folder-heading">RECnRun folder</h2>
-      <p>
-        In Documents, create a folder named RECnRun, or choose it if another profile already did.
-        Profiles that choose the same folder pair on their own.
-      </p>
+      <p>{FOLDER_HINT}</p>
       <p>If iCloud Drive syncs Documents, it uploads what RECnRun keeps in the folder.</p>
       <button type="button" disabled={action.busy} onClick={() => void choose()}>
         {granted ? "Choose another folder" : "Choose folder"}

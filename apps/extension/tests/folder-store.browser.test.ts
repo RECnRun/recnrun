@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, test, vi } from "vite-plus/test";
-import { chooseFolder, folderAccess, loadFolder, pickFolder } from "@/p2p/folder-store";
+import {
+  allowFolder,
+  chooseFolder,
+  folderAccess,
+  loadFolder,
+  pickFolder,
+} from "@/p2p/folder-store";
 
 /** A fresh folder in the origin private file system, standing in for the one the user picks. */
 async function privateFolder(name: string) {
@@ -38,6 +44,23 @@ describe("folderAccess", () => {
     const folder = { queryPermission: vi.fn(async () => state) };
     expect(await folderAccess(folder as unknown as FileSystemDirectoryHandle)).toBe("prompt");
     expect(folder.queryPermission).toHaveBeenCalledWith({ mode: "readwrite" });
+  });
+});
+
+describe("allowFolder", () => {
+  test("asks Chrome again for the folder this profile chose", async () => {
+    await expect(allowFolder()).rejects.toThrow("Choose the RECnRun folder first.");
+    await chooseFolder(async () => privateFolder("RECnRun"));
+    await expect(allowFolder()).resolves.toBeUndefined();
+  });
+
+  test("fails unless Chrome grants the folder", async () => {
+    const folder = { requestPermission: vi.fn(async () => "denied") };
+    const load = async () => folder as unknown as FileSystemDirectoryHandle;
+    await expect(allowFolder(load)).rejects.toThrow(
+      "Chrome did not allow RECnRun to use the folder.",
+    );
+    expect(folder.requestPermission).toHaveBeenCalledWith({ mode: "readwrite" });
   });
 });
 

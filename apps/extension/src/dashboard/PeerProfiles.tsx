@@ -1,4 +1,5 @@
 import * as v from "valibot";
+import { FolderBanner, PairControls } from "@/dashboard/FolderPairing";
 import { peerBlocks } from "@/dashboard/peer-blocks";
 import type { PairedStatus } from "@/dashboard/peer-blocks";
 import { TabList } from "@/dashboard/TabList";
@@ -46,19 +47,6 @@ function RemoteProfile({
   );
 }
 
-/** Leads to the folder page, since the framed dashboard cannot show Chrome's folder picker. */
-function FolderBanner({ peers }: { peers: PeerServices }) {
-  return (
-    <section class="folder-banner" aria-labelledby="folder-banner-heading">
-      <h3 id="folder-banner-heading">Choose the RECnRun folder</h3>
-      <p>Your Chrome profiles pair through a folder named RECnRun in Documents.</p>
-      <button type="button" onClick={() => void peers.openPairing()}>
-        Choose folder
-      </button>
-    </section>
-  );
-}
-
 /**
  * Unpaired, the dashboard is the local one plus a way to pair; paired, this profile's tabs and
  * the other profile's, each under the profile's name.
@@ -67,18 +55,14 @@ export function PeerProfiles({ services, peers, take, takeRemote }: PeerProfiles
   const { status } = usePeerStatus(peers.client);
   const localRunning = useRecording(services.recordings).status !== "idle";
   const paired = status?.peer ? { ...status, peer: status.peer } : undefined;
-  const pairButton = (
-    <button type="button" onClick={() => void peers.openPairing()}>
-      {paired ? "Manage pairing" : "Pair another profile"}
-    </button>
-  );
-  const banner = status && status.folder !== "granted" && <FolderBanner peers={peers} />;
+  const banner = <FolderBanner peers={peers} status={status} />;
+  const pairControls = <PairControls peers={peers} status={status} />;
   if (!paired) {
     return (
       <>
         {banner}
         <TabList tabs={services.tabs} store={services.recordings} take={take} />
-        {pairButton}
+        {pairControls}
       </>
     );
   }
@@ -94,7 +78,7 @@ export function PeerProfiles({ services, peers, take, takeRemote }: PeerProfiles
         blocked={blocks.local}
       />
       <RemoteProfile peers={peers} status={paired} take={takeRemote} blocked={blocks.remote} />
-      {pairButton}
+      {pairControls}
     </>
   );
 }

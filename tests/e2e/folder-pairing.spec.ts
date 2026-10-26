@@ -2,6 +2,7 @@ import type { Page } from "@playwright/test";
 import { expect } from "./fixtures/extension.ts";
 import { test } from "./fixtures/profiles.ts";
 import type { Profile } from "./fixtures/profiles.ts";
+import { dashboardOf } from "./fixtures/session.ts";
 
 /*
  * Playwright cannot drive Chrome's folder picker (H4), so each pairing page picks a RECnRun
@@ -167,6 +168,48 @@ test("a paired profile that restarts reconnects through the folder with no click
     });
     const page = await pairingPage(restarted);
     await expect(page.getByRole("status")).toHaveText(`Connected — ${profileA.name}`);
+  } finally {
+    await stop();
+  }
+});
+
+/** Chooses the folder from a site tab's dashboard, through the window the banner opens. */
+async function chooseFromDashboard(profile: Profile) {
+  const site = await profile.context.newPage();
+  await site.goto("/");
+  const dashboard = dashboardOf(site);
+  await expect(dashboard.getByRole("heading", { name: "Choose the RECnRun folder" })).toBeVisible();
+  const opened = profile.context.waitForEvent("page");
+  await dashboard.getByRole("button", { name: "Choose folder" }).click();
+  const window = await opened;
+  await window.waitForLoadState();
+  await expect(window.getByRole("heading", { name: "RECnRun folder" })).toBeVisible();
+  const closed = window.waitForEvent("close");
+  await chooseFolder(window);
+  // The window closes once the folder is granted and pairing started.
+  await closed;
+  return dashboard;
+}
+
+test("two profiles pair from their dashboards, each choosing the folder in a window of its own", async ({
+  profileA,
+  profileB,
+}) => {
+  const a = { profile: profileA, id: await profileIdOf(profileA) };
+  const b = { profile: profileB, id: await profileIdOf(profileB) };
+  const stop = mirror(a, b);
+  try {
+    const dashboardA = await chooseFromDashboard(profileA);
+    await expect(
+      dashboardA.getByText("Waiting for another profile in the RECnRun folder…"),
+    ).toBeVisible();
+    const dashboardB = await chooseFromDashboard(profileB);
+    await expect(
+      dashboardB.getByRole("heading", { name: `Chrome — ${profileA.name} (Connected)` }),
+    ).toBeVisible({ timeout: 30_000 });
+    await expect(
+      dashboardA.getByRole("heading", { name: `Chrome — ${profileB.name} (Connected)` }),
+    ).toBeVisible();
   } finally {
     await stop();
   }

@@ -107,6 +107,17 @@ describe("peerServices", () => {
     expect(sent).toEqual([{ type: "peer", request: { type: "session-set", status: "recording" } }]);
   });
 
+  test("opens the folder page in a small window of its own", async () => {
+    const create = vi.spyOn(fakeBrowser.windows, "create");
+    await peerServices().openFolder();
+    expect(create).toHaveBeenCalledWith({
+      url: fakeBrowser.runtime.getURL("/pairing.html#folder"),
+      type: "popup",
+      width: 480,
+      height: 360,
+    });
+  });
+
   test("opens the pairing page in a new tab", async () => {
     const create = vi.spyOn(fakeBrowser.tabs, "create");
     await peerServices().openPairing();
