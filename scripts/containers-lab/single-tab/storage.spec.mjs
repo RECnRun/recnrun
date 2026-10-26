@@ -33,7 +33,7 @@ async function assertWritten(written) {
     // The session cookie is HttpOnly: the page never sees it, the network always does.
     assert.equal(read.cookie, identity);
     assert.equal(/(^|; )sid=/.test(await handle.page.evaluate(() => document.cookie)), false);
-    assert.equal(read.cookieStore, false);
+    assert.equal(read.cookieStore, lab.SWAP);
   }
 }
 
@@ -44,7 +44,11 @@ function assertResumed({ read, user }, identity) {
 
 await test("storage per identity across suspend, resume, and reset", async (t) => {
   t.after(async () => {
-    lab.writeEvidence("single-tab-storage", { chromium: handle.version, ...evidence });
+    lab.writeEvidence(`single-tab-storage-${lab.MODE}`, {
+      mode: lab.MODE,
+      chromium: handle.version,
+      ...evidence,
+    });
     await handle.close();
   });
 
@@ -73,8 +77,11 @@ await test("storage per identity across suspend, resume, and reset", async (t) =
       assert.deepEqual(containers, ["a", "b.2", "c"]);
       assert.deepEqual(await handle.lab.jar("b"), []);
       assert.equal(lab.loginsOf(handle, "Admin"), 1);
-      // The real jar never received a session or a marker.
-      assert.deepEqual(await handle.lab.realCookies(), []);
+      // Debugger: the real jar never received a session or a marker. Swap: it holds C's, the active one.
+      assert.deepEqual(
+        await lab.realCookieNames(handle),
+        lab.SWAP ? ["__rnr", "marker", "sid"] : [],
+      );
     },
   );
 

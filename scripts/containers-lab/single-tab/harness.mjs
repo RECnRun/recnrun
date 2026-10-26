@@ -7,6 +7,9 @@ import { launchLab, readAfterReloads, writeEvidence } from "../lab-browser.mjs";
 export { APP, IDP, writeEvidence };
 
 export const USERS = { A: "Admin", B: "Requester", C: "Approver" };
+/** "debugger" (a jar per identity on the network path) or "swap" (chrome.cookies around the switch). */
+export const MODE = process.env.SINGLE_TAB_MODE ?? "debugger";
+export const SWAP = MODE === "swap";
 
 /** Chromium with the lab in N2B1, the fixture, and one blank managed tab. */
 export async function launchSingleTab() {
@@ -26,7 +29,7 @@ export async function launchSingleTab() {
 
 /** Activates `identity` in the tab and waits for the app document; returns the switch receipt. */
 export async function activate(handle, identity, options = {}) {
-  const receipt = await handle.lab.activate(handle.tabId, identity, options);
+  const receipt = await handle.lab.activate(handle.tabId, identity, { mode: MODE, ...options });
   await handle.page.waitForLoadState("domcontentloaded");
   return receipt;
 }
@@ -106,6 +109,12 @@ export const orderId = (prefix) => `${prefix}-${randomUUID().slice(0, 8)}`;
 export async function eventsMatching(handle, pattern) {
   return (await handle.lab.events()).filter(({ type }) => pattern.test(type));
 }
+
+/** The distinct names of the cookies in the profile's own store, sorted. */
+export const realCookieNames = async (handle) =>
+  [...new Set((await handle.lab.realCookies()).map(({ name }) => name))].toSorted((a, b) =>
+    a.localeCompare(b),
+  );
 
 /** The app tabs Chrome has: the single-tab flow must never open a second one. */
 export async function appTabs(handle) {

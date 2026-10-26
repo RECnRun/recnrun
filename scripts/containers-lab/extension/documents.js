@@ -51,10 +51,11 @@ export function waitForCommit(tabId, matches, timeoutMs = 5000) {
   });
 }
 
+/** Commits of every tab a switch waits on (managed or swap): documents, evidence, and waiters. */
 function onCommitted(details) {
   const { tabId, frameId, documentId, url } = details;
+  if (!tabs.has(tabId)) return;
   const phase = phaseOf(tabId);
-  if (!phase.managed) return;
   const state = stateOf(tabId);
   remember(state.documents, documentId, phase.container);
   if (frameId === 0) {

@@ -7,13 +7,18 @@ import { test } from "node:test";
 import * as lab from "./harness.mjs";
 
 const HOME = `${lab.APP}/home`;
+const late = (jar) => jar.find(({ name }) => name === "late")?.value ?? null;
 
 const handle = await lab.launchSingleTab();
 const evidence = {};
 
 await test("switch transitions", async (t) => {
   t.after(async () => {
-    lab.writeEvidence("single-tab-transitions", { chromium: handle.version, ...evidence });
+    lab.writeEvidence(`single-tab-transitions-${lab.MODE}`, {
+      mode: lab.MODE,
+      chromium: handle.version,
+      ...evidence,
+    });
     await handle.close();
   });
   await lab.activate(handle, "A", { url: HOME });
@@ -32,7 +37,6 @@ await test("switch transitions", async (t) => {
     await handle.page.waitForTimeout(2500);
     const pending = lab.requestsSince(handle, since).find(({ tag }) => tag === "pending");
     const jars = { a: await handle.lab.jar("a"), b: await handle.lab.jar("b") };
-    const late = (jar) => jar.find(({ name }) => name === "late")?.value ?? null;
     const events = await lab.eventsMatching(
       handle,
       /set-cookie-dropped|request-blocked|request-gone/,
@@ -46,8 +50,10 @@ await test("switch transitions", async (t) => {
     assert.equal(pending?.user, "Admin");
     assert.equal(late(jars.b), null);
     assert.equal(await lab.whoAmI(handle.page), "Requester");
-    // The late response's Set-Cookie reached the jar of the identity that made the request.
-    assert.equal(late(jars.a), "Admin");
+    // Debugger: the late Set-Cookie reached the jar of the identity that made the request. Swap: A's
+    // jar was saved before the response, so the cookie fell into the store B now uses (out of scope).
+    assert.equal(late(jars.a), lab.SWAP ? null : "Admin");
+    if (lab.SWAP) assert.ok((await lab.realCookieNames(handle)).includes("late"));
   });
 
   await t.test("queued switches run in order and the last one wins", async () => {
@@ -105,6 +111,7 @@ await test("switch transitions", async (t) => {
 
   await t.test(
     "a lost debugger session is re-established before the app document loads",
+    { skip: lab.SWAP && "the swap mode has no debugger session" },
     async () => {
       await handle.lab.clearEvents();
       await handle.lab.failNext("detach");
@@ -124,18 +131,23 @@ await test("switch transitions", async (t) => {
     async () => {
       await lab.activate(handle, "C", { url: HOME });
       const rendered = await lab.signIn(handle, "Approver", { idp: true });
-      const jars = { a: await handle.lab.jar("a"), c: await handle.lab.jar("c") };
-      const names = (jar) => jar.map(({ name }) => name).toSorted();
+      // C's jar is complete once C is suspended (the swap mode saves it then).
       await lab.activate(handle, "A", { url: HOME });
+      const jars = { a: await handle.lab.jar("a"), c: await handle.lab.jar("c") };
+      const names = (jar) => jar.map(({ name }) => name).toSorted((x, y) => x.localeCompare(y));
       evidence.idp = { rendered, jars: { a: names(jars.a), c: names(jars.c) } };
       assert.equal(rendered, "Approver");
-      assert.deepEqual(names(jars.c), ["idp_embed", "idp_user", "sid"]);
+      // Chrome's own store refuses the Secure cookie over http://idp.localhost; the lab's jar took it.
+      const expected = lab.SWAP ? ["idp_user", "sid"] : ["idp_embed", "idp_user", "sid"];
+      assert.deepEqual(names(jars.c), expected);
       assert.deepEqual(
         names(jars.a).filter((name) => name.startsWith("idp")),
         [],
       );
       assert.equal(await lab.whoAmI(handle.page), "Admin");
-      assert.deepEqual(await handle.lab.realCookies(), []);
+      assert.deepEqual(await lab.realCookieNames(handle), lab.SWAP ? ["__rnr", "sid"] : []);
+      // Swap: the late cookie of the pending case fell into the store B used, so it is in B's jar now.
+      if (lab.SWAP) assert.equal(late(await handle.lab.jar("b")), "Admin");
     },
   );
 

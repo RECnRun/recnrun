@@ -3,7 +3,9 @@
 // reset gives it a new, empty container. Every switch destroys the tab's document through a
 // neutral about:blank, rebinds the debugger session, the registry, and the prelude to the next
 // container, and only then loads the application again. Switches run one at a time, and a failed
-// switch leaves the tab blocked until a switch succeeds.
+// switch leaves the tab blocked until a switch succeeds. A tab runs in one of two modes: "debugger"
+// (the default: one jar per identity on the network path, as the tab-group lab does) or "swap"
+// (no debugger: the profile's cookie store is saved and restored around the switch, swap.js).
 import { switchPrelude } from "./b1.js";
 import { setPhaseSource, waitForCommit } from "./documents.js";
 import { record } from "./events.js";
@@ -11,6 +13,7 @@ import { clearJar } from "./jar-store.js";
 import { detachTab, isAttached, rebind } from "./n2.js";
 import { pin, refresh } from "./registry.js";
 import { blockTab, unblockTab } from "./sessions-block.js";
+import { PROFILE_JAR, restore, stash } from "./swap.js";
 
 const NEUTRAL = "about:blank";
 const identities = new Map();
@@ -22,9 +25,14 @@ let fault;
 export const containerIdOf = (id, generation) =>
   generation === 1 ? id.toLowerCase() : `${id.toLowerCase()}.${generation}`;
 
-function tabOf(tabId) {
-  if (!tabs.has(tabId)) tabs.set(tabId, { identity: null, phase: "idle", switches: [] });
-  return tabs.get(tabId);
+/** The tab's state; its mode is fixed by the first activation and later calls may omit it. */
+function tabOf(tabId, mode = "debugger") {
+  if (!tabs.has(tabId)) {
+    tabs.set(tabId, { identity: null, phase: "idle", mode, store: null, switches: [] });
+  }
+  const tab = tabs.get(tabId);
+  if (tab.mode !== mode) throw new Error(`Tab ${tabId} runs in mode ${tab.mode}, not ${mode}`);
+  return tab;
 }
 
 /** The identity's current container, created on first use; `reset` abandons the previous one. */
@@ -40,6 +48,13 @@ function identityOf(id, reset) {
 
 async function suspend(tab, tabId) {
   const previous = tab.phase === "active" ? identities.get(tab.identity) : undefined;
+  if (tab.mode === "swap") {
+    // The store holds the cookies of the jar last written into it (a failed switch included), or the
+    // profile's own before the first switch.
+    const jar = tab.store ?? PROFILE_JAR;
+    record("cookies-stashed", { tabId, jar, saved: await stash(jar) });
+    tab.store = null;
+  }
   if (!previous) return;
   previous.lastUrl = (await chrome.tabs.get(tabId)).url;
   record("identity-suspended", { tabId, identity: previous.id, lastUrl: previous.lastUrl });
@@ -50,6 +65,17 @@ async function neutralize(tabId) {
   const committed = waitForCommit(tabId, ({ frameId, url }) => frameId === 0 && url === NEUTRAL);
   await chrome.tabs.update(tabId, { url: NEUTRAL });
   return committed;
+}
+
+/** Writes `container`'s cookies into the store; the prelude reads the identity cookie from it. */
+async function bindSwap(tabId, container) {
+  tabs.get(tabId).store = container;
+  const restored = await restore(container);
+  record("cookies-restored", { tabId, container, restored });
+  if (fault === "reconfigure") {
+    fault = undefined;
+    throw new Error("Injected failure: the identity cookie could not be written");
+  }
 }
 
 /** Binds the debugger session, the registry, and the prelude to `container` before any app document. */
@@ -82,7 +108,7 @@ async function navigate(tabId, url) {
 
 async function transition(tabId, tab, identity, url) {
   const neutral = await neutralize(tabId);
-  await bind(tabId, identity.container);
+  await (tab.mode === "swap" ? bindSwap : bind)(tabId, identity.container);
   tab.identity = identity.id;
   tab.phase = "active";
   await unblockTab(tabId);
@@ -102,14 +128,14 @@ async function attempt(tab, identity, url, receipt) {
   }
 }
 
-async function doActivate(tabId, id, { reset = false, url } = {}) {
-  const tab = tabOf(tabId);
-  const { identity, kind } = identityOf(id, reset);
-  const target = url ?? identity.lastUrl;
+async function doActivate(tabId, id, { reset = false, url, mode } = {}) {
+  const tab = tabOf(tabId, mode ?? tabs.get(tabId)?.mode);
+  const target = url ?? identities.get(id)?.lastUrl;
   if (!target) throw new Error(`Identity ${id} has no URL to open; pass one`);
   const started = Date.now();
-  const receipt = { tabId, from: tab.identity, to: id, kind, container: identity.container };
   await suspend(tab, tabId);
+  const { identity, kind } = identityOf(id, reset);
+  const receipt = { tabId, from: tab.identity, to: id, kind, container: identity.container };
   tab.phase = "switching";
   record("switch-started", receipt);
   await attempt(tab, identity, target, receipt);
@@ -119,7 +145,10 @@ async function doActivate(tabId, id, { reset = false, url } = {}) {
   return receipt;
 }
 
-/** Makes `id` the tab's active identity: a start, a resume, or (with `reset`) a fresh container. */
+/**
+ * Makes `id` the tab's active identity: a start, a resume, or (with `reset`) a fresh container.
+ * `mode` is "debugger" or "swap" and is fixed by the tab's first activation.
+ */
 export function activate(tabId, id, options) {
   const run = queue.then(() => doActivate(tabId, id, options));
   queue = run.catch(() => {});
@@ -141,7 +170,8 @@ export const sessions = () => ({
 export function startSessions() {
   setPhaseSource((tabId) => {
     const tab = tabs.get(tabId);
-    if (!tab) return { managed: false, container: null };
+    // A swap tab is a control tab to the network engines: Chrome's store is the active identity's.
+    if (!tab || tab.mode === "swap") return { managed: false, container: null };
     const active = tab.phase === "active" ? identities.get(tab.identity) : undefined;
     return { managed: true, container: active?.container ?? null };
   });

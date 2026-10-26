@@ -4,7 +4,7 @@ Branch `poc/single-tab-multi-user`, based on `poc/tab-group-containers` (`d150bf
 
 **Scope.** Save and restore each identity's data (HTTP cookies, HttpOnly included, `document.cookie`, `localStorage`, `sessionStorage`, IndexedDB, CacheStorage, OPFS) across switches in one tab, with a new document on every switch. Isolating the network, service workers, and other workers is out of scope: the lab's debugger interception and prelude are used here as the mechanism that keeps one jar and one storage namespace per identity, not as a security boundary.
 
-**Verdict: PASS** for that scope. A → B → A → C → A ran three times in one tab (same `tabId`), every switch loaded a new document, nobody signed in twice, each identity found its cookies and every page storage API intact, and a reset gave an identity an empty jar and namespace while the others kept theirs. The tab-group POC's known leaks (shared-worker requests, the extension-reload window, service workers disabled) do not affect saving or restoring data; they are listed under Limitations as out of scope. §5 recommends a leaner mechanism for the product: swap cookies with `chrome.cookies` and keep the storage prelude, without `chrome.debugger`. The product choice behind the API is recorded in the Session panel sketch: the developer picks another identity, RECnRun decides Start versus Resume, and Reset is explicit.
+**Verdict: PASS** for that scope, in two modes of the same session manager. The **debugger** mode keeps the tab-group lab's mechanism (one jar per identity on the network path through `chrome.debugger`, the prelude installed by the debugger). The **swap** mode has no debugger: the profile's own cookie store is saved into the identity's jar with `chrome.cookies` and the next identity's jar is written back, and the prelude, a plain content script, learns the active identity from a cookie the extension sets. In both modes A → B → A → C → A ran three times in one tab (same `tabId`), every switch loaded a new document, nobody signed in twice, each identity found its cookies and every page storage API intact, and a reset gave an identity an empty jar and namespace while the others kept theirs. The tab-group POC's known leaks (shared-worker requests, the extension-reload window, service workers disabled) do not affect saving or restoring data; they are listed under Limitations as out of scope. The product choice behind the API is recorded in the Session panel sketch: the developer picks another identity, RECnRun decides Start versus Resume, and Reset is explicit.
 
 ## 1. Environment, setup, reproduction, cleanup
 
@@ -19,20 +19,29 @@ Branch `poc/single-tab-multi-user`, based on `poc/tab-group-containers` (`d150bf
 ```sh
 vp install
 vp run test:containers-lab          # unit checks, now including sessions.checks.mjs (node --test)
-vp run test:single-tab              # the three specs in Docker (Xvfb)
+vp run test:single-tab              # the three specs in Docker (Xvfb), once per mode
 vp run test:single-tab:local        # the same on the host, for debugging
+SINGLE_TAB_MODE=swap node --test --test-concurrency=1 scripts/containers-lab/single-tab/*.spec.mjs   # one mode
 ```
 
 Each spec starts the fixture, launches Chromium with the lab extension in a `mkdtemp` profile, opens one managed tab, writes `.artifacts/containers-lab/single-tab-<name>.json`, and deletes the profile on close. The specs run one at a time (`--test-concurrency=1`): they share the fixture ports. No step is manual.
 
 ## 2. Architecture
 
-The previous POC gave each identity its own tab (group). This one keeps the identity a container (a cookie jar plus a storage namespace, as before) but binds it to a tab for a while, not forever. Three new modules in the extension, all behind the existing `chrome.debugger` Fetch interception (N2) and the page prelude (B1):
+The previous POC gave each identity its own tab (group). This one keeps the identity a container (a cookie jar plus a storage namespace, as before) but binds it to a tab for a while, not forever. The session manager runs a tab in one of two modes, fixed by the tab's first activation (`activate(tabId, identity, { mode })`):
+
+| Mode       | Cookies                                                                                                                                                       | Storage namespace                                                                                                                    | Needs                                 |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------- |
+| `debugger` | One jar per identity, written into every request by `chrome.debugger` Fetch interception (N2); `Set-Cookie` attributed to the document that made the request. | The prelude, registered by the debugger with the container before any document (B1).                                                 | `debugger` permission, the infobar    |
+| `swap`     | The profile's own store holds the active identity's cookies; `swap.js` saves them (HttpOnly included) into the jar and writes the next jar back.              | The same prelude as a manifest content script (`control-start.js`), reading the identity from the `__rnr` cookie the extension sets. | `cookies` and `scripting` permissions |
+
+Modules in the extension:
 
 | Module                           | Role                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `extension/sessions.js`          | The session manager. `activate(tabId, identity, { reset, url })` is the one operation; it decides Start (first use), Resume (an existing container), or Reset (`reset: true`: a new generation `b.2`, the old jar cleared). Switches run through one queue, so two calls never interleave. A tab is `idle`, `switching`, `active`, or `failed`.                                                                                                     |
 | `extension/documents.js`         | Which identity each document belongs to. CDP's `loaderId` (from `Network.requestWillBeSent` and `Page.frameNavigated`) and webNavigation's `documentId` are mapped to the container that was active when the document was created. A paused request is attributed to its document, never to the tab's current identity; while the tab is switching no identity is active, and a request whose document is unknown is blocked (`Fetch.failRequest`). |
+| `extension/swap.js`              | The swap mode's cookie moves: `stash(jar)` reads the app's domains with `chrome.cookies.getAll`, stores them in the jar (the jar's cookie shape), and removes them; `restore(jar)` sets them back and sets `__rnr=<container>` on each domain. Before the first switch the profile's own cookies go to the jar `profile`.                                                                                                                           |
 | `extension/sessions-block.js`    | One session DNR rule per failed tab (id `20000 + tabId`, priority 100) that blocks every request until the next switch succeeds, so a failure never continues with the wrong identity.                                                                                                                                                                                                                                                              |
 | `extension/registry.js` (change) | `pin(tabId, container)` overrides the tab-group classification for a managed tab.                                                                                                                                                                                                                                                                                                                                                                   |
 | `extension/n2.js` (change)       | `rebind(tabId, container)` moves the attached debugger session to the next container; `decide` from `documents.js` runs before every paused request.                                                                                                                                                                                                                                                                                                |
@@ -42,31 +51,33 @@ A switch, in order:
 
 1. **Suspend.** The active identity's `lastUrl` is saved (the tab's URL). The tab's phase becomes `switching`: no identity is active, so any navigation request is blocked (`navigation-while-switching`) and any subresource request is attributed to the document that made it, or blocked.
 2. **Neutralize.** `chrome.tabs.update(tabId, { url: "about:blank" })`, and the manager waits for `webNavigation.onCommitted` of that document. The previous document is gone, with its JavaScript heap, its `sessionStorage` view, and its Web Locks.
-3. **Bind.** The debugger session is rebound to the next container (or re-attached if it was lost), the tab is pinned to the container in the registry, the DNR rules are refreshed, and the prelude is reinstalled with `Page.addScriptToEvaluateOnNewDocument`. Interception and the prelude are in place before any application request.
+3. **Bind.** Debugger mode: the debugger session is rebound to the next container (or re-attached if it was lost), the tab is pinned to the container in the registry, the DNR rules are refreshed, and the prelude is reinstalled with `Page.addScriptToEvaluateOnNewDocument`. Swap mode: step 1 already moved the store's cookies into the suspended identity's jar; now the next identity's jar is written into the store, with the `__rnr` cookie that names the container, and the tab remembers whose cookies the store holds (so a failed switch is stashed into the right jar). Either way the cookies and the prelude are in place before any application request.
 4. **Resume.** The tab's phase becomes `active`, the block rule (if any) is removed, and the tab navigates to `url` or the identity's `lastUrl`. The manager waits for that document's commit and returns a receipt: `{ tabId, from, to, kind, container, neutral: { documentId, url }, document: { documentId, url }, ms }`.
 
 If step 3 or 4 throws, the tab's phase becomes `failed`, the block rule is installed, and `activate` rejects; the next successful `activate` clears it. A debugger detach on an active tab (the user closing the infobar, for example) has the same effect.
 
-Storage is preserved because nothing is copied: the jar of container `a` keeps A's cookies while B is active, and the prelude maps B's `localStorage`, IndexedDB, CacheStorage, OPFS, `BroadcastChannel`, and Web Locks to B's namespace. Resume rebinds the same container; Reset binds a new one. `sessionStorage` is per tab in Chrome, and the prelude namespaces it per container, so A's `sessionStorage` survives the neutral navigation and B's turn (§3).
+In both modes storage is preserved because nothing is copied: the jar of container `a` keeps A's cookies while B is active, and the prelude maps B's `localStorage`, IndexedDB, CacheStorage, OPFS, `BroadcastChannel`, and Web Locks to B's namespace. Resume rebinds the same container; Reset binds a new one. `sessionStorage` is per tab in Chrome, and the prelude namespaces it per container, so A's `sessionStorage` survives the neutral navigation and B's turn (§3).
 
 ### Files
 
-| File                                                                               | Lines | Purpose                                                                        |
-| ---------------------------------------------------------------------------------- | ----- | ------------------------------------------------------------------------------ |
-| `scripts/containers-lab/extension/sessions.js`                                     | 157   | Session manager (new)                                                          |
-| `scripts/containers-lab/extension/documents.js`                                    | 156   | Document ↔ identity attribution (new)                                          |
-| `scripts/containers-lab/extension/sessions-block.js`                               | 45    | Block rule for failed tabs (new)                                               |
-| `scripts/containers-lab/extension/{registry,n2,b1,rules,bootstraps,background}.js` |       | Pinning, rebinding, prelude switch, Set-Cookie ownership, lab handle (changed) |
-| `scripts/containers-lab/single-tab/harness.mjs`                                    | 113   | One managed tab, sign-in, order page, fixture log queries                      |
-| `scripts/containers-lab/single-tab/flow.spec.mjs`                                  | 101   | A → B → A → C → A, three rounds                                                |
-| `scripts/containers-lab/single-tab/storage.spec.mjs`                               | 92    | Page APIs across suspend, resume, and reset                                    |
-| `scripts/containers-lab/single-tab/transitions.spec.mjs`                           | 155   | Pending requests, queued switches, injected failures, IdP redirects, cache     |
-| `scripts/containers-lab/sessions.checks.mjs`                                       | 50    | Unit checks for `containerIdOf` and `decide`                                   |
-| `scripts/containers-lab/fixture/order.html`, `fixture-server.mjs`                  |       | Order page and a `/slow` route (changed)                                       |
+| File                                                                               | Lines | Purpose                                                                         |
+| ---------------------------------------------------------------------------------- | ----- | ------------------------------------------------------------------------------- |
+| `scripts/containers-lab/extension/sessions.js`                                     | 187   | Session manager, both modes (new)                                               |
+| `scripts/containers-lab/extension/swap.js`                                         | 80    | Cookie stash and restore with `chrome.cookies` (new)                            |
+| `scripts/containers-lab/extension/control-start.js`                                | 13    | The content-script prelude takes the identity from the `__rnr` cookie (changed) |
+| `scripts/containers-lab/extension/documents.js`                                    | 156   | Document ↔ identity attribution (new)                                           |
+| `scripts/containers-lab/extension/sessions-block.js`                               | 45    | Block rule for failed tabs (new)                                                |
+| `scripts/containers-lab/extension/{registry,n2,b1,rules,bootstraps,background}.js` |       | Pinning, rebinding, prelude switch, Set-Cookie ownership, lab handle (changed)  |
+| `scripts/containers-lab/single-tab/harness.mjs`                                    | 113   | One managed tab, sign-in, order page, fixture log queries                       |
+| `scripts/containers-lab/single-tab/flow.spec.mjs`                                  | 101   | A → B → A → C → A, three rounds                                                 |
+| `scripts/containers-lab/single-tab/storage.spec.mjs`                               | 92    | Page APIs across suspend, resume, and reset                                     |
+| `scripts/containers-lab/single-tab/transitions.spec.mjs`                           | 155   | Pending requests, queued switches, injected failures, IdP redirects, cache      |
+| `scripts/containers-lab/sessions.checks.mjs`                                       | 50    | Unit checks for `containerIdOf` and `decide`                                    |
+| `scripts/containers-lab/fixture/order.html`, `fixture-server.mjs`                  |       | Order page and a `/slow` route (changed)                                        |
 
 ## 3. Tests and results
 
-All runs: `vp run test:single-tab` in Docker, 11/11; `vp run test:single-tab:local` on the host, 11/11; `vp run test:containers-lab`, 25/25.
+All runs, both modes: `vp run test:single-tab` in Docker, debugger 11/11 and swap 10/10 with the debugger-only case skipped; `vp run test:single-tab:local` on the host, the same; `vp run test:containers-lab`, 25/25. The tables below show the debugger mode's numbers; the swap mode's differences follow each section.
 
 ### The workflow, three rounds (`flow.spec.mjs`)
 
@@ -99,6 +110,8 @@ Assertions that passed, per round and over all 15 turns:
 - Every request the fixture logged during a turn carried that identity's `sid` or none (before its sign-in); none carried `profile=real-chrome-jar`, and the profile's jar still holds only that cookie afterwards.
 - No `switch-failed` or `session-lost` event.
 
+Swap mode, same assertions: 15 turns, switches 18–46 ms, three sign-ins, 30 distinct documents. The profile's cookie for the app was moved into the jar `profile` at the first switch and never reached a request; at the end the store holds A's `sid` and the `__rnr` cookie only.
+
 ### Storage across suspend, resume, and reset (`storage.spec.mjs`)
 
 On `/apis`, each identity writes its marker to `localStorage`, `sessionStorage`, `document.cookie`, IndexedDB, CacheStorage, and OPFS, and holds a Web Lock.
@@ -108,6 +121,8 @@ On `/apis`, each identity writes its marker to `localStorage`, `sessionStorage`,
 - Reset of B (`reset: true`): container `b.2`, every API reads `null`, no `localStorage` keys, no caches, `/me` answers signed out, and the jar `b` is empty. A and C then resume with their markers and their users intact; the identities are `a`, `b.2`, `c`. Admin still signed in once.
 - `sessionStorage` written by A after a resume is invisible to C (`null`) and present for A at the next resume (`A2`): it survives the neutral navigation.
 - The profile's jar is empty at the end: no session or marker reached it.
+
+Swap mode, same results for every API, reset, and `sessionStorage`. Differences: `cookieStore` is Chrome's own (not disabled), and the store holds the active identity's cookies at any time (`sid`, `marker`, `__rnr` while C is active).
 
 ### Transitions (`transitions.spec.mjs`)
 
@@ -120,6 +135,8 @@ On `/apis`, each identity writes its marker to `localStorage`, `sessionStorage`,
 | Cross-origin sign-in              | C signs in through the identity provider (`/authorize` → `/callback` → `/home`, with the provider's own cookies). Jar `c` holds `idp_embed`, `idp_user`, `sid`; jar `a` holds no provider cookie; A resumes as Admin; the profile's jar stays empty.                                                                                            |
 | Cacheable private response        | `/me-cached` answers Admin for A and Approver for C after the switch, with two server hits: the cache bypass of the previous POC holds across identities in one tab.                                                                                                                                                                            |
 
+Swap mode: the pending request still reached the fixture with Admin's `sid` (sent before the switch) and B's `/me` answers Requester, but its late `Set-Cookie` fell into the store B was using and so into B's jar at B's next suspend: the expected cost of not attributing responses. Queued switches ran B→A, A→B, B→A in 29, 50, and 38 ms. The reconfiguration failure (injected after the cookies are written) blocked the tab the same way and the retry recovered. The lost-debugger case is skipped. The identity provider's `idp_embed` cookie (`SameSite=None; Secure` over `http://idp.localhost`) is refused by Chrome's own store, so jar `c` holds `idp_user` and `sid`; the lab's jar had accepted it. `/me-cached` still gives two hits: the cache bypass applies to every tab while the lab runs.
+
 ### Unit checks (`sessions.checks.mjs`)
 
 `containerIdOf("A", 1)` is `a`, generation 2 is `a.2`. `decide`: an unmanaged tab keeps its container; a navigation while switching is blocked and an active identity gets its container; a child session (worker, frame) uses the container it was bound to or is blocked; a subresource whose document never reported is blocked after the 200 ms wait.
@@ -131,8 +148,10 @@ Each spec was run against a deliberately broken extension (the change made with 
 - **New document per switch.** Red: `transition` skips the neutral navigation (`neutral = { documentId: "none" }`): `flow.spec.mjs` fails at the distinct-`documentId` assertion (0 pass, 1 fail). Green: 1/1 on the host and in Docker.
 - **Storage per identity.** Red: `bind` pins every identity to container `a`: `storage.spec.mjs` fails on the markers (1 pass, 2 fail; B reads A's markers). Green: 2/2.
 - **Set-Cookie ownership.** Red: `containerForResponse` returns the tab's current container for every response: `transitions.spec.mjs` fails the pending-request case (`late=Admin` lands in jar `b`; 5 pass, 2 fail). Green: 6/6.
+- **Swap: cookies restored.** Red: `restore` writes nothing back into the store: `flow.spec.mjs` in swap mode fails because every turn signs in again (sign-ins `Admin, Requester, Admin, Approver, Admin, …`). Green: 1/1.
+- **Swap: the prelude's identity.** Red: `control-start.js` ignores the `__rnr` cookie: `storage.spec.mjs` in swap mode fails because A reads C's markers in every API. Green: 2/2.
 - **Earlier, during development.** A `/me` request of a document the harness destroyed before `Network.requestWillBeSent` arrived was blocked as `unknown-document`, then `Fetch.failRequest` answered "Invalid InterceptionId": the request was gone with its document. `block` now tolerates that and records `request-gone`.
-- **Gates.** `vp check`, `vp run deps`, Knip, and jscpd pass. `vp run verify` exits 0 in Docker (23/23 tasks). `vp run test:single-tab` is not part of `verify`: it takes a full Chromium with the lab extension per spec, like the other lab harnesses.
+- **Gates.** `vp check`, `vp run deps`, Knip, and jscpd pass. `vp run verify` exits 0 in Docker (23/23 tasks) with both modes in the tree. `vp run test:single-tab` is not part of `verify`: it takes a full Chromium with the lab extension per spec, like the other lab harnesses.
 
 ## 5. Answers
 
@@ -141,8 +160,8 @@ Each spec was run against a deliberately broken extension (the change made with 
 - **Are delayed requests attributed correctly?** Yes: by the document that made them, through CDP's `loaderId` and webNavigation's `documentId`, including a late `Set-Cookie`. When the document cannot be determined the request is blocked, never served with the current identity.
 - **What happens when a switch fails?** The tab is blocked by a DNR rule and `activate` rejects; the next successful switch unblocks it. A lost debugger session is re-attached before any application request.
 - **Does the mechanism need anything beyond the previous POC?** No new dependency, no new layer, no production change: three extension modules, one fixture page, one fixture route, and the specs.
-- **A leaner mechanism for save/restore only.** The debugger exists in this lab to give each identity its own jar on the network path. If only data matters, the same switch can run without it: at suspend, `chrome.cookies.getAll` on the app's domains (HttpOnly included) is saved as the identity's jar and removed from the profile's store; at resume, the next identity's jar is `chrome.cookies.set` back, before the navigation. Storage keeps the prelude (a namespace per identity, nothing copied), installed with `chrome.scripting.registerContentScripts` at `document_start` in the main world; the prelude learns the active identity synchronously from a cookie the extension sets on the app's domain, instead of from the debugger. Costs: requests in flight during the switch see the new cookies, the profile's own session on that site becomes one more identity to save and restore, and the prelude's coverage stays as the tab-group POC measured it (no service workers in a namespace; shared workers keep their own). None of these touches the data of a suspended identity. Not built; a next step if the product wants to drop the debugger infobar.
-- **Recommended integration.** Expose one action, "Switch identity", with an optional `reset` and a per-step `url`, as `activate(tabId, identity, { reset, url })` does; let RECnRun decide Start versus Resume. A recording captures the sequence of identities; the runner replays it with the same calls. Keep the document attribution (`documents.js`) and the fail-closed rules as tested domain logic. Treat the known leaks below as product rules, as the previous POC recommended.
+- **Does it work without the debugger?** Yes: the swap mode. Cookies move through `chrome.cookies` at the switch (HttpOnly included, session cookies restored as session cookies), the prelude is a manifest content script that reads the identity from a cookie, and every spec but the lost-debugger case passes with the same assertions. Costs measured: a request pending across the switch sees the new store, so its late `Set-Cookie` lands in the next identity's jar; the profile's own session on the site becomes one more jar (`profile`); Chrome's store applies its own cookie rules (a `Secure` cookie over `http://idp.localhost` is refused); workers get no namespace (content scripts do not run in them). None of these touches the data of a suspended identity.
+- **Recommended integration.** Expose one action, "Switch identity", with an optional `reset` and a per-step `url`, as `activate(tabId, identity, { reset, url })` does; let RECnRun decide Start versus Resume. A recording captures the sequence of identities; the runner replays it with the same calls. For a product that only saves and restores data, ship the swap mode: no `debugger` permission, no infobar, `cookies` and `scripting` only, and the jar and the prelude as tested domain logic. Keep the debugger mode in the lab as the reference for request attribution if network isolation ever becomes a goal.
 
 ## Limitations
 
@@ -152,7 +171,9 @@ Specific to save and restore in one tab:
 
 - **Back/forward cache.** Playwright disables bfcache, so whether Chrome could restore a suspended document from it (skipping the neutral navigation) was not tested. The prelude is per document, so a bfcache restore would need its own handling.
 - **`beforeunload` prompts.** A page that asks before leaving could hold the neutral navigation; not tested. The 5 s commit timeout would fail the switch and block the tab.
-- **Pending requests of the old document** finish with their own identity here; with the leaner mechanism above they would see the new cookies. Either way the suspended identity's data is intact.
+- **Pending requests of the old document** finish with their own identity in the debugger mode; in the swap mode they see the new store, and a late `Set-Cookie` lands in the next identity's jar (measured). Either way the suspended identity's data is intact.
+- **Swap mode and other tabs.** The profile's store is one per profile, so another tab on the same site shows the active identity too, and the `__rnr` cookie reaches the server with every request. The swap mode is a one-tab-at-a-time model by construction.
+- **Swap mode and workers.** Content scripts do not run in workers, so a dedicated or shared worker uses the origin's unprefixed storage.
 - **`sessionStorage`** is preserved per identity because the prelude namespaces it; without the prelude Chrome keeps one `sessionStorage` per tab across identities.
-- **The debugger infobar** stays on the managed tab, as in the previous POC; the leaner mechanism removes it.
+- **The debugger infobar** stays on the managed tab in the debugger mode; the swap mode has none.
 - **Manual checks** (DevTools on the managed tab, branded Chrome, idle suspension) were not done.

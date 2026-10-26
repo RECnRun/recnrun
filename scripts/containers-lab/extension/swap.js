@@ -1,0 +1,80 @@
+// The swap mode of the session manager: no debugger. The profile's own cookie store holds the
+// active identity's cookies; a switch saves them (HttpOnly included) into the identity's jar with
+// chrome.cookies and removes them, then writes the next identity's jar back. The page prelude
+// learns the active identity from a cookie the extension sets on the app's domains, so storage
+// keeps its namespace per identity; workers and pending requests are out of scope here.
+import { jarOf, replaceJar } from "./jar-store.js";
+
+/** The domains whose cookies belong to an identity: the lab's hosts. */
+const DOMAINS = ["app.localhost", "idp.localhost"];
+/** The cookie that tells the prelude which identity is active. */
+const IDENTITY_COOKIE = "__rnr";
+/** The jar that keeps what the profile held before the first switch. */
+export const PROFILE_JAR = "profile";
+
+const SAME_SITE_TO_JAR = { no_restriction: "none", lax: "lax", strict: "strict" };
+const SAME_SITE_TO_CHROME = { none: "no_restriction", lax: "lax", strict: "strict" };
+
+const urlOf = (cookie) =>
+  `${cookie.secure ? "https" : "http"}://${cookie.domain.replace(/^\./, "")}${cookie.path}`;
+
+/** A chrome.cookies cookie as the jar stores it. */
+function toJar(cookie) {
+  return {
+    name: cookie.name,
+    value: cookie.value,
+    domain: cookie.domain.replace(/^\./, ""),
+    hostOnly: cookie.hostOnly,
+    path: cookie.path,
+    secure: cookie.secure,
+    httpOnly: cookie.httpOnly,
+    sameSite: SAME_SITE_TO_JAR[cookie.sameSite],
+    expires: cookie.expirationDate === undefined ? undefined : cookie.expirationDate * 1000,
+  };
+}
+
+/** A jar cookie as chrome.cookies.set takes it. */
+function toChrome(cookie) {
+  return {
+    url: urlOf(cookie),
+    name: cookie.name,
+    value: cookie.value,
+    path: cookie.path,
+    domain: cookie.hostOnly ? undefined : cookie.domain,
+    secure: cookie.secure,
+    httpOnly: cookie.httpOnly,
+    sameSite: cookie.sameSite === undefined ? undefined : SAME_SITE_TO_CHROME[cookie.sameSite],
+    expirationDate: cookie.expires === undefined ? undefined : cookie.expires / 1000,
+  };
+}
+
+async function allCookies() {
+  const lists = await Promise.all(DOMAINS.map((domain) => chrome.cookies.getAll({ domain })));
+  return lists.flat();
+}
+
+/** Moves the store's cookies into `container`'s jar; the store is empty afterwards. */
+export async function stash(container) {
+  const cookies = await allCookies();
+  const jar = cookies.filter(({ name }) => name !== IDENTITY_COOKIE).map(toJar);
+  await replaceJar(container, jar);
+  for (const cookie of cookies) {
+    await chrome.cookies.remove({ url: urlOf(cookie), name: cookie.name });
+  }
+  return jar.length;
+}
+
+/** Writes `container`'s jar into the store and marks the identity for the prelude. */
+export async function restore(container) {
+  const jar = await jarOf(container);
+  for (const cookie of jar) await chrome.cookies.set(toChrome(cookie));
+  for (const domain of DOMAINS) {
+    await chrome.cookies.set({
+      url: `http://${domain}/`,
+      name: IDENTITY_COOKIE,
+      value: container,
+      path: "/",
+    });
+  }
+  return jar.length;
+}

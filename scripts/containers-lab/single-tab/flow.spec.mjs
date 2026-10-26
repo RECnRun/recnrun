@@ -50,7 +50,11 @@ async function round(number) {
 
 await test("three rounds keep one tab, one document per switch, and one sign-in per user", async (t) => {
   t.after(async () => {
-    lab.writeEvidence("single-tab-flow", { chromium: handle.version, rounds });
+    lab.writeEvidence(`single-tab-flow-${lab.MODE}`, {
+      mode: lab.MODE,
+      chromium: handle.version,
+      rounds,
+    });
     await handle.close();
   });
   // The profile's own jar has a cookie for the app; no managed request may carry it.
@@ -95,7 +99,12 @@ await test("three rounds keep one tab, one document per switch, and one sign-in 
       false,
     );
   }
-  const real = await handle.lab.realCookies();
-  assert.deepEqual(real.map(({ name }) => name).toSorted(), ["profile"]);
+  // Debugger: the profile's store is untouched. Swap: it holds A's cookies; the profile's own wait in a jar.
+  assert.deepEqual(await lab.realCookieNames(handle), lab.SWAP ? ["__rnr", "sid"] : ["profile"]);
+  if (lab.SWAP)
+    assert.deepEqual(
+      (await handle.lab.jar("profile")).map(({ name }) => name),
+      ["profile"],
+    );
   assert.deepEqual(await lab.eventsMatching(handle, /switch-failed|session-lost/), []);
 });
