@@ -213,17 +213,17 @@ describe("createFolderPairing", () => {
     expect(await state.read()).toEqual({ acted: { pairingId: OFFER_ID, at: NOW } });
   });
 
-  test("ignores sightings unless waiting, and stops once the link is verified", async () => {
+  test("ignores sightings unless waiting, and keeps waiting while the link is verified", async () => {
     const idle = folderPairing(null);
     await idle.flow.seen(seen([presence(PEER)]));
     expect(idle.pairing.createOffer).not.toHaveBeenCalled();
-    const { flow, commands, state, link } = folderPairing();
+    const { flow, commands, state, link, pairing } = folderPairing();
     await link.write({ state: "connected", verified: true });
     await flow.seen(seen([presence(PEER)]));
-    expect(await state.read()).toBeNull();
-    expect(commands).toEqual([{ type: "folder-stop" }]);
-    await flow.paired();
-    expect(commands).toEqual([{ type: "folder-stop" }]);
+    // The presence stays in the folder, so the pinned peer finds this profile after a restart.
+    expect(await state.read()).toEqual({});
+    expect(commands).toEqual([]);
+    expect(pairing.createOffer).not.toHaveBeenCalled();
   });
 
   test("logs a step that fails, and handles the next sighting", async () => {

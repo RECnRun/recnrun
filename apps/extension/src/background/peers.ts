@@ -102,11 +102,7 @@ async function linkDown(state: LinkState, channel: PeerChannel) {
   notifyPages();
 }
 
-async function linkUp(
-  remoteFingerprint: string | undefined,
-  channel: PeerChannel,
-  folder: FolderPairingFlow,
-) {
+async function linkUp(remoteFingerprint: string | undefined, channel: PeerChannel) {
   const peer = await authorizedPeerRepository.read();
   // DTLS proved the other side holds this certificate; only the one the user accepted may talk.
   if (!peer || remoteFingerprint !== peer.fingerprint) {
@@ -117,7 +113,6 @@ async function linkUp(
   }
   await peerLinkRepository.write({ state: "connected", verified: true });
   await hello(channel);
-  await folder.paired().catch((error: unknown) => log(errorMessage(error)));
   notifyPages();
 }
 
@@ -155,7 +150,7 @@ function createLinkHandler(
   return async (event: LinkEvent) => {
     if (event.type === "frame") return onFrame(event.frame);
     if (event.type === "folder") return folder.seen(event);
-    if (event.state === "connected") return linkUp(event.remoteFingerprint, channel, folder);
+    if (event.state === "connected") return linkUp(event.remoteFingerprint, channel);
     if (event.state !== "connecting") return linkDown(event.state, channel);
     await peerLinkRepository.write({ state: "connecting", verified: false });
     notifyPages();
@@ -272,6 +267,8 @@ export function startPeers(): PeerRoutes {
   const tabs = createTabsCache();
   watchExecutor(channel, executor);
   const pairings = createPairings();
+  // Chrome starts the worker with the browser only for a startup listener; starting resumes.
+  browser.runtime.onStartup.addListener(() => {});
   void pairings.folder.resume().catch((error: unknown) => log(errorMessage(error)));
   const deps = requestDependencies(channel, tabs, pairings);
   return {

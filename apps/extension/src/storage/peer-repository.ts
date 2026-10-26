@@ -24,7 +24,10 @@ const PendingOfferSchema = v.strictObject({
 
 export type PendingOffer = v.InferOutput<typeof PendingOfferSchema>;
 
-/** Present while this profile waits in the folder; `acted` is its last answer or accepted answer. */
+/**
+ * Present while this profile pairs through the folder, paired or not, so the pinned peer
+ * reconnects on its own; `acted` is its last answer or accepted answer.
+ */
 const FolderPairingSchema = v.strictObject({
   acted: v.optional(v.strictObject({ pairingId: PairingIdSchema, at: v.number() })),
 });

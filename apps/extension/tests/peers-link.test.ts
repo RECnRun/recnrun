@@ -7,6 +7,7 @@ import {
   folderPairingRepository,
   identityRepository,
   peerLinkRepository,
+  pendingOfferRepository,
   remoteRecordingRepository,
 } from "@/storage/peer-repository";
 import { FINGERPRINT, ME, PEER, STRANGER, fromPeer } from "./fake-peer";
@@ -155,7 +156,7 @@ describe("an intended close", () => {
     const { routes, link } = await peerBackground();
     await routes.request({ type: "disconnect" });
     expect(link.sentTypes()).toEqual([]);
-    expect(link.commands).toEqual([{ type: "close" }]);
+    expect(link.commands).toEqual([{ type: "folder-stop" }, { type: "close" }]);
   });
 });
 
@@ -203,6 +204,8 @@ describe("the folder", () => {
   test("waits in the folder again when the worker starts, if it waited before", async () => {
     await folderPairingRepository.write({});
     const { link } = await peerBackground();
+    // Chrome starts the worker as the browser starts only for a startup listener.
+    expect(fakeBrowser.runtime.onStartup.hasListeners()).toBe(true);
     await vi.waitFor(() =>
       expect(link.commands).toContainEqual({
         type: "folder-watch",
@@ -222,15 +225,32 @@ describe("the folder", () => {
     expect(link.commands).toContainEqual({ type: "folder-stop" });
   });
 
-  test("acts on what the folder holds, and stops waiting once the link is verified", async () => {
+  test("stops waiting in the folder when the user disconnects, so nothing reconnects", async () => {
+    const { routes, link } = await peerBackground();
+    await routes.request({ type: "folder-pair" });
+    await routes.request({ type: "disconnect" });
+    expect(await folderPairingRepository.read()).toBeNull();
+    expect(link.commands.slice(-2)).toEqual([{ type: "folder-stop" }, { type: "close" }]);
+  });
+
+  test("keeps waiting once the link is verified, and offers again once it goes down", async () => {
     const { routes, connect, link } = await peerBackground({ authorized: false });
     await folderPairingRepository.write({});
-    await routes.link({ type: "folder", presences: [presence], signals: [] });
+    const sighting = { type: "folder" as const, presences: [presence], signals: [] };
+    await routes.link(sighting);
     expect(link.commands).toContainEqual({ type: "offer" });
     const { displayName, fingerprint } = presence;
     await authorizedPeerRepository.write({ profileId: PEER, displayName, fingerprint });
+    // Accepting the answer ends the pending offer before the link comes up.
+    await pendingOfferRepository.write(null);
     await connect();
-    expect(await folderPairingRepository.read()).toBeNull();
-    expect(link.commands.at(-1)).toEqual({ type: "folder-stop" });
+    const offers = () => link.commands.filter(({ type }) => type === "offer").length;
+    await routes.link(sighting);
+    expect(offers()).toBe(1);
+    expect(await folderPairingRepository.read()).toEqual({});
+    expect(link.commands).not.toContainEqual({ type: "folder-stop" });
+    await routes.link({ type: "state", state: "disconnected" });
+    await routes.link(sighting);
+    expect(offers()).toBe(2);
   });
 });

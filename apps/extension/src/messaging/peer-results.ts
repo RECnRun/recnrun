@@ -44,7 +44,7 @@ export const PeerStatusSchema = v.object({
   /** Whether the session that runs here was started by the peer, over a link that still holds. */
   controlledByPeer: v.boolean(),
   folder: FolderAccessSchema,
-  /** Whether this profile waits in the folder for another profile to pair with. */
+  /** Whether this profile waits in the folder to pair, or to reconnect with its peer. */
   folderPairing: v.boolean(),
 });
 

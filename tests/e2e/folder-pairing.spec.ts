@@ -96,6 +96,27 @@ async function chooseFolder(page: Page) {
   await page.getByRole("button", { name: "Choose folder" }).click();
 }
 
+/** Both profiles choose the folder, A's pairing page closing before B chooses. */
+async function pairThroughFolder(a: Profile, b: Profile) {
+  await chooseFolder(a.pairing);
+  await expect(folderSection(a.pairing)).toContainText(
+    "Waiting for another profile in the folder…",
+  );
+  // H2: A's offscreen document keeps waiting with none of A's pages open.
+  await a.pairing.close();
+  await chooseFolder(b.pairing);
+  await expect(b.pairing.getByRole("status")).toHaveText(`Connected — ${a.name}`, {
+    timeout: 30_000,
+  });
+  await expect(folderSection(b.pairing)).toContainText(`Paired with ${a.name}`);
+}
+
+const pairingPage = async (profile: Pick<Profile, "context" | "serviceWorker">) => {
+  const page = await profile.context.newPage();
+  await page.goto(new URL("pairing.html", profile.serviceWorker.url()).href);
+  return page;
+};
+
 test("two profiles pair through the RECnRun folder once each chose it, with no page left open", async ({
   profileA,
   profileB,
@@ -104,23 +125,49 @@ test("two profiles pair through the RECnRun folder once each chose it, with no p
   const b = { profile: profileB, id: await profileIdOf(profileB) };
   const stop = mirror(a, b);
   try {
-    await chooseFolder(profileA.pairing);
-    await expect(folderSection(profileA.pairing)).toContainText(
-      "Waiting for another profile in the folder…",
-    );
-    // H2: A's offscreen document keeps waiting with none of A's pages open.
-    await profileA.pairing.close();
-    await chooseFolder(profileB.pairing);
-    await expect(profileB.pairing.getByRole("status")).toHaveText(`Connected — ${profileA.name}`, {
-      timeout: 30_000,
-    });
-    await expect(folderSection(profileB.pairing)).toContainText(`Paired with ${profileA.name}`);
-    const again = await profileA.context.newPage();
-    await again.goto(new URL("pairing.html", profileA.serviceWorker.url()).href);
+    await pairThroughFolder(profileA, profileB);
+    const again = await pairingPage(profileA);
     await expect(again.getByRole("status")).toHaveText(`Connected — ${profileB.name}`);
+    // Paired, each profile stays in the folder, so its peer finds it after a restart.
+    for (const side of [a, b])
+      await expect
+        .poll(async () => Object.keys(await readOwn(side.profile, side.id)))
+        .toContain("presence.json");
   } finally {
     await stop();
   }
-  // Once paired, each profile leaves nothing of its own in the folder.
-  for (const side of [a, b]) await expect.poll(() => readOwn(side.profile, side.id)).toEqual({});
+});
+
+test("a paired profile that restarts reconnects through the folder with no click", async ({
+  profileA,
+  profileB,
+  launch,
+}) => {
+  test.setTimeout(150_000);
+  const a = { profile: profileA, id: await profileIdOf(profileA) };
+  const b = { profile: profileB, id: await profileIdOf(profileB) };
+  let stop = mirror(a, b);
+  try {
+    await pairThroughFolder(profileA, profileB);
+    await stop();
+    await profileB.context.close();
+    const watching = await pairingPage(profileA);
+    // No close message comes from a browser that quits; ICE consent checks find it gone.
+    await expect(watching.getByRole("status")).toHaveText(
+      /^(Disconnected|Not reachable) — Profile B$/,
+      { timeout: 45_000 },
+    );
+    const context = await launch(profileB.dir);
+    const serviceWorker =
+      context.serviceWorkers()[0] ?? (await context.waitForEvent("serviceworker"));
+    const restarted = { ...profileB, context, serviceWorker };
+    stop = mirror(a, { profile: restarted, id: b.id });
+    await expect(watching.getByRole("status")).toHaveText(`Connected — ${profileB.name}`, {
+      timeout: 120_000,
+    });
+    const page = await pairingPage(restarted);
+    await expect(page.getByRole("status")).toHaveText(`Connected — ${profileA.name}`);
+  } finally {
+    await stop();
+  }
 });

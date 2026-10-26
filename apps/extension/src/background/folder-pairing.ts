@@ -123,8 +123,8 @@ export function createFolderPairing(deps: FolderPairingDependencies) {
   };
   const handle = async (seen: Seen) => {
     const state = await deps.state.read();
-    if (!state) return;
-    if ((await deps.link.read())?.verified) return stop();
+    // A verified link needs nothing; the presence stays, so the peer finds this one again.
+    if (!state || (await deps.link.read())?.verified) return;
     const [me, peer, pending] = await Promise.all([
       deps.identity(),
       deps.authorized.read(),
@@ -134,7 +134,7 @@ export function createFolderPairing(deps: FolderPairingDependencies) {
     await act(deps, step, now);
   };
   return {
-    /** Waits in the folder for another profile, as the user just chose it. */
+    /** Waits in the folder for another profile, and stays to reconnect once paired. */
     start: async () => {
       await deps.state.write({});
       await watch();
@@ -143,11 +143,8 @@ export function createFolderPairing(deps: FolderPairingDependencies) {
     resume: async () => {
       if (await deps.state.read()) await watch();
     },
+    /** Stops pairing through the folder, as the user disconnects or forgets the peer. */
     stop,
-    /** The link is verified, so waiting ends and this profile's files leave the folder. */
-    paired: async () => {
-      if (await deps.state.read()) await stop();
-    },
     /** One sighting at a time, so two in a row never both offer. */
     seen: (seen: Seen) => {
       queue = queue

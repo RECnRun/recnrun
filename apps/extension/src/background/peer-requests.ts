@@ -106,10 +106,15 @@ async function close(deps: Deps) {
   await deps.askLink({ type: "close" });
 }
 
-async function forget(deps: Deps) {
-  // Forget stops waiting even when the folder's own files cannot be removed.
+/** The user ends the link, so this profile also stops waiting in the folder to reconnect. */
+async function disconnect(deps: Deps) {
+  // Waiting stops even when the folder's own files cannot be removed.
   await deps.folder.stop().catch(() => {});
   await close(deps);
+}
+
+async function forget(deps: Deps) {
+  await disconnect(deps);
   await deps.authorized.write(null);
   await deps.mirror.write(null);
   await deps.tabs.write(null);
@@ -132,7 +137,7 @@ const HANDLERS: Handlers = {
   "create-offer": (deps) => deps.pairing.createOffer(),
   inspect: (deps, { code }) => deps.pairing.inspect(code),
   accept: (deps, { code }) => deps.pairing.accept(code),
-  disconnect: (deps) => close(deps),
+  disconnect: (deps) => disconnect(deps),
   forget: (deps) => forget(deps),
   "folder-pair": (deps) => deps.folder.start(),
   ping: (deps) => ping(deps),
