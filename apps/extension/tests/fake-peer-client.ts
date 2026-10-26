@@ -1,7 +1,6 @@
 import * as v from "valibot";
 import type { PeerRequest } from "@/messaging/peer-messages";
 import type { PeerStatus } from "@/messaging/peer-results";
-import { encodePairing } from "@/p2p/pairing-code";
 import type { PeerClient } from "@/views/peer-client";
 
 export const ALICE = { profileId: "11111111-1111-4111-8111-111111111111", displayName: "Alice" };
@@ -34,17 +33,6 @@ export function withPeerSession(
 export function closedFor(state: Link["state"], reason: NonNullable<Link["reason"]>): PeerStatus {
   const status = statusOf(state, false);
   return { ...status, link: { ...status.link, reason } };
-}
-
-/** A real pairing code, so the folder can name its file after the code's own fields. */
-export function pairingCode(
-  kind: "offer" | "answer",
-  maker: typeof ALICE,
-  pairingId: string,
-  ttlMs = 60_000,
-): string {
-  const expiresAt = Date.now() + ttlMs;
-  return encodePairing({ kind, pairingId, ...maker, expiresAt, sdp: `v=0 ${kind}` });
 }
 
 type Answers = Partial<Record<PeerRequest["type"], (request: PeerRequest) => unknown>>;

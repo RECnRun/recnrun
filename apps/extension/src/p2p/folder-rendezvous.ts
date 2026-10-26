@@ -118,5 +118,3 @@ export function folderRendezvous(pairing: Directory, me: string, now: () => numb
   const clean = () => remove((name) => name === PRESENCE_FILE || SIGNAL_NAME.test(name));
   return { announce, publish, look, clean };
 }
-
-export type FolderRendezvous = ReturnType<typeof folderRendezvous>;
