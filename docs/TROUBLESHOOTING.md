@@ -1,3 +1,11 @@
 # Troubleshooting
 
 Problems we hit, what caused them, and how we solved them. Add an entry when a problem took real investigation, so nobody has to repeat it.
+
+## Chrome's folder picker never shows in an end-to-end test (solved)
+
+**Symptom.** `showDirectoryPicker()` in a Playwright test rejects at once with `AbortError: Failed to execute 'showDirectoryPicker' on 'Window': Intercepted by Page.setInterceptFileChooserDialog().`, and no `filechooser` event fires, so the folder flow looked impossible to test without a mock.
+
+**Cause.** Playwright enables `Page.setInterceptFileChooserDialog` on every page so that `page.on("filechooser")` can answer `<input type="file">`. Chrome treats the File System Access picker as a file chooser too, but Playwright has no handler for a directory picker, so the request is cancelled.
+
+**Solution.** `tests/e2e/fixtures/native-dialogs.ts` turns the interception off per page through a CDP session and drives the dialogs on the container's Xvfb display with `xdotool` (installed with `scrot` by `Dockerfile.tests`). Found on the way: Chrome opens the picker only for the active tab, so the driver brings the page to the front first; the picker is a GTK window found by its title, where `ctrl+l`, the path, and `alt+o` choose the folder while `Return` cancels; "Allow this site to edit files?" comes up with Don't Allow focused, so `Tab` and `space` allow and `Return` denies; the three-button prompt after a restart takes no keyboard focus at all, so the driver clicks at a fixed offset from the browser window's corner; and there is no window manager, so windows stack at the origin and each gets focus explicitly. A failed test keeps a screenshot of the display (`display.png`) and a listing of the folder (`folder.txt`) in its output folder.
