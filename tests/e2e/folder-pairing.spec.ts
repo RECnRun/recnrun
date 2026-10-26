@@ -91,7 +91,10 @@ test("two profiles pair through one RECnRun folder on disk", async ({
     });
 });
 
-test("a restarted profile allows the folder once more, then reconnects with no click after later restarts", async ({
+const extensionPages = (profile: Pick<Profile, "context">) =>
+  profile.context.pages().filter((page) => page.url().startsWith("chrome-extension://"));
+
+test("a restarted profile allows the folder once more, keeps it with no page open, and reconnects with no click after later restarts", async ({
   profileA,
   profileB,
   native,
@@ -109,6 +112,14 @@ test("a restarted profile allows the folder once more, then reconnects with no c
   await expect(watching.getByRole("status")).toHaveText(`Connected — ${profileB.name}`, {
     timeout: 120_000,
   });
+  // "Allow on every visit" outlives B's pages: B refreshes its presence with none open.
+  for (const page of extensionPages(restarted)) await page.close();
+  expect(extensionPages(restarted)).toEqual([]);
+  const idB = await profileIdOf(restarted);
+  const expiry = () => (presenceOf(native.folder, idB) as { expiresAt: number }).expiresAt;
+  const before = expiry();
+  await expect.poll(expiry, { timeout: 45_000 }).toBeGreaterThan(before);
+  await expect(watching.getByRole("status")).toHaveText(`Connected — ${profileB.name}`);
   restarted = await restart(restarted, watching, launch);
   await expect(watching.getByRole("status")).toHaveText(`Connected — ${profileB.name}`, {
     timeout: 120_000,
