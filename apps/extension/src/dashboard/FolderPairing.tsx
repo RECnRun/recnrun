@@ -17,7 +17,7 @@ interface FolderPairingProps {
  * after a restart.
  */
 export function FolderBanner({ peers, status }: FolderPairingProps) {
-  if (!status || status.folder === "granted") return null;
+  if (!status || status.folder === "granted" || status.link.verified) return null;
   const again = status.folder === "prompt";
   return (
     <section class="folder-banner" aria-labelledby="folder-banner-heading">

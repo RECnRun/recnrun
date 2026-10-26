@@ -52,6 +52,9 @@ test("without the folder, the banner opens the window that chooses it", async ()
   expect(banner(root)).toContain("Allow the RECnRun folder");
   button(root, "Allow folder")?.click();
   await expect.poll(() => opened.folder).toBe(2);
+  // Connected, the profile needs the folder only once the link drops.
+  show({ ...statusOf("connected"), folder: "prompt" });
+  expect(banner(root)).toBeUndefined();
   show(statusOf());
   expect(banner(root)).toBeUndefined();
   show(undefined);
