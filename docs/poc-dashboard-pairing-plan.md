@@ -36,6 +36,18 @@ Later phases pair more than two profiles at once, such as the default profile an
 
 Each task is one commit with `Red:` and `Green:` lines where behavior changes, and `vp run verify` exits 0 at the end.
 
+## Results (2026-10-27)
+
+All five tasks are done, and `vp run verify` exits 0 on the branch:
+
+- The dashboard's **Pairing** section holds the profile's name, the link in words, **Pair with another profile** or **Reconnect**, **Disconnect**, and **Forget <name>**.
+- Every end-to-end test pairs through the real folder, from the dashboards, with Chrome's picker and prompts driven by `xdotool`.
+- The pairing page, the manual code flow, ping, and diagnostics are gone; the folder window is `folder.html` from `src/folder`.
+- Test B now proves the link by each dashboard listing the other profile's tab and by the frames each background exchanged.
+- Found on the way and fixed, each red then green: link events now run in arrival order, since a channel's close handled before the `BYE` in front of it showed "Disconnected" instead of "Disconnected by <name>"; and three flaky end-to-end causes in the fixtures (see `docs/TROUBLESHOOTING.md`).
+
+Clicks per case are in `POC-CROSS-PROFILE-WEBRTC.md`. The count in branded Chrome is the manual check below.
+
 ## Manual check for the user
 
 In two profiles of branded Chrome: open the site, click **Choose folder** in the dashboard, choose `Documents/RECnRun`, and allow. Count the clicks until both dashboards list the other profile's tabs. Then **Disconnect**, and see the same step offered again.
