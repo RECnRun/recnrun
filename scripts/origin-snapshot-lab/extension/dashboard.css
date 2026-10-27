@@ -1,0 +1,104 @@
+:root {
+  color-scheme: light dark;
+  --surface: #ffffff;
+  --text: #1d1d1f;
+  --muted: #5f6368;
+  --line: #d9d9de;
+  --accent: #c62828;
+  --ok: #1b5e20;
+  --error: #b71c1c;
+  font:
+    15px/1.5 system-ui,
+    sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --surface: #1e1f22;
+    --text: #e8e8ea;
+    --muted: #a0a3a8;
+    --line: #3a3b3f;
+    --accent: #ef7b7b;
+    --ok: #81c784;
+    --error: #ef9a9a;
+  }
+}
+
+body {
+  margin: 0 auto;
+  max-width: 860px;
+  padding: 16px;
+  background: var(--surface);
+  color: var(--text);
+}
+
+body.busy {
+  cursor: progress;
+}
+
+h1 {
+  margin: 0;
+  font-size: 1.4rem;
+}
+
+h2 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+}
+
+fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+
+section {
+  border-top: 1px solid var(--line);
+  padding: 12px 0;
+}
+
+#identity {
+  color: var(--accent);
+  font-size: 1.2rem;
+}
+
+.hint,
+small {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+button {
+  margin: 2px 4px 2px 0;
+  padding: 4px 10px;
+  font: inherit;
+}
+
+.danger {
+  color: var(--error);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+}
+
+#log {
+  font-family: ui-monospace, monospace;
+  font-size: 0.85rem;
+}
+
+#log .ok {
+  color: var(--ok);
+}
+
+#log .error {
+  color: var(--error);
+}

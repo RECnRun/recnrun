@@ -8,6 +8,11 @@
         "scripts/agent-hooks/*.mjs",
         "scripts/git-hooks/*.mjs",
         "tests/container/*.checks.mjs",
+        // The origin snapshot lab: harness, specs, an unpacked extension, and the fixture app.
+        "scripts/origin-snapshot-lab/*.mjs",
+        "scripts/origin-snapshot-lab/specs/*.checks.mjs",
+        "scripts/origin-snapshot-lab/extension/{background,gate,a0,page-storage,offscreen,dashboard}.js",
+        "scripts/origin-snapshot-lab/fixture/*.{js,mjs}",
       ],
     },
     "apps/extension": {

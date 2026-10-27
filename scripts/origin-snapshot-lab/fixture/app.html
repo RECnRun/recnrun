@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <script>
+      // Observer: the page's first script. It only reads what storage holds when the app starts;
+      // it never waits for the extension. An IndexedDB database that does not exist is not created.
+      (() => {
+        const observed = {
+          href: location.href,
+          document: crypto.randomUUID(),
+          t0: performance.now(),
+          ls: localStorage.getItem("marker"),
+          lsKeys: Object.keys(localStorage).sort(),
+          ss: sessionStorage.getItem("marker"),
+        };
+        const finish = () => {
+          observed.tIdb = performance.now();
+          window.__observed = observed;
+          navigator.sendBeacon("/observe", JSON.stringify(observed));
+        };
+        const request = indexedDB.open("app-db");
+        request.onupgradeneeded = () => {
+          observed.idb = { missing: true };
+          request.transaction.abort();
+        };
+        request.onerror = () => finish();
+        request.onblocked = () => (observed.idbBlocked = true);
+        request.onsuccess = () => {
+          const db = request.result;
+          if (!db.objectStoreNames.contains("kv")) {
+            observed.idb = { version: db.version, noStore: true };
+            db.close();
+            finish();
+            return;
+          }
+          const read = db.transaction("kv").objectStore("kv").get("marker");
+          read.onsuccess = () => {
+            observed.idb = { version: db.version, marker: read.result ?? null };
+            db.close();
+            finish();
+          };
+        };
+      })();
+    </script>
+    <script type="module" src="/app.js"></script>
+    <title>Origin lab app</title>
+  </head>
+  <body>
+    <h1>Origin lab app</h1>
+    <!-- Experiment E: the app opens tabs of its own, by a link and by window.open. -->
+    <a id="link" href="/app?from=link" target="_blank">New tab</a>
+    <button id="popup" type="button" onclick="window.open('/app?from=popup&conn=1', '_blank')">
+      Popup
+    </button>
+  </body>
+</html>
