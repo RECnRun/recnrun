@@ -181,7 +181,7 @@ test("neither profile lists RECnRun's own pages, such as its folder window", asy
   const { site, dashboard } = await dashboardIn(profileA);
   // The folder window, opened by hand in B before the tab A must list next.
   const window = await profileB.context.newPage();
-  await window.goto(new URL("pairing.html#folder", profileB.serviceWorker.url()).href);
+  await window.goto(new URL("folder.html", profileB.serviceWorker.url()).href);
   const app = await openInB(profileB, "app");
   await expect(remoteTab(dashboard, app.url())).toBeVisible();
   await expect(remoteTab(dashboard, site.url(), LOCAL)).toBeVisible();

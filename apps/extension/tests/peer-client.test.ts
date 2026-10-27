@@ -111,7 +111,7 @@ describe("peerServices", () => {
     const create = vi.spyOn(fakeBrowser.windows, "create");
     await peerServices().openFolder();
     expect(create).toHaveBeenCalledWith({
-      url: fakeBrowser.runtime.getURL("/pairing.html#folder"),
+      url: fakeBrowser.runtime.getURL("/folder.html"),
       type: "popup",
       width: 480,
       height: 360,

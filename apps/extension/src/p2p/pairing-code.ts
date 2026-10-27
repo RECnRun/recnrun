@@ -34,7 +34,7 @@ function fromBase64Url(code: string): string {
 /** One line of text, safe to paste anywhere: no whitespace for a chat app to mangle. */
 export const encodePairing = (pairing: Pairing) => PREFIX + toBase64Url(JSON.stringify(pairing));
 
-/** Decodes and validates a pasted code; throws with the reason the pairing page shows. */
+/** Decodes and validates a code; throws with the reason it is refused. */
 export function decodePairing(code: string, now = Date.now()): Pairing {
   const trimmed = code.trim();
   if (!trimmed.startsWith(PREFIX)) throw new Error("This is not a RECnRun pairing code.");

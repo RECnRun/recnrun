@@ -13,7 +13,7 @@ export function peerServices(): PeerServices {
     recordings: remoteRecordings(client, remoteRecordingRepository),
     openFolder: async () => {
       // Production builds have no folder window, so the typed public paths leave it out.
-      const url = new URL("pairing.html#folder", browser.runtime.getURL("/")).href;
+      const url = new URL("folder.html", browser.runtime.getURL("/")).href;
       await browser.windows.create({ url, type: "popup", width: 480, height: 360 });
     },
   };

@@ -1,4 +1,4 @@
-.pairing {
+.folder {
   display: grid;
   gap: var(--space);
   max-width: 40rem;

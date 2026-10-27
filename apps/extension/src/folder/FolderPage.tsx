@@ -63,7 +63,7 @@ export function FolderPage({
       wait();
     });
   return (
-    <main class="pairing">
+    <main class="folder">
       <h1>RECnRun folder</h1>
       <p>
         {again

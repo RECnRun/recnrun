@@ -2,8 +2,8 @@ import { afterEach, beforeEach, expect, test, vi } from "vite-plus/test";
 import { render } from "preact";
 import type { PeerStatus } from "@/messaging/peer-results";
 import { loadFolder } from "@/p2p/folder-store";
-import { FolderPage } from "@/pairing/FolderPage";
-import { startPairing } from "@/pairing/start";
+import { FolderPage } from "@/folder/FolderPage";
+import { startFolder } from "@/folder/start";
 import { fakePeerClient, statusOf } from "./fake-peer-client";
 import { alerts, button } from "./queries";
 
@@ -97,7 +97,7 @@ test("the extension's only page is the folder window, with Chrome's prompts", as
   const close = vi.spyOn(window, "close").mockImplementation(() => {});
   const peer = fakePeerClient(withFolder("none"));
   const root = document.body.appendChild(document.createElement("div"));
-  startPairing(root, peer.client);
+  startFolder(root, peer.client);
   await expect.poll(() => root.querySelector("h1")?.textContent).toBe("RECnRun folder");
   expect(root.textContent).not.toContain("Pair by hand instead");
   await expect.poll(() => button(root, "Choose folder")?.disabled).toBe(false);
