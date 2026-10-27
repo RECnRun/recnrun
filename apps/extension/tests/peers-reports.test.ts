@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vite-plus/test";
 import { fakeBrowser } from "wxt/testing/fake-browser";
 import {
-  authorizedPeerRepository,
+  authorizedPeersRepository,
   remoteControllerRepository,
-  remoteRecordingRepository,
+  remoteRecordingsRepository,
 } from "@/storage/peer-repository";
 import { recordingSessionRepository } from "@/storage/recording-session-repository";
 import { ME, PEER, STRANGER, fromPeer } from "./fake-peer";
@@ -94,7 +94,7 @@ describe("unreadable state", () => {
     await peers.connect();
     peers.link.link.pagesOpen = false;
     await peers.receive(fromPeer("TABS_CHANGED", { tabs: [] }));
-    await fakeBrowser.storage.session.set({ peerLink: "unreadable" });
+    await fakeBrowser.storage.session.set({ peerLinks: "unreadable" });
     vi.useFakeTimers();
     await fakeBrowser.tabs.update(0, { url: "https://docs.example/" });
     await vi.advanceTimersByTimeAsync(150);
@@ -169,7 +169,7 @@ describe("the peer's reports", () => {
     const peers = await peerBackground();
     await peers.connect();
     await peers.receive(fromPeer("HELLO", { displayName: "Studio", extensionVersion: "0.2.0" }));
-    expect(await authorizedPeerRepository.read()).toMatchObject({ displayName: "Studio" });
+    expect(await authorizedPeersRepository.get(PEER)).toMatchObject({ displayName: "Studio" });
     expect(peers.link.frames().at(-1)).toMatchObject({ type: "SESSION_STATUS", session: null });
   });
 
@@ -182,7 +182,7 @@ describe("the peer's reports", () => {
       [null, false],
     ] as const) {
       await peers.receive(fromPeer("SESSION_STATUS", { session, controlledBy }));
-      expect(await remoteRecordingRepository.read()).toEqual({
+      expect(await remoteRecordingsRepository.get(PEER)).toEqual({
         profileId: PEER,
         session,
         mine,
@@ -190,7 +190,10 @@ describe("the peer's reports", () => {
       });
     }
     await peers.receive(fromPeer("SESSION_STATUS", { session: null, controlledBy: ME }));
-    expect(await remoteRecordingRepository.read()).toMatchObject({ session: null, mine: false });
+    expect(await remoteRecordingsRepository.get(PEER)).toMatchObject({
+      session: null,
+      mine: false,
+    });
   });
 
   test("log the peer's errors", async () => {

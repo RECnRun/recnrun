@@ -112,13 +112,19 @@ export async function execute(message: PeerMessage, deps: ExecutorDependencies):
   const { channel } = deps;
   const requestId = message.id;
   if (message.type === "GET_TABS")
-    await channel.send("TABS_SNAPSHOT", { requestId, ...(await sharedTabs(deps.tabs)) });
+    await channel.send(message.from, "TABS_SNAPSHOT", {
+      requestId,
+      ...(await sharedTabs(deps.tabs)),
+    });
   // A new link starts with the session's state, so the controller never keeps a stale copy.
   if (message.type === "HELLO")
-    await channel.send("SESSION_STATUS", { requestId, ...(await sessionStatus(deps)) });
+    await channel.send(message.from, "SESSION_STATUS", {
+      requestId,
+      ...(await sessionStatus(deps)),
+    });
   if (!isCommand(message)) return;
   const outcome = await run(message, deps).catch((error: unknown) =>
     refused(errorMessage(error).slice(0, 200)),
   );
-  await channel.send("COMMAND_RESULT", { requestId, ...outcome });
+  await channel.send(message.from, "COMMAND_RESULT", { requestId, ...outcome });
 }

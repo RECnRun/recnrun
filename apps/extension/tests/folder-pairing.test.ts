@@ -4,7 +4,7 @@ import type { LinkCommand } from "@/messaging/peer-messages";
 import type { Presence, Seen, SignalFile } from "@/p2p/folder-rendezvous";
 import { PAIRING_TTL_MS, encodePairing } from "@/p2p/pairing-code";
 import type { FolderPairing, PeerLink, PendingOffer } from "@/storage/peer-repository";
-import { ME, PEER, STRANGER, memoryRepository } from "./fake-peer";
+import { ME, PEER, STRANGER, memoryRecords, memoryRepository } from "./fake-peer";
 
 const NOW = 1_700_000_000_000;
 const OFFER_ID = "44444444-4444-4444-8444-444444444444";
@@ -54,8 +54,8 @@ const pendingFor = (to: string, expiresAt = NOW + 1000): PendingOffer => ({
 const situation = (me: string, sighting: Seen) => ({
   me,
   seen: sighting,
-  peer: null,
-  pending: null,
+  peers: [] as string[],
+  pending: {} as Record<string, PendingOffer>,
   state: {},
   now: NOW,
 });
@@ -74,15 +74,14 @@ describe("decideFolderStep", () => {
   });
 
   test("once a peer is pinned, pairs only with it", () => {
-    const peer = { profileId: PEER, displayName: "Desk", fingerprint: "22:22" };
     const older = presence(STRANGER, NOW - 50);
-    const pinned = { ...situation(ME, seen([older, presence(PEER)])), peer };
+    const pinned = { ...situation(ME, seen([older, presence(PEER)])), peers: [PEER] };
     expect(decideFolderStep(pinned)).toEqual({ type: "offer", to: presence(PEER) });
     expect(decideFolderStep({ ...pinned, seen: seen([older]) })).toEqual({ type: "wait" });
   });
 
   test("waits for the answer to its current offer, then connects with it", () => {
-    const pending = pendingFor(PEER);
+    const pending = { [PEER]: pendingFor(PEER) };
     const waiting = { ...situation(ME, seen([presence(PEER)])), pending };
     expect(decideFolderStep(waiting)).toEqual({ type: "wait" });
     const answer = signal("answer", PEER, ME);
@@ -92,9 +91,9 @@ describe("decideFolderStep", () => {
 
   test("offers again when its offer expired or was for another profile", () => {
     const sighting = seen([presence(PEER)]);
-    const expired = { ...situation(ME, sighting), pending: pendingFor(PEER, NOW) };
+    const expired = { ...situation(ME, sighting), pending: { [PEER]: pendingFor(PEER, NOW) } };
     expect(decideFolderStep(expired).type).toBe("offer");
-    const elsewhere = { ...situation(ME, sighting), pending: pendingFor(STRANGER) };
+    const elsewhere = { ...situation(ME, sighting), pending: { [STRANGER]: pendingFor(STRANGER) } };
     expect(decideFolderStep(elsewhere).type).toBe("offer");
   });
 
@@ -133,7 +132,7 @@ describe("decideFolderStep", () => {
     ["holds an expired code", { expiresAt: NOW }],
   ])("ignores a signal whose code %s", (_, options: SignalOptions) => {
     const answer = signal("answer", PEER, ME, options);
-    const pending = pendingFor(PEER);
+    const pending = { [PEER]: pendingFor(PEER) };
     const answered = { ...situation(ME, seen([presence(PEER)], [answer])), pending };
     expect(decideFolderStep(answered)).toEqual({ type: "wait" });
   });
@@ -150,24 +149,24 @@ describe("decideFolderStep", () => {
 function folderPairing(initial: FolderPairing | null = {}, me = ME) {
   const commands: LinkCommand[] = [];
   const askLink = vi.fn(async (command: LinkCommand) => void commands.push(command));
-  const pending = memoryRepository<PendingOffer>();
+  const pending = memoryRecords<PendingOffer>();
   const offer = signal("offer", me, PEER);
   const answer = signal("answer", me, PEER);
   const pairing = {
     createOffer: vi.fn(async (to: string) => {
-      await pending.write({ pairingId: OFFER_ID, expiresAt: NOW + PAIRING_TTL_MS, to });
+      await pending.set(to, { pairingId: OFFER_ID, expiresAt: NOW + PAIRING_TTL_MS, to });
       return { code: offer.code };
     }),
     accept: vi.fn(async (_code: string): Promise<{ code?: string }> => ({ code: answer.code })),
   };
   const state = memoryRepository<FolderPairing>(initial);
-  const link = memoryRepository<PeerLink>();
+  const link = memoryRecords<PeerLink>();
   const log = vi.fn();
   const flow = createFolderPairing({
     askLink,
     identity: async () => ({ profileId: me, displayName: "Laptop" }),
     pairing,
-    authorized: memoryRepository(),
+    authorized: memoryRecords(),
     pending,
     link,
     state,
@@ -208,7 +207,7 @@ describe("createFolderPairing", () => {
 
   test("connects with the answer to its offer", async () => {
     const { flow, commands, pairing, state, pending } = folderPairing();
-    await pending.write(pendingFor(PEER));
+    await pending.set(PEER, pendingFor(PEER));
     const answer = signal("answer", PEER, ME);
     await flow.seen(seen([presence(PEER)], [answer]));
     expect(pairing.accept).toHaveBeenCalledWith(answer.code);
@@ -230,7 +229,7 @@ describe("createFolderPairing", () => {
     await idle.flow.seen(seen([presence(PEER)]));
     expect(idle.pairing.createOffer).not.toHaveBeenCalled();
     const { flow, commands, state, link, pairing } = folderPairing();
-    await link.write({ state: "connected", verified: true });
+    await link.set(PEER, { state: "connected", verified: true });
     await flow.seen(seen([presence(PEER)]));
     // The presence stays in the folder, so the pinned peer finds this profile after a restart.
     expect(await state.read()).toEqual({});

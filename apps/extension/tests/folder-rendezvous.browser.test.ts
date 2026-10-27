@@ -36,8 +36,10 @@ const step = (me: string, seen: Seen, pending: { to: string } | null = null) =>
   decideFolderStep({
     me,
     seen,
-    peer: null,
-    pending: pending && { ...pending, pairingId: PAIRING, expiresAt: Date.now() + 60_000 },
+    peers: [],
+    pending: pending
+      ? { [pending.to]: { ...pending, pairingId: PAIRING, expiresAt: Date.now() + 60_000 } }
+      : {},
     state: {},
     now: Date.now(),
   });

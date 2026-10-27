@@ -30,12 +30,25 @@ export function memoryRepository<T>(initial: T | null = null) {
   };
 }
 
-/** A channel whose sends are recorded, so a test reads what went to the peer. */
+/** Values keyed by peer, as a peer record repository keeps them. */
+export function memoryRecords<T>(initial: Record<string, T> = {}) {
+  let records = initial;
+  return {
+    all: vi.fn(async () => records),
+    get: vi.fn(async (peer: string) => records[peer] ?? null),
+    set: vi.fn(async (peer: string, next: T | null) => {
+      const rest = Object.fromEntries(Object.entries(records).filter(([id]) => id !== peer));
+      records = next === null ? rest : { ...rest, [peer]: next };
+    }),
+  };
+}
+
+/** A channel whose sends are recorded, so a test reads what went to which peer. */
 export function recordingChannel() {
-  const sent: { type: PeerType; payload: unknown }[] = [];
-  const send = async <T extends PeerType>(type: T, payload: PeerPayload<T>) => {
-    sent.push({ type, payload });
-    return peerMessage(type, { from: ME, to: PEER }, payload) as MessageOf<T>;
+  const sent: { to: string; type: PeerType; payload: unknown }[] = [];
+  const send = async <T extends PeerType>(to: string, type: T, payload: PeerPayload<T>) => {
+    sent.push({ to, type, payload });
+    return peerMessage(type, { from: ME, to }, payload) as MessageOf<T>;
   };
   return { channel: { send }, sent };
 }

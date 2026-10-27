@@ -71,19 +71,45 @@ function repository<T>(key: `local:${string}` | `session:${string}`, schema: v.G
 
 export type Repository<T> = ReturnType<typeof repository<T>>;
 
+/** One value per peer, keyed by its profile id; writes to one peer never lose another's. */
+function peerRecords<T>(key: `local:${string}` | `session:${string}`, schema: v.GenericSchema<T>) {
+  const whole = repository(key, v.record(ProfileIdSchema, schema));
+  const all = async (): Promise<Record<string, T>> => (await whole.read()) ?? {};
+  let queue = Promise.resolve();
+  // Each write reads the record first, so two at once would otherwise drop one of them.
+  const serial = (change: (records: Record<string, T>) => Record<string, T>) => {
+    const next = queue.then(async () => whole.write(change(await all())));
+    queue = next.catch(() => {});
+    return next;
+  };
+  return {
+    all,
+    get: async (peer: string): Promise<T | null> => (await all())[peer] ?? null,
+    /** Null removes the peer's value. */
+    set: (peer: string, value: T | null) =>
+      serial((records) => {
+        const rest = Object.fromEntries(Object.entries(records).filter(([id]) => id !== peer));
+        return value === null ? rest : { ...rest, [peer]: value };
+      }),
+    watch: whole.watch,
+  };
+}
+
+export type PeerRecords<T> = ReturnType<typeof peerRecords<T>>;
+
 export const identityRepository = repository("local:profileIdentity", ProfileIdentitySchema);
-export const authorizedPeerRepository = repository("local:authorizedPeer", AuthorizedPeerSchema);
+export const authorizedPeersRepository = peerRecords("local:authorizedPeers", AuthorizedPeerSchema);
 // Local, so waiting in the folder survives a restart of the browser.
 export const folderPairingRepository = repository("local:folderPairing", FolderPairingSchema);
 // Session storage ends with the browser, as the link and anything it carried do.
-export const peerLinkRepository = repository("session:peerLink", PeerLinkSchema);
-export const pendingOfferRepository = repository("session:pendingOffer", PendingOfferSchema);
-export const remoteRecordingRepository = repository(
-  "session:remoteRecording",
+export const peerLinksRepository = peerRecords("session:peerLinks", PeerLinkSchema);
+export const pendingOffersRepository = peerRecords("session:pendingOffers", PendingOfferSchema);
+export const remoteRecordingsRepository = peerRecords(
+  "session:remoteRecordings",
   RemoteRecordingSchema,
 );
-/** On the controller: the peer's tabs as last reported, so they outlive a sleeping worker. */
-export const peerTabsRepository = repository("session:peerTabs", SharedTabsSchema);
+/** On the controller: each peer's tabs as last reported, so they outlive a sleeping worker. */
+export const peerTabsRepository = peerRecords("session:peerTabs", SharedTabsSchema);
 export const remoteControllerRepository = repository(
   "session:remoteController",
   RemoteControllerSchema,

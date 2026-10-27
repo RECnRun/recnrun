@@ -3,16 +3,17 @@ import { PAIRING_TTL_MS, decodePairing, encodePairing, fingerprintOf } from "@/p
 import type { Pairing } from "@/p2p/pairing-code";
 import type {
   AuthorizedPeer,
+  PeerRecords,
   PendingOffer,
   ProfileIdentity,
-  Repository,
 } from "@/storage/peer-repository";
 
 export interface PairingDependencies {
   askLink: (command: LinkCommand) => Promise<unknown>;
   identity: () => Promise<ProfileIdentity>;
-  authorized: Pick<Repository<AuthorizedPeer>, "read" | "write">;
-  pending: Pick<Repository<PendingOffer>, "read" | "write">;
+  authorized: Pick<PeerRecords<AuthorizedPeer>, "set">;
+  /** This profile's offers waiting for an answer, by the profile each is for. */
+  pending: Pick<PeerRecords<PendingOffer>, "get" | "set">;
   now?: () => number;
 }
 
@@ -24,7 +25,7 @@ async function verifyCode(code: string, deps: PairingDependencies, now: number) 
   const me = await deps.identity();
   if (pairing.profileId === me.profileId) throw new Error("This code comes from this profile.");
   if (pairing.kind === "answer") {
-    const pending = await deps.pending.read();
+    const pending = await deps.pending.get(pairing.profileId);
     if (pending?.pairingId !== pairing.pairingId || pending.expiresAt <= now) {
       throw new Error("This answer is not for the offer this profile made.");
     }
@@ -48,14 +49,14 @@ export function createPairing(deps: PairingDependencies) {
   const createOffer = async (to: string) => {
     const pairingId = crypto.randomUUID();
     const sdp = sdpOf(await deps.askLink({ type: "offer", peer: to }));
-    await deps.pending.write({ pairingId, expiresAt: now() + PAIRING_TTL_MS, to });
+    await deps.pending.set(to, { pairingId, expiresAt: now() + PAIRING_TTL_MS, to });
     return { code: await half("offer", pairingId, sdp) };
   };
   const accept = async (code: string): Promise<{ code?: string }> => {
     const { pairing, fingerprint } = await verifyCode(code, deps, now());
     const { profileId, displayName } = pairing;
-    // The user accepted this profile, which replaces any earlier one: one peer at a time.
-    await deps.authorized.write({ profileId, displayName, fingerprint });
+    // Each profile paired joins the others; none replaces another.
+    await deps.authorized.set(profileId, { profileId, displayName, fingerprint });
     if (pairing.kind === "offer") {
       const answer = sdpOf(
         await deps.askLink({ type: "answer", peer: profileId, sdp: pairing.sdp }),
@@ -63,7 +64,7 @@ export function createPairing(deps: PairingDependencies) {
       return { code: await half("answer", pairing.pairingId, answer) };
     }
     await deps.askLink({ type: "accept-answer", peer: profileId, sdp: pairing.sdp });
-    await deps.pending.write(null);
+    await deps.pending.set(profileId, null);
     return {};
   };
   return { createOffer, accept };

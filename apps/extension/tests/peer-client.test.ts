@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vite-plus/tes
 import { fakeBrowser } from "wxt/testing/fake-browser";
 import { peerNotice } from "@/messaging/peer-messages";
 import { peerServices } from "@/peers/page-services";
-import { remoteRecordingRepository } from "@/storage/peer-repository";
+import { remoteRecordingsRepository } from "@/storage/peer-repository";
 import { createPeerClient } from "@/views/peer-client";
 import { PEER, answering } from "./fake-peer";
 
@@ -94,7 +94,7 @@ describe("peerServices", () => {
     const onChange = vi.fn();
     const unwatch = recordings.watch(onChange);
     expect(await recordings.read()).toBeNull();
-    await remoteRecordingRepository.write({
+    await remoteRecordingsRepository.set(PEER, {
       profileId: PEER,
       session,
       mine: true,

@@ -115,7 +115,7 @@ test("a malformed or forged frame runs nothing and gets no answer it could use",
 const pinnedPeer = (profile: Profile) =>
   profile.serviceWorker.evaluate(async () => {
     const { chrome } = globalThis as unknown as ChromeGlobal;
-    return (await chrome.storage.local.get("authorizedPeer")).authorizedPeer;
+    return (await chrome.storage.local.get("authorizedPeers")).authorizedPeers;
   });
 
 test("a profile that quits drops the link, and after a restart reconnects as itself", async ({

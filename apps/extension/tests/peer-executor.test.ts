@@ -87,10 +87,12 @@ describe("queries", () => {
     for (const message of [getTabs, hello]) await execute(message, deps);
     expect(sent).toEqual([
       {
+        to: PEER,
         type: "TABS_SNAPSHOT",
         payload: { requestId: getTabs.id, tabs: [expect.objectContaining({ id: shop.id })] },
       },
       {
+        to: PEER,
         type: "SESSION_STATUS",
         payload: { requestId: hello.id, session: running(shop.id), controlledBy: PEER },
       },
@@ -113,7 +115,7 @@ describe("tab commands", () => {
     const command = fromPeer("ACTIVATE_TAB", { tabId: shop.id });
     await execute(command, deps);
     expect(results()).toEqual([
-      { type: "COMMAND_RESULT", payload: { requestId: command.id, ok: true } },
+      { to: PEER, type: "COMMAND_RESULT", payload: { requestId: command.id, ok: true } },
     ]);
     expect(await activeTabId()).toBe(shop.id);
   });

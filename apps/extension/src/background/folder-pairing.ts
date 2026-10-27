@@ -8,6 +8,7 @@ import type {
   AuthorizedPeer,
   FolderPairing,
   PeerLink,
+  PeerRecords,
   PendingOffer,
   ProfileIdentity,
   Repository,
@@ -27,9 +28,10 @@ const WAIT: FolderStep = { type: "wait" };
 interface Situation {
   me: string;
   seen: Seen;
-  /** The pinned peer: once there is one, no other presence counts. */
-  peer: Pick<AuthorizedPeer, "profileId"> | null;
-  pending: PendingOffer | null;
+  /** The pinned peers: once there is one, no other presence counts. */
+  peers: string[];
+  /** This profile's offers waiting for an answer, by the profile each is for. */
+  pending: Record<string, PendingOffer>;
   state: FolderPairing;
   now: number;
 }
@@ -46,16 +48,17 @@ function vouched(signal: SignalFile, partner: Presence, now: number): boolean {
   }
 }
 
-/** The one profile to pair with: the pinned peer, or else the one that has waited longest. */
-function partnerOf(presences: Presence[], peer: Situation["peer"]): Presence | undefined {
-  if (peer) return presences.find(({ profileId }) => profileId === peer.profileId);
+/** The one profile to pair with: the one that has waited longest, among the pinned peers if any. */
+function partnerOf(presences: Presence[], peers: string[]): Presence | undefined {
+  const pinned = presences.filter(({ profileId }) => peers.includes(profileId));
   const oldest = (a: Presence, b: Presence) =>
     a.createdAt - b.createdAt || a.profileId.localeCompare(b.profileId);
-  return presences.toSorted(oldest)[0];
+  return (peers.length > 0 ? pinned : presences).toSorted(oldest)[0];
 }
 
 function offererStep(partner: Presence, signals: SignalFile[], situation: Situation) {
-  const { pending, state, now } = situation;
+  const { state, now } = situation;
+  const pending = situation.pending[partner.profileId];
   if (state.acted && now - state.acted.at < RETRY_MS) return WAIT;
   if (pending?.to !== partner.profileId || pending.expiresAt <= now)
     return { type: "offer", to: partner } as const;
@@ -71,8 +74,8 @@ function offererStep(partner: Presence, signals: SignalFile[], situation: Situat
  * one only when it gave up the last. Nobody clicks, since the folder is the consent.
  */
 export function decideFolderStep(situation: Situation): FolderStep {
-  const { me, seen, peer, state, now } = situation;
-  const partner = partnerOf(seen.presences, peer);
+  const { me, seen, peers, state, now } = situation;
+  const partner = partnerOf(seen.presences, peers);
   if (!partner) return WAIT;
   const signals = seen.signals.filter((each) => vouched(each, partner, now));
   if (me < partner.profileId) return offererStep(partner, signals, situation);
@@ -86,9 +89,9 @@ export interface FolderPairingDependencies {
   askLink: (command: LinkCommand) => Promise<unknown>;
   identity: () => Promise<ProfileIdentity>;
   pairing: Pick<PairingFlow, "createOffer" | "accept">;
-  authorized: Pick<Repository<AuthorizedPeer>, "read">;
-  pending: Pick<Repository<PendingOffer>, "read">;
-  link: Pick<Repository<PeerLink>, "read">;
+  authorized: Pick<PeerRecords<AuthorizedPeer>, "all">;
+  pending: Pick<PeerRecords<PendingOffer>, "all">;
+  link: Pick<PeerRecords<PeerLink>, "all">;
   state: Pick<Repository<FolderPairing>, "read" | "write">;
   log: (entry: string) => void;
   now?: () => number;
@@ -127,13 +130,15 @@ export function createFolderPairing(deps: FolderPairingDependencies) {
   const handle = async (seen: Seen) => {
     const state = await deps.state.read();
     // A verified link needs nothing; the presence stays, so the peer finds this one again.
-    if (!state || (await deps.link.read())?.verified) return;
-    const [me, peer, pending] = await Promise.all([
+    const links = Object.values(await deps.link.all());
+    if (!state || links.some((link) => link.verified)) return;
+    const [me, authorized, pending] = await Promise.all([
       deps.identity(),
-      deps.authorized.read(),
-      deps.pending.read(),
+      deps.authorized.all(),
+      deps.pending.all(),
     ]);
-    const step = decideFolderStep({ me: me.profileId, seen, peer, pending, state, now: now() });
+    const peers = Object.keys(authorized);
+    const step = decideFolderStep({ me: me.profileId, seen, peers, pending, state, now: now() });
     await act(deps, step, now);
   };
   return {
