@@ -50,6 +50,7 @@ function requests(link: PeerLink | null = VERIFIED, reply: PeerMessage = result(
       waiting: vi.fn(async () => false),
       start: vi.fn(async () => {}),
       stop: vi.fn(async () => {}),
+      release: vi.fn(async () => {}),
     },
   } satisfies PeerRequestDependencies;
   const asked = () => deps.channel.request.mock.calls;
@@ -156,6 +157,15 @@ describe("the link and its peer", () => {
     expect(await handlePeerRequest(deps, { type: "status" })).toMatchObject({ folder: "none" });
     await handlePeerRequest(deps, { type: "folder-pair" });
     expect(deps.folder.start).toHaveBeenCalledOnce();
+  });
+
+  test("releases the folder's handles before it is allowed again, only while the link is down", async () => {
+    const { deps } = requests();
+    await handlePeerRequest(deps, { type: "folder-release" });
+    expect(deps.folder.release).not.toHaveBeenCalled();
+    await deps.link.write({ state: "disconnected", verified: false });
+    await handlePeerRequest(deps, { type: "folder-release" });
+    expect(deps.folder.release).toHaveBeenCalledOnce();
   });
 
   test("measures a ping's round trip", async () => {

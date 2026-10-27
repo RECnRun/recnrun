@@ -5,7 +5,7 @@ import { execute, sessionStatus, sharedTabs } from "@/background/executor";
 import type { ExecutorDependencies } from "@/background/executor";
 import { createFolderPairing } from "@/background/folder-pairing";
 import type { FolderPairingFlow } from "@/background/folder-pairing";
-import { askLink } from "@/background/link";
+import { askLink, closeOffscreen } from "@/background/link";
 import { createPairing } from "@/background/pairing";
 import type { PairingFlow } from "@/background/pairing";
 import { createPeerChannel } from "@/background/peer-channel";
@@ -229,6 +229,7 @@ function requestDependencies(
       waiting: async () => (await folderPairingRepository.read()) !== null,
       start: () => folder.start().then(notifyPages),
       stop: folder.stop,
+      release: closeOffscreen,
     },
   };
 }
@@ -277,6 +278,8 @@ export function startPeers(): PeerRoutes {
   // Chrome starts the worker with the browser only for a startup listener; starting resumes.
   browser.runtime.onStartup.addListener(() => {});
   void pairings.folder.resume().catch((error: unknown) => log(errorMessage(error)));
+  // Chrome ends the folder's grant with the last extension page, so the pages read it again.
+  browser.tabs.onRemoved.addListener(notifyPages);
   const deps = requestDependencies(channel, tabs, pairings);
   return {
     request: (request) => handlePeerRequest(deps, request),

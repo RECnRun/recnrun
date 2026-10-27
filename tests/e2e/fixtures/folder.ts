@@ -37,7 +37,7 @@ export async function chooseFolder(profile: Profile, native: Native): Promise<Pa
 
 /**
  * Allows the folder chosen before, from the banner's window; says which prompt Chrome asked
- * with: its restore prompt after a restart, answered "Allow on every visit", or its write prompt.
+ * with: its restore prompt, answered "Allow on every visit", or its write prompt.
  */
 export async function allowFolder(profile: Profile, native: Native) {
   const { window, dialogs } = await openFolderWindow(profile, native);

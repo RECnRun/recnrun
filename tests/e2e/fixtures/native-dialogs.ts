@@ -46,7 +46,7 @@ interface NativeDialogs {
   cancelPicker(): Promise<void>;
   /** "Allow this site to edit files?", which comes up focused on Don't allow. */
   answerWritePrompt(answer: "allow" | "deny"): Promise<void>;
-  /** The three-button prompt after a restart; Chrome gives it no focus, so a click answers. */
+  /** The three-button restore prompt, for a grant that ended; Chrome gives it no focus, so a click answers. */
   answerRestorePrompt(answer: RestoreAnswer): Promise<void>;
   /**
    * Allows the folder in whichever prompt Chrome shows, on every visit for the restore prompt,

@@ -35,6 +35,8 @@ export interface PeerRequestDependencies {
     waiting: () => Promise<boolean>;
     start: () => Promise<void>;
     stop: () => Promise<void>;
+    /** Drops every handle to the folder, so Chrome may offer to keep it on every visit. */
+    release: () => Promise<void>;
   };
 }
 
@@ -120,6 +122,11 @@ async function forget(deps: Deps) {
   await deps.tabs.write(null);
 }
 
+/** A connected profile needs no folder, and its link lives in the handles' document. */
+async function releaseFolder(deps: Deps) {
+  if (!(await verified(deps))) await deps.folder.release();
+}
+
 async function rename(deps: Deps, displayName: string) {
   const identity = { ...(await deps.identity()), displayName };
   await deps.rename(identity);
@@ -140,6 +147,7 @@ const HANDLERS: Handlers = {
   disconnect: (deps) => disconnect(deps),
   forget: (deps) => forget(deps),
   "folder-pair": (deps) => deps.folder.start(),
+  "folder-release": (deps) => releaseFolder(deps),
   ping: (deps) => ping(deps),
   diagnostics: (deps) => deps.askLink({ type: "info" }),
   tabs: (deps) => peerTabs(deps),

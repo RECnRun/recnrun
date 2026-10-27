@@ -57,13 +57,21 @@ test("choosing the folder keeps it, starts pairing, and the window waits until p
   await expect.poll(() => close.mock.calls).toHaveLength(1);
 });
 
-test("after a restart, it asks Chrome again for the folder instead of choosing one", async () => {
-  const { peer, close, root, allow } = mount("prompt");
+test("once the grant ended, it asks Chrome again for the folder instead of choosing one", async () => {
+  let released = -1;
+  const { peer, close, root, allow } = mount(
+    "prompt",
+    vi.fn(async () => {
+      released = peer.asked("folder-release").length;
+    }),
+  );
   await expect.poll(() => button(root, "Allow folder")).toBeDefined();
   expect(root.textContent).toContain("Allow on every visit");
   button(root, "Allow folder")?.click();
   await expect.poll(() => peer.asked("folder-pair")).toHaveLength(1);
   expect(allow).toHaveBeenCalledOnce();
+  // Chrome offers "Allow on every visit" only once no old handle holds the picker's grant.
+  expect(released).toBe(1);
   await expect.poll(() => root.textContent).toContain(WAIT);
   expect(close).not.toHaveBeenCalled();
   peer.change(paired());
@@ -98,7 +106,7 @@ test("the pairing page opened for the folder shows only the folder, with Chrome'
   await expect.poll(() => root.textContent).toContain(WAIT);
   peer.change(paired());
   await expect.poll(() => close.mock.calls).toHaveLength(1);
-  // After a restart, the kept folder is asked for again; Chrome grants a private one at once.
+  // Once the grant ended, the kept folder is asked for again; Chrome grants a private one at once.
   peer.change(withFolder("prompt"));
   await expect.poll(() => button(root, "Allow folder")?.disabled).toBe(false);
   button(root, "Allow folder")?.click();

@@ -14,7 +14,7 @@ interface FolderPairingProps {
 
 /**
  * Leads to the folder window, which shows Chrome's folder picker or the prompt Chrome shows once
- * after a restart.
+ * the folder's grant ended.
  */
 export function FolderBanner({ peers, status }: FolderPairingProps) {
   if (!status || status.folder === "granted" || status.link.verified) return null;
@@ -26,7 +26,7 @@ export function FolderBanner({ peers, status }: FolderPairingProps) {
       </h3>
       <p>
         {again
-          ? "After a restart, Chrome asks once more before RECnRun may use the folder."
+          ? "Chrome asks once more before RECnRun may use the folder, since its windows closed."
           : "Your Chrome profiles pair through a folder named RECnRun in Documents."}
       </p>
       <button type="button" onClick={() => void peers.openFolder()}>

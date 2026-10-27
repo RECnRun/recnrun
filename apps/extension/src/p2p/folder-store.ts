@@ -58,7 +58,7 @@ export async function chooseFolder(pick: () => Promise<FileSystemDirectoryHandle
   await writeStored(STORE, KEY, folder);
 }
 
-/** Asks Chrome again for the folder chosen before, as it does once after a restart. */
+/** Asks Chrome again for the folder chosen before, as it does once the grant ended. */
 export async function allowFolder(load: typeof loadFolder = loadFolder): Promise<void> {
   const folder = await load();
   if (!folder) throw new Error("Choose the RECnRun folder first.");

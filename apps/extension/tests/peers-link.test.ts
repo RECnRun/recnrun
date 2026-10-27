@@ -253,6 +253,23 @@ describe("the folder", () => {
     expect(link.commands.slice(-2)).toEqual([{ type: "folder-stop" }, { type: "close" }]);
   });
 
+  test("tells the pages when a tab closes, since Chrome may have ended the folder's grant", async () => {
+    const { link } = await peerBackground();
+    await fakeBrowser.tabs.onRemoved.trigger(7, { windowId: 1, isWindowClosing: true });
+    expect(link.notices).toEqual([{ target: "pages", type: "peer-changed" }]);
+  });
+
+  test("closes the offscreen document before the folder is allowed again, unless connected", async () => {
+    const { routes, connect } = await peerBackground();
+    vi.spyOn(fakeBrowser.runtime, "getContexts").mockResolvedValue([{}] as never);
+    const close = vi.spyOn(fakeBrowser.offscreen, "closeDocument").mockResolvedValue(undefined);
+    await routes.request({ type: "folder-release" });
+    expect(close).toHaveBeenCalledOnce();
+    await connect();
+    await routes.request({ type: "folder-release" });
+    expect(close).toHaveBeenCalledOnce();
+  });
+
   test("keeps waiting once the link is verified, and offers again once it goes down", async () => {
     const { routes, connect, link } = await peerBackground({ authorized: false });
     await folderPairingRepository.write({});

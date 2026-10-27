@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, test, vi } from "vite-plus/test";
 import { fakeBrowser } from "wxt/testing/fake-browser";
-import { askLink } from "@/background/link";
+import { askLink, closeOffscreen } from "@/background/link";
 import { OFFSCREEN_PAGE } from "@/background/listener";
 import { linkCommandMessage } from "@/messaging/peer-messages";
 import { answering } from "./fake-peer";
@@ -55,4 +55,14 @@ test("rejects with the link's error, or when it does not answer", async () => {
   vi.restoreAllMocks();
   offscreen(true, null);
   await expect(askLink({ type: "close" })).rejects.toThrow("The link did not answer.");
+});
+
+test("closes the offscreen document only when one is open", async () => {
+  const close = vi.spyOn(fakeBrowser.offscreen, "closeDocument").mockResolvedValue(undefined);
+  offscreen(false);
+  await closeOffscreen();
+  expect(close).not.toHaveBeenCalled();
+  offscreen(true);
+  await closeOffscreen();
+  expect(close).toHaveBeenCalledOnce();
 });

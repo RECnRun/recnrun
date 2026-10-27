@@ -30,6 +30,7 @@ export const PeerRequestSchema = v.variant("type", [
   kind("disconnect", {}),
   kind("forget", {}),
   kind("folder-pair", {}),
+  kind("folder-release", {}),
   kind("ping", {}),
   kind("diagnostics", {}),
   kind("tabs", {}),

@@ -57,11 +57,11 @@ const connected = async (a: Profile, b: Profile) => {
 
 /**
  * Restarts `profile` and reconnects it: `other` allows the folder again, since its grant ended
- * with its folder window (H2), and `profile` on every visit, in the restore prompt (H1).
+ * with its folder window (H2), and both on every visit, in the restore prompt (H1).
  */
 async function restartAndAllow(profile: Profile, other: Profile, native: Native, launch: Launch) {
   const restarted = await restart(profile, other, launch);
-  await allowFolder(other, native);
+  expect(await allowFolder(other, native)).toBe("restore");
   expect(await allowFolder(restarted, native)).toBe("restore");
   await connected(other, restarted);
   return restarted;
@@ -88,6 +88,24 @@ test("two profiles pair from their dashboards through one RECnRun folder on disk
   }
 });
 
+test("a folder window closed before pairing brings the banner back, and allowing again keeps the folder on every visit", async ({
+  profileA,
+  native,
+}) => {
+  const window = await chooseFolder(profileA, native);
+  await window.close();
+  // Chrome ends the grant with the last extension page (H2), and the dashboard hears of it.
+  await expect(folderBanner(profileA.dashboard)).toContainText("Allow the RECnRun folder");
+  const { window: again, dialogs } = await openFolderWindow(profileA, native);
+  await again.getByRole("button", { name: "Allow folder" }).click();
+  expect(await dialogs.allowInEitherPrompt()).toBe("restore");
+  await expect(again.getByText("Keep this window open")).toBeVisible();
+  await again.close();
+  await profileA.site.reload();
+  await expect(pairingSection(profileA.dashboard)).toContainText(WAITING);
+  await expect(folderBanner(profileA.dashboard)).toHaveCount(0);
+});
+
 test("profiles that both allowed the folder on every visit keep it with no page open, and reconnect with no click after a restart", async ({
   profileA,
   profileB,
@@ -96,13 +114,11 @@ test("profiles that both allowed the folder on every visit keep it with no page 
 }) => {
   test.setTimeout(480_000);
   await pair(profileA, profileB, native);
-  // Chrome offers "Allow on every visit" only after a restart, so each profile restarts once.
+  // Both allow the folder on every visit when B reconnects, so A's restart takes no click.
   const b = await restartAndAllow(profileB, profileA, native, launch);
-  // B keeps its folder now, so only A allows it after its own restart.
   const a = await restart(profileA, b, launch);
-  await expect(folderBanner(b.dashboard)).toHaveCount(0);
-  expect(await allowFolder(a, native)).toBe("restore");
   await connected(b, a);
+  await expect(folderBanner(a.dashboard)).toHaveCount(0);
   // "Allow on every visit" outlives the folder windows: B refreshes its presence with none open.
   await expect.poll(() => extensionPages(b), { timeout: 15_000 }).toEqual([]);
   const idB = await profileIdOf(b);
@@ -182,7 +198,6 @@ test("a profile whose folder grant the user revokes in Chrome's settings allows 
   await expect(folderBanner(b.dashboard)).toContainText("Allow the RECnRun folder", {
     timeout: 30_000,
   });
-  await allowFolder(profileA, native);
   // With the kept grant gone, Chrome shows its write prompt, not the restore prompt.
   expect(await allowFolder(b, native)).toBe("write");
   await connected(profileA, b);
