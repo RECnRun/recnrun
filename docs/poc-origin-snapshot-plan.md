@@ -4,7 +4,7 @@
 
 Find out whether the extension alone (Chrome MV3, no companion app, no backend, no `chrome.debugger`, no CDP in the implementation) can switch **sequentially** between saved local states of one web application, in one tab and one origin, and prove it with the flow **A → B → A → C → A**, every identity keeping its data.
 
-An **identity** is a set of local data: cookies, `localStorage`, `sessionStorage`, IndexedDB, and CacheStorage of one origin. Restoring it does not restore a valid server session: tokens may expire or be revoked, and the report says when that happens.
+An **identity** is a set of local data: cookies, `localStorage`, `sessionStorage`, and IndexedDB of one origin. CacheStorage was in it until the user dropped it after Phase 2 (2026-10-27): it stays shared by the identities. Restoring it does not restore a valid server session: tokens may expire or be revoked, and the report says when that happens.
 
 The order is: **first prove that a switch can restore state before the application starts; only then build the adapters and the UI.** A demonstrated limitation is a valid result, NO-GO included. Do not simulate success, and do not run the whole plan if the experiments of Phase 1 find a blocking limitation: stop at the decision gate and report.
 
@@ -13,7 +13,7 @@ The order is: **first prove that a switch can restore state before the applicati
 - No companion app, support backend, `chrome.debugger`, or CDP in the extension.
 - Playwright drives the browser with its normal automation (and may use CDP for fault injection, such as stopping the extension's service worker), but never captures, clears, restores, or suspends application state itself: the extension does.
 - Do not modify the application under test to cooperate with the switch. The fixture app has observation-only instrumentation: it never waits for a signal, never delays its start, and has no special restore route.
-- No incremental snapshots, OPFS, sync, compression, or complex rollback. No extensive monkey patching of page APIs.
+- No incremental snapshots, OPFS, CacheStorage (dropped after Phase 2), sync, compression, or complex rollback. No extensive monkey patching of page APIs.
 - Test data and test accounts only. Captures of a real application contain its tokens: they stay in ignored folders (`.artifacts/`), are never committed, uploaded, or pasted into the report, and are deleted after the run. The report lists names, counts, and sizes, never values.
 - Code, docs, diagnostics, and UI in English.
 
@@ -176,8 +176,7 @@ Only after the user agrees with the decision. Each step ends with its tests gree
 2. Coordinator and the flow A → B → A.
 3. `localStorage` and `sessionStorage`.
 4. Cookies.
-5. CacheStorage.
-6. Full flow A → B → A → C → A and a minimal UI.
+5. Full flow A → B → A → C → A and a minimal UI.
 
 ### IndexedDB
 
@@ -192,7 +191,7 @@ Only after the user agrees with the decision. Each step ends with its tests gree
 - **`localStorage`:** capture every entry; restoring removes the keys the target does not have.
 - **`sessionStorage`:** same tab only. Do not promise anything after the tab closes unless shown.
 - **Cookies:** scope by domain, path, cookie store, and partition key. Never clear more than the configured domains; record cookies whose domain is wider than the origin (a parent domain), which no longer fit the "origin" model.
-- **CacheStorage:** state which requests and responses are supported (method, opaque responses, `Vary`, body types), test binary bodies, and list what cannot be rebuilt. Measure Zephyr with every cache and with the `ngsw:*` exclusion.
+- **CacheStorage:** not captured, cleared, or restored (the user's decision after Phase 2). Apps that keep identity data in it, or an older app shell that a restore could bring back, are out of scope.
 
 ### Coordinator and failures
 
