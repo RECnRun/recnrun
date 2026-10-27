@@ -55,13 +55,3 @@ export function decodePairing(code: string, now = Date.now()): Pairing {
 export function fingerprintOf(sdp: string): string | undefined {
   return /^a=fingerprint:sha-256 ([0-9A-F:]+)\s*$/im.exec(sdp)?.[1]?.toUpperCase();
 }
-
-/**
- * Six digits both profiles show, from both certificate fingerprints in either order. The same
- * digits on both screens mean nobody in between swapped a certificate.
- */
-export async function shortAuthenticationString(mine: string, theirs: string): Promise<string> {
-  const joined = [mine, theirs].toSorted().join("|");
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(joined));
-  return String(new DataView(digest).getUint32(0) % 1_000_000).padStart(6, "0");
-}

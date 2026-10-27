@@ -147,12 +147,8 @@ function folderPairing(initial: FolderPairing | null = {}, me = ME) {
   const offer = signal("offer", me, PEER);
   const answer = signal("answer", me, PEER);
   const pairing = {
-    createOffer: vi.fn(async (to?: string) => {
-      await pending.write({
-        pairingId: OFFER_ID,
-        expiresAt: NOW + PAIRING_TTL_MS,
-        ...(to && { to }),
-      });
+    createOffer: vi.fn(async (to: string) => {
+      await pending.write({ pairingId: OFFER_ID, expiresAt: NOW + PAIRING_TTL_MS, to });
       return { code: offer.code };
     }),
     accept: vi.fn(async (_code: string): Promise<{ code?: string }> => ({ code: answer.code })),

@@ -4,7 +4,6 @@ import { DisplayNameSchema } from "@/p2p/pairing-code";
 import { MAX_FRAME_LENGTH, ProfileIdSchema } from "@/p2p/protocol";
 
 const TabIdSchema = v.pipe(v.number(), v.integer(), v.minValue(0));
-const CodeSchema = v.pipe(v.string(), v.nonEmpty(), v.maxLength(128 * 1024));
 const SdpSchema = v.pipe(v.string(), v.nonEmpty(), v.maxLength(64 * 1024));
 const FrameSchema = v.pipe(v.string(), v.maxLength(MAX_FRAME_LENGTH));
 export const LinkStateSchema = v.picklist([
@@ -24,15 +23,10 @@ const kind = <T extends string, P extends v.ObjectEntries>(type: T, payload: P) 
 export const PeerRequestSchema = v.variant("type", [
   kind("status", {}),
   kind("rename", { displayName: DisplayNameSchema }),
-  kind("create-offer", {}),
-  kind("inspect", { code: CodeSchema }),
-  kind("accept", { code: CodeSchema }),
   kind("disconnect", {}),
   kind("forget", {}),
   kind("folder-pair", {}),
   kind("folder-release", {}),
-  kind("ping", {}),
-  kind("diagnostics", {}),
   kind("tabs", {}),
   kind("activate", { tabId: TabIdSchema }),
   kind("session-start", { tabId: TabIdSchema }),
@@ -54,13 +48,11 @@ export type LinkEvent = v.InferOutput<typeof LinkEventSchema>;
 
 /** What the background asks of the offscreen document, which alone holds the connection. */
 const LinkCommandSchema = v.variant("type", [
-  kind("fingerprint", {}),
   kind("offer", {}),
   kind("answer", { sdp: SdpSchema }),
   kind("accept-answer", { sdp: SdpSchema }),
   kind("send", { frame: FrameSchema }),
   kind("close", {}),
-  kind("info", {}),
   kind("folder-status", {}),
   kind("folder-watch", { profileId: ProfileIdSchema, displayName: DisplayNameSchema }),
   kind("folder-publish", { signal: SignalFileSchema }),

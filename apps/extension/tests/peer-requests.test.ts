@@ -1,5 +1,4 @@
 import { describe, expect, test, vi } from "vite-plus/test";
-import type { PairingFlow } from "@/background/pairing";
 import { handlePeerRequest } from "@/background/peer-requests";
 import type { PeerRequestDependencies } from "@/background/peer-requests";
 import type { FolderAccess } from "@/p2p/folder-store";
@@ -19,18 +18,12 @@ const result = (ok: boolean, reason?: string) =>
 
 /** Every dependency in memory; the channel answers each request with `reply`. */
 function requests(link: PeerLink | null = VERIFIED, reply: PeerMessage = result(true)) {
-  const pairing = {
-    createOffer: vi.fn(async () => ({ code: "offer" })),
-    inspect: vi.fn(async () => "preview"),
-    accept: vi.fn(async () => "accepted"),
-  } as unknown as PairingFlow;
   const deps = {
     channel: {
       request: vi.fn(async (_type: PeerType, _payload: unknown) => reply),
       send: recordingChannel().channel.send,
     },
     hello: vi.fn(async () => {}),
-    pairing,
     askLink: vi.fn(async () => "link"),
     identity: async () => identity,
     rename: vi.fn(async () => {}),
@@ -54,7 +47,7 @@ function requests(link: PeerLink | null = VERIFIED, reply: PeerMessage = result(
     },
   } satisfies PeerRequestDependencies;
   const asked = () => deps.channel.request.mock.calls;
-  return { deps, pairing, asked };
+  return { deps, asked };
 }
 
 describe("the link and its peer", () => {
@@ -119,20 +112,10 @@ describe("the link and its peer", () => {
     expect(offline.deps.hello).not.toHaveBeenCalled();
   });
 
-  test("hands pairing requests to the pairing flow", async () => {
-    const { deps, pairing } = requests();
-    expect(await handlePeerRequest(deps, { type: "create-offer" })).toEqual({ code: "offer" });
-    expect(await handlePeerRequest(deps, { type: "inspect", code: "c1" })).toBe("preview");
-    expect(await handlePeerRequest(deps, { type: "accept", code: "c2" })).toBe("accepted");
-    expect(pairing.inspect).toHaveBeenCalledWith("c1");
-    expect(pairing.accept).toHaveBeenCalledWith("c2");
-  });
-
-  test("closes the link on disconnect and asks it for diagnostics", async () => {
+  test("closes the link on disconnect", async () => {
     const { deps } = requests();
     await handlePeerRequest(deps, { type: "disconnect" });
-    expect(await handlePeerRequest(deps, { type: "diagnostics" })).toBe("link");
-    expect(deps.askLink.mock.calls).toEqual([[{ type: "close" }], [{ type: "info" }]]);
+    expect(deps.askLink.mock.calls).toEqual([[{ type: "close" }]]);
   });
 
   test("forgets the peer, its session copy, and its tabs, and closes the link", async () => {
@@ -166,15 +149,6 @@ describe("the link and its peer", () => {
     await deps.link.write({ state: "disconnected", verified: false });
     await handlePeerRequest(deps, { type: "folder-release" });
     expect(deps.folder.release).toHaveBeenCalledOnce();
-  });
-
-  test("measures a ping's round trip", async () => {
-    const { deps, asked } = requests();
-    const { latencyMs } = (await handlePeerRequest(deps, { type: "ping" })) as {
-      latencyMs: number;
-    };
-    expect(latencyMs).toBeGreaterThanOrEqual(0);
-    expect(asked()[0]?.[0]).toBe("PING");
   });
 });
 
@@ -238,8 +212,12 @@ describe("commands to the other profile", () => {
   });
 
   test("resolves on a reply that is not a command result", async () => {
-    const pong = peerMessage("PONG", { from: PEER, to: ME }, { requestId: PEER, timestamp: 1 });
-    const { deps } = requests(VERIFIED, pong);
+    const snapshot = peerMessage(
+      "TABS_SNAPSHOT",
+      { from: PEER, to: ME },
+      { requestId: PEER, tabs: [] },
+    );
+    const { deps } = requests(VERIFIED, snapshot);
     await expect(handlePeerRequest(deps, { type: "session-stop" })).resolves.toBeUndefined();
   });
 

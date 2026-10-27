@@ -42,7 +42,7 @@ function authorizedPeer(): AuthorizedPeer {
 }
 
 const fromPeer = (requestId: string) =>
-  JSON.stringify(peerMessage("PONG", { from: PEER, to: ME }, { requestId, timestamp: 2 }));
+  JSON.stringify(peerMessage("TABS_SNAPSHOT", { from: PEER, to: ME }, { requestId, tabs: [] }));
 
 afterEach(() => {
   vi.useRealTimers();
@@ -51,10 +51,10 @@ afterEach(() => {
 describe("send", () => {
   test("addresses the authorized peer and logs only the type", async () => {
     const { send, sent, log } = channel();
-    const message = await send("PING", { timestamp: 1 });
-    expect(message).toMatchObject({ from: ME, to: PEER, type: "PING", timestamp: 1 });
+    const message = await send("HELLO", { displayName: "Me", extensionVersion: "0.1.0" });
+    expect(message).toMatchObject({ from: ME, to: PEER, type: "HELLO", displayName: "Me" });
     expect(sent).toEqual([message]);
-    expect(log).toHaveBeenCalledWith("sent PING");
+    expect(log).toHaveBeenCalledWith("sent HELLO");
   });
 
   test.each([
@@ -73,7 +73,7 @@ describe("send", () => {
 describe("request", () => {
   test("resolves with the reply that names it, ignoring others", async () => {
     const { request, receive, sent } = channel();
-    const reply = request("PING", { timestamp: 1 });
+    const reply = request("GET_TABS", {});
     await vi.waitFor(() => expect(sent).toHaveLength(1));
     const other = await receive(fromPeer("44444444-4444-4444-8444-444444444444"));
     expect(other.kind).toBe("accepted");
@@ -115,7 +115,7 @@ describe("request", () => {
 
   test("fails every waiting request when the link drops", async () => {
     const { request, failAll, sent } = channel();
-    const replies = [request("GET_TABS", {}), request("PING", { timestamp: 1 })];
+    const replies = [request("GET_TABS", {}), request("SESSION_STOP", {})];
     await vi.waitFor(() => expect(sent).toHaveLength(2));
     failAll();
     for (const reply of replies) await expect(reply).rejects.toThrow(NOT_CONNECTED);
@@ -125,9 +125,9 @@ describe("request", () => {
 describe("receive", () => {
   test("accepts a message the authorized peer addressed to this profile", async () => {
     const { receive, log } = channel();
-    const ping = peerMessage("PING", { from: PEER, to: ME }, { timestamp: 3 });
-    expect(await receive(JSON.stringify(ping))).toEqual({ kind: "accepted", message: ping });
-    expect(log).toHaveBeenCalledWith("received PING");
+    const ask = peerMessage("GET_TABS", { from: PEER, to: ME }, {});
+    expect(await receive(JSON.stringify(ask))).toEqual({ kind: "accepted", message: ask });
+    expect(log).toHaveBeenCalledWith("received GET_TABS");
   });
 
   test("drops a frame that does not parse", async () => {
@@ -148,8 +148,8 @@ describe("receive", () => {
     ],
   ] as const)("refuses a message with %s", async (_, route, setup: Setup) => {
     const { receive, log } = channel(setup);
-    const ping = peerMessage("PING", route, { timestamp: 3 });
-    expect(await receive(JSON.stringify(ping))).toEqual({ kind: "unauthorized" });
+    const ask = peerMessage("GET_TABS", route, {});
+    expect(await receive(JSON.stringify(ask))).toEqual({ kind: "unauthorized" });
     expect(log).not.toHaveBeenCalled();
   });
 });

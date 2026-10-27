@@ -5,8 +5,7 @@ import { loadFolder } from "@/p2p/folder-store";
 import { FolderPage } from "@/pairing/FolderPage";
 import { startPairing } from "@/pairing/start";
 import { fakePeerClient, statusOf } from "./fake-peer-client";
-import { alerts } from "./pairing-page";
-import { button } from "./queries";
+import { alerts, button } from "./queries";
 
 const withFolder = (folder: PeerStatus["folder"]): PeerStatus => ({ ...statusOf(), folder });
 const paired = (): PeerStatus => ({ ...statusOf("connected"), folderPairing: true });
@@ -92,13 +91,13 @@ test("a folder Chrome does not allow is an alert, and the window stays", async (
   expect(peer.asked("folder-pair")).toEqual([]);
 });
 
-test("the pairing page opened for the folder shows only the folder, with Chrome's prompts", async () => {
+test("the extension's only page is the folder window, with Chrome's prompts", async () => {
   const picked = await privateFolder();
   vi.stubGlobal("showDirectoryPicker", async () => picked);
   const close = vi.spyOn(window, "close").mockImplementation(() => {});
   const peer = fakePeerClient(withFolder("none"));
   const root = document.body.appendChild(document.createElement("div"));
-  startPairing(root, peer.client, "#folder");
+  startPairing(root, peer.client);
   await expect.poll(() => root.querySelector("h1")?.textContent).toBe("RECnRun folder");
   expect(root.textContent).not.toContain("Pair by hand instead");
   await expect.poll(() => button(root, "Choose folder")?.disabled).toBe(false);

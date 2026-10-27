@@ -9,7 +9,7 @@ export const ProfileIdentitySchema = v.strictObject({
   displayName: DisplayNameSchema,
 });
 
-/** The one peer the user confirmed, pinned to its DTLS certificate fingerprint. */
+/** The peer this profile paired with, pinned to its DTLS certificate fingerprint. */
 export const AuthorizedPeerSchema = v.strictObject({
   profileId: ProfileIdSchema,
   displayName: DisplayNameSchema,
@@ -49,24 +49,3 @@ export const PeerStatusSchema = v.object({
 });
 
 export type PeerStatus = v.InferOutput<typeof PeerStatusSchema>;
-
-/** A pairing code to hand to the other profile; accepting an answer returns none. */
-export const PairingCodeResultSchema = v.object({ code: v.optional(v.string()) });
-
-/** What the user checks before accepting a pasted code. */
-export const PairingPreviewSchema = v.object({
-  kind: v.picklist(["offer", "answer"]),
-  profileId: ProfileIdSchema,
-  displayName: v.string(),
-  digits: v.pipe(v.string(), v.regex(/^\d{6}$/)),
-  known: v.boolean(),
-});
-
-export type PairingPreview = v.InferOutput<typeof PairingPreviewSchema>;
-
-export const PingResultSchema = v.object({ latencyMs: v.number() });
-
-export const DiagnosticsSchema = v.object({
-  state: LinkStateSchema,
-  diagnostics: v.array(v.string()),
-});

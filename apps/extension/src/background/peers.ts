@@ -7,7 +7,6 @@ import { createFolderPairing } from "@/background/folder-pairing";
 import type { FolderPairingFlow } from "@/background/folder-pairing";
 import { askLink, closeOffscreen } from "@/background/link";
 import { createPairing } from "@/background/pairing";
-import type { PairingFlow } from "@/background/pairing";
 import { createPeerChannel } from "@/background/peer-channel";
 import type { PeerChannel } from "@/background/peer-channel";
 import { handlePeerRequest } from "@/background/peer-requests";
@@ -200,20 +199,14 @@ function watchExecutor(channel: PeerChannel, executor: ExecutorDependencies) {
 
 const FolderStatusSchema = v.object({ access: FolderAccessSchema });
 
-interface Pairings {
-  pairing: PairingFlow;
-  folder: FolderPairingFlow;
-}
-
 function requestDependencies(
   channel: PeerChannel,
   tabs: TabsCache,
-  { pairing, folder }: Pairings,
+  folder: FolderPairingFlow,
 ): PeerRequestDependencies {
   return {
     channel,
     hello: () => hello(channel),
-    pairing,
     askLink,
     identity: readIdentity,
     rename: (identity) => identityRepository.write(identity),
@@ -234,14 +227,15 @@ function requestDependencies(
   };
 }
 
-function createPairings(): Pairings {
+/** Pairing through the folder, which exchanges the offer and answer codes. */
+function createFolder(): FolderPairingFlow {
   const pairing = createPairing({
     askLink,
     identity: readIdentity,
     authorized: authorizedPeerRepository,
     pending: pendingOfferRepository,
   });
-  const folder = createFolderPairing({
+  return createFolderPairing({
     askLink,
     identity: readIdentity,
     pairing,
@@ -251,7 +245,6 @@ function createPairings(): Pairings {
     state: folderPairingRepository,
     log,
   });
-  return { pairing, folder };
 }
 
 /**
@@ -274,15 +267,15 @@ export function startPeers(): PeerRoutes {
   };
   const tabs = createTabsCache();
   watchExecutor(channel, executor);
-  const pairings = createPairings();
+  const folder = createFolder();
   // Chrome starts the worker with the browser only for a startup listener; starting resumes.
   browser.runtime.onStartup.addListener(() => {});
-  void pairings.folder.resume().catch((error: unknown) => log(errorMessage(error)));
+  void folder.resume().catch((error: unknown) => log(errorMessage(error)));
   // Chrome ends the folder's grant with the last extension page, so the pages read it again.
   browser.tabs.onRemoved.addListener(notifyPages);
-  const deps = requestDependencies(channel, tabs, pairings);
+  const deps = requestDependencies(channel, tabs, folder);
   return {
     request: (request) => handlePeerRequest(deps, request),
-    link: createLinkHandler(channel, executor, tabs, pairings.folder),
+    link: createLinkHandler(channel, executor, tabs, folder),
   };
 }

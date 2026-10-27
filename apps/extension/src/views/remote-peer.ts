@@ -10,7 +10,6 @@ export interface PeerServices {
   client: PeerClient;
   tabs: TabSource;
   recordings: RecordingStore;
-  openPairing: () => Promise<void>;
   /** Opens the window that grants the RECnRun folder. */
   openFolder: () => Promise<void>;
 }

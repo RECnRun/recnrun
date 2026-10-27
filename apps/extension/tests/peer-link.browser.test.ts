@@ -79,17 +79,6 @@ describe("a pairing", () => {
     await pair(alice, bob);
     expect(alice.link.remoteFingerprint()).toMatch(/^[0-9A-F:]+$/);
   });
-
-  test("logs candidate types and states, never an address", async () => {
-    const [alice, bob] = [await side(), await side()];
-    await pair(alice, bob);
-    const log = alice.link.diagnostics();
-    expect(log[0]).toMatch(/^\+\d+ms link connecting$/);
-    expect(log).toContainEqual(expect.stringMatching(/ candidate host( \(mDNS\))? udp$/));
-    expect(log).toContainEqual(expect.stringMatching(/ gathering complete$/));
-    expect(log).toContainEqual(expect.stringMatching(/ link connected$/));
-    expect(log.join("\n")).not.toMatch(/\d+\.\d+\.\d+\.\d+|[0-9a-f-]{36}\.local/);
-  });
 });
 
 describe("closing", () => {
@@ -126,7 +115,6 @@ describe("failures", () => {
     const { link, states } = await side();
     await expect(link.acceptAnswer("v=0\r\n")).rejects.toThrow("Create an offer first.");
     expect(states).toEqual(["failed"]);
-    expect(link.diagnostics()).toContainEqual(expect.stringMatching(/ error Error$/));
   });
 
   test("refuses an answer on the side that answered", async () => {
@@ -136,23 +124,11 @@ describe("failures", () => {
     expect(bob.states).toEqual(["connecting", "failed"]);
   });
 
-  test("fails on an offer that is not SDP, naming only the error", async () => {
+  test("fails on an offer that is not SDP", async () => {
     const { link, states } = await side();
     const refused = await link.acceptOffer("not sdp").catch((error: unknown) => error);
     expect(refused).toBeInstanceOf(DOMException);
     expect(states).toEqual(["connecting", "failed"]);
-    const [error] = link.diagnostics().filter((entry) => entry.includes(" error "));
-    expect(error).toMatch(/ error \w+Error$/);
-  });
-
-  test("keeps only the last 200 diagnostics", async () => {
-    const { link } = await side();
-    for (let attempt = 0; attempt < 205; attempt += 1) {
-      await link.acceptAnswer("v=0\r\n").catch(() => undefined);
-    }
-    const log = link.diagnostics();
-    expect(log).toHaveLength(200);
-    expect(log.every((entry) => entry.endsWith(" error Error"))).toBe(true);
   });
 
   test("returns what was gathered when gathering stalls", async () => {

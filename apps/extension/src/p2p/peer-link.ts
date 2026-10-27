@@ -18,22 +18,12 @@ export interface PeerLink {
   close: () => void;
   state: () => LinkState;
   remoteFingerprint: () => string | undefined;
-  /** Candidate types, states, and error names; never addresses or payloads. */
-  diagnostics: () => string[];
 }
 
 interface LinkOptions {
   certificate?: RTCCertificate;
   /** Host candidates gather in milliseconds; this bounds a stalled gathering. */
   gatherTimeoutMs?: number;
-}
-
-/** "host (mDNS) udp" or "srflx udp": what a candidate is, without its address. */
-function describeCandidate(candidate: string): string {
-  const type = / typ (\w+)/.exec(candidate)?.[1] ?? "unknown";
-  const protocol = candidate.split(" ")[2]?.toLowerCase() ?? "?";
-  const mdns = /\s[\w-]+\.local\s/.test(candidate) ? " (mDNS)" : "";
-  return `${type}${mdns} ${protocol}`;
 }
 
 function gathered(pc: RTCPeerConnection, timeoutMs: number): Promise<void> {
@@ -49,38 +39,21 @@ function gathered(pc: RTCPeerConnection, timeoutMs: number): Promise<void> {
   });
 }
 
-/** The link's state and its bounded diagnostics log. */
+/** The link's state, reported once per change. */
 function createTracker(events: PeerLinkEvents) {
-  const log: string[] = [];
-  const started = Date.now();
   let current: LinkState = "idle";
-  const note = (entry: string) => {
-    log.push(`+${Date.now() - started}ms ${entry}`);
-    if (log.length > 200) log.shift();
-  };
   const set = (next: LinkState) => {
     if (next === current) return;
     current = next;
-    note(`link ${next}`);
     events.onState(next);
   };
-  return { log, note, set, state: () => current };
+  return { set, state: () => current };
 }
 
 type Tracker = ReturnType<typeof createTracker>;
 
 function watchConnection(pc: RTCPeerConnection, tracker: Tracker, isCurrent: () => boolean) {
-  pc.addEventListener("icecandidate", ({ candidate }) => {
-    if (candidate?.candidate) tracker.note(`candidate ${describeCandidate(candidate.candidate)}`);
-  });
-  pc.addEventListener("icegatheringstatechange", () =>
-    tracker.note(`gathering ${pc.iceGatheringState}`),
-  );
-  pc.addEventListener("iceconnectionstatechange", () =>
-    tracker.note(`ice ${pc.iceConnectionState}`),
-  );
   pc.addEventListener("connectionstatechange", () => {
-    tracker.note(`connection ${pc.connectionState}`);
     const { connectionState } = pc;
     if (!isCurrent()) return;
     if (connectionState === "failed" || connectionState === "disconnected")
@@ -138,7 +111,6 @@ export function createPeerLink(events: PeerLinkEvents, options: LinkOptions = {}
   const slot = createSlot(tracker, events, certificate);
   const guarded = <T>(work: () => Promise<T>) =>
     work().catch((error: unknown) => {
-      tracker.note(`error ${error instanceof Error ? error.name : "unknown"}`);
       tracker.set("failed");
       throw error;
     });
@@ -173,6 +145,5 @@ export function createPeerLink(events: PeerLinkEvents, options: LinkOptions = {}
     },
     state: tracker.state,
     remoteFingerprint: () => fingerprintOf(slot.pc()?.remoteDescription?.sdp ?? ""),
-    diagnostics: () => [...tracker.log],
   };
 }

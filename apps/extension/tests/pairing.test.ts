@@ -14,7 +14,7 @@ const sdpWith = (fingerprint: string) => `v=0\r\na=fingerprint:sha-256 ${fingerp
 interface PendingOffer {
   pairingId: string;
   expiresAt: number;
-  to?: string;
+  to: string;
 }
 
 function memory<T>(initial: T | null = null) {
@@ -26,7 +26,6 @@ function memory<T>(initial: T | null = null) {
 function side(identity: typeof A, fingerprint: string, clock = { now: NOW }) {
   const sdp = sdpWith(fingerprint);
   const askLink = vi.fn(async (command: LinkCommand): Promise<unknown> => {
-    if (command.type === "fingerprint") return { fingerprint };
     if (command.type === "offer" || command.type === "answer") return { sdp };
     return {};
   });
@@ -45,19 +44,19 @@ function side(identity: typeof A, fingerprint: string, clock = { now: NOW }) {
 async function offered() {
   const a = side(A, FP_A);
   const b = side(B, FP_B);
-  const { code } = await a.createOffer();
+  const { code } = await a.createOffer(B.profileId);
   return { a, b, offer: code };
 }
 
 describe("a full pairing", () => {
-  test("shows the same digits on both profiles and authorizes each other", async () => {
+  test("authorizes each other, each pinned to the other's certificate", async () => {
     const { a, b, offer } = await offered();
     const pairingId = decodePairing(offer, NOW).pairingId;
-    expect(await a.pending.read()).toEqual({ pairingId, expiresAt: NOW + PAIRING_TTL_MS });
-
-    const seenByB = await b.inspect(offer);
-    expect(seenByB).toMatchObject({ kind: "offer", ...A, known: false });
-    expect(seenByB.digits).toMatch(/^\d{6}$/);
+    expect(await a.pending.read()).toEqual({
+      pairingId,
+      expiresAt: NOW + PAIRING_TTL_MS,
+      to: B.profileId,
+    });
     expect(await b.authorized.read()).toBeNull();
 
     const { code: answer = "" } = await b.accept(offer);
@@ -65,33 +64,10 @@ describe("a full pairing", () => {
     expect(await b.authorized.read()).toEqual({ ...A, fingerprint: FP_A });
     expect(decodePairing(answer, NOW)).toMatchObject({ kind: "answer", pairingId, ...B });
 
-    const seenByA = await a.inspect(answer);
-    expect(seenByA).toEqual({ kind: "answer", ...B, digits: seenByB.digits, known: false });
     expect(await a.accept(answer)).toEqual({});
     expect(a.askLink).toHaveBeenCalledWith({ type: "accept-answer", sdp: sdpWith(FP_B) });
     expect(await a.authorized.read()).toEqual({ ...B, fingerprint: FP_B });
     expect(await a.pending.read()).toBeNull();
-  });
-
-  test("knows a peer it authorized with the same certificate", async () => {
-    const { b, offer } = await offered();
-    await b.authorized.write({ ...A, fingerprint: FP_A });
-    expect((await b.inspect(offer)).known).toBe(true);
-    await b.authorized.write({ ...A, fingerprint: "CC:CC" });
-    expect((await b.inspect(offer)).known).toBe(false);
-    await b.authorized.write({ ...B, fingerprint: FP_A });
-    expect((await b.inspect(offer)).known).toBe(false);
-  });
-
-  test("remembers whom an offer through the folder is for", async () => {
-    const a = side(A, FP_A);
-    const { code } = await a.createOffer(B.profileId);
-    const { pairingId } = decodePairing(code, NOW);
-    expect(await a.pending.read()).toEqual({
-      pairingId,
-      expiresAt: NOW + PAIRING_TTL_MS,
-      to: B.profileId,
-    });
   });
 
   test("dates codes from the real clock by default", async () => {
@@ -102,7 +78,7 @@ describe("a full pairing", () => {
       pending: memory<PendingOffer>(),
     });
     const before = Date.now();
-    const { expiresAt } = decodePairing((await flow.createOffer()).code);
+    const { expiresAt } = decodePairing((await flow.createOffer(B.profileId)).code);
     expect(expiresAt).toBeGreaterThanOrEqual(before + PAIRING_TTL_MS);
   });
 });
@@ -110,14 +86,14 @@ describe("a full pairing", () => {
 describe("refused codes", () => {
   test("refuses this profile's own code", async () => {
     const { a, offer } = await offered();
-    await expect(a.inspect(offer)).rejects.toThrow("This code comes from this profile.");
     await expect(a.accept(offer)).rejects.toThrow("This code comes from this profile.");
   });
 
   test("refuses an expired code", async () => {
     const { b, offer } = await offered();
     b.clock.now = NOW + PAIRING_TTL_MS;
-    await expect(b.inspect(offer)).rejects.toThrow("The pairing code expired; create a new one.");
+    await expect(b.accept(offer)).rejects.toThrow("The pairing code expired; create a new one.");
+    expect(await b.authorized.read()).toBeNull();
   });
 
   test("refuses an answer to another offer, to none, or to an expired one", async () => {
@@ -125,11 +101,12 @@ describe("refused codes", () => {
     const { code: answer = "" } = await b.accept(offer);
     const wrong = "This answer is not for the offer this profile made.";
     const pairingId = "55555555-5555-4555-8555-555555555555";
-    await a.pending.write({ pairingId, expiresAt: NOW + PAIRING_TTL_MS });
-    await expect(a.inspect(answer)).rejects.toThrow(wrong);
+    await a.pending.write({ pairingId, expiresAt: NOW + PAIRING_TTL_MS, to: B.profileId });
+    await expect(a.accept(answer)).rejects.toThrow(wrong);
     await a.pending.write(null);
     await expect(a.accept(answer)).rejects.toThrow(wrong);
-    await a.pending.write({ pairingId: decodePairing(answer, NOW).pairingId, expiresAt: NOW });
+    const expired = { pairingId: decodePairing(answer, NOW).pairingId, expiresAt: NOW };
+    await a.pending.write({ ...expired, to: B.profileId });
     await expect(a.accept(answer)).rejects.toThrow(wrong);
     expect(await a.authorized.read()).toBeNull();
   });

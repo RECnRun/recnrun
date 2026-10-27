@@ -14,6 +14,18 @@ In each Chrome profile the user opens the site and clicks the dashboard's button
 - **The folder window is the only extension page left.** It opens from the banner, as today; `pairing.html` without `#folder` no longer exists. Renaming the entrypoint to `folder.html` and `src/pairing` to `src/folder` is the last task, with `.dependency-cruiser.cjs` and `docs/ARCHITECTURE.md`.
 - **Every end-to-end test pairs through the real folder**, driven by `native-dialogs.ts`, since the picker is never mocked. The profiles fixture opens each profile's site tab and names the profile in its dashboard, and `pair(a, b)` chooses the folder in each through the window.
 
+## More than two profiles (later phases)
+
+Later phases pair more than two profiles at once, such as the default profile and profiles A, B, and C (the user's requirement, 2026-10-27). This POC still links one peer, but its changes must not make that harder. The target design:
+
+- **Authorized peers are a list**, replacing the one `AuthorizedPeer` in storage. Each entry keeps its profileId, name, and pinned certificate fingerprint.
+- **One link per peer.** The offscreen document holds one `RTCPeerConnection` per peer (a mesh), each with its own state.
+- **Folder pairing pairs with every presence** in the folder, instead of ignoring the rest once a peer is pinned. In each pair, the profile with the lower profileId writes the offer.
+- **The dashboard lists each peer's tabs**, grouped by profile name, and the link status shows one line per peer.
+- **Commands name their peer.** Tab commands and frames carry the target profileId.
+- **The session lock spans all peers**, so one recording session drives tabs in any of them.
+- **Disconnect and Forget act per peer.**
+
 ## Tasks
 
 1. **Dashboard pairing section.** Component tests first (name, status words, Disconnect, Forget, the step), then the section. Additive: the pairing page still works.

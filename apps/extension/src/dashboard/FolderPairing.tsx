@@ -96,9 +96,6 @@ export function PairingSection({ peers, status }: FolderPairingProps) {
             Forget {status.peer.displayName}
           </button>
         )}
-        <button type="button" onClick={() => void peers.openPairing()}>
-          Manage pairing
-        </button>
       </div>
       {action.error && <p role="alert">{action.error}</p>}
     </section>

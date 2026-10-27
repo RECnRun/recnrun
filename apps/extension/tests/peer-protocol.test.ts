@@ -18,23 +18,23 @@ const frameOf = (value: unknown) => JSON.stringify(value);
 
 describe("peerMessage", () => {
   test("builds an envelope with a fresh id that parses back unchanged", () => {
-    const first = peerMessage("PING", route, { timestamp: 42 });
-    const second = peerMessage("PING", route, { timestamp: 42 });
+    const first = peerMessage("ACTIVATE_TAB", route, { tabId: 42 });
+    const second = peerMessage("ACTIVATE_TAB", route, { tabId: 42 });
     expect(first).toMatchObject({
       channel: "recnrun-peer",
       protocol: 1,
       ...route,
-      type: "PING",
-      timestamp: 42,
+      type: "ACTIVATE_TAB",
+      tabId: 42,
     });
     expect(first.id).not.toBe(second.id);
     expect(parsePeerFrame(frameOf(first))).toEqual(first);
   });
 
   test("carries replies and tab snapshots", () => {
-    const ping = peerMessage("PING", route, { timestamp: 1 });
+    const ask = peerMessage("GET_TABS", route, {});
     const snapshot = peerMessage("TABS_SNAPSHOT", route, {
-      requestId: ping.id,
+      requestId: ask.id,
       tabs: [tab],
       currentId: 3,
     });

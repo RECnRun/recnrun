@@ -120,9 +120,9 @@ describe("commands", () => {
     const reply = vi.fn();
     const from = background();
     const ignored: [unknown, object][] = [
-      [linkCommandMessage({ type: "info" }), { ...from, id: "another-extension" }],
+      [linkCommandMessage({ type: "close" }), { ...from, id: "another-extension" }],
       [
-        linkCommandMessage({ type: "info" }),
+        linkCommandMessage({ type: "close" }),
         { ...from, url: fakeBrowser.runtime.getURL("/dashboard.html") },
       ],
       [{ target: "offscreen", command: { type: "erase" } }, from],
@@ -134,16 +134,8 @@ describe("commands", () => {
     expect(reply).not.toHaveBeenCalled();
   });
 
-  test("tells the profile certificate's fingerprint, and the idle link's state", async () => {
+  test("sends nothing before a link opens", async () => {
     offscreen();
-    expect(await run({ type: "fingerprint" })).toEqual({
-      ok: true,
-      result: { fingerprint: "AB:CD" },
-    });
-    expect(await run({ type: "info" })).toEqual({
-      ok: true,
-      result: { state: "idle", diagnostics: [] },
-    });
     expect(await run({ type: "send", frame: "{}" })).toEqual({ ok: true, result: { sent: false } });
   });
 
@@ -160,7 +152,7 @@ describe("commands", () => {
     offscreen(async () => {
       throw new Error("IndexedDB is unavailable.");
     });
-    expect(await run({ type: "info" })).toEqual({ ok: false, error: "IndexedDB is unavailable." });
+    expect(await run({ type: "close" })).toEqual({ ok: false, error: "IndexedDB is unavailable." });
   });
 });
 
@@ -234,8 +226,6 @@ describe("the link", () => {
     });
     FakeConnection.made[0]?.receiveChannel().open();
     expect(events).toStrictEqual([state("connecting"), state("connected", "AA:BB")]);
-    const info = (await run({ type: "info" })) as { result: { state: string } };
-    expect(info.result.state).toBe("connected");
   });
 
   test("keeps working when the service worker is not there to hear a report", async () => {

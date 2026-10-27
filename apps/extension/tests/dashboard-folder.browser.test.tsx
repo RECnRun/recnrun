@@ -7,18 +7,16 @@ import { memoryRecordingStore } from "./fake-extension";
 import { closedFor, fakePeerClient, statusOf } from "./fake-peer-client";
 import { fakeTabs } from "./fake-tabs";
 import { alertText } from "./dashboard-page";
-import { field, type } from "./pairing-page";
-import { button } from "./queries";
+import { button, field, type } from "./queries";
 
 /** The dashboard's folder banner and pairing controls, as Alice's status has them. */
 function mount(status: PeerStatus, answers: Parameters<typeof fakePeerClient>[1] = {}) {
   const peer = fakePeerClient(status, answers);
-  const opened = { folder: 0, pairing: 0 };
+  const opened = { folder: 0 };
   const peers: PeerServices = {
     client: peer.client,
     tabs: fakeTabs({ tabs: [] }).source,
     recordings: memoryRecordingStore(),
-    openPairing: async () => void opened.pairing++,
     openFolder: async () => void opened.folder++,
   };
   const root = document.body.appendChild(document.createElement("div"));
@@ -59,18 +57,15 @@ test("without the folder, the banner opens the window that chooses it", async ()
   expect(banner(root)).toBeUndefined();
   show(undefined);
   expect(banner(root)).toBeUndefined();
-  expect(button(root, "Manage pairing")).toBeDefined();
 });
 
 test("an unpaired profile pairs from the dashboard, then waits in the folder", async () => {
-  const { peer, opened, root, show } = mount(statusOf());
+  const { peer, root, show } = mount(statusOf());
   button(root, "Pair with another profile")?.click();
   await expect.poll(() => peer.asked("folder-pair")).toHaveLength(1);
   show({ ...statusOf(), folderPairing: true });
   expect(root.textContent).toContain("Waiting for another profile in the RECnRun folder…");
   expect(button(root, "Pair with another profile")).toBeUndefined();
-  button(root, "Manage pairing")?.click();
-  await expect.poll(() => opened.pairing).toBe(1);
 });
 
 test("a paired profile that stopped waiting reconnects from the dashboard", async () => {

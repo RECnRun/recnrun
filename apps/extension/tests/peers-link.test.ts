@@ -71,16 +71,16 @@ describe("frames", () => {
   test("executes what the verified peer asks, and keeps each frame in the tap", async () => {
     const { connect, receive, link } = await peerBackground();
     await connect();
-    const ping = fromPeer("PING", { timestamp: 1 });
-    await receive(ping);
-    expect(link.frames().at(-1)).toMatchObject({ type: "PONG", requestId: ping.id });
-    expect(tappedFrames()).toContain(JSON.stringify(ping));
+    const ask = fromPeer("GET_TABS", {});
+    await receive(ask);
+    expect(link.frames().at(-1)).toMatchObject({ type: "TABS_SNAPSHOT", requestId: ask.id });
+    expect(tappedFrames()).toContain(JSON.stringify(ask));
   });
 
   test("drops a frame from an unauthorized profile without an answer", async () => {
     const { connect, receive, link } = await peerBackground();
     await connect();
-    await receive(fromPeer("PING", { timestamp: 1 }, STRANGER));
+    await receive(fromPeer("GET_TABS", {}, STRANGER));
     expect(link.sentTypes()).toEqual(["HELLO"]);
   });
 
@@ -100,8 +100,8 @@ describe("a link that went down", () => {
     await connect();
     const copy = { profileId: PEER, session, mine: true, connected: true };
     await remoteRecordingRepository.write(copy);
-    const pending = routes.request({ type: "ping" });
-    await vi.waitFor(() => expect(link.sentTypes()).toContain("PING"));
+    const pending = routes.request({ type: "tabs" });
+    await vi.waitFor(() => expect(link.sentTypes()).toContain("GET_TABS"));
     await routes.link({ type: "state", state: "disconnected" });
     await expect(pending).rejects.toThrow(NOT_CONNECTED);
     expect(await peerLinkRepository.read()).toEqual({ state: "disconnected", verified: false });
