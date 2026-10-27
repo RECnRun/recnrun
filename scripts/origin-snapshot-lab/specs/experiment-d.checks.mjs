@@ -2,33 +2,12 @@
 // the origin's snapshot does not hold unless the extension swaps that host's cookies too.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { APP, SSO, startFixture } from "../fixture/server.mjs";
-import { launchLab, writeEvidence } from "../lab.mjs";
+import { APP, startFixture } from "../fixture/server.mjs";
+import { launchLab, signIn, ssoSession as sessionOf, writeEvidence } from "../lab.mjs";
 
 const evidence = {};
 // Top-level awaited tests do not wait for root before()/after() hooks; the module owns it.
 const fixture = await startFixture();
-
-/** The login page, or the app's session once the silent sign-in settled; navigations may cut in. */
-async function sessionOf(page) {
-  for (let attempt = 0; attempt < 100; attempt += 1) {
-    const seen = await page
-      .evaluate(() =>
-        document.title === "SSO login" ? { login: true } : (window.__session ?? null),
-      )
-      .catch(() => null);
-    if (seen) return seen;
-    await page.waitForTimeout(100);
-  }
-  throw new Error(`no session or login page at ${page.url()}`);
-}
-
-/** The person signs in at the sign-in server, by hand in a real run. */
-async function signIn(page, user) {
-  const back = encodeURIComponent(`${APP}/sso-app`);
-  await page.goto(`${SSO}/realms/lab/login?user=${user}&return=${back}`);
-  return sessionOf(page);
-}
 
 /** Signs in alice as A, switches to B (signing in bob if asked), back to A, and to B again. */
 async function scenario(cookieHosts) {
@@ -82,12 +61,18 @@ await test("D: with the sign-in host's cookies, each identity keeps its own sess
   );
 });
 
-await test("D: a group tab left on the sign-in page switches with the group", async () => {
+// A parent domain as the cookie host (google.com for mail.google.com) covers the origin itself.
+for (const cookieHost of ["sso.localhost", "localhost"]) {
+  await test(`D: a group tab left on the sign-in page switches with the group, ${cookieHost}`, () =>
+    signInTabScenario(cookieHost));
+}
+
+async function signInTabScenario(cookieHost) {
   const session = await launchLab();
   const steps = {};
-  evidence.signInTab = steps;
+  evidence[`signInTab ${cookieHost}`] = steps;
   try {
-    await session.lab.configure({ cookieHosts: ["sso.localhost"], firstIdentity: "A" });
+    await session.lab.configure({ cookieHosts: [cookieHost], firstIdentity: "A" });
     const lead = await session.context.newPage();
     await lead.goto(`${APP}/sso-app`);
     steps.a = await signIn(lead, "alice");
@@ -119,10 +104,10 @@ await test("D: a group tab left on the sign-in page switches with the group", as
       { user: "bob", profile: "bob" },
     ]);
   } finally {
-    console.log(JSON.stringify({ signInTab: steps }));
+    console.log(JSON.stringify({ signInTab: { cookieHost, steps } }));
     await session.close();
   }
-});
+}
 
 await fixture.close();
 writeEvidence("experiment-d", evidence);

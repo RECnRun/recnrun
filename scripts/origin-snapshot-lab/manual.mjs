@@ -9,7 +9,14 @@
 import { rmSync } from "node:fs";
 import { createInterface } from "node:readline/promises";
 import { cookieInventory, pageInventory } from "./inventory.mjs";
-import { extensionCopy, launchLab, openIncognito, writeEvidence } from "./lab.mjs";
+import {
+  extensionCopy,
+  hostPermissions,
+  launchLab,
+  openIncognito,
+  parseSite,
+  writeEvidence,
+} from "./lab.mjs";
 
 const HELP = `Commands:
   switch <identity>   suspend the tab's identity and start or resume <identity>
@@ -21,21 +28,7 @@ const HELP = `Commands:
 const USAGE =
   "Usage: vp run origin-snapshot-lab:manual -- <url> [--with-host <host>]... [--incognito]";
 
-/** The URL, the --with-host values, and --incognito; vp run passes the `--` separator through. */
-function parseArguments(argv) {
-  const cookieHosts = [];
-  const positional = [];
-  for (let index = 0; index < argv.length; index += 1) {
-    if (argv[index] === "--with-host") cookieHosts.push(argv[(index += 1)]);
-    else if (argv[index] !== "--" && argv[index] !== "--incognito") positional.push(argv[index]);
-  }
-  if (positional.length !== 1 || cookieHosts.some((host) => !/^[\w.-]+$/.test(host ?? ""))) {
-    throw new Error(USAGE);
-  }
-  return { url: positional[0], cookieHosts, incognito: argv.includes("--incognito") };
-}
-
-const { url, cookieHosts, incognito } = parseArguments(process.argv.slice(2));
+const { url, cookieHosts, incognito } = parseSite(process.argv.slice(2), USAGE);
 const { origin } = new URL(url);
 
 /** The receipt of a switch without any stored value. */
@@ -117,7 +110,7 @@ async function run(session) {
 
 const extension = extensionCopy((manifest) => ({
   ...manifest,
-  host_permissions: [`${origin}/*`, ...cookieHosts.map((host) => `*://${host}/*`)],
+  host_permissions: hostPermissions(origin, cookieHosts),
 }));
 const session = await launchLab({ extension, origin, bfcache: true, incognito });
 try {

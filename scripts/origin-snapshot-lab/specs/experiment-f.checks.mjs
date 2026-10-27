@@ -2,7 +2,7 @@
 // and cookies are apart from the normal window's; captures must be too, and must not outlive it.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { APP, SSO, startFixture } from "../fixture/server.mjs";
+import { APP, startFixture } from "../fixture/server.mjs";
 import {
   brief,
   launchLab,
@@ -10,6 +10,8 @@ import {
   openApp,
   openIncognito,
   sawIdentity,
+  signIn,
+  ssoSession as sessionOf,
   write,
   writeEvidence,
 } from "../lab.mjs";
@@ -59,26 +61,6 @@ await test("F: storage switches in an incognito window and leaves the normal win
     await session.close();
   }
 });
-
-/** The login page, or the app's session once the silent sign-in settled. */
-async function sessionOf(page) {
-  for (let attempt = 0; attempt < 100; attempt += 1) {
-    const found = await page
-      .evaluate(() =>
-        document.title === "SSO login" ? { login: true } : (window.__session ?? null),
-      )
-      .catch(() => null);
-    if (found) return found;
-    await page.waitForTimeout(100);
-  }
-  throw new Error(`no session or login page at ${page.url()}`);
-}
-
-async function signIn(page, user) {
-  const back = encodeURIComponent(`${APP}/sso-app`);
-  await page.goto(`${SSO}/realms/lab/login?user=${user}&return=${back}`);
-  return sessionOf(page);
-}
 
 await test("F: the sign-in host's cookies switch in the incognito cookie store only", async () => {
   const session = await incognitoSession({ cookieHosts: ["sso.localhost"] });

@@ -11,7 +11,7 @@ import {
   sessionsOf,
   unpark,
 } from "./group.js";
-import { getCapture, putCapture } from "./repo.js";
+import { getCapture, hasCaptures, putCapture } from "./repo.js";
 
 export const options = {
   candidate: "a1",
@@ -104,7 +104,14 @@ async function targetOf({ origin, partition }, to, reset) {
 }
 
 /** The origin's identity in this partition, if a switch from it to `to` may start. */
-function stateOf(key, to, reset) {
+async function stateOf({ partition, origin }, key, to, reset) {
+  // Identities live in the worker's memory: after Chrome restarts it, guessing would file one
+  // identity's storage under another's name.
+  if (!identities.has(key) && (await hasCaptures(partition, origin))) {
+    throw new Error(
+      `the lab lost track of ${origin}'s identity (its service worker restarted); run lab.reset() and start over`,
+    );
+  }
   const state = identities.get(key) ?? { identity: options.firstIdentity, urls: {} };
   if (state.identity === "unknown") throw new Error("the tab is in an unknown state");
   // Its suspend would overwrite the identity's capture with the state it is about to clear.
@@ -116,7 +123,7 @@ async function plan(tabId, to, { reset = false, url } = {}) {
   const tab = await chrome.tabs.get(tabId);
   const where = { origin: new URL(tab.url).origin, partition: partitionOf(tab) };
   const key = `${where.partition}|${where.origin}`;
-  const state = stateOf(key, to, reset);
+  const state = await stateOf(where, key, to, reset);
   // Each tab goes back to the URL it had under `to`, or stays where it is.
   const left = state.urls[to] ?? {};
   const companions = (await companionsOf(tab, options.cookieHosts)).map((companion) => ({

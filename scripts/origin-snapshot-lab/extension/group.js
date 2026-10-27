@@ -34,22 +34,33 @@ export async function adopt(tab) {
 
 const urlOf = (tab) => URL.parse(tab.url || tab.pendingUrl || "");
 
+const onHosts = (hostname, hosts) =>
+  hosts.some((host) => hostname === host || hostname.endsWith(`.${host}`));
+
 /** A tab of the lead's partition: a group mate to take along, an outsider to refuse, or neither. */
 function placeOf(tab, lead, cookieHosts) {
   const url = urlOf(tab);
   if (!url) return {};
   const mate = tab.groupId === lead.groupId;
-  if (cookieHosts.includes(url.hostname)) {
-    // A mate mid sign-in: its sign-in page belongs to the identity, so it comes back at the app.
-    if (!mate) throw new Error(`close the tab on ${url.hostname} first`);
-    return { companion: { id: tab.id, url: marked(lead.url) } };
+  // The origin first: a cookie host may be its parent domain (google.com for mail.google.com).
+  if (url.origin === new URL(lead.url).origin) {
+    return mate ? { companion: { id: tab.id, url: marked(url.href) } } : { outside: url.pathname };
   }
-  if (url.origin !== new URL(lead.url).origin) return {};
-  return mate ? { companion: { id: tab.id, url: marked(url.href) } } : { outside: url.pathname };
+  if (!onHosts(url.hostname, cookieHosts)) return {};
+  // A mate mid sign-in: its sign-in page belongs to the identity, so it comes back at the app.
+  if (!mate) throw new Error(`close the tab on ${url.hostname} first`);
+  return { companion: { id: tab.id, url: marked(lead.url) } };
+}
+
+/** Groups titled by the lab survive the worker; its memory of them does not. */
+export async function recoverGroups() {
+  for (const group of await chrome.tabGroups.query({})) {
+    if (group.title?.startsWith("RECnRun · ")) managed.add(group.id);
+  }
 }
 
 /**
- * The lead's group mates on its origin or on a cookie host. Tabs of the same storage partition on
+ * The lead's group mates on its origin or on a cookie host (or its subdomains). Tabs of the same storage partition on
  * the origin outside the group, or on a cookie host, refuse the switch. A lead outside any group
  * switches alone.
  */

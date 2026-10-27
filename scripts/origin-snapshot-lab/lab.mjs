@@ -4,7 +4,7 @@ import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } f
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { APP } from "./fixture/server.mjs";
+import { APP, SSO } from "./fixture/server.mjs";
 
 const extensionPath = fileURLToPath(new URL("extension", import.meta.url));
 const artifacts = fileURLToPath(new URL("../../.artifacts/origin-snapshot-lab/", import.meta.url));
@@ -17,13 +17,48 @@ export function writeEvidence(name, value) {
   return file;
 }
 
-function handle(worker) {
+export function handle(worker) {
   const call = (method, args) =>
     worker.evaluate(([name, values]) => globalThis.lab[name](...values), [method, args]);
   return new Proxy(
     {},
     { get: (_, method) => (method === "then" ? undefined : (...args) => call(method, args)) },
   );
+}
+
+/** Host access for the site's origin and each cookie host, its subdomains included. */
+export const hostPermissions = (origin, cookieHosts) => [
+  `${origin}/*`,
+  ...cookieHosts.flatMap((host) => [`*://${host}/*`, `*://*.${host}/*`]),
+];
+
+/** `<url> [--with-host <host>]... [--incognito]`; vp run passes the `--` separator through. */
+export function parseSite(argv, usage) {
+  const cookieHosts = [];
+  const positional = [];
+  for (let index = 0; index < argv.length; index += 1) {
+    if (argv[index] === "--with-host") cookieHosts.push(argv[(index += 1)]);
+    else if (argv[index] !== "--" && argv[index] !== "--incognito") positional.push(argv[index]);
+  }
+  if (positional.length !== 1 || cookieHosts.some((host) => !/^[\w.-]+$/.test(host ?? ""))) {
+    throw new Error(usage);
+  }
+  return { url: positional[0], cookieHosts, incognito: argv.includes("--incognito") };
+}
+
+/**
+ * The lab extension for the person's own Chrome, in `dir`: host access to the site and its cookie
+ * hosts, and a preset.json the service worker applies whenever it starts (Experiment G).
+ */
+export function writeUnpacked({ url, cookieHosts }, dir = join(artifacts, "unpacked")) {
+  rmSync(dir, { recursive: true, force: true });
+  cpSync(extensionPath, dir, { recursive: true });
+  const file = join(dir, "manifest.json");
+  const manifest = JSON.parse(readFileSync(file, "utf8"));
+  const host_permissions = hostPermissions(new URL(url).origin, cookieHosts);
+  writeFileSync(file, JSON.stringify({ ...manifest, host_permissions }, null, 2));
+  writeFileSync(join(dir, "preset.json"), JSON.stringify({ url, cookieHosts }, null, 2));
+  return dir;
 }
 
 /** A temporary copy of the lab extension whose manifest `edit` changed; delete it after use. */
@@ -36,23 +71,36 @@ export function extensionCopy(edit) {
 }
 
 /**
- * Turns on "Allow in Incognito" in chrome://extensions, as the user would, and returns the service
- * worker of the reloaded extension. A profile's Preferences cannot carry it: macOS keeps it in the
- * signed Secure Preferences. Developer mode first, or Chromium disables the reloaded unpacked one.
+ * Changes the extension in chrome://extensions, as the user would, and returns the service worker
+ * of the reloaded extension. Developer mode first, or Chromium disables the reloaded unpacked one.
  */
-async function allowIncognito(context, worker) {
-  const id = new URL(worker.url()).host;
+async function throughExtensionsPage(context, worker, change) {
   const reloaded = context.waitForEvent("serviceworker");
   const page = await context.newPage();
   await page.goto("chrome://extensions/");
-  await page.evaluate(async (extensionId) => {
-    const developer = globalThis.chrome.developerPrivate;
-    await developer.updateProfileConfiguration({ inDeveloperMode: true });
-    await developer.updateExtensionConfiguration({ extensionId, incognitoAccess: true });
-  }, id);
+  await page.evaluate(
+    async ([extensionId, name]) => {
+      const developer = globalThis.chrome.developerPrivate;
+      await developer.updateProfileConfiguration({ inDeveloperMode: true });
+      if (name === "reload") await developer.reload(extensionId, { failQuietly: true });
+      else await developer.updateExtensionConfiguration({ extensionId, incognitoAccess: true });
+    },
+    [new URL(worker.url()).host, change],
+  );
   const next = await reloaded;
   await page.close();
   return next;
+}
+
+// A profile's Preferences cannot carry "Allow in Incognito": macOS keeps it in Secure Preferences.
+const allowIncognito = (context, worker) => throughExtensionsPage(context, worker, "incognito");
+
+/** Reloads the extension: its worker starts again with empty memory, as after Chrome stops it. */
+export async function restartExtension({ context, worker }) {
+  const next = await throughExtensionsPage(context, worker, "reload");
+  const lab = handle(next);
+  await lab.ready();
+  return { worker: next, lab };
 }
 
 async function extensionWorker(context, incognito) {
@@ -88,6 +136,27 @@ export async function launchLab({
     rmSync(profile, { recursive: true, force: true });
   };
   return { context, worker, lab, version: context.browser()?.version(), close };
+}
+
+/** The fixture's sign-in page, or the SSO app's session once the silent sign-in settled. */
+export async function ssoSession(page) {
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const found = await page
+      .evaluate(() =>
+        document.title === "SSO login" ? { login: true } : (window.__session ?? null),
+      )
+      .catch(() => null);
+    if (found) return found;
+    await page.waitForTimeout(100);
+  }
+  throw new Error(`no session or login page at ${page.url()}`);
+}
+
+/** The person signs in at the fixture's sign-in server, by hand in a real run. */
+export async function signIn(page, user) {
+  const back = encodeURIComponent(`${APP}/sso-app`);
+  await page.goto(`${SSO}/realms/lab/login?user=${user}&return=${back}`);
+  return ssoSession(page);
 }
 
 /** What the observer of the tab's current document saw, once its IndexedDB read finished. */

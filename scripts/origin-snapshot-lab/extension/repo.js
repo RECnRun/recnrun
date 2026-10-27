@@ -44,6 +44,14 @@ export const deletePartition = (partition) =>
     store.delete(IDBKeyRange.bound(`${partition}|`, `${partition}|\uffff`)),
   );
 
+/** Whether any identity of the origin, in that partition, has a capture. */
+export const hasCaptures = async (partition, origin) =>
+  (await inStore("readonly", (store) =>
+    store.count(
+      IDBKeyRange.bound(keyOf(partition, origin, ""), keyOf(partition, origin, "\uffff")),
+    ),
+  )) > 0;
+
 export const allCaptures = () => inStore("readonly", (store) => store.getAll());
 
 export const clearCaptures = () => inStore("readwrite", (store) => store.clear());

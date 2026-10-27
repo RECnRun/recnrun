@@ -150,6 +150,10 @@ Added after the second Zephyr run, where the Agenda menu opened a second tab on 
 
 With "Allow in Incognito" on (spanning mode), one service worker serves both partitions. An incognito tab has its own storage and cookie store, so captures, identity state, and cookie calls are keyed by partition (`normal` or `incognito`), and the cookie calls name the tab's `storeId`. Captures of the incognito partition are deleted when its last window closes, and at startup.
 
+### Experiment G: the person's own Chrome
+
+The lab so far ran only under Playwright, which keeps the service worker alive. In the person's Chrome the worker stops when idle and starts again with empty memory. `vp run origin-snapshot-lab:unpacked -- <url> [--with-host <host>]...` writes an unpacked copy with a `preset.json` the worker applies at every start, and `rec.start()`, `rec.switch(id)`, and `rec.reset(id)` for the worker's console. A switch after a restart, when the origin has captures but the worker no longer knows its identity, refuses instead of guessing. A cookie host also covers its subdomains, so a parent domain (`google.com` for Gmail) can be one.
+
 ## Phase 2: Decision gate
 
 Write the intermediate decision in the report and **stop to tell the user** before Phase 3:

@@ -1,6 +1,7 @@
 // The lab's service worker: routes the page scripts' messages and exposes `globalThis.lab`,
 // the handle the specs call through Playwright.
-import { adopt, manage, managed } from "./group.js";
+import { applyPreset, leadFor } from "./console.js";
+import { adopt, manage, recoverGroups } from "./group.js";
 import { marked } from "./navigation.js";
 import { allCaptures, clearCaptures, deletePartition, getCapture, summarize } from "./repo.js";
 import { forgetTabs, onPageMessage, options, switchTo } from "./switch.js";
@@ -73,26 +74,21 @@ async function purgeIncognito() {
 }
 chrome.windows.onRemoved.addListener(() => void purgeIncognito());
 void purgeIncognito();
+void recoverGroups();
+const preset = applyPreset(register);
 
 globalThis.lab = {
-  ready: () => true,
+  // Ready once the preset, if any, configured the lab.
+  ready: async () => {
+    await preset;
+    return true;
+  },
   configure: (values) => Object.assign(options, values),
   register,
   switchTo,
   manage: async (tabId) => manage(tabId, options.firstIdentity),
   probeOffscreen,
-  // The manual run's lead: a tab of the origin in a RECnRun group, the active one if it can.
-  leadFor: async (origin, incognito) => {
-    const grouped = (await chrome.tabs.query({})).filter(
-      (tab) =>
-        tab.incognito === incognito &&
-        managed.has(tab.groupId) &&
-        URL.parse(tab.url ?? "")?.origin === origin,
-    );
-    const lead = grouped.find((tab) => tab.active) ?? grouped[0];
-    if (!lead) throw new Error(`no tab of ${origin} in the RECnRun group`);
-    return lead.id;
-  },
+  leadFor,
   activeTabId: async () =>
     (await chrome.tabs.query({ active: true, lastFocusedWindow: true }))[0]?.id,
   // A tab's cookies by name, domain, and size, from its own cookie store; never the values.

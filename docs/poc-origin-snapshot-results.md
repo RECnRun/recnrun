@@ -148,6 +148,19 @@ Red: the normal `switch B` resumed the incognito B and showed its data in the no
 
 Security: while an incognito window is open, its captures sit on disk in the extension's IndexedDB (a spanning extension has one), holding that window's tokens and cookies; they are deleted when the last incognito window closes or, after a crash, at the next start. A split-mode extension would keep them in memory but runs a second service worker. Also fixed here: the gate's `ready` reply carried the whole target, cookie values included, to the page script; it now carries the storage only.
 
+### Experiment G: the person's own Chrome
+
+Asked for by the user, to test in their own Chrome with Gmail. Two gaps showed up before any run there:
+
+- The coordinator keeps identities, groups, and options in the worker's memory, which Chrome clears when it stops an idle worker (Playwright's runs never let it). After a restart (reloading the extension, as the Reload button does) the worker believed the tab was A while it held B: `switch A` was refused with "the tab is already A", and a `switch B` would have saved B's storage as A's capture. Now a switch on an origin that has captures but no known identity refuses ("the lab lost track of ... its service worker restarted; run lab.reset() and start over"), groups are recovered from their `RECnRun · ` titles, and a `preset.json` reconfigures the lab and re-registers the gate at every start.
+- Google's session cookies sit on `.google.com`, `accounts.google.com`, and `mail.google.com`. A cookie host now covers its subdomains (host permissions `*://host/*` and `*://*.host/*`), and the origin is checked before the cookie hosts, so with `localhost` as the cookie host the fixture's group tab left on `sso.localhost` came along (red: `toA` took 1 tab and that tab stayed on the login page; green: 2 tabs, both alice, then both bob).
+
+| Check                                                             | Result                                                          |
+| ----------------------------------------------------------------- | --------------------------------------------------------------- |
+| Switch after the extension reloads, the tab holding B             | Refused, "lost track"; the tab still holds B; captures `A` only |
+| Unpacked copy with a preset, `rec.start()`, `rec.switch("B")`/`A` | `RECnRun · A`; B at the login page; A back as alice, no login   |
+| `rec.switch("B")` after the copy reloads                          | The preset is back (`rec` exists, gate registered); refused     |
+
 ## Phase 2: intermediate decision
 
 **Proceed with restrictions.** A1 restores before the app's first script in every measured run, with and without a service worker serving the page. The conditions under which that holds:
@@ -159,7 +172,7 @@ Security: while an incognito window is open, its captures sit on disk in the ext
 5. Service worker writes may land in either identity's data around the switch.
 6. **Sign-in host cookies** (D): when the session comes from a sign-in server on another host, its cookies are part of the snapshot (`cookies` permission and host access to that host); without them a switch can silently keep the previous account and mix it with the next identity's data.
 
-Phase 3 additionally owes: refusing a switch to the tab's current identity (the lab accepted B → B once, which would have overwritten B's capture with an empty state on the next switch; fixed in the lab), the key generator, a journal so the coordinator survives a background restart, keys for per-tab state that survive a restart, the incognito purge (F), and `beforeunload` reported as a refusal.
+Phase 3 additionally owes: refusing a switch to the tab's current identity (the lab accepted B → B once, which would have overwritten B's capture with an empty state on the next switch; fixed in the lab), the key generator, a journal so the coordinator survives a service worker restart (the lab only refuses, G), keys for per-tab state that survive a restart, the incognito purge (F), and `beforeunload` reported as a refusal.
 
 ## Zephyr manual run (protocol)
 
@@ -180,6 +193,21 @@ Steps, with test accounts only:
 
 What to record: for each step, the account the app shows, any login page or error, the time since that identity was last active (a login page after a long pause may be Keycloak's idle timeout, not a failure of the switch), and the terminal's output. Do not sign out inside the app: it ends that identity's Keycloak session for good. Do not open a tab on `login-acc.one.be` by hand outside the group (the switch refuses). If an inventory lists cookies on `.one.be` or on another host, report their names: the switch does not take them. Close DevTools' IndexedDB view before a switch: if it holds a connection (not verified), the probe blocks and the switch fails without changing anything. A failed switch leaves the tab unknown and refuses further switches; quit and start over.
 
+## Gmail in the person's own Chrome (protocol)
+
+Use two test Google accounts in a new Chrome profile that is not signed in to Chrome. Google accounts in Chrome's own sign-in make Chrome restore Google cookies by itself. The captures hold every `google.com` session cookie of each account, enough to use the account, unencrypted in the extension's IndexedDB on disk until the extension is removed.
+
+1. `vp run origin-snapshot-lab:unpacked -- https://mail.google.com/mail/u/0/ --with-host google.com`.
+2. In the test profile: `chrome://extensions`, Developer mode on, "Load unpacked", the printed folder. On the lab's card, open "service worker" (DevTools) and keep that window open for the whole test: it keeps the worker alive.
+3. Sign in to Gmail as A in a tab. In the worker's console: `await rec.start()`. Expected: the tab joins `RECnRun · A`.
+4. `await rec.switch("B")`. Expected: Google's sign-in page, the receipt's `cookies` showing many removed and none set. Sign in as B and wait for the inbox.
+5. `await rec.switch("A")`: A's inbox without a sign-in. Then `rec.switch("B")`: B's inbox. Open an email in a new tab from Gmail, and switch again: both tabs follow.
+6. `await lab.captures()`, and `await lab.capture("https://mail.google.com", "A")` for names and counts.
+7. Incognito, as a second round: `await lab.reset()`, "Allow in Incognito" on the lab's card (the extension reloads, so its worker forgets the identities; reopen its DevTools), Gmail in an incognito window, then steps 3 to 6 with `rec.start(true)` and `rec.switch("B", true)`.
+8. Afterwards: remove the extension (it deletes its captures) and the test profile.
+
+What may stop it, each a finding to record: Gmail dropping the gate's `__recnrun_gate` query parameter (the switch fails after 30 s with "no report from the a1 script", nothing cleared); Gmail's service worker holding an IndexedDB connection (the probe blocks, nothing cleared); Google rejecting a restored session (device-bound session credentials, or a "verify it's you" check), which shows as a sign-in page after a switch; partitioned cookies, which the swap does not take. Any other Google tab of the profile (Search, Calendar, Drive) is on the cookie host: outside the group it refuses the switch; inside it, it comes back at Gmail. A refused or failed switch leaves the tab unknown: `await lab.reset()` deletes every capture and starts over. Do not sign out inside Gmail: it ends that session for good.
+
 ## What was exercised
 
 - All four specs, on the host (31 tests, 3 runs per Experiment A cell, 100 large records): 31 passed, 0 failed.
@@ -187,7 +215,8 @@ What to record: for each step, the account the app shows, any login page or erro
 - The manual runner on the fixture (headless, scripted commands): inventory, start, resume, reset, captures, and an unknown command. On Zephyr signed out: the inventory of the Keycloak page (cookie names only) and the refusal to switch while the tab is on the sign-in host.
 - Experiment D: control and swap, 2 passed on the host and in the full Docker run (33 passed, 0 failed, `.artifacts/docker/2026-10-27T11-29-15.686Z-3aab8329-57c4-4d43-b4eb-5bf5b7410b84/run.log`, 50 runs per Experiment A cell); red before the extension swapped cookies (B came back as alice), green after. The manual runner with `--with-host sso.localhost` on the fixture (a scratch copy with navigation commands, scripted): B started at the login page, bob signed in, a tab on the sign-in host refused the switch, A came back as alice and B as bob, and `captures` listed cookie names only.
 - Experiments E and F, the sign-in tab test in D, and the whole lab: 39 passed on the host and in Docker (`.artifacts/docker/2026-10-27T13-04-44.062Z-2b59ebac-2f70-4953-8d65-5f55f206692e/run.log`), red before each change as described above. The first host run of the whole lab caught a regression in A0: the `ready` reply no longer carried the target, so A0 restored nothing (`Cannot read properties of undefined (reading 'local')`) and its delayed run stopped losing the race; A0 now gets the storage-only target there, and loses all 50 runs at both delays again.
+- Experiment G and the parent-domain cookie host: 42 passed on the host and in Docker (`.artifacts/docker/2026-10-27T13-45-40.450Z-6ff81940-5021-4583-9634-6d52d6e00a8a/run.log`), red before each change (the restart test failed with "the tab is already A", the preset test found no `rec`, the `localhost` cookie host left the sign-in tab behind). `vp run origin-snapshot-lab:unpacked -- https://mail.google.com/mail/u/0/ --with-host google.com` wrote the copy with host permissions `https://mail.google.com/*`, `*://google.com/*`, `*://*.google.com/*` and the preset; the user's Chrome is 156.
 - The manual runner on the fixture with `--with-host sso.localhost`, in a normal window and with `--incognito` (a scratch copy adding navigation, `window.open`, new-window, and close commands, scripted): a tab opened from the app joined the group; `switch B` took 2 tabs to the login page; bob signed in on one; `switch A` took both back to alice, the one left on the sign-in page included; a tab of the origin opened in a new window refused `switch B` with its path; after closing it `switch B` gave bob on both; `captures` listed `tabs: 2` and cookie names, the incognito run only `(incognito)` captures; `inventory` read the incognito cookie store through the extension.
 - Negative controls: A0 (fails as expected), the JSON transport (fails or corrupts as expected), and the unprobed second tab (late delete reproduced).
 - Zephyr signed in, first run (by the user, without `--with-host`): the inventory and `switch B`, which kept A signed in. Second run (by the user, with `--with-host login-acc.one.be`): the switches worked; a second tab from the Agenda menu was refused.
-- Not exercised: Zephyr with the tab group or `--incognito` (needs the user's test accounts), Secure, domain, and expired cookies in the fixture (Zephyr's are Secure, host-only), and a cancelled `beforeunload` dialog (Playwright accepted it; the cancelled path is inferred from navigation semantics).
+- Not exercised: Zephyr with the tab group or `--incognito`, and Gmail in the user's own Chrome (both need the user's test accounts), a real idle stop of the worker (the specs reload the extension instead), Secure, domain, and expired cookies in the fixture (Zephyr's are Secure, host-only), and a cancelled `beforeunload` dialog (Playwright accepted it; the cancelled path is inferred from navigation semantics).
