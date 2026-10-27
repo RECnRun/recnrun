@@ -1,39 +1,53 @@
 import * as v from "valibot";
 import type { PeerRequest } from "@/messaging/peer-messages";
-import type { PeerStatus } from "@/messaging/peer-results";
+import type { PeerEntry, PeerStatus } from "@/messaging/peer-results";
 import type { PeerClient } from "@/views/peer-client";
 
 const ALICE = { profileId: "11111111-1111-4111-8111-111111111111", displayName: "Alice" };
 const BOB = { profileId: "22222222-2222-4222-8222-222222222222", displayName: "Bob" };
+export const BOB_ID = BOB.profileId;
 
-type Link = PeerStatus["link"];
+type Link = PeerEntry["link"];
 
 /** This profile as Alice, paired with Bob unless `state` is undefined. */
 export function statusOf(state?: Link["state"], verified = state === "connected"): PeerStatus {
+  const bob = (link: Link) => ({
+    peer: { ...BOB, fingerprint: "AB:CD:EF" },
+    link,
+    peerSession: null,
+  });
   return {
     identity: ALICE,
-    peer: state ? { ...BOB, fingerprint: "AB:CD:EF" } : null,
-    link: { state: state ?? "idle", verified },
-    peerSession: null,
-    controlledByPeer: false,
+    peers: state ? [bob({ state, verified })] : [],
+    controlledBy: null,
+    paused: [],
     folder: "granted",
     folderPairing: false,
   };
 }
 
-/** Bob's session as Alice last heard of it. */
-export function withPeerSession(
-  status: PeerStatus,
-  peerSession: NonNullable<PeerStatus["peerSession"]>,
-): PeerStatus {
-  return { ...status, peerSession };
-}
+/** Changes Bob's entry in `status`. */
+const withBob = (status: PeerStatus, change: (bob: PeerEntry) => PeerEntry): PeerStatus => ({
+  ...status,
+  peers: status.peers.map(change),
+});
 
-/** A link that went down for `reason`. */
-export function closedFor(state: Link["state"], reason: NonNullable<Link["reason"]>): PeerStatus {
-  const status = statusOf(state, false);
-  return { ...status, link: { ...status.link, reason } };
-}
+/** Bob's session as Alice last heard of it. */
+export const withPeerSession = (status: PeerStatus, peerSession: PeerEntry["peerSession"]) =>
+  withBob(status, (bob) => ({ ...bob, peerSession }));
+
+/** A link to Bob that went down for `reason`. */
+export const closedFor = (state: Link["state"], reason: NonNullable<Link["reason"]>) =>
+  withBob(statusOf(state, false), (bob) => ({ ...bob, link: { ...bob.link, reason } }));
+
+/** Bob, whom the user disconnected, waits for Reconnect. */
+export const pausedBob = (status: PeerStatus): PeerStatus => ({ ...status, paused: [BOB_ID] });
+
+/** Bob started the session that runs in Alice's profile. */
+export const controlledByBob = (status: PeerStatus): PeerStatus => ({
+  ...status,
+  controlledBy: BOB_ID,
+});
 
 type Answers = Partial<Record<PeerRequest["type"], (request: PeerRequest) => unknown>>;
 

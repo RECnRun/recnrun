@@ -9,7 +9,14 @@ import type { OpenTab } from "@/ports/tabs";
 import type { PeerServices } from "@/views/remote-peer";
 import { CONTROL_LOCK, tryHoldLock } from "@/views/view-locks";
 import { fakeExtension, memoryRecordingStore } from "./fake-extension";
-import { closedFor, fakePeerClient, statusOf, withPeerSession } from "./fake-peer-client";
+import {
+  BOB_ID,
+  closedFor,
+  controlledByBob,
+  fakePeerClient,
+  statusOf,
+  withPeerSession,
+} from "./fake-peer-client";
 import { SHOP, fakeTabs } from "./fake-tabs";
 import { alertText, buttons, expectControlFree, item, pipWindow, tabPage } from "./dashboard-page";
 import { button } from "./queries";
@@ -23,8 +30,9 @@ function peerServices(peer: ReturnType<typeof fakePeerClient>) {
   const folders: unknown[] = [];
   const peers: PeerServices = {
     client: peer.client,
-    tabs: fakeTabs({ tabs: [MAIL] }).source,
+    tabsOf: () => fakeTabs({ tabs: [MAIL] }).source,
     recordings: memoryRecordingStore(),
+    sessionTabs: fakeTabs({ tabs: [] }).source,
     openFolder: async () => {
       folders.push(true);
     },
@@ -160,7 +168,7 @@ test("one session across the pair: each list says why it offers no Record", asyn
 
   // Bob controls the session that runs here: no Continue or Stop, only its state.
   await local.write({ tabId: SHOP.id, status: "recording", banked: 0, since: Date.now() });
-  peer.change({ ...statusOf("connected"), controlledByPeer: true });
+  peer.change(controlledByBob(statusOf("connected")));
   await expect
     .poll(() => note(root.querySelector("aside") ?? undefined))
     .toBe("Controlled from Bob");
@@ -180,7 +188,9 @@ test("Show tab brings the other profile's tab to the front, or shows why it cann
   const { root } = mount(peer);
   await expect.poll(() => button(remote(root) ?? root, "Show tab")).toBeDefined();
   button(remote(root) ?? root, "Show tab")?.click();
-  await expect.poll(() => peer.asked("activate")).toEqual([{ type: "activate", tabId: MAIL.id }]);
+  await expect
+    .poll(() => peer.asked("activate"))
+    .toEqual([{ type: "activate", peer: BOB_ID, tabId: MAIL.id }]);
 
   refuse = true;
   button(remote(root) ?? root, "Show tab")?.click();
@@ -197,7 +207,7 @@ test("Record on the other profile's tab takes the control and starts the session
 
   await expect
     .poll(() => peer.asked("session-start"))
-    .toEqual([{ type: "session-start", tabId: MAIL.id }]);
+    .toEqual([{ type: "session-start", peer: BOB_ID, tabId: MAIL.id }]);
   expect(pips).toHaveLength(1);
   expect(await tryHoldLock(CONTROL_LOCK)).toBeUndefined();
   expect(sent).toEqual([]);

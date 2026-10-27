@@ -46,7 +46,7 @@ describe("ask", () => {
 
   test("throws the background's error", async () => {
     background({ ok: false, error: "No peer is paired." });
-    await expect(createPeerClient().ask({ type: "tabs" }, v.unknown())).rejects.toThrow(
+    await expect(createPeerClient().ask({ type: "status" }, v.unknown())).rejects.toThrow(
       "No peer is paired.",
     );
   });
@@ -79,21 +79,22 @@ describe("watch", () => {
 });
 
 describe("peerServices", () => {
-  test("reads the peer's tabs from the background", async () => {
+  test("reads a peer's tabs from the background", async () => {
     const tabs = {
       tabs: [{ id: 1, windowId: 2, incognito: false, title: "A", url: "https://a/" }],
     };
     const sent = background({ ok: true, result: tabs });
-    expect(await peerServices().tabs.read()).toEqual(tabs);
-    expect(sent).toEqual([{ type: "peer", request: { type: "tabs" } }]);
+    expect(await peerServices().tabsOf(PEER).read()).toEqual(tabs);
+    expect(sent).toEqual([{ type: "peer", request: { type: "tabs", peer: PEER } }]);
   });
 
   test("reads the session it controls from session storage and commands the peer to change it", async () => {
     const sent = background({ ok: true });
-    const { recordings } = peerServices();
+    const { recordings, sessionTabs } = peerServices();
     const onChange = vi.fn();
     const unwatch = recordings.watch(onChange);
     expect(await recordings.read()).toBeNull();
+    expect(await sessionTabs.read()).toEqual({ tabs: [] });
     await remoteRecordingsRepository.set(PEER, {
       profileId: PEER,
       session,
@@ -104,7 +105,9 @@ describe("peerServices", () => {
     await vi.waitFor(() => expect(onChange).toHaveBeenCalled());
     unwatch();
     await recordings.write({ ...session, status: "recording" });
-    expect(sent).toEqual([{ type: "peer", request: { type: "session-set", status: "recording" } }]);
+    expect(sent).toEqual([
+      { type: "peer", request: { type: "session-set", peer: PEER, status: "recording" } },
+    ]);
   });
 
   test("opens the folder window, small and of its own", async () => {

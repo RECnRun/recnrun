@@ -1,8 +1,8 @@
 import { expect, test } from "vite-plus/test";
 import { peerBlocks } from "@/dashboard/peer-blocks";
-import type { PairedStatus } from "@/dashboard/peer-blocks";
+import type { PeerView } from "@/views/peer-view";
 
-const connected: PairedStatus = {
+const connected: PeerView = {
   identity: { profileId: "11111111-1111-4111-8111-111111111111", displayName: "Laptop" },
   peer: {
     profileId: "22222222-2222-4222-8222-222222222222",
@@ -12,13 +12,14 @@ const connected: PairedStatus = {
   link: { state: "connected", verified: true },
   peerSession: null,
   controlledByPeer: false,
+  paused: false,
   folder: "granted",
   folderPairing: false,
 };
-const down: PairedStatus = { ...connected, link: { state: "disconnected", verified: false } };
+const down: PeerView = { ...connected, link: { state: "disconnected", verified: false } };
 const recording = (mine: boolean, live = true) => ({ status: "recording" as const, mine, live });
 
-test.each<[string, PairedStatus, boolean, ReturnType<typeof peerBlocks>]>([
+test.each<[string, PeerView, boolean, ReturnType<typeof peerBlocks>]>([
   ["nothing while no session runs", connected, false, {}],
   [
     "the other profile's list while one runs here",

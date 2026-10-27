@@ -239,8 +239,11 @@ function requestDependencies(
       access: async () =>
         v.parse(FolderStatusSchema, await askLink({ type: "folder-status" })).access,
       waiting: async () => (await folderPairingRepository.read()) !== null,
+      paused: folder.paused,
       start: () => folder.start().then(notifyPages),
-      stop: folder.stop,
+      pause: folder.pause,
+      unpause: (peer) => folder.unpause(peer).then(notifyPages),
+      unpauseAll: () => folder.unpauseAll().then(notifyPages),
       release: closeOffscreen,
     },
   };

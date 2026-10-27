@@ -26,9 +26,10 @@ export type PendingOffer = v.InferOutput<typeof PendingOfferSchema>;
 
 /**
  * Present while this profile pairs through the folder, paired or not, so its peers reconnect on
- * their own. Not strict: an older build's fields are dropped instead of refused.
+ * their own; `paused` are the profiles the user disconnected or forgot. Not strict: an older
+ * build's fields are dropped instead of refused.
  */
-const FolderPairingSchema = v.object({});
+const FolderPairingSchema = v.object({ paused: v.optional(v.array(ProfileIdSchema)) });
 
 export type FolderPairing = v.InferOutput<typeof FolderPairingSchema>;
 

@@ -1,11 +1,14 @@
 import * as v from "valibot";
 import { FolderBanner, PairingSection } from "@/dashboard/FolderPairing";
+import type { RemoteTake } from "@/dashboard/control";
 import { peerBlocks } from "@/dashboard/peer-blocks";
-import type { PairedStatus } from "@/dashboard/peer-blocks";
 import { TabList } from "@/dashboard/TabList";
 import type { TakeControl } from "@/dashboard/TabList";
+import { useMemo } from "preact/hooks";
 import type { ExtensionServices } from "@/views/extension-services";
 import { linkLabel } from "@/views/link-label";
+import { peerViews } from "@/views/peer-view";
+import type { PeerView } from "@/views/peer-view";
 import { useRecording } from "@/views/recording";
 import type { PeerServices } from "@/views/remote-peer";
 import { usePeerStatus } from "@/views/use-peer";
@@ -14,11 +17,11 @@ interface PeerProfilesProps {
   services: Pick<ExtensionServices, "tabs" | "recordings">;
   peers: PeerServices;
   take: TakeControl;
-  /** Takes the control of a session in the other profile. */
-  takeRemote: TakeControl;
+  /** Takes the control of a session in another profile. */
+  takeRemote: RemoteTake;
 }
 
-/** The tabs of the paired Chrome profile, which this dashboard can show and record. */
+/** The tabs of a paired Chrome profile, which this dashboard can show and record. */
 function RemoteProfile({
   peers,
   status,
@@ -26,17 +29,20 @@ function RemoteProfile({
   blocked,
 }: {
   peers: PeerServices;
-  status: PairedStatus;
-  take: TakeControl;
+  status: PeerView;
+  take: RemoteTake;
   blocked?: string;
 }) {
+  const peer = status.peer.profileId;
+  // A new source each render would read the tabs again on every render.
+  const tabs = useMemo(() => peers.tabsOf(peer), [peers, peer]);
   const activate = (tabId: number) =>
-    peers.client.ask({ type: "activate", tabId }, v.unknown()).then(() => {});
+    peers.client.ask({ type: "activate", peer, tabId }, v.unknown()).then(() => {});
   return (
     <TabList
-      tabs={peers.tabs}
+      tabs={tabs}
       store={peers.recordings}
-      take={take}
+      take={take(peer)}
       activate={status.link.verified ? activate : undefined}
       blocked={blocked}
       heading={{
@@ -54,7 +60,7 @@ function RemoteProfile({
 export function PeerProfiles({ services, peers, take, takeRemote }: PeerProfilesProps) {
   const { status } = usePeerStatus(peers.client);
   const localRunning = useRecording(services.recordings).status !== "idle";
-  const paired = status?.peer ? { ...status, peer: status.peer } : undefined;
+  const paired = status && peerViews(status)[0];
   const banner = <FolderBanner peers={peers} status={status} />;
   const pairing = <PairingSection peers={peers} status={status} />;
   if (!paired) {

@@ -111,6 +111,24 @@ async function act(deps: FolderPairingDependencies, step: FolderStep, now: () =>
   }
 }
 
+/**
+ * The profiles the user disconnected or forgot, which the folder leaves alone until unpaused.
+ * Unpausing looks again at once: the sighting it skipped repeats only every few seconds.
+ */
+function folderPauses(state: FolderPairingDependencies["state"], lookAgain: () => Promise<void>) {
+  const edit = async (change: (paused: string[]) => string[]) => {
+    const current = await state.read();
+    // Not waiting, there is nothing to pause; starting again keeps the pauses.
+    if (current) await state.write({ ...current, paused: change(current.paused ?? []) });
+  };
+  return {
+    paused: async () => (await state.read())?.paused ?? [],
+    pause: (peer: string) => edit((ids) => [...ids.filter((id) => id !== peer), peer]),
+    unpause: (peer: string) => edit((ids) => ids.filter((id) => id !== peer)).then(lookAgain),
+    unpauseAll: () => edit(() => []).then(lookAgain),
+  };
+}
+
 /** Pairing through the RECnRun folder: the offscreen document watches, and this decides. */
 export function createFolderPairing(deps: FolderPairingDependencies) {
   const now = deps.now ?? Date.now;
@@ -119,13 +137,13 @@ export function createFolderPairing(deps: FolderPairingDependencies) {
     const { profileId, displayName } = await deps.identity();
     await deps.askLink({ type: "folder-watch", profileId, displayName });
   };
-  const stop = async () => {
-    await deps.state.write(null);
-    await deps.askLink({ type: "folder-stop" });
+  const resume = async () => {
+    if (await deps.state.read()) await watch();
   };
   const failed = (error: unknown) => deps.log(`folder pairing: ${errorMessage(error)}`);
   const handle = async (seen: Seen) => {
-    if (!(await deps.state.read())) return;
+    const state = await deps.state.read();
+    if (!state) return;
     const [me, links, pending, acted] = await Promise.all([
       deps.identity(),
       deps.link.all(),
@@ -133,7 +151,8 @@ export function createFolderPairing(deps: FolderPairingDependencies) {
       deps.acted.all(),
     ]);
     // A verified link needs nothing; the presence stays, so the peer finds this one again.
-    const skip = Object.keys(links).filter((peer) => links[peer]?.verified);
+    const linked = Object.keys(links).filter((peer) => links[peer]?.verified);
+    const skip = [...linked, ...(state.paused ?? [])];
     const steps = decideFolderSteps({ me: me.profileId, seen, skip, pending, acted, now: now() });
     // One step at a time, so two never offer at once; one that fails leaves the others theirs.
     await steps.reduce(
@@ -142,17 +161,14 @@ export function createFolderPairing(deps: FolderPairingDependencies) {
     );
   };
   return {
+    ...folderPauses(deps.state, resume),
     /** Waits in the folder for another profile, and stays to reconnect once paired. */
     start: async () => {
-      await deps.state.write({});
+      await deps.state.write((await deps.state.read()) ?? {});
       await watch();
     },
     /** Waits again after the service worker or the browser restarted, if it waited before. */
-    resume: async () => {
-      if (await deps.state.read()) await watch();
-    },
-    /** Stops pairing through the folder, as the user disconnects or forgets the peer. */
-    stop,
+    resume,
     /** The link to `peer` came up, so the attempt it waited for is over: a later drop needs no wait. */
     linked: async (peer: string) => {
       const acted = await deps.acted.get(peer);

@@ -3,6 +3,7 @@ import * as v from "valibot";
 import type { PeerStatus } from "@/messaging/peer-results";
 import { allowFolder, chooseFolder, pickFolder } from "@/p2p/folder-store";
 import type { PeerClient } from "@/views/peer-client";
+import { anyLinked } from "@/views/peer-view";
 import { useAction, usePeerStatus } from "@/views/use-peer";
 
 interface FolderPageProps {
@@ -21,13 +22,10 @@ const FOLDER_HINT =
 
 const FOLDER_WAIT = "Waiting for another profile in the folder…";
 
-const isPaired = (status: PeerStatus | undefined) =>
-  status !== undefined && status.peer !== null && status.link.verified;
-
 /** Whether the window waits for the pair; once paired, it closes itself. */
 function useWait(status: PeerStatus | undefined, close: () => void) {
   const [waiting, setWaiting] = useState(false);
-  const paired = isPaired(status);
+  const paired = anyLinked(status);
   useEffect(() => {
     // A page the user opened by hand ignores close(), so it shows the folder again.
     if (waiting && paired) {

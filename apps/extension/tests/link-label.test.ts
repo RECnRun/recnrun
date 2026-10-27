@@ -1,8 +1,8 @@
 import { expect, test } from "vite-plus/test";
-import type { PeerStatus } from "@/messaging/peer-results";
+import type { PeerEntry } from "@/messaging/peer-results";
 import { linkLabel } from "@/views/link-label";
 
-type Link = PeerStatus["link"];
+type Link = PeerEntry["link"];
 
 test.each<[Link, string]>([
   [{ state: "idle", verified: false }, "Disconnected"],

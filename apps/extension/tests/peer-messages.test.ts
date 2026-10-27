@@ -18,16 +18,24 @@ const accepts = (schema: v.GenericSchema, value: unknown) => v.safeParse(schema,
 test("accepts the page requests and rejects malformed ones", () => {
   expect(accepts(PeerRequestSchema, { type: "status" })).toBe(true);
   expect(accepts(PeerRequestSchema, { type: "rename", displayName: " Work " })).toBe(true);
-  expect(accepts(PeerRequestSchema, { type: "activate", tabId: 2 })).toBe(true);
+  expect(accepts(PeerRequestSchema, { type: "activate", peer: PEER, tabId: 2 })).toBe(true);
+  expect(accepts(PeerRequestSchema, { type: "pair-again" })).toBe(true);
   expect(accepts(PeerRequestSchema, { type: "rename", displayName: "  " })).toBe(false);
   expect(accepts(PeerRequestSchema, { type: "create-offer" })).toBe(false);
-  expect(accepts(PeerRequestSchema, { type: "activate", tabId: -1 })).toBe(false);
+  expect(accepts(PeerRequestSchema, { type: "activate", peer: PEER, tabId: -1 })).toBe(false);
+  // Each request about one peer names it.
+  expect(accepts(PeerRequestSchema, { type: "activate", tabId: 2 })).toBe(false);
+  expect(accepts(PeerRequestSchema, { type: "disconnect" })).toBe(false);
+  expect(accepts(PeerRequestSchema, { type: "tabs", peer: "desk" })).toBe(false);
   expect(accepts(PeerRequestSchema, { type: "status", extra: 1 })).toBe(false);
   expect(accepts(PeerRequestSchema, { type: "explode" })).toBe(false);
 });
 
 test("wraps a page request for the background", () => {
-  expect(peerRequestMessage({ type: "tabs" })).toEqual({ type: "peer", request: { type: "tabs" } });
+  expect(peerRequestMessage({ type: "status" })).toEqual({
+    type: "peer",
+    request: { type: "status" },
+  });
 });
 
 test("accepts link events that name their peer, up to the frame limit", () => {

@@ -1,8 +1,10 @@
 import * as v from "valibot";
+import type { PeerRequest } from "@/messaging/peer-messages";
 import type { PeerStatus } from "@/messaging/peer-results";
 import type { PeerServices } from "@/views/remote-peer";
 import { useState } from "preact/hooks";
 import { linkText } from "@/views/link-label";
+import { anyLinked, peerViews } from "@/views/peer-view";
 import { useAction } from "@/views/use-peer";
 import type { Action } from "@/views/use-peer";
 
@@ -17,7 +19,7 @@ interface FolderPairingProps {
  * the folder's grant ended.
  */
 export function FolderBanner({ peers, status }: FolderPairingProps) {
-  if (!status || status.folder === "granted" || status.link.verified) return null;
+  if (!status || status.folder === "granted" || anyLinked(status)) return null;
   const again = status.folder === "prompt";
   return (
     <section class="folder-banner" aria-labelledby="folder-banner-heading">
@@ -36,12 +38,23 @@ export function FolderBanner({ peers, status }: FolderPairingProps) {
   );
 }
 
+interface FolderStep {
+  wait?: string;
+  pair?: { label: string; request: PeerRequest };
+}
+
+function waitOrPair(folderPairing: boolean, partner = "another profile"): FolderStep {
+  if (folderPairing) return { wait: `Waiting for ${partner} in the RECnRun folder…` };
+  return { pair: { label: "Pair with another profile", request: { type: "folder-pair" } } };
+}
+
 /** What the dashboard shows about the folder: a wait, or the one click pairing needs. */
-function folderStep(status: PeerStatus | undefined): { wait?: string; pair?: string } {
-  if (status?.folder !== "granted" || status.link.verified) return {};
-  const partner = status.peer?.displayName ?? "another profile";
-  if (status.folderPairing) return { wait: `Waiting for ${partner} in the RECnRun folder…` };
-  return { pair: status.peer ? "Reconnect" : "Pair with another profile" };
+function folderStep(status: PeerStatus | undefined): FolderStep {
+  const view = status && peerViews(status)[0];
+  if (status?.folder !== "granted" || view?.link.verified) return {};
+  if (!view?.paused) return waitOrPair(status.folderPairing, view?.peer.displayName);
+  const peer = view.peer.profileId;
+  return { pair: { label: "Reconnect", request: { type: "reconnect", peer } } };
 }
 
 /** This profile's name, as the other profile's dashboard shows it. */
@@ -71,9 +84,11 @@ function ProfileName({ status, peers, action }: FolderPairingProps & { action: A
 /** The link in words, this profile's name, and what the user can do with the link. */
 export function PairingSection({ peers, status }: FolderPairingProps) {
   const action = useAction();
-  const ask = (type: "folder-pair" | "disconnect" | "forget") => () =>
-    void action.run(() => peers.client.ask({ type }, v.unknown()).then(() => {}));
+  const ask = (request: PeerRequest) => () =>
+    void action.run(() => peers.client.ask(request, v.unknown()).then(() => {}));
   const step = folderStep(status);
+  const view = status && peerViews(status)[0];
+  const peer = view?.peer.profileId;
   return (
     <section class="pairing-section" aria-labelledby="pairing-heading">
       <h3 id="pairing-heading">Pairing</h3>
@@ -82,18 +97,18 @@ export function PairingSection({ peers, status }: FolderPairingProps) {
       <div class="pairing-actions">
         {step.wait && <p>{step.wait}</p>}
         {step.pair && (
-          <button type="button" disabled={action.busy} onClick={ask("folder-pair")}>
-            {step.pair}
+          <button type="button" disabled={action.busy} onClick={ask(step.pair.request)}>
+            {step.pair.label}
           </button>
         )}
-        {status?.link.verified && (
-          <button type="button" disabled={action.busy} onClick={ask("disconnect")}>
+        {peer && view.link.verified && (
+          <button type="button" disabled={action.busy} onClick={ask({ type: "disconnect", peer })}>
             Disconnect
           </button>
         )}
-        {status?.peer && (
-          <button type="button" disabled={action.busy} onClick={ask("forget")}>
-            Forget {status.peer.displayName}
+        {peer && (
+          <button type="button" disabled={action.busy} onClick={ask({ type: "forget", peer })}>
+            Forget {view.peer.displayName}
           </button>
         )}
       </div>

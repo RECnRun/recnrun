@@ -197,6 +197,7 @@ function folderPairing(
 describe("createFolderPairing", () => {
   test("starts and resumes waiting in the folder as this profile", async () => {
     const { flow, commands, state } = folderPairing(null);
+    await flow.pause(PEER);
     await flow.resume();
     expect(commands).toEqual([]);
     await flow.start();
@@ -263,6 +264,21 @@ describe("createFolderPairing", () => {
     await link.set(PEER, { state: "connected", verified: true });
     await flow.seen(seen([presence(PEER), presence(STRANGER)]));
     expect(pairing.createOffer.mock.calls).toEqual([[STRANGER]]);
+  });
+
+  test("leaves a paused profile alone until it is unpaused, then looks again at once", async () => {
+    const { flow, pairing, commands } = folderPairing();
+    const both = seen([presence(PEER), presence(STRANGER)]);
+    for (const id of [PEER, STRANGER]) await flow.pause(id);
+    await flow.start();
+    await flow.seen(both);
+    expect(pairing.createOffer).not.toHaveBeenCalled();
+    await flow.unpause(PEER);
+    expect(commands.map(({ type }) => type)).toEqual(["folder-watch", "folder-watch"]);
+    await flow.seen(both);
+    expect(pairing.createOffer.mock.calls).toEqual([[PEER]]);
+    await flow.unpauseAll();
+    expect([await flow.paused(), commands.at(-1)?.type]).toEqual([[], "folder-watch"]);
   });
 
   test("a step that fails leaves the others in the same sighting", async () => {

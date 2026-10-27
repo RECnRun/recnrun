@@ -153,11 +153,14 @@ describe("the peer's reports", () => {
     const peers = await peerBackground();
     await peers.connect();
     await peers.receive(fromPeer("TABS_CHANGED", { tabs: [TAB], currentId: 3 }));
-    expect(await peers.routes.request({ type: "tabs" })).toEqual({ tabs: [TAB], currentId: 3 });
+    expect(await peers.routes.request({ type: "tabs", peer: PEER })).toEqual({
+      tabs: [TAB],
+      currentId: 3,
+    });
     await peers.receive(fromPeer("TABS_CHANGED", { tabs: [] }));
-    expect(await peers.routes.request({ type: "tabs" })).toStrictEqual({ tabs: [] });
+    expect(await peers.routes.request({ type: "tabs", peer: PEER })).toStrictEqual({ tabs: [] });
     await peers.receive(fromPeer("HELLO", { displayName: "Desk", extensionVersion: "0.1.0" }));
-    const listed = peers.routes.request({ type: "tabs" });
+    const listed = peers.routes.request({ type: "tabs", peer: PEER });
     await vi.waitFor(() => expect(peers.link.sentTypes().at(-1)).toBe("GET_TABS"));
     const ask = peers.link.frames().at(-1) as unknown as { id: string };
     await peers.receive(fromPeer("TABS_SNAPSHOT", { requestId: ask.id, tabs: [TAB] }));

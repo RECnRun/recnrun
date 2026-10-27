@@ -36,7 +36,7 @@ describe("two peers", () => {
     await receive(fromPeer("SESSION_STATUS", mine));
     await receive(fromPeer("SESSION_STATUS", mine, STRANGER), STRANGER);
     await receive(fromPeer("TABS_CHANGED", { tabs: [tab] }, STRANGER), STRANGER);
-    const pending = routes.request({ type: "tabs" });
+    const pending = routes.request({ type: "tabs", peer: PEER });
     await vi.waitFor(() => expect(link.sentTypes()).toContain("GET_TABS"));
     await routes.link({ type: "state", peer: STRANGER, state: "disconnected" });
     expect(await peerLinksRepository.get(PEER)).toEqual({ state: "connected", verified: true });

@@ -4,7 +4,7 @@ import { FolderBanner, PairingSection } from "@/dashboard/FolderPairing";
 import type { PeerStatus } from "@/messaging/peer-results";
 import type { PeerServices } from "@/views/remote-peer";
 import { memoryRecordingStore } from "./fake-extension";
-import { closedFor, fakePeerClient, statusOf } from "./fake-peer-client";
+import { BOB_ID, closedFor, fakePeerClient, pausedBob, statusOf } from "./fake-peer-client";
 import { fakeTabs } from "./fake-tabs";
 import { alertText } from "./dashboard-page";
 import { button, field, type } from "./queries";
@@ -15,8 +15,9 @@ function mount(status: PeerStatus, answers: Parameters<typeof fakePeerClient>[1]
   const opened = { folder: 0 };
   const peers: PeerServices = {
     client: peer.client,
-    tabs: fakeTabs({ tabs: [] }).source,
+    tabsOf: () => fakeTabs({ tabs: [] }).source,
     recordings: memoryRecordingStore(),
+    sessionTabs: fakeTabs({ tabs: [] }).source,
     openFolder: async () => void opened.folder++,
   };
   const root = document.body.appendChild(document.createElement("div"));
@@ -68,10 +69,10 @@ test("an unpaired profile pairs from the dashboard, then waits in the folder", a
   expect(button(root, "Pair with another profile")).toBeUndefined();
 });
 
-test("a paired profile that stopped waiting reconnects from the dashboard", async () => {
-  const { peer, root, show } = mount(statusOf("disconnected"));
+test("a peer the user disconnected reconnects from the dashboard", async () => {
+  const { peer, root, show } = mount(pausedBob(statusOf("disconnected")));
   button(root, "Reconnect")?.click();
-  await expect.poll(() => peer.asked("folder-pair")).toHaveLength(1);
+  await expect.poll(() => peer.asked("reconnect")).toEqual([{ type: "reconnect", peer: BOB_ID }]);
   show({ ...statusOf("disconnected"), folderPairing: true });
   expect(root.textContent).toContain("Waiting for Bob in the RECnRun folder…");
   show({ ...statusOf("connected"), folderPairing: true });
@@ -111,13 +112,13 @@ test("a connected profile disconnects, and a paired one forgets its peer, from t
   const { peer, root, show } = mount(statusOf("connected"));
   expect(button(root, "Reconnect")).toBeUndefined();
   button(root, "Disconnect")?.click();
-  await expect.poll(() => peer.asked("disconnect")).toHaveLength(1);
-  show(statusOf("disconnected"));
+  await expect.poll(() => peer.asked("disconnect")).toEqual([{ type: "disconnect", peer: BOB_ID }]);
+  show(pausedBob(statusOf("disconnected")));
   // Disconnected, the dashboard offers the folder step again.
   expect(button(root, "Disconnect")).toBeUndefined();
   expect(button(root, "Reconnect")).toBeDefined();
   button(root, "Forget Bob")?.click();
-  await expect.poll(() => peer.asked("forget")).toHaveLength(1);
+  await expect.poll(() => peer.asked("forget")).toEqual([{ type: "forget", peer: BOB_ID }]);
   show(statusOf());
   expect(button(root, "Forget Bob")).toBeUndefined();
 });

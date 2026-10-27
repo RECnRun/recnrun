@@ -10,6 +10,7 @@ import type { DashboardRouter } from "@/dashboard/router";
 import { PinHint } from "@/dashboard/PinHint";
 import type { Navigation } from "@/dashboard/RouteLink";
 import { TabList } from "@/dashboard/TabList";
+import type { RemoteTake } from "@/dashboard/control";
 import type { TakeControl } from "@/dashboard/TabList";
 import type { ExtensionServices } from "@/views/extension-services";
 
@@ -22,8 +23,8 @@ export interface DashboardProps {
   services: ExtensionServices;
   router: DashboardRouter;
   take: TakeControl;
-  /** Takes the control of a session in the paired profile, when there is one. */
-  takeRemote?: TakeControl;
+  /** Takes the control of a session in a paired profile, when there is one. */
+  takeRemote?: RemoteTake;
 }
 
 function useSnapshot(loadSnapshot: () => Promise<Snapshot>): Load {
