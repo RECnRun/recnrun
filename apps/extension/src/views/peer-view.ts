@@ -20,6 +20,9 @@ export function peerViews(status: PeerStatus): PeerView[] {
   }));
 }
 
+/** How many peers' links are verified now. */
+export const linkedCount = (status: PeerStatus | undefined) =>
+  status?.peers.filter(({ link }) => link.verified).length ?? 0;
+
 /** Whether any peer's link is verified now. */
-export const anyLinked = (status: PeerStatus | undefined) =>
-  status?.peers.some(({ link }) => link.verified) === true;
+export const anyLinked = (status: PeerStatus | undefined) => linkedCount(status) > 0;

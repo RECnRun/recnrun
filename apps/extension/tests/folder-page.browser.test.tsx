@@ -4,7 +4,7 @@ import type { PeerStatus } from "@/messaging/peer-results";
 import { loadFolder } from "@/p2p/folder-store";
 import { FolderPage } from "@/folder/FolderPage";
 import { startFolder } from "@/folder/start";
-import { fakePeerClient, statusOf } from "./fake-peer-client";
+import { CAROL_ID, fakePeerClient, statusOf, withCarol } from "./fake-peer-client";
 import { alerts, button } from "./queries";
 
 const withFolder = (folder: PeerStatus["folder"]): PeerStatus => ({ ...statusOf(), folder });
@@ -17,8 +17,12 @@ async function privateFolder() {
   return root.getDirectoryHandle("folder-page", { create: true });
 }
 
-function mount(folder: PeerStatus["folder"], allow = vi.fn(async () => {})) {
-  const peer = fakePeerClient(withFolder(folder));
+function mount(
+  folder: PeerStatus["folder"],
+  allow = vi.fn(async () => {}),
+  status = withFolder(folder),
+) {
+  const peer = fakePeerClient(status);
   const close = vi.fn();
   const root = document.body.appendChild(document.createElement("div"));
   render(
@@ -74,6 +78,36 @@ test("once the grant ended, it asks Chrome again for the folder instead of choos
   await expect.poll(() => root.textContent).toContain(WAIT);
   expect(close).not.toHaveBeenCalled();
   peer.change(paired());
+  await expect.poll(() => close.mock.calls).toHaveLength(1);
+});
+
+test("opened while linked, the window lets one more profile join, then closes", async () => {
+  const linked = { ...statusOf("connected"), folder: "prompt" as const, folderPairing: true };
+  const { peer, close, root } = mount("prompt", undefined, linked);
+  await expect.poll(() => button(root, "Allow folder")).toBeDefined();
+  expect(root.textContent).toContain("so another profile can join");
+  button(root, "Allow folder")?.click();
+  await expect.poll(() => root.textContent).toContain(WAIT);
+  peer.change({ ...linked, folder: "granted" });
+  await expect.poll(() => root.textContent).toContain("In Documents");
+  expect(close).not.toHaveBeenCalled();
+  peer.change({ ...withCarol(linked), folder: "granted" });
+  await expect.poll(() => close.mock.calls).toHaveLength(1);
+});
+
+test("a newcomer's window stays open until it linked every profile waiting in the folder", async () => {
+  const { peer, close, root } = mount("none");
+  await expect.poll(() => button(root, "Choose folder")?.disabled).toBe(false);
+  button(root, "Choose folder")?.click();
+  await expect.poll(() => root.textContent).toContain(WAIT);
+  // Linked to Bob, while Carol still waits in the folder: closing would end the grant she needs.
+  const asked = peer.asked("status").length;
+  peer.change({ ...paired(), unpaired: [CAROL_ID] });
+  await expect.poll(() => peer.asked("status").length).toBeGreaterThan(asked);
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  expect(root.textContent).toContain(WAIT);
+  expect(close).not.toHaveBeenCalled();
+  peer.change(withCarol(paired()));
   await expect.poll(() => close.mock.calls).toHaveLength(1);
 });
 

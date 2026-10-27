@@ -25,6 +25,8 @@ export interface Profile {
 interface ProfileFixtures {
   profileA: Profile;
   profileB: Profile;
+  /** A third profile, for a mesh of three. */
+  profileC: Profile;
   /** Opens a new browser process on a profile's directory, as after a restart. */
   launch: (dir: string) => Promise<BrowserContext>;
 }
@@ -42,6 +44,16 @@ export const pairingSection = (dashboard: Page) =>
 
 export const linkStatus = (profile: Pick<Profile, "dashboard">) =>
   pairingSection(profile.dashboard).getByRole("status");
+
+/** The pairing section's line about `other`, in a profile paired with several. */
+export const peerLine = (profile: Pick<Profile, "dashboard">, other: Pick<Profile, "name">) =>
+  pairingSection(profile.dashboard)
+    .getByRole("listitem")
+    .filter({ hasText: `Forget ${other.name}` });
+
+/** How `profile`'s link to `other` stands, in words. */
+export const peerStatus = (profile: Pick<Profile, "dashboard">, other: Pick<Profile, "name">) =>
+  peerLine(profile, other).getByRole("status");
 
 /** The profile on a browser just started on its directory, with a tab and a dashboard of its own. */
 export async function reopen(
@@ -85,7 +97,7 @@ async function closeProfile(profile: Profile) {
 }
 
 /**
- * Two independent Chrome profiles, each a persistent context of its own on its own temporary
+ * Independent Chrome profiles, each a persistent context of its own on its own temporary
  * user data directory, never `browser.newContext()`, and never the user's own profile.
  */
 export const test = base.extend<ProfileFixtures>({
@@ -96,6 +108,11 @@ export const test = base.extend<ProfileFixtures>({
   },
   profileB: async ({ headless }, use) => {
     const profile = await openProfile("Profile B", headless);
+    await use(profile);
+    await closeProfile(profile);
+  },
+  profileC: async ({ headless }, use) => {
+    const profile = await openProfile("Profile C", headless);
     await use(profile);
     await closeProfile(profile);
   },
@@ -117,3 +134,29 @@ interface PeerGlobal {
 /** Every frame the profile's background sent or received over the link, in the test build. */
 export const framesOf = (profile: Profile): Promise<string[]> =>
   profile.serviceWorker.evaluate(() => (globalThis as unknown as PeerGlobal).recnrunPeerFrames);
+
+interface RuntimeGlobal {
+  chrome: {
+    storage: { local: { get(key: string): Promise<Record<string, unknown>> } };
+    runtime: { sendMessage(message: unknown): Promise<unknown> };
+  };
+}
+
+/** Sends a raw frame over the link to `peer` from a profile's background, as a faulty peer would. */
+export const sendRaw = (profile: Profile, peer: string, frame: string) =>
+  profile.serviceWorker.evaluate(
+    ([to, raw]) =>
+      (globalThis as unknown as RuntimeGlobal).chrome.runtime.sendMessage({
+        target: "offscreen",
+        command: { type: "send", peer: to, frame: raw },
+      }),
+    [peer, frame] as const,
+  );
+
+/** The profile's own id, as its peers know it. */
+export const profileIdOf = (profile: Profile): Promise<string> =>
+  profile.serviceWorker.evaluate(async () => {
+    const { chrome } = globalThis as unknown as RuntimeGlobal;
+    const { profileIdentity } = await chrome.storage.local.get("profileIdentity");
+    return (profileIdentity as { profileId: string }).profileId;
+  });

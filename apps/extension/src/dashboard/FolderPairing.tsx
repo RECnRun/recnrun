@@ -112,6 +112,16 @@ function PeerLine({ view, ask, busy }: { view: PeerView; ask: Ask; busy: boolean
   );
 }
 
+/** Linked, the banner stays hidden, yet a newcomer pairs only while this profile holds the folder. */
+function JoinButton({ peers, status }: FolderPairingProps) {
+  if (status?.folder === "granted" || !anyLinked(status)) return null;
+  return (
+    <button type="button" onClick={() => void peers.openFolder()}>
+      Let another profile join
+    </button>
+  );
+}
+
 /** Each link in words, this profile's name, and what the user can do with the links. */
 export function PairingSection({ peers, status }: FolderPairingProps) {
   const action = useAction();
@@ -138,6 +148,7 @@ export function PairingSection({ peers, status }: FolderPairingProps) {
             {step.pair.label}
           </button>
         )}
+        <JoinButton peers={peers} status={status} />
       </div>
       {action.error && <p role="alert">{action.error}</p>}
     </section>

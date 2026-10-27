@@ -4,6 +4,8 @@ import { ME, PEER, STRANGER } from "./fake-peer";
 import { TAB, VERIFIED, identity, other, peer, requests, withOther } from "./peer-requests-fixture";
 
 const IDLE = { state: "idle", verified: false };
+/** A profile in the folder never paired with. */
+const ME_TOO = "66666666-6666-4666-8666-666666666666";
 
 describe("the status", () => {
   test("reports identity, the peer, and an idle link when none was stored", async () => {
@@ -15,6 +17,7 @@ describe("the status", () => {
       paused: [],
       folder: "granted",
       folderPairing: false,
+      unpaired: [],
     });
     await deps.link.set(PEER, VERIFIED);
     expect(await handlePeerRequest(deps, { type: "status" })).toMatchObject({
@@ -73,6 +76,10 @@ describe("the status", () => {
       folder: "granted",
       folderPairing: true,
     });
+    // A profile in the folder counts as unpaired until linked, or paused by the user.
+    deps.folder.present.mockResolvedValue([PEER, STRANGER, ME_TOO]);
+    await deps.folder.pause(STRANGER);
+    expect(await handlePeerRequest(deps, { type: "status" })).toMatchObject({ unpaired: [ME_TOO] });
     deps.folder.access.mockRejectedValue(new Error("No offscreen document."));
     expect(await handlePeerRequest(deps, { type: "status" })).toMatchObject({ folder: "none" });
     await handlePeerRequest(deps, { type: "folder-pair" });

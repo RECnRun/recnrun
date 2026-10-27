@@ -61,6 +61,17 @@ test("without the folder, the banner opens the window that chooses it", async ()
   expect(banner(root)).toBeUndefined();
 });
 
+test("a linked profile without the folder lets another profile join, from the pairing section", async () => {
+  const { opened, root, show } = mount({ ...statusOf("connected"), folder: "prompt" });
+  expect(banner(root)).toBeUndefined();
+  button(root, "Let another profile join")?.click();
+  await expect.poll(() => opened.folder).toBe(1);
+  show(statusOf("connected"));
+  expect(button(root, "Let another profile join")).toBeUndefined();
+  show({ ...statusOf(), folder: "prompt" });
+  expect(button(root, "Let another profile join")).toBeUndefined();
+});
+
 test("an unpaired profile pairs from the dashboard, then waits in the folder", async () => {
   const { peer, root, show } = mount(statusOf());
   button(root, "Pair with another profile")?.click();

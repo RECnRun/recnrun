@@ -106,6 +106,11 @@ export const authorizedPeersRepository = peerRecords("local:authorizedPeers", Au
 // Local, so waiting in the folder survives a restart of the browser.
 export const folderPairingRepository = repository("local:folderPairing", FolderPairingSchema);
 // Session storage ends with the browser, as the link and anything it carried do.
+/** The other profiles in the RECnRun folder, as this one last looked while waiting there. */
+export const folderPresentRepository = repository(
+  "session:folderPresent",
+  v.array(ProfileIdSchema),
+);
 export const peerLinksRepository = peerRecords("session:peerLinks", PeerLinkSchema);
 export const pendingOffersRepository = peerRecords("session:pendingOffers", PendingOfferSchema);
 export const folderActedRepository = peerRecords("session:folderActed", FolderActedSchema);

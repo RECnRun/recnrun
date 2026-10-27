@@ -3,7 +3,7 @@ import * as v from "valibot";
 import type { PeerStatus } from "@/messaging/peer-results";
 import { allowFolder, chooseFolder, pickFolder } from "@/p2p/folder-store";
 import type { PeerClient } from "@/views/peer-client";
-import { anyLinked } from "@/views/peer-view";
+import { anyLinked, linkedCount } from "@/views/peer-view";
 import { useAction, usePeerStatus } from "@/views/use-peer";
 
 interface FolderPageProps {
@@ -22,18 +22,32 @@ const FOLDER_HINT =
 
 const FOLDER_WAIT = "Waiting for another profile in the folder…";
 
-/** Whether the window waits for the pair; once paired, it closes itself. */
+/** What the window asks for: the folder, or Chrome's grant again, to pair or to let one join. */
+function folderHint(status: PeerStatus | undefined): string {
+  if (status?.folder !== "prompt") return FOLDER_HINT;
+  // A linked profile's links hold the folder's handles, so Chrome offers no "every visit" then.
+  if (anyLinked(status)) {
+    return "Chrome asks once more before RECnRun may use the folder, so another profile can join.";
+  }
+  return "Chrome asks once more before RECnRun may use the folder. Choose Allow on every visit, and it will not ask again.";
+}
+
+/**
+ * Whether the window waits for a profile to pair; once one more did, and none in the folder waits
+ * for this one, it closes itself.
+ */
 function useWait(status: PeerStatus | undefined, close: () => void) {
-  const [waiting, setWaiting] = useState(false);
-  const paired = anyLinked(status);
+  // The links that held when the wait began; undefined while not waiting.
+  const [since, setSince] = useState<number>();
+  const linked = linkedCount(status);
   useEffect(() => {
     // A page the user opened by hand ignores close(), so it shows the folder again.
-    if (waiting && paired) {
-      setWaiting(false);
+    if (since !== undefined && linked > since && status?.unpaired.length === 0) {
+      setSince(undefined);
       close();
     }
-  }, [waiting, paired, close]);
-  return { waiting, wait: () => setWaiting(true) };
+  }, [since, linked, status?.unpaired.length, close]);
+  return { waiting: since !== undefined, wait: () => setSince(linked) };
 }
 
 /**
@@ -63,11 +77,7 @@ export function FolderPage({
   return (
     <main class="folder">
       <h1>RECnRun folder</h1>
-      <p>
-        {again
-          ? "Chrome asks once more before RECnRun may use the folder. Choose Allow on every visit, and it will not ask again."
-          : FOLDER_HINT}
-      </p>
+      <p>{folderHint(status)}</p>
       {waiting ? (
         <p>
           {FOLDER_WAIT} Keep this window open: Chrome keeps the folder only while it is open. It

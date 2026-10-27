@@ -1,7 +1,7 @@
 import { expect } from "./fixtures/extension.ts";
 import { allowFolder, pair } from "./fixtures/folder.ts";
 import { test } from "./fixtures/native-dialogs.ts";
-import { framesOf, linkStatus, pairingSection, reopen } from "./fixtures/profiles.ts";
+import { framesOf, linkStatus, pairingSection, reopen, sendRaw } from "./fixtures/profiles.ts";
 import type { Profile } from "./fixtures/profiles.ts";
 
 interface ChromeGlobal {
@@ -17,17 +17,6 @@ const identityOf = (profile: Profile) =>
     const { profileIdentity } = await chrome.storage.local.get("profileIdentity");
     return { identity: profileIdentity as { profileId: string }, extensionId: chrome.runtime.id };
   });
-
-/** Sends a raw frame over the link to `peer` from a profile's background, as a faulty peer would. */
-const sendRaw = (profile: Profile, peer: string, frame: string) =>
-  profile.serviceWorker.evaluate(
-    ([to, raw]) =>
-      (globalThis as unknown as ChromeGlobal).chrome.runtime.sendMessage({
-        target: "offscreen",
-        command: { type: "send", peer: to, frame: raw },
-      }),
-    [peer, frame] as const,
-  );
 
 const typesOf = (frames: string[]) =>
   frames.map((frame) => (JSON.parse(frame) as { type: string }).type);

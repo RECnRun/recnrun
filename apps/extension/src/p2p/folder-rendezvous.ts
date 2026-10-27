@@ -97,11 +97,12 @@ export function folderRendezvous(pairing: Directory, me: string, now: () => numb
     for (const name of (await namesIn(folder)).filter(matches)) await folder.removeEntry(name);
   };
   const announce = async (presence: Presence) => writeFile(await own(), PRESENCE_FILE, presence);
-  /** Replaces this profile's earlier signal of the same kind, so only the current one counts. */
-  const publish = async (signal: SignalFile) => {
-    await remove((name) => SIGNAL_NAME.test(name) && name.startsWith(`${signal.kind}-`));
-    await writeFile(await own(), `${signal.kind}-${signal.pairingId}.json`, signal);
-  };
+  /**
+   * Replaces this profile's earlier signal of the same kind for the same profile, so only the
+   * current one counts, and answers to two offerers both stay until each reads its own.
+   */
+  const publish = async (signal: SignalFile) =>
+    writeFile(await own(), `${signal.kind}-${signal.to}.json`, signal);
   const look = async (): Promise<Seen> => {
     const seen: Seen = { presences: [], signals: [] };
     for (const owner of await namesIn(pairing)) {

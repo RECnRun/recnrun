@@ -88,6 +88,8 @@ export interface FolderPairingDependencies {
   link: Pick<PeerRecords<PeerLink>, "all">;
   acted: Pick<PeerRecords<FolderActed>, "all" | "get" | "set">;
   state: Pick<Repository<FolderPairing>, "read" | "write">;
+  /** The other profiles in the folder as last seen, so its window knows whom it still waits for. */
+  present: Pick<Repository<string[]>, "read" | "write">;
   log: (entry: string) => void;
   now?: () => number;
 }
@@ -129,6 +131,12 @@ function folderPauses(state: FolderPairingDependencies["state"], lookAgain: () =
   };
 }
 
+/** Keeps the profiles a sighting found, writing only a change. */
+async function notePresent(present: FolderPairingDependencies["present"], seen: Seen) {
+  const ids = seen.presences.map(({ profileId }) => profileId).sort();
+  if (JSON.stringify(ids) !== JSON.stringify(await present.read())) await present.write(ids);
+}
+
 /** Pairing through the RECnRun folder: the offscreen document watches, and this decides. */
 export function createFolderPairing(deps: FolderPairingDependencies) {
   const now = deps.now ?? Date.now;
@@ -141,9 +149,12 @@ export function createFolderPairing(deps: FolderPairingDependencies) {
     if (await deps.state.read()) await watch();
   };
   const failed = (error: unknown) => deps.log(`folder pairing: ${errorMessage(error)}`);
+  // Without the folder's grant the look fails; the window that grants it again starts one.
+  const lookAgain = () => resume().catch(failed);
   const handle = async (seen: Seen) => {
     const state = await deps.state.read();
     if (!state) return;
+    await notePresent(deps.present, seen);
     const [me, links, pending, acted] = await Promise.all([
       deps.identity(),
       deps.link.all(),
@@ -161,7 +172,7 @@ export function createFolderPairing(deps: FolderPairingDependencies) {
     );
   };
   return {
-    ...folderPauses(deps.state, resume),
+    ...folderPauses(deps.state, lookAgain),
     /** Waits in the folder for another profile, and stays to reconnect once paired. */
     start: async () => {
       await deps.state.write((await deps.state.read()) ?? {});

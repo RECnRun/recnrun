@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 import { expect } from "./extension.ts";
 import type { Native } from "./native-dialogs.ts";
-import { linkStatus, pairingSection } from "./profiles.ts";
+import { linkStatus, pairingSection, peerStatus } from "./profiles.ts";
 import type { Profile } from "./profiles.ts";
 
 /*
@@ -15,10 +15,14 @@ export const WAITING = "Waiting for another profile in the RECnRun folder…";
 export const folderBanner = (dashboard: Page) =>
   dashboard.locator('section[aria-labelledby="folder-banner-heading"]');
 
-/** Clicks the dashboard's folder banner; returns the window it opens and its dialogs. */
-export async function openFolderWindow(profile: Profile, native: Native) {
+/** Clicks the dashboard's folder banner, or `button`; returns the window it opens and its dialogs. */
+export async function openFolderWindow(
+  profile: Profile,
+  native: Native,
+  button = folderBanner(profile.dashboard).getByRole("button"),
+) {
   const opened = profile.context.waitForEvent("page");
-  await folderBanner(profile.dashboard).getByRole("button").click();
+  await button.click();
   const window = await opened;
   await window.waitForLoadState();
   await expect(window.getByRole("heading", { name: "RECnRun folder" })).toBeVisible();
@@ -53,4 +57,39 @@ export async function pair(a: Profile, b: Profile, native: Native): Promise<Page
   await expect(linkStatus(a)).toHaveText(`Connected — ${b.name}`, { timeout: 30_000 });
   await expect(linkStatus(b)).toHaveText(`Connected — ${a.name}`);
   return [windowA, windowB];
+}
+
+/**
+ * Lets a newcomer pair with a linked profile, whose folder grant ended with its window (H2). Its
+ * links keep handles to the folder, so Chrome mostly asks with its write prompt; the window then
+ * waits until the newcomer pairs.
+ */
+export async function letJoin(profile: Profile, native: Native): Promise<Page> {
+  const join = pairingSection(profile.dashboard).getByRole("button", {
+    name: "Let another profile join",
+  });
+  const { window, dialogs } = await openFolderWindow(profile, native, join);
+  await window.getByRole("button", { name: "Allow folder" }).click();
+  await dialogs.allowInEitherPrompt();
+  await expect(window.getByText("Keep this window open")).toBeVisible();
+  return window;
+}
+
+/** Pairs every profile with every other, one newcomer at a time, as a user adds profiles. */
+export async function pairAll(profiles: Profile[], native: Native): Promise<void> {
+  const [first, second, ...rest] = profiles;
+  if (!first || !second) throw new Error("Pairing takes two profiles.");
+  await pair(first, second, native);
+  const joined = [first, second];
+  for (const next of rest) {
+    for (const member of joined) await letJoin(member, native);
+    await chooseFolder(next, native);
+    for (const member of joined) {
+      await expect(peerStatus(member, next)).toHaveText(`Connected — ${next.name}`, {
+        timeout: 30_000,
+      });
+      await expect(peerStatus(next, member)).toHaveText(`Connected — ${member.name}`);
+    }
+    joined.push(next);
+  }
 }

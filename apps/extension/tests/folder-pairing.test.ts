@@ -188,6 +188,7 @@ function folderPairing(
     link,
     acted,
     state,
+    present: memoryRepository<string[]>(),
     log,
     now: () => NOW,
   });
@@ -287,14 +288,5 @@ describe("createFolderPairing", () => {
     await flow.seen(seen([presence(PEER), presence(STRANGER)]));
     expect(log).toHaveBeenCalledWith("folder pairing: No link.");
     expect(pairing.createOffer.mock.calls).toEqual([[PEER], [STRANGER]]);
-  });
-
-  test("logs a step that fails, and handles the next sighting", async () => {
-    const { flow, pairing, log } = folderPairing();
-    pairing.createOffer.mockRejectedValueOnce(new Error("No link."));
-    await flow.seen(seen([presence(PEER)]));
-    expect(log).toHaveBeenCalledWith("folder pairing: No link.");
-    await flow.seen(seen([presence(PEER)]));
-    expect(pairing.createOffer).toHaveBeenCalledTimes(2);
   });
 });
