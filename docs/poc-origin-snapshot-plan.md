@@ -152,7 +152,7 @@ With "Allow in Incognito" on (spanning mode), one service worker serves both par
 
 ### Experiment G: the person's own Chrome
 
-The lab so far ran only under Playwright, which keeps the service worker alive. In the person's Chrome the worker stops when idle and starts again with empty memory. `vp run origin-snapshot-lab:unpacked -- <url> [--with-host <host>]...` writes an unpacked copy with a `preset.json` the worker applies at every start, and `rec.start()`, `rec.switch(id)`, and `rec.reset(id)` for the worker's console. A switch after a restart, when the origin has captures but the worker no longer knows its identity, refuses instead of guessing. A cookie host also covers its subdomains, so a parent domain (`google.com` for Gmail) can be one.
+The lab so far ran only under Playwright, which keeps the service worker alive. In the person's Chrome the worker stops when idle and starts again with empty memory. `vp run origin-snapshot-lab:unpacked -- <url> [--with-host <host>]...` writes an unpacked copy with a `preset.json` the worker applies at every start, and `rec.start()`, `rec.switch(id)`, and `rec.reset(id)` for the worker's console. A switch after a restart, when the origin has captures but the worker no longer knows its identity, refuses instead of guessing. A cookie host also covers its subdomains, so a parent domain (`google.com` for Gmail) can be one. Nothing, cookies included, changes until every database passed the probe: a switch that fails before then takes the tabs back and keeps the identity, and `rec.restoreCookies(id)` puts an identity's captured cookies back by hand.
 
 ## Phase 2: Decision gate
 

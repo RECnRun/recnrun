@@ -1,7 +1,9 @@
 // Experiment G: the lab in the person's own Chrome. preset.json, which unpacked.mjs writes into
 // the copy it loads, configures the lab whenever the worker starts, and `rec` gives the worker's
 // console short commands. The specs' copy has no preset.
-import { manage, managed } from "./group.js";
+import { replaceCookies, storeOf } from "./cookies.js";
+import { manage, managed, partitionOf } from "./group.js";
+import { getCapture } from "./repo.js";
 import { options, switchTo } from "./switch.js";
 
 const PRESET = { firstIdentity: "A", clear: { timeoutMs: 5000, probe: true }, timeoutMs: 30000 };
@@ -45,6 +47,15 @@ function commands(origin) {
     },
     switch: (to, incognito = false) => run(to, incognito, false),
     reset: (to, incognito = false) => run(to, incognito, true),
+    /** Puts `identity`'s captured cookie-host cookies back, after a switch left them wrong. */
+    restoreCookies: async (identity, incognito = false) => {
+      // Any tab of the partition names its cookie store: the site's may be on its sign-in host.
+      const tab = (await chrome.tabs.query({})).find((each) => each.incognito === incognito);
+      if (!tab) throw new Error("open a window first");
+      const capture = await getCapture(origin, identity, partitionOf(tab));
+      if (!capture) throw new Error(`no capture of ${identity}`);
+      return replaceCookies(options.cookieHosts, capture.state.cookies, await storeOf(tab.id));
+    },
   };
 }
 

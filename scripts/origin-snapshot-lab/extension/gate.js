@@ -15,6 +15,12 @@
   const lab = self.__originLab;
   const report = (step, extra = {}) => chrome.runtime.sendMessage({ gate: step, nonce, ...extra });
   const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  /** Reports a step the background must accept before the page goes on. */
+  const accepted = async (step, extra) => {
+    const ack = await report(step, extra);
+    if (!ack?.ok) throw new Error(ack?.error ?? `the ${step} step was refused`);
+    return ack;
+  };
 
   async function run() {
     const plan = await report("ready", {
@@ -24,11 +30,14 @@
     });
     if (!plan?.ok) return;
     const captured = await lab.captureAll();
-    const ack = await report("captured", { captured });
-    if (!ack?.ok) throw new Error(ack?.error ?? "the capture was not persisted");
+    const { target } = await accepted("captured", { captured });
     await pause(plan.delayMs);
+    if (plan.clear.probe) await lab.probeAll(plan.clear);
+    // Up to here nothing changed: the background may still take the tabs back.
+    await accepted("clearing");
     const cleared = await lab.clearAll(plan.clear);
-    const restored = await lab.restoreAll(ack.target, plan.clear);
+    await accepted("cleared");
+    const restored = await lab.restoreAll(target, plan.clear);
     await report("done", { cleared, restored: restored.ms, captureMs: captured.ms });
   }
 

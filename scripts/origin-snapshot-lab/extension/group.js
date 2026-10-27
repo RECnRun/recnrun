@@ -10,7 +10,9 @@ export const partitionOf = (tab) => (tab.incognito ? "incognito" : "normal");
 
 /** Puts the tab in a new RECnRun group titled with its identity. */
 export async function manage(tabId, identity) {
-  const groupId = await chrome.tabs.group({ tabIds: [tabId] });
+  // Without a window, the group goes to the worker's current one: its DevTools, if open.
+  const { windowId } = await chrome.tabs.get(tabId);
+  const groupId = await chrome.tabs.group({ tabIds: [tabId], createProperties: { windowId } });
   await chrome.tabGroups.update(groupId, { title: `RECnRun · ${identity}`, color: "red" });
   managed.add(groupId);
   return groupId;

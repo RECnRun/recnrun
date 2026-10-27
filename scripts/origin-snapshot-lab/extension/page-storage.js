@@ -117,12 +117,15 @@ function probeExclusive(name, version, timeoutMs) {
   );
 }
 
-async function clearAll({ timeoutMs = 5000, probe = false } = {}) {
+/** Fails, having changed nothing, unless every database of the origin can be had exclusively. */
+async function probeAll({ timeoutMs = 5000 } = {}) {
+  const infos = (await indexedDB.databases()).filter((info) => info.name);
+  for (const info of infos) await probeExclusive(info.name, info.version, timeoutMs);
+}
+
+async function clearAll({ timeoutMs = 5000 } = {}) {
   const started = performance.now();
   const infos = (await indexedDB.databases()).filter((info) => info.name);
-  if (probe) {
-    for (const info of infos) await probeExclusive(info.name, info.version, timeoutMs);
-  }
   const deleted = [];
   for (const info of infos) deleted.push(await deleteDatabase(info.name, timeoutMs));
   localStorage.clear();
@@ -171,4 +174,11 @@ async function restoreAll(state, { timeoutMs = 5000 } = {}) {
   return { ms: performance.now() - started };
 }
 
-self.__originLab = { captureAll, clearAll, restoreAll, probeExclusive, deleteDatabase };
+self.__originLab = {
+  captureAll,
+  clearAll,
+  restoreAll,
+  probeAll,
+  probeExclusive,
+  deleteDatabase,
+};

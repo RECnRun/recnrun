@@ -84,10 +84,14 @@ async function viaA0(nonce, context, urls) {
     target: { tabId: context.tabId },
     args: [nonce],
     func: async (id) => {
-      const captured = await self.__originLab.captureAll();
-      const ack = await chrome.runtime.sendMessage({ a0: "captured", nonce: id, captured });
-      if (!ack?.ok) throw new Error(ack?.error ?? "the capture was not persisted");
+      const report = async (step, extra) => {
+        const ack = await chrome.runtime.sendMessage({ a0: step, nonce: id, ...extra });
+        if (!ack?.ok) throw new Error(ack?.error ?? `the ${step} step was refused`);
+      };
+      await report("captured", { captured: await self.__originLab.captureAll() });
+      await report("clearing");
       await self.__originLab.clearAll();
+      await report("cleared");
     },
   });
   const document = await navigate(context.tabId, marked(urls.final, "__recnrun_a0", nonce));
@@ -170,7 +174,7 @@ function remember({ key, state, companions, context, urls }) {
 /** Suspends the tab's identity and starts or resumes `to` in every tab of its group. */
 export async function switchTo(tabId, to, settings) {
   const planned = await plan(tabId, to, settings);
-  const { tab, key, state, companions, context } = planned;
+  const { tab, companions, context } = planned;
   const nonce = crypto.randomUUID();
   try {
     const result = await acrossTabs(nonce, planned);
@@ -187,11 +191,27 @@ export async function switchTo(tabId, to, settings) {
       ...result,
     };
   } catch (error) {
-    identities.set(key, { ...state, identity: "unknown" });
-    throw error;
+    throw await giveUp(nonce, planned, error);
   } finally {
     pending.delete(nonce);
   }
+}
+
+/**
+ * A switch that failed before any clearing changed nothing: the tabs go back to their URLs and
+ * keep the identity. After it, the origin's state is unknown.
+ */
+async function giveUp(nonce, { key, state, companions, context, urls }, error) {
+  // From here the page's "clearing" gets no answer, so it cannot start once this decided.
+  pending.delete(nonce);
+  if (context.marks.clearing) {
+    identities.set(key, { ...state, identity: "unknown" });
+    return error;
+  }
+  identities.set(key, state);
+  await navigate(context.tabId, urls.current, { replace: options.replace });
+  await unpark(companions.map((companion) => ({ ...companion, next: companion.url })));
+  return new Error(`${error.message} (nothing changed; the tabs are back)`);
 }
 
 const relative = (context) =>
@@ -212,10 +232,15 @@ async function persist(context, captured) {
     state: { ...state, tabs: { ...context.sessions, [context.tabId]: state.session }, cookies },
   });
   context.marks.persisted = performance.now();
-  // Swapped only once the capture is durable, while the gate holds the app off.
+  return { ok: true, target: pageTarget(context) };
+}
+
+/** Swapped only once the storage is cleared, while the page holds the app off. */
+async function swapCookies(context) {
+  context.marks.cleared = performance.now();
   const target = context.target.cookies ?? [];
   context.cookies = await replaceCookies(options.cookieHosts, target, context.storeId);
-  return { ok: true, target: pageTarget(context) };
+  return { ok: true };
 }
 
 /** The target as a page script gets it: its own tab's storage, never the cookies. */
@@ -224,29 +249,49 @@ function pageTarget(context) {
   return { ...storage, session: sessionFor(context.target, context.tabId) };
 }
 
+function onReady(context, message) {
+  context.marks.ready = performance.now();
+  context.ready = { href: message.href, topLevel: message.topLevel, scripts: message.scripts };
+  // A0 captured before its document loaded, so it restores from this reply; the gate waits.
+  const target = message.a0 ? pageTarget(context) : undefined;
+  return { ok: true, delayMs: options.delayMs, clear: options.clear, target };
+}
+
+function onDone(context, message) {
+  context.marks.done = performance.now();
+  context.resolve({
+    ...message,
+    ready: context.ready,
+    cookies: context.cookies,
+    marks: relative(context),
+  });
+  return { ok: true };
+}
+
+const steps = {
+  ready: onReady,
+  captured: (context, message) => persist(context, message.captured),
+  clearing: (context) => {
+    context.marks.clearing = performance.now();
+    return { ok: true };
+  },
+  cleared: swapCookies,
+  done: onDone,
+  failed: (context, message) => {
+    context.marks.failed = performance.now();
+    context.reject(new Error(message.error));
+    return { ok: true };
+  },
+};
+
 /** Messages from the gate and A0 scripts; only a pending switch's nonce gets an answer. */
 export async function onPageMessage(message, sender) {
   const step = message.gate ?? message.a0;
   const context = pending.get(message.nonce);
-  if (!context || sender.tab?.id !== context.tabId) return { ok: false, error: "unknown switch" };
-  if (step === "ready") {
-    context.marks.ready = performance.now();
-    context.ready = { href: message.href, topLevel: message.topLevel, scripts: message.scripts };
-    // A0 captured before its document loaded, so it restores from this reply; the gate waits.
-    const target = message.a0 ? pageTarget(context) : undefined;
-    return { ok: true, delayMs: options.delayMs, clear: options.clear, target };
+  if (!context || sender.tab?.id !== context.tabId || !Object.hasOwn(steps, step)) {
+    return { ok: false, error: "unknown switch" };
   }
-  if (step === "captured") return persist(context, message.captured);
-  context.marks[step] = performance.now();
-  if (step === "done")
-    context.resolve({
-      ...message,
-      ready: context.ready,
-      cookies: context.cookies,
-      marks: relative(context),
-    });
-  else context.reject(new Error(message.error));
-  return { ok: true };
+  return steps[step](context, message);
 }
 
 /** Forgets the identities of one partition's origins, or of all. */
