@@ -5,6 +5,7 @@ import { adopt, manage, recoverGroups } from "./group.js";
 import { marked } from "./navigation.js";
 import { allCaptures, clearCaptures, deletePartition, getCapture, summarize } from "./repo.js";
 import { forgetTabs, onPageMessage, options, switchTo } from "./switch.js";
+import { onUiMessage, openDashboard } from "./ui.js";
 
 const probes = new Map();
 const events = [];
@@ -50,6 +51,10 @@ async function probeOffscreen(url) {
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message?.ui !== undefined) {
+    void onUiMessage(message, sender).then(sendResponse);
+    return true;
+  }
   if (!message || (message.gate === undefined && message.a0 === undefined)) return false;
   events.push({ step: message.gate ?? message.a0, nonce: message.nonce, at: Date.now() });
   const probe = probes.get(message.nonce);
@@ -57,6 +62,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   answer.then(sendResponse, (error) => sendResponse({ ok: false, error: String(error) }));
   return true;
 });
+
+chrome.action.onClicked.addListener(() => void openDashboard());
 
 chrome.tabs.onCreated.addListener((tab) => {
   adopt(tab).then(
@@ -131,4 +138,5 @@ globalThis.lab = {
     await clearCaptures();
   },
   events: () => events,
+  openDashboard,
 };

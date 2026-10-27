@@ -12,9 +12,11 @@
     "storage",
     "unlimitedStorage",
     "declarativeNetRequestWithHostAccess",
-    "offscreen"
+    "offscreen",
+    "browsingData"
   ],
   "host_permissions": ["http://app.localhost/*", "http://sso.localhost/*"],
+  "action": { "default_title": "Open the lab's dashboard" },
   "background": { "service_worker": "background.js", "type": "module" },
   "message_serialization": "structured_clone"
 }

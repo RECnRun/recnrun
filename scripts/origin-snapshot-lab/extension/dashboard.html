@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Origin snapshot lab</title>
+    <link rel="stylesheet" href="dashboard.css" />
+    <script type="module" src="dashboard.js"></script>
+  </head>
+  <body>
+    <header>
+      <h1>Origin snapshot lab</h1>
+      <p>Site <strong id="site">…</strong> · cookie hosts <span id="hosts">…</span></p>
+    </header>
+    <p id="no-site" hidden>
+      This copy names no site. In the repository, run
+      <code>vp run origin-snapshot-lab:unpacked -- &lt;url&gt; --with-host &lt;host&gt;</code>
+      and load the folder it prints.
+    </p>
+    <fieldset id="controls">
+      <section>
+        <h2>Window</h2>
+        <label><input type="radio" name="window" value="normal" checked /> Normal</label>
+        <label>
+          <input type="radio" name="window" value="incognito" id="incognito" /> Incognito
+          <small id="incognito-hint">(turn on "Allow in Incognito" for this extension)</small>
+        </label>
+      </section>
+      <section>
+        <h2>Now</h2>
+        <p class="now">Identity <strong id="identity">…</strong></p>
+        <p id="tabs">…</p>
+        <p id="hint" class="hint"></p>
+        <button id="start" type="button">Start: group the site's tab</button>
+      </section>
+      <section>
+        <h2>Switch</h2>
+        <form id="switch-form">
+          <label
+            >Identity <input id="to" maxlength="20" placeholder="B" autocomplete="off"
+          /></label>
+          <button id="switch" type="submit">Switch</button>
+          <button id="reset" type="button">Start it empty</button>
+        </form>
+        <p class="hint">
+          Switch saves the current identity and resumes the one named, or starts it empty if it has
+          no capture. "Start it empty" discards that identity's capture first.
+        </p>
+      </section>
+      <section>
+        <h2>Captures</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Identity</th>
+              <th>Saved</th>
+              <th>Contents</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="captures"></tbody>
+        </table>
+        <p id="no-captures" class="hint">None yet: the first switch saves the current identity.</p>
+      </section>
+      <section>
+        <h2>Settings</h2>
+        <label> <input type="checkbox" id="force-clear" /> Force clearing (Experiment H) </label>
+        <p class="hint">
+          For apps whose service worker keeps a database open, such as Gmail: each switch removes
+          the site's service worker and closes its database connections. Push notifications and
+          background sync of the site are lost at each switch.
+        </p>
+        <button id="forget" type="button" class="danger">Forget everything</button>
+      </section>
+    </fieldset>
+    <section>
+      <h2>Log</h2>
+      <ol id="log" reversed></ol>
+    </section>
+    <footer class="hint">
+      Captures hold the accounts' session cookies, unencrypted, in this extension. Use test
+      accounts, and remove the extension when done: that deletes them.
+    </footer>
+  </body>
+</html>

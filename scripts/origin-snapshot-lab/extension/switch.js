@@ -23,6 +23,9 @@ export const options = {
   firstIdentity: "profile",
   // Experiment D: hosts whose cookies are part of the snapshot, such as a sign-in server.
   cookieHosts: [],
+  // Experiment H: clear IndexedDB through browsingData, which closes every connection to it, instead
+  // of probing; and remove the origin's service worker, so a fresh one starts after the switch.
+  forceClear: false,
 };
 const EMPTY = { local: [], session: [], databases: [], cookies: [] };
 // The identity each origin has, per storage partition: every tab of it shares that storage.
@@ -153,6 +156,7 @@ async function plan(tabId, to, { reset = false, url } = {}) {
 
 /** Parks the companions, switches the lead with the configured candidate, then the companions. */
 async function acrossTabs(nonce, { companions, context, urls }) {
+  await release(context);
   await park(companions, nonce);
   context.sessions = await sessionsOf(companions);
   const run = options.candidate === "a0" ? viaA0 : viaGate;
@@ -211,7 +215,10 @@ async function giveUp(nonce, { key, state, companions, context, urls }, error) {
   identities.set(key, state);
   await navigate(context.tabId, urls.current, { replace: options.replace });
   await unpark(companions.map((companion) => ({ ...companion, next: companion.url })));
-  return new Error(`${error.message} (nothing changed; the tabs are back)`);
+  const what = context.marks.released
+    ? "nothing but the service worker changed"
+    : "nothing changed";
+  return new Error(`${error.message} (${what}; the tabs are back)`);
 }
 
 const relative = (context) =>
@@ -235,6 +242,26 @@ async function persist(context, captured) {
   return { ok: true, target: pageTarget(context) };
 }
 
+/**
+ * Removed before any tab navigates, so no document of the switch is its client and the app's next
+ * load registers a fresh one. The old worker lives on until it is idle, holding the old identity.
+ */
+async function release(context) {
+  if (!options.forceClear) return;
+  if (context.partition !== "normal") throw new Error("forceClear is untested in incognito");
+  await chrome.browsingData.remove({ origins: [context.origin] }, { serviceWorkers: true });
+  context.marks.released = performance.now();
+}
+
+/** The capture is durable by now: closing the holders' connections loses nothing captured. */
+async function startClearing(context) {
+  context.marks.clearing = performance.now();
+  if (options.forceClear) {
+    await chrome.browsingData.remove({ origins: [context.origin] }, { indexedDB: true });
+  }
+  return { ok: true };
+}
+
 /** Swapped only once the storage is cleared, while the page holds the app off. */
 async function swapCookies(context) {
   context.marks.cleared = performance.now();
@@ -254,7 +281,9 @@ function onReady(context, message) {
   context.ready = { href: message.href, topLevel: message.topLevel, scripts: message.scripts };
   // A0 captured before its document loaded, so it restores from this reply; the gate waits.
   const target = message.a0 ? pageTarget(context) : undefined;
-  return { ok: true, delayMs: options.delayMs, clear: options.clear, target };
+  // Forced clearing closes the holders' connections, so the probe has nothing to wait for.
+  const clear = options.forceClear ? { ...options.clear, probe: false } : options.clear;
+  return { ok: true, delayMs: options.delayMs, clear, target };
 }
 
 function onDone(context, message) {
@@ -271,10 +300,7 @@ function onDone(context, message) {
 const steps = {
   ready: onReady,
   captured: (context, message) => persist(context, message.captured),
-  clearing: (context) => {
-    context.marks.clearing = performance.now();
-    return { ok: true };
-  },
+  clearing: startClearing,
   cleared: swapCookies,
   done: onDone,
   failed: (context, message) => {
@@ -293,6 +319,10 @@ export async function onPageMessage(message, sender) {
   }
   return steps[step](context, message);
 }
+
+/** The identity the worker knows the origin has in `partition`, or null. */
+export const identityOf = (partition, origin) =>
+  identities.get(`${partition}|${origin}`)?.identity ?? null;
 
 /** Forgets the identities of one partition's origins, or of all. */
 export function forgetTabs(partition) {

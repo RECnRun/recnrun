@@ -154,6 +154,12 @@ With "Allow in Incognito" on (spanning mode), one service worker serves both par
 
 The lab so far ran only under Playwright, which keeps the service worker alive. In the person's Chrome the worker stops when idle and starts again with empty memory. `vp run origin-snapshot-lab:unpacked -- <url> [--with-host <host>]...` writes an unpacked copy with a `preset.json` the worker applies at every start, and `rec.start()`, `rec.switch(id)`, and `rec.reset(id)` for the worker's console. A switch after a restart, when the origin has captures but the worker no longer knows its identity, refuses instead of guessing. A cookie host also covers its subdomains, so a parent domain (`google.com` for Gmail) can be one. Nothing, cookies included, changes until every database passed the probe: a switch that fails before then takes the tabs back and keeps the identity, and `rec.restoreCookies(id)` puts an identity's captured cookies back by hand.
 
+A dashboard page in the lab extension, opened from its toolbar button, gives the person the same commands without the console. It sends them to the worker, which accepts them only from that page.
+
+### Experiment H: forcing the release
+
+Gmail's service worker keeps an IndexedDB connection open, so the probe refuses every switch. With `forceClear` (`--force-clear`), the lab removes the origin's service worker registration before any tab navigates and, once the capture is durable, clears IndexedDB with `chrome.browsingData`, which closes the open connections, instead of probing. The control (off) must refuse; on, a fixture whose service worker holds `app-db` must switch both ways and get its service worker back. Incognito refuses until tested.
+
 ## Phase 2: Decision gate
 
 Write the intermediate decision in the report and **stop to tell the user** before Phase 3:

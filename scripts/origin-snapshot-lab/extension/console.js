@@ -59,13 +59,32 @@ function commands(origin) {
   };
 }
 
+/** The site the preset names, and its commands; both stay empty in a copy without a preset. */
+/** @type {{ origin: string | null, rec: ReturnType<typeof commands> | null }} */
+export const site = { origin: null, rec: null };
+
+/** Settings the dashboard changed outlive the worker: they apply over the preset at each start. */
+export async function saveSettings({ forceClear }) {
+  const settings = { forceClear: forceClear === true };
+  await chrome.storage.local.set({ settings });
+  Object.assign(options, settings);
+  return settings;
+}
+
 /** Applies preset.json when the copy has one, and publishes `rec`. */
 export async function applyPreset(register) {
   const response = await fetch(chrome.runtime.getURL("preset.json")).catch(() => undefined);
   if (!response?.ok) return;
-  const { url, cookieHosts } = await response.json();
+  const { url, cookieHosts, forceClear } = await response.json();
   const { origin } = new URL(url);
-  Object.assign(options, PRESET, { cookieHosts });
+  Object.assign(options, PRESET, {
+    cookieHosts,
+    forceClear: forceClear === true,
+  });
+  const { settings } = await chrome.storage.local.get("settings");
+  Object.assign(options, settings);
   await register(origin);
-  globalThis.rec = commands(origin);
+  site.origin = origin;
+  site.rec = commands(origin);
+  globalThis.rec = site.rec;
 }

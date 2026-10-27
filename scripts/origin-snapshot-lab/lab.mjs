@@ -7,7 +7,9 @@ import { fileURLToPath } from "node:url";
 import { APP, SSO } from "./fixture/server.mjs";
 
 const extensionPath = fileURLToPath(new URL("extension", import.meta.url));
-const artifacts = fileURLToPath(new URL("../../.artifacts/origin-snapshot-lab/", import.meta.url));
+export const artifacts = fileURLToPath(
+  new URL("../../.artifacts/origin-snapshot-lab/", import.meta.url),
+);
 
 /** Writes one experiment's evidence as JSON under .artifacts/origin-snapshot-lab. */
 export function writeEvidence(name, value) {
@@ -33,31 +35,44 @@ export const hostPermissions = (origin, cookieHosts) => [
 ];
 
 /** `<url> [--with-host <host>]... [--incognito]`; vp run passes the `--` separator through. */
+const FLAGS = ["--", "--incognito", "--force-clear"];
+
 export function parseSite(argv, usage) {
   const cookieHosts = [];
   const positional = [];
   for (let index = 0; index < argv.length; index += 1) {
     if (argv[index] === "--with-host") cookieHosts.push(argv[(index += 1)]);
-    else if (argv[index] !== "--" && argv[index] !== "--incognito") positional.push(argv[index]);
+    else if (!FLAGS.includes(argv[index])) positional.push(argv[index]);
   }
   if (positional.length !== 1 || cookieHosts.some((host) => !/^[\w.-]+$/.test(host ?? ""))) {
     throw new Error(usage);
   }
-  return { url: positional[0], cookieHosts, incognito: argv.includes("--incognito") };
+  return {
+    url: positional[0],
+    cookieHosts,
+    incognito: argv.includes("--incognito"),
+    forceClear: argv.includes("--force-clear"),
+  };
 }
 
 /**
  * The lab extension for the person's own Chrome, in `dir`: host access to the site and its cookie
  * hosts, and a preset.json the service worker applies whenever it starts (Experiment G).
  */
-export function writeUnpacked({ url, cookieHosts }, dir = join(artifacts, "unpacked")) {
+export function writeUnpacked(
+  { url, cookieHosts, forceClear = false },
+  dir = join(artifacts, "unpacked"),
+) {
   rmSync(dir, { recursive: true, force: true });
   cpSync(extensionPath, dir, { recursive: true });
   const file = join(dir, "manifest.json");
   const manifest = JSON.parse(readFileSync(file, "utf8"));
   const host_permissions = hostPermissions(new URL(url).origin, cookieHosts);
   writeFileSync(file, JSON.stringify({ ...manifest, host_permissions }, null, 2));
-  writeFileSync(join(dir, "preset.json"), JSON.stringify({ url, cookieHosts }, null, 2));
+  writeFileSync(
+    join(dir, "preset.json"),
+    JSON.stringify({ url, cookieHosts, forceClear }, null, 2),
+  );
   return dir;
 }
 
