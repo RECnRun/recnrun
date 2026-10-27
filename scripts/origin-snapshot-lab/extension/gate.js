@@ -10,6 +10,8 @@
     window.stop();
     document.documentElement.replaceChildren();
   }
+  // A parked companion tab (Experiment E) stays halted until the lead's switch reloads it.
+  if (mode === "park") return;
   const lab = self.__originLab;
   const report = (step, extra = {}) => chrome.runtime.sendMessage({ gate: step, nonce, ...extra });
   const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));

@@ -1,12 +1,15 @@
 // Manual run of the lab extension against a real site, driven from the terminal:
-//   vp run origin-snapshot-lab:manual -- <url> [--with-host <host>]...
+//   vp run origin-snapshot-lab:manual -- <url> [--with-host <host>]... [--incognito]
 // Each --with-host (a sign-in server, say) has its cookies captured and swapped with the origin's.
-// The tab's identity before the first switch is A. The person signs in by hand; every capture, clear, and restore runs in the extension. Output
-// shows names, counts, and sizes only. Captures live in a temporary profile deleted on quit.
+// --incognito opens the URL in an incognito window, with "Allow in Incognito" turned on.
+// The first tab opens in a "RECnRun · A" tab group; every tab of the origin must be in it, and
+// a switch takes them all. The person signs in by hand; every capture, clear, and restore runs in
+// the extension. Output shows names, counts, and sizes only. Captures live in a temporary profile
+// deleted on quit.
 import { rmSync } from "node:fs";
 import { createInterface } from "node:readline/promises";
 import { cookieInventory, pageInventory } from "./inventory.mjs";
-import { extensionCopy, launchLab, writeEvidence } from "./lab.mjs";
+import { extensionCopy, launchLab, openIncognito, writeEvidence } from "./lab.mjs";
 
 const HELP = `Commands:
   switch <identity>   suspend the tab's identity and start or resume <identity>
@@ -15,21 +18,24 @@ const HELP = `Commands:
   captures            the identities captured so far, by name and count
   help, quit`;
 
-/** The URL and the --with-host values; vp run passes the `--` separator through. */
+const USAGE =
+  "Usage: vp run origin-snapshot-lab:manual -- <url> [--with-host <host>]... [--incognito]";
+
+/** The URL, the --with-host values, and --incognito; vp run passes the `--` separator through. */
 function parseArguments(argv) {
   const cookieHosts = [];
   const positional = [];
   for (let index = 0; index < argv.length; index += 1) {
     if (argv[index] === "--with-host") cookieHosts.push(argv[(index += 1)]);
-    else if (argv[index] !== "--") positional.push(argv[index]);
+    else if (argv[index] !== "--" && argv[index] !== "--incognito") positional.push(argv[index]);
   }
   if (positional.length !== 1 || cookieHosts.some((host) => !/^[\w.-]+$/.test(host ?? ""))) {
-    throw new Error("Usage: vp run origin-snapshot-lab:manual -- <url> [--with-host <host>]...");
+    throw new Error(USAGE);
   }
-  return { url: positional[0], cookieHosts };
+  return { url: positional[0], cookieHosts, incognito: argv.includes("--incognito") };
 }
 
-const { url, cookieHosts } = parseArguments(process.argv.slice(2));
+const { url, cookieHosts, incognito } = parseArguments(process.argv.slice(2));
 const { origin } = new URL(url);
 
 /** The receipt of a switch without any stored value. */
@@ -44,18 +50,12 @@ const receipt = ({ from, to, kind, ms, report }) => ({
   cookies: report.cookies,
 });
 
-/** Chrome's own list of the origin's tabs: a switch needs exactly one, and none on a cookie host. */
+/** Leads from the group's tab on the origin; the extension refuses tabs of it outside the group. */
 async function switchTab({ lab }, to, reset) {
   if (!to) return "name the identity";
-  const tabs = await lab.originTabs(origin);
-  if (tabs.length !== 1) {
-    const paths = tabs.map((tab) => tab.path).join(", ");
-    return `refused: needs exactly one tab on ${origin}, found ${tabs.length} ${paths}`;
-  }
-  for (const host of cookieHosts) {
-    if ((await lab.hostTabs(host)).length > 0) return `refused: close the tabs on ${host} first`;
-  }
-  return receipt(await lab.switchTo(tabs[0].id, to, { reset }));
+  const lead = await lab.leadFor(origin, incognito);
+  const { tabs, ...rest } = await lab.switchTo(lead, to, { reset });
+  return { tabs, ...receipt(rest) };
 }
 
 async function inventory(session, label = "now") {
@@ -63,16 +63,27 @@ async function inventory(session, label = "now") {
   if (!page) return `refused: no tab on ${origin}`;
   const value = {
     page: await page.evaluate(pageInventory),
-    cookies: await cookieInventory(session.context),
+    // Playwright sees only the normal window's cookies; the extension reads the incognito store.
+    cookies: incognito
+      ? await session.lab.cookieInventory(await session.lab.leadFor(origin, true))
+      : await cookieInventory(session.context),
   };
   const file = writeEvidence(`manual-inventory-${label}`, value);
   return { file, ...value };
 }
 
+/** This run's partition only: the lab lists incognito captures as "<identity> (incognito)". */
 async function captures(session) {
-  const names = await session.lab.captures();
+  const suffix = " (incognito)";
+  const names = (await session.lab.captures()).filter(
+    (name) => name.endsWith(suffix) === incognito,
+  );
+  const partition = incognito ? "incognito" : "normal";
   return Promise.all(
-    names.map(async (name) => ({ name, ...(await session.lab.capture(origin, name)) })),
+    names.map(async (name) => {
+      const identity = incognito ? name.slice(0, -suffix.length) : name;
+      return { name, ...(await session.lab.capture(origin, identity, partition)) };
+    }),
   );
 }
 
@@ -97,7 +108,7 @@ async function run(session) {
     const result = command
       ? await Promise.resolve()
           .then(() => command(argument))
-          .catch((error) => `failed: ${String(error?.message ?? error)}`)
+          .catch((error) => `failed: ${String(error?.message ?? error).split("\n")[0]}`)
       : `unknown command: ${name}`;
     console.log(typeof result === "string" ? result : JSON.stringify(result, null, 2));
   }
@@ -108,7 +119,7 @@ const extension = extensionCopy((manifest) => ({
   ...manifest,
   host_permissions: [`${origin}/*`, ...cookieHosts.map((host) => `*://${host}/*`)],
 }));
-const session = await launchLab({ extension, origin, bfcache: true });
+const session = await launchLab({ extension, origin, bfcache: true, incognito });
 try {
   await session.lab.configure({
     clear: { timeoutMs: 5000, probe: true },
@@ -116,9 +127,14 @@ try {
     firstIdentity: "A",
     cookieHosts,
   });
-  console.log(`cookie hosts: ${cookieHosts.join(", ") || "none"}`);
-  const page = session.context.pages()[0] ?? (await session.context.newPage());
-  await page.goto(url);
+  console.log(`cookie hosts: ${cookieHosts.join(", ") || "none"}; incognito: ${incognito}`);
+  if (incognito) {
+    await session.lab.manage((await openIncognito(session, url)).tabId);
+  } else {
+    const page = session.context.pages()[0] ?? (await session.context.newPage());
+    await session.lab.manage(await session.lab.activeTabId());
+    await page.goto(url);
+  }
   await run(session);
 } finally {
   await session.close();

@@ -114,7 +114,39 @@ The fixture reproduces it with a sign-in server on `sso.localhost` and an app pa
 
 Cookies per switch with the host: removed 1 / set 0 (start), then removed 1 / set 1 (each resume). Red: the second test failed before the extension swapped cookies (B was alice); green after.
 
-Limits: only unpartitioned cookies whose domain is the host or a subdomain; cookies on a parent domain (`.one.be`) are not taken, since other hosts share them. Restored cookies are only as good as the server session behind them: one that the server ended or let expire (Keycloak's idle timeout) asks for a login again. Another tab on the sign-in host would see the swap, so the manual runner refuses then. This widens the security model: the extension now holds another host's session cookies, HttpOnly ones included.
+Limits: only unpartitioned cookies whose domain is the host or a subdomain; cookies on a parent domain (`.one.be`) are not taken, since other hosts share them. Restored cookies are only as good as the server session behind them: one that the server ended or let expire (Keycloak's idle timeout) asks for a login again. A tab on the sign-in host outside the RECnRun group would see the swap, so the switch refuses then; one inside the group goes along (Experiment E). This widens the security model: the extension now holds another host's session cookies, HttpOnly ones included.
+
+A group tab left on the sign-in page (B started on two tabs, bob signed in on one) first refused `switch A` with "close the tab on sso.localhost first" (red). Now that tab parks with the group and comes back at the lead's app URL, since its sign-in page belongs to the identity being left: both tabs came back alice, then bob (green, third test).
+
+### Experiment E: a group of tabs
+
+The second Zephyr run worked, until the Agenda menu opened a second tab and the switch was refused ("needs exactly one tab ... found 2 /zephyr-domes-frontend/folder/search, /zephyr-domes-frontend/agenda"). A switch now takes the lead's tab group.
+
+| Check                                                                  | Result                                                                                             |
+| ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| Tabs opened by the app (a `target="_blank"` link, `window.open`) group | Chrome itself put both in the group (`groupedBy`: none, chrome, chrome); `adopt` is the fallback   |
+| A → B → A → B led from a different tab each time, three tabs           | Every tab saw the identity's shared storage and its own `sessionStorage` marker, at its own URL    |
+| The popup tab holds an IndexedDB connection                            | Parked first, so the probe was not blocked (before: "app-db blocked=true timed out after 5000 ms") |
+| A tab of the origin opened outside the group (`windows.create`)        | Refused, "tabs of http://app.localhost:4330 outside the RECnRun group: /app"; nothing captured     |
+
+Red: E1 failed on the companion's IndexedDB connection, and E2 switched and wiped the outsider's storage. Finding: Playwright's `newPage` sets `openerTabId` to the active tab, so the outsider is opened with `windows.create`.
+
+Each tab's `sessionStorage` is kept per tab id in the capture, and each tab's URL per identity; tab ids do not survive a browser restart, so Phase 3 needs another key (the tab's position in the group, say) if captures must outlive the session. The group title follows the identity (`RECnRun · B`).
+
+### Experiment F: incognito windows
+
+The lab manifest stays in the default spanning mode; the harness turns "Allow in Incognito" on through `chrome://extensions` (`developerPrivate`), because on macOS the setting lives in the signed Secure Preferences and a pre-written profile file does not take.
+
+| Check                                                                   | Result                                                                     |
+| ----------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| A → B → A in an incognito window, the normal window holding its own app | Incognito B started empty, A came back; the normal window kept its storage |
+| `switch B` in the normal window afterwards                              | `start`, empty: it did not resume the incognito B                          |
+| Sign-in host cookies in incognito (normal window signed in as carol)    | Incognito alice and bob swapped; the normal window stayed carol            |
+| Closing the last incognito window                                       | Captures went from `A`, `A (incognito)` to `A`                             |
+
+Red: the normal `switch B` resumed the incognito B and showed its data in the normal window, and the incognito captures were not separated. Green after keying by partition.
+
+Security: while an incognito window is open, its captures sit on disk in the extension's IndexedDB (a spanning extension has one), holding that window's tokens and cookies; they are deleted when the last incognito window closes or, after a crash, at the next start. A split-mode extension would keep them in memory but runs a second service worker. Also fixed here: the gate's `ready` reply carried the whole target, cookie values included, to the page script; it now carries the storage only.
 
 ## Phase 2: intermediate decision
 
@@ -123,17 +155,17 @@ Limits: only unpartitioned cookies whose domain is the host or a subdomain; cook
 1. **Gate document** (A1) with a one-time query marker, halted at `document_start`; navigations with `location.replace`.
 2. **Structured clone messaging** (T1) from the gate to the background; Chromium 148 or later.
 3. **Probe before destroy**: every database gets an exclusive-access probe with a timeout before the first `deleteDatabase`; the capture is persisted (strict durability) before anything is cleared.
-4. **One tab of the origin**, and **no service worker holding an IndexedDB connection**; the switch refuses or fails safely otherwise. These are feasibility restrictions, not isolation.
+4. **The origin's tabs in one RECnRun tab group** (E), all switching together, and **no service worker holding an IndexedDB connection**; the switch refuses or fails safely otherwise. These are feasibility restrictions, not isolation: two tabs of the origin never hold two identities at once.
 5. Service worker writes may land in either identity's data around the switch.
 6. **Sign-in host cookies** (D): when the session comes from a sign-in server on another host, its cookies are part of the snapshot (`cookies` permission and host access to that host); without them a switch can silently keep the previous account and mix it with the next identity's data.
 
-Phase 3 additionally owes: refusing a switch to the tab's current identity (the lab accepted B → B once, which would have overwritten B's capture with an empty state on the next switch; fixed in the lab), the key generator, a journal so the coordinator survives a background restart, refusing early when another tab of the origin is open (`tabs.query`), and `beforeunload` reported as a refusal.
+Phase 3 additionally owes: refusing a switch to the tab's current identity (the lab accepted B → B once, which would have overwritten B's capture with an empty state on the next switch; fixed in the lab), the key generator, a journal so the coordinator survives a background restart, keys for per-tab state that survive a restart, the incognito purge (F), and `beforeunload` reported as a refusal.
 
 ## Zephyr manual run (protocol)
 
-`vp run origin-snapshot-lab:manual -- <url> [--with-host <host>]...` opens a headed Chromium with a temporary profile and the lab extension, its host access set to the URL's origin and each `--with-host`, the exclusive-access probe on, and the tab's first identity named A. Each `--with-host` has its cookies captured and swapped with the origin's storage (Experiment D). The terminal takes `switch <identity>`, `reset <identity>`, `inventory [label]`, `captures`, and `quit`. Output and `.artifacts/origin-snapshot-lab/manual-inventory-<label>.json` hold names, counts, and sizes, never values; captures, which hold tokens and session cookies, stay in the profile that `quit` deletes. A switch is refused unless Chrome shows exactly one tab on the origin (the refusal lists the tabs' paths) and none on a `--with-host` host. The runner finds that tab through the extension, not through Playwright's page, because on Zephyr the two disagreed once and the switch failed with no tab id.
+`vp run origin-snapshot-lab:manual -- <url> [--with-host <host>]... [--incognito]` opens a headed Chromium with a temporary profile and the lab extension, its host access set to the URL's origin and each `--with-host`, the exclusive-access probe on, and the first tab in a `RECnRun · A` tab group. Each `--with-host` has its cookies captured and swapped with the origin's storage (Experiment D). `--incognito` turns "Allow in Incognito" on and opens the URL in an incognito window (Experiment F). The terminal takes `switch <identity>`, `reset <identity>`, `inventory [label]`, `captures`, and `quit`; a switch takes every tab of the group (Experiment E), led from the group's active tab on the origin, and its receipt counts them in `tabs`. Output and `.artifacts/origin-snapshot-lab/manual-inventory-<label>.json` hold names, counts, and sizes, never values; captures, which hold tokens and session cookies, stay in the profile that `quit` deletes. A switch is refused while a tab of the origin, or of a `--with-host` host, is open outside the group in the same window kind. The runner finds tabs through the extension, not through Playwright's pages, because on Zephyr the two disagreed once and the switch failed with no tab id.
 
-First run, without `--with-host`: `switch B` cleared `errorDb` and `zephyrOffDb` (not blocked, 218 ms), and the app came back signed in as A on its first-run page (Experiment D explains why). The runner then refused `switch B` again with "the tab is already B".
+First run, without `--with-host`: `switch B` cleared `errorDb` and `zephyrOffDb` (not blocked, 218 ms), and the app came back signed in as A on its first-run page (Experiment D explains why). The runner then refused `switch B` again with "the tab is already B". Second run, with `--with-host login-acc.one.be`: the switches worked, until the Agenda menu opened a second tab and the one-tab rule refused (Experiment E).
 
 Steps, with test accounts only:
 
@@ -141,9 +173,12 @@ Steps, with test accounts only:
 2. `switch B`. Expected: Keycloak's login page, with the receipt's `cookies` showing some removed and none set. Sign in as B, let the data load, run `inventory b`.
 3. `switch A`. Expected: A's app without a login, A's account and offline data; the receipt shows cookies removed and set. Use the app for a few minutes (navigate, wait for a token refresh) and record whether it stays A.
 4. `switch B`. Expected: B without a login, B's data.
-5. `switch A` and `switch B` once more, then `captures` and `quit`.
+5. Open Agenda from the menu. Expected: the new tab joins the `RECnRun · B` group. `switch A`: both tabs come back as A; Agenda stays on Agenda, since it has no page of its own in A. Switch back to B from the Agenda tab.
+6. Open the Zephyr URL by hand in a new window (Ctrl/Cmd+N, paste). Expected: `switch A` is refused, naming the outside tab's path; nothing changes. Close that window.
+7. `captures` (each identity lists `tabs`) and `quit`.
+8. Again with `--incognito`: steps 1 to 5 in the incognito window; `captures` lists the incognito ones only.
 
-What to record: for each step, the account the app shows, any login page or error, the time since that identity was last active (a login page after a long pause may be Keycloak's idle timeout, not a failure of the switch), and the terminal's output. Do not sign out inside the app: it ends that identity's Keycloak session for good. Do not open a tab on `login-acc.one.be` (the switch refuses). If an inventory lists cookies on `.one.be` or on another host, report their names: the switch does not take them. Close DevTools' IndexedDB view before a switch: if it holds a connection (not verified), the probe blocks and the switch fails without changing anything. A failed switch leaves the tab unknown and refuses further switches; quit and start over.
+What to record: for each step, the account the app shows, any login page or error, the time since that identity was last active (a login page after a long pause may be Keycloak's idle timeout, not a failure of the switch), and the terminal's output. Do not sign out inside the app: it ends that identity's Keycloak session for good. Do not open a tab on `login-acc.one.be` by hand outside the group (the switch refuses). If an inventory lists cookies on `.one.be` or on another host, report their names: the switch does not take them. Close DevTools' IndexedDB view before a switch: if it holds a connection (not verified), the probe blocks and the switch fails without changing anything. A failed switch leaves the tab unknown and refuses further switches; quit and start over.
 
 ## What was exercised
 
@@ -151,6 +186,8 @@ What to record: for each step, the account the app shows, any login page or erro
 - In Docker with 50 runs per cell and 10,000 large records: 31 passed, 0 failed (`.artifacts/docker/2026-10-27T10-11-55.364Z-ff1bbd70-f662-43b3-8dc3-f0ed194ca05e/run.log`; the JSON evidence stays inside the container, so the tables above come from the JSON lines the specs print). A first Docker run failed 2 of 31 because a spec wrote before the app published `window.app`; the specs now wait for it, and the rerun passed.
 - The manual runner on the fixture (headless, scripted commands): inventory, start, resume, reset, captures, and an unknown command. On Zephyr signed out: the inventory of the Keycloak page (cookie names only) and the refusal to switch while the tab is on the sign-in host.
 - Experiment D: control and swap, 2 passed on the host and in the full Docker run (33 passed, 0 failed, `.artifacts/docker/2026-10-27T11-29-15.686Z-3aab8329-57c4-4d43-b4eb-5bf5b7410b84/run.log`, 50 runs per Experiment A cell); red before the extension swapped cookies (B came back as alice), green after. The manual runner with `--with-host sso.localhost` on the fixture (a scratch copy with navigation commands, scripted): B started at the login page, bob signed in, a tab on the sign-in host refused the switch, A came back as alice and B as bob, and `captures` listed cookie names only.
+- Experiments E and F, the sign-in tab test in D, and the whole lab: 39 passed on the host and in Docker (`.artifacts/docker/2026-10-27T13-04-44.062Z-2b59ebac-2f70-4953-8d65-5f55f206692e/run.log`), red before each change as described above. The first host run of the whole lab caught a regression in A0: the `ready` reply no longer carried the target, so A0 restored nothing (`Cannot read properties of undefined (reading 'local')`) and its delayed run stopped losing the race; A0 now gets the storage-only target there, and loses all 50 runs at both delays again.
+- The manual runner on the fixture with `--with-host sso.localhost`, in a normal window and with `--incognito` (a scratch copy adding navigation, `window.open`, new-window, and close commands, scripted): a tab opened from the app joined the group; `switch B` took 2 tabs to the login page; bob signed in on one; `switch A` took both back to alice, the one left on the sign-in page included; a tab of the origin opened in a new window refused `switch B` with its path; after closing it `switch B` gave bob on both; `captures` listed `tabs: 2` and cookie names, the incognito run only `(incognito)` captures; `inventory` read the incognito cookie store through the extension.
 - Negative controls: A0 (fails as expected), the JSON transport (fails or corrupts as expected), and the unprobed second tab (late delete reproduced).
-- Zephyr signed in, first run (by the user, without `--with-host`): the inventory and `switch B`, which kept A signed in.
-- Not exercised: Zephyr with `--with-host login-acc.one.be` (needs the user's test accounts), Secure, domain, and expired cookies in the fixture (Zephyr's are Secure, host-only), and a cancelled `beforeunload` dialog (Playwright accepted it; the cancelled path is inferred from navigation semantics).
+- Zephyr signed in, first run (by the user, without `--with-host`): the inventory and `switch B`, which kept A signed in. Second run (by the user, with `--with-host login-acc.one.be`): the switches worked; a second tab from the Agenda menu was refused.
+- Not exercised: Zephyr with the tab group or `--incognito` (needs the user's test accounts), Secure, domain, and expired cookies in the fixture (Zephyr's are Secure, host-only), and a cancelled `beforeunload` dialog (Playwright accepted it; the cancelled path is inferred from navigation semantics).

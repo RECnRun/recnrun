@@ -1,7 +1,8 @@
 // The lab's service worker: routes the page scripts' messages and exposes `globalThis.lab`,
 // the handle the specs call through Playwright.
+import { adopt, manage, managed } from "./group.js";
 import { marked } from "./navigation.js";
-import { allCaptures, clearCaptures, getCapture, summarize } from "./repo.js";
+import { allCaptures, clearCaptures, deletePartition, getCapture, summarize } from "./repo.js";
 import { forgetTabs, onPageMessage, options, switchTo } from "./switch.js";
 
 const probes = new Map();
@@ -56,30 +57,78 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   return true;
 });
 
+chrome.tabs.onCreated.addListener((tab) => {
+  adopt(tab).then(
+    (by) => events.push({ step: "tab created", groupedBy: by, at: Date.now() }),
+    (error) => events.push({ step: "adopt failed", error: String(error) }),
+  );
+});
+
+/** Incognito captures last no longer than the incognito session: gone once its last window is. */
+async function purgeIncognito() {
+  const windows = await chrome.windows.getAll();
+  if (windows.some((each) => each.incognito)) return;
+  forgetTabs("incognito");
+  await deletePartition("incognito");
+}
+chrome.windows.onRemoved.addListener(() => void purgeIncognito());
+void purgeIncognito();
+
 globalThis.lab = {
   ready: () => true,
   configure: (values) => Object.assign(options, values),
   register,
   switchTo,
+  manage: async (tabId) => manage(tabId, options.firstIdentity),
   probeOffscreen,
-  // The tabs Chrome shows on `origin`, by id and path; queries and fragments may hold tokens.
-  originTabs: async (origin) =>
-    (await chrome.tabs.query({}))
-      .map((tab) => ({ id: tab.id, url: URL.parse(tab.url ?? tab.pendingUrl ?? "") }))
-      .filter(({ url }) => url?.origin === origin)
-      .map(({ id, url }) => ({ id, path: url.pathname })),
-  hostTabs: async (host) =>
-    (await chrome.tabs.query({})).filter(
-      (tab) => URL.parse(tab.url ?? tab.pendingUrl ?? "")?.hostname === host,
-    ),
+  // The manual run's lead: a tab of the origin in a RECnRun group, the active one if it can.
+  leadFor: async (origin, incognito) => {
+    const grouped = (await chrome.tabs.query({})).filter(
+      (tab) =>
+        tab.incognito === incognito &&
+        managed.has(tab.groupId) &&
+        URL.parse(tab.url ?? "")?.origin === origin,
+    );
+    const lead = grouped.find((tab) => tab.active) ?? grouped[0];
+    if (!lead) throw new Error(`no tab of ${origin} in the RECnRun group`);
+    return lead.id;
+  },
+  activeTabId: async () =>
+    (await chrome.tabs.query({ active: true, lastFocusedWindow: true }))[0]?.id,
+  // A tab's cookies by name, domain, and size, from its own cookie store; never the values.
+  cookieInventory: async (tabId) => {
+    const stores = await chrome.cookies.getAllCookieStores();
+    const storeId = stores.find((store) => store.tabIds.includes(tabId))?.id;
+    return (await chrome.cookies.getAll({ storeId })).map(({ value, ...cookie }) => ({
+      name: cookie.name,
+      domain: cookie.domain,
+      path: cookie.path,
+      session: cookie.session,
+      httpOnly: cookie.httpOnly,
+      secure: cookie.secure,
+      sameSite: cookie.sameSite,
+      chars: value.length,
+    }));
+  },
+  // Experiment E: the RECnRun group a tab belongs to, as the specs see it.
+  groupOf: async (tabId) => {
+    const { groupId } = await chrome.tabs.get(tabId);
+    if (groupId === chrome.tabGroups.TAB_GROUP_ID_NONE) return null;
+    const group = await chrome.tabGroups.get(groupId);
+    return { id: groupId, title: group.title };
+  },
   tabIdFor: async (prefix) =>
     (await chrome.tabs.query({})).find((tab) => tab.url?.startsWith(prefix))?.id,
-  capture: async (origin, identity) => {
-    const record = await getCapture(origin, identity);
+  capture: async (origin, identity, partition) => {
+    const record = await getCapture(origin, identity, partition);
     return record && { lastUrl: record.lastUrl, ...summarize(record.state) };
   },
   captures: async () =>
-    (await allCaptures()).map((record) => record.identity).sort((a, b) => a.localeCompare(b)),
+    (await allCaptures())
+      .map(({ identity, partition }) =>
+        partition === "incognito" ? `${identity} (incognito)` : identity,
+      )
+      .sort((a, b) => a.localeCompare(b)),
   reset: async () => {
     forgetTabs();
     events.length = 0;

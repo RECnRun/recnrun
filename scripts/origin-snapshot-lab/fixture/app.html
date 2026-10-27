@@ -48,5 +48,10 @@
   </head>
   <body>
     <h1>Origin lab app</h1>
+    <!-- Experiment E: the app opens tabs of its own, by a link and by window.open. -->
+    <a id="link" href="/app?from=link" target="_blank">New tab</a>
+    <button id="popup" type="button" onclick="window.open('/app?from=popup&conn=1', '_blank')">
+      Popup
+    </button>
   </body>
 </html>

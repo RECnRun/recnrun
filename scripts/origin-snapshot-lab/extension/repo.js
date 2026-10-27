@@ -27,14 +27,22 @@ async function inStore(mode, action) {
   return result;
 }
 
-const keyOf = (origin, identity) => `${origin}|${identity}`;
+// Normal and incognito windows have separate storage, so their captures never meet.
+const keyOf = (partition, origin, identity) => `${partition}|${origin}|${identity}`;
 
 /** Resolves only once the transaction completed with strict durability. */
 export const putCapture = (record) =>
-  inStore("readwrite", (store) => store.put(record, keyOf(record.origin, record.identity)));
+  inStore("readwrite", (store) =>
+    store.put(record, keyOf(record.partition, record.origin, record.identity)),
+  );
 
-export const getCapture = (origin, identity) =>
-  inStore("readonly", (store) => store.get(keyOf(origin, identity)));
+export const getCapture = (origin, identity, partition = "normal") =>
+  inStore("readonly", (store) => store.get(keyOf(partition, origin, identity)));
+
+export const deletePartition = (partition) =>
+  inStore("readwrite", (store) =>
+    store.delete(IDBKeyRange.bound(`${partition}|`, `${partition}|\uffff`)),
+  );
 
 export const allCaptures = () => inStore("readonly", (store) => store.getAll());
 
@@ -52,6 +60,7 @@ export function summarize(state) {
       version: database.version,
       stores: database.stores.map((store) => ({ name: store.name, count: store.values.length })),
     })),
+    tabs: Object.keys(state.tabs ?? {}).length,
     cookies: (state.cookies ?? []).map((cookie) => `${cookie.domain}${cookie.path} ${cookie.name}`),
   };
 }

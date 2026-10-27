@@ -82,5 +82,47 @@ await test("D: with the sign-in host's cookies, each identity keeps its own sess
   );
 });
 
+await test("D: a group tab left on the sign-in page switches with the group", async () => {
+  const session = await launchLab();
+  const steps = {};
+  evidence.signInTab = steps;
+  try {
+    await session.lab.configure({ cookieHosts: ["sso.localhost"], firstIdentity: "A" });
+    const lead = await session.context.newPage();
+    await lead.goto(`${APP}/sso-app`);
+    steps.a = await signIn(lead, "alice");
+    const tabId = await session.lab.tabIdFor(`${APP}/`);
+    await session.lab.manage(tabId);
+    const next = session.context.waitForEvent("page");
+    await lead.evaluate((url) => window.open(url, "_blank"), `${APP}/sso-app?tab=2`);
+    const mate = await next;
+    steps.mateA = await sessionOf(mate);
+    steps.toB = (await session.lab.switchTo(tabId, "B")).tabs;
+    steps.b = [await sessionOf(lead), await sessionOf(mate)];
+    // The person signs in on one tab; the other is left on the sign-in page.
+    steps.bSignedIn = await signIn(lead, "bob");
+    steps.toA = await session.lab
+      .switchTo(tabId, "A")
+      .then((receipt) => receipt.tabs)
+      .catch((error) => String(error.message ?? error));
+    steps.backToA = [await sessionOf(lead), await sessionOf(mate)];
+    await session.lab.switchTo(tabId, "B");
+    steps.backToB = [await sessionOf(lead), await sessionOf(mate)];
+    assert.deepEqual(steps.b, [{ login: true }, { login: true }]);
+    assert.equal(steps.toA, 2);
+    assert.deepEqual(steps.backToA, [
+      { user: "alice", profile: "alice" },
+      { user: "alice", profile: "alice" },
+    ]);
+    assert.deepEqual(steps.backToB, [
+      { user: "bob", profile: "bob" },
+      { user: "bob", profile: "bob" },
+    ]);
+  } finally {
+    console.log(JSON.stringify({ signInTab: steps }));
+    await session.close();
+  }
+});
+
 await fixture.close();
 writeEvidence("experiment-d", evidence);

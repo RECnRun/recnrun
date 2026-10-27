@@ -69,6 +69,7 @@ The domain already has `Snapshot` (the stored recordings). Do not reuse the word
 | `scripting`                   | The gate content script, registered only during a switch (`registerContentScripts`)       |
 | `cookies`                     | Capture, clear, and restore the cookies of the origin and of its sign-in host (D)         |
 | `tabs`, `webNavigation`       | Navigate the tab, wait for commits, know each `documentId`; find other tabs on the origin |
+| `tabGroups`                   | Title and color the RECnRun group whose tabs switch together (E)                          |
 | `webRequest`                  | Drain the tab's pending requests before capture                                           |
 | `declarativeNetRequest`       | Block the tab after a failed switch; candidate A2 (response header)                       |
 | `storage`, `unlimitedStorage` | The switch journal; extension IndexedDB holding captures of many megabytes                |
@@ -140,6 +141,14 @@ A value the transport cannot carry fails the capture with a named error, or the 
 ### Experiment D: the sign-in host's cookies
 
 Added after the first Zephyr run, where `switch B` left the app signed in as A: Zephyr keeps its tokens in memory and signs in silently through Keycloak's cookies on another host, which an origin snapshot does not hold. The fixture adds a sign-in server on `http://sso.localhost:<port>` (an HttpOnly session cookie, a silent redirect when it is present, a login page otherwise) and an app page that takes its session from it. The background captures the configured hosts' cookies with `chrome.cookies`, persists them with the origin's capture, and only then removes them and sets the target identity's, while the gate holds the app off. The page scripts never receive cookie values. Control: without the sign-in host, B is silently signed in as A.
+
+### Experiment E: a group of tabs
+
+Added after the second Zephyr run, where the Agenda menu opened a second tab on the origin and the one-tab rule refused the switch. The extension puts the first tab in a tab group titled `RECnRun · <identity>`; a tab opened from a grouped tab joins it. A switch takes every tab of the group on the origin, and every group tab left on a sign-in host: the others are parked on a halted gate document, the lead switches, each parked tab's `sessionStorage` (per tab) is captured and restored in its gate, and each comes back at its own URL for the target identity. A tab of the origin outside the group, in the same storage partition, refuses the switch before anything is captured.
+
+### Experiment F: incognito windows
+
+With "Allow in Incognito" on (spanning mode), one service worker serves both partitions. An incognito tab has its own storage and cookie store, so captures, identity state, and cookie calls are keyed by partition (`normal` or `incognito`), and the cookie calls name the tab's `storeId`. Captures of the incognito partition are deleted when its last window closes, and at startup.
 
 ## Phase 2: Decision gate
 

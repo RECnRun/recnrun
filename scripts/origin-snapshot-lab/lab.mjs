@@ -36,6 +36,31 @@ export function extensionCopy(edit) {
 }
 
 /**
+ * Turns on "Allow in Incognito" in chrome://extensions, as the user would, and returns the service
+ * worker of the reloaded extension. A profile's Preferences cannot carry it: macOS keeps it in the
+ * signed Secure Preferences. Developer mode first, or Chromium disables the reloaded unpacked one.
+ */
+async function allowIncognito(context, worker) {
+  const id = new URL(worker.url()).host;
+  const reloaded = context.waitForEvent("serviceworker");
+  const page = await context.newPage();
+  await page.goto("chrome://extensions/");
+  await page.evaluate(async (extensionId) => {
+    const developer = globalThis.chrome.developerPrivate;
+    await developer.updateProfileConfiguration({ inDeveloperMode: true });
+    await developer.updateExtensionConfiguration({ extensionId, incognitoAccess: true });
+  }, id);
+  const next = await reloaded;
+  await page.close();
+  return next;
+}
+
+async function extensionWorker(context, incognito) {
+  const first = context.serviceWorkers()[0] ?? (await context.waitForEvent("serviceworker"));
+  return incognito ? allowIncognito(context, first) : first;
+}
+
+/**
  * A Chromium with a temporary profile and the lab extension; headed unless LAB_HEADLESS=1.
  * Playwright turns the back/forward cache off; `bfcache: true` keeps Chrome's default. The gate
  * content script is registered for `origin` (the fixture by default).
@@ -45,6 +70,7 @@ export async function launchLab({
   args = [],
   bfcache = false,
   origin = APP,
+  incognito = false,
 } = {}) {
   const profile = mkdtempSync(join(tmpdir(), "recnrun-origin-lab-"));
   const context = await chromium.launchPersistentContext(profile, {
@@ -53,7 +79,7 @@ export async function launchLab({
     ignoreDefaultArgs: bfcache ? ["--disable-back-forward-cache"] : [],
     args: [`--disable-extensions-except=${extension}`, `--load-extension=${extension}`, ...args],
   });
-  const worker = context.serviceWorkers()[0] ?? (await context.waitForEvent("serviceworker"));
+  const worker = await extensionWorker(context, incognito);
   const lab = handle(worker);
   await lab.ready();
   await lab.register(origin);
@@ -82,6 +108,23 @@ export async function openApp({ context, lab }, path = "/app") {
   await page.goto(`${APP}${path}`);
   await observed(page);
   return { page, tabId: await lab.tabIdFor(page.url()) };
+}
+
+/** Opens `url` in a new incognito window, as the user would, and returns its page and tab id. */
+export async function openIncognito({ context, worker }, url) {
+  const known = new Set(context.pages());
+  const tabId = await worker.evaluate(async (address) => {
+    const created = await chrome.windows.create({ incognito: true, url: address });
+    return created.tabs?.[0]?.id;
+  }, url);
+  const deadline = Date.now() + 10000;
+  let page;
+  while (!page && Date.now() < deadline) {
+    page = context.pages().find((each) => !known.has(each));
+    if (!page) await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  if (!page) throw new Error(`no page shows ${url} in the incognito window`);
+  return { page, tabId };
 }
 
 /** Whether the observer saw exactly `marker` everywhere, or nothing at all when it is null. */
