@@ -10,7 +10,9 @@ export interface PeerServices {
   client: PeerClient;
   /** One peer's tabs. */
   tabsOf: (peer: string) => TabSource;
-  /** The session this profile controls in a peer, if it controls one. */
+  /** The session this profile controls in one peer, as that peer's list shows it. */
+  recordingsOf: (peer: string) => RecordingStore;
+  /** The session this profile controls in any peer, if it controls one. */
   recordings: RecordingStore;
   /** The tabs of the peer that session runs in. */
   sessionTabs: TabSource;

@@ -5,7 +5,7 @@ import { peerNotice } from "@/messaging/peer-messages";
 import { peerServices } from "@/peers/page-services";
 import { remoteRecordingsRepository } from "@/storage/peer-repository";
 import { createPeerClient } from "@/views/peer-client";
-import { PEER, answering } from "./fake-peer";
+import { PEER, STRANGER, answering } from "./fake-peer";
 
 const NamedSchema = v.strictObject({ name: v.string() });
 const session = { tabId: 4, status: "paused" as const, banked: 10, since: 1 };
@@ -108,6 +108,16 @@ describe("peerServices", () => {
     expect(sent).toEqual([
       { type: "peer", request: { type: "session-set", peer: PEER, status: "recording" } },
     ]);
+  });
+
+  test("reads the session it controls under the peer that runs it, and none under another", async () => {
+    background({ ok: true });
+    const services = peerServices();
+    const report = { profileId: STRANGER, session, mine: true, connected: true };
+    await remoteRecordingsRepository.set(STRANGER, report);
+    expect(await services.recordingsOf(STRANGER).read()).toEqual(session);
+    expect(await services.recordingsOf(PEER).read()).toBeNull();
+    expect(await services.recordings.read()).toEqual(session);
   });
 
   test("opens the folder window, small and of its own", async () => {

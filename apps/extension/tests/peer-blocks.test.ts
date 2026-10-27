@@ -16,10 +16,16 @@ const connected: PeerView = {
   folder: "granted",
   folderPairing: false,
 };
+const DESK = connected.peer.profileId;
+const STUDIO = "33333333-3333-4333-8333-333333333333";
+const studio: PeerView = {
+  ...connected,
+  peer: { ...connected.peer, profileId: STUDIO, displayName: "Studio" },
+};
 const down: PeerView = { ...connected, link: { state: "disconnected", verified: false } };
 const recording = (mine: boolean, live = true) => ({ status: "recording" as const, mine, live });
 
-test.each<[string, PeerView, boolean, ReturnType<typeof peerBlocks>]>([
+test.each<[string, PeerView, boolean, { local?: string; remote?: string }]>([
   ["nothing while no session runs", connected, false, {}],
   [
     "the other profile's list while one runs here",
@@ -60,6 +66,22 @@ test.each<[string, PeerView, boolean, ReturnType<typeof peerBlocks>]>([
     { remote: "Not connected. Last seen recording." },
   ],
 ])("blocks %s", (_, status, localRunning, blocks) => {
-  const { local, remote } = peerBlocks(status, localRunning);
+  const { local, remotes } = peerBlocks([status], localRunning);
+  const remote = remotes[DESK];
   expect({ ...(local && { local }), ...(remote && { remote }) }).toEqual(blocks);
+});
+
+test("one session across every peer: a session in one blocks Record in the others' lists", () => {
+  expect(peerBlocks([{ ...connected, peerSession: recording(false) }, studio], false)).toEqual({
+    local: "Recording in Desk",
+    remotes: { [DESK]: "Recording in Desk", [STUDIO]: "Recording in Desk" },
+  });
+  expect(peerBlocks([{ ...connected, peerSession: recording(true) }, studio], false)).toEqual({
+    local: "Recording in Desk",
+    remotes: { [STUDIO]: "Recording in Desk" },
+  });
+  expect(peerBlocks([connected, { ...studio, controlledByPeer: true }], true)).toEqual({
+    local: "Controlled from Studio",
+    remotes: { [DESK]: "Recording in Laptop", [STUDIO]: "Recording in Laptop" },
+  });
 });

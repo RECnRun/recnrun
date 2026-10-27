@@ -13,9 +13,14 @@ export function peerServices(): PeerServices {
       Object.values(await remoteRecordingsRepository.all()).find(({ mine }) => mine) ?? null,
     watch: remoteRecordingsRepository.watch,
   };
+  const mirrorOf = (peer: string) => ({
+    read: () => remoteRecordingsRepository.get(peer),
+    watch: remoteRecordingsRepository.watch,
+  });
   return {
     client,
     tabsOf: (peer) => remoteTabs(client, peer),
+    recordingsOf: (peer) => remoteRecordings(client, mirrorOf(peer)),
     recordings: remoteRecordings(client, mirror),
     sessionTabs: remoteSessionTabs(client, mirror),
     openFolder: async () => {

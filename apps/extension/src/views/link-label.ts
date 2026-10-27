@@ -1,5 +1,5 @@
-import type { PeerEntry, PeerStatus } from "@/messaging/peer-results";
-import { peerViews } from "@/views/peer-view";
+import type { PeerEntry } from "@/messaging/peer-results";
+import type { PeerView } from "@/views/peer-view";
 
 const LABELS = {
   idle: "Disconnected",
@@ -20,13 +20,9 @@ export function linkLabel(link: PeerEntry["link"], peerName: string): string {
   return link.state === "connected" && !link.verified ? LABELS.connecting : LABELS[link.state];
 }
 
-/** The first peer's link in words: connected names the peer, since only a verified link counts. */
-export function linkText(status: PeerStatus | undefined): string {
-  if (!status) return "Loading";
-  const [view] = peerViews(status);
-  if (!view) return "Not paired";
-  const { link, peer } = view;
-  if (link.state === "connected" && !link.verified) return "Checking the other profile";
+/** One peer's link in words: connected names the peer, since only a verified link counts. */
+export function linkText({ link, peer }: Pick<PeerView, "link" | "peer">): string {
+  if (link.state === "connected" && !link.verified) return `Checking ${peer.displayName}`;
   const label = linkLabel(link, peer.displayName);
   // "Disconnected by <name>" names the peer already.
   return link.reason === "closed-by-peer" ? label : `${label} — ${peer.displayName}`;

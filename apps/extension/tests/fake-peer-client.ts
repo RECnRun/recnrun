@@ -5,7 +5,9 @@ import type { PeerClient } from "@/views/peer-client";
 
 const ALICE = { profileId: "11111111-1111-4111-8111-111111111111", displayName: "Alice" };
 const BOB = { profileId: "22222222-2222-4222-8222-222222222222", displayName: "Bob" };
+const CAROL = { profileId: "33333333-3333-4333-8333-333333333333", displayName: "Carol" };
 export const BOB_ID = BOB.profileId;
+export const CAROL_ID = CAROL.profileId;
 
 type Link = PeerEntry["link"];
 
@@ -29,7 +31,17 @@ export function statusOf(state?: Link["state"], verified = state === "connected"
 /** Changes Bob's entry in `status`. */
 const withBob = (status: PeerStatus, change: (bob: PeerEntry) => PeerEntry): PeerStatus => ({
   ...status,
-  peers: status.peers.map(change),
+  peers: status.peers.map((each) => (each.peer.profileId === BOB_ID ? change(each) : each)),
+});
+
+/** `status`, also paired with Carol, whose link is verified unless `link` says otherwise. */
+export const withCarol = (
+  status: PeerStatus,
+  link: Link = { state: "connected", verified: true },
+  peerSession: PeerEntry["peerSession"] = null,
+): PeerStatus => ({
+  ...status,
+  peers: [...status.peers, { peer: { ...CAROL, fingerprint: "12:34:56" }, link, peerSession }],
 });
 
 /** Bob's session as Alice last heard of it. */

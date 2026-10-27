@@ -5,6 +5,7 @@ import type { PeerServices } from "@/views/remote-peer";
 import { useState } from "preact/hooks";
 import { linkText } from "@/views/link-label";
 import { anyLinked, peerViews } from "@/views/peer-view";
+import type { PeerView } from "@/views/peer-view";
 import { useAction } from "@/views/use-peer";
 import type { Action } from "@/views/use-peer";
 
@@ -43,18 +44,18 @@ interface FolderStep {
   pair?: { label: string; request: PeerRequest };
 }
 
-function waitOrPair(folderPairing: boolean, partner = "another profile"): FolderStep {
-  if (folderPairing) return { wait: `Waiting for ${partner} in the RECnRun folder…` };
-  return { pair: { label: "Pair with another profile", request: { type: "folder-pair" } } };
-}
-
 /** What the dashboard shows about the folder: a wait, or the one click pairing needs. */
 function folderStep(status: PeerStatus | undefined): FolderStep {
-  const view = status && peerViews(status)[0];
-  if (status?.folder !== "granted" || view?.link.verified) return {};
-  if (!view?.paused) return waitOrPair(status.folderPairing, view?.peer.displayName);
-  const peer = view.peer.profileId;
-  return { pair: { label: "Reconnect", request: { type: "reconnect", peer } } };
+  if (status?.folder !== "granted") return {};
+  if (status.paused.length > 0) {
+    return { pair: { label: "Pair with other profiles", request: { type: "pair-again" } } };
+  }
+  if (!status.folderPairing) {
+    return { pair: { label: "Pair with another profile", request: { type: "folder-pair" } } };
+  }
+  if (status.peers.length === 0)
+    return { wait: "Waiting for another profile in the RECnRun folder…" };
+  return {};
 }
 
 /** This profile's name, as the other profile's dashboard shows it. */
@@ -81,34 +82,60 @@ function ProfileName({ status, peers, action }: FolderPairingProps & { action: A
   );
 }
 
-/** The link in words, this profile's name, and what the user can do with the link. */
+type Ask = (request: PeerRequest) => () => void;
+
+/** One paired profile: its link in words, and what the user can do with that link. */
+function PeerLine({ view, ask, busy }: { view: PeerView; ask: Ask; busy: boolean }) {
+  const { peer, link, paused } = view;
+  const id = peer.profileId;
+  const waits = !link.verified && !paused && view.folder === "granted" && view.folderPairing;
+  return (
+    <li>
+      <p role="status">{linkText(view)}</p>
+      {waits && <p>Waiting for {peer.displayName} in the RECnRun folder…</p>}
+      <div class="pairing-actions">
+        {link.verified && (
+          <button type="button" disabled={busy} onClick={ask({ type: "disconnect", peer: id })}>
+            Disconnect
+          </button>
+        )}
+        {paused && !link.verified && (
+          <button type="button" disabled={busy} onClick={ask({ type: "reconnect", peer: id })}>
+            Reconnect
+          </button>
+        )}
+        <button type="button" disabled={busy} onClick={ask({ type: "forget", peer: id })}>
+          Forget {peer.displayName}
+        </button>
+      </div>
+    </li>
+  );
+}
+
+/** Each link in words, this profile's name, and what the user can do with the links. */
 export function PairingSection({ peers, status }: FolderPairingProps) {
   const action = useAction();
-  const ask = (request: PeerRequest) => () =>
+  const ask: Ask = (request) => () =>
     void action.run(() => peers.client.ask(request, v.unknown()).then(() => {}));
   const step = folderStep(status);
-  const view = status && peerViews(status)[0];
-  const peer = view?.peer.profileId;
+  const views = status ? peerViews(status) : [];
   return (
     <section class="pairing-section" aria-labelledby="pairing-heading">
       <h3 id="pairing-heading">Pairing</h3>
-      <p role="status">{linkText(status)}</p>
+      {views.length === 0 && <p role="status">{status ? "Not paired" : "Loading"}</p>}
+      {views.length > 0 && (
+        <ul class="peer-lines">
+          {views.map((view) => (
+            <PeerLine key={view.peer.profileId} view={view} ask={ask} busy={action.busy} />
+          ))}
+        </ul>
+      )}
       {status && <ProfileName peers={peers} status={status} action={action} />}
       <div class="pairing-actions">
         {step.wait && <p>{step.wait}</p>}
         {step.pair && (
           <button type="button" disabled={action.busy} onClick={ask(step.pair.request)}>
             {step.pair.label}
-          </button>
-        )}
-        {peer && view.link.verified && (
-          <button type="button" disabled={action.busy} onClick={ask({ type: "disconnect", peer })}>
-            Disconnect
-          </button>
-        )}
-        {peer && (
-          <button type="button" disabled={action.busy} onClick={ask({ type: "forget", peer })}>
-            Forget {view.peer.displayName}
           </button>
         )}
       </div>

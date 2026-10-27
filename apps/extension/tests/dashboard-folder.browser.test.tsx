@@ -16,6 +16,7 @@ function mount(status: PeerStatus, answers: Parameters<typeof fakePeerClient>[1]
   const peers: PeerServices = {
     client: peer.client,
     tabsOf: () => fakeTabs({ tabs: [] }).source,
+    recordingsOf: () => memoryRecordingStore(),
     recordings: memoryRecordingStore(),
     sessionTabs: fakeTabs({ tabs: [] }).source,
     openFolder: async () => void opened.folder++,
@@ -102,6 +103,8 @@ test("the pairing section says how the link stands, and renames this profile", a
   await expect
     .poll(() => peer.asked("rename"))
     .toEqual([{ type: "rename", displayName: "Alice at work" }]);
+  show(statusOf("connected", false));
+  expect(pairingText(root)).toBe("Checking Bob");
   show(statusOf("connected"));
   expect(pairingText(root)).toBe("Connected — Bob");
   show(closedFor("disconnected", "closed-by-peer"));
