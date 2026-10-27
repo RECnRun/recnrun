@@ -127,9 +127,9 @@ test("a profile that quits drops the link, and after a restart reconnects as its
   await pair(profileA, profileB, native);
   const pinned = await pinnedPeer(profileA);
   await profileB.context.close();
-  // No close message comes from a browser that quits; ICE consent checks find it gone.
+  // No close message comes from a browser that quits; its heartbeat stops, well before ICE gives up.
   await expect(linkStatus(profileA)).toHaveText(/^(Disconnected|Not reachable) — Profile B$/, {
-    timeout: 45_000,
+    timeout: 5_000,
   });
 
   // Chrome kept neither folder grant past its folder window (H2), so both allow it again.

@@ -24,7 +24,16 @@ interface LinkOptions {
   certificate?: RTCCertificate;
   /** Host candidates gather in milliseconds; this bounds a stalled gathering. */
   gatherTimeoutMs?: number;
+  /** How often an open channel beats, so the peer can tell a browser that quit. */
+  heartbeatMs?: number;
+  /** Silence after which the peer counts as gone, well before ICE consent checks give up. */
+  silenceMs?: number;
 }
+
+type Liveness = Required<Pick<LinkOptions, "heartbeatMs" | "silenceMs">>;
+
+// Binary, so the peer counts it as life and never forwards it to the background.
+const HEARTBEAT = new Uint8Array([0]);
 
 function gathered(pc: RTCPeerConnection, timeoutMs: number): Promise<void> {
   return new Promise((resolve) => {
@@ -61,6 +70,23 @@ function watchConnection(pc: RTCPeerConnection, tracker: Tracker, isCurrent: () 
   });
 }
 
+/** Beats while the channel is open, and calls `silent` once nothing came from the peer for too long. */
+function keepAlive(
+  channel: RTCDataChannel,
+  { heartbeatMs, silenceMs }: Liveness,
+  silent: () => void,
+) {
+  let heard = Date.now();
+  channel.addEventListener("message", () => (heard = Date.now()));
+  const timer = setInterval(() => {
+    if (channel.readyState !== "open") clearInterval(timer);
+    else if (Date.now() - heard >= silenceMs) {
+      clearInterval(timer);
+      silent();
+    } else channel.send(HEARTBEAT);
+  }, heartbeatMs);
+}
+
 async function exportLocal(pc: RTCPeerConnection, timeoutMs: number): Promise<string> {
   await pc.setLocalDescription();
   await gathered(pc, timeoutMs);
@@ -70,12 +96,29 @@ async function exportLocal(pc: RTCPeerConnection, timeoutMs: number): Promise<st
 }
 
 /** The current connection and its channel; a fresh one closes the previous. */
-function createSlot(tracker: Tracker, events: PeerLinkEvents, certificate?: RTCCertificate) {
+function createSlot(
+  tracker: Tracker,
+  events: PeerLinkEvents,
+  liveness: Liveness,
+  certificate?: RTCCertificate,
+) {
   let pc: RTCPeerConnection | undefined;
   let channel: RTCDataChannel | undefined;
+  const close = () => {
+    channel?.close();
+    channel = undefined;
+    pc?.close();
+  };
   const adopt = (opened: RTCDataChannel) => {
     channel = opened;
-    opened.addEventListener("open", () => tracker.set("connected"));
+    opened.addEventListener("open", () => {
+      tracker.set("connected");
+      keepAlive(opened, liveness, () => {
+        if (channel !== opened) return;
+        close();
+        tracker.set("disconnected");
+      });
+    });
     opened.addEventListener("close", () => {
       if (channel === opened) tracker.set("disconnected");
     });
@@ -97,18 +140,13 @@ function createSlot(tracker: Tracker, events: PeerLinkEvents, certificate?: RTCC
     tracker.set("connecting");
     return next;
   };
-  const close = () => {
-    channel?.close();
-    channel = undefined;
-    pc?.close();
-  };
   return { adopt, fresh, close, pc: () => pc, channel: () => channel };
 }
 
 export function createPeerLink(events: PeerLinkEvents, options: LinkOptions = {}): PeerLink {
-  const { certificate, gatherTimeoutMs = 10_000 } = options;
+  const { certificate, gatherTimeoutMs = 10_000, heartbeatMs = 1_000, silenceMs = 2_500 } = options;
   const tracker = createTracker(events);
-  const slot = createSlot(tracker, events, certificate);
+  const slot = createSlot(tracker, events, { heartbeatMs, silenceMs }, certificate);
   const guarded = <T>(work: () => Promise<T>) =>
     work().catch((error: unknown) => {
       tracker.set("failed");

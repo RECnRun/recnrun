@@ -8,8 +8,13 @@ const CONNECT_MS = 15_000;
 const links: PeerLink[] = [];
 const P256: EcKeyGenParams = { name: "ECDSA", namedCurve: "P-256" };
 
+type Liveness = Pick<
+  NonNullable<Parameters<typeof createPeerLink>[1]>,
+  "heartbeatMs" | "silenceMs"
+>;
+
 /** A link whose frames and state changes are recorded. */
-async function side(withCertificate = true) {
+async function side(withCertificate = true, liveness: Liveness = {}) {
   const frames: string[] = [];
   const states: string[] = [];
   const certificate = withCertificate
@@ -17,7 +22,7 @@ async function side(withCertificate = true) {
     : undefined;
   const link = createPeerLink(
     { onFrame: (frame) => frames.push(frame), onState: (state) => states.push(state) },
-    { certificate },
+    { certificate, ...liveness },
   );
   links.push(link);
   return { link, frames, states, certificate };
@@ -107,6 +112,26 @@ describe("closing", () => {
     await vi.waitFor(() => expect(bob.link.state()).toBe("disconnected"), { timeout: CONNECT_MS });
     expect(alice.states).toEqual(["connecting", "connected", "connecting"]);
     expect(alice.link.send("old channel")).toBe(false);
+  });
+});
+
+describe("liveness", () => {
+  const quick = { heartbeatMs: 100, silenceMs: 400 };
+
+  test("keeps a link whose peer beats, and forwards no beat as a frame", async () => {
+    const [alice, bob] = [await side(true, quick), await side(true, quick)];
+    await pair(alice, bob);
+    await new Promise((resolve) => setTimeout(resolve, 1_000));
+    expect(alice.states).toEqual(["connecting", "connected"]);
+    expect(bob.states).toEqual(["connecting", "connected"]);
+    expect([...alice.frames, ...bob.frames]).toEqual([]);
+  });
+
+  test("drops a link whose peer went silent, as when its browser quits", async () => {
+    const [alice, bob] = [await side(true, quick), await side(true, { heartbeatMs: 60_000 })];
+    await pair(alice, bob);
+    await vi.waitFor(() => expect(alice.link.state()).toBe("disconnected"), { timeout: 2_000 });
+    expect(alice.link.send("late")).toBe(false);
   });
 });
 
