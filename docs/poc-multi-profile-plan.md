@@ -33,7 +33,7 @@ The user chose the per-peer pause and no cap on 2026-10-27.
 - **One session across all profiles.** While a session runs anywhere, no list offers Record, as with two profiles. The PiP window floats this profile's own session, or else the one it controls in whichever peer runs it.
 - **Disconnect and Forget per peer.** Disconnect closes the link to that peer and pauses it: the folder does not link with it again until **Reconnect** on that peer. Forget removes it and keeps it paused, so it does not pair again at once while it stays in the folder. **Pair with other profiles**, shown while any peer is paused, clears every pause. The alternative, Forget letting the profile pair again at once, makes Forget undo itself.
 - **No cap on N.** Tests cover three profiles. The folder is polled once a second whatever N is, and each link beats once a second.
-- **Joining later needs the folder.** Chrome ends the picker's grant with the extension's last top-level page (H2), so a profile already paired sees a newcomer only while it holds the folder: with "Allow on every visit", or after **Allow folder** in its banner. The dashboard already shows that banner while the grant is missing.
+- **Joining later needs the folder.** Chrome ends the picker's grant with the extension's last top-level page (H2), so a profile already paired sees a newcomer only while it holds the folder. This plan first assumed the dashboard's banner covered that; it does not, since the banner hides while any peer is linked, and a linked profile cannot get "Allow on every visit", because its links hold handles to the folder. The user chose (2026-10-27) a **Let another profile join** button in the Pairing section, shown while linked and without the grant, which opens the folder window.
 
 ## Tasks
 
@@ -116,9 +116,25 @@ The existing two-profile specs stay.
 
 `docs/ARCHITECTURE.md` (the POC section: storage keys, the link API, the mesh, the frame-to-connection check), `POC-CROSS-PROFILE-WEBRTC.md` (the mesh, clicks per case with three profiles, "Before production"), `docs/POCS.md`, `.claude/rules/extension.md` if its storage or messaging rules change (then confirm Codex loads it), and this plan's results.
 
+## Results
+
+All seven tasks landed, one commit each, and `vp run verify` exited 0 after each:
+
+| Task | Commit    | Notes                                                                                                                                                                                                                                                                          |
+| ---- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1    | `2ed42fd` | As planned                                                                                                                                                                                                                                                                     |
+| 2    | `e2de76f` | As planned                                                                                                                                                                                                                                                                     |
+| 3    | `b2f247b` | As planned                                                                                                                                                                                                                                                                     |
+| 4    | `7c0f9c5` | Unpausing now looks at the folder again at once: the answerer skipped the offer while paused, and the watch repeats an unchanged sighting only every 10 s, past the two-profile Reconnect test's timeout                                                                       |
+| 5    | `d1b62ff` | The PiP `session.browser` test was not added: the PiP across peers is covered by the `remote-peer` and `peer-client` tests                                                                                                                                                     |
+| 6    | `93fd8f5` | Needed more than the plan: the **Let another profile join** button; a folder window that waits until nobody in the folder is unlinked; signal files named per recipient; and a Reconnect that unpauses even without the grant. The red at task 5 stopped at the missing button |
+| 7    | this one  | Docs                                                                                                                                                                                                                                                                           |
+
+Clicks with three profiles, from the end-to-end tests: the first pairing costs each profile five, as before; a third profile joining costs it five and each linked profile three (**Let another profile join**, **Allow folder**, **Allow**); Reconnect after the grants ended costs one plus those three in each profile of the pair. Quitting a profile shows it down in the others within 5 s. The count in branded Chrome is the manual check below.
+
 ## Manual check for the user
 
-In three profiles of branded Chrome, choose the RECnRun folder in each. Count the clicks until each dashboard lists the other two. Then:
+In three profiles of branded Chrome, choose the RECnRun folder in two; once they link, click **Let another profile join** in both and allow the folder, then choose it in the third. Count the clicks until each dashboard lists the other two. Then:
 
 1. Disconnect one pair and Reconnect it.
 2. Quit one profile and time how long the other two take to show it down.
