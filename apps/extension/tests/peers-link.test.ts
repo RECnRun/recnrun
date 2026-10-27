@@ -4,6 +4,7 @@ import { NOT_CONNECTED } from "@/background/peer-channel";
 import { startPeers } from "@/background/peers";
 import {
   authorizedPeersRepository,
+  folderActedRepository,
   folderPairingRepository,
   identityRepository,
   peerLinksRepository,
@@ -48,10 +49,10 @@ describe("a new link", () => {
   test("verifies the accepted certificate, ends the folder's wait, and introduces this profile", async () => {
     const { connect, link } = await peerBackground();
     const pairingId = "44444444-4444-4444-8444-444444444444";
-    await folderPairingRepository.write({ acted: { pairingId, at: 5 } });
+    await folderActedRepository.set(PEER, { pairingId, at: 5 });
     await connect();
     expect(await peerLinksRepository.get(PEER)).toEqual({ state: "connected", verified: true });
-    expect(await folderPairingRepository.read()).toEqual({ acted: { pairingId, at: 0 } });
+    expect(await folderActedRepository.get(PEER)).toEqual({ pairingId, at: 0 });
     expect(link.frames()).toEqual([
       expect.objectContaining({
         type: "HELLO",

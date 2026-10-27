@@ -1,9 +1,9 @@
 import { describe, expect, test, vi } from "vite-plus/test";
-import { createFolderPairing, decideFolderStep } from "@/background/folder-pairing";
+import { createFolderPairing, decideFolderSteps } from "@/background/folder-pairing";
 import type { LinkCommand } from "@/messaging/peer-messages";
 import type { Presence, Seen, SignalFile } from "@/p2p/folder-rendezvous";
 import { PAIRING_TTL_MS, encodePairing } from "@/p2p/pairing-code";
-import type { FolderPairing, PeerLink, PendingOffer } from "@/storage/peer-repository";
+import type { FolderActed, FolderPairing, PeerLink, PendingOffer } from "@/storage/peer-repository";
 import { ME, PEER, STRANGER, memoryRecords, memoryRepository } from "./fake-peer";
 
 const NOW = 1_700_000_000_000;
@@ -54,76 +54,91 @@ const pendingFor = (to: string, expiresAt = NOW + 1000): PendingOffer => ({
 const situation = (me: string, sighting: Seen) => ({
   me,
   seen: sighting,
-  peers: [] as string[],
+  skip: [] as string[],
   pending: {} as Record<string, PendingOffer>,
-  state: {},
+  acted: {} as Record<string, FolderActed>,
   now: NOW,
 });
 
-describe("decideFolderStep", () => {
-  test("waits while no other profile is in the folder", () => {
-    expect(decideFolderStep(situation(ME, seen([])))).toEqual({ type: "wait" });
+describe("decideFolderSteps", () => {
+  test("does nothing while no other profile is in the folder", () => {
+    expect(decideFolderSteps(situation(ME, seen([])))).toEqual([]);
   });
 
-  test("offers to the profile that has waited longest, when this one's id is lower", () => {
+  test("offers to every profile in the folder whose id is higher", () => {
     const sighting = seen([presence(PEER, NOW - 10), presence(STRANGER, NOW - 20)]);
-    expect(decideFolderStep(situation(ME, sighting))).toEqual({
-      type: "offer",
-      to: presence(STRANGER, NOW - 20),
-    });
+    expect(decideFolderSteps(situation(ME, sighting))).toEqual([
+      { type: "offer", to: presence(PEER, NOW - 10) },
+      { type: "offer", to: presence(STRANGER, NOW - 20) },
+    ]);
   });
 
-  test("once a peer is pinned, pairs only with it", () => {
-    const older = presence(STRANGER, NOW - 50);
-    const pinned = { ...situation(ME, seen([older, presence(PEER)])), peers: [PEER] };
-    expect(decideFolderStep(pinned)).toEqual({ type: "offer", to: presence(PEER) });
-    expect(decideFolderStep({ ...pinned, seen: seen([older]) })).toEqual({ type: "wait" });
+  test("leaves alone the profiles it skips, as linked or paused", () => {
+    const sighting = seen([presence(PEER), presence(STRANGER)]);
+    const linked = { ...situation(ME, sighting), skip: [PEER] };
+    expect(decideFolderSteps(linked)).toEqual([{ type: "offer", to: presence(STRANGER) }]);
   });
 
   test("waits for the answer to its current offer, then connects with it", () => {
     const pending = { [PEER]: pendingFor(PEER) };
     const waiting = { ...situation(ME, seen([presence(PEER)])), pending };
-    expect(decideFolderStep(waiting)).toEqual({ type: "wait" });
+    expect(decideFolderSteps(waiting)).toEqual([]);
     const answer = signal("answer", PEER, ME);
     const answered = { ...waiting, seen: seen([presence(PEER)], [answer]) };
-    expect(decideFolderStep(answered)).toEqual({ type: "connect", answer });
+    expect(decideFolderSteps(answered)).toEqual([{ type: "connect", answer }]);
   });
 
-  test("offers again when its offer expired or was for another profile", () => {
+  test("offers again when its offer expired, and an offer to another profile does not count", () => {
     const sighting = seen([presence(PEER)]);
     const expired = { ...situation(ME, sighting), pending: { [PEER]: pendingFor(PEER, NOW) } };
-    expect(decideFolderStep(expired).type).toBe("offer");
+    expect(decideFolderSteps(expired)).toEqual([{ type: "offer", to: presence(PEER) }]);
     const elsewhere = { ...situation(ME, sighting), pending: { [STRANGER]: pendingFor(STRANGER) } };
-    expect(decideFolderStep(elsewhere).type).toBe("offer");
+    expect(decideFolderSteps(elsewhere)).toEqual([{ type: "offer", to: presence(PEER) }]);
   });
 
   test("answers an offer made for it when the other profile's id is lower", () => {
     const offer = signal("offer", PEER, STRANGER);
     const sighting = seen([presence(PEER)], [offer]);
-    expect(decideFolderStep(situation(STRANGER, sighting))).toEqual({ type: "answer", offer });
-    expect(decideFolderStep(situation(STRANGER, seen([presence(PEER)])))).toEqual({
-      type: "wait",
-    });
+    expect(decideFolderSteps(situation(STRANGER, sighting))).toEqual([{ type: "answer", offer }]);
+    expect(decideFolderSteps(situation(STRANGER, seen([presence(PEER)])))).toEqual([]);
+  });
+
+  test("answers B's offer and offers to D in the same sighting", () => {
+    // PEER sits between ME and STRANGER: it answers the lower id and offers to the higher.
+    const offer = signal("offer", ME, PEER);
+    const sighting = seen([presence(ME), presence(STRANGER)], [offer]);
+    expect(decideFolderSteps(situation(PEER, sighting))).toEqual([
+      { type: "answer", offer },
+      { type: "offer", to: presence(STRANGER) },
+    ]);
   });
 
   test("answers an offer once, and a newer one at once, since the offerer gave up the last", () => {
     const offer = signal("offer", PEER, STRANGER);
     const sighting = seen([presence(PEER)], [offer]);
-    const acted = { pairingId: OFFER_ID, at: NOW - 1 };
-    const answered = { ...situation(STRANGER, sighting), state: { acted } };
-    expect(decideFolderStep(answered)).toEqual({ type: "wait" });
+    const acted = { [PEER]: { pairingId: OFFER_ID, at: NOW - 1 } };
+    const answered = { ...situation(STRANGER, sighting), acted };
+    expect(decideFolderSteps(answered)).toEqual([]);
     const newer = signal("offer", PEER, STRANGER, { pairingId: OTHER_ID });
     const again = { ...answered, seen: seen([presence(PEER)], [newer]) };
-    expect(decideFolderStep(again)).toEqual({ type: "answer", offer: newer });
+    expect(decideFolderSteps(again)).toEqual([{ type: "answer", offer: newer }]);
   });
 
   test("gives the link time after connecting before it offers again", () => {
     const sighting = seen([presence(PEER)]);
-    const acted = { pairingId: OFFER_ID, at: NOW - 29_999 };
-    const connected = { ...situation(ME, sighting), state: { acted } };
-    expect(decideFolderStep(connected)).toEqual({ type: "wait" });
-    const later = { ...connected, state: { acted: { ...acted, at: NOW - 30_000 } } };
-    expect(decideFolderStep(later)).toEqual({ type: "offer", to: presence(PEER) });
+    const acted = { [PEER]: { pairingId: OFFER_ID, at: NOW - 29_999 } };
+    const connected = { ...situation(ME, sighting), acted };
+    expect(decideFolderSteps(connected)).toEqual([]);
+    const later = { ...connected, acted: { [PEER]: { pairingId: OFFER_ID, at: NOW - 30_000 } } };
+    expect(decideFolderSteps(later)).toEqual([{ type: "offer", to: presence(PEER) }]);
+  });
+
+  test("the retry for one pair does not hold back another", () => {
+    const sighting = seen([presence(PEER), presence(STRANGER)]);
+    const acted = { [PEER]: { pairingId: OFFER_ID, at: NOW - 1 } };
+    expect(decideFolderSteps({ ...situation(ME, sighting), acted })).toEqual([
+      { type: "offer", to: presence(STRANGER) },
+    ]);
   });
 
   test.each([
@@ -134,19 +149,21 @@ describe("decideFolderStep", () => {
     const answer = signal("answer", PEER, ME, options);
     const pending = { [PEER]: pendingFor(PEER) };
     const answered = { ...situation(ME, seen([presence(PEER)], [answer])), pending };
-    expect(decideFolderStep(answered)).toEqual({ type: "wait" });
+    expect(decideFolderSteps(answered)).toEqual([]);
   });
 
   test("ignores a signal whose code is another kind than its file", () => {
     const offer = { ...signal("answer", PEER, STRANGER), kind: "offer" as const };
-    expect(decideFolderStep(situation(STRANGER, seen([presence(PEER)], [offer])))).toEqual({
-      type: "wait",
-    });
+    expect(decideFolderSteps(situation(STRANGER, seen([presence(PEER)], [offer])))).toEqual([]);
   });
 });
 
 /** The background's folder pairing over fakes, as profile `me`, whose link is idle. */
-function folderPairing(initial: FolderPairing | null = {}, me = ME) {
+function folderPairing(
+  initial: FolderPairing | null = {},
+  me = ME,
+  initialActed: Record<string, FolderActed> = {},
+) {
   const commands: LinkCommand[] = [];
   const askLink = vi.fn(async (command: LinkCommand) => void commands.push(command));
   const pending = memoryRecords<PendingOffer>();
@@ -160,20 +177,21 @@ function folderPairing(initial: FolderPairing | null = {}, me = ME) {
     accept: vi.fn(async (_code: string): Promise<{ code?: string }> => ({ code: answer.code })),
   };
   const state = memoryRepository<FolderPairing>(initial);
+  const acted = memoryRecords<FolderActed>(initialActed);
   const link = memoryRecords<PeerLink>();
   const log = vi.fn();
   const flow = createFolderPairing({
     askLink,
     identity: async () => ({ profileId: me, displayName: "Laptop" }),
     pairing,
-    authorized: memoryRecords(),
     pending,
     link,
+    acted,
     state,
     log,
     now: () => NOW,
   });
-  return { flow, commands, pairing, state, link, pending, log, offer, answer };
+  return { flow, commands, pairing, state, acted, link, pending, log, offer, answer };
 }
 
 describe("createFolderPairing", () => {
@@ -197,29 +215,32 @@ describe("createFolderPairing", () => {
   });
 
   test("answers an offer, publishing the answer for the offerer", async () => {
-    const { flow, commands, pairing, state, answer } = folderPairing({}, STRANGER);
+    const { flow, commands, pairing, acted, answer } = folderPairing({}, STRANGER);
     const made = signal("offer", PEER, STRANGER);
     await flow.seen(seen([presence(PEER)], [made]));
     expect(pairing.accept).toHaveBeenCalledWith(made.code);
     expect(commands).toEqual([{ type: "folder-publish", signal: answer }]);
-    expect(await state.read()).toEqual({ acted: { pairingId: OFFER_ID, at: NOW } });
+    expect(await acted.all()).toEqual({ [PEER]: { pairingId: OFFER_ID, at: NOW } });
   });
 
   test("connects with the answer to its offer", async () => {
-    const { flow, commands, pairing, state, pending } = folderPairing();
+    const { flow, commands, pairing, acted, pending } = folderPairing();
     await pending.set(PEER, pendingFor(PEER));
     const answer = signal("answer", PEER, ME);
     await flow.seen(seen([presence(PEER)], [answer]));
     expect(pairing.accept).toHaveBeenCalledWith(answer.code);
     expect(commands).toEqual([]);
-    expect(await state.read()).toEqual({ acted: { pairingId: OFFER_ID, at: NOW } });
+    expect(await acted.all()).toEqual({ [PEER]: { pairingId: OFFER_ID, at: NOW } });
   });
 
   test("offers again at once when a link that came up drops, with no wait for it", async () => {
-    const { flow, pairing } = folderPairing({ acted: { pairingId: OFFER_ID, at: NOW } });
+    const { flow, pairing } = folderPairing({}, ME, { [PEER]: { pairingId: OFFER_ID, at: NOW } });
     await flow.seen(seen([presence(PEER)]));
     expect(pairing.createOffer).not.toHaveBeenCalled();
-    await flow.linked();
+    await flow.linked(STRANGER);
+    await flow.seen(seen([presence(PEER)]));
+    expect(pairing.createOffer).not.toHaveBeenCalled();
+    await flow.linked(PEER);
     await flow.seen(seen([presence(PEER)]));
     expect(pairing.createOffer).toHaveBeenCalledWith(PEER);
   });
@@ -231,10 +252,25 @@ describe("createFolderPairing", () => {
     const { flow, commands, state, link, pairing } = folderPairing();
     await link.set(PEER, { state: "connected", verified: true });
     await flow.seen(seen([presence(PEER)]));
-    // The presence stays in the folder, so the pinned peer finds this profile after a restart.
+    // The presence stays in the folder, so the peer finds this profile after a restart.
     expect(await state.read()).toEqual({});
     expect(commands).toEqual([]);
     expect(pairing.createOffer).not.toHaveBeenCalled();
+  });
+
+  test("offers to C while linked to B", async () => {
+    const { flow, pairing, link } = folderPairing();
+    await link.set(PEER, { state: "connected", verified: true });
+    await flow.seen(seen([presence(PEER), presence(STRANGER)]));
+    expect(pairing.createOffer.mock.calls).toEqual([[STRANGER]]);
+  });
+
+  test("a step that fails leaves the others in the same sighting", async () => {
+    const { flow, pairing, log } = folderPairing();
+    pairing.createOffer.mockRejectedValueOnce(new Error("No link."));
+    await flow.seen(seen([presence(PEER), presence(STRANGER)]));
+    expect(log).toHaveBeenCalledWith("folder pairing: No link.");
+    expect(pairing.createOffer.mock.calls).toEqual([[PEER], [STRANGER]]);
   });
 
   test("logs a step that fails, and handles the next sighting", async () => {

@@ -1,5 +1,5 @@
 import { expect, test } from "vite-plus/test";
-import { decideFolderStep } from "@/background/folder-pairing";
+import { decideFolderSteps } from "@/background/folder-pairing";
 import { PRESENCE_TTL_MS, folderRendezvous, signalFileOf } from "@/p2p/folder-rendezvous";
 import type { Presence, Seen, SignalFile } from "@/p2p/folder-rendezvous";
 import { PAIRING_TTL_MS, encodePairing } from "@/p2p/pairing-code";
@@ -33,14 +33,14 @@ const signalOf = (kind: SignalFile["kind"], from: string, to: string) =>
 
 /** What profile `me` does about what it sees, as a profile that has done nothing yet. */
 const step = (me: string, seen: Seen, pending: { to: string } | null = null) =>
-  decideFolderStep({
+  decideFolderSteps({
     me,
     seen,
-    peers: [],
+    skip: [],
     pending: pending
       ? { [pending.to]: { ...pending, pairingId: PAIRING, expiresAt: Date.now() + 60_000 } }
       : {},
-    state: {},
+    acted: {},
     now: Date.now(),
   });
 
@@ -64,13 +64,13 @@ test("two profiles in one real folder find each other and cross an offer and an 
   await b.announce(presence(B));
 
   const offer = signalOf("offer", A, B);
-  expect(step(A, await a.look())).toMatchObject({ type: "offer", to: { profileId: B } });
+  expect(step(A, await a.look())).toMatchObject([{ type: "offer", to: { profileId: B } }]);
   await a.publish(offer);
-  expect(step(B, await b.look())).toEqual({ type: "answer", offer });
+  expect(step(B, await b.look())).toEqual([{ type: "answer", offer }]);
 
   const answer = signalOf("answer", B, A);
   await b.publish(answer);
-  expect(step(A, await a.look(), { to: B })).toEqual({ type: "connect", answer });
+  expect(step(A, await a.look(), { to: B })).toEqual([{ type: "connect", answer }]);
   // B never sees its own answer, nor A the offer it made.
   expect((await b.look()).signals).toEqual([offer]);
 

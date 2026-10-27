@@ -2,6 +2,7 @@ import { beforeEach, expect, test, vi } from "vite-plus/test";
 import { fakeBrowser } from "wxt/testing/fake-browser";
 import {
   authorizedPeersRepository,
+  folderPairingRepository,
   identityRepository,
   peerLinksRepository,
   readIdentity,
@@ -65,6 +66,12 @@ test("keeps each peer's link in session storage, and goes on after a failed writ
   expect(await fakeBrowser.storage.session.get("peerLinks")).toEqual({
     peerLinks: { [WORK.profileId]: link },
   });
+});
+
+test("reads an older build's folder pairing, whose fields it no longer keeps", async () => {
+  const acted = { pairingId: "44444444-4444-4444-8444-444444444444", at: 5 };
+  await fakeBrowser.storage.local.set({ folderPairing: { acted } });
+  expect(await folderPairingRepository.read()).toEqual({});
 });
 
 test("rejects a stored value that does not match its schema, and leaves it", async () => {

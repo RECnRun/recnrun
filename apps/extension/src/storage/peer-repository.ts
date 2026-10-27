@@ -25,14 +25,17 @@ const PendingOfferSchema = v.strictObject({
 export type PendingOffer = v.InferOutput<typeof PendingOfferSchema>;
 
 /**
- * Present while this profile pairs through the folder, paired or not, so the pinned peer
- * reconnects on its own; `acted` is its last answer or accepted answer.
+ * Present while this profile pairs through the folder, paired or not, so its peers reconnect on
+ * their own. Not strict: an older build's fields are dropped instead of refused.
  */
-const FolderPairingSchema = v.strictObject({
-  acted: v.optional(v.strictObject({ pairingId: PairingIdSchema, at: v.number() })),
-});
+const FolderPairingSchema = v.object({});
 
 export type FolderPairing = v.InferOutput<typeof FolderPairingSchema>;
+
+/** This profile's last answer, or accepted answer, with one peer in the folder. */
+const FolderActedSchema = v.strictObject({ pairingId: PairingIdSchema, at: v.number() });
+
+export type FolderActed = v.InferOutput<typeof FolderActedSchema>;
 
 /**
  * On the controller: its copy of the session the peer runs, written only from the peer's reports.
@@ -104,6 +107,7 @@ export const folderPairingRepository = repository("local:folderPairing", FolderP
 // Session storage ends with the browser, as the link and anything it carried do.
 export const peerLinksRepository = peerRecords("session:peerLinks", PeerLinkSchema);
 export const pendingOffersRepository = peerRecords("session:pendingOffers", PendingOfferSchema);
+export const folderActedRepository = peerRecords("session:folderActed", FolderActedSchema);
 export const remoteRecordingsRepository = peerRecords(
   "session:remoteRecordings",
   RemoteRecordingSchema,

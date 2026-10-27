@@ -5,7 +5,7 @@ import { signalFileOf } from "@/p2p/folder-rendezvous";
 import type { Presence, Seen, SignalFile } from "@/p2p/folder-rendezvous";
 import { decodePairing, fingerprintOf } from "@/p2p/pairing-code";
 import type {
-  AuthorizedPeer,
+  FolderActed,
   FolderPairing,
   PeerLink,
   PeerRecords,
@@ -14,25 +14,22 @@ import type {
   Repository,
 } from "@/storage/peer-repository";
 
-/** How long the link gets to come up after the offerer connected, before it offers again. */
+/** How long a link gets to come up after the offerer connected, before it offers again. */
 const RETRY_MS = 30_000;
 
 export type FolderStep =
-  | { type: "wait" }
   | { type: "offer"; to: Presence }
   | { type: "answer"; offer: SignalFile }
   | { type: "connect"; answer: SignalFile };
 
-const WAIT: FolderStep = { type: "wait" };
-
 interface Situation {
   me: string;
   seen: Seen;
-  /** The pinned peers: once there is one, no other presence counts. */
-  peers: string[];
+  /** Profiles to leave alone: linked already, or paused by the user. */
+  skip: string[];
   /** This profile's offers waiting for an answer, by the profile each is for. */
   pending: Record<string, PendingOffer>;
-  state: FolderPairing;
+  acted: Record<string, FolderActed>;
   now: number;
 }
 
@@ -48,50 +45,48 @@ function vouched(signal: SignalFile, partner: Presence, now: number): boolean {
   }
 }
 
-/** The one profile to pair with: the one that has waited longest, among the pinned peers if any. */
-function partnerOf(presences: Presence[], peers: string[]): Presence | undefined {
-  const pinned = presences.filter(({ profileId }) => peers.includes(profileId));
-  const oldest = (a: Presence, b: Presence) =>
-    a.createdAt - b.createdAt || a.profileId.localeCompare(b.profileId);
-  return (peers.length > 0 ? pinned : presences).toSorted(oldest)[0];
-}
-
 function offererStep(partner: Presence, signals: SignalFile[], situation: Situation) {
-  const { state, now } = situation;
+  const { now } = situation;
+  const acted = situation.acted[partner.profileId];
   const pending = situation.pending[partner.profileId];
-  if (state.acted && now - state.acted.at < RETRY_MS) return WAIT;
-  if (pending?.to !== partner.profileId || pending.expiresAt <= now)
-    return { type: "offer", to: partner } as const;
+  if (acted && now - acted.at < RETRY_MS) return undefined;
+  if (!pending || pending.expiresAt <= now) return { type: "offer", to: partner } as const;
   const answer = signals.find(
     (each) => each.kind === "answer" && each.pairingId === pending.pairingId,
   );
-  return answer ? ({ type: "connect", answer } as const) : WAIT;
+  return answer && ({ type: "connect", answer } as const);
+}
+
+/** The next step with one partner, if there is one now. */
+function stepWith(partner: Presence, situation: Situation): FolderStep | undefined {
+  const { me, seen, now } = situation;
+  const signals = seen.signals.filter((each) => vouched(each, partner, now));
+  if (me < partner.profileId) return offererStep(partner, signals, situation);
+  const acted = situation.acted[partner.profileId];
+  const offer = signals.find(
+    (each) => each.kind === "offer" && each.pairingId !== acted?.pairingId,
+  );
+  return offer && { type: "answer", offer };
 }
 
 /**
- * What this profile does next in the folder: the lower profile id offers to its partner and
- * connects with the answer; the other answers each new offer at once, since the offerer makes
- * one only when it gave up the last. Nobody clicks, since the folder is the consent.
+ * What this profile does next with each profile in the folder: of each pair, the lower profile id
+ * offers and connects with the answer; the other answers each new offer at once, since the
+ * offerer makes one only when it gave up the last. Nobody clicks, since the folder is the consent.
  */
-export function decideFolderStep(situation: Situation): FolderStep {
-  const { me, seen, peers, state, now } = situation;
-  const partner = partnerOf(seen.presences, peers);
-  if (!partner) return WAIT;
-  const signals = seen.signals.filter((each) => vouched(each, partner, now));
-  if (me < partner.profileId) return offererStep(partner, signals, situation);
-  const offer = signals.find(
-    (each) => each.kind === "offer" && each.pairingId !== state.acted?.pairingId,
-  );
-  return offer ? { type: "answer", offer } : WAIT;
+export function decideFolderSteps(situation: Situation): FolderStep[] {
+  return situation.seen.presences
+    .filter(({ profileId }) => !situation.skip.includes(profileId))
+    .flatMap((partner) => stepWith(partner, situation) ?? []);
 }
 
 export interface FolderPairingDependencies {
   askLink: (command: LinkCommand) => Promise<unknown>;
   identity: () => Promise<ProfileIdentity>;
   pairing: Pick<PairingFlow, "createOffer" | "accept">;
-  authorized: Pick<PeerRecords<AuthorizedPeer>, "all">;
   pending: Pick<PeerRecords<PendingOffer>, "all">;
   link: Pick<PeerRecords<PeerLink>, "all">;
+  acted: Pick<PeerRecords<FolderActed>, "all" | "get" | "set">;
   state: Pick<Repository<FolderPairing>, "read" | "write">;
   log: (entry: string) => void;
   now?: () => number;
@@ -101,17 +96,18 @@ export interface FolderPairingDependencies {
 async function act(deps: FolderPairingDependencies, step: FolderStep, now: () => number) {
   const publish = (code: string, to: string) =>
     deps.askLink({ type: "folder-publish", signal: signalFileOf(code, to, now()) });
-  const acted = (pairingId: string) => deps.state.write({ acted: { pairingId, at: now() } });
+  const acted = ({ profileId, pairingId }: SignalFile) =>
+    deps.acted.set(profileId, { pairingId, at: now() });
   if (step.type === "offer") {
     const { code } = await deps.pairing.createOffer(step.to.profileId);
     await publish(code, step.to.profileId);
   } else if (step.type === "answer") {
     const { code } = await deps.pairing.accept(step.offer.code);
-    await acted(step.offer.pairingId);
+    await acted(step.offer);
     if (code) await publish(code, step.offer.profileId);
-  } else if (step.type === "connect") {
+  } else {
     await deps.pairing.accept(step.answer.code);
-    await acted(step.answer.pairingId);
+    await acted(step.answer);
   }
 }
 
@@ -127,19 +123,23 @@ export function createFolderPairing(deps: FolderPairingDependencies) {
     await deps.state.write(null);
     await deps.askLink({ type: "folder-stop" });
   };
+  const failed = (error: unknown) => deps.log(`folder pairing: ${errorMessage(error)}`);
   const handle = async (seen: Seen) => {
-    const state = await deps.state.read();
-    // A verified link needs nothing; the presence stays, so the peer finds this one again.
-    const links = Object.values(await deps.link.all());
-    if (!state || links.some((link) => link.verified)) return;
-    const [me, authorized, pending] = await Promise.all([
+    if (!(await deps.state.read())) return;
+    const [me, links, pending, acted] = await Promise.all([
       deps.identity(),
-      deps.authorized.all(),
+      deps.link.all(),
       deps.pending.all(),
+      deps.acted.all(),
     ]);
-    const peers = Object.keys(authorized);
-    const step = decideFolderStep({ me: me.profileId, seen, peers, pending, state, now: now() });
-    await act(deps, step, now);
+    // A verified link needs nothing; the presence stays, so the peer finds this one again.
+    const skip = Object.keys(links).filter((peer) => links[peer]?.verified);
+    const steps = decideFolderSteps({ me: me.profileId, seen, skip, pending, acted, now: now() });
+    // One step at a time, so two never offer at once; one that fails leaves the others theirs.
+    await steps.reduce(
+      (done, step) => done.then(() => act(deps, step, now).catch(failed)),
+      Promise.resolve(),
+    );
   };
   return {
     /** Waits in the folder for another profile, and stays to reconnect once paired. */
@@ -153,17 +153,15 @@ export function createFolderPairing(deps: FolderPairingDependencies) {
     },
     /** Stops pairing through the folder, as the user disconnects or forgets the peer. */
     stop,
-    /** The link came up, so the attempt it waited for is over: a later drop needs no wait. */
-    linked: async () => {
-      const { acted } = (await deps.state.read()) ?? {};
+    /** The link to `peer` came up, so the attempt it waited for is over: a later drop needs no wait. */
+    linked: async (peer: string) => {
+      const acted = await deps.acted.get(peer);
       // The pairing id stays, so an offer already answered is not answered again.
-      if (acted) await deps.state.write({ acted: { ...acted, at: 0 } });
+      if (acted) await deps.acted.set(peer, { ...acted, at: 0 });
     },
     /** One sighting at a time, so two in a row never both offer. */
     seen: (seen: Seen) => {
-      queue = queue
-        .then(() => handle(seen))
-        .catch((error: unknown) => deps.log(`folder pairing: ${errorMessage(error)}`));
+      queue = queue.then(() => handle(seen)).catch(failed);
       return queue;
     },
   };

@@ -18,6 +18,7 @@ import { FolderAccessSchema } from "@/messaging/peer-results";
 import type { PeerMessage, PeerPayload, PeerType, SharedTabs } from "@/p2p/protocol";
 import {
   authorizedPeersRepository,
+  folderActedRepository,
   folderPairingRepository,
   identityRepository,
   peerLinksRepository,
@@ -116,7 +117,7 @@ async function linkUp(event: StateEvent, channel: PeerChannel, folder: FolderPai
     return;
   }
   await peerLinksRepository.set(event.peer, { state: "connected", verified: true });
-  await folder.linked();
+  await folder.linked(event.peer);
   await hello(channel, event.peer);
   notifyPages();
 }
@@ -257,9 +258,9 @@ function createFolder(): FolderPairingFlow {
     askLink,
     identity: readIdentity,
     pairing,
-    authorized: authorizedPeersRepository,
     pending: pendingOffersRepository,
     link: peerLinksRepository,
+    acted: folderActedRepository,
     state: folderPairingRepository,
     log,
   });
