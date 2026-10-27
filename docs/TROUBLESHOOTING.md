@@ -45,3 +45,11 @@ git -c credential.helper= -c 'credential.helper=!gh auth git-credential' push ht
 **Cause.** A's Disconnect sends `BYE` and closes the channel, so B's offscreen document reports the frame and then the close, back to back. The background handled each link event as it arrived, without waiting for the previous one; when the close was written first, the link was no longer verified, and `peer-channel.ts` dropped the `BYE` as coming from an unauthorized peer.
 
 **Solution.** `createLinkHandler` in `background/peers.ts` runs link events one after the other, in arrival order. `peers-link.test.ts` "a BYE keeps its reason when the channel's close arrives right behind it" delays the first storage read to reproduce the race.
+
+## Profiles stay "Connecting" for about 35 s before they reconnect (solved)
+
+**Symptom.** After **Reconnect**, or after a restart, both dashboards said "Waiting for <name> in the RECnRun folder…" for about 35 s, though both presences were fresh in `pairing/`.
+
+**Cause.** `background/folder-pairing.ts` waited `RETRY_MS` (30 s) after each answer or connect before acting again, on both sides, to give the link time to come up. Two cases hit it with nothing in flight: the offerer's last offer stays in the folder until it expires, so the answerer, starting to wait again, answered that stale offer and then ignored the offerer's new one for 30 s; and the offerer counted its 30 s from the connect of the link that had just dropped.
+
+**Solution.** The answerer answers each new offer at once, since a new offer means the offerer gave up the last; it still answers a pairing id only once. Once a link comes up, `linked()` sets the attempt's time to zero, so a later drop needs no wait. The 30 s now holds only while an offerer's attempt has not come up. `folder-pairing.spec.ts` "profiles that both allowed the folder on every visit…" disconnects, reconnects, and expects the link within 10 s.

@@ -14,6 +14,7 @@ import { test } from "./fixtures/native-dialogs.ts";
 import type { Native } from "./fixtures/native-dialogs.ts";
 import { linkStatus, pairingSection, reopen } from "./fixtures/profiles.ts";
 import type { Profile } from "./fixtures/profiles.ts";
+import { clickInDashboard } from "./fixtures/session.ts";
 
 /*
  * Both profiles choose one real folder on the container's disk through Chrome's own picker
@@ -106,7 +107,7 @@ test("a folder window closed before pairing brings the banner back, and allowing
   await expect(folderBanner(profileA.dashboard)).toHaveCount(0);
 });
 
-test("profiles that both allowed the folder on every visit keep it with no page open, and reconnect with no click after a restart", async ({
+test("profiles that both allowed the folder on every visit keep it with no page open, reconnect with no click after a restart, and within seconds after a Disconnect", async ({
   profileA,
   profileB,
   native,
@@ -128,6 +129,18 @@ test("profiles that both allowed the folder on every visit keep it with no page 
   const again = await restart(b, a, launch);
   await connected(a, again);
   expect(extensionPages(again)).toEqual([]);
+
+  // The lower profile id offers, and its last offer is still in the folder when the other,
+  // which answers, disconnects and reconnects.
+  const [offerer, answerer] = (await profileIdOf(a)) < idB ? [a, again] : [again, a];
+  const click = (name: string) =>
+    clickInDashboard(pairingSection(answerer.dashboard).getByRole("button", { name }));
+  await click("Disconnect");
+  await expect(linkStatus(offerer)).toHaveText(`Disconnected by ${answerer.name}`);
+  await click("Reconnect");
+  await expect(linkStatus(answerer)).toHaveText(`Connected — ${offerer.name}`, {
+    timeout: 10_000,
+  });
 });
 
 test("a profile stays unpaired when the user cancels the picker or Chrome may not edit the folder", async ({

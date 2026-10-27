@@ -101,7 +101,11 @@ async function linkDown(state: LinkState, channel: PeerChannel) {
   notifyPages();
 }
 
-async function linkUp(remoteFingerprint: string | undefined, channel: PeerChannel) {
+async function linkUp(
+  remoteFingerprint: string | undefined,
+  channel: PeerChannel,
+  folder: FolderPairingFlow,
+) {
   const peer = await authorizedPeerRepository.read();
   // DTLS proved the other side holds this certificate; only the one the user accepted may talk.
   if (!peer || remoteFingerprint !== peer.fingerprint) {
@@ -111,6 +115,7 @@ async function linkUp(remoteFingerprint: string | undefined, channel: PeerChanne
     return;
   }
   await peerLinkRepository.write({ state: "connected", verified: true });
+  await folder.linked();
   await hello(channel);
   notifyPages();
 }
@@ -149,7 +154,7 @@ function createLinkHandler(
   const handle = async (event: LinkEvent) => {
     if (event.type === "frame") return onFrame(event.frame);
     if (event.type === "folder") return folder.seen(event);
-    if (event.state === "connected") return linkUp(event.remoteFingerprint, channel);
+    if (event.state === "connected") return linkUp(event.remoteFingerprint, channel, folder);
     if (event.state !== "connecting") return linkDown(event.state, channel);
     await peerLinkRepository.write({ state: "connecting", verified: false });
     notifyPages();

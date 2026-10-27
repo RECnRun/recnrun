@@ -42,10 +42,13 @@ describe("a new link", () => {
     expect(link.commands).toEqual([{ type: "close" }]);
   });
 
-  test("verifies the accepted certificate and introduces this profile", async () => {
+  test("verifies the accepted certificate, ends the folder's wait, and introduces this profile", async () => {
     const { connect, link } = await peerBackground();
+    const pairingId = "44444444-4444-4444-8444-444444444444";
+    await folderPairingRepository.write({ acted: { pairingId, at: 5 } });
     await connect();
     expect(await peerLinkRepository.read()).toEqual({ state: "connected", verified: true });
+    expect(await folderPairingRepository.read()).toEqual({ acted: { pairingId, at: 0 } });
     expect(link.frames()).toEqual([
       expect.objectContaining({
         type: "HELLO",

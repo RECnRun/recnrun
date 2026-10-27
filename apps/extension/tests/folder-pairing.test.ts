@@ -107,17 +107,24 @@ describe("decideFolderStep", () => {
     });
   });
 
-  test("answers an offer once, and gives the link time before acting again", () => {
+  test("answers an offer once, and a newer one at once, since the offerer gave up the last", () => {
     const offer = signal("offer", PEER, STRANGER);
     const sighting = seen([presence(PEER)], [offer]);
-    const acted = { pairingId: OFFER_ID, at: NOW - 30_000 };
+    const acted = { pairingId: OFFER_ID, at: NOW - 1 };
     const answered = { ...situation(STRANGER, sighting), state: { acted } };
     expect(decideFolderStep(answered)).toEqual({ type: "wait" });
     const newer = signal("offer", PEER, STRANGER, { pairingId: OTHER_ID });
     const again = { ...answered, seen: seen([presence(PEER)], [newer]) };
     expect(decideFolderStep(again)).toEqual({ type: "answer", offer: newer });
-    const soon = { ...again, state: { acted: { ...acted, at: NOW - 29_999 } } };
-    expect(decideFolderStep(soon)).toEqual({ type: "wait" });
+  });
+
+  test("gives the link time after connecting before it offers again", () => {
+    const sighting = seen([presence(PEER)]);
+    const acted = { pairingId: OFFER_ID, at: NOW - 29_999 };
+    const connected = { ...situation(ME, sighting), state: { acted } };
+    expect(decideFolderStep(connected)).toEqual({ type: "wait" });
+    const later = { ...connected, state: { acted: { ...acted, at: NOW - 30_000 } } };
+    expect(decideFolderStep(later)).toEqual({ type: "offer", to: presence(PEER) });
   });
 
   test.each([
@@ -207,6 +214,15 @@ describe("createFolderPairing", () => {
     expect(pairing.accept).toHaveBeenCalledWith(answer.code);
     expect(commands).toEqual([]);
     expect(await state.read()).toEqual({ acted: { pairingId: OFFER_ID, at: NOW } });
+  });
+
+  test("offers again at once when a link that came up drops, with no wait for it", async () => {
+    const { flow, pairing } = folderPairing({ acted: { pairingId: OFFER_ID, at: NOW } });
+    await flow.seen(seen([presence(PEER)]));
+    expect(pairing.createOffer).not.toHaveBeenCalled();
+    await flow.linked();
+    await flow.seen(seen([presence(PEER)]));
+    expect(pairing.createOffer).toHaveBeenCalledWith(PEER);
   });
 
   test("ignores sightings unless waiting, and keeps waiting while the link is verified", async () => {
