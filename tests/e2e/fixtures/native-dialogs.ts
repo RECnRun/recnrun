@@ -69,24 +69,33 @@ async function xdotool(...args: string[]): Promise<string> {
   return stdout.trim();
 }
 
-/** Resolves once no visible window matches the title; `search` exits 1 for no match. */
-const windowGone = (title: string) =>
-  until(
-    async () => !(await xdotool("search", "--onlyvisible", "--name", title).catch(() => "")),
-    `the window "${title}" to close`,
-  );
-
 /**
- * The visible windows whose title matches. Searched again on failure: Ubuntu's xdotool
- * 3.20160805 predates the fix for #335 and exits on BadWindow when any window closes meanwhile.
+ * The visible windows whose title matches, "" for none, or undefined when the search has to run
+ * again: Ubuntu's xdotool 3.20160805 predates the fix for #335 and exits on BadWindow when any
+ * window closes during the search. Both that and no match exit 1, so stderr tells them apart.
  */
+async function search(title: string, ...options: string[]): Promise<string | undefined> {
+  try {
+    return await xdotool("search", ...options, "--onlyvisible", "--name", title);
+  } catch (error) {
+    const { code, stderr } = error as { code?: unknown; stderr?: unknown };
+    if (String(stderr).includes("BadWindow")) return undefined;
+    if (code === 1 && !stderr) return "";
+    throw error;
+  }
+}
+
+const windowGone = (title: string) =>
+  until(async () => (await search(title)) === "", `the window "${title}" to close`);
+
+/** Keeps --sync, whose half-second wait between searches lets a new window take keys. */
 async function findWindow(title: string): Promise<string> {
-  let found = "";
+  let found: string | undefined;
   await until(async () => {
-    found = await xdotool("search", "--sync", "--onlyvisible", "--name", title).catch(() => "");
-    return found !== "";
+    found = await search(title, "--sync");
+    return found !== undefined;
   }, `the window "${title}" to show`);
-  return found;
+  return found ?? "";
 }
 
 const pickerWindow = () => findWindow(PICKER_TITLE);
