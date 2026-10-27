@@ -11,6 +11,7 @@ import {
   peerRequestMessage,
 } from "@/messaging/peer-messages";
 import { MAX_FRAME_LENGTH } from "@/p2p/protocol";
+import { PEER } from "./fake-peer";
 
 const accepts = (schema: v.GenericSchema, value: unknown) => v.safeParse(schema, value).success;
 
@@ -29,23 +30,38 @@ test("wraps a page request for the background", () => {
   expect(peerRequestMessage({ type: "tabs" })).toEqual({ type: "peer", request: { type: "tabs" } });
 });
 
-test("accepts link events up to the frame limit", () => {
-  const frame = (length: number) => ({ type: "frame", frame: "x".repeat(length) });
+test("accepts link events that name their peer, up to the frame limit", () => {
+  const frame = (length: number) => ({ type: "frame", peer: PEER, frame: "x".repeat(length) });
   expect(accepts(LinkEventSchema, frame(MAX_FRAME_LENGTH))).toBe(true);
   expect(accepts(LinkEventSchema, frame(MAX_FRAME_LENGTH + 1))).toBe(false);
-  expect(accepts(LinkEventSchema, { type: "state", state: "connected" })).toBe(true);
-  expect(accepts(LinkEventSchema, { type: "state", state: "melted" })).toBe(false);
-  const event = { type: "state" as const, state: "failed" as const, remoteFingerprint: "AB" };
+  expect(accepts(LinkEventSchema, { type: "state", peer: PEER, state: "connected" })).toBe(true);
+  expect(accepts(LinkEventSchema, { type: "state", state: "connected" })).toBe(false);
+  expect(accepts(LinkEventSchema, { type: "state", peer: PEER, state: "melted" })).toBe(false);
+  const event = {
+    type: "state" as const,
+    peer: PEER,
+    state: "failed" as const,
+    remoteFingerprint: "AB",
+  };
   expect(linkEventMessage(event)).toEqual({ type: "link", event });
 });
 
-test("addresses link commands to the offscreen document only", () => {
-  const message = linkCommandMessage({ type: "answer", sdp: "v=0" });
-  expect(message).toEqual({ target: "offscreen", command: { type: "answer", sdp: "v=0" } });
+test("addresses link commands to the offscreen document only, each to one peer's link", () => {
+  const message = linkCommandMessage({ type: "answer", peer: PEER, sdp: "v=0" });
+  expect(message).toEqual({
+    target: "offscreen",
+    command: { type: "answer", peer: PEER, sdp: "v=0" },
+  });
   expect(accepts(LinkCommandMessageSchema, message)).toBe(true);
   expect(accepts(LinkCommandMessageSchema, { ...message, target: "pages" })).toBe(false);
-  expect(accepts(LinkCommandMessageSchema, linkCommandMessage({ type: "offer" }))).toBe(true);
-  const empty = { target: "offscreen", command: { type: "answer", sdp: "" } };
+  const offer = linkCommandMessage({ type: "offer", peer: PEER });
+  expect(accepts(LinkCommandMessageSchema, offer)).toBe(true);
+  for (const command of [
+    { type: "send", frame: "{}" },
+    { type: "close", peer: "nobody" },
+  ])
+    expect(accepts(LinkCommandMessageSchema, { target: "offscreen", command })).toBe(false);
+  const empty = { target: "offscreen", command: { type: "answer", peer: PEER, sdp: "" } };
   expect(accepts(LinkCommandMessageSchema, empty)).toBe(false);
 });
 

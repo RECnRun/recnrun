@@ -97,7 +97,8 @@ async function close(deps: Deps) {
   // The channel sends only over a verified link; a peer already gone hears nothing.
   await deps.channel.send("BYE", {}).catch(() => {});
   await deps.link.write({ state: "disconnected", verified: false, reason: "closed-here" });
-  await deps.askLink({ type: "close" });
+  const peer = await deps.authorized.read();
+  if (peer) await deps.askLink({ type: "close", peer: peer.profileId });
 }
 
 /** The user ends the link, so this profile also stops waiting in the folder to reconnect. */

@@ -36,23 +36,26 @@ export const PeerRequestSchema = v.variant("type", [
 
 export type PeerRequest = v.InferOutput<typeof PeerRequestSchema>;
 
-/** What the offscreen document reports about its link. */
+// Each peer has its own link, and every link command and event names the peer's profile id.
+const peer = { peer: ProfileIdSchema };
+
+/** What the offscreen document reports about its links. */
 export const LinkEventSchema = v.variant("type", [
-  kind("frame", { frame: FrameSchema }),
-  kind("state", { state: LinkStateSchema, remoteFingerprint: v.optional(v.string()) }),
+  kind("frame", { ...peer, frame: FrameSchema }),
+  kind("state", { ...peer, state: LinkStateSchema, remoteFingerprint: v.optional(v.string()) }),
   /** What the other profiles left in the RECnRun folder for this one. */
   kind("folder", { presences: v.array(PresenceSchema), signals: v.array(SignalFileSchema) }),
 ]);
 
 export type LinkEvent = v.InferOutput<typeof LinkEventSchema>;
 
-/** What the background asks of the offscreen document, which alone holds the connection. */
+/** What the background asks of the offscreen document, which alone holds the connections. */
 const LinkCommandSchema = v.variant("type", [
-  kind("offer", {}),
-  kind("answer", { sdp: SdpSchema }),
-  kind("accept-answer", { sdp: SdpSchema }),
-  kind("send", { frame: FrameSchema }),
-  kind("close", {}),
+  kind("offer", peer),
+  kind("answer", { ...peer, sdp: SdpSchema }),
+  kind("accept-answer", { ...peer, sdp: SdpSchema }),
+  kind("send", { ...peer, frame: FrameSchema }),
+  kind("close", peer),
   kind("folder-status", {}),
   kind("folder-watch", { profileId: ProfileIdSchema, displayName: DisplayNameSchema }),
   kind("folder-publish", { signal: SignalFileSchema }),

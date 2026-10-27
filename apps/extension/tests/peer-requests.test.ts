@@ -115,7 +115,7 @@ describe("the link and its peer", () => {
   test("closes the link on disconnect", async () => {
     const { deps } = requests();
     await handlePeerRequest(deps, { type: "disconnect" });
-    expect(deps.askLink.mock.calls).toEqual([[{ type: "close" }]]);
+    expect(deps.askLink.mock.calls).toEqual([[{ type: "close", peer: PEER }]]);
   });
 
   test("forgets the peer, its session copy, and its tabs, and closes the link", async () => {
@@ -125,7 +125,7 @@ describe("the link and its peer", () => {
     expect(await deps.authorized.read()).toBeNull();
     expect(await deps.mirror.read()).toBeNull();
     expect(await deps.tabs.read()).toBeNull();
-    expect(deps.askLink).toHaveBeenCalledWith({ type: "close" });
+    expect(deps.askLink).toHaveBeenCalledWith({ type: "close", peer: PEER });
     expect(deps.folder.stop).toHaveBeenCalledOnce();
   });
 

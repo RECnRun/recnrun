@@ -101,17 +101,15 @@ async function linkDown(state: LinkState, channel: PeerChannel) {
   notifyPages();
 }
 
-async function linkUp(
-  remoteFingerprint: string | undefined,
-  channel: PeerChannel,
-  folder: FolderPairingFlow,
-) {
+type StateEvent = Extract<LinkEvent, { type: "state" }>;
+
+async function linkUp(event: StateEvent, channel: PeerChannel, folder: FolderPairingFlow) {
   const peer = await authorizedPeerRepository.read();
   // DTLS proved the other side holds this certificate; only the one the user accepted may talk.
-  if (!peer || remoteFingerprint !== peer.fingerprint) {
+  if (!peer || event.remoteFingerprint !== peer.fingerprint) {
     log("closed a link whose certificate is not the accepted one");
     await peerLinkRepository.write({ state: "failed", verified: false, reason: "certificate" });
-    await askLink({ type: "close" });
+    await askLink({ type: "close", peer: event.peer });
     return;
   }
   await peerLinkRepository.write({ state: "connected", verified: true });
@@ -121,14 +119,14 @@ async function linkUp(
 }
 
 /** The peer said it closes the link on purpose, so this side closes too, without waiting for ICE. */
-async function closedByPeer(channel: PeerChannel) {
+async function closedByPeer(channel: PeerChannel, peer: string) {
   await peerLinkRepository.write({
     state: "disconnected",
     verified: false,
     reason: "closed-by-peer",
   });
   await linkDown("disconnected", channel);
-  await askLink({ type: "close" });
+  await askLink({ type: "close", peer });
 }
 
 function createLinkHandler(
@@ -147,14 +145,14 @@ function createLinkHandler(
         await channel.send("ERROR", { reason: "Invalid message." }).catch(() => {});
       return;
     }
-    if (received.message.type === "BYE") return closedByPeer(channel);
+    if (received.message.type === "BYE") return closedByPeer(channel, received.message.from);
     await execute(received.message, executor);
     await observe(received.message, tabs);
   };
   const handle = async (event: LinkEvent) => {
     if (event.type === "frame") return onFrame(event.frame);
     if (event.type === "folder") return folder.seen(event);
-    if (event.state === "connected") return linkUp(event.remoteFingerprint, channel, folder);
+    if (event.state === "connected") return linkUp(event, channel, folder);
     if (event.state !== "connecting") return linkDown(event.state, channel);
     await peerLinkRepository.write({ state: "connecting", verified: false });
     notifyPages();

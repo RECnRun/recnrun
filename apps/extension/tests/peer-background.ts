@@ -38,12 +38,14 @@ export async function peerBackground({ authorized = true } = {}) {
   const connect = (remoteFingerprint: string | null = FINGERPRINT) =>
     routes.link({
       type: "state",
+      peer: PEER,
       state: "connected",
       remoteFingerprint: remoteFingerprint ?? undefined,
     });
   const receive = (message: PeerMessage | string) =>
     routes.link({
       type: "frame",
+      peer: PEER,
       frame: typeof message === "string" ? message : JSON.stringify(message),
     });
   return { routes, link, connect, receive, moved, log };

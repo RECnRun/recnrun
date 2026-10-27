@@ -31,7 +31,10 @@ describe("a new link", () => {
       await connect(fingerprint);
       expect(await peerLinkRepository.read()).toEqual(MISMATCH);
     }
-    expect(link.commands).toEqual([{ type: "close" }, { type: "close" }]);
+    expect(link.commands).toEqual([
+      { type: "close", peer: PEER },
+      { type: "close", peer: PEER },
+    ]);
     expect(link.sentTypes()).toEqual([]);
   });
 
@@ -39,7 +42,7 @@ describe("a new link", () => {
     const { connect, link } = await peerBackground({ authorized: false });
     await connect();
     expect(await peerLinkRepository.read()).toEqual(MISMATCH);
-    expect(link.commands).toEqual([{ type: "close" }]);
+    expect(link.commands).toEqual([{ type: "close", peer: PEER }]);
   });
 
   test("verifies the accepted certificate, ends the folder's wait, and introduces this profile", async () => {
@@ -64,7 +67,7 @@ describe("a new link", () => {
 
   test("stores a connecting link as unverified and tells the pages", async () => {
     const { routes, link } = await peerBackground();
-    await routes.link({ type: "state", state: "connecting" });
+    await routes.link({ type: "state", peer: PEER, state: "connecting" });
     expect(await peerLinkRepository.read()).toEqual({ state: "connecting", verified: false });
     expect(link.notices).toHaveLength(1);
   });
@@ -105,7 +108,7 @@ describe("a link that went down", () => {
     await remoteRecordingRepository.write(copy);
     const pending = routes.request({ type: "tabs" });
     await vi.waitFor(() => expect(link.sentTypes()).toContain("GET_TABS"));
-    await routes.link({ type: "state", state: "disconnected" });
+    await routes.link({ type: "state", peer: PEER, state: "disconnected" });
     await expect(pending).rejects.toThrow(NOT_CONNECTED);
     expect(await peerLinkRepository.read()).toEqual({ state: "disconnected", verified: false });
     expect(await remoteRecordingRepository.read()).toEqual({ ...copy, connected: false });
@@ -113,10 +116,10 @@ describe("a link that went down", () => {
 
   test("writes no copy when there was none, or when it is unreadable", async () => {
     const { routes } = await peerBackground();
-    await routes.link({ type: "state", state: "failed" });
+    await routes.link({ type: "state", peer: PEER, state: "failed" });
     expect(await remoteRecordingRepository.read()).toBeNull();
     await fakeBrowser.storage.session.set({ remoteRecording: "unreadable" });
-    await routes.link({ type: "state", state: "failed" });
+    await routes.link({ type: "state", peer: PEER, state: "failed" });
     expect(await fakeBrowser.storage.session.get("remoteRecording")).toEqual({
       remoteRecording: "unreadable",
     });
@@ -131,10 +134,10 @@ describe("an intended close", () => {
     await receive(fromPeer("BYE", {}));
     const closed = { state: "disconnected", verified: false, reason: "closed-by-peer" };
     expect(await peerLinkRepository.read()).toEqual(closed);
-    expect(link.commands.at(-1)).toEqual({ type: "close" });
-    await routes.link({ type: "state", state: "failed" });
+    expect(link.commands.at(-1)).toEqual({ type: "close", peer: PEER });
+    await routes.link({ type: "state", peer: PEER, state: "failed" });
     expect(await peerLinkRepository.read()).toEqual({ ...closed, state: "failed" });
-    await routes.link({ type: "state", state: "connecting" });
+    await routes.link({ type: "state", peer: PEER, state: "connecting" });
     expect(await peerLinkRepository.read()).toEqual({ state: "connecting", verified: false });
   });
 
@@ -149,7 +152,7 @@ describe("an intended close", () => {
     });
     await Promise.all([
       receive(fromPeer("BYE", {})),
-      routes.link({ type: "state", state: "disconnected" }),
+      routes.link({ type: "state", peer: PEER, state: "disconnected" }),
     ]);
     expect(await peerLinkRepository.read()).toEqual({
       state: "disconnected",
@@ -165,8 +168,8 @@ describe("an intended close", () => {
       await connect();
       await routes.request({ type });
       expect(link.sentTypes()).toEqual(["HELLO", "BYE"]);
-      expect(link.commands.at(-1)).toEqual({ type: "close" });
-      await routes.link({ type: "state", state: "disconnected" });
+      expect(link.commands.at(-1)).toEqual({ type: "close", peer: PEER });
+      await routes.link({ type: "state", peer: PEER, state: "disconnected" });
       expect(await peerLinkRepository.read()).toEqual({
         state: "disconnected",
         verified: false,
@@ -179,7 +182,7 @@ describe("an intended close", () => {
     const { routes, link } = await peerBackground();
     await routes.request({ type: "disconnect" });
     expect(link.sentTypes()).toEqual([]);
-    expect(link.commands).toEqual([{ type: "folder-stop" }, { type: "close" }]);
+    expect(link.commands).toEqual([{ type: "folder-stop" }, { type: "close", peer: PEER }]);
   });
 });
 
@@ -189,7 +192,7 @@ describe("the peer's tabs", () => {
     const { routes, connect, receive } = await peerBackground();
     await connect();
     await receive(fromPeer("TABS_CHANGED", { tabs: [tab], currentId: 3 }));
-    await routes.link({ type: "state", state: "disconnected" });
+    await routes.link({ type: "state", peer: PEER, state: "disconnected" });
     // A worker that slept starts again with nothing in memory and the same storage.
     const woken = startPeers();
     expect(await woken.request({ type: "tabs" })).toEqual({ tabs: [tab], currentId: 3 });
@@ -253,7 +256,10 @@ describe("the folder", () => {
     await routes.request({ type: "folder-pair" });
     await routes.request({ type: "disconnect" });
     expect(await folderPairingRepository.read()).toBeNull();
-    expect(link.commands.slice(-2)).toEqual([{ type: "folder-stop" }, { type: "close" }]);
+    expect(link.commands.slice(-2)).toEqual([
+      { type: "folder-stop" },
+      { type: "close", peer: PEER },
+    ]);
   });
 
   test("tells the pages when a tab closes, since Chrome may have ended the folder's grant", async () => {
@@ -278,7 +284,7 @@ describe("the folder", () => {
     await folderPairingRepository.write({});
     const sighting = { type: "folder" as const, presences: [presence], signals: [] };
     await routes.link(sighting);
-    expect(link.commands).toContainEqual({ type: "offer" });
+    expect(link.commands).toContainEqual({ type: "offer", peer: PEER });
     const { displayName, fingerprint } = presence;
     await authorizedPeerRepository.write({ profileId: PEER, displayName, fingerprint });
     // Accepting the answer ends the pending offer before the link comes up.
@@ -289,7 +295,7 @@ describe("the folder", () => {
     expect(offers()).toBe(1);
     expect(await folderPairingRepository.read()).toEqual({});
     expect(link.commands).not.toContainEqual({ type: "folder-stop" });
-    await routes.link({ type: "state", state: "disconnected" });
+    await routes.link({ type: "state", peer: PEER, state: "disconnected" });
     await routes.link(sighting);
     expect(offers()).toBe(2);
   });

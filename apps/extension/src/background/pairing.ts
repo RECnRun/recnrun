@@ -47,7 +47,7 @@ export function createPairing(deps: PairingDependencies) {
   /** An offer for the profile `to`. */
   const createOffer = async (to: string) => {
     const pairingId = crypto.randomUUID();
-    const sdp = sdpOf(await deps.askLink({ type: "offer" }));
+    const sdp = sdpOf(await deps.askLink({ type: "offer", peer: to }));
     await deps.pending.write({ pairingId, expiresAt: now() + PAIRING_TTL_MS, to });
     return { code: await half("offer", pairingId, sdp) };
   };
@@ -57,10 +57,12 @@ export function createPairing(deps: PairingDependencies) {
     // The user accepted this profile, which replaces any earlier one: one peer at a time.
     await deps.authorized.write({ profileId, displayName, fingerprint });
     if (pairing.kind === "offer") {
-      const answer = sdpOf(await deps.askLink({ type: "answer", sdp: pairing.sdp }));
+      const answer = sdpOf(
+        await deps.askLink({ type: "answer", peer: profileId, sdp: pairing.sdp }),
+      );
       return { code: await half("answer", pairing.pairingId, answer) };
     }
-    await deps.askLink({ type: "accept-answer", sdp: pairing.sdp });
+    await deps.askLink({ type: "accept-answer", peer: profileId, sdp: pairing.sdp });
     await deps.pending.write(null);
     return {};
   };

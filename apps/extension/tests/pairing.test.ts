@@ -60,12 +60,20 @@ describe("a full pairing", () => {
     expect(await b.authorized.read()).toBeNull();
 
     const { code: answer = "" } = await b.accept(offer);
-    expect(b.askLink).toHaveBeenCalledWith({ type: "answer", sdp: sdpWith(FP_A) });
+    expect(b.askLink).toHaveBeenCalledWith({
+      type: "answer",
+      peer: A.profileId,
+      sdp: sdpWith(FP_A),
+    });
     expect(await b.authorized.read()).toEqual({ ...A, fingerprint: FP_A });
     expect(decodePairing(answer, NOW)).toMatchObject({ kind: "answer", pairingId, ...B });
 
     expect(await a.accept(answer)).toEqual({});
-    expect(a.askLink).toHaveBeenCalledWith({ type: "accept-answer", sdp: sdpWith(FP_B) });
+    expect(a.askLink).toHaveBeenCalledWith({
+      type: "accept-answer",
+      peer: B.profileId,
+      sdp: sdpWith(FP_B),
+    });
     expect(await a.authorized.read()).toEqual({ ...B, fingerprint: FP_B });
     expect(await a.pending.read()).toBeNull();
   });

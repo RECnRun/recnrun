@@ -78,7 +78,8 @@ export function createPeerChannel(deps: PeerChannelDependencies) {
     return peerMessage(type, { from: me.profileId, to: peer.profileId }, payload);
   };
   const transmit = async (message: PeerMessage) => {
-    const result = await deps.askLink({ type: "send", frame: JSON.stringify(message) });
+    const frame = JSON.stringify(message);
+    const result = await deps.askLink({ type: "send", peer: message.to, frame });
     if ((result as { sent?: boolean } | undefined)?.sent !== true) throw new Error(NOT_CONNECTED);
     deps.log(`sent ${message.type}`);
   };
