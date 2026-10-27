@@ -1,5 +1,7 @@
 import { expect } from "./fixtures/extension.ts";
-import { dashboardIn, framesOf, pair, test } from "./fixtures/profiles.ts";
+import { allowFolder, pair } from "./fixtures/folder.ts";
+import { test } from "./fixtures/native-dialogs.ts";
+import { framesOf, linkStatus, pairingSection, reopen } from "./fixtures/profiles.ts";
 import type { Profile } from "./fixtures/profiles.ts";
 
 interface ChromeGlobal {
@@ -30,14 +32,27 @@ const sendRaw = (profile: Profile, frame: string) =>
 const typesOf = (frames: string[]) =>
   frames.map((frame) => (JSON.parse(frame) as { type: string }).type);
 
-test("two profiles pair by hand and answer each other's ping", async ({ profileA, profileB }) => {
-  await pair(profileA, profileB);
-  for (const profile of [profileA, profileB]) {
-    await profile.pairing.getByRole("button", { name: "Send ping" }).click();
-    await expect(profile.pairing.getByText(/^Pong in \d+ ms$/)).toBeVisible();
+/** Clicks one of the pairing section's buttons in the profile's dashboard. */
+const clickPairing = (profile: Profile, name: string) =>
+  pairingSection(profile.dashboard).getByRole("button", { name }).click();
+
+test("two profiles pair from their dashboards and exchange their tabs over the link", async ({
+  profileA,
+  profileB,
+  native,
+}) => {
+  await pair(profileA, profileB, native);
+  for (const [profile, other] of [
+    [profileA, profileB],
+    [profileB, profileA],
+  ] as const) {
+    const heading = `Chrome — ${other.name} (Connected)`;
+    // The other profile's site tab, as its background reported it over the link.
+    const tabs = profile.dashboard.getByRole("complementary", { name: heading });
+    await expect(tabs.getByRole("listitem").filter({ hasText: other.site.url() })).toBeVisible();
+    const types = typesOf(await framesOf(profile));
+    expect(types).toEqual(expect.arrayContaining(["HELLO", "GET_TABS", "TABS_SNAPSHOT"]));
   }
-  const sentByA = typesOf(await framesOf(profileA));
-  expect(sentByA).toEqual(expect.arrayContaining(["HELLO", "PING", "PONG", "SESSION_STATUS"]));
 });
 
 test("each profile has its own id, not the extension's, kept across a restart", async ({
@@ -66,8 +81,9 @@ test("each profile has its own id, not the extension's, kept across a restart", 
 test("a malformed or forged frame runs nothing and gets no answer it could use", async ({
   profileA,
   profileB,
+  native,
 }) => {
-  await pair(profileA, profileB);
+  await pair(profileA, profileB, native);
   const before = (await framesOf(profileB)).length;
   await sendRaw(profileA, "not json");
   // A well-formed message from a profile B never accepted: dropped without an answer.
@@ -92,7 +108,7 @@ test("a malformed or forged frame runs nothing and gets no answer it could use",
   await expect.poll(sentByB).toEqual(["ERROR"]);
   await expect.poll(async () => (await framesOf(profileB)).length).toBe(before + 3);
   expect(await sentByB()).toEqual(["ERROR"]);
-  await expect(profileB.pairing.getByRole("status")).toHaveText("Connected — Profile A");
+  await expect(linkStatus(profileB)).toHaveText("Connected — Profile A");
 });
 
 const pinnedPeer = (profile: Profile) =>
@@ -101,50 +117,50 @@ const pinnedPeer = (profile: Profile) =>
     return (await chrome.storage.local.get("authorizedPeer")).authorizedPeer;
   });
 
-test("a profile that quits drops the link, and after a restart pairs again as itself", async ({
+test("a profile that quits drops the link, and after a restart reconnects as itself", async ({
   profileA,
   profileB,
+  native,
   launch,
 }) => {
-  await pair(profileA, profileB);
+  test.setTimeout(150_000);
+  await pair(profileA, profileB, native);
   const pinned = await pinnedPeer(profileA);
   await profileB.context.close();
   // No close message comes from a browser that quits; ICE consent checks find it gone.
-  await expect(profileA.pairing.getByRole("status")).toHaveText(
-    /^(Disconnected|Not reachable) — Profile B$/,
-    { timeout: 45_000 },
-  );
+  await expect(linkStatus(profileA)).toHaveText(/^(Disconnected|Not reachable) — Profile B$/, {
+    timeout: 45_000,
+  });
 
-  // Without a signaling server nothing reconnects on its own: the users pair again.
-  const context = await launch(profileB.dir);
-  const serviceWorker =
-    context.serviceWorkers()[0] ?? (await context.waitForEvent("serviceworker"));
-  const pairing = await context.newPage();
-  await pairing.goto(`chrome-extension://${new URL(serviceWorker.url()).host}/pairing.html`);
-  await pair(profileA, { ...profileB, context, serviceWorker, pairing });
+  // Chrome kept neither folder grant past its folder window (H2), so both allow it again.
+  const restarted = await reopen(profileB, await launch(profileB.dir));
+  await allowFolder(profileA, native);
+  expect(await allowFolder(restarted, native)).toBe("restore");
+  await expect(linkStatus(profileA)).toHaveText("Connected — Profile B", { timeout: 90_000 });
+  await expect(linkStatus(restarted)).toHaveText("Connected — Profile A");
   // The same certificate after the restart: the pinned peer is unchanged.
   expect(await pinnedPeer(profileA)).toEqual(pinned);
 });
 
-test("disconnect and forget end the link on both sides", async ({ profileA, profileB }) => {
-  await pair(profileA, profileB);
-  await profileA.pairing.getByRole("button", { name: "Disconnect" }).click();
-  await expect(profileA.pairing.getByRole("status")).toHaveText("Disconnected — Profile B");
-  await expect(profileB.pairing.getByRole("status")).toHaveText("Disconnected by Profile A");
-  await profileB.pairing.getByRole("button", { name: "Forget the other profile" }).click();
-  await expect(profileB.pairing.getByRole("status")).toHaveText("Not paired");
+test("disconnect and forget end the link on both sides", async ({ profileA, profileB, native }) => {
+  await pair(profileA, profileB, native);
+  await clickPairing(profileA, "Disconnect");
+  await expect(linkStatus(profileA)).toHaveText("Disconnected — Profile B");
+  await expect(linkStatus(profileB)).toHaveText("Disconnected by Profile A");
+  await clickPairing(profileB, "Forget Profile A");
+  await expect(linkStatus(profileB)).toHaveText("Not paired");
 });
 
 test("a profile that disconnects tells the other, whose dashboard says so instead of an error", async ({
   profileA,
   profileB,
+  native,
 }) => {
-  await pair(profileA, profileB);
-  const dashboard = await dashboardIn(profileB);
+  await pair(profileA, profileB, native);
   const heading = (state: string) =>
-    dashboard.getByRole("heading", { name: `Chrome — Profile A (${state})` });
+    profileB.dashboard.getByRole("heading", { name: `Chrome — Profile A (${state})` });
   await expect(heading("Connected")).toBeVisible();
-  await profileA.pairing.getByRole("button", { name: "Disconnect" }).click();
+  await clickPairing(profileA, "Disconnect");
   await expect(heading("Disconnected by Profile A")).toBeVisible();
-  await expect(profileB.pairing.getByRole("status")).toHaveText("Disconnected by Profile A");
+  await expect(linkStatus(profileB)).toHaveText("Disconnected by Profile A");
 });

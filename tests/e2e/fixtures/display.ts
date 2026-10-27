@@ -6,8 +6,8 @@ import { promisify } from "node:util";
 import { inflateSync } from "node:zlib";
 
 /*
- * Chrome's permission bubbles are drawn inside the browser window, with no X window of their
- * own, so the one sign of them is what the display shows: scrot captures one pixel of it.
+ * Chrome's permission bubbles show over the browser window, and the driver has no handle on
+ * them, so the one sign of them is what the display shows: scrot captures one pixel of it.
  */
 
 const exec = promisify(execFile);

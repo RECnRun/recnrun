@@ -1,6 +1,8 @@
 import type { Page } from "@playwright/test";
 import { expect } from "./fixtures/extension.ts";
-import { framesOf, pair, test } from "./fixtures/profiles.ts";
+import { pair } from "./fixtures/folder.ts";
+import { test } from "./fixtures/native-dialogs.ts";
+import { framesOf } from "./fixtures/profiles.ts";
 import type { Profile } from "./fixtures/profiles.ts";
 import { storedText } from "./fixtures/tabs.ts";
 
@@ -50,12 +52,13 @@ const seen = (app: Page) =>
 test("each profile keeps its own cookies, storage, and cache; none of it crosses the link", async ({
   profileA,
   profileB,
+  native,
 }) => {
   const tokenA = `user-a-${crypto.randomUUID()}`;
   const tokenB = `user-b-${crypto.randomUUID()}`;
   const appA = await signIn(profileA, tokenA, "/privacy/?app-a");
   const appB = await signIn(profileB, tokenB, "/privacy/?app-b");
-  await pair(profileA, profileB);
+  await pair(profileA, profileB, native);
   // The tabs of each profile cross the link, as reports from both sides.
   await appB.reload();
   await appA.reload();
