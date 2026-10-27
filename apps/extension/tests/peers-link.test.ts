@@ -135,6 +135,26 @@ describe("an intended close", () => {
     expect(await peerLinkRepository.read()).toEqual({ state: "connecting", verified: false });
   });
 
+  test("a BYE keeps its reason when the channel's close arrives right behind it", async () => {
+    const { routes, connect, receive } = await peerBackground();
+    await connect();
+    // The BYE's own read of the link is slow, as in a busy worker.
+    const read = peerLinkRepository.read.bind(peerLinkRepository);
+    vi.spyOn(peerLinkRepository, "read").mockImplementationOnce(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      return read();
+    });
+    await Promise.all([
+      receive(fromPeer("BYE", {})),
+      routes.link({ type: "state", state: "disconnected" }),
+    ]);
+    expect(await peerLinkRepository.read()).toEqual({
+      state: "disconnected",
+      verified: false,
+      reason: "closed-by-peer",
+    });
+  });
+
   test.each(["disconnect", "forget"] as const)(
     "%s says BYE to the verified peer before closing, and marks the close as this profile's",
     async (type) => {

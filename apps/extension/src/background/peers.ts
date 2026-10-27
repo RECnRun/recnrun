@@ -147,13 +147,20 @@ function createLinkHandler(
     await execute(received.message, executor);
     await observe(received.message, tabs);
   };
-  return async (event: LinkEvent) => {
+  const handle = async (event: LinkEvent) => {
     if (event.type === "frame") return onFrame(event.frame);
     if (event.type === "folder") return folder.seen(event);
     if (event.state === "connected") return linkUp(event.remoteFingerprint, channel);
     if (event.state !== "connecting") return linkDown(event.state, channel);
     await peerLinkRepository.write({ state: "connecting", verified: false });
     notifyPages();
+  };
+  let queue = Promise.resolve();
+  // In arrival order, so a frame sent before the channel closed is read while the link is verified.
+  return (event: LinkEvent) => {
+    const next = queue.then(() => handle(event));
+    queue = next.catch(() => {});
+    return next;
   };
 }
 
