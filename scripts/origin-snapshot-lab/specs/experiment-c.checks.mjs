@@ -2,26 +2,18 @@
 // with every type IndexedDB can hold? T1 is structured clone messaging; the red control is the
 // same extension with the default (JSON) serialization.
 import assert from "node:assert/strict";
-import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { rmSync } from "node:fs";
 import { test } from "node:test";
 import { startFixture } from "../fixture/server.mjs";
-import { extensionPath, launchLab, observed, openApp, writeEvidence } from "../lab.mjs";
+import { extensionCopy, launchLab, observed, openApp, writeEvidence } from "../lab.mjs";
 
 const evidence = {};
 // Top-level awaited tests do not wait for root before()/after() hooks; the module owns it.
 const fixture = await startFixture();
 
 /** A copy of the lab extension without `message_serialization`, so messages use JSON. */
-function jsonExtension() {
-  const copy = mkdtempSync(join(tmpdir(), "recnrun-origin-lab-json-"));
-  cpSync(extensionPath, copy, { recursive: true });
-  const manifest = JSON.parse(readFileSync(join(copy, "manifest.json"), "utf8"));
-  delete manifest.message_serialization;
-  writeFileSync(join(copy, "manifest.json"), JSON.stringify(manifest));
-  return copy;
-}
+const jsonExtension = () =>
+  extensionCopy(({ message_serialization: _json, ...manifest }) => manifest);
 
 /** Runs in the page, as the app would: one database whose values and keys use every kind. */
 async function writeTyped({ bigint, binaryKey }) {

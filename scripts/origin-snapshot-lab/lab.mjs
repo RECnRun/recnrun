@@ -1,12 +1,12 @@
 // Launches a disposable Chromium with the lab extension and wraps its `globalThis.lab` handle.
 import { chromium } from "@playwright/test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { APP } from "./fixture/server.mjs";
 
-export const extensionPath = fileURLToPath(new URL("extension", import.meta.url));
+const extensionPath = fileURLToPath(new URL("extension", import.meta.url));
 const artifacts = fileURLToPath(new URL("../../.artifacts/origin-snapshot-lab/", import.meta.url));
 
 /** Writes one experiment's evidence as JSON under .artifacts/origin-snapshot-lab. */
@@ -26,11 +26,26 @@ function handle(worker) {
   );
 }
 
+/** A temporary copy of the lab extension whose manifest `edit` changed; delete it after use. */
+export function extensionCopy(edit) {
+  const copy = mkdtempSync(join(tmpdir(), "recnrun-origin-lab-extension-"));
+  cpSync(extensionPath, copy, { recursive: true });
+  const file = join(copy, "manifest.json");
+  writeFileSync(file, JSON.stringify(edit(JSON.parse(readFileSync(file, "utf8")))));
+  return copy;
+}
+
 /**
  * A Chromium with a temporary profile and the lab extension; headed unless LAB_HEADLESS=1.
- * Playwright turns the back/forward cache off; `bfcache: true` keeps Chrome's default.
+ * Playwright turns the back/forward cache off; `bfcache: true` keeps Chrome's default. The gate
+ * content script is registered for `origin` (the fixture by default).
  */
-export async function launchLab({ extension = extensionPath, args = [], bfcache = false } = {}) {
+export async function launchLab({
+  extension = extensionPath,
+  args = [],
+  bfcache = false,
+  origin = APP,
+} = {}) {
   const profile = mkdtempSync(join(tmpdir(), "recnrun-origin-lab-"));
   const context = await chromium.launchPersistentContext(profile, {
     channel: "chromium",
@@ -41,7 +56,7 @@ export async function launchLab({ extension = extensionPath, args = [], bfcache 
   const worker = context.serviceWorkers()[0] ?? (await context.waitForEvent("serviceworker"));
   const lab = handle(worker);
   await lab.ready();
-  await lab.register(APP);
+  await lab.register(origin);
   const close = async () => {
     await context.close();
     rmSync(profile, { recursive: true, force: true });

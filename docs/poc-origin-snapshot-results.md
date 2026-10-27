@@ -19,7 +19,7 @@ The lab sets `LAB_HEADLESS=1` in its test task; without it a headed window opens
 - **WXT 0.21.4** supports content scripts with `registration: "runtime"` (no manifest entry; the background registers them). It has no typed option for `message_serialization`; Phase 3 adds the key through the manifest hook and checks that it reaches the built manifest.
 - **Permissions the lab needs**: `scripting` (runtime content script, `location.replace` injection), `tabs`, `webNavigation` (commit of each navigation), `storage`/`unlimitedStorage` (extension IndexedDB), `offscreen` (A3 only), and `declarativeNetRequestWithHostAccess` (A2 only), with host access limited to the fixture's origin. A2 and A3 were rejected (below), so Phase 3 needs neither `offscreen` nor `declarativeNetRequestWithHostAccess`.
 - **Back/forward cache.** Playwright launches Chromium with `--disable-back-forward-cache`; the lab removes that flag where history matters, so those runs use Chrome's default.
-- **Zephyr (public facts only).** An Angular app under `/zephyr-domes-frontend/` served by Apache, with `ngsw.json` (asset groups `app` with 265 URLs and `assets` with 570, both prefetch; no data groups; `navigationUrls` exclude a last segment with a dot or `__`). No CSP or `Set-Cookie` on a `HEAD` of the entry page. **The inventory after sign-in is not done**: it needs the user to sign in by hand with a test account (names, counts, and sizes only).
+- **Zephyr (public facts only).** An Angular app under `/zephyr-domes-frontend/` served by Apache, with `ngsw.json` (asset groups `app` with 265 URLs and `assets` with 570, both prefetch; no data groups; `navigationUrls` exclude a last segment with a dot or `__`). No CSP or `Set-Cookie` on a `HEAD` of the entry page. Signed out, the app redirects to Keycloak on another host (`login-acc.one.be`, realm `ONE`, OpenID Connect), which sets its own cookies there. An origin snapshot of `zephyr-tq.one.be` does not include them, so the sign-in host's single sign-on session is shared by every identity: the manual run below measures what that does. **The inventory after sign-in is not done**: it needs the user to sign in by hand with a test account.
 
 ## Phase 1: Lab
 
@@ -113,9 +113,24 @@ About 10 MB went through one structured clone message without error. Records of 
 
 Phase 3 additionally owes: the key generator, a journal so the coordinator survives a background restart, refusing early when another tab of the origin is open (`tabs.query`), and `beforeunload` reported as a refusal.
 
+## Zephyr manual run (protocol)
+
+`vp run origin-snapshot-lab:manual -- <url>` opens a headed Chromium with a temporary profile and the lab extension, its host access set to the URL's origin, the exclusive-access probe on, and the tab's first identity named A. The terminal takes `switch <identity>`, `reset <identity>`, `inventory [label]`, `captures`, and `quit`. Output and `.artifacts/origin-snapshot-lab/manual-inventory-<label>.json` hold names, counts, and sizes, never values; captures, which hold tokens, stay in the profile that `quit` deletes. A switch is refused while another tab of the origin is open or the tab is on another host (the sign-in page).
+
+Steps, with test accounts only:
+
+1. Start the runner on `https://zephyr-tq.one.be/zephyr-domes-frontend/` and sign in as test account A; let the app finish loading its offline data. Run `inventory a`.
+2. `switch B`. B starts empty, so the app goes to Keycloak. Record whether Keycloak asks for credentials or signs A in again on its own (its cookies were not switched).
+3. If Keycloak asked, sign in as B. If it signed A in, the session cookies of the sign-in host decide the account, which the snapshot cannot change; to go on, sign out of Keycloak from the app or delete the `login-acc.one.be` cookies in DevTools by hand, sign in as B, and record which you did (signing out may end A's server session too). Run `inventory b`.
+4. `switch A`. Record whether A's app opens without a sign-in, shows A's account and offline data, and stays signed in for a few minutes (token refresh and Keycloak's session checks use the sign-in host's cookies, which are now B's).
+5. `switch B`, then `switch A` once more, recording the same. Run `captures`, then `quit`.
+
+What to record: for each step, the account the app shows, any sign-in page or error, and the terminal's output. Close DevTools' IndexedDB view before a switch: if it holds a connection (not verified), the probe blocks and the switch fails without changing anything. A failed switch leaves the tab unknown and refuses further switches; quit and start over.
+
 ## What was exercised
 
 - All four specs, on the host (31 tests, 3 runs per Experiment A cell, 100 large records): 31 passed, 0 failed.
 - In Docker with 50 runs per cell and 10,000 large records: 31 passed, 0 failed (`.artifacts/docker/2026-10-27T10-11-55.364Z-ff1bbd70-f662-43b3-8dc3-f0ed194ca05e/run.log`; the JSON evidence stays inside the container, so the tables above come from the JSON lines the specs print). A first Docker run failed 2 of 31 because a spec wrote before the app published `window.app`; the specs now wait for it, and the rerun passed.
+- The manual runner on the fixture (headless, scripted commands): inventory, start, resume, reset, captures, and an unknown command. On Zephyr signed out: the inventory of the Keycloak page (cookie names only) and the refusal to switch while the tab is on the sign-in host.
 - Negative controls: A0 (fails as expected), the JSON transport (fails or corrupts as expected), and the unprobed second tab (late delete reproduced).
 - Not exercised: the Zephyr inventory and any run against Zephyr (needs a manual sign-in with a test account), and a cancelled `beforeunload` dialog (Playwright accepted it; the cancelled path is inferred from navigation semantics).

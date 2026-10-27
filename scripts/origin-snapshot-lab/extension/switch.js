@@ -8,6 +8,8 @@ export const options = {
   timeoutMs: 20000,
   clear: { timeoutMs: 5000, probe: false },
   replace: true,
+  // The identity a tab has before its first switch.
+  firstIdentity: "profile",
 };
 const EMPTY = { local: [], session: [], databases: [] };
 const tabs = new Map();
@@ -90,7 +92,7 @@ async function targetOf(origin, to, reset) {
 async function plan(tabId, to, { reset = false, url } = {}) {
   const tab = await chrome.tabs.get(tabId);
   const origin = new URL(tab.url).origin;
-  const state = tabs.get(tabId) ?? { identity: "profile", urls: {} };
+  const state = tabs.get(tabId) ?? { identity: options.firstIdentity, urls: {} };
   if (state.identity === "unknown") throw new Error("the tab is in an unknown state");
   const { kind, target, lastUrl } = await targetOf(origin, to, reset);
   const current = marked(tab.url);
