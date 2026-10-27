@@ -169,8 +169,8 @@ async function driverOf(page: Page): Promise<NativeDialogs> {
   // Playwright intercepts every file chooser unless told otherwise, and the picker never shows.
   const cdp = await page.context().newCDPSession(page);
   await cdp.send("Page.setInterceptFileChooserDialog", { enabled: false });
+  // Never brought to front again: raising the window covers a prompt Chrome already shows.
   const browserWindow = async () => {
-    await page.bringToFront();
     // Set on every call, since a reload restores the page's own title.
     await page.evaluate((name) => {
       document.title = name;
