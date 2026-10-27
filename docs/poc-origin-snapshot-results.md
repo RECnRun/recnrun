@@ -111,7 +111,7 @@ About 10 MB went through one structured clone message without error. Records of 
 4. **One tab of the origin**, and **no service worker holding an IndexedDB connection**; the switch refuses or fails safely otherwise. These are feasibility restrictions, not isolation.
 5. Service worker writes may land in either identity's data around the switch.
 
-Phase 3 additionally owes: the key generator, a journal so the coordinator survives a background restart, refusing early when another tab of the origin is open (`tabs.query`), and `beforeunload` reported as a refusal.
+Phase 3 additionally owes: refusing a switch to the tab's current identity (the lab accepted B → B once, which would have overwritten B's capture with an empty state on the next switch; fixed in the lab), the key generator, a journal so the coordinator survives a background restart, refusing early when another tab of the origin is open (`tabs.query`), and `beforeunload` reported as a refusal.
 
 ## Zephyr manual run (protocol)
 
@@ -120,8 +120,8 @@ Phase 3 additionally owes: the key generator, a journal so the coordinator survi
 Steps, with test accounts only:
 
 1. Start the runner on `https://zephyr-tq.one.be/zephyr-domes-frontend/` and sign in as test account A; let the app finish loading its offline data. Run `inventory a`.
-2. `switch B`. B starts empty, so the app goes to Keycloak. Record whether Keycloak asks for credentials or signs A in again on its own (its cookies were not switched).
-3. If Keycloak asked, sign in as B. If it signed A in, the session cookies of the sign-in host decide the account, which the snapshot cannot change; to go on, sign out of Keycloak from the app or delete the `login-acc.one.be` cookies in DevTools by hand, sign in as B, and record which you did (signing out may end A's server session too). Run `inventory b`.
+2. `switch B`. B starts empty. Record which account the app shows and run `inventory after-b`. In the first run the app did not show Keycloak's page: it likely signed A in again without a visible redirect (a silent single sign-on through the sign-in host's cookies, which were not switched).
+3. If Keycloak asked for credentials, sign in as B. If A came back, the session cookies of the sign-in host decide the account, which the snapshot cannot change; to go on, sign out of Keycloak from the app or delete the `login-acc.one.be` cookies in DevTools by hand, sign in as B, and record which you did (signing out may end A's server session too). Run `inventory b`.
 4. `switch A`. Record whether A's app opens without a sign-in, shows A's account and offline data, and stays signed in for a few minutes (token refresh and Keycloak's session checks use the sign-in host's cookies, which are now B's).
 5. `switch B`, then `switch A` once more, recording the same. Run `captures`, then `quit`.
 

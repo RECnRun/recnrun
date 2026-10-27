@@ -94,6 +94,8 @@ async function plan(tabId, to, { reset = false, url } = {}) {
   const origin = new URL(tab.url).origin;
   const state = tabs.get(tabId) ?? { identity: options.firstIdentity, urls: {} };
   if (state.identity === "unknown") throw new Error("the tab is in an unknown state");
+  // Its suspend would overwrite the identity's capture with the state it is about to clear.
+  if (state.identity === to && !reset) throw new Error(`the tab is already ${to}`);
   const { kind, target, lastUrl } = await targetOf(origin, to, reset);
   const current = marked(tab.url);
   const context = {
