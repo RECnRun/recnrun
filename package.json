@@ -20,6 +20,8 @@
     "test:coverage:local": "vp test --coverage && node --test scripts/coverage.checks.mjs",
     "test:container": "node --test tests/container/runner.checks.mjs",
     "test:hooks": "node --test scripts/agent-hooks/*.checks.mjs scripts/git-hooks/*.checks.mjs",
+    "test:origin-snapshot-lab": "node scripts/test-container.mjs test:origin-snapshot-lab:local",
+    "test:origin-snapshot-lab:local": "LAB_HEADLESS=1 node --test --test-concurrency=1 scripts/origin-snapshot-lab/specs/*.checks.mjs",
     "test:extension-manifest": "vp run extension#test:manifest",
     "deps": "depcruise packages tests --config .dependency-cruiser.cjs && depcruise apps/website --config .dependency-cruiser.cjs --ts-config apps/website/tsconfig.deps.json && depcruise apps/extension --config .dependency-cruiser.cjs --ts-config apps/extension/tsconfig.deps.json",
     "dead-code": "knip",
