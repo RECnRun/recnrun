@@ -115,7 +115,7 @@ Phase 3 additionally owes: the key generator, a journal so the coordinator survi
 
 ## Zephyr manual run (protocol)
 
-`vp run origin-snapshot-lab:manual -- <url>` opens a headed Chromium with a temporary profile and the lab extension, its host access set to the URL's origin, the exclusive-access probe on, and the tab's first identity named A. The terminal takes `switch <identity>`, `reset <identity>`, `inventory [label]`, `captures`, and `quit`. Output and `.artifacts/origin-snapshot-lab/manual-inventory-<label>.json` hold names, counts, and sizes, never values; captures, which hold tokens, stay in the profile that `quit` deletes. A switch is refused while another tab of the origin is open or the tab is on another host (the sign-in page).
+`vp run origin-snapshot-lab:manual -- <url>` opens a headed Chromium with a temporary profile and the lab extension, its host access set to the URL's origin, the exclusive-access probe on, and the tab's first identity named A. The terminal takes `switch <identity>`, `reset <identity>`, `inventory [label]`, `captures`, and `quit`. Output and `.artifacts/origin-snapshot-lab/manual-inventory-<label>.json` hold names, counts, and sizes, never values; captures, which hold tokens, stay in the profile that `quit` deletes. A switch is refused unless Chrome shows exactly one tab on the origin; the refusal lists the tabs' paths. The runner finds that tab through the extension, not through Playwright's page, because on Zephyr the two disagreed once and the switch failed with no tab id.
 
 Steps, with test accounts only:
 

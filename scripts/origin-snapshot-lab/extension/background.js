@@ -62,6 +62,12 @@ globalThis.lab = {
   register,
   switchTo,
   probeOffscreen,
+  // The tabs Chrome shows on `origin`, by id and path; queries and fragments may hold tokens.
+  originTabs: async (origin) =>
+    (await chrome.tabs.query({}))
+      .map((tab) => ({ id: tab.id, url: URL.parse(tab.url ?? tab.pendingUrl ?? "") }))
+      .filter(({ url }) => url?.origin === origin)
+      .map(({ id, url }) => ({ id, path: url.pathname })),
   tabIdFor: async (prefix) =>
     (await chrome.tabs.query({})).find((tab) => tab.url?.startsWith(prefix))?.id,
   capture: async (origin, identity) => {

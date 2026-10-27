@@ -30,21 +30,20 @@ const receipt = ({ from, to, kind, ms, report }) => ({
   restoreMs: Math.round(report.restored ?? 0),
 });
 
-function sameOriginTabs({ context }, page) {
-  return context.pages().filter((other) => other !== page && other.url().startsWith(origin));
-}
-
-async function switchTab(session, page, to, reset) {
+/** Chrome's own list of the origin's tabs: a switch needs exactly one. */
+async function switchTab({ lab }, to, reset) {
   if (!to) return "name the identity";
-  const others = sameOriginTabs(session, page);
-  if (others.length > 0)
-    return `refused: close the other tabs of ${origin} first (${others.length})`;
-  if (!page.url().startsWith(origin)) return `refused: the tab must be on ${origin}`;
-  const tabId = await session.lab.tabIdFor(page.url());
-  return receipt(await session.lab.switchTo(tabId, to, { reset }));
+  const tabs = await lab.originTabs(origin);
+  if (tabs.length !== 1) {
+    const paths = tabs.map((tab) => tab.path).join(", ");
+    return `refused: needs exactly one tab on ${origin}, found ${tabs.length} ${paths}`;
+  }
+  return receipt(await lab.switchTo(tabs[0].id, to, { reset }));
 }
 
-async function inventory(session, page, label = "now") {
+async function inventory(session, label = "now") {
+  const page = session.context.pages().find((open) => open.url().startsWith(`${origin}/`));
+  if (!page) return `refused: no tab on ${origin}`;
   const value = {
     page: await page.evaluate(pageInventory),
     cookies: await cookieInventory(session.context),
@@ -60,18 +59,18 @@ async function captures(session) {
   );
 }
 
-function commands(session, page) {
+function commands(session) {
   return {
-    switch: (to) => switchTab(session, page, to, false),
-    reset: (to) => switchTab(session, page, to, true),
-    inventory: (label) => inventory(session, page, label),
+    switch: (to) => switchTab(session, to, false),
+    reset: (to) => switchTab(session, to, true),
+    inventory: (label) => inventory(session, label),
     captures: () => captures(session),
     help: () => HELP,
   };
 }
 
-async function run(session, page) {
-  const table = commands(session, page);
+async function run(session) {
+  const table = commands(session);
   const terminal = createInterface({ input: process.stdin, output: process.stdout });
   console.log(HELP);
   for await (const line of terminal) {
@@ -98,7 +97,7 @@ try {
   });
   const page = session.context.pages()[0] ?? (await session.context.newPage());
   await page.goto(url);
-  await run(session, page);
+  await run(session);
 } finally {
   await session.close();
   rmSync(extension, { recursive: true, force: true });
