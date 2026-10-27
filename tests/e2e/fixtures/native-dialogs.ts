@@ -76,9 +76,20 @@ const windowGone = (title: string) =>
     `the window "${title}" to close`,
   );
 
-async function pickerWindow(): Promise<string> {
-  return xdotool("search", "--sync", "--onlyvisible", "--name", PICKER_TITLE);
+/**
+ * The visible windows whose title matches. Searched again on failure: Ubuntu's xdotool
+ * 3.20160805 predates the fix for #335 and exits on BadWindow when any window closes meanwhile.
+ */
+async function findWindow(title: string): Promise<string> {
+  let found = "";
+  await until(async () => {
+    found = await xdotool("search", "--sync", "--onlyvisible", "--name", title).catch(() => "");
+    return found !== "";
+  }, `the window "${title}" to show`);
+  return found;
 }
+
+const pickerWindow = () => findWindow(PICKER_TITLE);
 
 async function windowOrigin(id: string): Promise<{ x: number; y: number }> {
   const geometry = await xdotool("getwindowgeometry", "--shell", id);
@@ -155,7 +166,7 @@ async function driverOf(page: Page): Promise<NativeDialogs> {
     await page.evaluate((name) => {
       document.title = name;
     }, title);
-    const id = await xdotool("search", "--sync", "--onlyvisible", "--name", `^${title}( - |$)`);
+    const id = await findWindow(`^${title}( - |$)`);
     // A button under the pointer, left there by the last answer, is no longer light blue; no
     // --sync, which waits forever when the pointer is there already.
     await xdotool("mousemove", "0", "0");
