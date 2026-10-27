@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <script>
+      // Experiment D: an app whose session lives in memory and comes from the sign-in server, as
+      // keycloak-js does. Without a token it asks the server, which answers silently when its
+      // cookie names a user. `profile` stands for what the app keeps about its user.
+      (() => {
+        const token = new URLSearchParams(location.hash.slice(1)).get("token");
+        if (!token) {
+          const back = location.origin + location.pathname;
+          location.replace(`%SSO%?return=${encodeURIComponent(back)}`);
+          return;
+        }
+        history.replaceState(null, "", location.pathname + location.search);
+        const profile = localStorage.getItem("profile");
+        if (!profile) localStorage.setItem("profile", token);
+        window.__session = { user: token, profile };
+      })();
+    </script>
+    <title>Origin lab SSO app</title>
+  </head>
+  <body>
+    <h1>Origin lab SSO app</h1>
+  </body>
+</html>

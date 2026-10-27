@@ -5,6 +5,7 @@
   "description": "Lab extension: captures, clears, and restores one origin's storage per identity.",
   "permissions": [
     "scripting",
+    "cookies",
     "tabs",
     "webNavigation",
     "storage",
@@ -12,7 +13,7 @@
     "declarativeNetRequestWithHostAccess",
     "offscreen"
   ],
-  "host_permissions": ["http://app.localhost/*"],
+  "host_permissions": ["http://app.localhost/*", "http://sso.localhost/*"],
   "background": { "service_worker": "background.js", "type": "module" },
   "message_serialization": "structured_clone"
 }

@@ -68,6 +68,10 @@ globalThis.lab = {
       .map((tab) => ({ id: tab.id, url: URL.parse(tab.url ?? tab.pendingUrl ?? "") }))
       .filter(({ url }) => url?.origin === origin)
       .map(({ id, url }) => ({ id, path: url.pathname })),
+  hostTabs: async (host) =>
+    (await chrome.tabs.query({})).filter(
+      (tab) => URL.parse(tab.url ?? tab.pendingUrl ?? "")?.hostname === host,
+    ),
   tabIdFor: async (prefix) =>
     (await chrome.tabs.query({})).find((tab) => tab.url?.startsWith(prefix))?.id,
   capture: async (origin, identity) => {

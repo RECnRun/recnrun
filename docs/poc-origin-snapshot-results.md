@@ -101,6 +101,21 @@ Large capture (`ORIGIN_LAB_RECORDS` records of about 1 kB in one store):
 
 About 10 MB went through one structured clone message without error. Records of several megabytes each were not tried.
 
+### Experiment D: the sign-in host's cookies
+
+The first Zephyr run (below) showed the gap: after `switch B` the extension had cleared `errorDb`, `zephyrOffDb`, and web storage, yet the app came back signed in as A, on its first-run page. Zephyr's storage holds no token (`localStorage` has `user-profile`, `user-roles`, configuration, and feature flags); keycloak-js keeps the tokens in memory and gets new ones from Keycloak on every load, silently, because Keycloak's session cookies on `login-acc.one.be` (`KEYCLOAK_IDENTITY` HttpOnly, `KEYCLOAK_SESSION`, `AUTH_SESSION_ID`, all `SameSite=None`) still named A. Worse, `switch A` after signing in B would restore A's data under B's session.
+
+The fixture reproduces it with a sign-in server on `sso.localhost` and an app page that signs in from it. With `cookieHosts` configured, the background captures that host's cookies (`chrome.cookies.getAll({ domain })`) into the same capture, persists it, and only then removes them and sets the target's, while the gate holds the app off; the gate script gets the target without the cookies.
+
+| Run                            | After A → B              | After B → A                    | After A → B                |
+| ------------------------------ | ------------------------ | ------------------------------ | -------------------------- |
+| Control, no cookie host        | alice, silently          | alice                          | alice                      |
+| `cookieHosts: [sso.localhost]` | login page; bob signs in | alice, profile alice, no login | bob, profile bob, no login |
+
+Cookies per switch with the host: removed 1 / set 0 (start), then removed 1 / set 1 (each resume). Red: the second test failed before the extension swapped cookies (B was alice); green after.
+
+Limits: only unpartitioned cookies whose domain is the host or a subdomain; cookies on a parent domain (`.one.be`) are not taken, since other hosts share them. Restored cookies are only as good as the server session behind them: one that the server ended or let expire (Keycloak's idle timeout) asks for a login again. Another tab on the sign-in host would see the swap, so the manual runner refuses then. This widens the security model: the extension now holds another host's session cookies, HttpOnly ones included.
+
 ## Phase 2: intermediate decision
 
 **Proceed with restrictions.** A1 restores before the app's first script in every measured run, with and without a service worker serving the page. The conditions under which that holds:
@@ -110,27 +125,32 @@ About 10 MB went through one structured clone message without error. Records of 
 3. **Probe before destroy**: every database gets an exclusive-access probe with a timeout before the first `deleteDatabase`; the capture is persisted (strict durability) before anything is cleared.
 4. **One tab of the origin**, and **no service worker holding an IndexedDB connection**; the switch refuses or fails safely otherwise. These are feasibility restrictions, not isolation.
 5. Service worker writes may land in either identity's data around the switch.
+6. **Sign-in host cookies** (D): when the session comes from a sign-in server on another host, its cookies are part of the snapshot (`cookies` permission and host access to that host); without them a switch can silently keep the previous account and mix it with the next identity's data.
 
 Phase 3 additionally owes: refusing a switch to the tab's current identity (the lab accepted B → B once, which would have overwritten B's capture with an empty state on the next switch; fixed in the lab), the key generator, a journal so the coordinator survives a background restart, refusing early when another tab of the origin is open (`tabs.query`), and `beforeunload` reported as a refusal.
 
 ## Zephyr manual run (protocol)
 
-`vp run origin-snapshot-lab:manual -- <url>` opens a headed Chromium with a temporary profile and the lab extension, its host access set to the URL's origin, the exclusive-access probe on, and the tab's first identity named A. The terminal takes `switch <identity>`, `reset <identity>`, `inventory [label]`, `captures`, and `quit`. Output and `.artifacts/origin-snapshot-lab/manual-inventory-<label>.json` hold names, counts, and sizes, never values; captures, which hold tokens, stay in the profile that `quit` deletes. A switch is refused unless Chrome shows exactly one tab on the origin; the refusal lists the tabs' paths. The runner finds that tab through the extension, not through Playwright's page, because on Zephyr the two disagreed once and the switch failed with no tab id.
+`vp run origin-snapshot-lab:manual -- <url> [--with-host <host>]...` opens a headed Chromium with a temporary profile and the lab extension, its host access set to the URL's origin and each `--with-host`, the exclusive-access probe on, and the tab's first identity named A. Each `--with-host` has its cookies captured and swapped with the origin's storage (Experiment D). The terminal takes `switch <identity>`, `reset <identity>`, `inventory [label]`, `captures`, and `quit`. Output and `.artifacts/origin-snapshot-lab/manual-inventory-<label>.json` hold names, counts, and sizes, never values; captures, which hold tokens and session cookies, stay in the profile that `quit` deletes. A switch is refused unless Chrome shows exactly one tab on the origin (the refusal lists the tabs' paths) and none on a `--with-host` host. The runner finds that tab through the extension, not through Playwright's page, because on Zephyr the two disagreed once and the switch failed with no tab id.
+
+First run, without `--with-host`: `switch B` cleared `errorDb` and `zephyrOffDb` (not blocked, 218 ms), and the app came back signed in as A on its first-run page (Experiment D explains why). The runner then refused `switch B` again with "the tab is already B".
 
 Steps, with test accounts only:
 
-1. Start the runner on `https://zephyr-tq.one.be/zephyr-domes-frontend/` and sign in as test account A; let the app finish loading its offline data. Run `inventory a`.
-2. `switch B`. B starts empty. Record which account the app shows and run `inventory after-b`. In the first run the app did not show Keycloak's page: it likely signed A in again without a visible redirect (a silent single sign-on through the sign-in host's cookies, which were not switched).
-3. If Keycloak asked for credentials, sign in as B. If A came back, the session cookies of the sign-in host decide the account, which the snapshot cannot change; to go on, sign out of Keycloak from the app or delete the `login-acc.one.be` cookies in DevTools by hand, sign in as B, and record which you did (signing out may end A's server session too). Run `inventory b`.
-4. `switch A`. Record whether A's app opens without a sign-in, shows A's account and offline data, and stays signed in for a few minutes (token refresh and Keycloak's session checks use the sign-in host's cookies, which are now B's).
-5. `switch B`, then `switch A` once more, recording the same. Run `captures`, then `quit`.
+1. `vp run origin-snapshot-lab:manual -- https://zephyr-tq.one.be/zephyr-domes-frontend/ --with-host login-acc.one.be`. Sign in as A and let the app finish loading its offline data. Run `inventory a`.
+2. `switch B`. Expected: Keycloak's login page, with the receipt's `cookies` showing some removed and none set. Sign in as B, let the data load, run `inventory b`.
+3. `switch A`. Expected: A's app without a login, A's account and offline data; the receipt shows cookies removed and set. Use the app for a few minutes (navigate, wait for a token refresh) and record whether it stays A.
+4. `switch B`. Expected: B without a login, B's data.
+5. `switch A` and `switch B` once more, then `captures` and `quit`.
 
-What to record: for each step, the account the app shows, any sign-in page or error, and the terminal's output. Close DevTools' IndexedDB view before a switch: if it holds a connection (not verified), the probe blocks and the switch fails without changing anything. A failed switch leaves the tab unknown and refuses further switches; quit and start over.
+What to record: for each step, the account the app shows, any login page or error, the time since that identity was last active (a login page after a long pause may be Keycloak's idle timeout, not a failure of the switch), and the terminal's output. Do not sign out inside the app: it ends that identity's Keycloak session for good. Do not open a tab on `login-acc.one.be` (the switch refuses). If an inventory lists cookies on `.one.be` or on another host, report their names: the switch does not take them. Close DevTools' IndexedDB view before a switch: if it holds a connection (not verified), the probe blocks and the switch fails without changing anything. A failed switch leaves the tab unknown and refuses further switches; quit and start over.
 
 ## What was exercised
 
 - All four specs, on the host (31 tests, 3 runs per Experiment A cell, 100 large records): 31 passed, 0 failed.
 - In Docker with 50 runs per cell and 10,000 large records: 31 passed, 0 failed (`.artifacts/docker/2026-10-27T10-11-55.364Z-ff1bbd70-f662-43b3-8dc3-f0ed194ca05e/run.log`; the JSON evidence stays inside the container, so the tables above come from the JSON lines the specs print). A first Docker run failed 2 of 31 because a spec wrote before the app published `window.app`; the specs now wait for it, and the rerun passed.
 - The manual runner on the fixture (headless, scripted commands): inventory, start, resume, reset, captures, and an unknown command. On Zephyr signed out: the inventory of the Keycloak page (cookie names only) and the refusal to switch while the tab is on the sign-in host.
+- Experiment D: control and swap, 2 passed on the host and in the full Docker run (33 passed, 0 failed, `.artifacts/docker/2026-10-27T11-29-15.686Z-3aab8329-57c4-4d43-b4eb-5bf5b7410b84/run.log`, 50 runs per Experiment A cell); red before the extension swapped cookies (B came back as alice), green after. The manual runner with `--with-host sso.localhost` on the fixture (a scratch copy with navigation commands, scripted): B started at the login page, bob signed in, a tab on the sign-in host refused the switch, A came back as alice and B as bob, and `captures` listed cookie names only.
 - Negative controls: A0 (fails as expected), the JSON transport (fails or corrupts as expected), and the unprobed second tab (late delete reproduced).
-- Not exercised: the Zephyr inventory and any run against Zephyr (needs a manual sign-in with a test account), and a cancelled `beforeunload` dialog (Playwright accepted it; the cancelled path is inferred from navigation semantics).
+- Zephyr signed in, first run (by the user, without `--with-host`): the inventory and `switch B`, which kept A signed in.
+- Not exercised: Zephyr with `--with-host login-acc.one.be` (needs the user's test accounts), Secure, domain, and expired cookies in the fixture (Zephyr's are Secure, host-only), and a cancelled `beforeunload` dialog (Playwright accepted it; the cancelled path is inferred from navigation semantics).

@@ -52,5 +52,6 @@ export function summarize(state) {
       version: database.version,
       stores: database.stores.map((store) => ({ name: store.name, count: store.values.length })),
     })),
+    cookies: (state.cookies ?? []).map((cookie) => `${cookie.domain}${cookie.path} ${cookie.name}`),
   };
 }

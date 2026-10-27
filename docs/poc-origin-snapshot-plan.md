@@ -67,13 +67,13 @@ The domain already has `Snapshot` (the stored recordings). Do not reuse the word
 | Permission                    | Used for                                                                                  |
 | ----------------------------- | ----------------------------------------------------------------------------------------- |
 | `scripting`                   | The gate content script, registered only during a switch (`registerContentScripts`)       |
-| `cookies`                     | Capture, clear, and restore the origin's cookies (partitioned ones included)              |
+| `cookies`                     | Capture, clear, and restore the cookies of the origin and of its sign-in host (D)         |
 | `tabs`, `webNavigation`       | Navigate the tab, wait for commits, know each `documentId`; find other tabs on the origin |
 | `webRequest`                  | Drain the tab's pending requests before capture                                           |
 | `declarativeNetRequest`       | Block the tab after a failed switch; candidate A2 (response header)                       |
 | `storage`, `unlimitedStorage` | The switch journal; extension IndexedDB holding captures of many megabytes                |
 | `offscreen`                   | Candidate A3 only                                                                         |
-| Host permissions              | The fixture origin; Zephyr's origin only in the manual run's copy of the manifest         |
+| Host permissions              | The fixture origins; Zephyr's origin and sign-in host only in the manual run's manifest   |
 
 ### Security model change (document it)
 
@@ -136,6 +136,10 @@ Prove the path **app IndexedDB → gate content script → background → extens
 | T3      | Note only unless T1 and T2 fail: a web-accessible extension frame with a `MessageChannel`; record why a page could reach that frame                                                          |
 
 A value the transport cannot carry fails the capture with a named error, or the supported scope shrinks and the report says so. Never convert silently: compare each round-tripped value with the original by type and content.
+
+### Experiment D: the sign-in host's cookies
+
+Added after the first Zephyr run, where `switch B` left the app signed in as A: Zephyr keeps its tokens in memory and signs in silently through Keycloak's cookies on another host, which an origin snapshot does not hold. The fixture adds a sign-in server on `http://sso.localhost:<port>` (an HttpOnly session cookie, a silent redirect when it is present, a login page otherwise) and an app page that takes its session from it. The background captures the configured hosts' cookies with `chrome.cookies`, persists them with the origin's capture, and only then removes them and sets the target identity's, while the gate holds the app off. The page scripts never receive cookie values. Control: without the sign-in host, B is silently signed in as A.
 
 ## Phase 2: Decision gate
 

@@ -1,5 +1,6 @@
 // The lab's switch coordinator. Phase 1 keeps its state in memory; Phase 3 needs a journal.
 import { marked, navigate } from "./navigation.js";
+import { captureCookies, replaceCookies } from "./cookies.js";
 import { getCapture, putCapture } from "./repo.js";
 
 export const options = {
@@ -10,8 +11,10 @@ export const options = {
   replace: true,
   // The identity a tab has before its first switch.
   firstIdentity: "profile",
+  // Experiment D: hosts whose cookies are part of the snapshot, such as a sign-in server.
+  cookieHosts: [],
 };
-const EMPTY = { local: [], session: [], databases: [] };
+const EMPTY = { local: [], session: [], databases: [], cookies: [] };
 const tabs = new Map();
 const pending = new Map();
 
@@ -146,15 +149,19 @@ const relative = (context) =>
 async function persist(context, captured) {
   context.marks.captured = performance.now();
   const { ms: _ms, ...state } = captured;
+  const cookies = await captureCookies(options.cookieHosts);
   await putCapture({
     origin: context.origin,
     identity: context.from,
     lastUrl: context.lastUrl,
     capturedAt: Date.now(),
-    state,
+    state: { ...state, cookies },
   });
   context.marks.persisted = performance.now();
-  return { ok: true, target: context.target };
+  // Swapped only once the capture is durable, while the gate holds the app off.
+  context.cookies = await replaceCookies(options.cookieHosts, context.target.cookies ?? []);
+  const { cookies: _cookies, ...target } = context.target;
+  return { ok: true, target };
 }
 
 /** Messages from the gate and A0 scripts; only a pending switch's nonce gets an answer. */
@@ -170,7 +177,12 @@ export async function onPageMessage(message, sender) {
   if (step === "captured") return persist(context, message.captured);
   context.marks[step] = performance.now();
   if (step === "done")
-    context.resolve({ ...message, ready: context.ready, marks: relative(context) });
+    context.resolve({
+      ...message,
+      ready: context.ready,
+      cookies: context.cookies,
+      marks: relative(context),
+    });
   else context.reject(new Error(message.error));
   return { ok: true };
 }

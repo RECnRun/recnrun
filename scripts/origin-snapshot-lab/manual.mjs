@@ -1,5 +1,6 @@
 // Manual run of the lab extension against a real site, driven from the terminal:
-//   vp run origin-snapshot-lab:manual -- <url>
+//   vp run origin-snapshot-lab:manual -- <url> [--with-host <host>]...
+// Each --with-host (a sign-in server, say) has its cookies captured and swapped with the origin's.
 // The tab's identity before the first switch is A. The person signs in by hand; every capture, clear, and restore runs in the extension. Output
 // shows names, counts, and sizes only. Captures live in a temporary profile deleted on quit.
 import { rmSync } from "node:fs";
@@ -14,9 +15,21 @@ const HELP = `Commands:
   captures            the identities captured so far, by name and count
   help, quit`;
 
-// vp run passes the `--` separator through.
-const url = process.argv.slice(2).find((argument) => argument !== "--");
-if (!url) throw new Error("Usage: vp run origin-snapshot-lab:manual -- <url>");
+/** The URL and the --with-host values; vp run passes the `--` separator through. */
+function parseArguments(argv) {
+  const cookieHosts = [];
+  const positional = [];
+  for (let index = 0; index < argv.length; index += 1) {
+    if (argv[index] === "--with-host") cookieHosts.push(argv[(index += 1)]);
+    else if (argv[index] !== "--") positional.push(argv[index]);
+  }
+  if (positional.length !== 1 || cookieHosts.some((host) => !/^[\w.-]+$/.test(host ?? ""))) {
+    throw new Error("Usage: vp run origin-snapshot-lab:manual -- <url> [--with-host <host>]...");
+  }
+  return { url: positional[0], cookieHosts };
+}
+
+const { url, cookieHosts } = parseArguments(process.argv.slice(2));
 const { origin } = new URL(url);
 
 /** The receipt of a switch without any stored value. */
@@ -28,15 +41,19 @@ const receipt = ({ from, to, kind, ms, report }) => ({
   cleared: report.cleared?.deleted,
   captureMs: Math.round(report.captureMs ?? 0),
   restoreMs: Math.round(report.restored ?? 0),
+  cookies: report.cookies,
 });
 
-/** Chrome's own list of the origin's tabs: a switch needs exactly one. */
+/** Chrome's own list of the origin's tabs: a switch needs exactly one, and none on a cookie host. */
 async function switchTab({ lab }, to, reset) {
   if (!to) return "name the identity";
   const tabs = await lab.originTabs(origin);
   if (tabs.length !== 1) {
     const paths = tabs.map((tab) => tab.path).join(", ");
     return `refused: needs exactly one tab on ${origin}, found ${tabs.length} ${paths}`;
+  }
+  for (const host of cookieHosts) {
+    if ((await lab.hostTabs(host)).length > 0) return `refused: close the tabs on ${host} first`;
   }
   return receipt(await lab.switchTo(tabs[0].id, to, { reset }));
 }
@@ -87,14 +104,19 @@ async function run(session) {
   terminal.close();
 }
 
-const extension = extensionCopy((manifest) => ({ ...manifest, host_permissions: [`${origin}/*`] }));
+const extension = extensionCopy((manifest) => ({
+  ...manifest,
+  host_permissions: [`${origin}/*`, ...cookieHosts.map((host) => `*://${host}/*`)],
+}));
 const session = await launchLab({ extension, origin, bfcache: true });
 try {
   await session.lab.configure({
     clear: { timeoutMs: 5000, probe: true },
     timeoutMs: 30000,
     firstIdentity: "A",
+    cookieHosts,
   });
+  console.log(`cookie hosts: ${cookieHosts.join(", ") || "none"}`);
   const page = session.context.pages()[0] ?? (await session.context.newPage());
   await page.goto(url);
   await run(session);

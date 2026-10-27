@@ -1,0 +1,86 @@
+// Experiment D: an app signed in through a sign-in server on another host, whose session cookie
+// the origin's snapshot does not hold unless the extension swaps that host's cookies too.
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import { APP, SSO, startFixture } from "../fixture/server.mjs";
+import { launchLab, writeEvidence } from "../lab.mjs";
+
+const evidence = {};
+// Top-level awaited tests do not wait for root before()/after() hooks; the module owns it.
+const fixture = await startFixture();
+
+/** The login page, or the app's session once the silent sign-in settled; navigations may cut in. */
+async function sessionOf(page) {
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const seen = await page
+      .evaluate(() =>
+        document.title === "SSO login" ? { login: true } : (window.__session ?? null),
+      )
+      .catch(() => null);
+    if (seen) return seen;
+    await page.waitForTimeout(100);
+  }
+  throw new Error(`no session or login page at ${page.url()}`);
+}
+
+/** The person signs in at the sign-in server, by hand in a real run. */
+async function signIn(page, user) {
+  const back = encodeURIComponent(`${APP}/sso-app`);
+  await page.goto(`${SSO}/realms/lab/login?user=${user}&return=${back}`);
+  return sessionOf(page);
+}
+
+/** Signs in alice as A, switches to B (signing in bob if asked), back to A, and to B again. */
+async function scenario(cookieHosts) {
+  const session = await launchLab();
+  try {
+    await session.lab.configure({ cookieHosts, firstIdentity: "A" });
+    const page = await session.context.newPage();
+    await page.goto(`${APP}/sso-app`);
+    const steps = { first: await sessionOf(page), a: await signIn(page, "alice") };
+    const tabId = await session.lab.tabIdFor(`${APP}/`);
+    const switches = [];
+    for (const [label, to] of [
+      ["b", "B"],
+      ["backToA", "A"],
+      ["backToB", "B"],
+    ]) {
+      const receipt = await session.lab.switchTo(tabId, to);
+      switches.push({ to, kind: receipt.kind, cookies: receipt.report.cookies });
+      steps[label] = await sessionOf(page);
+      if (steps[label].login) steps[`${label}SignedIn`] = await signIn(page, "bob");
+    }
+    return { steps, switches };
+  } finally {
+    await session.close();
+  }
+}
+
+await test("D control: without the sign-in host's cookies, B is silently signed in as A", async () => {
+  const result = await scenario([]);
+  evidence.control = result;
+  console.log(JSON.stringify({ control: result.steps }));
+  assert.deepEqual(result.steps.first, { login: true });
+  assert.deepEqual(result.steps.b, { user: "alice", profile: null });
+});
+
+await test("D: with the sign-in host's cookies, each identity keeps its own session", async () => {
+  const result = await scenario(["sso.localhost"]);
+  evidence.withCookies = result;
+  console.log(JSON.stringify({ withCookies: result }));
+  assert.deepEqual(result.steps.b, { login: true });
+  assert.deepEqual(result.steps.bSignedIn, { user: "bob", profile: null });
+  assert.deepEqual(result.steps.backToA, { user: "alice", profile: "alice" });
+  assert.deepEqual(result.steps.backToB, { user: "bob", profile: "bob" });
+  assert.deepEqual(
+    result.switches.map((step) => step.cookies),
+    [
+      { removed: 1, set: 0, expired: 0 },
+      { removed: 1, set: 1, expired: 0 },
+      { removed: 1, set: 1, expired: 0 },
+    ],
+  );
+});
+
+await fixture.close();
+writeEvidence("experiment-d", evidence);
