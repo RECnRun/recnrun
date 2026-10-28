@@ -44,7 +44,11 @@ describe("two peers", () => {
     expect(await peerLinksRepository.get(STRANGER)).toMatchObject({ verified: false });
     expect(await remoteRecordingsRepository.get(PEER)).toMatchObject({ connected: true });
     expect(await remoteRecordingsRepository.get(STRANGER)).toMatchObject({ connected: false });
-    const ask = link.frames().at(-1) as unknown as { id: string; to: string };
+    // Found by type: a report from an earlier file's timer may follow it (isolate: false).
+    const ask = link.frames().find(({ type }) => type === "GET_TABS") as unknown as {
+      id: string;
+      to: string;
+    };
     expect(ask.to).toBe(PEER);
     await receive(fromPeer("TABS_SNAPSHOT", { requestId: ask.id, tabs: [] }));
     expect(await pending).toEqual({ tabs: [] });
