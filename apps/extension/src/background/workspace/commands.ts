@@ -44,7 +44,14 @@ async function startAt(url: string): Promise<void> {
 /** The user decided on the windows they saw; any other set needs a fresh decision. */
 async function closeShownAndStart(url: string, windowIds: readonly number[]): Promise<void> {
   await requireAccess();
-  const { foreign } = await classifiedWindows();
+  const { managed, foreign } = await classifiedWindows();
+  // Starting needs every Incognito window gone, so closing the shown ones first would be in vain.
+  if (managed !== undefined) {
+    throw new WorkspaceError(
+      "WorkspaceOpen",
+      "Close and start empty replaces the open workspace; close the other Incognito windows first.",
+    );
+  }
   const shown = new Set(windowIds);
   if (shown.size !== foreign.length || !foreign.every((window) => shown.has(window.id))) {
     throw new WorkspaceError(

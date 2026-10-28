@@ -156,6 +156,24 @@ describe("workspace-close-and-start", () => {
     expect(remove).not.toHaveBeenCalled();
   });
 
+  test("refuses while the managed window is open, and closes none", async () => {
+    expect(await send({ type: "workspace-start", url: TARGET })).toEqual({ ok: true });
+    const shown = await openIncognitoWindow();
+    const remove = vi.spyOn(fakeBrowser.windows, "remove");
+    const message = { type: "workspace-close-and-start", url: TARGET, windowIds: [shown] };
+    const reply = await send(message);
+    // One comparison, so a failure shows both the reply and any window closed before it.
+    expect({ reply, removed: remove.mock.calls.map(([id]) => id) }).toEqual({
+      reply: {
+        ok: false,
+        error:
+          "Close and start empty replaces the open workspace; close the other Incognito windows first.",
+      },
+      removed: [],
+    });
+    expect((await status()).foreign.map((each) => each.id)).toEqual([shown]);
+  });
+
   test("refuses an internal target before closing anything", async () => {
     const shown = await openIncognitoWindow();
     const remove = vi.spyOn(fakeBrowser.windows, "remove");

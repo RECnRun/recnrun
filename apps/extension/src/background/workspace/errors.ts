@@ -8,7 +8,8 @@ type WorkspaceErrorName =
   | "WindowNotCreated"
   | "WindowsChanged"
   | "WindowsNotClosed"
-  | "WorkspaceBusy";
+  | "WorkspaceBusy"
+  | "WorkspaceOpen";
 
 export class WorkspaceError extends Error {
   constructor(name: WorkspaceErrorName, message: string) {

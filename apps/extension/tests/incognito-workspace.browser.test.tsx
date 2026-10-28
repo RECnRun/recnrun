@@ -158,6 +158,17 @@ test("with the workspace open, Close and start empty restarts it and warns about
   await expect.poll(() => sent).toEqual([{ type: "workspace-restart", url: TARGET }]);
 });
 
+test("with the workspace and other windows open, the panel lists them and offers no command", async () => {
+  const managed = { generation: 1, windowId: 3, tabId: 30, status: "active" as const };
+  const { root } = mount({ ...NO_INCOGNITO_WINDOW, managed, foreign: foreign(5) });
+  await expect.poll(() => panelText(root)).toContain("1 Incognito window is open");
+  expect(panelText(root)).toContain("Incognito workspace open");
+  expect(panelText(root)).toContain("Close the other Incognito windows yourself");
+  for (const name of ["Close and start empty", "Close these windows and start", "Start"]) {
+    expect(inPanel(root, name)).toBeUndefined();
+  }
+});
+
 test("a closed managed window offers Start again", async () => {
   const managed = { generation: 1, windowId: 3, tabId: 30, status: "closed" as const };
   const { root } = mount({ ...NO_INCOGNITO_WINDOW, managed });

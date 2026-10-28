@@ -96,9 +96,20 @@ interface ActionProps {
   run: (request: WorkspaceRequest) => void;
 }
 
-/** One action per state: restart the open workspace, close the windows shown, or start. */
+/** One action per state: restart the open workspace, close the windows shown, or start; none while both are open. */
 function WorkspaceAction({ status, target, disabled, run }: ActionProps) {
   const url = target.trim();
+  // Both commands need every other Incognito window gone; RECnRun closes none it did not open here.
+  if (status.managed?.status === "active" && status.foreign.length > 0) {
+    return (
+      <>
+        <p>Incognito workspace open</p>
+        <p class="workspace-hint">
+          Close the other Incognito windows yourself; this list follows them.
+        </p>
+      </>
+    );
+  }
   if (status.managed?.status === "active") {
     return (
       <>

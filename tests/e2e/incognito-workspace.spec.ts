@@ -5,6 +5,7 @@ import { chromeTabs, openIncognitoTab } from "./fixtures/tabs.ts";
 import {
   APP,
   managedWindow,
+  pageAt,
   runWorkspace,
   startWorkspace,
   workspacePanel,
@@ -101,6 +102,23 @@ test.describe("with incognito access", () => {
     expect(after?.windowId).not.toBe(before?.windowId);
     await expect.poll(() => incognitoUrls(serviceWorker)).toEqual([`${APP}/inspect?run=two`]);
     await expect(workspacePanel(site)).toContainText("Incognito workspace open");
+  });
+
+  test("another Incognito window beside the workspace leaves no command until the user closes it", async ({
+    context,
+    serviceWorker,
+  }) => {
+    const site = await openSite(context, "/");
+    await startWorkspace(site, serviceWorker, `${APP}/inspect?run=managed`);
+    await openIncognitoTab(serviceWorker, `${APP}/inspect?run=beside`);
+    const panel = workspacePanel(site);
+    await expect(panel).toContainText("1 Incognito window is open");
+    await expect(panel).toContainText("Close the other Incognito windows yourself");
+    await expect(panel.getByRole("button")).toHaveCount(0);
+    await screen(site, "open-and-foreign");
+
+    await (await pageAt(context, `${APP}/inspect?run=beside`)).close();
+    await expect(panel.getByRole("button", { name: "Close and start empty" })).toBeVisible();
   });
 
   test("an internal address is refused with the background's reason", async ({ context }) => {
