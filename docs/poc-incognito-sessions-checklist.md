@@ -8,7 +8,7 @@ Plan: [poc-incognito-sessions-plan.md](poc-incognito-sessions-plan.md). Assignme
 | Branch               | `poc/incognito-sessions`                                         |
 | Planned base         | `44c154da29860c7a8df829e902b177df5ce2ba2a` (2026-10-28)          |
 | Actual base (P0.1)   | `44c154d` (re-resolved 2026-10-28, unchanged)                    |
-| Last recorded commit | `5338ba4`                                                        |
+| Last recorded commit | `be2f3eb`                                                        |
 | Decisions OD-1…OD-4  | defaults of plan §3, accepted by the user ("Avance", 2026-10-28) |
 
 ## Status legend
@@ -349,7 +349,11 @@ Stage 3 verify: exit 0 on `8f2647e`, 485 unit/component, 86/86 e2e, coverage 98.
 
 ## Stage 4 — PWA compatibility and Zephyr
 
-- [ ] S4.1 PWA fixture `/pwa/` + native Incognito baseline
+- [i] S4.1 PWA fixture `/pwa/` + native Incognito baseline
+  red: scratch worktree (`wt-s41`, removed), worker API fetch with `credentials: "omit"`: `vp run test:e2e -- tests/e2e/poc-pwa.spec.ts` → `me.user` expected `"A"`, received `null` (`.artifacts/docker/2026-10-28T21-26-04.979Z-056478fb-4bc4-4cb6-ad1c-a6e231220a1b`); worker navigation without the cache fallback → `page.reload: net::ERR_FAILED` at the offline reload (`2026-10-28T21-26-16.305Z-786d3f5a`)
+  green: same command → 1 passed (`.artifacts/docker/2026-10-28T21-25-39.926Z-3b9eb771-f877-46dc-aed2-5bdea9889cc8`); `vp check` passes
+  commit: be2f3eb Add a PWA fixture and its native Incognito baseline
+  notes: `/pwa/?run=` (`tests/e2e/apps/pwa-pages.ts`, `pwa-routes.ts`): a manifest (`scope`, `standalone`), a first inline script that reads the localStorage and IndexedDB profile, `controller`, and `workerStart` before anything else and beacons them, then registers `/pwa/sw.js?run=` (scope `/pwa/`). The worker precaches the page into `pwa-v<version>`, `skipWaiting`, deletes other `pwa-v*` caches and `clients.claim()`s on activate, serves navigations network-first with a cache fallback, and on `whoami` makes its own `fetch('/pwa/api/me')` (HttpOnly `pwa_user` cookie, `x-pwa-from: worker`), stores the answer in Cache Storage `pwa-api` and the user in its IndexedDB `pwa-sw`, and reads the page's IndexedDB profile. The server keeps per run a version (in the worker's bytes, so `update()` installs a new worker) and an offline switch that destroys the socket. Native baseline in a plain managed Incognito window (dashboard Start, no restore): first load uncontrolled, then claimed (`controller` `/pwa/sw.js?run=…`); signed in as A, the worker's fetch answers A; controlled reload served by the worker with A's profile; version 2 installs, `pwa-v1` deleted, API answers version 2; offline reload served from `pwa-v2` with A's profile, the worker answers A from `pwa-api`; every API call carried `pwa_user`. Readiness (first script to controller): install 16 ms, controlled reload 3 ms, offline reload 4 ms. A `controllerchange` fires before the new worker's activate event ends (`update()` waits for `activated`; seen as a stale `pwa-v1` on the first run). `tests/e2e/apps/http.ts` takes the shared request helpers out of `server.ts`. Not exercised: the install prompt (the manifest is served and parsed, never installed as an app window)
 - [ ] S4.2 PWA through A→B→A→C→A (first load, controlled reload, version change, offline cases)
 - [ ] S4.3 Declared capability: additional cookie hosts (fixture SSO)
 - [ ] [manual] S4.4 Zephyr build, `vp run poc:zephyr`, runbook; user runs baseline and A→B→A→C→A
