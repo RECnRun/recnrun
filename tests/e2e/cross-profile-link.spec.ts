@@ -1,7 +1,7 @@
 import { expect } from "./fixtures/extension.ts";
 import { allowFolder, pair } from "./fixtures/folder.ts";
 import { test } from "./fixtures/native-dialogs.ts";
-import { framesOf, linkStatus, pairingSection, reopen } from "./fixtures/profiles.ts";
+import { framesOf, linkStatus, pairingSection, reopen, sendRaw } from "./fixtures/profiles.ts";
 import type { Profile } from "./fixtures/profiles.ts";
 
 interface ChromeGlobal {
@@ -17,17 +17,6 @@ const identityOf = (profile: Profile) =>
     const { profileIdentity } = await chrome.storage.local.get("profileIdentity");
     return { identity: profileIdentity as { profileId: string }, extensionId: chrome.runtime.id };
   });
-
-/** Sends a raw frame over the link from a profile's background, as a faulty peer would. */
-const sendRaw = (profile: Profile, frame: string) =>
-  profile.serviceWorker.evaluate(
-    (raw) =>
-      (globalThis as unknown as ChromeGlobal).chrome.runtime.sendMessage({
-        target: "offscreen",
-        command: { type: "send", frame: raw },
-      }),
-    frame,
-  );
 
 const typesOf = (frames: string[]) =>
   frames.map((frame) => (JSON.parse(frame) as { type: string }).type);
@@ -85,18 +74,19 @@ test("a malformed or forged frame runs nothing and gets no answer it could use",
 }) => {
   await pair(profileA, profileB, native);
   const before = (await framesOf(profileB)).length;
-  await sendRaw(profileA, "not json");
+  const idB = (await identityOf(profileB)).identity.profileId;
+  await sendRaw(profileA, idB, "not json");
   // A well-formed message from a profile B never accepted: dropped without an answer.
   const forged = {
     channel: "recnrun-peer",
     protocol: 1,
     id: crypto.randomUUID(),
     from: crypto.randomUUID(),
-    to: (await identityOf(profileB)).identity.profileId,
+    to: idB,
     type: "ACTIVATE_TAB",
     tabId: 1,
   };
-  await sendRaw(profileA, JSON.stringify(forged));
+  await sendRaw(profileA, idB, JSON.stringify(forged));
   // The tap holds frames both ways; B's own are the ones from its profile id.
   const sentByB = async () =>
     (await framesOf(profileB))
@@ -114,7 +104,7 @@ test("a malformed or forged frame runs nothing and gets no answer it could use",
 const pinnedPeer = (profile: Profile) =>
   profile.serviceWorker.evaluate(async () => {
     const { chrome } = globalThis as unknown as ChromeGlobal;
-    return (await chrome.storage.local.get("authorizedPeer")).authorizedPeer;
+    return (await chrome.storage.local.get("authorizedPeers")).authorizedPeers;
   });
 
 test("a profile that quits drops the link, and after a restart reconnects as itself", async ({

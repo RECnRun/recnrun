@@ -19,40 +19,46 @@ export type LinkState = v.InferOutput<typeof LinkStateSchema>;
 const kind = <T extends string, P extends v.ObjectEntries>(type: T, payload: P) =>
   v.strictObject({ type: v.literal(type), ...payload });
 
-/** What an extension page asks the background about the other profile. */
+// Each peer has its own link, and every link command, link event, and request about one peer
+// names the peer's profile id.
+const peer = { peer: ProfileIdSchema };
+
+/** What an extension page asks the background about the other profiles. */
 export const PeerRequestSchema = v.variant("type", [
   kind("status", {}),
   kind("rename", { displayName: DisplayNameSchema }),
-  kind("disconnect", {}),
-  kind("forget", {}),
+  kind("disconnect", peer),
+  kind("reconnect", peer),
+  kind("forget", peer),
+  kind("pair-again", {}),
   kind("folder-pair", {}),
   kind("folder-release", {}),
-  kind("tabs", {}),
-  kind("activate", { tabId: TabIdSchema }),
-  kind("session-start", { tabId: TabIdSchema }),
-  kind("session-set", { status: v.picklist(["recording", "paused"]) }),
-  kind("session-stop", {}),
+  kind("tabs", peer),
+  kind("activate", { ...peer, tabId: TabIdSchema }),
+  kind("session-start", { ...peer, tabId: TabIdSchema }),
+  kind("session-set", { ...peer, status: v.picklist(["recording", "paused"]) }),
+  kind("session-stop", peer),
 ]);
 
 export type PeerRequest = v.InferOutput<typeof PeerRequestSchema>;
 
-/** What the offscreen document reports about its link. */
+/** What the offscreen document reports about its links. */
 export const LinkEventSchema = v.variant("type", [
-  kind("frame", { frame: FrameSchema }),
-  kind("state", { state: LinkStateSchema, remoteFingerprint: v.optional(v.string()) }),
+  kind("frame", { ...peer, frame: FrameSchema }),
+  kind("state", { ...peer, state: LinkStateSchema, remoteFingerprint: v.optional(v.string()) }),
   /** What the other profiles left in the RECnRun folder for this one. */
   kind("folder", { presences: v.array(PresenceSchema), signals: v.array(SignalFileSchema) }),
 ]);
 
 export type LinkEvent = v.InferOutput<typeof LinkEventSchema>;
 
-/** What the background asks of the offscreen document, which alone holds the connection. */
+/** What the background asks of the offscreen document, which alone holds the connections. */
 const LinkCommandSchema = v.variant("type", [
-  kind("offer", {}),
-  kind("answer", { sdp: SdpSchema }),
-  kind("accept-answer", { sdp: SdpSchema }),
-  kind("send", { frame: FrameSchema }),
-  kind("close", {}),
+  kind("offer", peer),
+  kind("answer", { ...peer, sdp: SdpSchema }),
+  kind("accept-answer", { ...peer, sdp: SdpSchema }),
+  kind("send", { ...peer, frame: FrameSchema }),
+  kind("close", peer),
   kind("folder-status", {}),
   kind("folder-watch", { profileId: ProfileIdSchema, displayName: DisplayNameSchema }),
   kind("folder-publish", { signal: SignalFileSchema }),

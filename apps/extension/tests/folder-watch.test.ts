@@ -110,7 +110,7 @@ describe("publish and stop", () => {
       code: "RECNRUN-PAIR-1.code",
     };
     await watch.publish(offer);
-    expect([...pairing(ME).files.keys()]).toEqual(["presence.json", `offer-${PAIRING}.json`]);
+    expect([...pairing(ME).files.keys()]).toEqual(["presence.json", `offer-${PEER}.json`]);
     await watch.stop();
     expect([...pairing(ME).files.keys()]).toEqual([]);
     pairing(PEER).drop("presence.json", peerPresence);

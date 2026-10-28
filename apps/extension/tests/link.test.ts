@@ -3,7 +3,7 @@ import { fakeBrowser } from "wxt/testing/fake-browser";
 import { askLink, closeOffscreen } from "@/background/link";
 import { OFFSCREEN_PAGE } from "@/background/listener";
 import { linkCommandMessage } from "@/messaging/peer-messages";
-import { answering } from "./fake-peer";
+import { PEER, answering } from "./fake-peer";
 
 /** Chrome's view of the offscreen document: whether one is open, and what it answers. */
 function offscreen(open: boolean, reply: unknown = { ok: true, result: { sent: true } }) {
@@ -27,7 +27,7 @@ afterEach(() => {
 
 test("sends the command to an open offscreen document and returns its result", async () => {
   const { create, send } = offscreen(true);
-  const command = { type: "send" as const, frame: "{}" };
+  const command = { type: "send" as const, peer: PEER, frame: "{}" };
   expect(await askLink(command)).toEqual({ sent: true });
   expect(send).toHaveBeenCalledWith(linkCommandMessage(command));
   expect(create).not.toHaveBeenCalled();
@@ -35,7 +35,7 @@ test("sends the command to an open offscreen document and returns its result", a
 
 test("creates the offscreen document first, once for commands sent together", async () => {
   const { create } = offscreen(false);
-  await Promise.all([askLink({ type: "folder-status" }), askLink({ type: "close" })]);
+  await Promise.all([askLink({ type: "folder-status" }), askLink({ type: "close", peer: PEER })]);
   expect(create).toHaveBeenCalledTimes(1);
   expect(create).toHaveBeenCalledWith(expect.objectContaining({ url: OFFSCREEN_PAGE }));
   await askLink({ type: "folder-status" });
@@ -53,10 +53,10 @@ test("retries the creation after Chrome refused it", async () => {
 
 test("rejects with the link's error, or when it does not answer", async () => {
   offscreen(true, { ok: false, error: "No connection." });
-  await expect(askLink({ type: "close" })).rejects.toThrow("No connection.");
+  await expect(askLink({ type: "close", peer: PEER })).rejects.toThrow("No connection.");
   vi.restoreAllMocks();
   offscreen(true, null);
-  await expect(askLink({ type: "close" })).rejects.toThrow("The link did not answer.");
+  await expect(askLink({ type: "close", peer: PEER })).rejects.toThrow("The link did not answer.");
 });
 
 test("closes the offscreen document only when one is open", async () => {

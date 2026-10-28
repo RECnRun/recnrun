@@ -4,8 +4,14 @@ import { describe, expect, test, vi } from "vite-plus/test";
 import type { PeerRequest } from "@/messaging/peer-messages";
 import type { TabSource } from "@/ports/tabs";
 import type { PeerClient } from "@/views/peer-client";
-import { eitherSession, remoteRecordings, remoteTabs } from "@/views/remote-peer";
+import {
+  eitherSession,
+  remoteRecordings,
+  remoteSessionTabs,
+  remoteTabs,
+} from "@/views/remote-peer";
 import { memoryRecordingStore } from "./fake-extension";
+import { PEER } from "./fake-peer";
 
 const session: RecordingSession = { tabId: 4, status: "recording", banked: 0, since: 1 };
 const REMOTE_TAB = { id: 9, windowId: 1, incognito: false, title: "Peer", url: "https://p/" };
@@ -24,11 +30,13 @@ function recordingClient(answer: unknown = {}) {
   return { client, requests, unwatch };
 }
 
-function mirrorOf(
-  remote: { session: RecordingSession | null; mine: boolean; connected: boolean } | null,
-) {
+type Report = { session: RecordingSession | null; mine: boolean; connected: boolean };
+
+/** The background's copy of `PEER`'s last report. */
+function mirrorOf(remote: Report | null) {
   const unwatch = vi.fn();
-  return { read: async () => remote, watch: vi.fn(() => unwatch), unwatch };
+  const read = async () => remote && { profileId: PEER, ...remote };
+  return { read, watch: vi.fn(() => unwatch), unwatch };
 }
 
 /** A tab source with one tab under `id`, whose subscriptions are counted. */
@@ -42,17 +50,16 @@ function tabSource(id: number) {
 describe("remoteTabs", () => {
   test("asks the background for the peer's tabs and validates them", async () => {
     const { client, requests } = recordingClient({ tabs: [REMOTE_TAB], currentId: 9 });
-    expect(await remoteTabs(client).read()).toEqual({ tabs: [REMOTE_TAB], currentId: 9 });
-    expect(requests).toEqual([{ type: "tabs" }]);
-    await expect(
-      remoteTabs(recordingClient({ tabs: [{ ...REMOTE_TAB, incognito: true }] }).client).read(),
-    ).rejects.toThrow();
+    expect(await remoteTabs(client, PEER).read()).toEqual({ tabs: [REMOTE_TAB], currentId: 9 });
+    expect(requests).toEqual([{ type: "tabs", peer: PEER }]);
+    const incognito = recordingClient({ tabs: [{ ...REMOTE_TAB, incognito: true }] }).client;
+    await expect(remoteTabs(incognito, PEER).read()).rejects.toThrow();
   });
 
   test("hears every peer notice as a change", () => {
     const { client, unwatch } = recordingClient();
     const onChange = vi.fn();
-    remoteTabs(client).watch(onChange)();
+    remoteTabs(client, PEER).watch(onChange)();
     expect(client.watch).toHaveBeenCalledWith(onChange);
     expect(unwatch).toHaveBeenCalledOnce();
   });
@@ -73,12 +80,28 @@ describe("remoteRecordings", () => {
     expect(await store.read()).toEqual(expected);
   });
 
-  test("writes as commands to the executor", async () => {
+  test("writes as commands to the executor of the peer that runs it", async () => {
     const { client, requests } = recordingClient();
-    const store = remoteRecordings(client, mirrorOf(null));
+    const store = remoteRecordings(client, mirrorOf({ session, mine: true, connected: true }));
     await store.write({ ...session, status: "paused" });
     await store.write(null);
-    expect(requests).toEqual([{ type: "session-set", status: "paused" }, { type: "session-stop" }]);
+    expect(requests).toEqual([
+      { type: "session-set", peer: PEER, status: "paused" },
+      { type: "session-stop", peer: PEER },
+    ]);
+    const none = remoteRecordings(client, mirrorOf({ session, mine: false, connected: true }));
+    await expect(none.write(null)).rejects.toThrow("This profile controls no session");
+  });
+
+  test("lists the tabs of the peer that runs it, and none without one", async () => {
+    const { client, requests } = recordingClient({ tabs: [REMOTE_TAB] });
+    const onChange = vi.fn();
+    remoteSessionTabs(client, mirrorOf(null)).watch(onChange);
+    expect(client.watch).toHaveBeenCalledWith(onChange);
+    expect(await remoteSessionTabs(client, mirrorOf(null)).read()).toEqual({ tabs: [] });
+    const running = mirrorOf({ session, mine: true, connected: true });
+    expect(await remoteSessionTabs(client, running).read()).toEqual({ tabs: [REMOTE_TAB] });
+    expect(requests).toEqual([{ type: "tabs", peer: PEER }]);
   });
 
   test("watches the mirror", () => {

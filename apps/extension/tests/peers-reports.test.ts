@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vite-plus/test";
 import { fakeBrowser } from "wxt/testing/fake-browser";
 import {
-  authorizedPeerRepository,
+  authorizedPeersRepository,
   remoteControllerRepository,
-  remoteRecordingRepository,
+  remoteRecordingsRepository,
 } from "@/storage/peer-repository";
 import { recordingSessionRepository } from "@/storage/recording-session-repository";
 import { ME, PEER, STRANGER, fromPeer } from "./fake-peer";
@@ -52,10 +52,12 @@ describe("this profile's tabs", () => {
     await fakeBrowser.windows.onFocusChanged.trigger(2);
     for (const listener of peers.moved) listener();
     await vi.advanceTimersByTimeAsync(149);
-    expect(peers.link.sentTypes()).toEqual(["HELLO"]);
+    expect(peers.link.sentTypes()).toEqual(["HELLO", "MEMBERS"]);
     await vi.advanceTimersByTimeAsync(1);
-    await vi.waitFor(() => expect(peers.link.sentTypes()).toEqual(["HELLO", "TABS_CHANGED"]));
-    const { tabs, currentId } = peers.link.frames()[1] as unknown as Record<string, unknown>;
+    await vi.waitFor(() =>
+      expect(peers.link.sentTypes()).toEqual(["HELLO", "MEMBERS", "TABS_CHANGED"]),
+    );
+    const { tabs, currentId } = peers.link.frames()[2] as unknown as Record<string, unknown>;
     expect(tabs).toEqual([
       { ...TAB, id: 5 },
       { ...TAB, id: 6 },
@@ -94,13 +96,13 @@ describe("unreadable state", () => {
     await peers.connect();
     peers.link.link.pagesOpen = false;
     await peers.receive(fromPeer("TABS_CHANGED", { tabs: [] }));
-    await fakeBrowser.storage.session.set({ peerLink: "unreadable" });
+    await fakeBrowser.storage.session.set({ peerLinks: "unreadable" });
     vi.useFakeTimers();
     await fakeBrowser.tabs.update(0, { url: "https://docs.example/" });
     await vi.advanceTimersByTimeAsync(150);
     await fakeBrowser.storage.session.set({ recording: "unreadable" });
     await vi.advanceTimersByTimeAsync(10);
-    expect(peers.link.sentTypes()).toEqual(["HELLO"]);
+    expect(peers.link.sentTypes()).toEqual(["HELLO", "MEMBERS"]);
   });
 });
 
@@ -153,11 +155,14 @@ describe("the peer's reports", () => {
     const peers = await peerBackground();
     await peers.connect();
     await peers.receive(fromPeer("TABS_CHANGED", { tabs: [TAB], currentId: 3 }));
-    expect(await peers.routes.request({ type: "tabs" })).toEqual({ tabs: [TAB], currentId: 3 });
+    expect(await peers.routes.request({ type: "tabs", peer: PEER })).toEqual({
+      tabs: [TAB],
+      currentId: 3,
+    });
     await peers.receive(fromPeer("TABS_CHANGED", { tabs: [] }));
-    expect(await peers.routes.request({ type: "tabs" })).toStrictEqual({ tabs: [] });
+    expect(await peers.routes.request({ type: "tabs", peer: PEER })).toStrictEqual({ tabs: [] });
     await peers.receive(fromPeer("HELLO", { displayName: "Desk", extensionVersion: "0.1.0" }));
-    const listed = peers.routes.request({ type: "tabs" });
+    const listed = peers.routes.request({ type: "tabs", peer: PEER });
     await vi.waitFor(() => expect(peers.link.sentTypes().at(-1)).toBe("GET_TABS"));
     const ask = peers.link.frames().at(-1) as unknown as { id: string };
     await peers.receive(fromPeer("TABS_SNAPSHOT", { requestId: ask.id, tabs: [TAB] }));
@@ -169,7 +174,7 @@ describe("the peer's reports", () => {
     const peers = await peerBackground();
     await peers.connect();
     await peers.receive(fromPeer("HELLO", { displayName: "Studio", extensionVersion: "0.2.0" }));
-    expect(await authorizedPeerRepository.read()).toMatchObject({ displayName: "Studio" });
+    expect(await authorizedPeersRepository.get(PEER)).toMatchObject({ displayName: "Studio" });
     expect(peers.link.frames().at(-1)).toMatchObject({ type: "SESSION_STATUS", session: null });
   });
 
@@ -182,7 +187,7 @@ describe("the peer's reports", () => {
       [null, false],
     ] as const) {
       await peers.receive(fromPeer("SESSION_STATUS", { session, controlledBy }));
-      expect(await remoteRecordingRepository.read()).toEqual({
+      expect(await remoteRecordingsRepository.get(PEER)).toEqual({
         profileId: PEER,
         session,
         mine,
@@ -190,7 +195,10 @@ describe("the peer's reports", () => {
       });
     }
     await peers.receive(fromPeer("SESSION_STATUS", { session: null, controlledBy: ME }));
-    expect(await remoteRecordingRepository.read()).toMatchObject({ session: null, mine: false });
+    expect(await remoteRecordingsRepository.get(PEER)).toMatchObject({
+      session: null,
+      mine: false,
+    });
   });
 
   test("log the peer's errors", async () => {

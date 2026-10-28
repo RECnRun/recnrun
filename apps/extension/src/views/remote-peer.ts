@@ -5,18 +5,27 @@ import type { RecordingStore } from "@/ports/recording-store";
 import type { TabSource } from "@/ports/tabs";
 import type { PeerClient } from "@/views/peer-client";
 
-/** The other profile as this profile's pages see it: its tabs, and the session this one controls. */
+/** The other profiles as this profile's pages see them: their tabs, and the session this one controls. */
 export interface PeerServices {
   client: PeerClient;
-  tabs: TabSource;
+  /** One peer's tabs. */
+  tabsOf: (peer: string) => TabSource;
+  /** The session this profile controls in one peer, as that peer's list shows it. */
+  recordingsOf: (peer: string) => RecordingStore;
+  /** The session this profile controls in any peer, if it controls one. */
   recordings: RecordingStore;
-  /** Opens the window that grants the RECnRun folder. */
-  openFolder: () => Promise<void>;
+  /** The tabs of the peer that session runs in. */
+  sessionTabs: TabSource;
+  /** Shows Chrome's folder picker and keeps the RECnRun folder; only a click may. */
+  chooseFolder: () => Promise<void>;
+  /** Asks Chrome again for the folder chosen before, once its grant ended; only a click may. */
+  allowFolder: () => Promise<void>;
 }
 
 /** The background's copy of the executor's last report, as session storage keeps it. */
 interface Mirror {
   read: () => Promise<{
+    profileId: string;
     session: RecordingSession | null;
     mine: boolean;
     connected: boolean;
@@ -26,12 +35,28 @@ interface Mirror {
 
 const ignored = v.unknown();
 
-/** The peer's tabs as the background last heard them; a report from the peer is a change. */
-export function remoteTabs(client: PeerClient): TabSource {
+/** A peer's tabs as the background last heard them; a report from any peer is a change. */
+export function remoteTabs(client: PeerClient, peer: string): TabSource {
   return {
-    read: () => client.ask({ type: "tabs" }, SharedTabsSchema),
+    read: () => client.ask({ type: "tabs", peer }, SharedTabsSchema),
     watch: (onChange) => client.watch(onChange),
   };
+}
+
+/** The peer's last report, while it is of a session this profile controls over a link that holds. */
+async function controlled(mirror: Mirror) {
+  const remote = await mirror.read();
+  // A copy from a link that went down is no session to show or to control.
+  return remote?.mine && remote.connected ? remote : null;
+}
+
+/** The tabs of the peer that runs the session this profile controls; none without one. */
+export function remoteSessionTabs(client: PeerClient, mirror: Mirror): TabSource {
+  const read = async () => {
+    const remote = await controlled(mirror);
+    return remote ? remoteTabs(client, remote.profileId).read() : { tabs: [] };
+  };
+  return { read, watch: (onChange) => client.watch(onChange) };
 }
 
 /**
@@ -40,14 +65,13 @@ export function remoteTabs(client: PeerClient): TabSource {
  * report shows the outcome.
  */
 export function remoteRecordings(client: PeerClient, mirror: Mirror): RecordingStore {
-  const read = async () => {
-    const remote = await mirror.read();
-    // A copy from a link that went down is no session to show or to control.
-    return remote?.mine && remote.connected ? remote.session : null;
-  };
+  const read = async () => (await controlled(mirror))?.session ?? null;
   const write = async (next: RecordingSession | null) => {
-    if (next === null) return void (await client.ask({ type: "session-stop" }, ignored));
-    await client.ask({ type: "session-set", status: next.status }, ignored);
+    const remote = await controlled(mirror);
+    if (!remote) throw new Error("This profile controls no session in another profile.");
+    const peer = remote.profileId;
+    if (next === null) return void (await client.ask({ type: "session-stop", peer }, ignored));
+    await client.ask({ type: "session-set", peer, status: next.status }, ignored);
   };
   return { read, write, watch: (onChange) => mirror.watch(onChange) };
 }
@@ -58,7 +82,7 @@ export function remoteRecordings(client: PeerClient, mirror: Mirror): RecordingS
  */
 export function eitherSession(
   local: { recordings: RecordingStore; tabs: TabSource },
-  remote: Pick<PeerServices, "recordings" | "tabs">,
+  remote: { recordings: RecordingStore; tabs: TabSource },
 ): { recordings: RecordingStore; tabs: TabSource } {
   const pick = async () => ((await local.recordings.read()) ? local : remote);
   const both = (onChange: () => void) => {

@@ -76,20 +76,27 @@ describe("announce and publish", () => {
     await rendezvous.publish(offer);
     expect([...pairing.folders.keys()]).toEqual([ME]);
     expect(stored(ME, "presence.json")).toEqual(mine);
-    expect(stored(ME, `offer-${PAIRING}.json`)).toEqual(offer);
+    expect(stored(ME, `offer-${PEER}.json`)).toEqual(offer);
   });
 
-  test("a new signal replaces this profile's earlier one of the same kind", async () => {
-    const { rendezvous, names } = sharedFolder();
+  test("a new signal replaces this profile's earlier one of the same kind for the same profile", async () => {
+    const { rendezvous, names, stored } = sharedFolder();
     await rendezvous.announce(presence({ profileId: ME }));
     await rendezvous.publish(signal({ profileId: ME, to: PEER }));
     await rendezvous.publish(signal({ kind: "answer", profileId: ME, to: PEER }));
-    await rendezvous.publish(signal({ profileId: ME, to: PEER, pairingId: OTHER_PAIRING }));
-    expect(names(ME).toSorted()).toEqual([
-      `answer-${PAIRING}.json`,
-      `offer-${OTHER_PAIRING}.json`,
-      "presence.json",
-    ]);
+    const newer = signal({ profileId: ME, to: PEER, pairingId: OTHER_PAIRING });
+    await rendezvous.publish(newer);
+    // Answers to two offerers in one sighting both stay, each until its offerer reads it.
+    await rendezvous.publish(signal({ kind: "answer", profileId: ME, to: STRANGER }));
+    expect(names(ME).toSorted()).toEqual(
+      [
+        `answer-${PEER}.json`,
+        `answer-${STRANGER}.json`,
+        `offer-${PEER}.json`,
+        "presence.json",
+      ].toSorted(),
+    );
+    expect(stored(ME, `offer-${PEER}.json`)).toEqual(newer);
   });
 });
 

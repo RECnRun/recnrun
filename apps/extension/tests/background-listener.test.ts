@@ -6,6 +6,7 @@ import type { BackgroundReply } from "@/messaging/background-reply";
 import { linkEventMessage, peerRequestMessage } from "@/messaging/peer-messages";
 import { returnToDashboardMessage, startSessionMessage } from "@/messaging/session-protocol";
 import { memoryRecordingStore } from "./fake-extension";
+import { PEER } from "./fake-peer";
 
 const EXTENSION_URL = "chrome-extension://own-id/";
 const identity = { extensionId: "own-id", extensionUrl: EXTENSION_URL };
@@ -146,7 +147,7 @@ describe("session requests", () => {
 
 describe("cross-profile messages", () => {
   const status = peerRequestMessage({ type: "status" });
-  const connecting = linkEventMessage({ type: "state", state: "connecting" });
+  const connecting = linkEventMessage({ type: "state", peer: PEER, state: "connecting" });
   const fakePeers = () => ({
     request: vi.fn(async () => "status"),
     link: vi.fn(async () => {}),
@@ -159,7 +160,7 @@ describe("cross-profile messages", () => {
     await vi.waitFor(() => expect(request.replies).toEqual([{ ok: true, result: "status" }]));
     await vi.waitFor(() => expect(event.replies).toEqual([{ ok: true }]));
     expect(peers.request).toHaveBeenCalledWith({ type: "status" });
-    expect(peers.link).toHaveBeenCalledWith({ type: "state", state: "connecting" });
+    expect(peers.link).toHaveBeenCalledWith({ type: "state", peer: PEER, state: "connecting" });
   });
 
   test("takes link events only from the offscreen document, and peer requests only from pages", async () => {

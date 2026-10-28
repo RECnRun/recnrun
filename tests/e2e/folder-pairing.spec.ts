@@ -5,8 +5,8 @@ import { expect } from "./fixtures/extension.ts";
 import {
   allowFolder,
   chooseFolder,
+  clickFolder,
   folderBanner,
-  openFolderWindow,
   pair,
   WAITING,
 } from "./fixtures/folder.ts";
@@ -18,7 +18,7 @@ import { dashboardUrl } from "./fixtures/tabs.ts";
 
 /*
  * Both profiles choose one real folder on the container's disk through Chrome's own picker
- * and answer its prompts (H4), from the window each dashboard's folder banner opens.
+ * and answer its prompts (H4), each in its own dashboard.
  */
 
 interface ChromeGlobal {
@@ -67,18 +67,21 @@ async function restartAndAllow(profile: Profile, other: Profile, native: Native,
   return restarted;
 }
 
-test("two profiles pair from their dashboards through one RECnRun folder on disk, in windows that close once paired", async ({
+test("two profiles pair from their dashboards through one RECnRun folder on disk, with no other page", async ({
   profileA,
   profileB,
   native,
 }) => {
-  const windows = await pair(profileA, profileB, native);
-  for (const window of windows)
-    await expect.poll(() => window.isClosed(), { timeout: 10_000 }).toBe(true);
+  await pair(profileA, profileB, native);
+  // The picker and its prompts came from the dashboards; RECnRun opened no page of its own.
+  for (const profile of [profileA, profileB]) {
+    const paths = extensionPages(profile).map((page) => new URL(page.url()).pathname);
+    expect(new Set(paths)).toEqual(new Set(["/dashboard.html"]));
+  }
   await expect(
     profileA.dashboard.getByRole("heading", { name: `Chrome — ${profileB.name} (Connected)` }),
   ).toBeVisible();
-  // Connected, neither dashboard asks for the folder: each keeps the grant its window gave (H2).
+  // Connected, neither dashboard asks for the folder: each keeps the grant it asked for (H2).
   for (const profile of [profileA, profileB]) {
     await expect(folderBanner(profile.dashboard)).toHaveCount(0);
     // Paired, each profile stays in the folder, so its peer finds it after a restart.
@@ -88,28 +91,25 @@ test("two profiles pair from their dashboards through one RECnRun folder on disk
   }
 });
 
-test("the folder grant ends with the last extension page, and allowing again keeps the folder on every visit", async ({
+test("the folder grant ends with the last dashboard, and allowing again keeps the folder on every visit", async ({
   profileA,
   native,
 }) => {
-  const window = await chooseFolder(profileA, native);
-  await window.close();
-  // The dashboard is an extension page too, so it keeps the grant (H2).
+  await chooseFolder(profileA, native);
   await expect(pairingSection(profileA.dashboard)).toContainText(WAITING);
-  await expect(folderBanner(profileA.dashboard)).toHaveCount(0);
   for (const page of extensionPages(profileA)) await page.close();
   const dashboard = await profileA.context.newPage();
   await dashboard.goto(dashboardUrl(profileA.serviceWorker));
   const reopened = { ...profileA, dashboard };
   await expect(folderBanner(dashboard)).toContainText("Allow the RECnRun folder");
-  const { window: again, dialogs } = await openFolderWindow(reopened, native);
-  await again.getByRole("button", { name: "Allow folder" }).click();
-  expect(await dialogs.allowInEitherPrompt()).toBe("restore");
-  await expect(again.getByText("Keep this window open")).toBeVisible();
-  await again.close();
-  await dashboard.reload();
+  expect(await allowFolder(reopened, native)).toBe("restore");
   await expect(pairingSection(dashboard)).toContainText(WAITING);
-  await expect(folderBanner(dashboard)).toHaveCount(0);
+  // On every visit, the grant outlives this dashboard too.
+  await dashboard.close();
+  const later = await profileA.context.newPage();
+  await later.goto(dashboardUrl(profileA.serviceWorker));
+  await expect(pairingSection(later)).toContainText(WAITING);
+  await expect(folderBanner(later)).toHaveCount(0);
 });
 
 test("profiles that both allowed the folder on every visit keep it with no page open, reconnect with no click after a restart, and within seconds after a Disconnect", async ({
@@ -151,13 +151,13 @@ test("a profile stays unpaired when the user cancels the picker or Chrome may no
   profileA,
   native,
 }) => {
-  const { window, dialogs } = await openFolderWindow(profileA, native);
-  const choose = window.getByRole("button", { name: "Choose folder" });
-  const aborted = window.getByRole("alert").filter({ hasText: "The user aborted a request." });
-  await choose.click();
+  const banner = folderBanner(profileA.dashboard);
+  const choose = banner.getByRole("button", { name: "Choose folder" });
+  const aborted = banner.getByRole("alert").filter({ hasText: "The user aborted a request." });
+  const dialogs = await clickFolder(profileA, native, "Choose folder");
   await dialogs.cancelPicker();
   await expect(aborted).toBeVisible();
-  await window.reload();
+  await profileA.dashboard.reload();
   await choose.click();
   await dialogs.chooseFolder(native.folder);
   await dialogs.answerWritePrompt("deny");
@@ -169,7 +169,7 @@ test("a profile stays unpaired when the user cancels the picker or Chrome may no
   expect(existsSync(join(native.folder, "pairing"))).toBe(false);
 });
 
-test("the folder window says so when Chrome refuses the folder after a restart", async ({
+test("the dashboard says so when Chrome refuses the folder after a restart", async ({
   profileA,
   native,
   launch,
@@ -179,13 +179,13 @@ test("the folder window says so when Chrome refuses the folder after a restart",
   await profileA.context.close();
   const restarted = await reopen(profileA, await launch(profileA.dir));
   await expect(folderBanner(restarted.dashboard)).toContainText("Allow the RECnRun folder");
-  const { window, dialogs } = await openFolderWindow(restarted, native);
-  await window.getByRole("button", { name: "Allow folder" }).click();
+  const dialogs = await clickFolder(restarted, native, "Allow folder");
   await dialogs.answerRestorePrompt("deny");
-  await expect(window.getByRole("alert")).toHaveText(
+  const banner = folderBanner(restarted.dashboard);
+  await expect(banner.getByRole("alert")).toHaveText(
     "Chrome did not allow RECnRun to use the folder.",
   );
-  await expect(window.getByRole("button", { name: "Allow folder" })).toBeEnabled();
+  await expect(banner.getByRole("button", { name: "Allow folder" })).toBeEnabled();
 });
 
 /** Removes the extension's folder grant with its trash button in Chrome's settings. */

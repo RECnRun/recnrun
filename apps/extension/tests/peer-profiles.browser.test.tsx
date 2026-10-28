@@ -1,67 +1,32 @@
 import { render } from "preact";
 import { afterEach, expect, test } from "vite-plus/test";
 import { Dashboard } from "@/dashboard/Dashboard";
-import { startDashboard } from "@/dashboard/start";
 import type { PeerStatus } from "@/messaging/peer-results";
 import { returnToDashboardMessage } from "@/messaging/session-protocol";
-import type { SessionRequest } from "@/messaging/session-protocol";
-import type { OpenTab } from "@/ports/tabs";
-import type { PeerServices } from "@/views/remote-peer";
 import { CONTROL_LOCK, tryHoldLock } from "@/views/view-locks";
 import { fakeExtension, memoryRecordingStore } from "./fake-extension";
-import { closedFor, fakePeerClient, statusOf, withPeerSession } from "./fake-peer-client";
-import { SHOP, fakeTabs } from "./fake-tabs";
-import { alertText, buttons, expectControlFree, item, pipWindow, tabPage } from "./dashboard-page";
+import {
+  BOB_ID,
+  closedFor,
+  controlledByBob,
+  fakePeerClient,
+  statusOf,
+  withPeerSession,
+} from "./fake-peer-client";
+import { SHOP } from "./fake-tabs";
+import { alertText, buttons, expectControlFree, item } from "./dashboard-page";
+import {
+  MAIL,
+  banner,
+  headings,
+  mount,
+  note,
+  notes,
+  pairingSection,
+  peerServices,
+  remote,
+} from "./peer-dashboard";
 import { button } from "./queries";
-
-const MAIL: OpenTab = { ...SHOP, id: 21, title: "Mail", url: "https://mail.example/" };
-
-const pairingSection = (root: HTMLElement) =>
-  root.querySelector('section[aria-labelledby="pairing-heading"]');
-
-function peerServices(peer: ReturnType<typeof fakePeerClient>) {
-  const folders: unknown[] = [];
-  const peers: PeerServices = {
-    client: peer.client,
-    tabs: fakeTabs({ tabs: [MAIL] }).source,
-    recordings: memoryRecordingStore(),
-    openFolder: async () => {
-      folders.push(true);
-    },
-  };
-  return { peers, folders };
-}
-
-/** A dashboard tab in Alice's profile, with Bob's profile as `peer` answers for it. */
-function mount(peer: ReturnType<typeof fakePeerClient>, recordings = memoryRecordingStore()) {
-  const { peers, folders } = peerServices(peer);
-  const sent: SessionRequest[] = [];
-  const send = async (request: SessionRequest) => {
-    sent.push(request);
-    return { ok: true };
-  };
-  const pips: Window[] = [];
-  const page = tabPage("", async () => {
-    pips.push(pipWindow());
-    return pips.at(-1) as Window;
-  });
-  const root = document.body.appendChild(document.createElement("div"));
-  startDashboard(
-    root,
-    fakeExtension({ tabs: fakeTabs({ tabs: [SHOP] }).source, send, peers, recordings }),
-    page,
-  );
-  return { root, sent, pips, folders };
-}
-
-const headings = (root: HTMLElement) =>
-  [...root.querySelectorAll("aside h2")].map((each) => each.textContent);
-const remote = (root: HTMLElement) =>
-  root.querySelector<HTMLElement>('aside[aria-labelledby="remote-tabs-heading"]') ?? undefined;
-
-const note = (scope: HTMLElement | undefined) => scope?.querySelector(".tab-note")?.textContent;
-const banner = (root: HTMLElement) =>
-  root.querySelector('section[aria-labelledby="folder-banner-heading"]')?.textContent ?? undefined;
 
 afterEach(() => {
   for (const root of document.body.children) render(null, root);
@@ -87,13 +52,13 @@ test("before the background answers, the dashboard is the local one", async () =
   expect(banner(root)).toBeUndefined();
 });
 
-test("until Chrome grants the RECnRun folder, a banner opens the window that chooses it", async () => {
+test("until Chrome grants the RECnRun folder, a banner shows Chrome's picker in the dashboard", async () => {
   const { root, folders } = mount(fakePeerClient({ ...statusOf(), folder: "none" }));
   await expect.poll(() => banner(root)).toContain("Choose the RECnRun folder");
   // Recording needs no folder.
   expect(buttons(item(root, "Shop"))).toEqual(["Record"]);
   button(root, "Choose folder")?.click();
-  await expect.poll(() => folders).toHaveLength(1);
+  await expect.poll(() => folders).toEqual(["choose"]);
 });
 
 test("the paired profile's tabs follow under its name and the link's state", async () => {
@@ -153,14 +118,11 @@ test("one session across the pair: each list says why it offers no Record", asyn
   );
   await expect.poll(() => buttons(item(root, "Shop"))).toEqual([]);
   expect(buttons(item(remote(root) ?? root, "Mail"))).toEqual(["Show tab"]);
-  expect([...root.querySelectorAll(".tab-note")].map((each) => each.textContent)).toEqual([
-    "Recording in Bob",
-    "Recording in Bob",
-  ]);
+  expect(notes(root)).toEqual(["Recording in Bob", "Recording in Bob"]);
 
   // Bob controls the session that runs here: no Continue or Stop, only its state.
   await local.write({ tabId: SHOP.id, status: "recording", banked: 0, since: Date.now() });
-  peer.change({ ...statusOf("connected"), controlledByPeer: true });
+  peer.change(controlledByBob(statusOf("connected")));
   await expect
     .poll(() => note(root.querySelector("aside") ?? undefined))
     .toBe("Controlled from Bob");
@@ -180,7 +142,9 @@ test("Show tab brings the other profile's tab to the front, or shows why it cann
   const { root } = mount(peer);
   await expect.poll(() => button(remote(root) ?? root, "Show tab")).toBeDefined();
   button(remote(root) ?? root, "Show tab")?.click();
-  await expect.poll(() => peer.asked("activate")).toEqual([{ type: "activate", tabId: MAIL.id }]);
+  await expect
+    .poll(() => peer.asked("activate"))
+    .toEqual([{ type: "activate", peer: BOB_ID, tabId: MAIL.id }]);
 
   refuse = true;
   button(remote(root) ?? root, "Show tab")?.click();
@@ -197,7 +161,7 @@ test("Record on the other profile's tab takes the control and starts the session
 
   await expect
     .poll(() => peer.asked("session-start"))
-    .toEqual([{ type: "session-start", tabId: MAIL.id }]);
+    .toEqual([{ type: "session-start", peer: BOB_ID, tabId: MAIL.id }]);
   expect(pips).toHaveLength(1);
   expect(await tryHoldLock(CONTROL_LOCK)).toBeUndefined();
   expect(sent).toEqual([]);

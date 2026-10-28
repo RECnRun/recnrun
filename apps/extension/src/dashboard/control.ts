@@ -73,19 +73,21 @@ function openWindow(pip: DocumentPictureInPicture, float: FloatSession, closed: 
   );
 }
 
+/** Takes the control of a session in a peer: one dashboard per peer's tab list. */
+export type RemoteTake = (peer: string) => TakeControl;
+
 /**
- * The control for the dashboard in its own tab, which opens its PiP window itself. `start` starts
- * the session: this profile's own by default, or one in the other profile.
+ * The control for the dashboard in its own tab, which opens its PiP window itself. The returned
+ * function takes the lock and runs `start`, which starts the session, here or in a peer.
  */
-export function controlInTab(
+export function holdInTab(
   page: Window,
   send: SendRequest,
   float: FloatSession,
-  start: (tabId: number) => Promise<void> = (tabId) => ask(send, startSessionMessage(tabId)),
-): TakeControl {
+): (start: () => Promise<void>) => Promise<void> {
   const lock = controlLock();
   const closed = closedWith(lock, send);
-  return async (tabId) => {
+  return async (start) => {
     if (lock.held()) return;
     await lock.take();
     const pip = documentPip(page);
@@ -93,10 +95,16 @@ export function controlInTab(
     // Without the API the session cannot float, so no dashboard keeps the control.
     if (!pip) lock.free();
     try {
-      await begin(lock, start(tabId));
+      await begin(lock, start());
     } catch (error) {
       void opened.then((pipWindow) => pipWindow?.close());
       throw error;
     }
   };
+}
+
+/** Takes the control of a session in this profile. */
+export function controlInTab(page: Window, send: SendRequest, float: FloatSession): TakeControl {
+  const hold = holdInTab(page, send, float);
+  return (tabId) => hold(() => ask(send, startSessionMessage(tabId)));
 }

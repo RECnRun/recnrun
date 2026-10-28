@@ -4,9 +4,6 @@ export const button = (scope: ParentNode, name: string) =>
 export const panelText = (scope: ParentNode) =>
   scope.querySelector('section[aria-label="Recording panel"]')?.textContent;
 
-export const alerts = (scope: ParentNode) =>
-  [...scope.querySelectorAll('[role="alert"]')].map((each) => each.textContent);
-
 export const field = (scope: ParentNode, id: string) =>
   scope.querySelector<HTMLInputElement>(`#${id}`) ?? undefined;
 

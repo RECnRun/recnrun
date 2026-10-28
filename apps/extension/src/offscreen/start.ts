@@ -34,17 +34,40 @@ async function runFolderCommand(watch: FolderWatch, command: FolderCommand, fold
 }
 
 interface Held {
-  link: PeerLink;
+  linkOf: (peer: string) => PeerLink;
   watch: FolderWatch;
 }
 
-/** Runs one command; the offscreen document holds the connection and no logic beyond it. */
+/** One link per peer, made on first use, each reporting its events under the peer's id. */
+function createLinks(certificate: RTCCertificate, report: (event: LinkEvent) => void) {
+  const links = new Map<string, PeerLink>();
+  return (peer: string): PeerLink => {
+    const known = links.get(peer);
+    if (known) return known;
+    const link: PeerLink = createPeerLink(
+      {
+        onFrame: (frame) => report({ type: "frame", peer, frame }),
+        onState: (state) => {
+          const remoteFingerprint = link.remoteFingerprint();
+          const fingerprint = remoteFingerprint ? { remoteFingerprint } : {};
+          report({ type: "state", peer, state, ...fingerprint });
+        },
+      },
+      { certificate },
+    );
+    links.set(peer, link);
+    return link;
+  };
+}
+
+/** Runs one command; the offscreen document holds the connections and no logic beyond them. */
 async function runLinkCommand(
-  { link, watch }: Held,
+  { linkOf, watch }: Held,
   command: LinkCommand,
   folder: Folder,
 ): Promise<unknown> {
   if (isFolderCommand(command)) return runFolderCommand(watch, command, folder);
+  const link = linkOf(command.peer);
   switch (command.type) {
     case "offer":
       return { sdp: await link.createOffer() };
@@ -74,18 +97,9 @@ export function startOffscreen({
   // A sleeping service worker wakes for the message; a closed one makes nothing to report to.
   const report = (event: LinkEvent) => void send(linkEventMessage(event)).catch(() => {});
   const ready = certificate().then((cert) => {
-    const link: PeerLink = createPeerLink(
-      {
-        onFrame: (frame) => report({ type: "frame", frame }),
-        onState: (state) => {
-          const remoteFingerprint = link.remoteFingerprint();
-          report({ type: "state", state, ...(remoteFingerprint ? { remoteFingerprint } : {}) });
-        },
-      },
-      { certificate: cert },
-    );
     const fingerprint = certificateFingerprint(cert) ?? "";
-    return { link, watch: createFolderWatch({ report, fingerprint, folder }) };
+    const watch = createFolderWatch({ report, fingerprint, folder });
+    return { linkOf: createLinks(cert, report), watch };
   });
   const backgroundUrl = browser.runtime.getURL("/background.js");
   browser.runtime.onMessage.addListener(

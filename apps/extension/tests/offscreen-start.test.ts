@@ -3,7 +3,7 @@ import { fakeBrowser } from "wxt/testing/fake-browser";
 import { linkCommandMessage } from "@/messaging/peer-messages";
 import type { LinkCommand } from "@/messaging/peer-messages";
 import { startOffscreen } from "@/offscreen/start";
-import { ME, PEER, answering } from "./fake-peer";
+import { ME, PEER, STRANGER, answering } from "./fake-peer";
 import { MemoryDirectory } from "./memory-directory";
 
 const LOCAL_SDP = "v=0\r\na=fingerprint:sha-256 11:22\r\n";
@@ -57,7 +57,10 @@ class FakeConnection extends EventTarget {
   async setRemoteDescription({ sdp }: { sdp: string }) {
     this.remoteDescription = { sdp };
   }
-  close() {}
+  closed = false;
+  close() {
+    this.closed = true;
+  }
   /** The other side's channel arriving, as the answering side receives it. */
   receiveChannel() {
     this.channel = new FakeChannel();
@@ -97,8 +100,9 @@ async function run(command: LinkCommand, sender: object = background()) {
   return reply.mock.calls[0]?.[0] as unknown;
 }
 
-const state = (name: string, remoteFingerprint?: string) => ({
+const state = (name: string, remoteFingerprint?: string, peer = PEER) => ({
   type: "state",
+  peer,
   state: name,
   ...(remoteFingerprint ? { remoteFingerprint } : {}),
 });
@@ -120,9 +124,9 @@ describe("commands", () => {
     const reply = vi.fn();
     const from = background();
     const ignored: [unknown, object][] = [
-      [linkCommandMessage({ type: "close" }), { ...from, id: "another-extension" }],
+      [linkCommandMessage({ type: "close", peer: PEER }), { ...from, id: "another-extension" }],
       [
-        linkCommandMessage({ type: "close" }),
+        linkCommandMessage({ type: "close", peer: PEER }),
         { ...from, url: fakeBrowser.runtime.getURL("/dashboard.html") },
       ],
       [{ target: "offscreen", command: { type: "erase" } }, from],
@@ -136,12 +140,15 @@ describe("commands", () => {
 
   test("sends nothing before a link opens", async () => {
     offscreen();
-    expect(await run({ type: "send", frame: "{}" })).toEqual({ ok: true, result: { sent: false } });
+    expect(await run({ type: "send", peer: PEER, frame: "{}" })).toEqual({
+      ok: true,
+      result: { sent: false },
+    });
   });
 
   test("replies with the error of a command that fails, and reports the failed link", async () => {
     const { events } = offscreen();
-    expect(await run({ type: "accept-answer", sdp: REMOTE_SDP })).toEqual({
+    expect(await run({ type: "accept-answer", peer: PEER, sdp: REMOTE_SDP })).toEqual({
       ok: false,
       error: "Create an offer first.",
     });
@@ -152,7 +159,10 @@ describe("commands", () => {
     offscreen(async () => {
       throw new Error("IndexedDB is unavailable.");
     });
-    expect(await run({ type: "close" })).toEqual({ ok: false, error: "IndexedDB is unavailable." });
+    expect(await run({ type: "close", peer: PEER })).toEqual({
+      ok: false,
+      error: "IndexedDB is unavailable.",
+    });
   });
 });
 
@@ -198,34 +208,64 @@ describe("the folder", () => {
 describe("the link", () => {
   test("offers, takes the answer, and carries frames both ways", async () => {
     const { events } = offscreen();
-    expect(await run({ type: "offer" })).toEqual({ ok: true, result: { sdp: LOCAL_SDP } });
+    expect(await run({ type: "offer", peer: PEER })).toEqual({
+      ok: true,
+      result: { sdp: LOCAL_SDP },
+    });
     const [pc] = FakeConnection.made;
     expect(pc?.config).toEqual({ iceServers: [], certificates: [certificate] });
-    expect(await run({ type: "accept-answer", sdp: REMOTE_SDP })).toEqual({ ok: true });
+    expect(await run({ type: "accept-answer", peer: PEER, sdp: REMOTE_SDP })).toEqual({ ok: true });
     pc?.channel?.open();
-    expect(await run({ type: "send", frame: "to peer" })).toEqual({
+    expect(await run({ type: "send", peer: PEER, frame: "to peer" })).toEqual({
       ok: true,
       result: { sent: true },
     });
     expect(pc?.channel?.sent).toEqual(["to peer"]);
     pc?.channel?.dispatchEvent(new MessageEvent("message", { data: "from peer" }));
-    expect(await run({ type: "close" })).toEqual({ ok: true });
+    expect(await run({ type: "close", peer: PEER })).toEqual({ ok: true });
     expect(events).toStrictEqual([
       state("connecting"),
       state("connected", "AA:BB"),
-      { type: "frame", frame: "from peer" },
+      { type: "frame", peer: PEER, frame: "from peer" },
       state("disconnected", "AA:BB"),
     ]);
   });
 
   test("answers an offer and reports the channel the offer opened", async () => {
     const { events } = offscreen();
-    expect(await run({ type: "answer", sdp: REMOTE_SDP })).toEqual({
+    expect(await run({ type: "answer", peer: PEER, sdp: REMOTE_SDP })).toEqual({
       ok: true,
       result: { sdp: LOCAL_SDP },
     });
     FakeConnection.made[0]?.receiveChannel().open();
     expect(events).toStrictEqual([state("connecting"), state("connected", "AA:BB")]);
+  });
+
+  test("keeps one link per peer, and names the peer of every event", async () => {
+    const { events } = offscreen();
+    await run({ type: "offer", peer: PEER });
+    await run({ type: "answer", peer: STRANGER, sdp: REMOTE_SDP });
+    await run({ type: "accept-answer", peer: PEER, sdp: REMOTE_SDP });
+    const [first, second] = FakeConnection.made;
+    if (!first?.channel || !second) throw new Error("Expected a connection per peer.");
+    const [offered, answered] = [first.channel, second.receiveChannel()];
+    offered.open();
+    answered.open();
+    expect(first.closed).toBe(false);
+    const sent = { ok: true, result: { sent: true } };
+    expect(await run({ type: "send", peer: STRANGER, frame: "to stranger" })).toEqual(sent);
+    expect([offered.sent, answered.sent]).toEqual([[], ["to stranger"]]);
+    offered.dispatchEvent(new MessageEvent("message", { data: "from peer" }));
+    await run({ type: "close", peer: PEER });
+    expect(await run({ type: "send", peer: STRANGER, frame: "still linked" })).toEqual(sent);
+    expect(events).toStrictEqual([
+      state("connecting"),
+      state("connecting", undefined, STRANGER),
+      state("connected", "AA:BB"),
+      state("connected", "AA:BB", STRANGER),
+      { type: "frame", peer: PEER, frame: "from peer" },
+      state("disconnected", "AA:BB"),
+    ]);
   });
 
   test("keeps working when the service worker is not there to hear a report", async () => {
@@ -239,7 +279,10 @@ describe("the link", () => {
     const unhandled = vi.fn();
     process.on("unhandledRejection", unhandled);
     startOffscreen({ send, certificate: async () => certificate });
-    expect(await run({ type: "offer" })).toEqual({ ok: true, result: { sdp: LOCAL_SDP } });
+    expect(await run({ type: "offer", peer: PEER })).toEqual({
+      ok: true,
+      result: { sdp: LOCAL_SDP },
+    });
     await new Promise((resolve) => setTimeout(resolve, 0));
     process.off("unhandledRejection", unhandled);
     expect(unhandled).not.toHaveBeenCalled();

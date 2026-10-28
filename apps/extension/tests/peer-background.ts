@@ -2,7 +2,7 @@ import { vi } from "vite-plus/test";
 import { fakeBrowser } from "wxt/testing/fake-browser";
 import { startPeers } from "@/background/peers";
 import type { PeerMessage } from "@/p2p/protocol";
-import { authorizedPeerRepository, identityRepository } from "@/storage/peer-repository";
+import { authorizedPeersRepository, identityRepository } from "@/storage/peer-repository";
 import { FINGERPRINT, ME, PEER, fakeOffscreen } from "./fake-peer";
 
 const manifest = { manifest_version: 3 as const, name: "RECnRun", version: "0.1.0" };
@@ -28,22 +28,25 @@ export async function peerBackground({ authorized = true } = {}) {
   tappedFrames().length = 0;
   await identityRepository.write({ profileId: ME, displayName: "Laptop" });
   if (authorized)
-    await authorizedPeerRepository.write({
+    await authorizedPeersRepository.set(PEER, {
       profileId: PEER,
       displayName: "Desk",
       fingerprint: FINGERPRINT,
     });
   const routes = startPeers();
   // Null stands for a link that reported no certificate.
-  const connect = (remoteFingerprint: string | null = FINGERPRINT) =>
+  const connect = (remoteFingerprint: string | null = FINGERPRINT, peer = PEER) =>
     routes.link({
       type: "state",
+      peer,
       state: "connected",
       remoteFingerprint: remoteFingerprint ?? undefined,
     });
-  const receive = (message: PeerMessage | string) =>
+  /** A frame that came over the link to `peer`. */
+  const receive = (message: PeerMessage | string, peer = PEER) =>
     routes.link({
       type: "frame",
+      peer,
       frame: typeof message === "string" ? message : JSON.stringify(message),
     });
   return { routes, link, connect, receive, moved, log };

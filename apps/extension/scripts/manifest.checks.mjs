@@ -56,13 +56,7 @@ await test("the production build ships the logo as its icons", () => {
 });
 
 await test("the production build leaves out the cross-profile POC", () => {
-  for (const page of ["offscreen.html", "folder.html"]) {
-    assert.equal(
-      existsSync(new URL(`../.output/chrome-mv3/${page}`, import.meta.url)),
-      false,
-      page,
-    );
-  }
+  assert.equal(existsSync(new URL("../.output/chrome-mv3/offscreen.html", import.meta.url)), false);
   const background = readFileSync(new URL("../.output/chrome-mv3/background.js", import.meta.url));
   assert.doesNotMatch(String(background), /createDocument|RTCPeerConnection/);
 });

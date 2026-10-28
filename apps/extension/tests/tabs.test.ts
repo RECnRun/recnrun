@@ -68,7 +68,7 @@ test("leaves out the extension's own pages, which are no pages to record", () =>
         focused: true,
         tabs: [
           tab({ id: 1, url: "https://shop.example/" }),
-          tab({ id: 2, active: true, url: `${own}folder.html` }),
+          tab({ id: 2, active: true, url: `${own}dashboard.html` }),
           tab({ id: 3, url: "chrome-extension://other-id/page.html" }),
         ],
       }),
@@ -128,7 +128,7 @@ test("reads the browser's tabs and calls back on each tab or focus change until 
       focused: true,
       tabs: [
         tab({ id: 9, active: true, url: "https://shop.example/" }),
-        tab({ id: 10, url: fakeBrowser.runtime.getURL("/folder.html") }),
+        tab({ id: 10, url: fakeBrowser.runtime.getURL("/dashboard.html") }),
       ],
     }),
   ] as never);

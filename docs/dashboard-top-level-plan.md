@@ -44,7 +44,7 @@ Each task is one commit with `Red:` and `Green:` lines where behavior changes, u
 
 ## Next: the cross-profile POC on this branch
 
-Once this lands, the POC stack (`poc/cross-profile-webrtc-v2`, `poc/dashboard-only-pairing`, `poc/multi-profile-mesh`) is rebased onto it:
+Once this lands, the POC stack (`poc/cross-profile-webrtc-v2`, `poc/dashboard-only-pairing`, `poc/multi-profile-mesh`) is rebased onto it. Done on `poc/multi-profile-mesh`:
 
 - The folder picker runs in the dashboard, and `folder.html` and its window go.
 - The grant lasts while any dashboard tab is open, and the dashboard opens with the profile, so a profile's linked peers usually read the folder and find a newcomer with no click; the mesh relay covers profiles whose dashboard is closed.
