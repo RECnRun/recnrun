@@ -8,7 +8,7 @@ Plan: [poc-incognito-sessions-plan.md](poc-incognito-sessions-plan.md). Assignme
 | Branch               | `poc/incognito-sessions`                                         |
 | Planned base         | `44c154da29860c7a8df829e902b177df5ce2ba2a` (2026-10-28)          |
 | Actual base (P0.1)   | `44c154d` (re-resolved 2026-10-28, unchanged)                    |
-| Last recorded commit | `672a37b`                                                        |
+| Last recorded commit | `369ab7a`                                                        |
 | Decisions OD-1…OD-4  | defaults of plan §3, accepted by the user ("Avance", 2026-10-28) |
 
 ## Status legend
@@ -35,22 +35,22 @@ Evidence format under each task:
 
 ## Stage 0 — Setup and reconnaissance
 
-- [i] P0.1 Baseline: `vp install`, re-resolve `origin/master`, versions, baseline `vp run verify`, report skeleton
-  red: n/a (docs only)
-  green: `vp run verify` → run 1 exit 1 (pre-existing focus flake in `incognito.spec.ts`, then 25/25 with `--repeat-each=5`); run 2 exit 0 (`.artifacts/docker/2026-10-28T12-02-21.796Z-1433f9f5-2cce-4bf5-9a53-3c1e49edf6f6`)
-  commit: 19d7088 Record the POC baseline and platform facts in its report
-  notes: report sections 2 and 4
-- [i] P0.2 Platform facts in a scratch copy (structured clone, runtime content script, DNR in Incognito, cookie stores)
-  red: n/a (throwaway probe, nothing committed)
-  green: scratch `vp run test:e2e -- tests/e2e/zz-probe.spec.ts` → 1 passed; facts in report §4
-  commit: 19d7088 (with P0.1)
-- [i] P0.3 Fixture server (`/sentinel`, `/inspect`, `/sw.js`, logs) + second `webServer` + `POC_REPEATS` forwarding
-  red: `vp run test:e2e -- tests/e2e/poc-fixture.spec.ts` → `page.goto: net::ERR_CONNECTION_REFUSED at http://app.localhost:5191/sentinel?tag=normal-1…` (no fixture server; `.artifacts/docker/2026-10-28T12-05-56.444Z-acc5603c-fe1f-4809-aae5-795517fc417a`)
-  green: same command → 1 passed: JS and HttpOnly cookies, localStorage, sessionStorage, IndexedDB record, cache entry all `normal-1`, one SW at `http://app.localhost:5191/`; `other.localhost` sees none; log has the `/sentinel` request and two reports (`.artifacts/docker/2026-10-28T12-07-32.869Z-5051aa75-8829-48e2-84aa-009b83fd008d`)
-  commit: 672a37b Serve fixture origins for the Incognito sessions POC
-  notes: curl smoke test of every route on the host (Node 22 type stripping); `POC_REPEATS=7` reaches `docker create --env` (stub `docker` on PATH); `vp check`, `vp run deps`, `dead-code` (Knip reads the webServer command, no `knip.jsonc` change), `duplication` (0 clones), `test:container` (13 pass) all pass
+- [x] P0.1 Baseline: `vp install`, re-resolve `origin/master`, versions, baseline `vp run verify`, report skeleton
+      red: n/a (docs only)
+      green: `vp run verify` → run 1 exit 1 (pre-existing focus flake in `incognito.spec.ts`, then 25/25 with `--repeat-each=5`); run 2 exit 0 (`.artifacts/docker/2026-10-28T12-02-21.796Z-1433f9f5-2cce-4bf5-9a53-3c1e49edf6f6`)
+      commit: 19d7088 Record the POC baseline and platform facts in its report
+      notes: report sections 2 and 4
+- [x] P0.2 Platform facts in a scratch copy (structured clone, runtime content script, DNR in Incognito, cookie stores)
+      red: n/a (throwaway probe, nothing committed)
+      green: scratch `vp run test:e2e -- tests/e2e/zz-probe.spec.ts` → 1 passed; facts in report §4
+      commit: 19d7088 (with P0.1)
+- [x] P0.3 Fixture server (`/sentinel`, `/inspect`, `/sw.js`, logs) + second `webServer` + `POC_REPEATS` forwarding
+      red: `vp run test:e2e -- tests/e2e/poc-fixture.spec.ts` → `page.goto: net::ERR_CONNECTION_REFUSED at http://app.localhost:5191/sentinel?tag=normal-1…` (no fixture server; `.artifacts/docker/2026-10-28T12-05-56.444Z-acc5603c-fe1f-4809-aae5-795517fc417a`)
+      green: same command → 1 passed: JS and HttpOnly cookies, localStorage, sessionStorage, IndexedDB record, cache entry all `normal-1`, one SW at `http://app.localhost:5191/`; `other.localhost` sees none; log has the `/sentinel` request and two reports (`.artifacts/docker/2026-10-28T12-07-32.869Z-5051aa75-8829-48e2-84aa-009b83fd008d`)
+      commit: 672a37b Serve fixture origins for the Incognito sessions POC
+      notes: curl smoke test of every route on the host (Node 22 type stripping); `POC_REPEATS=7` reaches `docker create --env` (stub `docker` on PATH); `vp check`, `vp run deps`, `dead-code` (Knip reads the webServer command, no `knip.jsonc` change), `duplication` (0 clones), `test:container` (13 pass) all pass
 
-Stage 0 verify: _pending_
+Stage 0 verify: first run exit 1 — P0.3's server took port 5191, which `dashboard-embedding.spec.ts` uses (`EADDRINUSE`); fixed in `369ab7a` (fixture server on 5192). Second run exit 0, 22/22 tasks, 151 unit/component, 43/43 e2e (`.artifacts/docker/2026-10-28T12-10-32.366Z-8b259847-a7cc-455e-82bf-7e2b54d0513d`).
 
 ## Stage 1 — Native context reset
 
