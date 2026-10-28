@@ -69,6 +69,7 @@ test("the PWA installs, signs in, updates, and works offline in a plain managed 
     me: { user: "A", version: 1, from: "worker" },
     idbUser: "A",
     lastSeen: null,
+    cachedBefore: null,
     caches: ["pwa-api", "pwa-v1"],
   });
 

@@ -31,6 +31,8 @@ export interface PwaAnswer {
   idbUser: unknown;
   /** The user the worker recorded on the previous `whoami`, before this one. */
   lastSeen: unknown;
+  /** The API answer the worker cached on the previous `whoami`, before this one fetched. */
+  cachedBefore: unknown;
   caches: string[];
 }
 
@@ -220,22 +222,27 @@ function pwaWorker(version: number, get: typeof idbGet, put: typeof idbPut): voi
   scope.addEventListener("fetch", (event) => {
     if (event.request.mode === "navigate") event.respondWith(navigate(event.request));
   });
+  const cachedMe = async () => {
+    const cached = await caches.match(ME, { cacheName: "pwa-api" });
+    return cached ? ((await cached.json()) as unknown) : null;
+  };
   const me = async (): Promise<PwaAnswer["me"]> => {
     try {
       const response = await fetch(`${ME}?${query}`, { headers: { "x-pwa-from": "worker" } });
       await (await caches.open("pwa-api")).put(ME, response.clone());
       return (await response.json()) as PwaAnswer["me"];
     } catch {
-      const cached = await caches.match(ME, { cacheName: "pwa-api" });
-      return { offline: true, cached: cached ? await cached.json() : null };
+      return { offline: true, cached: await cachedMe() };
     }
   };
   const whoami = async (): Promise<PwaAnswer> => {
     const idbUser = await get("pwa", "kv", "user");
     const lastSeen = await get("pwa-sw", "seen", "last");
+    const cachedBefore = await cachedMe();
     const answer = await me();
-    await put("pwa-sw", "seen", "last", "user" in answer ? answer.user : null);
-    return { version, me: answer, idbUser, lastSeen, caches: (await caches.keys()).toSorted() };
+    if ("user" in answer) await put("pwa-sw", "seen", "last", answer.user);
+    const keys = (await caches.keys()).toSorted();
+    return { version, me: answer, idbUser, lastSeen, cachedBefore, caches: keys };
   };
   scope.addEventListener("message", (event) => {
     event.waitUntil(whoami().then((answer) => event.ports[0]?.postMessage(answer)));
