@@ -15,14 +15,10 @@ export const WAITING = "Waiting for another profile in the RECnRun folder…";
 export const folderBanner = (dashboard: Page) =>
   dashboard.locator('section[aria-labelledby="folder-banner-heading"]');
 
-/** Clicks the dashboard's folder banner, or `button`; returns the window it opens and its dialogs. */
-export async function openFolderWindow(
-  profile: Profile,
-  native: Native,
-  button = folderBanner(profile.dashboard).getByRole("button"),
-) {
+/** Clicks the dashboard's folder banner; returns the window it opens and its dialogs. */
+export async function openFolderWindow(profile: Profile, native: Native) {
   const opened = profile.context.waitForEvent("page");
-  await button.click();
+  await folderBanner(profile.dashboard).getByRole("button").click();
   const window = await opened;
   await window.waitForLoadState();
   await expect(window.getByRole("heading", { name: "RECnRun folder" })).toBeVisible();
@@ -60,24 +56,8 @@ export async function pair(a: Profile, b: Profile, native: Native): Promise<Page
 }
 
 /**
- * Lets a newcomer pair with a linked profile, whose folder grant ended with its window (H2). Its
- * links keep handles to the folder, so Chrome mostly asks with its write prompt; the window then
- * waits until the newcomer pairs. The newcomer reaches the rest of the mesh through that profile.
- */
-async function letJoin(profile: Profile, native: Native): Promise<Page> {
-  const join = pairingSection(profile.dashboard).getByRole("button", {
-    name: "Let another profile join",
-  });
-  const { window, dialogs } = await openFolderWindow(profile, native, join);
-  await window.getByRole("button", { name: "Allow folder" }).click();
-  await dialogs.allowInEitherPrompt();
-  await expect(window.getByText("Keep this window open")).toBeVisible();
-  return window;
-}
-
-/**
- * Pairs every profile with every other, one newcomer at a time, as a user adds profiles: only the
- * last one to join lets the next in through the folder, and the mesh carries the rest.
+ * Pairs every profile with every other, one newcomer at a time, as a user adds profiles: the
+ * linked profiles' dashboards keep the folder grant (H2), so they find each newcomer there.
  */
 export async function pairAll(profiles: Profile[], native: Native): Promise<void> {
   const [first, second, ...rest] = profiles;
@@ -85,7 +65,6 @@ export async function pairAll(profiles: Profile[], native: Native): Promise<void
   await pair(first, second, native);
   const joined = [first, second];
   for (const next of rest) {
-    await letJoin(joined.at(-1) ?? first, native);
     await chooseFolder(next, native);
     for (const member of joined) {
       await expect(peerStatus(member, next)).toHaveText(`Connected — ${next.name}`, {

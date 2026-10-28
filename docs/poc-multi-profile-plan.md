@@ -134,11 +134,15 @@ All seven tasks landed, one commit each, and `vp run verify` exited 0 after each
 
 Three clicks in every linked profile per newcomer was too many, and the user chose (2026-10-28) to relay pairing codes over the links, and to simulate with five profiles from then on. Each profile tells its peers whom its links reach (`MEMBERS`); two profiles that share a peer exchange offer and answer through it (`SIGNAL`, or `INVITE` to ask the lower id for an offer), with a folder signal's checks. A peer relays only its own signals, and a list cannot swap a pinned fingerprint. `cross-profile-mesh.spec.ts` now runs five profiles, where only the last profile to join lets the next one in, and Reconnect needs no folder window. Red: that spec at the previous source stopped in `pairAll`, A never paired with C. The five-profile runs also showed the `xdotool` driver sometimes losing the release of `space` on Allow, which it now presses again.
 
+### After the rebase onto the top-level dashboard
+
+On `dashboard-top-level` the dashboard is a top-level extension tab, so it holds the folder grant after the folder window closes (H2). A linked profile with its dashboard open finds a newcomer with no click, and `pairAll` no longer clicks **Let another profile join**, which shows only once a linked profile's grant ended. Red: `cross-profile-mesh.spec.ts` waited for that button until it timed out.
+
 Clicks with three profiles, from the end-to-end tests, before the mesh relayed pairing: the first pairing costs each profile five, as before; a third profile joining costs it five and each linked profile three (**Let another profile join**, **Allow folder**, **Allow**); Reconnect after the grants ended costs one plus those three in each profile of the pair. Quitting a profile shows it down in the others within 5 s. The count in branded Chrome is the manual check below.
 
 ## Manual check for the user
 
-In five profiles of branded Chrome, choose the RECnRun folder in two; once they link, for each new profile click **Let another profile join** in one linked profile and allow the folder, then choose it in the new profile. Count the clicks until each dashboard lists the other four. Then:
+In five profiles of branded Chrome, choose the RECnRun folder in two; once they link, choose it in each new profile, with the linked profiles' dashboards open. Count the clicks until each dashboard lists the other four. Then:
 
 1. Disconnect one pair and Reconnect it; no folder window should open.
 2. Quit one profile and time how long the other four take to show it down.
