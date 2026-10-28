@@ -128,3 +128,23 @@ The dashboard header has a Record button (`dashboard/panel/RecordControls.tsx`).
   - The window stays on top after switching to another tab and to another Chrome window.
   - Stop brings back the dashboard tab (6A); note where the focus goes in 6C.
   - Whether `await`ing storage before `requestWindow()` still opens it, which decides whether Record can wait for the extension before opening the window.
+
+## Sequential Incognito sessions (October 2026)
+
+**Problem.** A developer often needs the same app signed in as several users, one after another, without the sessions leaking into each other or into the normal profile. Each identity's site data must come back exactly, and the app must not run before it is in place.
+
+**Question.** Can RECnRun keep one managed Incognito window, save each identity's site data (cookies, Web Storage, IndexedDB, Cache Storage) when it closes, and restore it into a fresh Incognito session before the app's first script runs? Branch `poc/incognito-sessions`; the full report, with commands, run ids, and Chromium sources, is [POC-ORIGIN-SNAPSHOT.md](POC-ORIGIN-SNAPSHOT.md).
+
+**Method.** Test and development builds only gain `declarativeNetRequest`, `scripting`, `cookies`, `webNavigation`, and `unlimitedStorage`; production is unchanged and shows the workspace as unavailable. A fixture server (`*.localhost`) serves a conventional app, a PWA, and a cross-site sign-in; end-to-end tests in Docker run each claim with negative controls in scratch copies, and stress loops of 50 cycles. Zephyr, a real app, is a manual run by the user ([poc-zephyr-runbook.md](poc-zephyr-runbook.md)).
+
+| Area                    | Verdict                                 | What it rests on                                                                                                                      |
+| ----------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Native reset            | GO                                      | Closing the managed window and opening a new one gives an empty session, 50 of 50, once Chrome has erased the previous profile        |
+| Startup barrier         | GO                                      | Tab-scoped DNR rules and a script-blocking CSP hold the app while the origin agent restores; the first reads saw the data, 100 of 100 |
+| Data fidelity           | GO                                      | Every storage kind round-trips; each loss (an `autoIncrement` counter, opaque cache entries) is reported or unobservable by the page  |
+| Capture consistency     | GO, per database                        | One `readonly` transaction per IndexedDB database; not atomic across databases or storage kinds                                       |
+| Local PWA compatibility | GO                                      | The app's Service Worker registers again on its first load; a resume needs the network                                                |
+| Zephyr                  | Not validated (awaiting the user's run) | —                                                                                                                                     |
+
+- **Findings.** Problems that took investigation are in [TROUBLESHOOTING.md](TROUBLESHOOTING.md): the teardown signal, Blobs from an Incognito page, Strict cookies on the released document, domain cookies hidden by host permissions, a redirect to a declared sign-in host, `ERR_ABORTED` before `about:blank` commits, two focused windows, and a session-control test flake.
+- **Non-claims.** Service Worker registrations are not restored; a declared cookie host contributes its cookies only, not its storage; data written after the last capture is lost when the window closes outside RECnRun.
