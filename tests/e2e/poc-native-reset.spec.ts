@@ -1,7 +1,7 @@
-import { writeFileSync } from "node:fs";
 import type { Page, Worker } from "@playwright/test";
 import { sampleSnapshot } from "@recnrun/domain/testing";
 import { expect, test } from "./fixtures/extension.ts";
+import { keep } from "./fixtures/keep.ts";
 import { dashboardOf, openSite } from "./fixtures/session.ts";
 import {
   holding,
@@ -44,13 +44,6 @@ async function managedGeneration(serviceWorker: Worker): Promise<number> {
   const managed = await managedWindow(serviceWorker);
   if (managed?.status !== "active") throw new Error("No managed window is open.");
   return managed.generation;
-}
-
-/** Keeps an observation as JSON in the test's results, for the POC report to quote. */
-async function keep(name: string, value: unknown): Promise<void> {
-  const path = test.info().outputPath(`${name}.json`);
-  writeFileSync(path, JSON.stringify(value, null, 2));
-  await test.info().attach(name, { path, contentType: "application/json" });
 }
 
 test.use({ incognitoAccess: true });

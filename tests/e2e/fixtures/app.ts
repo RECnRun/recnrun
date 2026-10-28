@@ -8,6 +8,8 @@ export interface AppLogEntry {
   method?: string;
   path?: string;
   dest?: string;
+  /** The names of the cookies the request carried, sorted; never their values. */
+  cookies?: string[];
   time: number;
   body?: unknown;
 }
@@ -18,6 +20,7 @@ export const EMPTY_FIRST_READS: Omit<FirstReads, "time"> = {
   localStorage: {},
   sessionStorage: {},
   idbRecord: null,
+  controlled: false,
 };
 
 interface AppWindow {

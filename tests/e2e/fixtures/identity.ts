@@ -50,6 +50,7 @@ export const restoredReads = (run: string): Omit<FirstReads, "time"> => ({
   localStorage: { token: `local-${run}` },
   sessionStorage: { tab: `session-${run}` },
   idbRecord: `idb-${run}`,
+  controlled: false,
 });
 
 /** Starts the managed window at `url` with `data` restored first; resolves with the step timings. */
@@ -68,3 +69,45 @@ export function startWithIdentity(
     [url, data, restoreDelayMs] as const,
   );
 }
+
+interface ChromeGlobal {
+  chrome: {
+    windows: { getAll: () => Promise<{ incognito: boolean }[]> };
+    declarativeNetRequest: { getSessionRules: () => Promise<unknown[]> };
+    scripting: { getRegisteredContentScripts: () => Promise<unknown[]> };
+    cookies: {
+      getAll: (filter: { url: string }) => Promise<unknown[]>;
+      set: (details: { url: string; name: string; value: string }) => Promise<unknown>;
+    };
+  };
+}
+
+/** How many Incognito windows Chrome lists. */
+export const incognitoWindows = (serviceWorker: Worker) =>
+  serviceWorker.evaluate(async () => {
+    const { chrome } = globalThis as unknown as ChromeGlobal;
+    return (await chrome.windows.getAll()).filter(({ incognito }) => incognito).length;
+  });
+
+/** What the barrier left behind: session rules and registered content scripts. */
+export const barrierLeft = (serviceWorker: Worker) =>
+  serviceWorker.evaluate(async () => {
+    const { chrome } = globalThis as unknown as ChromeGlobal;
+    const rules = (await chrome.declarativeNetRequest.getSessionRules()).length;
+    const scripts = (await chrome.scripting.getRegisteredContentScripts()).length;
+    return { rules, scripts };
+  });
+
+/** The normal profile's cookies for `url`: the service worker's own store. */
+export const normalCookies = (serviceWorker: Worker, url: string) =>
+  serviceWorker.evaluate(async (target) => {
+    const { chrome } = globalThis as unknown as ChromeGlobal;
+    return chrome.cookies.getAll({ url: target });
+  }, url);
+
+/** Sets a cookie in the normal profile, which a start with an identity must leave alone. */
+export const setNormalCookie = (serviceWorker: Worker, url: string) =>
+  serviceWorker.evaluate(async (target) => {
+    const { chrome } = globalThis as unknown as ChromeGlobal;
+    await chrome.cookies.set({ url: target, name: "normal", value: "kept" });
+  }, url);

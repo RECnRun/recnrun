@@ -1,38 +1,127 @@
-import { appLog, appState } from "./fixtures/app.ts";
+import type { BrowserContext, Worker } from "@playwright/test";
+import { appLog, appState, requestsOf } from "./fixtures/app.ts";
+import type { AppLogEntry } from "./fixtures/app.ts";
 import { expect, test } from "./fixtures/extension.ts";
-import { identityFor, restoredReads, startWithIdentity } from "./fixtures/identity.ts";
+import {
+  barrierLeft,
+  identityFor,
+  incognitoWindows,
+  normalCookies,
+  restoredReads,
+  setNormalCookie,
+  startWithIdentity,
+} from "./fixtures/identity.ts";
+import type { StepTiming } from "./fixtures/identity.ts";
+import { keep } from "./fixtures/keep.ts";
+import { spread } from "./fixtures/teardown-probe.ts";
 import { APP, pageAt } from "./fixtures/workspace.ts";
 
 test.use({ incognitoAccess: true });
 
-test("a start with an identity restores it before the app's first script runs", async ({
-  context,
+/** Starts per restore delay in one test; the recorded run sets `POC_REPEATS=50`. */
+const CYCLES = Number(process.env.POC_REPEATS ?? "3");
+
+const STEPS = [
+  "store-gone",
+  "window",
+  "cookie-store",
+  "cookies",
+  "barrier",
+  "navigate",
+  "restore",
+  "unbarrier",
+  "reload",
+];
+
+const isFirstReport = ({ kind, body }: AppLogEntry) =>
+  kind === "report" && (body as { phase?: string }).phase === "first";
+
+/** What reached the server before the release: everything before the reload's `/app/` request. */
+function beforeRelease(entries: readonly AppLogEntry[]): AppLogEntry[] {
+  const documents = entries.flatMap(({ kind, path }, index) =>
+    kind === "request" && path === "/app/" ? [index] : [],
+  );
+  return entries.slice(0, documents[1] ?? entries.length);
+}
+
+interface Cycle {
+  context: BrowserContext;
+  serviceWorker: Worker;
+  run: string;
+  delay: number;
+}
+
+/** One start under the site's own CSP; proves what the app saw first and what the barrier let by. */
+async function proveCycle({ context, serviceWorker, run, delay }: Cycle) {
+  const query = `run=${run}&csp=1`;
+  const target = `${APP}/app/redirect?${query}`;
+  const timings = await startWithIdentity(serviceWorker, target, identityFor(run), delay);
+  expect(timings.map(({ step }) => step)).toEqual(STEPS);
+  const page = await pageAt(context, `${APP}/app/?${query}`);
+
+  const state = await appState(page);
+  expect(state.failure, run).toBeUndefined();
+  expect(state.first, run).toMatchObject(restoredReads(run));
+  expect(state).toMatchObject({ module: true, worker: "ready", frame: true, image: true });
+  // The site's own policy still holds once the barrier's is gone.
+  expect(state.unnonced).toBe(false);
+  expect(state.violations.map(({ directive }) => directive)).toContain("script-src-elem");
+
+  const entries = await appLog(run);
+  const held = beforeRelease(entries);
+  expect(requestsOf(held), run).toEqual(["/app/redirect document", "/app/ document"]);
+  expect(
+    held.filter(({ kind }) => kind === "report"),
+    run,
+  ).toEqual([]);
+  // The cookies were in the tab's store before its first request, and only they.
+  for (const request of held) expect(request.cookies, run).toEqual(["run", "theme"]);
+  expect(entries.find(isFirstReport)?.body, run).toMatchObject(restoredReads(run));
+  expect(await barrierLeft(serviceWorker)).toEqual({ rules: 0, scripts: 0 });
+  return { page, timings };
+}
+
+for (const delay of [0, 2_000]) {
+  test(`the app's first reads see the restored identity, with the restore held ${delay} ms`, async ({
+    context,
+    serviceWorker,
+  }) => {
+    test.setTimeout(30_000 + CYCLES * (delay + 10_000));
+    await setNormalCookie(serviceWorker, `${APP}/`);
+    const normal = await normalCookies(serviceWorker, `${APP}/`);
+    const cycles: StepTiming[][] = [];
+    for (let cycle = 1; cycle <= CYCLES; cycle += 1) {
+      const run = `barrier-${delay}-${cycle}-${Date.now()}`;
+      const { page, timings } = await proveCycle({ context, serviceWorker, run, delay });
+      cycles.push(timings);
+      // Closed as a user would; the next start must wait for Chrome to drop the Incognito data.
+      await page.close();
+      await expect.poll(() => incognitoWindows(serviceWorker)).toBe(0);
+    }
+    expect(await normalCookies(serviceWorker, `${APP}/`)).toEqual(normal);
+    const stats = Object.fromEntries(
+      STEPS.map((step) => [
+        step,
+        spread(cycles.map((each) => each.find((t) => t.step === step)?.ms)),
+      ]),
+    );
+    await keep(`barrier-${delay}ms`, { delay, cycles: cycles.length, stats, perCycle: cycles });
+  });
+}
+
+test("a redirect off the target origin fails the start, closes the window, and releases nothing", async ({
   serviceWorker,
 }) => {
-  const run = `barrier-${Date.now()}`;
-  const timings = await startWithIdentity(
-    serviceWorker,
-    `${APP}/app/redirect?run=${run}`,
-    identityFor(run),
-    2_000,
+  const run = `barrier-off-${Date.now()}`;
+  const target = `${APP}/app/redirect?to=other&run=${run}`;
+  const failure = await startWithIdentity(serviceWorker, target, identityFor(run)).then(
+    () => "started",
+    (error: unknown) => String(error),
   );
-  expect(timings.map(({ step }) => step)).toEqual([
-    "store-gone",
-    "window",
-    "cookie-store",
-    "cookies",
-    "barrier",
-    "navigate",
-    "restore",
-    "unbarrier",
-    "reload",
-  ]);
-
-  const state = await appState(await pageAt(context, `${APP}/app/?run=${run}`));
-  expect(state.failure).toBeUndefined();
-  expect(state.first).toMatchObject(restoredReads(run));
-  const first = (await appLog(run)).find(
-    ({ kind, body }) => kind === "report" && (body as { phase?: string }).phase === "first",
-  );
-  expect(first?.body).toMatchObject({ phase: "first", ...restoredReads(run) });
+  expect(failure).toMatch(/did not load \(net::ERR_BLOCKED_BY_CLIENT\)|left the target site/);
+  expect(await incognitoWindows(serviceWorker)).toBe(0);
+  expect(await barrierLeft(serviceWorker)).toEqual({ rules: 0, scripts: 0 });
+  const entries = await appLog(run);
+  expect(requestsOf(entries)).toEqual(["/app/redirect document"]);
+  expect(entries.some(({ kind }) => kind === "report")).toBe(false);
 });

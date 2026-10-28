@@ -8,7 +8,15 @@ import { inspectPage, sentinelPage, serviceWorker } from "./pages.ts";
 const PORT = 5192;
 
 type LogEntry =
-  | { kind: "request"; method: string; path: string; host: string; dest: string; time: number }
+  | {
+      kind: "request";
+      method: string;
+      path: string;
+      host: string;
+      dest: string;
+      cookies: string[];
+      time: number;
+    }
   | { kind: "report"; host: string; body: unknown; time: number };
 
 const logs = new Map<string, LogEntry[]>();
@@ -75,9 +83,10 @@ function app({ response, url, run }: Exchange): void {
   send(response, HTML, appPage(run ?? "", nonce), csp);
 }
 
-/** One same-origin hop before the app, as sign-in and locale redirects do. */
+/** One hop before the app, as sign-in and locale redirects do; `?to=other` leaves the origin. */
 function redirect({ response, url }: Exchange): void {
-  response.writeHead(302, { location: `/app/${url.search}`, "cache-control": "no-store" });
+  const away = url.searchParams.get("to") === "other" ? "http://other.localhost:5192" : "";
+  response.writeHead(302, { location: `${away}/app/${url.search}`, "cache-control": "no-store" });
   response.end();
 }
 
@@ -110,7 +119,9 @@ async function route(request: IncomingMessage, response: ServerResponse): Promis
   // Reading the log is not part of what a spec observes.
   if (key !== "GET /__log") {
     const dest = String(request.headers["sec-fetch-dest"] ?? "");
-    record(run, { kind: "request", method, path: url.pathname, host, dest, time: Date.now() });
+    const cookies = Object.keys(cookiesOf(request)).sort();
+    const path = url.pathname;
+    record(run, { kind: "request", method, path, host, dest, cookies, time: Date.now() });
   }
   const handler = routes[key];
   if (handler) return handler({ request, response, url, host, run });

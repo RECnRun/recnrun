@@ -7,6 +7,8 @@ export interface FirstReads {
   localStorage: Record<string, string>;
   sessionStorage: Record<string, string>;
   idbRecord: unknown;
+  /** Whether a Service Worker already controlled the document when the app started. */
+  controlled: boolean;
   time: number;
 }
 
@@ -53,6 +55,7 @@ function observeFirst(run: string): void {
     localStorage: entries(localStorage),
     sessionStorage: entries(sessionStorage),
     idbRecord: null,
+    controlled: navigator.serviceWorker.controller !== null,
     time: Date.now(),
   };
   const beacon = () => {
