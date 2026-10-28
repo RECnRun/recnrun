@@ -8,6 +8,8 @@ import { managedWindowRepository } from "@/storage/managed-window-repository";
 export type IncognitoWindow = Browser.windows.Window & { id: number };
 
 const CLOSE_TIMEOUT_MS = 10_000;
+/** How long a new window's blank page may take to load before RECnRun navigates anyway. */
+export const BLANK_BOUND_MS = 5_000;
 
 /** The Incognito windows this extension sees, with their tabs; titles and URLs stay in memory. */
 export async function inventory(): Promise<IncognitoWindow[]> {
@@ -61,8 +63,35 @@ export async function closeWindows(
 }
 
 /**
+ * Resolves once `tabId` finished loading, or after `boundMs`, or when Chrome no longer knows it;
+ * whatever navigates the tab next finds out about a tab that never loaded.
+ */
+async function loaded(tabId: number, boundMs: number): Promise<void> {
+  let settle = () => {};
+  const done = new Promise<void>((resolve) => {
+    settle = resolve;
+  });
+  const onUpdated = (id: number, change: Browser.tabs.OnUpdatedInfo) => {
+    if (id === tabId && change.status === "complete") settle();
+  };
+  // Registered before the read, so a load that ends in between is not missed.
+  browser.tabs.onUpdated.addListener(onUpdated);
+  const timer = setTimeout(settle, boundMs);
+  try {
+    const tab = await browser.tabs.get(tabId).catch(() => undefined);
+    if (tab?.status !== "loading") settle();
+    await done;
+  } finally {
+    clearTimeout(timer);
+    browser.tabs.onUpdated.removeListener(onUpdated);
+  }
+}
+
+/**
  * Opens RECnRun's Incognito window on a blank page, only when no other Incognito window exists,
- * holding `identityId` when it is given.
+ * holding `identityId` when it is given. It returns once the blank page loaded: windows.create
+ * replies while that navigation is still running, and a navigation started before it commits
+ * can fail with net::ERR_ABORTED.
  */
 export async function createNeutralWindow(identityId?: string): Promise<ManagedWindowState> {
   if ((await inventory()).length > 0) {
@@ -71,7 +100,7 @@ export async function createNeutralWindow(identityId?: string): Promise<ManagedW
       "Close every Incognito window before RECnRun opens its own.",
     );
   }
-  return managedWindowRepository.update(async (previous) => {
+  const state = await managedWindowRepository.update(async (previous) => {
     const created = await browser.windows.create({ incognito: true, url: "about:blank" });
     const windowId = created?.id;
     const tabId = created?.tabs?.[0]?.id;
@@ -81,6 +110,8 @@ export async function createNeutralWindow(identityId?: string): Promise<ManagedW
     const generation = (previous?.generation ?? 0) + 1;
     return { generation, windowId, tabId, status: "active", ...(identityId && { identityId }) };
   });
+  await loaded(state.tabId, BLANK_BOUND_MS);
+  return state;
 }
 
 function markClosed(windowId?: number): void {

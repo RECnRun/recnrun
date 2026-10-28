@@ -2,7 +2,9 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vite-plus/tes
 import type { MockInstance } from "vite-plus/test";
 import type { Browser } from "wxt/browser";
 import { fakeBrowser } from "wxt/testing/fake-browser";
+import type { ManagedWindowState } from "@recnrun/domain";
 import {
+  BLANK_BOUND_MS,
   closeWindows,
   createNeutralWindow,
   inventory,
@@ -130,6 +132,41 @@ describe("createNeutralWindow", () => {
     const [window] = await inventory();
     expect(window?.id).toBe(second.windowId);
     expect(window?.tabs?.map((tab) => [tab.id, tab.url])).toEqual([[second.tabId, "about:blank"]]);
+  });
+
+  test("returns once the new tab's blank page finished loading, so no navigation races it", async () => {
+    const get = vi.spyOn(fakeBrowser.tabs, "get");
+    get.mockImplementation((async (id: number) => ({ id, status: "loading" })) as never);
+    let opened: ManagedWindowState | undefined;
+    void createNeutralWindow().then((state) => (opened = state));
+    await vi.waitFor(() => expect(create).toHaveBeenCalled());
+    const created = (await create.mock.results[0]?.value) as Browser.windows.Window;
+    const tabId = created.tabs?.[0]?.id ?? -1;
+    const update = (id: number, change: Browser.tabs.OnUpdatedInfo) =>
+      fakeBrowser.tabs.onUpdated.trigger(id, change, {} as Browser.tabs.Tab);
+    await update(tabId + 1, { status: "complete" });
+    await update(tabId, { title: "" });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(opened).toBeUndefined();
+    await update(tabId, { status: "complete" });
+    await vi.waitFor(() => expect(opened).toMatchObject({ tabId, status: "active" }));
+  });
+
+  test("goes on after a bound when the blank page never reports loaded, or the tab is gone", async () => {
+    vi.useFakeTimers();
+    try {
+      const get = vi.spyOn(fakeBrowser.tabs, "get");
+      get.mockImplementation((async (id: number) => ({ id, status: "loading" })) as never);
+      const opened = createNeutralWindow();
+      await vi.advanceTimersByTimeAsync(BLANK_BOUND_MS);
+      await expect(opened).resolves.toMatchObject({ generation: 1 });
+
+      await closeWindows([(await opened).windowId]);
+      get.mockRejectedValueOnce(new Error("No tab with id: 2."));
+      await expect(createNeutralWindow()).resolves.toMatchObject({ generation: 2 });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   test("refuses while any Incognito window is open, and opens none", async () => {
