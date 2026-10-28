@@ -6,6 +6,7 @@ import { RecordingDetail } from "@/dashboard/RecordingDetail";
 import { EmptyState, RecordingList } from "@/dashboard/RecordingList";
 import { selectedRecordingId, titleFor } from "@/dashboard/route";
 import type { DashboardRouter } from "@/dashboard/router";
+import { PinHint } from "@/dashboard/PinHint";
 import type { Navigation } from "@/dashboard/RouteLink";
 import { TabList } from "@/dashboard/TabList";
 import type { TakeControl } from "@/dashboard/TabList";
@@ -71,6 +72,7 @@ export function Dashboard({ services, router, take }: DashboardProps) {
         <h1>RECnRun</h1>
       </header>
       <main>
+        <PinHint pin={services.toolbar} />
         <div class="session-panel">
           <IncognitoControl access={services.incognito}>
             <TabList tabs={services.tabs} store={services.recordings} take={take} />

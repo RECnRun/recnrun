@@ -93,3 +93,19 @@ test("closing the dashboard tab's PiP window keeps the session and gives the con
     .poll(() => activeTabId(serviceWorker))
     .toBe(await tabIdOf(serviceWorker, dashboard.url()));
 });
+
+test("the dashboard tab asks to pin RECnRun while its icon is off the toolbar", async ({
+  context,
+  serviceWorker,
+}) => {
+  // Nothing pins an extension for the user, so the test browser starts with it off the toolbar.
+  const settings = await serviceWorker.evaluate(() =>
+    (
+      globalThis as unknown as { chrome: { action: { getUserSettings(): Promise<unknown> } } }
+    ).chrome.action.getUserSettings(),
+  );
+  expect(settings).toEqual({ isOnToolbar: false });
+  const dashboard = await installedDashboard(context, serviceWorker);
+  const hint = dashboard.getByRole("region", { name: "Pin RECnRun to the toolbar" });
+  await expect(hint).toContainText("Extensions menu");
+});

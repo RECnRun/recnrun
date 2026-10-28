@@ -109,7 +109,8 @@
   gap: var(--space);
 }
 
-.incognito-banner {
+.incognito-banner,
+.pin-hint {
   display: grid;
   justify-items: start;
   gap: 0.5rem;
@@ -121,17 +122,25 @@
 }
 
 .incognito-banner h3,
-.incognito-banner p {
+.incognito-banner p,
+.pin-hint h3,
+.pin-hint p {
   margin: 0;
 }
 
-.incognito-banner h3 {
+.incognito-banner h3,
+.pin-hint h3 {
   font-size: 1rem;
 }
 
-.incognito-banner p {
+.incognito-banner p,
+.pin-hint p {
   color: var(--muted);
   font-size: 0.875rem;
+}
+
+.pin-hint {
+  margin-bottom: var(--space);
 }
 
 .tab-new-window {
