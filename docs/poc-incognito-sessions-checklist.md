@@ -8,7 +8,7 @@ Plan: [poc-incognito-sessions-plan.md](poc-incognito-sessions-plan.md). Assignme
 | Branch               | `poc/incognito-sessions`                                         |
 | Planned base         | `44c154da29860c7a8df829e902b177df5ce2ba2a` (2026-10-28)          |
 | Actual base (P0.1)   | `44c154d` (re-resolved 2026-10-28, unchanged)                    |
-| Last recorded commit | `9394b55`                                                        |
+| Last recorded commit | `0ebe6b4`                                                        |
 | Decisions OD-1…OD-4  | defaults of plan §3, accepted by the user ("Avance", 2026-10-28) |
 
 ## Status legend
@@ -304,6 +304,11 @@ Stage 2 verify: exit 0 on `dfb882d`, 302 unit/component, 61/61 e2e, coverage 99.
   - Extension restart (service worker stopped through DevTools port 9336): during `capture` the journal recovers as failed with `Interrupted: RECnRun restarted before the start finished.` (the message says "start" for a switch too), and B's window stays open with `B:1`, because an interrupted lifecycle capture's journal has no generation or windowId to close it by; a switch then works. During `restore` the window closes, the barrier is 0 rules/0 scripts, and Resume B gives `B:1`.
   - Stale replies: with the replay on through A→B→A→B→A, every marker is right and the replay delivered > 0 replies; N1 shows the operationId/generation check is what drops them.
   - Browser restart (`relaunch()` on the same profile): no Incognito window; status lists A with a capture and B without; Resume B → `RECnRun has no saved data for this identity.` (B was never captured, and Chrome discarded its Incognito data); Resume A gives `A:1`; the normal profile keeps every sentinel except session cookies and sessionStorage, which end with any browser session.
+- [i] S3.12b The recovery error after a restart names the interrupted command (follow-up to S3.11)
+  red: `vp test run apps/extension/tests/workspace-recovery.test.ts` → "switch: Expected 'Interrupted: RECnRun restarted before the switch finished.' Received '… before the start finished.'"; `vp run test:e2e -- tests/e2e/poc-lifecycle-restarts.spec.ts -g "extension restart"` against the old `recovery.ts` → 1 failed, journal `error` `- …before the switch finished.` `+ …before the start finished.` (`.artifacts/docker/2026-10-28T20-24-27.646Z-a29bbaba-2433-4094-a2ed-7e9d169d214f`)
+  green: same unit command → 6 passed; `vp run test:e2e -- tests/e2e/poc-lifecycle-restarts.spec.ts tests/e2e/poc-failure.spec.ts` → 6 passed (`2026-10-28T20-24-46.705Z-85c4c4df`); `vp check`, `vp run deps` pass
+  commit: 0ebe6b4 Name the interrupted command in the recovery error
+  notes: `recovery.ts` names the journaled kind: the start, the switch, the suspension, the resumption, the new identity's creation, the deletion. The bootstrap's entries already carry the lifecycle command's kind (`lifecycle-effects.ts`), so a restart inside a switch's start also says "switch". ARCHITECTURE updated.
 
 Stage 3 verify: _pending_
 
