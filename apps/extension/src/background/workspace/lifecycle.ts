@@ -43,7 +43,7 @@ export interface LifecycleDeps {
   now?: () => number;
 }
 
-export interface IdentityDraft {
+interface IdentityDraft {
   label: string;
   url: string;
   capabilities: CaptureCapabilities;

@@ -24,7 +24,7 @@ function lastSaved({ lastCapture }: Identity): string {
 }
 
 /** An Incognito window, or a tab in the managed window, that RECnRun did not open. */
-export function hasConflict(status: WorkspaceStatus, tabs: readonly OpenTab[]): boolean {
+function hasConflict(status: WorkspaceStatus, tabs: readonly OpenTab[]): boolean {
   if (status.foreign.length > 0) return true;
   const { managed } = status;
   if (managed?.status !== "active") return false;
