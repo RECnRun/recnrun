@@ -8,7 +8,7 @@ Plan: [poc-incognito-sessions-plan.md](poc-incognito-sessions-plan.md). Assignme
 | Branch               | `poc/incognito-sessions`                                         |
 | Planned base         | `44c154da29860c7a8df829e902b177df5ce2ba2a` (2026-10-28)          |
 | Actual base (P0.1)   | `44c154d` (re-resolved 2026-10-28, unchanged)                    |
-| Last recorded commit | `17a4a1b`                                                        |
+| Last recorded commit | `94e80cb`                                                        |
 | Decisions OD-1…OD-4  | defaults of plan §3, accepted by the user ("Avance", 2026-10-28) |
 
 ## Status legend
@@ -59,7 +59,11 @@ Stage 0 verify: first run exit 1 — P0.3's server took port 5191, which `dashbo
   green: same command → 25 files, 95 tests passed
   commit: 17a4a1b Add the managed Incognito window state and its inventory rules
   notes: `vp check`, `vp run deps`, `vp run dead-code` pass; Incognito windows of an unreported `type` count as foreign (conservative), DevTools and `alwaysOnTop` windows are left out
-- [ ] S1.2 Background: `inventory`, `closeWindows` (waits for removal), `createNeutralWindow` (refuses when any Incognito window exists), state repository
+- [i] S1.2 Background: `inventory`, `closeWindows` (waits for removal), `createNeutralWindow` (refuses when any Incognito window exists), state repository
+  red: `vp run test:unit` → 16 failed against stubs that store nothing, list every window, remove without waiting, and create without checking, e.g. `createNeutralWindow > refuses while any Incognito window is open: promise resolved "{ generation: +0, windowId: 2, …(2) }" instead of rejecting` and `closeWindows > waits for Chrome to report each removal: expected true to be false`; `background-start` tracker test failed (`Matcher did not succeed in time`) before `startBackground` registered it
+  green: same command → 27 files, 115 tests passed
+  commit: 94e80cb Add Incognito window primitives and the managed window repository
+  notes: `vp check`, `vp run deps`, `vp run dead-code` pass; `fakeBrowser.windows.create` opens no tab, so `tests/fake-windows.ts` adds one; the tracker also marks the window closed on `runtime.onStartup` (Chrome reuses window ids after a restart); not exercised in a real browser (S1.6)
 - [ ] S1.3 Workspace commands, `OWN_PAGE` routes, single-operation lock, stale `windowIds` refusal
 - [ ] S1.4 Dashboard: access requirement, blockers + "Close these windows and start", Start, "Use this tab's address"
 - [ ] S1.5 Record only the managed tab; existing e2e and product docs updated
