@@ -60,6 +60,19 @@ test("names the focused window's active tab current, and leaves the PiP window o
   expect(pipFocused).toEqual({ tabs: [expect.objectContaining({ id: 1 })] });
 });
 
+test("names the last focused window's tab current when Chrome reports two windows focused", () => {
+  // While the focus moves between windows, Chrome can report both the old and the new one focused.
+  const windows = [
+    browserWindow({ id: 1, focused: true, tabs: [tab({ id: 1, active: true })] }),
+    browserWindow({ id: 2, focused: true, tabs: [tab({ id: 2, windowId: 2, active: true })] }),
+  ];
+  expect(toBrowserTabs(windows, 2).currentId).toBe(2);
+  expect(toBrowserTabs(windows, 1).currentId).toBe(1);
+  expect(toBrowserTabs(windows).currentId).toBe(1);
+  const unfocused = [browserWindow({ id: 1, tabs: [tab({ id: 1, active: true })] })];
+  expect(toBrowserTabs(unfocused, 1).currentId).toBeUndefined();
+});
+
 test("shows only icons that load without exposing an incognito tab", () => {
   const icons = (incognito: boolean) =>
     toBrowserTabs([
@@ -123,4 +136,16 @@ test("reads the browser's tabs and calls back on each tab or focus change until 
   onChange.mockClear();
   await fakeBrowser.tabs.create({ url: "https://other.example/" });
   expect(onChange).not.toHaveBeenCalled();
+});
+
+test("reads which window Chrome last focused, to settle a read with two focused windows", async () => {
+  vi.spyOn(fakeBrowser.windows, "getAll").mockResolvedValue([
+    browserWindow({ id: 1, focused: true, tabs: [tab({ id: 1, active: true })] }),
+    browserWindow({ id: 2, focused: true, tabs: [tab({ id: 2, windowId: 2, active: true })] }),
+  ] as never);
+  const lastFocused = vi
+    .spyOn(fakeBrowser.windows, "getLastFocused")
+    .mockResolvedValue(browserWindow({ id: 2, focused: true }) as never);
+  expect((await browserTabs().read()).currentId).toBe(2);
+  expect(lastFocused).toHaveBeenCalledWith({ windowTypes: ["normal"] });
 });

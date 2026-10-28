@@ -132,6 +132,13 @@ test.describe("with incognito access", () => {
     await expect(current).not.toContainText("Recorded");
     await expect(tabRegion(pip, "Recorded tab")).toContainText(recordedUrl);
 
+    await focusTab(serviceWorker, app.id);
+    await expect(current).toContainText(recordedUrl);
+    await expect(tabRegion(pip, "Recorded tab")).toHaveCount(0);
+    await pip.screenshot({ path: test.info().outputPath("pip-recorded-current.png") });
+
+    await focusTab(serviceWorker, await idOf(serviceWorker, other.url()));
+    await expect(current).toContainText("?other");
     await other.close();
     await expect(current).not.toContainText("?other");
 
