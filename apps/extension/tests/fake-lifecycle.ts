@@ -88,7 +88,7 @@ export function fakeEffects(open?: { identityId?: string }) {
     }),
     load: vi.fn(async (target: Identity, from: "capture" | "empty") => {
       fail("load");
-      return { from, url: target.url, data: NOTHING };
+      return { from, url: target.url, cookieHosts: target.capabilities.cookieHosts, data: NOTHING };
     }),
     start: vi.fn(async (target: Identity, { from }: { from: "capture" | "empty" }) => {
       calls.push(`start ${target.id} ${from}`);

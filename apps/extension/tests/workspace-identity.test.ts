@@ -241,6 +241,7 @@ describe("captureIdentity and startFromCapture", () => {
     captures.read.mockResolvedValue(capture);
     await expect(savedStart("identity-a", identities)).resolves.toEqual({
       url: capture.url,
+      cookieHosts: [],
       data: restorableData(capture),
     });
     await expect(commands.startFromCapture("identity-a")).rejects.toMatchObject({

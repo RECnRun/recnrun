@@ -162,11 +162,23 @@ export function openBehindBarrier(
 interface Released {
   tabId: number;
   origin: string;
+  /** Hosts the identity declares: the released app may hand over to them, as to its sign-in. */
+  declaredHosts: readonly string[];
   /** The barrier's document, which the reload replaces. */
   documentId: string;
 }
 
-/** Reloads the tab and resolves with the id of the new document it committed on the target origin. */
+/** Whether `url` is a web page on one of `hosts`, on any port. */
+function onDeclaredHost(url: string, hosts: readonly string[]): boolean {
+  const parsed = URL.parse(url);
+  const web = parsed?.protocol === "http:" || parsed?.protocol === "https:";
+  return web && hosts.includes(parsed.hostname);
+}
+
+/**
+ * Reloads the tab and resolves with the id of the new document it committed on the target origin,
+ * or on a declared host.
+ */
 export function reloadAndCommit(
   api: NavigationApi,
   released: Released,
@@ -180,7 +192,9 @@ export function reloadAndCommit(
     (settle) => ({
       onCommit: (commit) => {
         if (commit.documentId === released.documentId) return;
-        if (!sameOrigin(commit.url, origin)) settle.reject(offOrigin());
+        const allowed =
+          sameOrigin(commit.url, origin) || onDeclaredHost(commit.url, released.declaredHosts);
+        if (!allowed) settle.reject(offOrigin());
         else settle.resolve(commit.documentId ?? "");
       },
     }),

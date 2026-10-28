@@ -46,12 +46,13 @@ export async function captureManaged(
 export async function savedStart(
   identityId: string,
   { captures, identities }: Pick<IdentityDeps, "captures" | "identities">,
-): Promise<{ url: string; data: IdentityData }> {
+): Promise<{ url: string; cookieHosts: readonly string[]; data: IdentityData }> {
   const saved = (await identities.list()).find(({ id }) => id === identityId);
   await captures.settle(identityId, saved?.lastCapture?.id);
   const capture = await captures.read(identityId);
   if (!capture) {
     throw new WorkspaceError("CaptureMissing", "RECnRun has no saved data for this identity.");
   }
-  return { url: capture.url, data: restorableData(capture) };
+  const { cookieHosts } = capture.capabilities;
+  return { url: capture.url, cookieHosts, data: restorableData(capture) };
 }

@@ -13,6 +13,7 @@ import { echoProbes, fakePort } from "./fake-port";
 
 const ORIGIN = "http://app.localhost:5192";
 const URL_ = `${ORIGIN}/app/redirect?run=1`;
+const START = { url: URL_, cookieHosts: [] };
 const WINDOW = { generation: 2, windowId: 5, tabId: 9, status: "active" as const };
 const DATA: IdentityData = {
   cookies: [{ name: "sid", value: "s", path: "/", secure: false, httpOnly: true, sameSite: "lax" }],
@@ -122,7 +123,7 @@ beforeEach(() => {
 
 describe("bootstrapIdentity", () => {
   test("restores cookies and site data behind the barrier, then releases the same tab", async () => {
-    const timings = await bootstrapIdentity(URL_, DATA, deps, "op-1");
+    const timings = await bootstrapIdentity(START, DATA, deps, "op-1");
 
     expect(cookies.written).toEqual([{ ...DATA.cookies[0], storeId: "1", url: `${ORIGIN}/` }]);
     expect(seen.cookiesAtNavigation).toBe(1);
@@ -152,18 +153,18 @@ describe("bootstrapIdentity", () => {
       events.push("create");
       return WINDOW;
     });
-    await bootstrapIdentity(URL_, DATA, { ...deps, stores: memoryStoreMemory(["1"]) }, "op-1");
+    await bootstrapIdentity(START, DATA, { ...deps, stores: memoryStoreMemory(["1"]) }, "op-1");
     expect(events).toEqual(["probe 1 true", "probe 1 true", "probe 1 false", "create"]);
   });
 
   test("remembers the new window's Incognito store, so the next start can wait for it", async () => {
     const memory = memoryStoreMemory();
-    await bootstrapIdentity(URL_, DATA, { ...deps, stores: memory }, "op-1");
+    await bootstrapIdentity(START, DATA, { ...deps, stores: memory }, "op-1");
     expect(memory.ids).toEqual(["1"]);
   });
 
   test("runs the test hook before each step and records each step, then done", async () => {
-    await bootstrapIdentity(URL_, DATA, deps, "op-1");
+    await bootstrapIdentity(START, DATA, deps, "op-1");
     expect(vi.mocked(deps.hooks.beforeStep).mock.calls.map(([step]) => step)).toEqual(
       BOOTSTRAP_STEPS,
     );
@@ -192,7 +193,7 @@ describe("bootstrapIdentity", () => {
     vi.mocked(deps.windows.close).mockImplementation(async () => {
       expect(records.at(-1)?.status).toBe("failed");
     });
-    await expect(bootstrapIdentity(URL_, DATA, deps, "op-1")).rejects.toMatchObject({
+    await expect(bootstrapIdentity(START, DATA, deps, "op-1")).rejects.toMatchObject({
       name: "InjectedFailure",
     });
     expect(deps.windows.close).toHaveBeenCalledWith([5]);
@@ -216,7 +217,7 @@ describe("bootstrapIdentity", () => {
         });
       }
     });
-    const starting = bootstrapIdentity(URL_, DATA, deps, "op-1");
+    const starting = bootstrapIdentity(START, DATA, deps, "op-1");
     await vi.waitFor(() => expect(records.at(-1)?.step).toBe("window"));
     expect(deps.windows.create).not.toHaveBeenCalled();
     release();
@@ -231,7 +232,7 @@ describe("bootstrapIdentity", () => {
     vi.mocked(deps.record).mockImplementation(async (operation) => {
       if (operation.status === "failed") throw new Error("Storage is full.");
     });
-    await expect(bootstrapIdentity(URL_, DATA, deps, "op-1")).rejects.toMatchObject({
+    await expect(bootstrapIdentity(START, DATA, deps, "op-1")).rejects.toMatchObject({
       name: "InjectedFailure",
     });
     expect(deps.windows.close).toHaveBeenCalledWith([5]);
@@ -240,7 +241,7 @@ describe("bootstrapIdentity", () => {
 
   test("fails when the agent cannot restore, and leaves the app unreleased", async () => {
     deps = harness("failed");
-    await expect(bootstrapIdentity(URL_, DATA, deps, "op-1")).rejects.toMatchObject({
+    await expect(bootstrapIdentity(START, DATA, deps, "op-1")).rejects.toMatchObject({
       name: "RestoreFailed",
     });
     expect(navigation.reloads).toEqual([]);
@@ -252,7 +253,7 @@ describe("bootstrapIdentity", () => {
       { id: "0", tabIds: [1] },
       { id: "1", tabIds: [] },
     ]);
-    const failing = bootstrapIdentity(URL_, DATA, { ...deps, storeBoundMs: 0 }, "op-1");
+    const failing = bootstrapIdentity(START, DATA, { ...deps, storeBoundMs: 0 }, "op-1");
     await expect(failing).rejects.toMatchObject({ name: "IncognitoNotGone" });
     expect(deps.windows.create).not.toHaveBeenCalled();
     expect(deps.windows.close).not.toHaveBeenCalled();
@@ -266,12 +267,28 @@ describe("bootstrapIdentity", () => {
     vi.mocked(deps.windows.close).mockRejectedValue(
       new WorkspaceError("WindowsNotClosed", "Some Incognito windows are still open."),
     );
-    await expect(bootstrapIdentity(URL_, DATA, deps, "op-1")).rejects.toMatchObject({
+    await expect(bootstrapIdentity(START, DATA, deps, "op-1")).rejects.toMatchObject({
       name: "InjectedFailure",
     });
     expect(records.at(-1)?.error).toBe(
       "Injected at navigate. Cleanup also failed: Some Incognito windows are still open.",
     );
     expect(barrier.rules.size).toBe(0);
+  });
+});
+
+describe("bootstrapIdentity with declared hosts", () => {
+  test("hands over to a declared host: its redirect is stripped behind the barrier, then followed", async () => {
+    navigation.reload = async (tabId, documentId) => {
+      navigation.reloads.push({ tabId, documentId });
+      const url = "http://sso.localhost:5192/sso/authorize?run=1";
+      navigation.onCommitted.emit({ tabId, frameId: 0, url, documentId: "doc-2" });
+    };
+    const start = { url: URL_, cookieHosts: ["sso.localhost"] };
+    await expect(bootstrapIdentity(start, DATA, deps, "op-1")).resolves.toHaveLength(
+      BOOTSTRAP_STEPS.length,
+    );
+    expect(seen.rulesAtNavigation).toBe(5);
+    expect(records.at(-1)).toMatchObject({ step: "reload", status: "done" });
   });
 });

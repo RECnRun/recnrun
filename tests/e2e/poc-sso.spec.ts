@@ -1,34 +1,16 @@
-import type { BrowserContext, Page, Worker } from "@playwright/test";
 import { appLog } from "./fixtures/app.ts";
 import { expect, test } from "./fixtures/extension.ts";
 import { incognitoWindows } from "./fixtures/identity.ts";
-import { identitiesAt, lifecycleDriver, nextPageAt } from "./fixtures/lifecycle.ts";
-import { idpStorage, ssoAppUrl, ssoSettled, ssoSignIn } from "./fixtures/sso.ts";
+import {
+  idpStorage,
+  SIGNED_OUT,
+  SSO_HOSTS,
+  ssoAppUrl,
+  ssoSetUp,
+  ssoSignIn,
+} from "./fixtures/sso.ts";
 
 test.use({ incognitoAccess: true });
-
-const SSO_HOSTS = { cookieHosts: ["sso.localhost"] };
-const SIGNED_OUT = { signedIn: null, error: "login_required" };
-
-/** Identities by label at the SSO app of `run`, each declaring `capabilities`. */
-async function ssoSetUp(
-  context: BrowserContext,
-  serviceWorker: Worker,
-  run: string,
-  capabilities?: { cookieHosts: string[] },
-) {
-  const url = ssoAppUrl(run);
-  const driver = await lifecycleDriver(context, serviceWorker);
-  const identities = identitiesAt(driver.command, url, new Map(), capabilities);
-  const tab: { page?: Page } = {};
-  /** Opens `label` and waits until the app settled on who is signed in. */
-  const open = async (label: string) => {
-    await identities.open(label);
-    tab.page = await nextPageAt(context, url, tab.page);
-    return { page: tab.page, state: await ssoSettled(tab.page) };
-  };
-  return { open, tab };
-}
 
 /** The provider's silent checks of `run`, by whether they carried its session cookie. */
 const silentChecks = async (run: string) =>
@@ -41,7 +23,7 @@ test("a declared SSO host keeps each identity signed in at its provider through 
   serviceWorker,
 }) => {
   const run = `sso-declared-${Date.now()}`;
-  const { open } = await ssoSetUp(context, serviceWorker, run, SSO_HOSTS);
+  const { open } = await ssoSetUp(context, serviceWorker, ssoAppUrl(run), SSO_HOSTS);
   const a = await open("A");
   expect(a.state).toMatchObject({ first: { token: null }, ...SIGNED_OUT });
   expect(await ssoSignIn(a.page, run, "A")).toMatchObject({ signedIn: "A" });
@@ -68,7 +50,7 @@ test("without the declared SSO host, a resumed identity keeps its token but is s
   serviceWorker,
 }) => {
   const run = `sso-undeclared-${Date.now()}`;
-  const { open } = await ssoSetUp(context, serviceWorker, run);
+  const { open } = await ssoSetUp(context, serviceWorker, ssoAppUrl(run));
   await ssoSignIn((await open("A")).page, run, "A");
   await ssoSignIn((await open("B")).page, run, "B");
   const back = await open("A");

@@ -10,6 +10,7 @@ import { memoryOperationJournal } from "./fake-journal";
 import { openIncognitoWindow, openWindowsWithTabs } from "./fake-windows";
 
 const ORIGIN = "http://app.localhost:5192";
+const TARGET = { origin: ORIGIN, declaredHosts: [] };
 const INTERRUPTED = "Interrupted: RECnRun restarted before the start finished.";
 
 let barrier: FakeBarrierApi;
@@ -18,7 +19,7 @@ let barrier: FakeBarrierApi;
 async function interruptedAt(step: string) {
   const window = await createNeutralWindow();
   const { generation, windowId, tabId } = window;
-  await installBarrier(tabId, ORIGIN, { id: "op-1", generation }, barrier);
+  await installBarrier(tabId, TARGET, { id: "op-1", generation }, barrier);
   const operation: WorkspaceOperation = {
     id: "op-1",
     kind: "start-with-identity",
@@ -42,7 +43,7 @@ beforeEach(async () => {
   openWindowsWithTabs();
   barrier = fakeBarrierApi();
   // Another generation's barrier, which recovery must leave alone.
-  await installBarrier(77, ORIGIN, { id: "op-other", generation: 9 }, barrier);
+  await installBarrier(77, TARGET, { id: "op-other", generation: 9 }, barrier);
 });
 
 afterEach(() => {

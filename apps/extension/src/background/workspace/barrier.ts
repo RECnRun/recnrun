@@ -9,14 +9,24 @@ export interface BarrierRule {
   priority: number;
   action: {
     type: "allow" | "block" | "modifyHeaders";
-    responseHeaders?: { header: string; operation: "append"; value: string }[];
+    responseHeaders?: (
+      | { header: string; operation: "append"; value: string }
+      | { header: string; operation: "remove" }
+    )[];
   };
   condition: {
     tabIds: number[];
     resourceTypes?: ResourceType[];
     excludedResourceTypes?: ResourceType[];
     urlFilter?: string;
+    responseHeaders?: { header: string; values: string[] }[];
   };
+}
+
+/** The origin the barrier lets through, and the hosts the identity declares beside it. */
+export interface BarrierTarget {
+  origin: string;
+  declaredHosts: readonly string[];
 }
 
 export interface AgentScript {
@@ -54,6 +64,7 @@ export const BARRIER_CSP =
 export const AGENT_SCRIPT = "content-scripts/origin-agent.js";
 
 const RULES_PER_GENERATION = 10;
+const RULES_PER_BARRIER = 5;
 
 function requireOrigin(target: string): void {
   const url = URL.parse(target);
@@ -66,8 +77,48 @@ function requireOrigin(target: string): void {
   }
 }
 
+/**
+ * Location values that send the tab to a declared host, as Chrome matches them: the whole value,
+ * lowercased, with `*` for any run of characters (`request_params.cc:70-86`). `?` would match one
+ * optional character, so no pattern uses it.
+ */
+export function declaredLocations(hosts: readonly string[]): string[] {
+  return hosts.flatMap((host) =>
+    ["http://", "https://", "//"].flatMap((scheme) => {
+      const start = `${scheme}${host.toLowerCase()}`;
+      return [start, `${start}/*`, `${start}:*`];
+    }),
+  );
+}
+
+/**
+ * A redirect to a declared host, such as a sign-in when the app's own session expired, would be
+ * blocked as an off-origin document. Without its Location the response is no redirect, so it
+ * commits on the target origin, script-free, and the release reload follows the redirect again.
+ */
+function handOverRule(id: number, tabIds: number[], hosts: readonly string[]): BarrierRule[] {
+  if (hosts.length === 0) return [];
+  const values = declaredLocations(hosts);
+  return [
+    {
+      id,
+      priority: 3,
+      action: {
+        type: "modifyHeaders",
+        responseHeaders: [{ header: "location", operation: "remove" }],
+      },
+      condition: {
+        tabIds,
+        resourceTypes: ["main_frame"],
+        responseHeaders: [{ header: "location", values }],
+      },
+    },
+  ];
+}
+
 /** Blocks everything in the tab, then lets only the target origin's documents through, script-free. */
-function barrierRules(tabId: number, origin: string, generation: number): BarrierRule[] {
+function barrierRules(tabId: number, target: BarrierTarget, generation: number): BarrierRule[] {
+  const { origin, declaredHosts } = target;
   const base = generation * RULES_PER_GENERATION;
   const tabIds = [tabId];
   return [
@@ -101,6 +152,7 @@ function barrierRules(tabId: number, origin: string, generation: number): Barrie
       },
       condition: { tabIds, resourceTypes: ["main_frame", "sub_frame"] },
     },
+    ...handOverRule(base + 5, tabIds, declaredHosts),
   ];
 }
 
@@ -109,7 +161,8 @@ const agentScriptId = (operationId: string) => `recnrun-origin-agent-${operation
 /** The rule and script ids an operation's barrier uses, known without the tab or the origin. */
 export function barrierOf({ id, generation }: BarrierOperation): Barrier {
   const base = generation * RULES_PER_GENERATION;
-  return { ruleIds: [base + 1, base + 2, base + 3, base + 4], scriptId: agentScriptId(id) };
+  const ruleIds = Array.from({ length: RULES_PER_BARRIER }, (_, index) => base + index + 1);
+  return { ruleIds, scriptId: agentScriptId(id) };
 }
 
 function agentScript(origin: string, operationId: string): AgentScript {
@@ -137,13 +190,13 @@ async function requireFree(barrier: Barrier, api: BarrierApi): Promise<void> {
 /** Installs the tab's barrier and the origin agent; on failure, leaves nothing behind. */
 export async function installBarrier(
   tabId: number,
-  targetOrigin: string,
+  target: BarrierTarget,
   operation: BarrierOperation,
   api: BarrierApi,
 ): Promise<Barrier> {
-  requireOrigin(targetOrigin);
-  const rules = barrierRules(tabId, targetOrigin, operation.generation);
-  const script = agentScript(targetOrigin, operation.id);
+  requireOrigin(target.origin);
+  const rules = barrierRules(tabId, target, operation.generation);
+  const script = agentScript(target.origin, operation.id);
   const barrier = barrierOf(operation);
   await requireFree(barrier, api);
   await api.addSessionRules(rules);

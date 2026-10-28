@@ -68,3 +68,17 @@ export const idpStorageHtml =
   `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Provider storage</title>` +
   `<script>window.__idp = { localStorage: { ...localStorage } };</script>` +
   `</head><body></body></html>`;
+
+/** The server client's page: the session decided who is signed in; it keeps the user as a token. */
+function ssoServer(run: string, user: string | null, error: string | null): void {
+  const first = { token: localStorage.getItem("sso_token"), time: Date.now() };
+  const state: SsoState = { first, signedIn: user, error, done: true };
+  (window as unknown as { __sso: SsoState }).__sso = state;
+  navigator.sendBeacon(`/__log?run=${encodeURIComponent(run)}`, JSON.stringify(first));
+  if (user !== null) localStorage.setItem("sso_token", user);
+}
+
+export const ssoServerHtml = (run: string, user: string | null, error: string | null) =>
+  `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>SSO server app</title>` +
+  `<script>(${ssoServer.toString()})(${literal(run)}, ${literal(user)}, ${literal(error)});` +
+  `</script></head><body>${user === null ? "Not signed in" : "Signed in"}</body></html>`;

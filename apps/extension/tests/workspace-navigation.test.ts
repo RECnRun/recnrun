@@ -105,7 +105,7 @@ describe("reloadAndCommit", () => {
   test("reloads the tab and resolves with the new document of the target origin", async () => {
     const reloading = reloadAndCommit(
       api,
-      { tabId: TAB, origin: ORIGIN, documentId: "doc-1" },
+      { tabId: TAB, origin: ORIGIN, declaredHosts: [], documentId: "doc-1" },
       1_000,
     );
     expect(api.reloads).toEqual([{ tabId: TAB, documentId: "doc-1" }]);
@@ -119,11 +119,28 @@ describe("reloadAndCommit", () => {
   test("fails when the released document is not the target origin's", async () => {
     const reloading = reloadAndCommit(
       api,
-      { tabId: TAB, origin: ORIGIN, documentId: "doc-1" },
+      { tabId: TAB, origin: ORIGIN, declaredHosts: [], documentId: "doc-1" },
       1_000,
     );
     commit(api, "doc-2", "chrome-error://chromewebdata/");
     await expect(reloading).rejects.toMatchObject({ name: "OffOriginNavigation" });
+  });
+
+  test("accepts a document on a declared host, on any port, as the app handing over to it", async () => {
+    const released = { tabId: TAB, origin: ORIGIN, declaredHosts: ["sso.localhost"] };
+    const signIn = reloadAndCommit(api, { ...released, documentId: "doc-1" }, 1_000);
+    commit(api, "doc-2", "http://sso.localhost:5192/sso/login?run=1");
+    await expect(signIn).resolves.toBe("doc-2");
+    for (const url of [
+      "http://other.localhost:5192/",
+      "http://evil.sso.localhost/",
+      "ftp://sso.localhost/",
+      "http://sso.localhost:x@evil.localhost/",
+    ]) {
+      const elsewhere = reloadAndCommit(api, { ...released, documentId: "doc-1" }, 1_000);
+      commit(api, "doc-3", url);
+      await expect(elsewhere, url).rejects.toMatchObject({ name: "OffOriginNavigation" });
+    }
   });
 });
 

@@ -18,6 +18,8 @@ export type LifecycleKind = LifecycleCommand["kind"];
 export interface Opening {
   from: "capture" | "empty";
   url: string;
+  /** The hosts the identity declares; the start may hand over to them. */
+  cookieHosts: readonly string[];
   data: IdentityData;
 }
 

@@ -70,12 +70,24 @@ test("loading a start from a capture RECnRun does not have refuses and opens no 
   expect(captures.settle).toHaveBeenCalledWith("a", "cap-a");
   expect(captures.read).toHaveBeenCalledWith("a");
   expect(fakeBrowser.windows.create).not.toHaveBeenCalled();
-  const capture = sampleCapture();
+  // The capture's declared hosts, not the identity's, go with the data they were captured from.
+  const capture = { ...sampleCapture(), capabilities: { cookieHosts: ["sso.localhost"] } };
   captures.read.mockResolvedValue(capture);
   await expect(chromeSide.load(identity("a"), "capture")).resolves.toEqual({
     from: "capture",
     url: capture.url,
+    cookieHosts: ["sso.localhost"],
     data: restorableData(capture),
+  });
+});
+
+test("a new identity's start carries the hosts it declares", async () => {
+  const { effects: chromeSide } = effects();
+  const declared = { ...identity("a"), capabilities: { cookieHosts: ["sso.localhost"] } };
+  await expect(chromeSide.load(declared, "empty")).resolves.toMatchObject({
+    from: "empty",
+    url: declared.url,
+    cookieHosts: ["sso.localhost"],
   });
 });
 

@@ -4,7 +4,12 @@ import { browser } from "wxt/browser";
 import { workspaceAvailable, workspaceUnavailable } from "@/background/workspace/availability";
 import { chromeBarrierApi } from "@/background/workspace/barrier";
 import { bootstrapIdentity } from "@/background/workspace/bootstrap";
-import type { BootstrapHooks, BootstrapPorts, StepTiming } from "@/background/workspace/bootstrap";
+import type {
+  BootstrapHooks,
+  BootstrapPorts,
+  StartTarget,
+  StepTiming,
+} from "@/background/workspace/bootstrap";
 import type { CaptureSummary } from "@/background/workspace/capture";
 import { chromeCookieApi } from "@/background/workspace/cookie-stores";
 import { WorkspaceError } from "@/background/workspace/errors";
@@ -222,13 +227,13 @@ function restoringStart(
     create: createNeutralWindow,
     close: (ids: readonly number[]) => closeRemembering(ids, ports),
   };
-  return (load: () => Promise<{ url: string; data: IdentityData }>) =>
+  return (load: () => Promise<StartTarget & { data: IdentityData }>) =>
     exclusive(async () => {
       await requireNoRecording(recordings);
       await requireAccess();
-      const { url, data } = await load();
+      const { url, cookieHosts, data } = await load();
       const deps = { ...ports, windows, record: journal.write };
-      return bootstrapIdentity(url, data, deps, crypto.randomUUID());
+      return bootstrapIdentity({ url, cookieHosts }, data, deps, crypto.randomUUID());
     });
 }
 
@@ -272,7 +277,7 @@ export function createWorkspaceCommands(
     },
     startWithIdentity: async (url, data) => {
       requireTarget(url);
-      return startRestoring(async () => ({ url, data }));
+      return startRestoring(async () => ({ url, cookieHosts: [], data }));
     },
     captureIdentity: (identityId, capabilities) =>
       exclusive(async () => {
