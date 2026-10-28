@@ -8,7 +8,7 @@ Plan: [poc-incognito-sessions-plan.md](poc-incognito-sessions-plan.md). Assignme
 | Branch               | `poc/incognito-sessions`                                         |
 | Planned base         | `44c154da29860c7a8df829e902b177df5ce2ba2a` (2026-10-28)          |
 | Actual base (P0.1)   | `44c154d` (re-resolved 2026-10-28, unchanged)                    |
-| Last recorded commit | `22e9eb3`                                                        |
+| Last recorded commit | `3d444ea`                                                        |
 | Decisions OD-1…OD-4  | defaults of plan §3, accepted by the user ("Avance", 2026-10-28) |
 
 ## Status legend
@@ -329,6 +329,11 @@ Stage 2 verify: exit 0 on `dfb882d`, 302 unit/component, 61/61 e2e, coverage 99.
   green: `vp run test:unit` → 338 passed; `vp run test:e2e -- tests/e2e/poc-lifecycle-faults.spec.ts tests/e2e/poc-lifecycle.spec.ts tests/e2e/identities.spec.ts tests/e2e/poc-lifecycle-restarts.spec.ts` → 16 passed (`2026-10-28T20-48-45.811Z-cdf20490`); `vp check`, `vp run deps` pass
   commit: 22e9eb3 Refuse window commands while the managed window has other tabs
   notes: `LifecycleState.otherTabs` (the managed window's tabs but its own) feeds `windowGuard`, which refuses Switch, Suspend, and New identity (even with `closeWindowIds`) with `IncognitoTabsOpen` before anything is captured; `closeOpen` reads the windows again after the capture and stops with `IncognitoTabsOpen` ("The capture is saved; …"), the capture kept and the window open. Delete and Resume are unaffected (Resume already needs no managed window). The commit body names `poc-identities.spec.ts`, which does not exist (the filter then ran 10 tests); the green above is the rerun with the right file names. `lifecycle-types.ts` takes the lifecycle types out of `lifecycle.ts` (file limit). ARCHITECTURE updated (table and dashboard paragraph).
+- [i] S3.12g An Incognito window the user opens and closes between two commands is waited for (follow-up to S3.11)
+  red: `vp test run apps/extension/tests/cookie-stores.test.ts` with a no-op `trackIncognitoStores` → both new tests `expected [] to deeply equal [ '1' ]`; `vp test run apps/extension/tests/background-start.test.ts` without the `start.ts` registration → "remembers the cookie store of each new Incognito tab from the start" `expected [] to deeply equal [ '1' ]`; `vp run test:e2e -- tests/e2e/poc-native-reset.spec.ts -g "opened and closed"` without the registration → remembered ids `Array []`, expected `["1"]` (`.artifacts/docker/2026-10-28T20-52-10.490Z-2dcd3353-8019-4430-ba9f-0a39dd12e22e`)
+  green: `vp run test:unit` → 341 passed; `vp run test:e2e -- tests/e2e/poc-native-reset.spec.ts tests/e2e/incognito-workspace.spec.ts` → 11 passed (`2026-10-28T20-52-40.281Z-57c7161b`); `vp check`, `vp run deps` pass
+  commit: 3d444ea Remember the cookie store of every new Incognito tab
+  notes: `trackIncognitoStores` (cookie-stores.ts), registered in `startBackground`, runs `noteIncognitoStores` on every Incognito `tabs.onCreated`, dropping a failed listing (a build without `cookies` included). Chrome lists a store only while it has a tab (`cookies_api.cc:895`) and dispatches `onCreated` once the tab is in its window (`tabs_event_router.cc:461-471`). E2E: the user's Incognito window writes the sentinels and closes, `local:incognito-store-ids` then holds `"1"`, and a Start sees `NOTHING`. Without the fix, three repeated runs of the same test with the id assertion removed still saw `NOTHING` (`2026-10-28T20-53-02.991Z-821352f8`): the dashboard round trip outlasts Chrome's ≤1 s profile teardown here, so the leak itself is timing-dependent and the stored id is the deterministic signal. Residual: a window closed before the listing its first tab triggers has answered, on an install that never saw an Incognito store; every Incognito profile gets store id `"1"` (`cookies_helpers.cc:78-79`), so once remembered it covers all later profiles. ARCHITECTURE updated.
 
 Stage 3 verify: _pending_
 
