@@ -311,7 +311,54 @@ Result: **not validated**, pending the user's run.
 
 ## 9. Timings
 
-_pending_
+Fresh run on `2672864` (Chrome for Testing 156 on Linux in Docker, Xvfb), `POC_REPEATS=10`: `vp run test:e2e -- tests/e2e/poc-lifecycle.spec.ts tests/e2e/poc-pwa-lifecycle.spec.ts tests/e2e/poc-barrier.spec.ts`, 11 passed (`.artifacts/docker/2026-10-28T22-40-16.486Z-3b88a23c-a1ef-4df3-9efb-abe4c9a182f1`, JSON attachments per spec). Milliseconds, min / median / p95 / max.
+
+### Switch between two identities (A→B→A→C→A ×10, 40 switches)
+
+| Measure                                          | min | median | p95 | max |
+| ------------------------------------------------ | --- | ------ | --- | --- |
+| **Total switch**, command sent → command settled | 118 | 136    | 151 | 186 |
+| Capture of the open identity                     | 5   | 6      | 8   | 12  |
+| Persistence (publish + identity update)          | 1   | 2      | 3   | 4   |
+| Teardown (close the window)                      | 15  | 16     | 18  | 18  |
+
+These come from the gaps between journal writes. The start steps are timed better by the bootstrap's own clock below; the journal attributes the window creation, including the wait for `about:blank` (S4.4b), to no single step, which is why its per-step sum (about 70 ms) is below the total.
+
+### Start from a capture (bootstrap clock, 10 cycles per delay)
+
+| Step                                         | Restore returns at once   | Restore held 2,000 ms (hold excluded) |
+| -------------------------------------------- | ------------------------- | ------------------------------------- |
+| Teardown wait (`store-gone`, profile erased) | 0.6 / 0.8 / 0.9 / 0.9     | 0.4 / 0.7 / 0.9 / 0.9                 |
+| Window (create + `about:blank` committed)    | 41.0 / 42.9 / 66.6 / 66.6 | 40.4 / 41.1 / 52.4 / 52.4             |
+| Cookie store lookup                          | 1.3 / 1.5 / 3.2 / 3.2     | 1.2 / 1.5 / 4.2 / 4.2                 |
+| Cookies set                                  | 0.8 / 1.2 / 2.6 / 2.6     | 0.6 / 0.9 / 2.9 / 2.9                 |
+| Barrier installed                            | 1.3 / 1.6 / 6.1 / 6.1     | 1.3 / 1.6 / 4.6 / 4.6                 |
+| Barrier navigation committed                 | 13.5 / 15.4 / 24.3 / 24.3 | 13.7 / 14.2 / 16.6 / 16.6             |
+| Restore in the page (transport + writes)     | 23.5 / 25.0 / 30.3 / 30.3 | 6.7 / 15.7 / 18.4 / 18.4              |
+| Barrier removed                              | 1.1 / 1.4 / 4.1 / 4.1     | 1.2 / 2.3 / 3.1 / 3.1                 |
+| Release reload committed                     | 8.9 / 9.6 / 12.6 / 12.6   | 11.1 / 16.6 / 18.4 / 18.4             |
+| Sum of medians                               | about 99                  | about 95                              |
+
+The window step grew from a 27 ms median in Stage 2 to 43 ms. Two later changes run inside it: the wait for `about:blank` that S4.4b added to stop `ERR_ABORTED` in headed Chrome, and the store-id listing S2.5a does after opening a window. Their shares were not measured separately.
+
+### Size and volume
+
+| Case                                       | Result                                                                                          |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| 10,000 IndexedDB records of ~200 B         | Capture 4,460,000 bytes (~446 B per record) in 72 ms; restore step 157 ms; other steps as above |
+| One 8 MiB binary record (S3.4)             | Capture 53–54 ms; restore step 31–34 ms                                                         |
+| Cache Storage, 7 entries with 4 MiB (S3.7) | Capture 29 ms; restore step 41.7 ms                                                             |
+| Writers active during capture (S3.10)      | Capture step 11 / 15 / 21 / 24 ms over 60 restores                                              |
+
+### PWA readiness (S4.2)
+
+Command sent → settled, A→B→A→C→A: 107, 128, 129, 122, 127 ms. First app load → a Service Worker controls the page: 22, 15, 16, 20, 10 ms. Native Incognito baseline for comparison (S4.1): install 16 ms, controlled reload 3 ms.
+
+### Teardown
+
+Native reset (S1.7, 50 cycles): `windows.remove` → `onRemoved` 4.7 ms median; no Incognito window listed 13.9 ms. Profile erasure observed through the store id probe (S2.5a scratch probe): 16–27 ms after the close for ordinary pages, 516 ms when a page's `pagehide`/`unload` handlers stayed busy for 3 s, within Chrome's own bound.
+
+What these numbers do not cover: host Chrome on macOS, and a real application (the Zephyr run records stopwatch times only).
 
 ## 10. Supported claims and non-claims
 

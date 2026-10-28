@@ -400,7 +400,8 @@ Stage 4 verify: exit 0 on `f0ffb45`, 503 unit/component, 97/97 e2e, coverage 99.
 
 ## Stage 5 — Delivery
 
-- [ ] D.1 Timings aggregated (capture, transport, persistence, teardown, bootstrap, restore, PWA readiness, total; 10,000-record size)
+- [i] D.1 Timings aggregated (capture, transport, persistence, teardown, bootstrap, restore, PWA readiness, total; 10,000-record size)
+  evidence: report §9 from a fresh run on `2672864`: `POC_REPEATS=10 vp run test:e2e -- tests/e2e/poc-lifecycle.spec.ts tests/e2e/poc-pwa-lifecycle.spec.ts tests/e2e/poc-barrier.spec.ts` → 11 passed (`.artifacts/docker/2026-10-28T22-40-16.486Z-3b88a23c-a1ef-4df3-9efb-abe4c9a182f1`); switch 118 / 136 / 151 / 186 ms; start sum of medians ~99 ms; 10,000 records 4,460,000 bytes. Stage 1–4 figures cited from their runs. No code change.
 - [i] D.2 Durable docs (ARCHITECTURE, PRODUCT_BRIEF, POCS, TROUBLESHOOTING)
   red: n/a (docs only, `No-behavior-change: docs only`)
   green: `vp check --fix` → formatted, no lint or type errors; `vp run deps` → no violations; every relative link in the four docs resolves (script over `](...)` targets); pre-commit hook passed (359 unit tests)
