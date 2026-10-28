@@ -54,22 +54,25 @@ test("a capture command names its operation and a chunk size, 500 records unless
   }
 });
 
-test("a capture answers each database's schema, its records, and the counts", () => {
+test("a capture answers Web Storage, each database's schema, its records, and the counts", () => {
   const operation = { operationId: "op-1", generation: 2 };
   const store = { name: "kv", keyPath: null, autoIncrement: false, indexes: [], records: [] };
   const database = { name: "app", version: 3, stores: [store] };
   const records = { database: "app", store: "kv", records: [{ key: 1, value: new Date(0) }] };
   const replies = [
+    { type: "capture-storage", ...operation, localStorage: { "": "" }, sessionStorage: {} },
     { type: "capture-database", ...operation, database },
     { type: "capture-records", ...operation, ...records },
-    { type: "captured", ...operation, counts: { databases: 1, records: 1 } },
+    { type: "captured", ...operation, counts },
   ];
   for (const reply of replies) expect(v.is(OriginReplySchema, reply), reply.type).toBe(true);
   for (const bad of [
     { type: "capture-database", ...operation, database: { ...database, version: 0 } },
     { type: "capture-records", ...operation, ...records, store: undefined },
     { type: "capture-records", ...operation, ...records, records: [{ key: 1 }, 2] },
-    { type: "captured", ...operation, counts: { databases: 1 } },
+    { type: "captured", ...operation, counts: { databases: 1, records: 1 } },
+    { type: "capture-storage", ...operation, localStorage: { n: 1 }, sessionStorage: {} },
+    { type: "capture-storage", ...operation, localStorage: {} },
   ]) {
     expect(v.is(OriginReplySchema, bad), JSON.stringify(bad)).toBe(false);
   }

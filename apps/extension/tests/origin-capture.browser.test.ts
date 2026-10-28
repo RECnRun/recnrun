@@ -63,13 +63,23 @@ async function createShop() {
   await createDatabase("blank", 1, () => {});
 }
 
-/** Runs a capture and rebuilds its databases from the messages it sent, in their order. */
-async function captured(chunk: number) {
+type WebStorage = Pick<OriginData, "localStorage" | "sessionStorage">;
+
+const emptyStores = () => ({
+  localStorage: memoryStorage(),
+  sessionStorage: memoryStorage(),
+  indexedDB,
+});
+
+/** Runs a capture and rebuilds its storage and databases from the messages it sent, in their order. */
+async function captured(chunk: number, stores = emptyStores()) {
   const databases: Database[] = [];
   const pages: { store: string; size: number }[] = [];
+  const sent: WebStorage[] = [];
   const counts = await captureOrigin(
-    indexedDB,
+    stores,
     {
+      storage: (entries) => sent.push(entries),
       database: (database) => databases.push(database),
       records: (database: string, store: string, records: Records) => {
         const target = databases.find(({ name }) => name === database);
@@ -79,7 +89,8 @@ async function captured(chunk: number) {
     },
     chunk,
   );
-  return { counts, databases, pages };
+  expect(sent).toHaveLength(1);
+  return { counts, databases, pages, storage: sent[0] };
 }
 
 /** Every store of `database` as the browser holds it. */
@@ -100,7 +111,7 @@ test("captures every database's version, stores, key paths, indexes, and records
   await createShop();
   const close = vi.spyOn(IDBDatabase.prototype, "close");
   const { counts, databases } = await captured(500);
-  expect(counts).toEqual({ databases: 2, records: 11 });
+  expect(counts).toEqual({ localStorage: 0, sessionStorage: 0, databases: 2, records: 11 });
   expect(close).toHaveBeenCalledTimes(2);
 
   const blank = databases.find(({ name }) => name === "blank");
@@ -161,9 +172,11 @@ test("a captured origin restores into an empty one as it was, its schema and key
   const { databases } = await captured(2);
   await clearDatabases();
 
-  const stores = { localStorage: memoryStorage(), sessionStorage: memoryStorage(), indexedDB };
   const site = { localStorage: {}, sessionStorage: {}, indexedDB: databases };
-  await expect(restoreOrigin(stores, site)).resolves.toMatchObject({ databases: 2, records: 11 });
+  await expect(restoreOrigin(emptyStores(), site)).resolves.toMatchObject({
+    databases: 2,
+    records: 11,
+  });
   await expect(storesOf("shop", SHOP_STORES)).resolves.toEqual(before);
   const listed = await indexedDB.databases();
   expect(listed.map(({ name, version }) => `${name}@${version}`).toSorted()).toEqual([
@@ -186,15 +199,18 @@ test("after the highest generated key was deleted, the restored generator contin
   // The source's generator remembers the deleted key 3; restoring writes only keys 1 and 2.
   await expect(nextKey()).resolves.toBe(4);
   await clearDatabases();
-  const stores = { localStorage: memoryStorage(), sessionStorage: memoryStorage(), indexedDB };
-  await restoreOrigin(stores, { localStorage: {}, sessionStorage: {}, indexedDB: databases });
+  await restoreOrigin(emptyStores(), {
+    localStorage: {},
+    sessionStorage: {},
+    indexedDB: databases,
+  });
   await expect(nextKey()).resolves.toBe(3);
 });
 
 test("a database that vanished before it opened fails the capture and is not created", async () => {
   vi.spyOn(indexedDB, "databases").mockResolvedValue([{ name: "ghost", version: 1 }]);
-  const sink = { database: vi.fn(), records: vi.fn() };
-  await expect(captureOrigin(indexedDB, sink, 500)).rejects.toMatchObject({
+  const sink = { storage: vi.fn(), database: vi.fn(), records: vi.fn() };
+  await expect(captureOrigin(emptyStores(), sink, 500)).rejects.toMatchObject({
     name: "OriginFailure",
     message: "indexedDB: AbortError",
   });
@@ -203,8 +219,14 @@ test("a database that vanished before it opened fails the capture and is not cre
   await expect(indexedDB.databases()).resolves.toEqual([]);
 });
 
-test("an origin without databases captures nothing", async () => {
-  const sink = { database: vi.fn(), records: vi.fn() };
-  await expect(captureOrigin(indexedDB, sink, 500)).resolves.toEqual({ databases: 0, records: 0 });
+test("an origin without data captures nothing", async () => {
+  const sink = { storage: vi.fn(), database: vi.fn(), records: vi.fn() };
+  await expect(captureOrigin(emptyStores(), sink, 500)).resolves.toEqual({
+    localStorage: 0,
+    sessionStorage: 0,
+    databases: 0,
+    records: 0,
+  });
+  expect(sink.storage).toHaveBeenCalledExactlyOnceWith({ localStorage: {}, sessionStorage: {} });
   expect(sink.database).not.toHaveBeenCalled();
 });

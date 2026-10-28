@@ -147,9 +147,13 @@ describe("captureIdentity and startFromCapture", () => {
     expect(generation).toBe(1);
     const store = { name: "kv", keyPath: null, autoIncrement: false, indexes: [], records: [] };
     for (const reply of [
+      { type: "capture-storage", localStorage: {}, sessionStorage: {} },
       { type: "capture-database", database: { name: "app", version: 1, stores: [store] } },
       { type: "capture-records", database: "app", store: "kv", records: [{ key: 1, value: 1 }] },
-      { type: "captured", counts: { databases: 1, records: 1 } },
+      {
+        type: "captured",
+        counts: { databases: 1, records: 1, localStorage: 0, sessionStorage: 0 },
+      },
     ]) {
       setup.agent.onMessage.emit({ ...reply, operationId, generation });
     }

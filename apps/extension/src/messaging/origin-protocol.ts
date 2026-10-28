@@ -47,27 +47,32 @@ export type OriginCommand = v.InferOutput<typeof OriginCommandSchema>;
 const DatabaseSchema = OriginDataSchema.entries.indexedDB.item;
 const StoreRecordsSchema = DatabaseSchema.entries.stores.item.entries.records;
 
-const CapturedCountsSchema = v.object({ databases: CountSchema, records: CountSchema });
-
-export type CapturedCounts = v.InferOutput<typeof CapturedCountsSchema>;
-
-const RestoredCountsSchema = v.object({
+/** What a capture sent and a restore wrote: Web Storage entries, databases, and records. */
+const CountsSchema = v.object({
   localStorage: CountSchema,
   sessionStorage: CountSchema,
   databases: CountSchema,
   records: CountSchema,
 });
 
-export type RestoredCounts = v.InferOutput<typeof RestoredCountsSchema>;
+export type CapturedCounts = v.InferOutput<typeof CountsSchema>;
+
+export type RestoredCounts = v.InferOutput<typeof CountsSchema>;
 
 /**
- * The agent's answers: the probe's echo; restore counts; a capture's schemas, records, and counts; or a
- * failed step and an error name, never a stored value.
+ * The agent's answers: the probe's echo; restore counts; a capture's Web Storage, schemas, records,
+ * and counts; or a failed step and an error name, never a stored value.
  */
 export const OriginReplySchema = v.variant("type", [
   v.object({ type: v.literal("probe-echo"), ...OPERATION, probe: v.unknown() }),
-  v.object({ type: v.literal("restored"), ...OPERATION, counts: RestoredCountsSchema }),
-  // A database's schema comes before its records, and its stores carry no records of their own.
+  v.object({ type: v.literal("restored"), ...OPERATION, counts: CountsSchema }),
+  // Web Storage comes first; a database's schema comes before its records, which travel apart.
+  v.object({
+    type: v.literal("capture-storage"),
+    ...OPERATION,
+    localStorage: OriginDataSchema.entries.localStorage,
+    sessionStorage: OriginDataSchema.entries.sessionStorage,
+  }),
   v.object({ type: v.literal("capture-database"), ...OPERATION, database: DatabaseSchema }),
   v.object({
     type: v.literal("capture-records"),
@@ -76,7 +81,7 @@ export const OriginReplySchema = v.variant("type", [
     store: v.string(),
     records: StoreRecordsSchema,
   }),
-  v.object({ type: v.literal("captured"), ...OPERATION, counts: CapturedCountsSchema }),
+  v.object({ type: v.literal("captured"), ...OPERATION, counts: CountsSchema }),
   v.object({
     type: v.literal("failed"),
     ...OPERATION,

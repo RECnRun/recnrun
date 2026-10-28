@@ -175,6 +175,7 @@ export async function restoreThroughAgent(
 
 /** Receives a capture's messages as the agent reads them. */
 export interface CaptureReceiver {
+  storage: (entries: Pick<OriginData, "localStorage" | "sessionStorage">) => void;
   database: (database: OriginData["indexedDB"][number]) => void;
   records: (part: Extract<OriginReply, { type: "capture-records" }>) => void;
 }
@@ -199,7 +200,8 @@ export async function captureThroughAgent(
     boundMs: idleMs,
     idle: true,
     onReply: (reply, settle) => {
-      if (reply.type === "capture-database") receiver.database(reply.database);
+      if (reply.type === "capture-storage") receiver.storage(reply);
+      else if (reply.type === "capture-database") receiver.database(reply.database);
       else if (reply.type === "capture-records") receiver.records(reply);
       else if (reply.type === "captured") settle.resolve(reply.counts);
       else failedWith(reply, settle, "capture");

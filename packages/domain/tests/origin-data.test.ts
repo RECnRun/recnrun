@@ -51,6 +51,33 @@ test("accepts Web Storage entries and IndexedDB stores with any record value", (
 test("rejects storage values that are not strings", () => {
   expect(v.is(OriginDataSchema, { ...data, localStorage: { count: 1 } })).toBe(false);
   expect(v.is(OriginDataSchema, { ...data, sessionStorage: undefined })).toBe(false);
+  for (const [what, storage] of Object.entries({
+    null: null,
+    empty: [],
+    array: ["a"],
+    map: new Map([["a", "b"]]),
+    text: "a=b",
+  })) {
+    expect(v.is(OriginDataSchema, { ...data, localStorage: storage }), what).toBe(false);
+  }
+});
+
+test("keeps every Web Storage key, even those named like an object's own properties", () => {
+  // Built with defineProperty-like semantics, as structured clone builds a received object.
+  const entries = Object.fromEntries([
+    ["__proto__", "a"],
+    ["constructor", "b"],
+    ["prototype", "c"],
+    ["", ""],
+    ["ключ 🔑", "värde \u{1F600}"],
+  ]);
+  const parsed = v.parse(OriginDataSchema, {
+    ...data,
+    localStorage: entries,
+    sessionStorage: entries,
+  });
+  expect(Object.entries(parsed.localStorage)).toEqual(Object.entries(entries));
+  expect(Object.entries(parsed.sessionStorage)).toEqual(Object.entries(entries));
 });
 
 test("rejects a database without a positive integer version or a store without its shape", () => {

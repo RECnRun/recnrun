@@ -8,7 +8,7 @@ import { WorkspaceError } from "@/background/workspace/errors";
 import { ownBlobs } from "@/background/workspace/own-blobs";
 import { collectValueTypes } from "@/background/workspace/value-types";
 import { ORIGIN_AGENT_PORT } from "@/messaging/origin-protocol";
-import type { OriginPort } from "@/messaging/origin-protocol";
+import type { CapturedCounts, OriginPort } from "@/messaging/origin-protocol";
 import type { IdentityCaptures } from "@/storage/identity-captures";
 
 interface ConnectEvent {
@@ -32,6 +32,8 @@ export interface CaptureDeps {
 /** A published capture's size and duration, never its values. */
 export interface CaptureSummary {
   captureId: string;
+  localStorage: number;
+  sessionStorage: number;
   databases: number;
   records: number;
   ms: number;
@@ -41,7 +43,17 @@ export interface CaptureSummary {
 const CAPTURE_BOUND_MS = 15_000;
 
 type ValueType = IdentityCapture["valueTypes"][number];
-type Database = IdentityCapture["origins"][number]["indexedDB"][number];
+type OriginCapture = IdentityCapture["origins"][number];
+type Database = OriginCapture["indexedDB"][number];
+type WebStorage = Pick<OriginCapture, "localStorage" | "sessionStorage">;
+
+/** What the collector received, checked against the agent's counts before anything is published. */
+interface Collected {
+  storage?: WebStorage;
+  databases: Database[];
+  valueTypes: ValueType[];
+  records: number;
+}
 
 interface Target {
   tabId: number;
@@ -105,10 +117,14 @@ function startedHeader(identityId: string, target: Target): IdentityCapture {
 function collector(captureId: string, origin: string, captures: CaptureDeps["captures"]) {
   const databases: Database[] = [];
   const valueTypes = new Set<ValueType>();
+  let storage: WebStorage | undefined;
   let records = 0;
   let writing = Promise.resolve();
   let failure: { error: unknown } | undefined;
   const receiver: CaptureReceiver = {
+    storage: ({ localStorage, sessionStorage }) => {
+      storage = { localStorage, sessionStorage };
+    },
     database: (database) => databases.push(database),
     records: ({ database, store, records: part }) => {
       records += part.length;
@@ -127,20 +143,34 @@ function collector(captureId: string, origin: string, captures: CaptureDeps["cap
       });
     },
   };
-  const written = async () => {
+  const written = async (): Promise<Collected> => {
     await writing;
     if (failure) throw failure.error;
-    return { databases, valueTypes: [...valueTypes], records };
+    return { storage, databases, valueTypes: [...valueTypes], records };
   };
   return { receiver, written };
 }
 
-const SKIPPED = ["localStorage", "sessionStorage", "cookies", "cacheStorage"] as const;
+const SKIPPED = ["cookies", "cacheStorage"] as const;
+const CAPTURED = ["localStorage", "sessionStorage", "indexedDB"] as const;
+
+/** Every count the agent sent must match what arrived, or the capture is not whole. */
+function checkWhole(collected: Collected, counts: CapturedCounts): WebStorage {
+  const { storage, databases, records } = collected;
+  const whole =
+    storage !== undefined &&
+    Object.keys(storage.localStorage).length === counts.localStorage &&
+    Object.keys(storage.sessionStorage).length === counts.sessionStorage &&
+    databases.length === counts.databases &&
+    records === counts.records;
+  if (!whole) throw new WorkspaceError("CaptureIncomplete", "The page's data did not all arrive.");
+  return storage;
+}
 
 function completeHeader(
   started: IdentityCapture,
-  databases: Database[],
-  valueTypes: ValueType[],
+  storage: WebStorage,
+  collected: Collected,
 ): IdentityCapture {
   const [origin] = started.origins;
   return {
@@ -148,11 +178,11 @@ function completeHeader(
     status: "complete",
     endedAt: Date.now(),
     adapters: [
-      { adapter: "indexedDB", status: "captured" },
+      ...CAPTURED.map((adapter) => ({ adapter, status: "captured" as const })),
       ...SKIPPED.map((adapter) => ({ adapter, status: "skipped" as const })),
     ],
-    valueTypes,
-    origins: origin ? [{ ...origin, indexedDB: databases }] : [],
+    valueTypes: collected.valueTypes,
+    origins: origin ? [{ ...origin, ...storage, indexedDB: collected.databases }] : [],
   };
 }
 
@@ -168,11 +198,9 @@ async function captureThrough(
     await captures.begin(started);
     const { receiver, written } = collector(started.id, started.origins[0]?.origin ?? "", captures);
     const counts = await captureThroughAgent(port, operation, receiver, boundMs);
-    const { databases, valueTypes, records } = await written();
-    if (databases.length !== counts.databases || records !== counts.records) {
-      throw new WorkspaceError("CaptureIncomplete", "The page's data did not all arrive.");
-    }
-    await captures.publish(completeHeader(started, databases, valueTypes));
+    const collected = await written();
+    const storage = checkWhole(collected, counts);
+    await captures.publish(completeHeader(started, storage, collected));
     return counts;
   } catch (error) {
     await captures.discard(started.id).catch(() => undefined);

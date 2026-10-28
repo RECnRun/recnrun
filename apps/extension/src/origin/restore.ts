@@ -1,6 +1,7 @@
 import type { OriginData } from "@recnrun/domain";
 import type { RestoredCounts } from "@/messaging/origin-protocol";
 import { OriginFailure, step } from "@/origin/failure";
+import { writeEntries } from "@/origin/web-storage";
 
 /** The page's own storage, as the agent sees it from its isolated world. */
 export interface OriginStores {
@@ -17,12 +18,6 @@ async function requireEmpty(stores: OriginStores): Promise<void> {
   if (stores.localStorage.length + stores.sessionStorage.length + databases.length > 0) {
     throw new OriginFailure("check", "OriginNotEmpty");
   }
-}
-
-function writeEntries(storage: Storage, entries: Record<string, string>): number {
-  const pairs = Object.entries(entries);
-  for (const [key, value] of pairs) storage.setItem(key, value);
-  return pairs.length;
 }
 
 function createStores(connection: IDBDatabase, database: Database): void {

@@ -40,6 +40,8 @@ function run(port: OriginPort, stores: OriginStores, command: OriginCommand): Pr
   }
   // Each message goes out while the read transaction is live; the port keeps their order.
   const sink = {
+    storage: (entries: object) =>
+      port.postMessage({ type: "capture-storage", operationId, generation, ...entries }),
     database: (database: unknown) =>
       port.postMessage({ type: "capture-database", operationId, generation, database }),
     records: (database: string, store: string, records: unknown[]) =>
@@ -54,7 +56,7 @@ function run(port: OriginPort, stores: OriginStores, command: OriginCommand): Pr
   };
   return replyAfter(port, command, async () => ({
     type: "captured",
-    counts: await captureOrigin(stores.indexedDB, sink, command.chunk),
+    counts: await captureOrigin(stores, sink, command.chunk),
   }));
 }
 

@@ -39,11 +39,17 @@ async function captureAnswering(replies: object[], setup = chrome(), captures = 
   return { capturing, captures, ...setup };
 }
 
-const completeReplies = [
-  { type: "capture-database", database: DATABASE },
-  { type: "capture-records", database: "app", store: "kv", records: RECORDS },
-  { type: "captured", counts: { databases: 1, records: 2 } },
-];
+const LOCAL = { theme: "dark", "": "", "ключ 🔑": "värde" };
+const SESSION = { tab: "" };
+const STORAGE = { type: "capture-storage", localStorage: LOCAL, sessionStorage: SESSION };
+const SCHEMA = { type: "capture-database", database: DATABASE };
+const PART = { type: "capture-records", database: "app", store: "kv", records: RECORDS };
+const COUNTS = { databases: 1, records: 2, localStorage: 3, sessionStorage: 1 };
+const capturedWith = (counts: Partial<typeof COUNTS>) => ({
+  type: "captured",
+  counts: { ...COUNTS, ...counts },
+});
+const completeReplies = [STORAGE, SCHEMA, PART, capturedWith({})];
 
 beforeEach(() => {
   fakeBrowser.reset();
@@ -71,21 +77,27 @@ describe("captureIdentity", () => {
       formatVersion: 1,
       status: "complete",
       origins: [
-        { origin: ORIGIN, localStorage: {}, sessionStorage: {}, indexedDB: [DATABASE], caches: [] },
+        {
+          origin: ORIGIN,
+          localStorage: LOCAL,
+          sessionStorage: SESSION,
+          indexedDB: [DATABASE],
+          caches: [],
+        },
       ],
       cookies: [],
       unsupported: [],
     });
     expect(complete?.adapters).toEqual([
+      { adapter: "localStorage", status: "captured" },
+      { adapter: "sessionStorage", status: "captured" },
       { adapter: "indexedDB", status: "captured" },
-      { adapter: "localStorage", status: "skipped" },
-      { adapter: "sessionStorage", status: "skipped" },
       { adapter: "cookies", status: "skipped" },
       { adapter: "cacheStorage", status: "skipped" },
     ]);
     expect(complete?.valueTypes.toSorted()).toEqual(["Date", "Object", "Set", "primitive"]);
     expect(complete?.endedAt).toBeGreaterThanOrEqual(complete?.startedAt ?? Infinity);
-    expect(summary).toMatchObject({ captureId: started?.id, databases: 1, records: 2 });
+    expect(summary).toMatchObject({ captureId: started?.id, ...COUNTS });
     expect(agent.disconnected).toBe(true);
     expect(onConnect.listeners.size).toBe(0);
   });
@@ -148,13 +160,22 @@ describe("a failed capture", () => {
   });
 
   test("discards a capture whose counts do not match what arrived", async () => {
-    const short = [
-      ...completeReplies.slice(0, 2),
-      { type: "captured", counts: { databases: 1, records: 3 } },
-    ];
+    const short = [...completeReplies.slice(0, 3), capturedWith({ records: 3 })];
     const { capturing, captures } = await captureAnswering(short);
     await expect(capturing).rejects.toMatchObject({ name: "CaptureIncomplete" });
     expect(captures.calls).toEqual(["begin", "append", "discard"]);
+  });
+
+  test("discards a capture whose Web Storage did not arrive whole, or not at all", async () => {
+    for (const replies of [
+      [{ ...STORAGE, localStorage: { theme: "dark" } }, SCHEMA, PART, capturedWith({})],
+      [STORAGE, SCHEMA, PART, capturedWith({ sessionStorage: 2 })],
+      [SCHEMA, PART, capturedWith({})],
+    ]) {
+      const { capturing, captures } = await captureAnswering(replies);
+      await expect(capturing).rejects.toMatchObject({ name: "CaptureIncomplete" });
+      expect(captures.publish).not.toHaveBeenCalled();
+    }
   });
 
   test("discards the capture when a part cannot be written, and writes no later part", async () => {
@@ -162,11 +183,7 @@ describe("a failed capture", () => {
     captures.append.mockRejectedValueOnce(
       new DOMException("Quota exceeded.", "QuotaExceededError"),
     );
-    const twice = [
-      ...completeReplies.slice(0, 2),
-      completeReplies[1],
-      { type: "captured", counts: { databases: 1, records: 4 } },
-    ];
+    const twice = [...completeReplies.slice(0, 3), PART, capturedWith({ records: 4 })];
     const { capturing } = await captureAnswering(twice as object[], chrome(), captures);
     await expect(capturing).rejects.toMatchObject({ name: "QuotaExceededError" });
     expect(captures.append).toHaveBeenCalledOnce();
@@ -190,7 +207,7 @@ describe("a failed capture", () => {
   });
 
   test("discards the capture when the page goes away or stops sending", async () => {
-    const gone = await captureAnswering([completeReplies[0] as object]);
+    const gone = await captureAnswering([STORAGE]);
     gone.agent.onDisconnect.emit();
     await expect(gone.capturing).rejects.toMatchObject({ name: "AgentDisconnected" });
     expect(gone.captures.calls).toEqual(["begin", "discard"]);
@@ -208,7 +225,7 @@ describe("a failed capture", () => {
     const capturing = captureIdentity("identity-a", MANAGED, { ...quiet, boundMs: BOUND });
     const { operationId, generation } = await sent;
     await vi.advanceTimersByTimeAsync(BOUND - 1);
-    quiet.agent.onMessage.emit({ ...completeReplies[0], operationId, generation });
+    quiet.agent.onMessage.emit({ ...STORAGE, operationId, generation });
     // Each message restarts the bound, so only a full bound of silence ends the capture.
     await vi.advanceTimersByTimeAsync(BOUND - 1);
     expect(quiet.agent.disconnected).toBe(false);

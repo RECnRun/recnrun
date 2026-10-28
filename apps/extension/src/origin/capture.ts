@@ -1,13 +1,16 @@
 import type { OriginData } from "@recnrun/domain";
 import type { CapturedCounts } from "@/messaging/origin-protocol";
 import { step } from "@/origin/failure";
+import type { OriginStores } from "@/origin/restore";
+import { readEntries } from "@/origin/web-storage";
 
 type Database = OriginData["indexedDB"][number];
 type Store = Database["stores"][number];
 type Records = Store["records"];
 
-/** Where a capture sends each database's schema, then its records, a chunk at a time. */
+/** Where a capture sends Web Storage, then each database's schema and its records, a chunk at a time. */
 export interface CaptureSink {
+  storage: (entries: Pick<OriginData, "localStorage" | "sessionStorage">) => void;
   database: (database: Database) => void;
   records: (database: string, store: string, records: Records) => void;
 }
@@ -87,12 +90,8 @@ async function captureDatabase(
   return records;
 }
 
-/** Reads every database of the page's origin into `sink` and counts what it sent. */
-export async function captureOrigin(
-  factory: IDBFactory,
-  sink: CaptureSink,
-  chunk: number,
-): Promise<CapturedCounts> {
+/** Reads every database of the page's origin into `sink` and counts the databases and records. */
+async function captureDatabases(factory: IDBFactory, sink: CaptureSink, chunk: number) {
   const listed = await step("indexedDB", () => factory.databases());
   let records = 0;
   for (const { name = "" } of listed) {
@@ -107,4 +106,21 @@ export async function captureOrigin(
     });
   }
   return { databases: listed.length, records };
+}
+
+/** Reads the page's Web Storage, then its IndexedDB, into `sink` and counts what it sent. */
+export async function captureOrigin(
+  stores: OriginStores,
+  sink: CaptureSink,
+  chunk: number,
+): Promise<CapturedCounts> {
+  const localStorage = await step("localStorage", () => readEntries(stores.localStorage));
+  const sessionStorage = await step("sessionStorage", () => readEntries(stores.sessionStorage));
+  sink.storage({ localStorage, sessionStorage });
+  const counts = await captureDatabases(stores.indexedDB, sink, chunk);
+  return {
+    localStorage: Object.keys(localStorage).length,
+    sessionStorage: Object.keys(sessionStorage).length,
+    ...counts,
+  };
 }

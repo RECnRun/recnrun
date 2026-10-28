@@ -1,7 +1,19 @@
 import * as v from "valibot";
 
-/** Web Storage as captured: every key and value is a string. */
-const StorageEntriesSchema = v.record(v.string(), v.string());
+function isStorageEntries(input: unknown): input is Record<string, string> {
+  if (typeof input !== "object" || input === null) return false;
+  if (Object.getPrototypeOf(input) !== Object.prototype) return false;
+  return Object.values(input).every((value) => typeof value === "string");
+}
+
+/**
+ * Web Storage as captured: a plain object of string values, kept as it is. `v.record` would drop
+ * keys named `__proto__`, `constructor`, or `prototype`, which a page may store like any other.
+ */
+const StorageEntriesSchema = v.custom<Record<string, string>>(
+  isStorageEntries,
+  "Web Storage entries must be a plain object of strings.",
+);
 
 /** One record; `key` is present only for stores without an in-line key path. */
 const StoreRecordSchema = v.object({ key: v.optional(v.unknown()), value: v.unknown() });

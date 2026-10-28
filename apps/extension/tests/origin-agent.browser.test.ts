@@ -150,8 +150,10 @@ async function createApp() {
 
 const capture = { type: "capture", ...operation, chunk: 2 };
 
-test("captures on a capture command: each schema, its records in chunks, then the counts", async () => {
+test("captures on a capture command: Web Storage, each schema, its records in chunks, then the counts", async () => {
   await createApp();
+  stores.localStorage.setItem("theme", "dark");
+  stores.sessionStorage.setItem("draft", "");
   const agent = linked();
   agent.onMessage.emit(capture);
   const kv = { name: "kv", keyPath: null, autoIncrement: false, indexes: [], records: [] };
@@ -161,13 +163,23 @@ test("captures on a capture command: each schema, its records in chunks, then th
     .toEqual([
       echo,
       {
+        type: "capture-storage",
+        ...operation,
+        localStorage: { theme: "dark" },
+        sessionStorage: { draft: "" },
+      },
+      {
         type: "capture-database",
         ...operation,
         database: { name: "app", version: 2, stores: [kv] },
       },
       { ...part, records: [1, 2].map((key) => ({ key, value: `value-${key}` })) },
       { ...part, records: [{ key: 3, value: "value-3" }] },
-      { type: "captured", ...operation, counts: { databases: 1, records: 3 } },
+      {
+        type: "captured",
+        ...operation,
+        counts: { localStorage: 1, sessionStorage: 1, databases: 1, records: 3 },
+      },
     ]);
   expect(agent.onMessage.listeners.size).toBe(0);
 });
@@ -178,6 +190,10 @@ test("a capture that fails replies failed with the step and an error name", asyn
   agent.onMessage.emit(capture);
   await expect
     .poll(() => agent.posted)
-    .toEqual([echo, { type: "failed", ...operation, error: "indexedDB: AbortError" }]);
+    .toEqual([
+      echo,
+      { type: "capture-storage", ...operation, localStorage: {}, sessionStorage: {} },
+      { type: "failed", ...operation, error: "indexedDB: AbortError" },
+    ]);
   vi.restoreAllMocks();
 });

@@ -21,6 +21,8 @@ interface PocGlobal {
 /** A published capture's id, size, and duration, as the test build reports it. */
 interface CaptureSummary {
   captureId: string;
+  localStorage: number;
+  sessionStorage: number;
   databases: number;
   records: number;
   ms: number;
