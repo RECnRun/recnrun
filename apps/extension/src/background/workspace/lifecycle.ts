@@ -31,6 +31,8 @@ export interface LifecycleEffects {
     operation: { id: string; kind: LifecycleKind },
   ) => Promise<StepTiming[]>;
   removeCaptures: (identityId: string) => Promise<void>;
+  /** Runs before each step; the test build delays or fails a step through it. */
+  beforeStep?: (step: LifecycleStep) => Promise<void>;
 }
 
 export interface LifecycleDeps {
@@ -137,6 +139,7 @@ async function runSteps(run: Run, steps: readonly LifecycleStep[]): Promise<void
     run.operation = { ...run.operation, step };
     await run.deps.journal.write(run.operation);
     try {
+      await run.deps.effects.beforeStep?.(step);
       await STEP_RUNS[step](run);
     } catch (error) {
       await recordFailure(run, error);

@@ -1,13 +1,12 @@
-import type { Page, Worker } from "@playwright/test";
+import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures/extension.ts";
 import { keep } from "./fixtures/keep.ts";
-import { journalMarks, lifecycleDriver, watchJournal } from "./fixtures/lifecycle.ts";
+import { lifecycleDriver, marksOf, nextPageAt, watchJournal } from "./fixtures/lifecycle.ts";
 import {
   beacons,
   checkRestore,
   cutoffOf,
   firstReads,
-  nextPageAt,
   startWriters,
   writing,
 } from "./fixtures/writers.ts";
@@ -15,13 +14,6 @@ import type { WriterOutcome } from "./fixtures/writers.ts";
 import { APP } from "./fixtures/workspace.ts";
 
 test.use({ incognitoAccess: true });
-
-/** The journal writes of the operations `run` starts, timed by the service worker. */
-async function marksOf(serviceWorker: Worker, run: () => Promise<unknown>) {
-  const before = (await journalMarks(serviceWorker)).length;
-  await run();
-  return (await journalMarks(serviceWorker)).slice(before);
-}
 
 test("writers in the page, a worker, and a Service Worker never tear a capture or cross identities", async ({
   context,

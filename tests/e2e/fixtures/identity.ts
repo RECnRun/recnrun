@@ -12,7 +12,10 @@ interface PocGlobal {
   recnrunPoc: {
     startWithIdentity: (url: string, data: unknown) => Promise<StepTiming[]>;
     setRestoreDelay: (ms: number) => void;
+    setStepDelay: (step: string, ms: number) => void;
     failNext: (step: string) => void;
+    replayStale: (on: boolean) => void;
+    staleDelivered: () => number;
     captureIdentity: (identityId: string, capabilities?: unknown) => Promise<CaptureSummary>;
     startFromCapture: (identityId: string) => Promise<StepTiming[]>;
   };
@@ -111,6 +114,25 @@ export const failNext = (serviceWorker: Worker, step: string) =>
   serviceWorker.evaluate((name) => {
     (globalThis as unknown as PocGlobal).recnrunPoc.failNext(name);
   }, step);
+
+/** Holds every later run of `step` back `ms` before it starts; 0 lets it run at once again. */
+export const delayStep = (serviceWorker: Worker, step: string, ms: number) =>
+  serviceWorker.evaluate(
+    ([name, delay]) => {
+      (globalThis as unknown as PocGlobal).recnrunPoc.setStepDelay(name, delay);
+    },
+    [step, ms] as const,
+  );
+
+/** Replays an earlier operation's agent replies ahead of each new link's own, while on. */
+export const replayStale = (serviceWorker: Worker, on: boolean) =>
+  serviceWorker.evaluate((active) => {
+    (globalThis as unknown as PocGlobal).recnrunPoc.replayStale(active);
+  }, on);
+
+/** How many stale replies the replay delivered to the background. */
+export const staleDelivered = (serviceWorker: Worker) =>
+  serviceWorker.evaluate(() => (globalThis as unknown as PocGlobal).recnrunPoc.staleDelivered());
 
 interface ChromeGlobal {
   chrome: {

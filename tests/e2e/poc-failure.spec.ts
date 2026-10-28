@@ -1,4 +1,3 @@
-import { chromium } from "@playwright/test";
 import type { Page, Worker } from "@playwright/test";
 import { appLog, requestsOf } from "./fixtures/app.ts";
 import { expect, test } from "./fixtures/extension.ts";
@@ -12,6 +11,7 @@ import {
   nextWorker,
   startWithIdentity,
 } from "./fixtures/identity.ts";
+import { stopWorker } from "./fixtures/restart.ts";
 import { openSite } from "./fixtures/session.ts";
 import { APP, managedWindow, workspacePanel } from "./fixtures/workspace.ts";
 
@@ -81,30 +81,9 @@ test("a tab closed during the start is shown as a failure, and nothing is releas
   );
 });
 
-interface TargetInfo {
-  targetId: string;
-  type: string;
-  url: string;
-}
-
-/** Stops the extension's service worker through the DevTools port, as Chrome stops it on its own. */
-async function stopWorker(port: number) {
-  const remote = await chromium.connectOverCDP(`http://127.0.0.1:${port}`);
-  const cdp = await remote.newBrowserCDPSession();
-  const workers = async () =>
-    ((await cdp.send("Target.getTargets")) as { targetInfos: TargetInfo[] }).targetInfos.filter(
-      ({ type, url }) => type === "service_worker" && url.startsWith("chrome-extension://"),
-    );
-  for (const { targetId } of await workers()) await cdp.send("Target.closeTarget", { targetId });
-  await expect.poll(async () => (await workers()).length).toBe(0);
-  await remote.close();
-}
-
 test.describe("with a DevTools port", () => {
   test.use({ remoteDebuggingPort: 9335 });
 
-  // chrome.runtime.reload() unloads the command-line extension for good in this Chromium, so the
-  // worker is stopped instead: either way the start's memory is gone and a new worker starts.
   test("a service worker stopped during the start is recovered as a failure, and nothing is released", async ({
     context,
     serviceWorker,

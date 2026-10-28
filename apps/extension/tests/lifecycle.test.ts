@@ -47,6 +47,20 @@ test("switch saves the open identity before it closes, then starts the target fr
   expect(access).toHaveBeenCalledOnce();
 });
 
+test("the test hook runs before each lifecycle step, and a step it fails is journaled failed", async () => {
+  const seen: string[] = [];
+  const beforeStep = vi.fn(async (step: string) => {
+    seen.push(step);
+    if (step === "persist") throw new Error("Injected before persist.");
+  });
+  const { lifecycle, chrome, journal } = setUp({ open: "a" });
+  chrome.effects.beforeStep = beforeStep;
+  await expect(lifecycle.switchTo("b")).rejects.toThrow("Injected before persist.");
+  expect(seen).toEqual(["capture", "persist"]);
+  expect(chrome.calls).toEqual(["capture a"]);
+  expect(journal.written.at(-1)).toMatchObject({ step: "persist", status: "failed" });
+});
+
 test("switch to an identity never captured opens it empty", async () => {
   const { lifecycle, chrome } = setUp();
   await lifecycle.switchTo("c");

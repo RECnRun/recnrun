@@ -1,25 +1,14 @@
-import type { BrowserContext, Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
 import type { WriterBeacon, WritersFirst } from "../apps/writer-pages.ts";
 import { appLog } from "./app.ts";
 import { expect } from "./extension.ts";
 import type { JournalMark } from "./lifecycle.ts";
 
 /** The three writers; `mirror` is the page writer's second database. */
-export const WRITERS = ["page", "worker", "sw"] as const;
+const WRITERS = ["page", "worker", "sw"] as const;
 
 interface WritersWindow {
   __writers: { first: Promise<WritersFirst>; start: (tag: string) => Promise<void> };
-}
-
-/** The open page at `url` that is not `previous`, once Chrome lists it. */
-export async function nextPageAt(context: BrowserContext, url: string, previous?: Page) {
-  if (previous) await expect.poll(() => previous.isClosed()).toBe(true);
-  await expect
-    .poll(() => context.pages().some((each) => each.url() === url && !each.isClosed()))
-    .toBe(true);
-  const page = context.pages().find((each) => each.url() === url && !each.isClosed());
-  if (!page) throw new Error(`No page shows ${url}.`);
-  return page;
 }
 
 /** What the page read before any writer ran in it. */

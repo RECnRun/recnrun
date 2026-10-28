@@ -49,5 +49,7 @@ export function chromeLifecycleEffects(
       return bootstrapIdentity(url, data, { ...ports, windows, record }, operation.id);
     },
     removeCaptures: (identityId) => deps.captures.remove(identityId),
+    // Read at each step: the test build sets the hook after the commands exist.
+    beforeStep: (step) => ports.hooks.beforeStep(step),
   };
 }

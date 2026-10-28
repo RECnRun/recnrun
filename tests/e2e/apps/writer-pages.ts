@@ -3,7 +3,7 @@
 import { literal } from "./app-pages.ts";
 
 /** One writer's database as a restored page first reads it, before any writer runs again. */
-export interface WriterRead {
+interface WriterRead {
   count: number;
   max: number | null;
   /** Whether the keys are exactly 1…count, so no write in the middle went missing. */

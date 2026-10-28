@@ -4,6 +4,7 @@ import { installTestHandles } from "@/background/test-handles";
 import type { PocHandles } from "@/background/test-handles";
 import type { BootstrapHooks } from "@/background/workspace/bootstrap";
 import type { WorkspaceCommands } from "@/background/workspace/commands";
+import { ORIGIN_AGENT_PORT } from "@/messaging/origin-protocol";
 
 const DATA: IdentityData = {
   cookies: [],
@@ -23,9 +24,12 @@ function install() {
     startFromCapture,
   } as unknown as WorkspaceCommands;
   const hooks: BootstrapHooks = { beforeStep: async () => {} };
-  installTestHandles(scope, commands, hooks);
+  const added = vi.fn();
+  const onConnect = { addListener: added, removeListener: vi.fn() };
+  installTestHandles(scope, commands, hooks, onConnect);
   if (!scope.recnrunPoc) throw new Error("No handles installed");
-  return { handles: scope.recnrunPoc, hooks, startWithIdentity, captureIdentity, startFromCapture };
+  const { recnrunPoc: handles } = scope;
+  return { handles, hooks, onConnect, added, startWithIdentity, captureIdentity, startFromCapture };
 }
 
 afterEach(() => {
@@ -59,6 +63,23 @@ test("delays the restore step only, by the set delay", async () => {
   expect(restored).toBe(true);
 });
 
+test("delays and fails a lifecycle step as it does a start's step", async () => {
+  vi.useFakeTimers();
+  const { handles, hooks } = install();
+  handles.setStepDelay("capture", 500);
+  let captured = false;
+  const capture = hooks.beforeStep("capture").then(() => {
+    captured = true;
+  });
+  await vi.advanceTimersByTimeAsync(499);
+  expect(captured).toBe(false);
+  await vi.advanceTimersByTimeAsync(1);
+  await capture;
+  expect(captured).toBe(true);
+  handles.failNext("persist");
+  await expect(hooks.beforeStep("persist")).rejects.toMatchObject({ name: "InjectedFailure" });
+});
+
 test("fails the next run of one step once", async () => {
   const { handles, hooks } = install();
   handles.failNext("restore");
@@ -80,4 +101,18 @@ test("captures an identity and starts from its capture, keeping that start's tim
   await expect(handles.startFromCapture("identity-a")).resolves.toEqual(TIMINGS);
   expect(startFromCapture).toHaveBeenCalledWith("identity-a");
   expect(handles.timings()).toEqual([TIMINGS]);
+});
+
+test("hands the agent links to the stale replay, which stays off until a test turns it on", () => {
+  const { handles, onConnect, added } = install();
+  const listener = vi.fn();
+  onConnect.addListener(listener);
+  const [own] = (added.mock.calls[0] ?? []) as [((port: unknown) => void)?];
+  const port = { name: ORIGIN_AGENT_PORT };
+  own?.(port);
+  expect(listener).toHaveBeenLastCalledWith(port);
+  handles.replayStale(true);
+  own?.(port);
+  expect(listener.mock.lastCall?.[0]).not.toBe(port);
+  expect(handles.staleDelivered()).toBe(0);
 });

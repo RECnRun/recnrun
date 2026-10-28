@@ -1,5 +1,10 @@
 import { errorMessage } from "@recnrun/domain";
-import type { IdentityData, ManagedWindowState, WorkspaceOperation } from "@recnrun/domain";
+import type {
+  IdentityData,
+  LifecycleStep,
+  ManagedWindowState,
+  WorkspaceOperation,
+} from "@recnrun/domain";
 import { restoreThroughAgent } from "@/background/workspace/agent-link";
 import { installBarrier, removeBarrier } from "@/background/workspace/barrier";
 import type { Barrier, BarrierApi } from "@/background/workspace/barrier";
@@ -29,7 +34,7 @@ export const BOOTSTRAP_STEPS = [
   "reload",
 ] as const;
 
-export type BootstrapStep = (typeof BOOTSTRAP_STEPS)[number];
+type BootstrapStep = (typeof BOOTSTRAP_STEPS)[number];
 
 /** How long one step took, in milliseconds; no payload, so timings can be logged and reported. */
 export interface StepTiming {
@@ -37,9 +42,12 @@ export interface StepTiming {
   ms: number;
 }
 
+/** A step a test build can delay or fail: one of a start's, or one of a lifecycle command's. */
+export type HookStep = BootstrapStep | LifecycleStep;
+
 /** Runs before each step; test builds delay or fail a step through it, product builds do nothing. */
 export interface BootstrapHooks {
-  beforeStep: (step: BootstrapStep) => Promise<void>;
+  beforeStep: (step: HookStep) => Promise<void>;
 }
 
 /** Chrome, behind ports, plus the test hook. */
