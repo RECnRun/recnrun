@@ -85,6 +85,7 @@ export function fakeEffects(open?: { identityId?: string }) {
     removeCaptures: vi.fn(async (identityId: string) => {
       calls.push(`remove ${identityId}`);
     }),
+    settle: vi.fn(async (_identityId: string, _committedId: string | undefined) => {}),
   };
   return { calls, state, effects };
 }

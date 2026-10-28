@@ -97,6 +97,18 @@ test("a failed capture keeps the workspace open and names the step", async () =>
   });
 });
 
+test("a capture is kept once the identity names it, and taken back when that fails", async () => {
+  const { lifecycle, chrome, memory } = setUp({ open: "a" });
+  // A settle that fails is left to the identity's next read or capture, never to the caller.
+  vi.mocked(chrome.effects.settle).mockRejectedValue(new Error("Later."));
+  memory.failNext = true;
+  await expect(lifecycle.switchTo("b")).rejects.toThrow("The disk is full.");
+  expect(chrome.effects.settle).toHaveBeenCalledExactlyOnceWith("a", "cap-a");
+  vi.mocked(chrome.effects.settle).mockClear();
+  await lifecycle.switchTo("b");
+  expect(chrome.effects.settle).toHaveBeenCalledExactlyOnceWith("a", "cap-a-2");
+});
+
 test("a capture RECnRun cannot record on the identity keeps the workspace open", async () => {
   const { lifecycle, chrome, journal, memory } = setUp({ open: "a" });
   memory.failNext = true;

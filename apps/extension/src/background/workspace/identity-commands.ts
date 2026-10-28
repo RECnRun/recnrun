@@ -12,7 +12,7 @@ import type { IdentityRepository } from "@/ports/identities";
 
 /** A capture's Chrome APIs, the captures that are also read back and deleted, and the identities. */
 export interface IdentityDeps extends CaptureDeps {
-  captures: CaptureDeps["captures"] & Pick<IdentityCaptures, "read" | "remove">;
+  captures: CaptureDeps["captures"] & Pick<IdentityCaptures, "read" | "remove" | "settle">;
   identities: IdentityRepository;
 }
 
@@ -39,11 +39,16 @@ export async function captureManaged(
   return captureIdentity(identityId, managed, deps, capabilities);
 }
 
-/** Where a start from `identityId`'s published capture opens, and what it restores there. */
+/**
+ * Where a start from `identityId`'s published capture opens, and what it restores there; a
+ * tentative capture is settled first on the one the identity names, so only a saved one is read.
+ */
 export async function savedStart(
   identityId: string,
-  captures: IdentityDeps["captures"],
+  { captures, identities }: Pick<IdentityDeps, "captures" | "identities">,
 ): Promise<{ url: string; data: IdentityData }> {
+  const saved = (await identities.list()).find(({ id }) => id === identityId);
+  await captures.settle(identityId, saved?.lastCapture?.id);
   const capture = await captures.read(identityId);
   if (!capture) {
     throw new WorkspaceError("CaptureMissing", "RECnRun has no saved data for this identity.");

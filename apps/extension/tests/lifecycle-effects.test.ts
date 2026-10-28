@@ -4,6 +4,7 @@ import { WorkspaceError } from "@/background/workspace/errors";
 import { chromeLifecycleEffects } from "@/background/workspace/lifecycle-effects";
 import { createNeutralWindow } from "@/background/workspace/windows";
 import { managedWindowRepository } from "@/storage/managed-window-repository";
+import { completeReplies } from "./capture-replies";
 import { chrome, memoryCaptures } from "./fake-capture";
 import { memoryOperationJournal } from "./fake-journal";
 import { identity, memoryIdentities } from "./fake-lifecycle";
@@ -15,11 +16,11 @@ function effects(failAt?: string, frame?: null) {
     if (step === failAt) throw new WorkspaceError("InjectedFailure", `Injected at ${step}.`);
   };
   const ports = { ...fakeWorkspacePorts(), hooks: { beforeStep } };
-  const { api, cookies } = chrome(frame);
+  const { api, cookies, agent } = chrome(frame);
   const captures = memoryCaptures();
-  const deps = { api, cookies, captures, identities: memoryIdentities().repository };
+  const deps = { api, cookies, captures, identities: memoryIdentities([identity("a")]).repository };
   const journal = memoryOperationJournal();
-  return { effects: chromeLifecycleEffects(ports, deps, journal), captures, journal, api };
+  return { effects: chromeLifecycleEffects(ports, deps, journal), captures, journal, api, agent };
 }
 
 beforeEach(() => {
@@ -61,6 +62,8 @@ test("a start from a capture RECnRun does not have opens no window", async () =>
   await expect(chromeSide.start(identity("a"), "capture", operation)).rejects.toMatchObject({
     name: "CaptureMissing",
   });
+  expect(captures.calls).toEqual(["settle"]);
+  expect(captures.settle).toHaveBeenCalledWith("a", "cap-a");
   expect(captures.read).toHaveBeenCalledWith("a");
   expect(fakeBrowser.windows.create).not.toHaveBeenCalled();
 });
@@ -74,4 +77,17 @@ test("captures the managed tab with the identity's capabilities, and deletes its
   expect(api.topFrame).toHaveBeenCalledWith(managed.tabId);
   await chromeSide.removeCaptures("a");
   expect(captures.remove).toHaveBeenCalledWith("a");
+});
+
+test("a capture first settles the identity's earlier one, then publishes tentatively", async () => {
+  const { effects: chromeSide, captures, agent } = effects();
+  const managed = { generation: 1, windowId: 5, tabId: 7, status: "active" as const };
+  const capturing = chromeSide.capture(identity("a"), { ...managed, identityId: "a" });
+  await vi.waitFor(() => expect(agent.posted).toHaveLength(1));
+  const { operationId, generation } = agent.posted[0] as Record<string, unknown>;
+  for (const reply of completeReplies) agent.onMessage.emit({ ...reply, operationId, generation });
+  await expect(capturing).resolves.toMatchObject({ records: 2 });
+  expect(captures.calls.slice(0, 2)).toEqual(["settle", "begin"]);
+  expect(captures.settle).toHaveBeenCalledWith("a", "cap-a");
+  expect(captures.publish).toHaveBeenCalledWith(captures.headers.at(-1), { tentative: true });
 });

@@ -11,7 +11,7 @@ import {
 import { keep } from "./fixtures/keep.ts";
 import { lifecycleSetUp } from "./fixtures/lifecycle.ts";
 import { marked, readMarker, writeMarker } from "./fixtures/markers.ts";
-import { tamperCapture, untamperCapture } from "./fixtures/tamper.ts";
+import { storedCaptures, tamperCapture, untamperCapture } from "./fixtures/tamper.ts";
 import type { Tamper } from "./fixtures/tamper.ts";
 import { managedWindow } from "./fixtures/workspace.ts";
 
@@ -115,6 +115,12 @@ test("a failed capture, persistence, or restore leaves a state the next command 
     expect(await incognitoWindows(serviceWorker)).toBe(1);
     if (tab.page) expect(await readMarker(tab.page)).toEqual(marked("A:2"));
     expect(await lastCapture()).toBe(savedA);
+    // The capture taken before the failure is taken back: A's saved capture is still the published one.
+    const idA = identities.idOf("A");
+    expect(await storedCaptures(serviceWorker, idA)).toEqual({
+      pointer: { identityId: idA, captureId: savedA },
+      count: 1,
+    });
   }
 
   await failNext(serviceWorker, "restore");

@@ -1,5 +1,5 @@
 import { classifyIncognitoWindows } from "@recnrun/domain";
-import type { Identity, IdentityData } from "@recnrun/domain";
+import type { Identity, IdentityCapture, IdentityData } from "@recnrun/domain";
 import { bootstrapIdentity } from "@/background/workspace/bootstrap";
 import type { BootstrapPorts } from "@/background/workspace/bootstrap";
 import { captureIdentity } from "@/background/workspace/capture";
@@ -18,7 +18,7 @@ const NOTHING: IdentityData = {
 };
 
 async function startData(identity: Identity, from: "capture" | "empty", deps: IdentityDeps) {
-  if (from === "capture") return savedStart(identity.id, deps.captures);
+  if (from === "capture") return savedStart(identity.id, deps);
   return { url: identity.url, data: NOTHING };
 }
 
@@ -37,8 +37,14 @@ export function chromeLifecycleEffects(
       const open = managed === undefined || stored === undefined ? {} : { managed: stored };
       return { ...open, foreign: foreign.map(({ id }) => id) };
     },
-    capture: (identity, managed) =>
-      captureIdentity(identity.id, managed, deps, identity.capabilities),
+    capture: async (identity, managed) => {
+      await deps.captures.settle(identity.id, identity.lastCapture?.id);
+      // Tentative until the identity names it: the lifecycle settles it after its persist step.
+      const publish = (header: IdentityCapture) =>
+        deps.captures.publish(header, { tentative: true });
+      const captures = { ...deps.captures, publish };
+      return captureIdentity(identity.id, managed, { ...deps, captures }, identity.capabilities);
+    },
     close,
     start: async (identity, from, operation) => {
       const { url, data } = await startData(identity, from, deps);
@@ -49,6 +55,7 @@ export function chromeLifecycleEffects(
       return bootstrapIdentity(url, data, { ...ports, windows, record }, operation.id);
     },
     removeCaptures: (identityId) => deps.captures.remove(identityId),
+    settle: (identityId, committedId) => deps.captures.settle(identityId, committedId),
     // Read at each step: the test build sets the hook after the commands exist.
     beforeStep: (step) => ports.hooks.beforeStep(step),
   };

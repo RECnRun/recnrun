@@ -238,7 +238,7 @@ describe("captureIdentity and startFromCapture", () => {
     });
     const capture = sampleCapture();
     captures.read.mockResolvedValue(capture);
-    await expect(savedStart("identity-a", captures)).resolves.toEqual({
+    await expect(savedStart("identity-a", identities)).resolves.toEqual({
       url: capture.url,
       data: restorableData(capture),
     });
@@ -247,5 +247,7 @@ describe("captureIdentity and startFromCapture", () => {
     });
     expect(await journal.read()).toMatchObject({ kind: "start-with-identity", step: "window" });
     expect(captures.read).toHaveBeenCalledWith("identity-a");
+    // An identity the lifecycle never saved has no capture to keep from a tentative publish.
+    expect(captures.settle).toHaveBeenCalledWith("identity-a", undefined);
   });
 });

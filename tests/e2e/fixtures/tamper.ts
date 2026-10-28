@@ -54,3 +54,22 @@ export const untamperCapture = (serviceWorker: Worker) =>
     await new Promise((resolve) => (tx.oncomplete = resolve));
     db.close();
   });
+
+/** The identity's pointer row and how many captures it has stored, published or not. */
+export const storedCaptures = (serviceWorker: Worker, identityId: string) =>
+  serviceWorker.evaluate(async (id) => {
+    const opening = indexedDB.open("recnrun-identity-captures");
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      opening.onsuccess = () => resolve(opening.result);
+      opening.onerror = () => reject(opening.error ?? new Error("open failed"));
+    });
+    const tx = db.transaction(["captures", "pointers"], "readonly");
+    const pointer = tx.objectStore("pointers").get(id);
+    const count = tx.objectStore("captures").index("byIdentity").count(id);
+    await new Promise((resolve, reject) => {
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error ?? new Error("read failed"));
+    });
+    db.close();
+    return { pointer: pointer.result as unknown, count: count.result };
+  }, identityId);

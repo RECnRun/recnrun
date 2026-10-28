@@ -31,6 +31,8 @@ export interface LifecycleEffects {
     operation: { id: string; kind: LifecycleKind },
   ) => Promise<StepTiming[]>;
   removeCaptures: (identityId: string) => Promise<void>;
+  /** Ends a tentative capture: kept when it is `committedId`, else the one before comes back. */
+  settle: (identityId: string, committedId: string | undefined) => Promise<void>;
   /** Runs before each step; the test build delays or fails a step through it. */
   beforeStep?: (step: LifecycleStep) => Promise<void>;
 }
@@ -71,6 +73,8 @@ interface Run {
   /** A new identity, saved only once the open one is saved and closed. */
   adding?: Identity;
   captured?: CaptureSummary;
+  /** Set once the open identity names the new capture as its last one. */
+  persisted?: boolean;
   timings: StepTiming[];
 }
 
@@ -105,6 +109,18 @@ async function persist(run: Run): Promise<void> {
   await deps.identities.update((list) =>
     list.map((each) => (each.id === open.identity.id ? { ...each, lastCapture } : each)),
   );
+  run.persisted = true;
+  // Reads settle first, so a failure here only leaves the replaced capture until then.
+  await deps.effects.settle(open.identity.id, captured.captureId).catch(() => undefined);
+}
+
+/** A capture the identity does not name yet is taken back, so its last capture stays published. */
+async function takeBack(run: Run): Promise<void> {
+  const { open, captured, persisted, deps } = run;
+  if (open === undefined || captured === undefined || persisted === true) return;
+  const previous = open.identity.lastCapture?.id;
+  // When this fails too, the next read or capture of the identity settles it the same way.
+  await deps.effects.settle(open.identity.id, previous).catch(() => undefined);
 }
 
 async function start(run: Run, from: "capture" | "empty"): Promise<void> {
@@ -150,6 +166,7 @@ async function runSteps(run: Run, steps: readonly LifecycleStep[]): Promise<void
       await run.deps.effects.beforeStep?.(step);
       await STEP_RUNS[step](run);
     } catch (error) {
+      await takeBack(run);
       await recordFailure(run, error);
       throw error;
     }

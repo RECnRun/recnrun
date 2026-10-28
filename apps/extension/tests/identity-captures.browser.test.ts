@@ -47,12 +47,16 @@ function split(id: string, overrides: Partial<IdentityCapture> = {}) {
   return { capture, complete, started, parts };
 }
 
-/** Writes a whole capture through the repository and publishes it. */
-async function store(repository: ReturnType<typeof createIdentityCaptures>, id: string) {
+/** Writes a whole capture through the repository and publishes it, tentatively when asked. */
+async function store(
+  repository: ReturnType<typeof createIdentityCaptures>,
+  id: string,
+  tentative = false,
+) {
   const { capture, complete, started, parts } = split(id);
   await repository.begin(started);
   for (const part of parts) await repository.append(id, part);
-  await repository.publish(complete);
+  await repository.publish(complete, { tentative });
   return capture;
 }
 
@@ -161,6 +165,37 @@ test("publishing removes the previous capture and abandoned ones with all their 
   await expect(repository.append("capture-2", abandoned.parts[0] as CapturePart)).rejects.toThrow(
     /not in progress/,
   );
+});
+
+test("a tentative publish keeps the previous capture until it is settled on the new one", async () => {
+  const repository = createIdentityCaptures(indexedDB);
+  await store(repository, "capture-1");
+  const latest = await store(repository, "capture-2", true);
+  expect(await repository.read("identity-a")).toEqual(latest);
+  expect(await rowCounts()).toEqual({ captures: 2, parts: 6, pointers: 1 });
+  await expect(store(repository, "capture-3")).rejects.toThrow(/not settled/);
+  await repository.settle("identity-a", "capture-2");
+  expect(await repository.read("identity-a")).toEqual(latest);
+  expect(await rowCounts()).toEqual({ captures: 1, parts: 3, pointers: 1 });
+  // Settled, the pointer no longer changes on a later settle.
+  await repository.settle("identity-a", "capture-1");
+  expect(await repository.read("identity-a")).toEqual(latest);
+});
+
+test("settling a tentative publish on another capture puts the previous one back", async () => {
+  const repository = createIdentityCaptures(indexedDB);
+  const first = await store(repository, "capture-1");
+  await store(repository, "capture-2", true);
+  await repository.settle("identity-a", "capture-1");
+  expect(await repository.read("identity-a")).toEqual(first);
+  expect(await rowCounts()).toEqual({ captures: 1, parts: 3, pointers: 1 });
+  await store(repository, "capture-3", true);
+  await repository.remove("identity-a");
+  await store(repository, "capture-4", true);
+  await repository.settle("identity-a", undefined);
+  await repository.settle("identity-z", undefined);
+  expect(await repository.read("identity-a")).toBeNull();
+  expect(await rowCounts()).toEqual({ captures: 0, parts: 0, pointers: 0 });
 });
 
 test("a published capture takes no more parts and cannot be discarded", async () => {

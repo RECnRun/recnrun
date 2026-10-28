@@ -60,6 +60,9 @@ export function memoryCaptures() {
       calls.push("discard");
     }),
     read: vi.fn(async (_identityId: string): Promise<IdentityCapture | null> => null),
+    settle: vi.fn(async (_identityId: string, _committedId: string | undefined) => {
+      calls.push("settle");
+    }),
     remove: vi.fn(async () => {
       calls.push("remove");
     }),

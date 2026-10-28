@@ -279,7 +279,6 @@ export function createWorkspaceCommands(
         await requireAccess();
         return captureManaged(identityId, identities, capabilities);
       }),
-    startFromCapture: (identityId) =>
-      startRestoring(() => savedStart(identityId, identities.captures)),
+    startFromCapture: (identityId) => startRestoring(() => savedStart(identityId, identities)),
   };
 }

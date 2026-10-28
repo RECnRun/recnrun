@@ -1,6 +1,7 @@
 import { IdentityCaptureSchema } from "@recnrun/domain";
 import type { IdentityCapture } from "@recnrun/domain";
 import * as v from "valibot";
+import { request, transact } from "@/storage/indexed-db";
 
 type Origin = IdentityCapture["origins"][number];
 type StoreRecord = Origin["indexedDB"][number]["stores"][number]["records"][number];
@@ -32,7 +33,12 @@ const CacheRowSchema = v.object({
   cache: v.object({ name: v.string(), entries: v.array(v.unknown()) }),
 });
 const PartRowSchema = v.union([RecordsRowSchema, CacheRowSchema]);
-const PointerSchema = v.object({ identityId: v.string(), captureId: v.string() });
+const PointerSchema = v.object({
+  identityId: v.string(),
+  captureId: v.string(),
+  /** Set while a tentative publish awaits `settle`: the capture it replaced, or null for none. */
+  previous: v.optional(v.nullable(v.string())),
+});
 
 type RecordsRow = v.InferOutput<typeof RecordsRowSchema>;
 
@@ -42,15 +48,6 @@ class CaptureStoreError extends Error {
     super(message);
     this.name = "CaptureStoreError";
   }
-}
-
-function request<T>(target: IDBRequest<T>): Promise<T> {
-  return new Promise((resolve, reject) => {
-    target.addEventListener("success", () => resolve(target.result));
-    target.addEventListener("error", () =>
-      reject(target.error ?? new DOMException("Request failed.", "UnknownError")),
-    );
-  });
 }
 
 function parsed<S extends v.GenericSchema>(schema: S, row: unknown): v.InferOutput<S> {
@@ -65,36 +62,6 @@ function createSchema(connection: IDBDatabase): void {
   const parts = connection.createObjectStore(PARTS, { autoIncrement: true });
   parts.createIndex(BY_CAPTURE, "captureId");
   connection.createObjectStore(POINTERS, { keyPath: "identityId" });
-}
-
-/**
- * Runs `body` in one transaction and settles after `complete`, so nothing counts as written before
- * it commits; a rejection aborts every write in it. `body` awaits only this transaction's requests.
- */
-function transact<T>(
-  connection: IDBDatabase,
-  mode: IDBTransactionMode,
-  body: (transaction: IDBTransaction) => Promise<T>,
-): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const transaction = connection.transaction(EVERY_STORE, mode);
-    let outcome: { value: T } | { error: unknown } | undefined;
-    transaction.addEventListener("complete", () => {
-      if (outcome && "value" in outcome) resolve(outcome.value);
-      else reject(new CaptureStoreError("The transaction committed before its work ended."));
-    });
-    transaction.addEventListener("abort", () => {
-      reject(outcome && "error" in outcome ? outcome.error : transaction.error);
-    });
-    body(transaction).then(
-      (value) => (outcome = { value }),
-      (error: unknown) => {
-        outcome = { error };
-        // A failed request has already aborted the transaction, and aborting twice throws.
-        if (transaction.error === null) transaction.abort();
-      },
-    );
-  });
 }
 
 function storeOf(origin: Origin | undefined, part: RecordsRow) {
@@ -159,11 +126,15 @@ async function deleteCapture(transaction: IDBTransaction, captureId: IDBValidKey
   await request(transaction.objectStore(CAPTURES).delete(captureId));
 }
 
-/** Deletes every capture of `identityId` but `keep`, whether published before or abandoned. */
-async function deleteCaptures(transaction: IDBTransaction, identityId: string, keep?: string) {
+/** Deletes every capture of `identityId` but those in `keep`, whether published or abandoned. */
+async function deleteCaptures(
+  transaction: IDBTransaction,
+  identityId: string,
+  keep: readonly IDBValidKey[] = [],
+) {
   const index = transaction.objectStore(CAPTURES).index(BY_IDENTITY);
   const ids = await request(index.getAllKeys(identityId));
-  for (const id of ids) if (id !== keep) await deleteCapture(transaction, id);
+  for (const id of ids) if (!keep.includes(id)) await deleteCapture(transaction, id);
 }
 
 function requireStatus(header: IdentityCapture, status: IdentityCapture["status"]): void {
@@ -177,24 +148,52 @@ function validHeader(header: IdentityCapture, status: IdentityCapture["status"])
   return valid;
 }
 
-/** Completes a started capture and makes it the identity's only one, in the caller's transaction. */
-async function publishIn(transaction: IDBTransaction, header: IdentityCapture): Promise<void> {
+async function pointerOf(transaction: IDBTransaction, identityId: string) {
+  const row: unknown = await request(transaction.objectStore(POINTERS).get(identityId));
+  return row === undefined ? undefined : parsed(PointerSchema, row);
+}
+
+/**
+ * Completes a started capture and makes it the identity's only one, in the caller's transaction;
+ * a tentative publish keeps the capture it replaces until `settle` decides between them.
+ */
+async function publishIn(transaction: IDBTransaction, header: IdentityCapture, tentative: boolean) {
   const started = await openHeader(transaction, header.id);
   if (started.identityId !== header.identityId) {
     throw new CaptureStoreError("The capture belongs to another identity.");
   }
   // Validating the whole capture here means a published pointer never names one `read` refuses.
   assemble(header, await partsOf(transaction, header.id));
+  const current = await pointerOf(transaction, header.identityId);
+  if (current?.previous !== undefined) {
+    throw new CaptureStoreError("The identity's previous capture is not settled.");
+  }
   await request(transaction.objectStore(CAPTURES).put(header));
-  const pointer = { identityId: header.identityId, captureId: header.id };
+  const previous = tentative ? { previous: current?.captureId ?? null } : {};
+  const pointer = { identityId: header.identityId, captureId: header.id, ...previous };
   await request(transaction.objectStore(POINTERS).put(pointer));
-  await deleteCaptures(transaction, header.identityId, header.id);
+  const kept = tentative && current ? [header.id, current.captureId] : [header.id];
+  await deleteCaptures(transaction, header.identityId, kept);
+}
+
+/** Keeps the pointer's capture when it is `committedId`, else puts its previous one back. */
+async function settleIn(transaction: IDBTransaction, identityId: string, committedId?: string) {
+  const pointer = await pointerOf(transaction, identityId);
+  if (pointer?.previous === undefined) return;
+  const { captureId, previous } = pointer;
+  const kept = captureId === committedId;
+  const pointers = transaction.objectStore(POINTERS);
+  if (kept) await request(pointers.put({ identityId, captureId }));
+  else if (previous === null) await request(pointers.delete(identityId));
+  else await request(pointers.put({ identityId, captureId: previous }));
+  const survivor = kept ? captureId : previous;
+  await deleteCaptures(transaction, identityId, survivor === null ? [] : [survivor]);
 }
 
 async function readIn(transaction: IDBTransaction, identityId: string) {
-  const row: unknown = await request(transaction.objectStore(POINTERS).get(identityId));
-  if (row === undefined) return null;
-  const { captureId } = parsed(PointerSchema, row);
+  const pointer = await pointerOf(transaction, identityId);
+  if (pointer === undefined) return null;
+  const { captureId } = pointer;
   const header = await headerOf(transaction, captureId);
   if (!header) throw new CaptureStoreError("The published capture is missing.");
   requireStatus(header, "complete");
@@ -233,7 +232,7 @@ function connector(factory: IDBFactory): () => Promise<IDBDatabase> {
 export function createIdentityCaptures(factory: IDBFactory) {
   const connect = connector(factory);
   const run = async <T>(mode: IDBTransactionMode, body: (tx: IDBTransaction) => Promise<T>) =>
-    transact(await connect(), mode, body);
+    transact(await connect(), EVERY_STORE, mode, body);
 
   return {
     /** Starts a capture: its in-progress header, under an id no other capture has used. */
@@ -247,11 +246,14 @@ export function createIdentityCaptures(factory: IDBFactory) {
         await openHeader(tx, captureId);
         await request(tx.objectStore(PARTS).add({ ...part, captureId }));
       }),
-    /** Completes a capture and makes it the identity's only one, or changes nothing. */
-    publish: async (header: IdentityCapture): Promise<void> => {
+    /** Completes a capture and makes it the identity's published one, or changes nothing. */
+    publish: async (header: IdentityCapture, { tentative = false } = {}): Promise<void> => {
       const valid = validHeader(header, "complete");
-      await run("readwrite", (tx) => publishIn(tx, valid));
+      await run("readwrite", (tx) => publishIn(tx, valid, tentative));
     },
+    /** Ends a tentative publish: keeps it if it is `committedId`, else restores the one before. */
+    settle: (identityId: string, committedId: string | undefined): Promise<void> =>
+      run("readwrite", (tx) => settleIn(tx, identityId, committedId)),
     /** Drops a capture in progress and its parts; a published capture stays. */
     discard: (captureId: string): Promise<void> =>
       run("readwrite", async (tx) => {
