@@ -8,7 +8,7 @@ Plan: [poc-incognito-sessions-plan.md](poc-incognito-sessions-plan.md). Assignme
 | Branch               | `poc/incognito-sessions`                                         |
 | Planned base         | `44c154da29860c7a8df829e902b177df5ce2ba2a` (2026-10-28)          |
 | Actual base (P0.1)   | `44c154d` (re-resolved 2026-10-28, unchanged)                    |
-| Last recorded commit | `a2ca31e`                                                        |
+| Last recorded commit | `8ea4416`                                                        |
 | Decisions OD-1…OD-4  | defaults of plan §3, accepted by the user ("Avance", 2026-10-28) |
 
 ## Status legend
@@ -401,7 +401,11 @@ Stage 4 verify: exit 0 on `f0ffb45`, 503 unit/component, 97/97 e2e, coverage 99.
 ## Stage 5 — Delivery
 
 - [ ] D.1 Timings aggregated (capture, transport, persistence, teardown, bootstrap, restore, PWA readiness, total; 10,000-record size)
-- [ ] D.2 Durable docs (ARCHITECTURE, PRODUCT_BRIEF, POCS, TROUBLESHOOTING)
+- [i] D.2 Durable docs (ARCHITECTURE, PRODUCT_BRIEF, POCS, TROUBLESHOOTING)
+  red: n/a (docs only, `No-behavior-change: docs only`)
+  green: `vp check --fix` → formatted, no lint or type errors; `vp run deps` → no violations; every relative link in the four docs resolves (script over `](...)` targets); pre-commit hook passed (359 unit tests)
+  commit: 8ea4416 Document the Incognito sessions POC in the durable docs
+  notes: POCS.md: new "Sequential Incognito sessions" entry (question, method, six verdicts with Zephyr not validated, findings, non-claims, link to the report). TROUBLESHOOTING.md: Chromium source added to the Blob entry (S3.4); new entries for S1.5b, S2.4a, S2.5a, S3.7a, S3.6a/S3.12a, S4.3a, S4.4b. ARCHITECTURE.md drift: which commands close foreign and managed windows, `operation` in `workspace-status`, restart no longer "nothing captures it yet". PRODUCT_BRIEF.md drift: every workspace command but Delete refuses while recording, Suspend/Resume vs Pause/Resume, production shows the workspace unavailable, own window closed when a start fails or is interrupted. Checked against code: five barrier rules (`RULES_PER_BARRIER`), permissions per build (`config/permissions.ts`, `manifest.checks.mjs`), `WorkspaceStatusSchema`. Not run: `vp run poc:zephyr` (named only; opens headed Chromium for the user's manual run)
 - [ ] D.3 Report complete with six verdicts and recommendation
 - [ ] D.4 `vp run verify` exit 0: _run id pending_
 
