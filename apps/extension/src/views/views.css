@@ -53,7 +53,8 @@ dd {
 }
 
 button.record-button,
-.incognito-banner button {
+.incognito-banner button,
+.folder-banner button {
   font: inherit;
   background: var(--accent);
   color: var(--accent-text);

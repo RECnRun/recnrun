@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, test, vi } from "vite-plus/test";
 import { fakeBrowser } from "wxt/testing/fake-browser";
 import { createBackgroundListener } from "@/background/listener";
 import { createRoutes } from "@/background/routes";
-import type { BackgroundReply } from "@/messaging/background-messages";
+import type { BackgroundReply } from "@/messaging/background-reply";
+import { linkEventMessage, peerRequestMessage } from "@/messaging/peer-messages";
 import { returnToDashboardMessage, startSessionMessage } from "@/messaging/session-protocol";
 import { memoryRecordingStore } from "./fake-extension";
 
@@ -10,6 +11,9 @@ const EXTENSION_URL = "chrome-extension://own-id/";
 const identity = { extensionId: "own-id", extensionUrl: EXTENSION_URL };
 const ownPage = { id: "own-id", url: `${EXTENSION_URL}dashboard.html` };
 const contentScript = { id: "own-id", url: "https://recnrun.com/" };
+type RouteDependencies = Pick<Parameters<typeof createRoutes>[0], "showDashboard" | "peers">;
+
+const offscreen = { id: "own-id", url: `${EXTENSION_URL}offscreen.html` };
 
 interface Sender {
   id?: string;
@@ -21,9 +25,9 @@ function listen(
   message: unknown,
   sender: Sender,
   store = memoryRecordingStore(),
-  showDashboard = async (_from?: { windowId: number; incognito: boolean }) => {},
+  { showDashboard = async () => {}, peers }: Partial<RouteDependencies> = {},
 ) {
-  const routes = createRoutes({ extensionVersion: "0.1.0", store, showDashboard });
+  const routes = createRoutes({ extensionVersion: "0.1.0", store, showDashboard, peers });
   const replies: BackgroundReply[] = [];
   const listener = createBackgroundListener(routes, identity);
   const answered = listener(message, sender as never, (reply) => replies.push(reply));
@@ -56,12 +60,16 @@ describe("bridge requests", () => {
       shown.push(from);
     };
     const siteTab = { ...contentScript, tab: { id: 3, windowId: 2, incognito: false } };
-    const { answered, replies } = listen({ type: "open-dashboard" }, siteTab, undefined, show);
+    const { answered, replies } = listen({ type: "open-dashboard" }, siteTab, undefined, {
+      showDashboard: show,
+    });
     expect(answered).toBe(true);
     await vi.waitFor(() => expect(replies).toEqual([{ ok: true, result: {} }]));
     expect(shown).toEqual([{ windowId: 2, incognito: false }]);
 
-    const untabbed = listen({ type: "open-dashboard" }, contentScript, undefined, show);
+    const untabbed = listen({ type: "open-dashboard" }, contentScript, undefined, {
+      showDashboard: show,
+    });
     await vi.waitFor(() => expect(untabbed.replies).toEqual([{ ok: true, result: {} }]));
     expect(shown).toEqual([{ windowId: 2, incognito: false }, undefined]);
   });
@@ -133,5 +141,49 @@ describe("session requests", () => {
     expect(await activeTabId()).toBe(site.id);
     const noTab = listen(returnToDashboardMessage(), ownPage);
     await vi.waitFor(() => expect(noTab.replies).toEqual([{ ok: true }]));
+  });
+});
+
+describe("cross-profile messages", () => {
+  const status = peerRequestMessage({ type: "status" });
+  const connecting = linkEventMessage({ type: "state", state: "connecting" });
+  const fakePeers = () => ({
+    request: vi.fn(async () => "status"),
+    link: vi.fn(async () => {}),
+  });
+
+  test("routes a page's peer request and the offscreen document's link event", async () => {
+    const peers = fakePeers();
+    const request = listen(status, ownPage, memoryRecordingStore(), { peers });
+    const event = listen(connecting, offscreen, memoryRecordingStore(), { peers });
+    await vi.waitFor(() => expect(request.replies).toEqual([{ ok: true, result: "status" }]));
+    await vi.waitFor(() => expect(event.replies).toEqual([{ ok: true }]));
+    expect(peers.request).toHaveBeenCalledWith({ type: "status" });
+    expect(peers.link).toHaveBeenCalledWith({ type: "state", state: "connecting" });
+  });
+
+  test("takes link events only from the offscreen document, and peer requests only from pages", async () => {
+    const peers = fakePeers();
+    const ignored = [
+      listen(connecting, ownPage, memoryRecordingStore(), { peers }),
+      listen(connecting, contentScript, memoryRecordingStore(), { peers }),
+      listen(connecting, { ...offscreen, id: "other-id" }, memoryRecordingStore(), { peers }),
+      listen(status, offscreen, memoryRecordingStore(), { peers }),
+      listen(status, contentScript, memoryRecordingStore(), { peers }),
+    ];
+    for (const { answered, replies } of ignored) {
+      expect(answered).toBe(false);
+      expect(replies).toEqual([]);
+    }
+    expect(peers.request).not.toHaveBeenCalled();
+    expect(peers.link).not.toHaveBeenCalled();
+  });
+
+  test("answers both with an error in a build without the link", async () => {
+    const off = { ok: false, error: "This build has no cross-profile link." };
+    const request = listen(status, ownPage);
+    const event = listen(connecting, offscreen);
+    await vi.waitFor(() => expect(request.replies).toEqual([off]));
+    await vi.waitFor(() => expect(event.replies).toEqual([off]));
   });
 });

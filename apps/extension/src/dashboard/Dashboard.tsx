@@ -2,6 +2,7 @@ import { errorMessage } from "@recnrun/domain";
 import type { Snapshot } from "@recnrun/domain";
 import { useEffect, useState } from "preact/hooks";
 import { IncognitoControl } from "@/dashboard/IncognitoControl";
+import { PeerProfiles } from "@/dashboard/PeerProfiles";
 import { RecordingDetail } from "@/dashboard/RecordingDetail";
 import { EmptyState, RecordingList } from "@/dashboard/RecordingList";
 import { selectedRecordingId, titleFor } from "@/dashboard/route";
@@ -21,6 +22,8 @@ export interface DashboardProps {
   services: ExtensionServices;
   router: DashboardRouter;
   take: TakeControl;
+  /** Takes the control of a session in the paired profile, when there is one. */
+  takeRemote?: TakeControl;
 }
 
 function useSnapshot(loadSnapshot: () => Promise<Snapshot>): Load {
@@ -53,7 +56,16 @@ function Content(props: { load: Load; route: string; nav: Navigation }) {
   }
 }
 
-export function Dashboard({ services, router, take }: DashboardProps) {
+function Profiles({ services, take, takeRemote }: Omit<DashboardProps, "router">) {
+  if (!services.peers || !takeRemote) {
+    return <TabList tabs={services.tabs} store={services.recordings} take={take} />;
+  }
+  return (
+    <PeerProfiles services={services} peers={services.peers} take={take} takeRemote={takeRemote} />
+  );
+}
+
+export function Dashboard({ services, router, take, takeRemote }: DashboardProps) {
   const load = useSnapshot(services.loadSnapshot);
   const [route, setRoute] = useState(router.initialRoute);
   useEffect(() => router.subscribe(setRoute), [router]);
@@ -75,7 +87,7 @@ export function Dashboard({ services, router, take }: DashboardProps) {
         <PinHint pin={services.toolbar} />
         <div class="session-panel">
           <IncognitoControl access={services.incognito}>
-            <TabList tabs={services.tabs} store={services.recordings} take={take} />
+            <Profiles services={services} take={take} takeRemote={takeRemote} />
           </IncognitoControl>
         </div>
         <Content load={load} route={route} nav={{ router, navigate }} />

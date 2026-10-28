@@ -7,6 +7,11 @@ export function contentScriptMatches(mode: string): string[] {
   return LOCAL_MODES.has(mode) ? [...PRODUCTION_MATCHES, ...LOCAL_MATCHES] : PRODUCTION_MATCHES;
 }
 
+/** The cross-profile POC exists only in development and test builds, never in a published one. */
+export function peersEnabled(mode: string): boolean {
+  return LOCAL_MODES.has(mode);
+}
+
 /** The privacy policy needs no bridge, so RECnRun runs nothing on it. */
 export function contentScriptExcludes(mode: string): string[] {
   return contentScriptMatches(mode).map((pattern) => pattern.replace(/\*$/, "privacy/*"));

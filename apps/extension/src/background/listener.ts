@@ -2,10 +2,14 @@ import { errorMessage } from "@recnrun/domain";
 import * as v from "valibot";
 import type { Browser } from "wxt/browser";
 import { BackgroundMessageSchema } from "@/messaging/background-messages";
-import type { BackgroundMessage, BackgroundReply } from "@/messaging/background-messages";
+import type { BackgroundMessage } from "@/messaging/background-messages";
+import type { BackgroundReply } from "@/messaging/background-reply";
 
-/** Who sent a message: one of this extension's pages, or its content script in a web page. */
-export type Sender = "ownPage" | "contentScript";
+/**
+ * Who sent a message: one of this extension's pages, its offscreen document (which holds the
+ * cross-profile link), or its content script in a web page.
+ */
+export type Sender = "ownPage" | "offscreen" | "contentScript";
 
 /** How the background answers one message type: whom it trusts, and what it does. */
 export interface Route {
@@ -22,9 +26,13 @@ interface Identity {
   extensionUrl: string;
 }
 
+/** The one document the offscreen sender may be, so no page can pose as the link. */
+export const OFFSCREEN_PAGE = "offscreen.html";
+
 /** A content script shares the extension id but runs in a web page that may be compromised. */
 function classify(sender: Browser.runtime.MessageSender, identity: Identity): Sender | undefined {
   if (sender.id !== identity.extensionId) return undefined;
+  if (sender.url === identity.extensionUrl + OFFSCREEN_PAGE) return "offscreen";
   return sender.url?.startsWith(identity.extensionUrl) ? "ownPage" : "contentScript";
 }
 

@@ -60,6 +60,26 @@ test("names the focused window's active tab current, and leaves the PiP window o
   expect(pipFocused).toEqual({ tabs: [expect.objectContaining({ id: 1 })] });
 });
 
+test("leaves out the extension's own pages, which are no pages to record", () => {
+  const own = "chrome-extension://own-id/";
+  const state = toBrowserTabs(
+    [
+      browserWindow({
+        focused: true,
+        tabs: [
+          tab({ id: 1, url: "https://shop.example/" }),
+          tab({ id: 2, active: true, url: `${own}pairing.html` }),
+          tab({ id: 3, url: "chrome-extension://other-id/page.html" }),
+        ],
+      }),
+    ],
+    own,
+  );
+  expect(state).toEqual({
+    tabs: [expect.objectContaining({ id: 1 }), expect.objectContaining({ id: 3 })],
+  });
+});
+
 test("shows only icons that load without exposing an incognito tab", () => {
   const icons = (incognito: boolean) =>
     toBrowserTabs([
@@ -106,14 +126,20 @@ test("reads the browser's tabs and calls back on each tab or focus change until 
   const getAll = vi.spyOn(fakeBrowser.windows, "getAll").mockResolvedValue([
     browserWindow({
       focused: true,
-      tabs: [tab({ id: 9, active: true, url: "https://shop.example/" })],
+      tabs: [
+        tab({ id: 9, active: true, url: "https://shop.example/" }),
+        tab({ id: 10, url: fakeBrowser.runtime.getURL("/pairing.html") }),
+      ],
     }),
   ] as never);
   const source = browserTabs();
   const onChange = vi.fn();
   const unwatch = source.watch(onChange);
   expect(focus?.add).toHaveBeenCalled();
-  expect((await source.read()).currentId).toBe(9);
+  expect(await source.read()).toEqual({
+    tabs: [expect.objectContaining({ id: 9 })],
+    currentId: 9,
+  });
   expect(getAll).toHaveBeenCalledWith({ populate: true, windowTypes: ["normal"] });
 
   await fakeBrowser.tabs.create({ url: "https://shop.example/" });

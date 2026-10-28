@@ -1,6 +1,6 @@
 import * as v from "valibot";
 import type { TakeControl } from "@/dashboard/TabList";
-import { BackgroundReplySchema } from "@/messaging/background-messages";
+import { BackgroundReplySchema } from "@/messaging/background-reply";
 import { returnToDashboardMessage, startSessionMessage } from "@/messaging/session-protocol";
 import type { SessionRequest } from "@/messaging/session-protocol";
 import { documentPip, requestPanelWindow } from "@/pip/document-pip";
@@ -43,9 +43,9 @@ function closedWith(lock: ReturnType<typeof controlLock>, send: SendRequest) {
 }
 
 /** Starts the session; when it cannot, this dashboard controls nothing and the tab list says why. */
-async function start(lock: ReturnType<typeof controlLock>, send: SendRequest, tabId: number) {
+async function begin(lock: ReturnType<typeof controlLock>, start: Promise<void>) {
   try {
-    await ask(send, startSessionMessage(tabId));
+    await start;
   } catch (error) {
     lock.free();
     throw error;
@@ -73,8 +73,16 @@ function openWindow(pip: DocumentPictureInPicture, float: FloatSession, closed: 
   );
 }
 
-/** The control for the dashboard in its own tab, which opens its PiP window itself. */
-export function controlInTab(page: Window, send: SendRequest, float: FloatSession): TakeControl {
+/**
+ * The control for the dashboard in its own tab, which opens its PiP window itself. `start` starts
+ * the session: this profile's own by default, or one in the other profile.
+ */
+export function controlInTab(
+  page: Window,
+  send: SendRequest,
+  float: FloatSession,
+  start: (tabId: number) => Promise<void> = (tabId) => ask(send, startSessionMessage(tabId)),
+): TakeControl {
   const lock = controlLock();
   const closed = closedWith(lock, send);
   return async (tabId) => {
@@ -85,7 +93,7 @@ export function controlInTab(page: Window, send: SendRequest, float: FloatSessio
     // Without the API the session cannot float, so no dashboard keeps the control.
     if (!pip) lock.free();
     try {
-      await start(lock, send, tabId);
+      await begin(lock, start(tabId));
     } catch (error) {
       void opened.then((pipWindow) => pipWindow?.close());
       throw error;

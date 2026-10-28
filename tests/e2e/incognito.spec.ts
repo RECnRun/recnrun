@@ -39,12 +39,15 @@ async function idOf(serviceWorker: Worker, url: string): Promise<number> {
 test.describe("without incognito access", () => {
   test("lists the normal tabs and says how to allow incognito ones", async ({
     context,
+    page,
     serviceWorker,
   }) => {
+    await page.goto("/privacy/");
     const dashboard = await openDashboard(context, serviceWorker);
     await expect(dashboard.locator("body")).toContainText("Allow in Incognito");
     await expect(incognitoWindowButton(dashboard)).toHaveCount(0);
-    await expect(tabItem(dashboard, dashboard.url())).not.toContainText("Incognito");
+    await expect(tabItem(dashboard, page.url())).toBeVisible();
+    await expect(tabItem(dashboard, page.url())).not.toContainText("Incognito");
   });
 });
 
@@ -71,8 +74,10 @@ test.describe("with incognito access", () => {
   test("records an incognito tab, and the PiP window follows the current tab", async ({
     baseURL,
     context,
+    page,
     serviceWorker,
   }) => {
+    await page.goto("/privacy/?normal");
     const privateUrl = `${baseURL}/privacy/?private`;
     await openIncognitoTab(serviceWorker, privateUrl);
     const privatePage = await pageAt(context, privateUrl);
@@ -94,8 +99,8 @@ test.describe("with incognito access", () => {
     await privatePage.goto(otherUrl);
     await expect(current).toContainText(otherUrl);
 
-    await focusTab(serviceWorker, await idOf(serviceWorker, dashboard.url()));
-    await expect(current).toContainText(dashboard.url());
+    await focusTab(serviceWorker, await idOf(serviceWorker, page.url()));
+    await expect(current).toContainText(page.url());
     await expect(current).not.toContainText("Incognito");
     await expect(tabRegion(pip, "Recorded tab")).toContainText(otherUrl);
     await expect(tabRegion(pip, "Recorded tab")).toContainText("Incognito");

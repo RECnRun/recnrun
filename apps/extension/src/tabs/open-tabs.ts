@@ -17,11 +17,18 @@ function toOpenTab(tab: Browser.tabs.Tab): OpenTab[] {
   return [favicon ? { ...open, favicon } : open];
 }
 
-export function toBrowserTabs(windows: readonly Browser.windows.Window[]): BrowserTabs {
+/** The browsing tabs, without the PiP window or, given its origin, the extension's own pages. */
+export function toBrowserTabs(
+  windows: readonly Browser.windows.Window[],
+  ownOrigin?: string,
+): BrowserTabs {
   // Chrome lists a Document PiP window as an always-on-top normal window; it is no page to record.
   const browsing = windows.filter((each) => !each.alwaysOnTop);
-  const tabs = browsing.flatMap((each) => (each.tabs ?? []).flatMap(toOpenTab));
-  const currentId = browsing.find((each) => each.focused)?.tabs?.find((tab) => tab.active)?.id;
+  const tabs = browsing
+    .flatMap((each) => (each.tabs ?? []).flatMap(toOpenTab))
+    .filter(({ url }) => ownOrigin === undefined || !url.startsWith(ownOrigin));
+  const activeId = browsing.find((each) => each.focused)?.tabs?.find((tab) => tab.active)?.id;
+  const currentId = tabs.find(({ id }) => id === activeId)?.id;
   return currentId === undefined ? { tabs } : { tabs, currentId };
 }
 
@@ -47,7 +54,10 @@ export function browserTabs(): TabSource {
   return {
     // With "Allow in Incognito" on, the extension's normal context also gets incognito windows.
     read: async () =>
-      toBrowserTabs(await browser.windows.getAll({ populate: true, windowTypes: ["normal"] })),
+      toBrowserTabs(
+        await browser.windows.getAll({ populate: true, windowTypes: ["normal"] }),
+        browser.runtime.getURL("/"),
+      ),
     watch: (onChange) => {
       const listener = () => onChange();
       for (const event of TAB_EVENTS) browser.tabs[event].addListener(listener);
