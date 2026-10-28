@@ -114,7 +114,9 @@ test.describe("with incognito access", () => {
     const panel = workspacePanel(site);
     await expect(panel).toContainText("1 Incognito window is open");
     await expect(panel).toContainText("Close the other Incognito windows yourself");
-    await expect(panel.getByRole("button")).toHaveCount(0);
+    // New identity stays in view, disabled, beside the conflict that explains why.
+    await expect(panel.getByRole("button", { disabled: false })).toHaveCount(0);
+    await expect(panel.getByRole("button", { name: "New identity" })).toBeDisabled();
     await screen(site, "open-and-foreign");
 
     await (await pageAt(context, `${APP}/inspect?run=beside`)).close();

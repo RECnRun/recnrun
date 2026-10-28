@@ -1,77 +1,12 @@
-import { render } from "preact";
-import { afterEach, expect, test } from "vite-plus/test";
-import { Dashboard } from "@/dashboard/Dashboard";
-import type { DashboardRouter } from "@/dashboard/router";
-import type { WorkspaceStatus } from "@/messaging/workspace-protocol";
+import { expect, test } from "vite-plus/test";
 import type { PageRequest } from "@/views/extension-services";
-import { NO_INCOGNITO_WINDOW, fakeBackground, fakeExtension } from "./fake-extension";
-import { memoryOperationJournal } from "./fake-journal";
-import { PRIVATE, SHOP, fakeIncognito, fakeTabs } from "./fake-tabs";
+import { NO_INCOGNITO_WINDOW } from "./fake-extension";
+import { SHOP } from "./fake-tabs";
 import { button } from "./queries";
+import { inPanel, mount, panel, panelText, row, typeAddress } from "./workspace-panel";
 
 const TARGET = "https://app.example/start";
 const CHANGED = "The Incognito windows changed; review them again before closing them.";
-
-const router: DashboardRouter = {
-  initialRoute: "/",
-  href: (path) => path,
-  subscribe: () => () => {},
-  navigate: () => {},
-  publish: () => {},
-};
-
-/** Answers a request itself, or returns undefined to leave it to the fake background. */
-type Answer = (request: PageRequest) => Promise<unknown> | undefined;
-
-let mounted: HTMLElement | undefined;
-
-afterEach(() => {
-  if (mounted) render(null, mounted);
-  mounted = undefined;
-});
-
-function mount(initial: WorkspaceStatus, answer: Answer = () => undefined) {
-  let status = initial;
-  let reads = 0;
-  const background = fakeBackground(() => {
-    reads += 1;
-    return status;
-  });
-  const incognito = fakeIncognito(initial.access);
-  const send = (request: PageRequest) => answer(request) ?? background.send(request);
-  const operations = memoryOperationJournal();
-  const services = fakeExtension({
-    send,
-    operations,
-    incognito: incognito.access,
-    tabs: fakeTabs({ tabs: [SHOP, PRIVATE] }).source,
-  });
-  const root = document.createElement("div");
-  document.body.replaceChildren(root);
-  mounted = root;
-  render(<Dashboard services={services} router={router} take={async () => {}} />, root);
-  const setStatus = (next: WorkspaceStatus) => {
-    status = next;
-  };
-  return { root, sent: background.sent, reads: () => reads, setStatus, incognito, operations };
-}
-
-const panel = (root: HTMLElement) =>
-  root.querySelector<HTMLElement>('section[aria-labelledby="incognito-workspace-heading"]') ??
-  undefined;
-const panelText = (root: HTMLElement) => panel(root)?.textContent ?? "";
-const inPanel = (root: HTMLElement, name: string) => button(panel(root) ?? root, name);
-const row = (root: HTMLElement, title: string) =>
-  root.querySelector<HTMLElement>(`li[aria-label="${title}"]`) ?? root;
-
-/** Types the address and waits for the render that gives the buttons the new value. */
-async function typeAddress(root: HTMLElement, url: string) {
-  const input = panel(root)?.querySelector("input");
-  if (!input) throw new Error("No address field");
-  input.value = url;
-  input.dispatchEvent(new Event("input", { bubbles: true }));
-  await new Promise((resolve) => setTimeout(resolve, 0));
-}
 
 const foreign = (...ids: number[]) => ids.map((id) => ({ id, tabCount: id === 5 ? 3 : 1 }));
 

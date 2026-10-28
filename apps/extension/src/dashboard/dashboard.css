@@ -177,3 +177,55 @@
   color: var(--muted);
   font-size: 0.875rem;
 }
+
+.identities {
+  display: grid;
+  gap: 0.5rem;
+  justify-self: stretch;
+}
+
+.identities h4 {
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+.identities ul {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0;
+  list-style: none;
+}
+
+.identity {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.75rem;
+  border-top: 1px solid var(--border);
+  padding-top: 0.5rem;
+}
+
+.identity-open {
+  color: var(--accent);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.identity-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+.workspace-conflict {
+  color: var(--link);
+  font-weight: 600;
+}
+
+.new-identity {
+  display: grid;
+  justify-items: start;
+  gap: 0.5rem;
+}

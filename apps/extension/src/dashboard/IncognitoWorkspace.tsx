@@ -2,6 +2,7 @@ import { errorMessage } from "@recnrun/domain";
 import { useEffect, useRef, useState } from "preact/hooks";
 import * as v from "valibot";
 import { ask } from "@/dashboard/ask";
+import { Identities } from "@/dashboard/Identities";
 import { WorkspaceStatusSchema } from "@/messaging/workspace-protocol";
 import type { WorkspaceRequest, WorkspaceStatus } from "@/messaging/workspace-protocol";
 import type { TabSource } from "@/ports/tabs";
@@ -176,27 +177,50 @@ interface BodyProps extends ActionProps {
   onTarget: (url: string) => void;
 }
 
+/** The saved identity the open managed window holds, if it holds one. */
+function heldIdentity({ managed, identities }: WorkspaceStatus) {
+  if (managed?.status !== "active") return undefined;
+  return identities.find(({ id }) => id === managed.identityId);
+}
+
 function WorkspaceBody({ status, tabs, target, onTarget, disabled, run }: BodyProps) {
   if (!status.access) return <p>The Incognito workspace requires “Allow in Incognito”.</p>;
+  const held = heldIdentity(status);
   return (
     <>
       <AddressField target={target} onTarget={onTarget} />
       {status.foreign.length > 0 && <ForeignWindows status={status} tabs={tabs} />}
-      <WorkspaceAction
-        status={status}
-        target={target}
-        disabled={disabled || status.busy}
-        run={run}
-      />
+      {held ? (
+        <p>Incognito workspace open: {held.label}</p>
+      ) : (
+        <WorkspaceAction status={status} target={target} disabled={disabled} run={run} />
+      )}
     </>
   );
 }
 
-/** Why the last start with an identity stopped, kept until another command runs. */
-function failedStart(status: WorkspaceStatus | undefined): string | undefined {
+const OPERATION_NAMES: Record<NonNullable<WorkspaceStatus["operation"]>["kind"], string> = {
+  "start-with-identity": "Start with an identity",
+  switch: "Switch",
+  suspend: "Suspend",
+  resume: "Resume",
+  "new-identity": "New identity",
+  "delete-identity": "Delete",
+};
+
+/** Why the last operation stopped, by its step, kept until another command runs. */
+function failedOperation(status: WorkspaceStatus | undefined): string | undefined {
   const operation = status?.operation;
   if (operation?.status !== "failed") return undefined;
-  return `Start with an identity failed at the ${operation.step} step. ${operation.error ?? ""}`;
+  const name = OPERATION_NAMES[operation.kind];
+  return `${name} failed at the ${operation.step} step. ${operation.error ?? ""}`;
+}
+
+/** The panel's alerts; a command's error that its failed operation already names shows once. */
+function alerts(status: WorkspaceStatus | undefined, shown: string | undefined): string[] {
+  const failed = failedOperation(status);
+  const repeated = shown !== undefined && shown === status?.operation?.error;
+  return [failed, repeated ? undefined : shown].filter((each) => each !== undefined);
 }
 
 /**
@@ -217,23 +241,33 @@ export function IncognitoWorkspace({ workspace, tabs, send, target, onTarget }: 
         refresh();
       });
   };
-  const shown = error ?? readError;
-  const failed = failedStart(status);
   return (
     <section class="incognito-workspace" aria-labelledby="incognito-workspace-heading">
       <h3 id="incognito-workspace-heading">Incognito workspace</h3>
       {status && (
-        <WorkspaceBody
-          status={status}
-          tabs={tabs}
-          target={target}
-          onTarget={onTarget}
-          disabled={pending}
-          run={run}
-        />
+        <>
+          <WorkspaceBody
+            status={status}
+            tabs={tabs}
+            target={target}
+            onTarget={onTarget}
+            disabled={pending || status.busy}
+            run={run}
+          />
+          <Identities
+            status={status}
+            tabs={tabs}
+            target={target}
+            disabled={pending || status.busy}
+            run={run}
+          />
+        </>
       )}
-      {failed && <p role="alert">{failed}</p>}
-      {shown && <p role="alert">{shown}</p>}
+      {alerts(status, error ?? readError).map((message) => (
+        <p key={message} role="alert">
+          {message}
+        </p>
+      ))}
     </section>
   );
 }

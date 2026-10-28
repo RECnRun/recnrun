@@ -62,6 +62,13 @@ button.record-button,
   padding: 0.25rem 0.75rem;
 }
 
+/* A blocked command must look blocked, not only refuse the click. */
+.incognito-workspace button:disabled {
+  background: var(--border);
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
 .tab-title {
   display: flex;
   flex-wrap: wrap;
