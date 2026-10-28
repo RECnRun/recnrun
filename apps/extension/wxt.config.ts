@@ -2,6 +2,7 @@ import { fileURLToPath } from "node:url";
 import preact from "@preact/preset-vite";
 import { defineConfig } from "wxt";
 import { contentScriptMatches } from "./src/config/origins.ts";
+import { buildAccess } from "./src/config/permissions.ts";
 
 const chromiumProfile = fileURLToPath(new URL("./.wxt/chrome-data", import.meta.url));
 
@@ -26,8 +27,9 @@ export default defineConfig({
   manifest: ({ mode }) => ({
     name: "RECnRun",
     description: "Records and replays browser sessions for developers.",
-    // tabs lets the dashboard list every tab, with its title and address, to record one.
-    permissions: ["storage", "tabs"],
+    // tabs lets the dashboard list every tab, with its title and address, to record one; test and
+    // development builds add the Incognito workspace POC's permissions (src/config/permissions.ts).
+    ...buildAccess(mode, process.env.RECNRUN_POC_HOSTS),
     // One extension context spans normal and incognito windows, so the dashboard and the PiP
     // window see incognito tabs once the user turns on "Allow in Incognito".
     incognito: "spanning",

@@ -5,9 +5,21 @@ import { fileURLToPath } from "node:url";
 
 const manifestPath = fileURLToPath(new URL("../.output/chrome-mv3/manifest.json", import.meta.url));
 
+const testManifestPath = fileURLToPath(
+  new URL("../.output/chrome-mv3-test/manifest.json", import.meta.url),
+);
+
 function productionManifest() {
   assert.ok(existsSync(manifestPath), "Build the extension first: vp run extension#build");
   return JSON.parse(readFileSync(manifestPath, "utf8"));
+}
+
+function testManifest() {
+  assert.ok(
+    existsSync(testManifestPath),
+    "Build the test extension first: vp run extension#build:test",
+  );
+  return JSON.parse(readFileSync(testManifestPath, "utf8"));
 }
 
 await test("the production build talks only to the RECnRun domains", () => {
@@ -60,4 +72,26 @@ await test("the production build ships the logo as its icons", () => {
   for (const icon of Object.values(manifest.icons)) {
     assert.ok(existsSync(new URL(`../.output/chrome-mv3/${icon}`, import.meta.url)), icon);
   }
+});
+
+await test("the test build adds exactly the Incognito workspace POC permissions", () => {
+  const manifest = testManifest();
+  assert.deepEqual(manifest.permissions, [
+    "storage",
+    "tabs",
+    "declarativeNetRequest",
+    "scripting",
+    "cookies",
+    "webNavigation",
+  ]);
+  assert.deepEqual(manifest.host_permissions, ["http://*.localhost/*"]);
+  assert.equal(manifest.message_serialization, "structured_clone");
+  assert.equal(manifest.optional_permissions, undefined);
+  assert.equal(manifest.optional_host_permissions, undefined);
+  assert.equal(manifest.externally_connectable, undefined);
+  assert.equal(manifest.incognito, "spanning");
+});
+
+await test("the production build keeps the default JSON messaging", () => {
+  assert.equal(productionManifest().message_serialization, undefined);
 });

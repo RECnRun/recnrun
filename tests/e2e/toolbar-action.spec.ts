@@ -39,7 +39,15 @@ test("the extension has no popup, keyboard commands, or context menu", async ({
   expect(manifest.action).toBeDefined();
   expect(manifest.action.default_popup).toBeUndefined();
   expect(manifest.commands).toBeUndefined();
-  expect(manifest.permissions).toEqual(["storage", "tabs"]);
+  // The test build adds the Incognito workspace POC's set; none of it is contextMenus or commands.
+  expect(manifest.permissions).toEqual([
+    "storage",
+    "tabs",
+    "declarativeNetRequest",
+    "scripting",
+    "cookies",
+    "webNavigation",
+  ]);
 
   const surface = await serviceWorker.evaluate(async () => {
     const { chrome } = globalThis as unknown as ChromeGlobal;
