@@ -1,49 +1,34 @@
 import { render } from "preact";
-import { afterEach, expect, test, vi } from "vite-plus/test";
+import { afterEach, expect, test } from "vite-plus/test";
 import { startDashboard } from "@/dashboard/start";
-import { openPanelMessage, panelClosedMessage } from "@/messaging/frame-protocol";
 import { returnToDashboardMessage, startSessionMessage } from "@/messaging/session-protocol";
 import type { SessionRequest } from "@/messaging/session-protocol";
 import type { ExtensionServices } from "@/views/extension-services";
 import { CONTROL_LOCK, tryHoldLock } from "@/views/view-locks";
+import { pipWindow, tabPage } from "./dashboard-page";
 import { fakeExtension, memoryRecordingStore } from "./fake-extension";
 import { DOCS, PRIVATE, SHOP, fakeIncognito, fakeTabs } from "./fake-tabs";
 import { button } from "./queries";
 
-/** A dashboard frame stand-in whose parent, the site, is this test page. */
-function framedPage() {
-  return Object.assign(new EventTarget(), {
-    parent: window,
-    document,
-    location: { ancestorOrigins: [location.origin], search: "" },
-  }) as unknown as Window;
-}
-
-/** What the site's content script would send the frame once the PiP window closes. */
-const closePanel = (page: Window) =>
-  page.dispatchEvent(
-    new MessageEvent("message", {
-      data: panelClosedMessage(),
-      origin: location.origin,
-      source: window,
-    }),
-  );
+/** Closes the PiP window the dashboard opened last, as the user would. */
+const closePanel = (opened: Window[]) => opened.at(-1)?.close();
 
 function mount(services: Partial<ExtensionServices> = {}) {
   const tabs = fakeTabs({ tabs: [SHOP, DOCS] });
   const sent: SessionRequest[] = [];
-  const page = framedPage();
+  const opened: Window[] = [];
+  const page = tabPage("", async () => {
+    opened.push(pipWindow());
+    return opened.at(-1) as Window;
+  });
   const send = async (request: SessionRequest) => {
     sent.push(request);
     return { ok: true };
   };
   const root = document.body.appendChild(document.createElement("div"));
   startDashboard(root, fakeExtension({ tabs: tabs.source, send, ...services }), page);
-  return { root, sent, tabs, page };
+  return { root, sent, tabs, opened };
 }
-
-const posted: unknown[] = [];
-const onMessage = (event: MessageEvent) => posted.push(event.data);
 
 const item = (root: HTMLElement, title: string) =>
   root.querySelector<HTMLElement>(`li[aria-label="${title}"]`) ?? undefined;
@@ -65,7 +50,6 @@ async function expectControlFree() {
 const running = (tabId: number) => ({ tabId, status: "recording" as const, banked: 0, since: 0 });
 
 afterEach(() => {
-  window.removeEventListener("message", onMessage);
   // Unmounting stops the lock watchers; the tests release the locks they take.
   for (const root of document.body.children) render(null, root);
   document.body.replaceChildren();
@@ -82,29 +66,19 @@ test("lists the browser's tabs as they change, each able to start a session", as
   expect(buttons(item(root, "Docs"))).toEqual(["Record"]);
 });
 
-test("Record takes the control, asks the site for the PiP window, and records the tab", async () => {
-  window.addEventListener("message", onMessage);
-  const { root, sent, page } = mount();
+test("Record takes the control, opens the PiP window, and records the tab", async () => {
+  const { root, sent, opened } = mount();
   await expect.poll(() => button(item(root, "Shop") ?? root, "Record")).toBeDefined();
   button(item(root, "Shop") ?? root, "Record")?.click();
 
   await expect.poll(() => sent).toEqual([startSessionMessage(SHOP.id)]);
-  await expect.poll(() => posted).toContainEqual(openPanelMessage());
+  expect(opened).toHaveLength(1);
   expect(await tryHoldLock(CONTROL_LOCK)).toBeUndefined();
   await expect.poll(() => buttons(item(root, "Docs"))).toEqual([]);
 
-  closePanel(page);
+  closePanel(opened);
   await expect.poll(() => sent.at(-1)).toEqual(returnToDashboardMessage());
   await expectControlFree();
-});
-
-test("the dashboard listens to the frame channel once for its route and its control", async () => {
-  const page = framedPage();
-  const added = vi.spyOn(page, "addEventListener");
-  const root = document.body.appendChild(document.createElement("div"));
-  startDashboard(root, fakeExtension({ tabs: fakeTabs({ tabs: [SHOP] }).source }), page);
-  await expect.poll(() => button(item(root, "Shop") ?? root, "Record")).toBeDefined();
-  expect(added.mock.calls.filter(([type]) => type === "message")).toHaveLength(1);
 });
 
 test("a session the background cannot start frees the control and shows the error", async () => {
@@ -137,14 +111,14 @@ test("while another dashboard has the control, the recorded tab only shows the s
 test("a session left without control can be continued or stopped from any dashboard", async () => {
   const recordings = memoryRecordingStore();
   await recordings.write(running(SHOP.id));
-  const { root, sent, page } = mount({ recordings });
+  const { root, sent, opened } = mount({ recordings });
   await expect.poll(() => buttons(item(root, "Shop"))).toEqual(["Continue", "Stop"]);
   expect(item(root, "Shop")?.textContent).toContain("Recording");
   expect(buttons(item(root, "Docs"))).toEqual([]);
 
   button(item(root, "Shop") ?? root, "Continue")?.click();
   await expect.poll(() => sent).toEqual([startSessionMessage(SHOP.id)]);
-  closePanel(page);
+  closePanel(opened);
   await expect.poll(() => buttons(item(root, "Shop"))).toEqual(["Continue", "Stop"]);
 
   button(item(root, "Shop") ?? root, "Stop")?.click();
@@ -182,13 +156,13 @@ test("of two dashboards starting at once, only one takes the control", async () 
   await expect.poll(() => alertText(second.root)).toBe("Another RECnRun tab controls the session.");
   expect(first.sent).toEqual([startSessionMessage(SHOP.id)]);
   expect(second.sent).toEqual([]);
-  closePanel(first.page);
+  closePanel(first.opened);
   await expectControlFree();
 });
 
 test("marks incognito tabs, shows only the icons it may load, and records them alike", async () => {
   const shop = { ...SHOP, favicon: "data:image/png;base64,AA==" };
-  const { root, sent, page } = mount({ tabs: fakeTabs({ tabs: [shop, PRIVATE] }).source });
+  const { root, sent, opened } = mount({ tabs: fakeTabs({ tabs: [shop, PRIVATE] }).source });
   await expect.poll(() => buttons(item(root, "Private"))).toEqual(["Record"]);
   expect(item(root, "Private")?.textContent).toContain("Incognito");
   expect(item(root, "Shop")?.textContent).not.toContain("Incognito");
@@ -198,7 +172,7 @@ test("marks incognito tabs, shows only the icons it may load, and records them a
 
   button(item(root, "Private") ?? root, "Record")?.click();
   await expect.poll(() => sent).toEqual([startSessionMessage(PRIVATE.id)]);
-  closePanel(page);
+  closePanel(opened);
   await expectControlFree();
 });
 
@@ -278,11 +252,4 @@ test("a window Chrome refuses to open is an alert", async () => {
   await expect.poll(() => button(root, "New incognito window")).toBeDefined();
   button(root, "New incognito window")?.click();
   await expect.poll(() => alertText(root)).toContain("Incognito mode is disabled.");
-});
-
-test("only a framed dashboard holds the site tabs' ports", async () => {
-  let held = 0;
-  const { root } = mount({ holdSitePorts: () => (held += 1) });
-  await expect.poll(() => root.querySelector("main")).not.toBeNull();
-  expect(held).toBe(1);
 });

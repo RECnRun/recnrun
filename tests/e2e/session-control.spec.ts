@@ -11,7 +11,7 @@ import {
 } from "./fixtures/session.ts";
 import { recordedTabId, storedSession, tabIdOf } from "./fixtures/tabs.ts";
 
-// The privacy policy has no dashboard frame, so it stands in for the user's own application.
+// The privacy policy runs no RECnRun script, so it stands in for the user's own application.
 const APP = "/privacy/";
 const LOGIN = "#/recordings/rec-login";
 

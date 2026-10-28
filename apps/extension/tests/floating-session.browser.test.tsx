@@ -1,10 +1,9 @@
 import { render } from "preact";
 import { afterEach, expect, test } from "vite-plus/test";
-import { closePanelMessage } from "@/messaging/frame-protocol";
 import type { RecordingStore } from "@/ports/recording-store";
 import type { TabSource } from "@/ports/tabs";
-import { startSession } from "@/session/start";
-import { fakeExtension, memoryRecordingStore } from "./fake-extension";
+import { FloatingSession } from "@/views/FloatingSession";
+import { memoryRecordingStore } from "./fake-extension";
 import { DOCS, PRIVATE, SHOP, fakeTabs } from "./fake-tabs";
 import { button, panelText } from "./queries";
 
@@ -14,34 +13,22 @@ async function runningStore(): Promise<RecordingStore> {
   return store;
 }
 
-/** A session page framed by `ancestors`, as the site's PiP window or a hostile page would frame it. */
-function framedPage(ancestors: string[]) {
-  return Object.assign(new EventTarget(), {
-    parent: window,
-    document,
-    location: { ancestorOrigins: ancestors, origin: "chrome-extension://test-id" },
-  }) as unknown as Window;
-}
+let ended = 0;
 
-function mount(store: RecordingStore, ancestors = [location.origin], tabs?: TabSource) {
+/** The session as the dashboard floats it in its PiP window, which counts the ends it asks for. */
+function mount(store: RecordingStore, tabs: TabSource = fakeTabs({ tabs: [] }).source) {
   const root = document.body.appendChild(document.createElement("div"));
-  const services = fakeExtension(tabs ? { recordings: store, tabs } : { recordings: store });
-  startSession(root, services, framedPage(ancestors));
+  render(<FloatingSession store={store} tabs={tabs} onEnd={() => (ended += 1)} />, root);
   return root;
 }
 
-const posted: unknown[] = [];
-const onMessage = (event: MessageEvent) => posted.push(event.data);
-
 afterEach(() => {
-  window.removeEventListener("message", onMessage);
-  posted.length = 0;
+  ended = 0;
   for (const root of document.body.children) render(null, root);
   document.body.replaceChildren();
 });
 
-test("in the PiP window, the session pauses, resumes, and asks to close when stopped", async () => {
-  window.addEventListener("message", onMessage);
+test("in the PiP window, the session pauses, resumes, and ends when stopped", async () => {
   const store = await runningStore();
   const root = mount(store);
   await expect.poll(() => panelText(root)).toContain("Recording 00:00");
@@ -52,34 +39,19 @@ test("in the PiP window, the session pauses, resumes, and asks to close when sto
   await expect.poll(() => panelText(root)).toContain("Paused");
   button(root, "Resume")?.click();
   await expect.poll(() => panelText(root)).toContain("Recording");
-  expect(posted).not.toContainEqual(closePanelMessage());
+  expect(ended).toBe(0);
 
   button(root, "Stop")?.click();
-  await expect.poll(() => posted).toContainEqual(closePanelMessage());
+  await expect.poll(() => ended).toBe(1);
   expect(await store.read()).toBeNull();
 });
 
-test("stopped from another view, the session still asks to close its window", async () => {
-  window.addEventListener("message", onMessage);
+test("stopped from another view, the session still ends its window", async () => {
   const store = await runningStore();
   const root = mount(store);
   await expect.poll(() => panelText(root)).toContain("Recording");
   await store.write(null);
-  await expect.poll(() => posted).toContainEqual(closePanelMessage());
-});
-
-test("the session refuses to render inside a foreign ancestor", async () => {
-  const root = mount(await runningStore(), ["https://evil.example"]);
-  expect(root.textContent).toContain("https://evil.example");
-  expect(panelText(root)).toBeUndefined();
-});
-
-test("opened on its own, the session page points to the site", async () => {
-  const root = mount(await runningStore(), []);
-  expect(root.querySelector('[role="status"]')?.textContent).toBe(
-    "Open recnrun.com to use RECnRun.",
-  );
-  expect(panelText(root)).toBeUndefined();
+  await expect.poll(() => ended).toBe(1);
 });
 
 const region = (root: HTMLElement, name: string) =>
@@ -88,7 +60,7 @@ const region = (root: HTMLElement, name: string) =>
 test("shows the tab in focus apart from the recorded one, and never retargets the session", async () => {
   const store = await runningStore();
   const tabs = fakeTabs({ tabs: [SHOP, DOCS, PRIVATE], currentId: SHOP.id });
-  const root = mount(store, [location.origin], tabs.source);
+  const root = mount(store, tabs.source);
   await expect.poll(() => region(root, "Current tab")).toContain("Recorded");
   expect(region(root, "Current tab")).toContain("https://shop.example/");
   expect(region(root, "Recorded tab")).toBeUndefined();
@@ -108,7 +80,7 @@ test("shows the tab in focus apart from the recorded one, and never retargets th
 
 test("with the focus outside the browser, the last tab shown stays until it closes", async () => {
   const tabs = fakeTabs({ tabs: [SHOP, DOCS], currentId: DOCS.id });
-  const root = mount(await runningStore(), [location.origin], tabs.source);
+  const root = mount(await runningStore(), tabs.source);
   await expect.poll(() => region(root, "Current tab")).toContain("Docs");
   expect(region(root, "Current tab")).not.toContain("Not in focus");
 
@@ -122,7 +94,7 @@ test("with the focus outside the browser, the last tab shown stays until it clos
 
 test("a burst of tab events reads the tabs once more, not once per event", async () => {
   const tabs = fakeTabs({ tabs: [SHOP], currentId: SHOP.id });
-  const root = mount(await runningStore(), [location.origin], tabs.source);
+  const root = mount(await runningStore(), tabs.source);
   await expect.poll(() => region(root, "Current tab")).toContain("Shop");
   const before = tabs.reads();
   for (let event = 0; event < 5; event += 1)

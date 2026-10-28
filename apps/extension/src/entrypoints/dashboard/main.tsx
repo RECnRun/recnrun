@@ -1,6 +1,5 @@
 import { browser } from "wxt/browser";
 import { browserIncognito } from "@/dashboard/incognito-access";
-import { holdSitePorts } from "@/dashboard/site-ports";
 import { startDashboard } from "@/dashboard/start";
 import { browserToolbarPin } from "@/dashboard/toolbar-pin";
 import { recordingSessionRepository } from "@/storage/recording-session-repository";
@@ -19,7 +18,6 @@ if (root) {
     tabs: browserTabs(),
     incognito: browserIncognito,
     toolbar: browserToolbarPin,
-    holdSitePorts,
     send: (request) => browser.runtime.sendMessage(request),
   });
 }

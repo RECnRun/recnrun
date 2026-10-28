@@ -1,6 +1,6 @@
 import * as v from "valibot";
 import type { DashboardRouter } from "@/dashboard/router";
-import { PathSchema } from "@/messaging/frame-protocol";
+import { PathSchema } from "@/dashboard/route";
 
 /** The route the address's hash names; anything but a path is the list. */
 function hashRoute(hash: string): string {

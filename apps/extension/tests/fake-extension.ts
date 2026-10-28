@@ -53,7 +53,6 @@ export function fakeExtension(overrides: Partial<ExtensionServices> = {}): Exten
     tabs: fakeTabs({ tabs: [SHOP, DOCS] }).source,
     incognito: fakeIncognito(true).access,
     toolbar: fakeToolbarPin(true).pin,
-    holdSitePorts: () => {},
     send: async () => ({ ok: true }),
     ...overrides,
   };

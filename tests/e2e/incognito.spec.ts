@@ -3,7 +3,9 @@ import { expect, test } from "./fixtures/extension.ts";
 import { clickToOpenPanel, openDashboard, tabItem } from "./fixtures/session.ts";
 import {
   chromeTabs,
+  dashboardUrl,
   focusTab,
+  installedDashboard,
   openIncognitoTab,
   recordedTabId,
   storedText,
@@ -102,17 +104,22 @@ test.describe("with incognito access", () => {
     expect(await storedText(serviceWorker)).not.toMatch(/private|elsewhere/);
   });
 
-  test("an incognito site tab points to a normal window", async ({
+  test("the site in an incognito window opens the dashboard in a normal one", async ({
     baseURL,
     context,
     serviceWorker,
   }) => {
+    const dashboard = await installedDashboard(context, serviceWorker);
+    await dashboard.close();
     await openIncognitoTab(serviceWorker, `${baseURL}/`);
     const privateSite = await pageAt(context, `${baseURL}/`);
-    await expect(privateSite.getByRole("status").last()).toHaveText(
-      "RECnRun opens from a normal window. Open recnrun.com there to record incognito tabs.",
-    );
-    await expect(privateSite.locator('iframe[title="RECnRun dashboard"]')).toHaveCount(0);
+    await expect(privateSite.getByRole("button", { name: "Open dashboard" })).toBeVisible();
+
+    const url = dashboardUrl(serviceWorker);
+    await expect
+      .poll(async () => (await chromeTabs(serviceWorker)).filter((tab) => tab.url === url))
+      .toEqual([expect.objectContaining({ incognito: false, active: true })]);
+    await expect(privateSite.getByRole("status")).toHaveCount(0);
   });
 });
 

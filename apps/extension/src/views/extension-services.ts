@@ -14,7 +14,5 @@ export interface ExtensionServices {
   tabs: TabSource;
   incognito: IncognitoAccess;
   toolbar: ToolbarPin;
-  /** Keeps the site tabs' ports open, so a site tab learns when RECnRun unloads. */
-  holdSitePorts: () => void;
   send: SendRequest;
 }

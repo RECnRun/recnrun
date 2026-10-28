@@ -1,8 +1,6 @@
 import * as v from "valibot";
 import type { TakeControl } from "@/dashboard/TabList";
 import { BackgroundReplySchema } from "@/messaging/background-messages";
-import { subscribeFrame } from "@/messaging/frame-channel";
-import { openPanelMessage } from "@/messaging/frame-protocol";
 import { returnToDashboardMessage, startSessionMessage } from "@/messaging/session-protocol";
 import type { SessionRequest } from "@/messaging/session-protocol";
 import { documentPip, requestPanelWindow } from "@/pip/document-pip";
@@ -52,22 +50,6 @@ async function start(lock: ReturnType<typeof controlLock>, send: SendRequest, ta
     lock.free();
     throw error;
   }
-}
-
-/**
- * The control lock makes this dashboard the only one with a PiP window. A frame cannot open that
- * window, so the site's content script opens it, and says when it closes; the lock then frees, and
- * the site tab gets the focus back.
- */
-export function controlFrom(page: Window, parent: string, send: SendRequest): TakeControl {
-  const lock = controlLock();
-  subscribeFrame(page, page.parent, parent, { "panel-closed": closedWith(lock, send) });
-  return async (tabId) => {
-    if (lock.held()) return;
-    await lock.take();
-    page.parent.postMessage(openPanelMessage(), parent);
-    await start(lock, send, tabId);
-  };
 }
 
 /** Fills a PiP window the dashboard opened with the session. */

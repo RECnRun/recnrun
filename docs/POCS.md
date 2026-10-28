@@ -6,7 +6,7 @@ Experiments that shaped a durable decision. Each ran on its own local branch wit
 
 **Problem.** The website at recnrun.com rendered the user's recordings, so every change to the stored data needed two deploys that had to stay in sync: the website on GitHub Pages and the extension on the Chrome Web Store. A website ahead of or behind the installed extension would show data it could not parse.
 
-**Decision.** The extension owns its UI: `dashboard.html` (POC 1). recnrun.com keeps its address and shows that page in a frame (POC 3). The website only detects the extension and asks to install it when it is missing, so it no longer depends on the data model. POC 2 is the fallback if the frame stops working; POC 4 is deferred.
+**Decision.** The extension owns its UI: `dashboard.html` (POC 1). recnrun.com keeps its address and shows that page in a frame (POC 3). The website only detects the extension and asks to install it when it is missing, so it no longer depends on the data model. POC 2 is the fallback if the frame stops working; POC 4 is deferred. The frame went on 2026-10-28: the dashboard became the extension's own top-level tab, which recnrun.com only brings forward ([POC 7](#poc-7-spike-on-the-top-level-dashboard)).
 
 | POC | Branch                    | Idea                                                         | Result                    |
 | --- | ------------------------- | ------------------------------------------------------------ | ------------------------- |

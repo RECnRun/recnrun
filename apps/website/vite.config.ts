@@ -2,10 +2,9 @@ import preact from "@preact/preset-vite";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite-plus";
 import { contentSecurityPolicy } from "./build/content-security-policy.ts";
-import { notFoundPage } from "./build/not-found-page.ts";
 
 export default defineConfig({
-  plugins: [preact(), contentSecurityPolicy(), notFoundPage()],
+  plugins: [preact(), contentSecurityPolicy()],
   // The dev extension opens this exact URL, so the port must not drift.
   server: { port: 5173, strictPort: true },
   // The policy is its own file, so GitHub Pages answers /privacy/ with 200 instead of 404.html.

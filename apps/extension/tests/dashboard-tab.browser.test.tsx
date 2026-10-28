@@ -4,32 +4,10 @@ import { startDashboard } from "@/dashboard/start";
 import { returnToDashboardMessage, startSessionMessage } from "@/messaging/session-protocol";
 import type { SessionRequest } from "@/messaging/session-protocol";
 import { CONTROL_LOCK, tryHoldLock } from "@/views/view-locks";
+import { pipWindow, tabPage } from "./dashboard-page";
 import { fakeExtension, memoryRecordingStore } from "./fake-extension";
 import { DOCS, SHOP, fakeTabs } from "./fake-tabs";
 import { button, panelText } from "./queries";
-
-/** A window for the PiP API to hand out: a frame of this page, closed by removing it. */
-function pipWindow(): Window {
-  const frame = document.body.appendChild(document.createElement("iframe"));
-  const opened = frame.contentWindow;
-  if (!opened) throw new Error("The frame has no window.");
-  opened.close = () => {
-    opened.dispatchEvent(new Event("pagehide"));
-    frame.remove();
-  };
-  return opened;
-}
-
-/** A top-level dashboard tab stand-in, with the PiP API when `pip` is given. */
-function tabPage(hash: string, pip?: () => Promise<Window>) {
-  const api = pip && { window: null, requestWindow: pip };
-  return Object.assign(new EventTarget(), {
-    document,
-    history,
-    location: { ancestorOrigins: [], hash },
-    documentPictureInPicture: api,
-  }) as unknown as Window;
-}
 
 /** Mounts the dashboard on its own tab, whose start-session reply comes from `reply`. */
 function mount(page: Window, reply: { ok: boolean; error?: string } = { ok: true }) {

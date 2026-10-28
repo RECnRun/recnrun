@@ -35,8 +35,8 @@ test("answers its own page but ignores requests from another origin", async ({
       (window as unknown as Observed).opened = window.open(url);
     }, `${baseURL}/`),
   ]);
-  // The frame proves the content script, and so the bridge host, is running.
-  await expect(site.locator('iframe[title="RECnRun dashboard"]')).toBeVisible();
+  // The detected version proves the content script, and so the bridge host, is running.
+  await expect(site.getByTestId("extension-version")).toHaveText("Extension 0.1.0");
 
   await forged.evaluate(
     (message) => (window as unknown as Observed).opened?.postMessage(message, "*"),
