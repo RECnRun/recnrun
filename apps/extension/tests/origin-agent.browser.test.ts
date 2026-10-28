@@ -41,7 +41,7 @@ function started() {
 /** An agent past the link probe, its echo already posted. */
 function linked() {
   const agent = fakePort();
-  runOriginAgent(agent, stores);
+  runOriginAgent(agent, stores, () => "");
   agent.onMessage.emit(probe);
   return agent;
 }
@@ -194,6 +194,7 @@ test("captures on a capture command: Web Storage, each schema, its records in ch
         type: "captured",
         ...operation,
         counts: { ...NONE, localStorage: 1, sessionStorage: 1, databases: 1, records: 3 },
+        cookieNames: [],
       },
     ]);
   expect(agent.onMessage.listeners.size).toBe(0);
@@ -222,7 +223,12 @@ test("captures each cache after IndexedDB, one message per cache", async () => {
         cache: { name: "v1", entries: [entry] },
         unsupported: [],
       },
-      { type: "captured", ...operation, counts: { ...NONE, caches: 1, cacheEntries: 1 } },
+      {
+        type: "captured",
+        ...operation,
+        counts: { ...NONE, caches: 1, cacheEntries: 1 },
+        cookieNames: [],
+      },
     ]);
 });
 
@@ -240,6 +246,18 @@ test("outside a secure context the agent has no Cache Storage and captures no ca
     "capture-cache",
   );
   vi.unstubAllGlobals();
+});
+
+test("a capture names the cookies the page can read, never their values", async () => {
+  const agent = fakePort();
+  // Chrome writes a cookie with no name as its value alone (canonical_cookie.cc:126-136).
+  runOriginAgent(agent, stores, () => "theme=dark; d_lax=on=1; lone");
+  agent.onMessage.emit(probe);
+  agent.onMessage.emit(capture);
+  await expect
+    .poll(() => agent.posted.at(-1))
+    .toMatchObject({ type: "captured", cookieNames: ["theme", "d_lax", ""] });
+  expect(JSON.stringify(agent.posted)).not.toMatch(/dark|on=1|lone/);
 });
 
 test("a capture that fails replies failed with the step and an error name", async () => {

@@ -166,7 +166,7 @@ describe("a failed capture", () => {
     expect(captures.calls).toEqual([]);
   });
 
-  test("discards the capture when the cookies cannot be read", async () => {
+  test("discards the capture when the cookies cannot be read, or miss one the page showed", async () => {
     const setup = chrome();
     setup.cookies.jar = new Error("No cookie store.");
     const { capturing, captures } = await captureAnswering(completeReplies, setup);
@@ -175,6 +175,12 @@ describe("a failed capture", () => {
       message: "Chrome did not list the workspace's cookies.",
     });
     expect(captures.calls).toEqual(["begin", "append", "append", "discard"]);
+    const unlisted = chrome();
+    unlisted.cookies.jar = [SID];
+    const replies = [...completeReplies.slice(0, -1), capturedWith({}, ["d_lax"])];
+    const missing = await captureAnswering(replies, unlisted);
+    await expect(missing.capturing).rejects.toMatchObject({ name: "CookiesNotReadable" });
+    expect(missing.captures.calls).toEqual(["begin", "append", "append", "discard"]);
   });
 
   test("fails as not connected when the agent does not run or does not connect in time", async () => {

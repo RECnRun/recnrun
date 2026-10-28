@@ -207,6 +207,7 @@ describe("captureIdentity and startFromCapture", () => {
       { type: "capture-records", database: "app", store: "kv", records: [{ key: 1, value: 1 }] },
       {
         type: "captured",
+        cookieNames: [],
         counts: {
           databases: 1,
           records: 1,

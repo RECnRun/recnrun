@@ -16,6 +16,7 @@ type WorkspaceErrorName =
   | "CookieNotSet"
   | "CookieStoreNotFound"
   | "CookiesNotCaptured"
+  | "CookiesNotReadable"
   | "CookiesUnavailable"
   | "IncognitoNotAllowed"
   | "IncognitoNotGone"

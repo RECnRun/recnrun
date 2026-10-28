@@ -30,8 +30,9 @@ export const COUNTS = {
   caches: 1,
   cacheEntries: 1,
 };
-export const capturedWith = (counts: Partial<typeof COUNTS>) => ({
+export const capturedWith = (counts: Partial<typeof COUNTS>, cookieNames: string[] = []) => ({
   type: "captured",
   counts: { ...COUNTS, ...counts },
+  cookieNames,
 });
 export const completeReplies = [STORAGE, SCHEMA, PART, CACHE, capturedWith({})];

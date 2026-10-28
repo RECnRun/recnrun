@@ -68,6 +68,12 @@ const CountsSchema = v.object({
 
 export type CapturedCounts = v.InferOutput<typeof CountsSchema>;
 
+/** What a capture's last reply reports: its counts and the names of the page's cookies. */
+export interface CapturedPage {
+  counts: CapturedCounts;
+  cookieNames: string[];
+}
+
 export type RestoredCounts = v.InferOutput<typeof CountsSchema>;
 
 /**
@@ -99,7 +105,14 @@ export const OriginReplySchema = v.variant("type", [
     cache: CacheSchema,
     unsupported: v.array(UnsupportedEntrySchema),
   }),
-  v.object({ type: v.literal("captured"), ...OPERATION, counts: CountsSchema }),
+  // The names in the page's `document.cookie`, never a value, so the background can tell a cookie
+  // Chrome did not list it from one the page never had.
+  v.object({
+    type: v.literal("captured"),
+    ...OPERATION,
+    counts: CountsSchema,
+    cookieNames: v.array(v.string()),
+  }),
   v.object({
     type: v.literal("failed"),
     ...OPERATION,

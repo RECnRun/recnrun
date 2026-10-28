@@ -146,16 +146,13 @@ function completeHeader(
   };
 }
 
-/** The store's cookies of the target's host and the declared ones; a failed read fails the capture. */
-async function cookieJar(deps: CaptureDeps, target: Target, started: IdentityCapture) {
-  try {
-    return await captureCookies(deps.cookies, target.storeId, {
-      target: new URL(target.origin).hostname,
-      extra: started.capabilities.cookieHosts,
-    });
-  } catch {
-    throw new WorkspaceError("CookiesNotCaptured", "Chrome did not list the workspace's cookies.");
-  }
+/** The store's cookies of the target's host and the declared ones, checked against the page's. */
+function cookieJar(deps: CaptureDeps, target: Target, started: IdentityCapture, seen: string[]) {
+  const hosts = {
+    target: new URL(target.origin).hostname,
+    extra: started.capabilities.cookieHosts,
+  };
+  return captureCookies(deps.cookies, target.storeId, hosts, seen);
 }
 
 /** Reads the page through its link and publishes it as `identityId`'s capture, or discards it. */
@@ -169,10 +166,10 @@ async function captureThrough(
   try {
     await captures.begin(started);
     const { receiver, written } = collector(started.id, started.origins[0]?.origin ?? "", captures);
-    const counts = await captureThroughAgent(port, operation, receiver, boundMs);
+    const { counts, cookieNames } = await captureThroughAgent(port, operation, receiver, boundMs);
     const collected = await written();
     const storage = checkWhole(collected, counts);
-    const jar = await cookieJar(deps, target, started);
+    const jar = await cookieJar(deps, target, started, cookieNames);
     const header = completeHeader(started, storage, collected, jar);
     await captures.publish(header);
     const kept = [storage.localStorage, storage.sessionStorage, header.cookies];

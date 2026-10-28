@@ -4,7 +4,7 @@ import type { BarrierOperation } from "@/background/workspace/barrier";
 import { WorkspaceError } from "@/background/workspace/errors";
 import { ORIGIN_AGENT_PORT, OriginReplySchema } from "@/messaging/origin-protocol";
 import type {
-  CapturedCounts,
+  CapturedPage,
   OriginPort,
   OriginReply,
   RestoredCounts,
@@ -194,9 +194,9 @@ export async function captureThroughAgent(
   operation: BarrierOperation,
   receiver: CaptureReceiver,
   idleMs: number,
-): Promise<CapturedCounts> {
+): Promise<CapturedPage> {
   await probeLink(port, operation, idleMs, CAPTURE_ENDING);
-  return exchange<CapturedCounts>(port, operation, {
+  return exchange<CapturedPage>(port, operation, {
     command: { type: "capture" },
     boundMs: idleMs,
     idle: true,
@@ -205,8 +205,9 @@ export async function captureThroughAgent(
       else if (reply.type === "capture-database") receiver.database(reply.database);
       else if (reply.type === "capture-records") receiver.records(reply);
       else if (reply.type === "capture-cache") receiver.cache(reply);
-      else if (reply.type === "captured") settle.resolve(reply.counts);
-      else failedWith(reply, settle, "capture");
+      else if (reply.type === "captured") {
+        settle.resolve({ counts: reply.counts, cookieNames: reply.cookieNames });
+      } else failedWith(reply, settle, "capture");
     },
     late: CAPTURE_ENDING.late,
     gone: CAPTURE_ENDING.gone,

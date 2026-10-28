@@ -39,7 +39,7 @@ describe("captureCookies", () => {
         partitionKey: { topLevelSite: "http://app.localhost", hasCrossSiteAncestor: false },
       }),
     ]);
-    const jar = await captureCookies(api, "1", HOSTS);
+    const jar = await captureCookies(api, "1", HOSTS, []);
     expect(api.all).toHaveBeenCalledExactlyOnceWith("1");
     expect(jar.unsupported).toEqual([]);
     expect(jar.cookies).toEqual([
@@ -72,6 +72,7 @@ describe("captureCookies", () => {
       jarOf([stored({ name: "shadow", path: "/deep" }), stored({ name: "shadow" })]),
       "1",
       HOSTS,
+      [],
     );
     expect(jar.cookies.map(({ name, path }) => `${name}@${path}`)).toEqual([
       "shadow@/deep",
@@ -88,6 +89,7 @@ describe("captureCookies", () => {
       ]),
       "1",
       HOSTS,
+      [],
     );
     expect(jar.cookies.map(({ name, domain, host }) => ({ name, domain, host }))).toEqual([
       { name: "sso", domain: undefined, host: "sso.localhost" },
@@ -105,6 +107,7 @@ describe("captureCookies", () => {
       ]),
       "1",
       { target: "app.localhost", extra: [] },
+      [],
     );
     expect(jar.cookies.map(({ name }) => name)).toEqual(["kept"]);
     expect(jar.unsupported).toEqual([
@@ -120,5 +123,37 @@ describe("captureCookies", () => {
       },
     ]);
     expect(JSON.stringify(jar.unsupported)).not.toMatch(/secret/);
+  });
+
+  test("fails when the page shows a cookie Chrome did not list, naming it, never its value", async () => {
+    // getAll leaves out a cookie whose domain the host permissions miss (cookies_helpers.cc:51-56).
+    const api = jarOf([stored({ name: "theme", httpOnly: false })]);
+    const capturing = captureCookies(api, "1", HOSTS, ["theme", "d_lax", "d_lax", "sid"]);
+    await expect(capturing).rejects.toMatchObject({
+      name: "CookiesNotReadable",
+      message:
+        'Chrome did not list the page\'s cookies "d_lax", "sid"; RECnRun needs host access to their domain.',
+    });
+  });
+
+  test("counts only listed cookies the page could read: its host's or domain's, never HttpOnly", async () => {
+    const api = jarOf([
+      stored({ name: "dup", httpOnly: false }),
+      stored({ name: "dup", path: "/deep", httpOnly: false }),
+      stored({ name: "wide", domain: ".app.localhost", hostOnly: false, httpOnly: false }),
+      stored({ name: "", httpOnly: false }),
+      stored({ name: "sso", domain: "sso.localhost", httpOnly: false }),
+      stored({ name: "secret" }),
+    ]);
+    await expect(
+      captureCookies(api, "1", HOSTS, ["dup", "dup", "wide", ""]),
+    ).resolves.toMatchObject({
+      cookies: expect.any(Array),
+    });
+    for (const seen of [["dup", "dup", "dup"], ["sso"], ["secret"]]) {
+      await expect(captureCookies(api, "1", HOSTS, seen), seen.join()).rejects.toMatchObject({
+        name: "CookiesNotReadable",
+      });
+    }
   });
 });

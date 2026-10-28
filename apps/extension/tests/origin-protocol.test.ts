@@ -70,14 +70,16 @@ test("a capture answers Web Storage, each database's schema, its records, and th
     { type: "capture-storage", ...operation, localStorage: { "": "" }, sessionStorage: {} },
     { type: "capture-database", ...operation, database },
     { type: "capture-records", ...operation, ...records },
-    { type: "captured", ...operation, counts },
+    { type: "captured", ...operation, counts, cookieNames: ["theme", ""] },
   ];
   for (const reply of replies) expect(v.is(OriginReplySchema, reply), reply.type).toBe(true);
   for (const bad of [
     { type: "capture-database", ...operation, database: { ...database, version: 0 } },
     { type: "capture-records", ...operation, ...records, store: undefined },
     { type: "capture-records", ...operation, ...records, records: [{ key: 1 }, 2] },
-    { type: "captured", ...operation, counts: { databases: 1, records: 1 } },
+    { type: "captured", ...operation, counts: { databases: 1, records: 1 }, cookieNames: [] },
+    // Without the page's cookie names, a cookie Chrome did not list would go unnoticed.
+    { type: "captured", ...operation, counts },
     { type: "captured", ...operation, counts: { ...counts, cacheEntries: undefined } },
     { type: "capture-storage", ...operation, localStorage: { n: 1 }, sessionStorage: {} },
     { type: "capture-storage", ...operation, localStorage: {} },

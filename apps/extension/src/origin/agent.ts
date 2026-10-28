@@ -30,7 +30,20 @@ async function replyAfter(
   port.postMessage(reply);
 }
 
-function run(port: OriginPort, stores: OriginStores, command: OriginCommand): Promise<void> {
+/** The cookie names in a `document.cookie` line; Chrome writes a nameless cookie as its value alone. */
+function cookieNames(line: string): string[] {
+  return line
+    .split("; ")
+    .filter(Boolean)
+    .map((pair) => (pair.includes("=") ? pair.slice(0, pair.indexOf("=")) : ""));
+}
+
+function run(
+  port: OriginPort,
+  stores: OriginStores,
+  command: OriginCommand,
+  documentCookie: () => string,
+): Promise<void> {
   const { operationId, generation } = command;
   if (command.type === "restore") {
     return replyAfter(port, command, async () => ({
@@ -59,6 +72,7 @@ function run(port: OriginPort, stores: OriginStores, command: OriginCommand): Pr
   return replyAfter(port, command, async () => ({
     type: "captured",
     counts: await captureOrigin(stores, sink, command.chunk),
+    cookieNames: cookieNames(documentCookie()),
   }));
 }
 
@@ -76,7 +90,11 @@ function once(port: OriginPort, next: (message: unknown) => void): void {
  * or capture of the probe's operation runs once, anything else ends the link. Until then the agent
  * touches nothing, which matters since it may run in any page of the origin.
  */
-export function runOriginAgent(port: OriginPort, stores: OriginStores): void {
+export function runOriginAgent(
+  port: OriginPort,
+  stores: OriginStores,
+  documentCookie: () => string = () => document.cookie,
+): void {
   once(port, (message) => {
     const probe = v.safeParse(OriginProbeSchema, message);
     if (!probe.success) return port.disconnect();
@@ -88,7 +106,7 @@ export function runOriginAgent(port: OriginPort, stores: OriginStores): void {
         command.success &&
         command.output.operationId === operationId &&
         command.output.generation === generation;
-      if (ours) void run(port, stores, command.output);
+      if (ours) void run(port, stores, command.output, documentCookie);
       else port.disconnect();
     });
   });

@@ -27,9 +27,30 @@ export interface BuildAccess {
   message_serialization?: "structured_clone";
 }
 
-/** `RECNRUN_POC_HOSTS`, comma-separated `http(s)` origins, as `origin/*` match patterns. */
+/** The URL parser's form of an IP address: bracketed IPv6, or four dotted decimal numbers. */
+const IP_ADDRESS = /^(\[.*\]|\d+\.\d+\.\d+\.\d+)$/;
+
+/**
+ * `hostname` and each parent domain of two labels or more: every domain a cookie set by it can
+ * name. Parents above the registrable domain (`co.uk`) are included too, as no public suffix
+ * list ships here; Chrome stores no cookie on a public suffix, so they reach no cookie.
+ */
+function cookieDomains(hostname: string): string[] {
+  if (IP_ADDRESS.test(hostname)) return [hostname];
+  const labels = hostname.split(".");
+  return labels
+    .slice(0, Math.max(labels.length - 1, 1))
+    .map((_, index) => labels.slice(index).join("."));
+}
+
+/**
+ * `RECNRUN_POC_HOSTS`, comma-separated `http(s)` origins, as match patterns for each host and the
+ * domains its cookies can name. `cookies.getAll` and `cookies.set` need access to a cookie's
+ * domain as a URL whose scheme follows its `Secure` attribute alone (`cookies_helpers.cc:51-56,
+ * 201-206`, `cookie_util.cc:664-692`), with no port, so each domain gets both schemes, portless.
+ */
 function pocHostPatterns(pocHosts: string): string[] {
-  return pocHosts
+  const hostnames = pocHosts
     .split(",")
     .map((each) => each.trim())
     .filter(Boolean)
@@ -38,8 +59,10 @@ function pocHostPatterns(pocHosts: string): string[] {
       if (url?.protocol !== "http:" && url?.protocol !== "https:") {
         throw new Error(`RECNRUN_POC_HOSTS lists "${each}", which is not an http(s) origin.`);
       }
-      return `${url.origin}/*`;
+      return url.hostname;
     });
+  const domains = hostnames.flatMap(cookieDomains);
+  return [...new Set(domains.flatMap((domain) => [`https://${domain}/*`, `http://${domain}/*`]))];
 }
 
 /** Published builds keep only the product's permissions; local builds add the POC's set. */
