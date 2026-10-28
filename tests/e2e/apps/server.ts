@@ -1,4 +1,5 @@
-// Fixture origins for the POC specs: app.localhost:5192 and other.localhost:5192 share these routes.
+// Fixture origins for the POC specs: app.localhost, other.localhost, and sso.localhost (port 5192)
+// share these routes.
 import { randomBytes } from "node:crypto";
 import { createServer } from "node:http";
 import type { IncomingMessage, ServerResponse } from "node:http";
@@ -7,6 +8,7 @@ import { bodyOf, cookiesOf, HTML, JS, redirectTo, send } from "./http.ts";
 import type { Exchange } from "./http.ts";
 import { domainJarCookies, frameCookies, framePage, jarCookies, jarPage } from "./cookie-pages.ts";
 import { pwaRoutes } from "./pwa-routes.ts";
+import { ssoRoutes } from "./sso-routes.ts";
 import { blankPage, inspectPage, sentinelPage, serviceWorker } from "./pages.ts";
 import { writersHtml, writersServiceWorker, writersWorker } from "./writer-pages.ts";
 
@@ -114,6 +116,7 @@ const routes: Record<string, (exchange: Exchange) => void | Promise<void>> = {
     response.end();
   },
   ...pwaRoutes,
+  ...ssoRoutes,
   "POST /__log": report,
   "GET /__log": ({ response, run }) =>
     send(response, "application/json", JSON.stringify({ entries: logs.get(run ?? "") ?? [] })),
