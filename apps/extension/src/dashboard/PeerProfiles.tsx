@@ -1,5 +1,5 @@
 import * as v from "valibot";
-import { FolderBanner, PairControls } from "@/dashboard/FolderPairing";
+import { FolderBanner, PairingSection } from "@/dashboard/FolderPairing";
 import { peerBlocks } from "@/dashboard/peer-blocks";
 import type { PairedStatus } from "@/dashboard/peer-blocks";
 import { TabList } from "@/dashboard/TabList";
@@ -56,13 +56,13 @@ export function PeerProfiles({ services, peers, take, takeRemote }: PeerProfiles
   const localRunning = useRecording(services.recordings).status !== "idle";
   const paired = status?.peer ? { ...status, peer: status.peer } : undefined;
   const banner = <FolderBanner peers={peers} status={status} />;
-  const pairControls = <PairControls peers={peers} status={status} />;
+  const pairing = <PairingSection peers={peers} status={status} />;
   if (!paired) {
     return (
       <>
         {banner}
         <TabList tabs={services.tabs} store={services.recordings} take={take} />
-        {pairControls}
+        {pairing}
       </>
     );
   }
@@ -78,7 +78,7 @@ export function PeerProfiles({ services, peers, take, takeRemote }: PeerProfiles
         blocked={blocks.local}
       />
       <RemoteProfile peers={peers} status={paired} take={takeRemote} blocked={blocks.remote} />
-      {pairControls}
+      {pairing}
     </>
   );
 }

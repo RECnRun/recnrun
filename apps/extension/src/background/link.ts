@@ -24,6 +24,19 @@ async function ensureOffscreen(): Promise<void> {
   await creating;
 }
 
+/**
+ * Closes the offscreen document, and every folder handle it holds. Chrome shows its restore
+ * prompt, with "Allow on every visit", only for a grant that a handle loaded from storage created;
+ * a live handle keeps the picker's grant instead (`GetWritePermissionGrant` in Chromium's
+ * chrome_file_system_access_permission_context.cc).
+ */
+export async function closeOffscreen(): Promise<void> {
+  const contexts = await browser.runtime.getContexts({
+    contextTypes: [browser.runtime.ContextType.OFFSCREEN_DOCUMENT],
+  });
+  if (contexts.length > 0) await browser.offscreen.closeDocument();
+}
+
 /** Sends a command to the offscreen document, creating it first, and unwraps its reply. */
 export async function askLink(command: LinkCommand): Promise<unknown> {
   await ensureOffscreen();

@@ -4,7 +4,7 @@ import { defineConfig } from "wxt";
 import { peersEnabled } from "./src/config/origins.ts";
 
 /** The cross-profile POC's pages, left out of every build that has no cross-profile link. */
-const PEER_ENTRYPOINTS = new Set(["offscreen", "pairing"]);
+const PEER_ENTRYPOINTS = new Set(["offscreen", "folder"]);
 
 const chromiumProfile = fileURLToPath(new URL("./.wxt/chrome-data", import.meta.url));
 

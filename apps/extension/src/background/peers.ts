@@ -5,9 +5,8 @@ import { execute, sessionStatus, sharedTabs } from "@/background/executor";
 import type { ExecutorDependencies } from "@/background/executor";
 import { createFolderPairing } from "@/background/folder-pairing";
 import type { FolderPairingFlow } from "@/background/folder-pairing";
-import { askLink } from "@/background/link";
+import { askLink, closeOffscreen } from "@/background/link";
 import { createPairing } from "@/background/pairing";
-import type { PairingFlow } from "@/background/pairing";
 import { createPeerChannel } from "@/background/peer-channel";
 import type { PeerChannel } from "@/background/peer-channel";
 import { handlePeerRequest } from "@/background/peer-requests";
@@ -102,7 +101,11 @@ async function linkDown(state: LinkState, channel: PeerChannel) {
   notifyPages();
 }
 
-async function linkUp(remoteFingerprint: string | undefined, channel: PeerChannel) {
+async function linkUp(
+  remoteFingerprint: string | undefined,
+  channel: PeerChannel,
+  folder: FolderPairingFlow,
+) {
   const peer = await authorizedPeerRepository.read();
   // DTLS proved the other side holds this certificate; only the one the user accepted may talk.
   if (!peer || remoteFingerprint !== peer.fingerprint) {
@@ -112,6 +115,7 @@ async function linkUp(remoteFingerprint: string | undefined, channel: PeerChanne
     return;
   }
   await peerLinkRepository.write({ state: "connected", verified: true });
+  await folder.linked();
   await hello(channel);
   notifyPages();
 }
@@ -150,7 +154,7 @@ function createLinkHandler(
   const handle = async (event: LinkEvent) => {
     if (event.type === "frame") return onFrame(event.frame);
     if (event.type === "folder") return folder.seen(event);
-    if (event.state === "connected") return linkUp(event.remoteFingerprint, channel);
+    if (event.state === "connected") return linkUp(event.remoteFingerprint, channel, folder);
     if (event.state !== "connecting") return linkDown(event.state, channel);
     await peerLinkRepository.write({ state: "connecting", verified: false });
     notifyPages();
@@ -200,20 +204,14 @@ function watchExecutor(channel: PeerChannel, executor: ExecutorDependencies) {
 
 const FolderStatusSchema = v.object({ access: FolderAccessSchema });
 
-interface Pairings {
-  pairing: PairingFlow;
-  folder: FolderPairingFlow;
-}
-
 function requestDependencies(
   channel: PeerChannel,
   tabs: TabsCache,
-  { pairing, folder }: Pairings,
+  folder: FolderPairingFlow,
 ): PeerRequestDependencies {
   return {
     channel,
     hello: () => hello(channel),
-    pairing,
     askLink,
     identity: readIdentity,
     rename: (identity) => identityRepository.write(identity),
@@ -229,18 +227,20 @@ function requestDependencies(
       waiting: async () => (await folderPairingRepository.read()) !== null,
       start: () => folder.start().then(notifyPages),
       stop: folder.stop,
+      release: closeOffscreen,
     },
   };
 }
 
-function createPairings(): Pairings {
+/** Pairing through the folder, which exchanges the offer and answer codes. */
+function createFolder(): FolderPairingFlow {
   const pairing = createPairing({
     askLink,
     identity: readIdentity,
     authorized: authorizedPeerRepository,
     pending: pendingOfferRepository,
   });
-  const folder = createFolderPairing({
+  return createFolderPairing({
     askLink,
     identity: readIdentity,
     pairing,
@@ -250,7 +250,6 @@ function createPairings(): Pairings {
     state: folderPairingRepository,
     log,
   });
-  return { pairing, folder };
 }
 
 /**
@@ -273,13 +272,15 @@ export function startPeers(): PeerRoutes {
   };
   const tabs = createTabsCache();
   watchExecutor(channel, executor);
-  const pairings = createPairings();
+  const folder = createFolder();
   // Chrome starts the worker with the browser only for a startup listener; starting resumes.
   browser.runtime.onStartup.addListener(() => {});
-  void pairings.folder.resume().catch((error: unknown) => log(errorMessage(error)));
-  const deps = requestDependencies(channel, tabs, pairings);
+  void folder.resume().catch((error: unknown) => log(errorMessage(error)));
+  // Chrome ends the folder's grant with the last extension page, so the pages read it again.
+  browser.tabs.onRemoved.addListener(notifyPages);
+  const deps = requestDependencies(channel, tabs, folder);
   return {
     request: (request) => handlePeerRequest(deps, request),
-    link: createLinkHandler(channel, executor, tabs, pairings.folder),
+    link: createLinkHandler(channel, executor, tabs, folder),
   };
 }

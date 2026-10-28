@@ -204,11 +204,11 @@ module.exports = {
       },
     },
     {
-      name: "extension-pairing-page-isolated",
+      name: "extension-folder-page-isolated",
       severity: "error",
       comment:
-        "Cross-profile POC: the pairing page reaches the link only through the background, as the dashboard does.",
-      from: { path: "^apps/extension/src/pairing/" },
+        "Cross-profile POC: the folder window reaches the link only through the background, as the dashboard does.",
+      from: { path: "^apps/extension/src/folder/" },
       to: {
         path: "^apps/extension/src/(content|background|dashboard|storage|offscreen|peers)/",
       },

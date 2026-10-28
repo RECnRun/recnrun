@@ -1,23 +1,22 @@
 import { afterEach, expect, test } from "vite-plus/test";
 import { render } from "preact";
-import { FolderBanner, PairControls } from "@/dashboard/FolderPairing";
+import { FolderBanner, PairingSection } from "@/dashboard/FolderPairing";
 import type { PeerStatus } from "@/messaging/peer-results";
 import type { PeerServices } from "@/views/remote-peer";
 import { memoryRecordingStore } from "./fake-extension";
-import { fakePeerClient, statusOf } from "./fake-peer-client";
+import { closedFor, fakePeerClient, statusOf } from "./fake-peer-client";
 import { fakeTabs } from "./fake-tabs";
 import { alertText } from "./dashboard-page";
-import { button } from "./queries";
+import { button, field, type } from "./queries";
 
 /** The dashboard's folder banner and pairing controls, as Alice's status has them. */
 function mount(status: PeerStatus, answers: Parameters<typeof fakePeerClient>[1] = {}) {
   const peer = fakePeerClient(status, answers);
-  const opened = { folder: 0, pairing: 0 };
+  const opened = { folder: 0 };
   const peers: PeerServices = {
     client: peer.client,
     tabs: fakeTabs({ tabs: [] }).source,
     recordings: memoryRecordingStore(),
-    openPairing: async () => void opened.pairing++,
     openFolder: async () => void opened.folder++,
   };
   const root = document.body.appendChild(document.createElement("div"));
@@ -25,7 +24,7 @@ function mount(status: PeerStatus, answers: Parameters<typeof fakePeerClient>[1]
     render(
       <>
         <FolderBanner peers={peers} status={next} />
-        <PairControls peers={peers} status={next} />
+        <PairingSection peers={peers} status={next} />
       </>,
       root,
     );
@@ -51,22 +50,22 @@ test("without the folder, the banner opens the window that chooses it", async ()
   expect(banner(root)).toContain("Allow the RECnRun folder");
   button(root, "Allow folder")?.click();
   await expect.poll(() => opened.folder).toBe(2);
+  // Connected, the profile needs the folder only once the link drops.
+  show({ ...statusOf("connected"), folder: "prompt" });
+  expect(banner(root)).toBeUndefined();
   show(statusOf());
   expect(banner(root)).toBeUndefined();
   show(undefined);
   expect(banner(root)).toBeUndefined();
-  expect(button(root, "Manage pairing")).toBeDefined();
 });
 
 test("an unpaired profile pairs from the dashboard, then waits in the folder", async () => {
-  const { peer, opened, root, show } = mount(statusOf());
+  const { peer, root, show } = mount(statusOf());
   button(root, "Pair with another profile")?.click();
   await expect.poll(() => peer.asked("folder-pair")).toHaveLength(1);
   show({ ...statusOf(), folderPairing: true });
   expect(root.textContent).toContain("Waiting for another profile in the RECnRun folder…");
   expect(button(root, "Pair with another profile")).toBeUndefined();
-  button(root, "Manage pairing")?.click();
-  await expect.poll(() => opened.pairing).toBe(1);
 });
 
 test("a paired profile that stopped waiting reconnects from the dashboard", async () => {
@@ -88,4 +87,37 @@ test("pairing that fails is an alert", async () => {
   });
   button(root, "Pair with another profile")?.click();
   await expect.poll(() => alertText(root)).toBe("Choose the RECnRun folder first.");
+});
+
+const pairingText = (root: HTMLElement) =>
+  root.querySelector('section[aria-labelledby="pairing-heading"] [role="status"]')?.textContent;
+
+test("the pairing section says how the link stands, and renames this profile", async () => {
+  const { peer, root, show } = mount(statusOf());
+  expect(pairingText(root)).toBe("Not paired");
+  expect(field(root, "profile-name")?.value).toBe("Alice");
+  await type(field(root, "profile-name"), "Alice at work");
+  button(root, "Save name")?.click();
+  await expect
+    .poll(() => peer.asked("rename"))
+    .toEqual([{ type: "rename", displayName: "Alice at work" }]);
+  show(statusOf("connected"));
+  expect(pairingText(root)).toBe("Connected — Bob");
+  show(closedFor("disconnected", "closed-by-peer"));
+  expect(pairingText(root)).toBe("Disconnected by Bob");
+});
+
+test("a connected profile disconnects, and a paired one forgets its peer, from the dashboard", async () => {
+  const { peer, root, show } = mount(statusOf("connected"));
+  expect(button(root, "Reconnect")).toBeUndefined();
+  button(root, "Disconnect")?.click();
+  await expect.poll(() => peer.asked("disconnect")).toHaveLength(1);
+  show(statusOf("disconnected"));
+  // Disconnected, the dashboard offers the folder step again.
+  expect(button(root, "Disconnect")).toBeUndefined();
+  expect(button(root, "Reconnect")).toBeDefined();
+  button(root, "Forget Bob")?.click();
+  await expect.poll(() => peer.asked("forget")).toHaveLength(1);
+  show(statusOf());
+  expect(button(root, "Forget Bob")).toBeUndefined();
 });

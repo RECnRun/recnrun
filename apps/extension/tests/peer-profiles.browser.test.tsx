@@ -16,26 +16,25 @@ import { button } from "./queries";
 
 const MAIL: OpenTab = { ...SHOP, id: 21, title: "Mail", url: "https://mail.example/" };
 
+const pairingSection = (root: HTMLElement) =>
+  root.querySelector('section[aria-labelledby="pairing-heading"]');
+
 function peerServices(peer: ReturnType<typeof fakePeerClient>) {
-  const opened: unknown[] = [];
   const folders: unknown[] = [];
   const peers: PeerServices = {
     client: peer.client,
     tabs: fakeTabs({ tabs: [MAIL] }).source,
     recordings: memoryRecordingStore(),
-    openPairing: async () => {
-      opened.push(true);
-    },
     openFolder: async () => {
       folders.push(true);
     },
   };
-  return { peers, opened, folders };
+  return { peers, folders };
 }
 
 /** A dashboard tab in Alice's profile, with Bob's profile as `peer` answers for it. */
 function mount(peer: ReturnType<typeof fakePeerClient>, recordings = memoryRecordingStore()) {
-  const { peers, opened, folders } = peerServices(peer);
+  const { peers, folders } = peerServices(peer);
   const sent: SessionRequest[] = [];
   const send = async (request: SessionRequest) => {
     sent.push(request);
@@ -52,7 +51,7 @@ function mount(peer: ReturnType<typeof fakePeerClient>, recordings = memoryRecor
     fakeExtension({ tabs: fakeTabs({ tabs: [SHOP] }).source, send, peers, recordings }),
     page,
   );
-  return { root, sent, pips, opened, folders };
+  return { root, sent, pips, folders };
 }
 
 const headings = (root: HTMLElement) =>
@@ -71,21 +70,19 @@ afterEach(() => {
 
 test("an unpaired profile shows the local dashboard and offers to pair", async () => {
   const peer = fakePeerClient(statusOf());
-  const { root, opened } = mount(peer);
+  const { root } = mount(peer);
   await expect.poll(() => button(root, "Pair with another profile")).toBeDefined();
   // Local use with no peer looks as it does without the POC.
   expect(headings(root)).toEqual(["Tabs"]);
   expect(buttons(item(root, "Shop"))).toEqual(["Record"]);
   button(root, "Pair with another profile")?.click();
   await expect.poll(() => peer.asked("folder-pair")).toHaveLength(1);
-  button(root, "Manage pairing")?.click();
-  await expect.poll(() => opened).toHaveLength(1);
 });
 
 test("before the background answers, the dashboard is the local one", async () => {
   const { root } = mount(fakePeerClient(statusOf(), { status: () => new Promise(() => {}) }));
   await expect.poll(() => headings(root)).toEqual(["Tabs"]);
-  expect(button(root, "Manage pairing")).toBeDefined();
+  expect(pairingSection(root)).not.toBeNull();
   expect(button(root, "Pair with another profile")).toBeUndefined();
   expect(banner(root)).toBeUndefined();
 });
@@ -125,7 +122,7 @@ test("the paired profile's tabs follow under its name and the link's state", asy
     .poll(() => buttons(item(remote(root) ?? root, "Mail")))
     .toEqual(["Record", "Show tab"]);
   expect(buttons(item(root, "Shop"))).toEqual(["Record"]);
-  expect(button(root, "Manage pairing")).toBeDefined();
+  expect(pairingSection(root)).not.toBeNull();
 });
 
 test("while the link is down, the other profile's tabs are read only, as last seen", async () => {
@@ -240,5 +237,5 @@ test("without a way to control the other profile, the dashboard lists only its o
     root,
   );
   await expect.poll(() => headings(root)).toEqual(["Tabs"]);
-  expect(button(root, "Manage pairing")).toBeUndefined();
+  expect(pairingSection(root)).toBeNull();
 });

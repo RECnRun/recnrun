@@ -18,3 +18,14 @@ export function linkLabel(link: PeerStatus["link"], peerName: string): string {
   if (link.reason === "closed-here") return LABELS.disconnected;
   return link.state === "connected" && !link.verified ? LABELS.connecting : LABELS[link.state];
 }
+
+/** The link in words: connected names the peer, since only a verified link counts. */
+export function linkText(status: PeerStatus | undefined): string {
+  if (!status) return "Loading";
+  if (!status.peer) return "Not paired";
+  const { link, peer } = status;
+  if (link.state === "connected" && !link.verified) return "Checking the other profile";
+  const label = linkLabel(link, peer.displayName);
+  // "Disconnected by <name>" names the peer already.
+  return link.reason === "closed-by-peer" ? label : `${label} — ${peer.displayName}`;
+}

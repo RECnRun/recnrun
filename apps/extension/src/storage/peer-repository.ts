@@ -15,11 +15,11 @@ export type PeerLink = v.InferOutput<typeof PeerLinkSchema>;
 
 const PairingIdSchema = v.pipe(v.string(), v.uuid());
 
-/** The offer this profile waits an answer for, and through the folder, whom it is for. */
+/** The offer this profile waits an answer for, and whom it is for. */
 const PendingOfferSchema = v.strictObject({
   pairingId: PairingIdSchema,
   expiresAt: v.number(),
-  to: v.optional(ProfileIdSchema),
+  to: ProfileIdSchema,
 });
 
 export type PendingOffer = v.InferOutput<typeof PendingOfferSchema>;

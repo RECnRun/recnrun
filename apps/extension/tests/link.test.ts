@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, test, vi } from "vite-plus/test";
 import { fakeBrowser } from "wxt/testing/fake-browser";
-import { askLink } from "@/background/link";
+import { askLink, closeOffscreen } from "@/background/link";
 import { OFFSCREEN_PAGE } from "@/background/listener";
 import { linkCommandMessage } from "@/messaging/peer-messages";
 import { answering } from "./fake-peer";
@@ -35,18 +35,20 @@ test("sends the command to an open offscreen document and returns its result", a
 
 test("creates the offscreen document first, once for commands sent together", async () => {
   const { create } = offscreen(false);
-  await Promise.all([askLink({ type: "info" }), askLink({ type: "close" })]);
+  await Promise.all([askLink({ type: "folder-status" }), askLink({ type: "close" })]);
   expect(create).toHaveBeenCalledTimes(1);
   expect(create).toHaveBeenCalledWith(expect.objectContaining({ url: OFFSCREEN_PAGE }));
-  await askLink({ type: "info" });
+  await askLink({ type: "folder-status" });
   expect(create).toHaveBeenCalledTimes(2);
 });
 
 test("retries the creation after Chrome refused it", async () => {
   const { create } = offscreen(false);
   create.mockRejectedValueOnce(new Error("Only a single offscreen document may be created."));
-  await expect(askLink({ type: "info" })).rejects.toThrow("Only a single offscreen document");
-  await expect(askLink({ type: "info" })).resolves.toEqual({ sent: true });
+  await expect(askLink({ type: "folder-status" })).rejects.toThrow(
+    "Only a single offscreen document",
+  );
+  await expect(askLink({ type: "folder-status" })).resolves.toEqual({ sent: true });
 });
 
 test("rejects with the link's error, or when it does not answer", async () => {
@@ -55,4 +57,14 @@ test("rejects with the link's error, or when it does not answer", async () => {
   vi.restoreAllMocks();
   offscreen(true, null);
   await expect(askLink({ type: "close" })).rejects.toThrow("The link did not answer.");
+});
+
+test("closes the offscreen document only when one is open", async () => {
+  const close = vi.spyOn(fakeBrowser.offscreen, "closeDocument").mockResolvedValue(undefined);
+  offscreen(false);
+  await closeOffscreen();
+  expect(close).not.toHaveBeenCalled();
+  offscreen(true);
+  await closeOffscreen();
+  expect(close).toHaveBeenCalledOnce();
 });

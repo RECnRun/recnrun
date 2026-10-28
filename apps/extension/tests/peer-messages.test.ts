@@ -19,14 +19,14 @@ test("accepts the page requests and rejects malformed ones", () => {
   expect(accepts(PeerRequestSchema, { type: "rename", displayName: " Work " })).toBe(true);
   expect(accepts(PeerRequestSchema, { type: "activate", tabId: 2 })).toBe(true);
   expect(accepts(PeerRequestSchema, { type: "rename", displayName: "  " })).toBe(false);
-  expect(accepts(PeerRequestSchema, { type: "inspect", code: "" })).toBe(false);
+  expect(accepts(PeerRequestSchema, { type: "create-offer" })).toBe(false);
   expect(accepts(PeerRequestSchema, { type: "activate", tabId: -1 })).toBe(false);
   expect(accepts(PeerRequestSchema, { type: "status", extra: 1 })).toBe(false);
   expect(accepts(PeerRequestSchema, { type: "explode" })).toBe(false);
 });
 
 test("wraps a page request for the background", () => {
-  expect(peerRequestMessage({ type: "ping" })).toEqual({ type: "peer", request: { type: "ping" } });
+  expect(peerRequestMessage({ type: "tabs" })).toEqual({ type: "peer", request: { type: "tabs" } });
 });
 
 test("accepts link events up to the frame limit", () => {

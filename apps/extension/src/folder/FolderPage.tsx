@@ -2,7 +2,6 @@ import { useEffect, useState } from "preact/hooks";
 import * as v from "valibot";
 import type { PeerStatus } from "@/messaging/peer-results";
 import { allowFolder, chooseFolder, pickFolder } from "@/p2p/folder-store";
-import { FOLDER_HINT, FOLDER_WAIT } from "@/pairing/FolderSection";
 import type { PeerClient } from "@/views/peer-client";
 import { useAction, usePeerStatus } from "@/views/use-peer";
 
@@ -14,6 +13,13 @@ interface FolderPageProps {
   allow?: () => Promise<void>;
   close?: () => void;
 }
+
+/** How the user finds the folder. */
+const FOLDER_HINT =
+  "In Documents, create a folder named RECnRun, or choose it if another profile already did. " +
+  "Profiles that choose the same folder pair on their own.";
+
+const FOLDER_WAIT = "Waiting for another profile in the folder…";
 
 const isPaired = (status: PeerStatus | undefined) =>
   status !== undefined && status.peer !== null && status.link.verified;
@@ -49,16 +55,19 @@ export function FolderPage({
   const again = status?.folder === "prompt";
   const grant = () =>
     action.run(async () => {
-      await (again ? allow() : chooseFolder(pick));
+      if (again) {
+        await client.ask({ type: "folder-release" }, v.unknown());
+        await allow();
+      } else await chooseFolder(pick);
       await client.ask({ type: "folder-pair" }, v.unknown());
       wait();
     });
   return (
-    <main class="pairing">
+    <main class="folder">
       <h1>RECnRun folder</h1>
       <p>
         {again
-          ? "After a restart, Chrome asks once more before RECnRun may use the folder. Choose Allow on every visit."
+          ? "Chrome asks once more before RECnRun may use the folder. Choose Allow on every visit, and it will not ask again."
           : FOLDER_HINT}
       </p>
       {waiting ? (

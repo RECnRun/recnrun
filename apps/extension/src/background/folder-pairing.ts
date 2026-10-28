@@ -13,7 +13,7 @@ import type {
   Repository,
 } from "@/storage/peer-repository";
 
-/** How long the link gets to come up after this profile answered or connected, before a retry. */
+/** How long the link gets to come up after the offerer connected, before it offers again. */
 const RETRY_MS = 30_000;
 
 export type FolderStep =
@@ -54,7 +54,9 @@ function partnerOf(presences: Presence[], peer: Situation["peer"]): Presence | u
   return presences.toSorted(oldest)[0];
 }
 
-function offererStep(partner: Presence, signals: SignalFile[], { pending, now }: Situation) {
+function offererStep(partner: Presence, signals: SignalFile[], situation: Situation) {
+  const { pending, state, now } = situation;
+  if (state.acted && now - state.acted.at < RETRY_MS) return WAIT;
   if (pending?.to !== partner.profileId || pending.expiresAt <= now)
     return { type: "offer", to: partner } as const;
   const answer = signals.find(
@@ -65,12 +67,13 @@ function offererStep(partner: Presence, signals: SignalFile[], { pending, now }:
 
 /**
  * What this profile does next in the folder: the lower profile id offers to its partner and
- * connects with the answer; the other answers. Nobody clicks, since the folder is the consent.
+ * connects with the answer; the other answers each new offer at once, since the offerer makes
+ * one only when it gave up the last. Nobody clicks, since the folder is the consent.
  */
 export function decideFolderStep(situation: Situation): FolderStep {
   const { me, seen, peer, state, now } = situation;
   const partner = partnerOf(seen.presences, peer);
-  if (!partner || (state.acted && now - state.acted.at < RETRY_MS)) return WAIT;
+  if (!partner) return WAIT;
   const signals = seen.signals.filter((each) => vouched(each, partner, now));
   if (me < partner.profileId) return offererStep(partner, signals, situation);
   const offer = signals.find(
@@ -145,6 +148,12 @@ export function createFolderPairing(deps: FolderPairingDependencies) {
     },
     /** Stops pairing through the folder, as the user disconnects or forgets the peer. */
     stop,
+    /** The link came up, so the attempt it waited for is over: a later drop needs no wait. */
+    linked: async () => {
+      const { acted } = (await deps.state.read()) ?? {};
+      // The pairing id stays, so an offer already answered is not answered again.
+      if (acted) await deps.state.write({ acted: { ...acted, at: 0 } });
+    },
     /** One sighting at a time, so two in a row never both offer. */
     seen: (seen: Seen) => {
       queue = queue

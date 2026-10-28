@@ -42,10 +42,13 @@ describe("a new link", () => {
     expect(link.commands).toEqual([{ type: "close" }]);
   });
 
-  test("verifies the accepted certificate and introduces this profile", async () => {
+  test("verifies the accepted certificate, ends the folder's wait, and introduces this profile", async () => {
     const { connect, link } = await peerBackground();
+    const pairingId = "44444444-4444-4444-8444-444444444444";
+    await folderPairingRepository.write({ acted: { pairingId, at: 5 } });
     await connect();
     expect(await peerLinkRepository.read()).toEqual({ state: "connected", verified: true });
+    expect(await folderPairingRepository.read()).toEqual({ acted: { pairingId, at: 0 } });
     expect(link.frames()).toEqual([
       expect.objectContaining({
         type: "HELLO",
@@ -71,16 +74,16 @@ describe("frames", () => {
   test("executes what the verified peer asks, and keeps each frame in the tap", async () => {
     const { connect, receive, link } = await peerBackground();
     await connect();
-    const ping = fromPeer("PING", { timestamp: 1 });
-    await receive(ping);
-    expect(link.frames().at(-1)).toMatchObject({ type: "PONG", requestId: ping.id });
-    expect(tappedFrames()).toContain(JSON.stringify(ping));
+    const ask = fromPeer("GET_TABS", {});
+    await receive(ask);
+    expect(link.frames().at(-1)).toMatchObject({ type: "TABS_SNAPSHOT", requestId: ask.id });
+    expect(tappedFrames()).toContain(JSON.stringify(ask));
   });
 
   test("drops a frame from an unauthorized profile without an answer", async () => {
     const { connect, receive, link } = await peerBackground();
     await connect();
-    await receive(fromPeer("PING", { timestamp: 1 }, STRANGER));
+    await receive(fromPeer("GET_TABS", {}, STRANGER));
     expect(link.sentTypes()).toEqual(["HELLO"]);
   });
 
@@ -100,8 +103,8 @@ describe("a link that went down", () => {
     await connect();
     const copy = { profileId: PEER, session, mine: true, connected: true };
     await remoteRecordingRepository.write(copy);
-    const pending = routes.request({ type: "ping" });
-    await vi.waitFor(() => expect(link.sentTypes()).toContain("PING"));
+    const pending = routes.request({ type: "tabs" });
+    await vi.waitFor(() => expect(link.sentTypes()).toContain("GET_TABS"));
     await routes.link({ type: "state", state: "disconnected" });
     await expect(pending).rejects.toThrow(NOT_CONNECTED);
     expect(await peerLinkRepository.read()).toEqual({ state: "disconnected", verified: false });
@@ -251,6 +254,23 @@ describe("the folder", () => {
     await routes.request({ type: "disconnect" });
     expect(await folderPairingRepository.read()).toBeNull();
     expect(link.commands.slice(-2)).toEqual([{ type: "folder-stop" }, { type: "close" }]);
+  });
+
+  test("tells the pages when a tab closes, since Chrome may have ended the folder's grant", async () => {
+    const { link } = await peerBackground();
+    await fakeBrowser.tabs.onRemoved.trigger(7, { windowId: 1, isWindowClosing: true });
+    expect(link.notices).toEqual([{ target: "pages", type: "peer-changed" }]);
+  });
+
+  test("closes the offscreen document before the folder is allowed again, unless connected", async () => {
+    const { routes, connect } = await peerBackground();
+    vi.spyOn(fakeBrowser.runtime, "getContexts").mockResolvedValue([{}] as never);
+    const close = vi.spyOn(fakeBrowser.offscreen, "closeDocument").mockResolvedValue(undefined);
+    await routes.request({ type: "folder-release" });
+    expect(close).toHaveBeenCalledOnce();
+    await connect();
+    await routes.request({ type: "folder-release" });
+    expect(close).toHaveBeenCalledOnce();
   });
 
   test("keeps waiting once the link is verified, and offers again once it goes down", async () => {

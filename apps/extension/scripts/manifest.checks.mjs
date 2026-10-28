@@ -56,7 +56,7 @@ await test("the production build ships the logo as its icons", () => {
 });
 
 await test("the production build leaves out the cross-profile POC", () => {
-  for (const page of ["offscreen.html", "pairing.html"]) {
+  for (const page of ["offscreen.html", "folder.html"]) {
     assert.equal(
       existsSync(new URL(`../.output/chrome-mv3/${page}`, import.meta.url)),
       false,

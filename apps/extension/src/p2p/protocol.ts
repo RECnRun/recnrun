@@ -52,8 +52,6 @@ const reply = { requestId: MessageIdSchema };
 /** The closed set of things a peer may say; anything else is dropped. */
 const PeerMessageSchema = v.variant("type", [
   message("HELLO", { displayName: text(64), extensionVersion: text(32) }),
-  message("PING", { timestamp: v.number() }),
-  message("PONG", { ...reply, timestamp: v.number() }),
   message("GET_TABS", {}),
   message("TABS_SNAPSHOT", { ...reply, ...SharedTabsSchema.entries }),
   message("TABS_CHANGED", SharedTabsSchema.entries),

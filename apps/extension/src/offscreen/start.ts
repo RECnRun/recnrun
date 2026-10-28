@@ -35,20 +35,17 @@ async function runFolderCommand(watch: FolderWatch, command: FolderCommand, fold
 
 interface Held {
   link: PeerLink;
-  cert: RTCCertificate;
   watch: FolderWatch;
 }
 
 /** Runs one command; the offscreen document holds the connection and no logic beyond it. */
 async function runLinkCommand(
-  { link, cert, watch }: Held,
+  { link, watch }: Held,
   command: LinkCommand,
   folder: Folder,
 ): Promise<unknown> {
   if (isFolderCommand(command)) return runFolderCommand(watch, command, folder);
   switch (command.type) {
-    case "fingerprint":
-      return { fingerprint: certificateFingerprint(cert) };
     case "offer":
       return { sdp: await link.createOffer() };
     case "answer":
@@ -59,8 +56,6 @@ async function runLinkCommand(
       return { sent: link.send(command.frame) };
     case "close":
       return link.close();
-    case "info":
-      return { state: link.state(), diagnostics: link.diagnostics() };
   }
 }
 
@@ -90,7 +85,7 @@ export function startOffscreen({
       { certificate: cert },
     );
     const fingerprint = certificateFingerprint(cert) ?? "";
-    return { link, cert, watch: createFolderWatch({ report, fingerprint, folder }) };
+    return { link, watch: createFolderWatch({ report, fingerprint, folder }) };
   });
   const backgroundUrl = browser.runtime.getURL("/background.js");
   browser.runtime.onMessage.addListener(

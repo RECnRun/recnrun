@@ -52,6 +52,7 @@ Test commands and `verify` run in Docker, so start Docker Desktop first. If Dock
     - UI: see it in a browser.
   - Run experiments that need a broken state in a scratch copy, never in the shared checkout.
   - End every report with what you exercised and the result. Name anything you could not exercise and why; partly tested work is not done.
+- **Check hypotheses about Chrome in its source.** When a design or a fix depends on how Chrome behaves (permissions, prompts, extension APIs, lifetimes), read the Chromium code that decides it before building on it or probing by trial: [source.chromium.org](https://source.chromium.org/chromium/chromium/src), or raw files from the GitHub mirror (`https://raw.githubusercontent.com/chromium/chromium/main/<path>`). Name the file and function in the report or doc, then confirm the behavior with a test.
 - **Red/green testing.** Applies to every behavior change and every new test.
   1. Run the targeted test against the unfixed behavior, or a controlled negative condition, and see it fail for the expected reason.
   2. Make the change.

@@ -1,11 +1,5 @@
 import type { LinkCommand } from "@/messaging/peer-messages";
-import {
-  PAIRING_TTL_MS,
-  decodePairing,
-  encodePairing,
-  fingerprintOf,
-  shortAuthenticationString,
-} from "@/p2p/pairing-code";
+import { PAIRING_TTL_MS, decodePairing, encodePairing, fingerprintOf } from "@/p2p/pairing-code";
 import type { Pairing } from "@/p2p/pairing-code";
 import type {
   AuthorizedPeer,
@@ -22,19 +16,9 @@ export interface PairingDependencies {
   now?: () => number;
 }
 
-/** What the user checks before accepting: who made the code, and the six digits. */
-export interface PairingPreview {
-  kind: Pairing["kind"];
-  profileId: string;
-  displayName: string;
-  digits: string;
-  /** The authorized peer, with the same certificate, as when pairing again after a disconnect. */
-  known: boolean;
-}
-
 const sdpOf = (result: unknown) => (result as { sdp: string }).sdp;
 
-/** Decodes a pasted code: another profile's, and for an answer, one to this profile's offer. */
+/** Decodes a code from the folder: another profile's, and for an answer, one to this profile's offer. */
 async function verifyCode(code: string, deps: PairingDependencies, now: number) {
   const pairing = decodePairing(code, now);
   const me = await deps.identity();
@@ -51,8 +35,8 @@ async function verifyCode(code: string, deps: PairingDependencies, now: number) 
 }
 
 /**
- * Manual pairing: A creates an offer; B inspects it and its user accepts, which answers; A
- * inspects the answer and its user confirms that both profiles show the same digits.
+ * The offer and answer codes profiles exchange through the RECnRun folder: A offers to B, B
+ * accepts and answers, A accepts the answer. Accepting pins the code's certificate fingerprint.
  */
 export function createPairing(deps: PairingDependencies) {
   const now = deps.now ?? Date.now;
@@ -60,21 +44,12 @@ export function createPairing(deps: PairingDependencies) {
     const me = await deps.identity();
     return encodePairing({ kind, pairingId, ...me, expiresAt: now() + PAIRING_TTL_MS, sdp });
   };
-  /** An offer for whoever imports it, or through the folder, for the profile `to`. */
-  const createOffer = async (to?: string) => {
+  /** An offer for the profile `to`. */
+  const createOffer = async (to: string) => {
     const pairingId = crypto.randomUUID();
     const sdp = sdpOf(await deps.askLink({ type: "offer" }));
-    await deps.pending.write({ pairingId, expiresAt: now() + PAIRING_TTL_MS, ...(to && { to }) });
+    await deps.pending.write({ pairingId, expiresAt: now() + PAIRING_TTL_MS, to });
     return { code: await half("offer", pairingId, sdp) };
-  };
-  const inspect = async (code: string): Promise<PairingPreview> => {
-    const { pairing, fingerprint } = await verifyCode(code, deps, now());
-    const mine = (await deps.askLink({ type: "fingerprint" })) as { fingerprint: string };
-    const peer = await deps.authorized.read();
-    const { kind, profileId, displayName } = pairing;
-    const digits = await shortAuthenticationString(mine.fingerprint, fingerprint);
-    const known = peer?.profileId === profileId && peer.fingerprint === fingerprint;
-    return { kind, profileId, displayName, digits, known };
   };
   const accept = async (code: string): Promise<{ code?: string }> => {
     const { pairing, fingerprint } = await verifyCode(code, deps, now());
@@ -89,7 +64,7 @@ export function createPairing(deps: PairingDependencies) {
     await deps.pending.write(null);
     return {};
   };
-  return { createOffer, inspect, accept };
+  return { createOffer, accept };
 }
 
 export type PairingFlow = ReturnType<typeof createPairing>;

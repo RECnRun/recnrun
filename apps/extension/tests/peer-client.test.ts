@@ -46,7 +46,7 @@ describe("ask", () => {
 
   test("throws the background's error", async () => {
     background({ ok: false, error: "No peer is paired." });
-    await expect(createPeerClient().ask({ type: "ping" }, v.unknown())).rejects.toThrow(
+    await expect(createPeerClient().ask({ type: "tabs" }, v.unknown())).rejects.toThrow(
       "No peer is paired.",
     );
   });
@@ -107,20 +107,14 @@ describe("peerServices", () => {
     expect(sent).toEqual([{ type: "peer", request: { type: "session-set", status: "recording" } }]);
   });
 
-  test("opens the folder page in a small window of its own", async () => {
+  test("opens the folder window, small and of its own", async () => {
     const create = vi.spyOn(fakeBrowser.windows, "create");
     await peerServices().openFolder();
     expect(create).toHaveBeenCalledWith({
-      url: fakeBrowser.runtime.getURL("/pairing.html#folder"),
+      url: fakeBrowser.runtime.getURL("/folder.html"),
       type: "popup",
       width: 480,
       height: 360,
     });
-  });
-
-  test("opens the pairing page in a new tab", async () => {
-    const create = vi.spyOn(fakeBrowser.tabs, "create");
-    await peerServices().openPairing();
-    expect(create).toHaveBeenCalledWith({ url: fakeBrowser.runtime.getURL("/pairing.html") });
   });
 });

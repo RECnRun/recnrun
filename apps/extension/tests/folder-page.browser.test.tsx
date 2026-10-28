@@ -2,11 +2,10 @@ import { afterEach, beforeEach, expect, test, vi } from "vite-plus/test";
 import { render } from "preact";
 import type { PeerStatus } from "@/messaging/peer-results";
 import { loadFolder } from "@/p2p/folder-store";
-import { FolderPage } from "@/pairing/FolderPage";
-import { startPairing } from "@/pairing/start";
+import { FolderPage } from "@/folder/FolderPage";
+import { startFolder } from "@/folder/start";
 import { fakePeerClient, statusOf } from "./fake-peer-client";
-import { alerts } from "./pairing-page";
-import { button } from "./queries";
+import { alerts, button } from "./queries";
 
 const withFolder = (folder: PeerStatus["folder"]): PeerStatus => ({ ...statusOf(), folder });
 const paired = (): PeerStatus => ({ ...statusOf("connected"), folderPairing: true });
@@ -57,13 +56,21 @@ test("choosing the folder keeps it, starts pairing, and the window waits until p
   await expect.poll(() => close.mock.calls).toHaveLength(1);
 });
 
-test("after a restart, it asks Chrome again for the folder instead of choosing one", async () => {
-  const { peer, close, root, allow } = mount("prompt");
+test("once the grant ended, it asks Chrome again for the folder instead of choosing one", async () => {
+  let released = -1;
+  const { peer, close, root, allow } = mount(
+    "prompt",
+    vi.fn(async () => {
+      released = peer.asked("folder-release").length;
+    }),
+  );
   await expect.poll(() => button(root, "Allow folder")).toBeDefined();
   expect(root.textContent).toContain("Allow on every visit");
   button(root, "Allow folder")?.click();
   await expect.poll(() => peer.asked("folder-pair")).toHaveLength(1);
   expect(allow).toHaveBeenCalledOnce();
+  // Chrome offers "Allow on every visit" only once no old handle holds the picker's grant.
+  expect(released).toBe(1);
   await expect.poll(() => root.textContent).toContain(WAIT);
   expect(close).not.toHaveBeenCalled();
   peer.change(paired());
@@ -84,13 +91,13 @@ test("a folder Chrome does not allow is an alert, and the window stays", async (
   expect(peer.asked("folder-pair")).toEqual([]);
 });
 
-test("the pairing page opened for the folder shows only the folder, with Chrome's prompts", async () => {
+test("the extension's only page is the folder window, with Chrome's prompts", async () => {
   const picked = await privateFolder();
   vi.stubGlobal("showDirectoryPicker", async () => picked);
   const close = vi.spyOn(window, "close").mockImplementation(() => {});
   const peer = fakePeerClient(withFolder("none"));
   const root = document.body.appendChild(document.createElement("div"));
-  startPairing(root, peer.client, "#folder");
+  startFolder(root, peer.client);
   await expect.poll(() => root.querySelector("h1")?.textContent).toBe("RECnRun folder");
   expect(root.textContent).not.toContain("Pair by hand instead");
   await expect.poll(() => button(root, "Choose folder")?.disabled).toBe(false);
@@ -98,7 +105,7 @@ test("the pairing page opened for the folder shows only the folder, with Chrome'
   await expect.poll(() => root.textContent).toContain(WAIT);
   peer.change(paired());
   await expect.poll(() => close.mock.calls).toHaveLength(1);
-  // After a restart, the kept folder is asked for again; Chrome grants a private one at once.
+  // Once the grant ended, the kept folder is asked for again; Chrome grants a private one at once.
   peer.change(withFolder("prompt"));
   await expect.poll(() => button(root, "Allow folder")?.disabled).toBe(false);
   button(root, "Allow folder")?.click();

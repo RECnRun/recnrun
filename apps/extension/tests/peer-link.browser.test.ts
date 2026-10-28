@@ -8,8 +8,13 @@ const CONNECT_MS = 15_000;
 const links: PeerLink[] = [];
 const P256: EcKeyGenParams = { name: "ECDSA", namedCurve: "P-256" };
 
+type Liveness = Pick<
+  NonNullable<Parameters<typeof createPeerLink>[1]>,
+  "heartbeatMs" | "silenceMs"
+>;
+
 /** A link whose frames and state changes are recorded. */
-async function side(withCertificate = true) {
+async function side(withCertificate = true, liveness: Liveness = {}) {
   const frames: string[] = [];
   const states: string[] = [];
   const certificate = withCertificate
@@ -17,7 +22,7 @@ async function side(withCertificate = true) {
     : undefined;
   const link = createPeerLink(
     { onFrame: (frame) => frames.push(frame), onState: (state) => states.push(state) },
-    { certificate },
+    { certificate, ...liveness },
   );
   links.push(link);
   return { link, frames, states, certificate };
@@ -79,17 +84,6 @@ describe("a pairing", () => {
     await pair(alice, bob);
     expect(alice.link.remoteFingerprint()).toMatch(/^[0-9A-F:]+$/);
   });
-
-  test("logs candidate types and states, never an address", async () => {
-    const [alice, bob] = [await side(), await side()];
-    await pair(alice, bob);
-    const log = alice.link.diagnostics();
-    expect(log[0]).toMatch(/^\+\d+ms link connecting$/);
-    expect(log).toContainEqual(expect.stringMatching(/ candidate host( \(mDNS\))? udp$/));
-    expect(log).toContainEqual(expect.stringMatching(/ gathering complete$/));
-    expect(log).toContainEqual(expect.stringMatching(/ link connected$/));
-    expect(log.join("\n")).not.toMatch(/\d+\.\d+\.\d+\.\d+|[0-9a-f-]{36}\.local/);
-  });
 });
 
 describe("closing", () => {
@@ -121,12 +115,31 @@ describe("closing", () => {
   });
 });
 
+describe("liveness", () => {
+  const quick = { heartbeatMs: 100, silenceMs: 400 };
+
+  test("keeps a link whose peer beats, and forwards no beat as a frame", async () => {
+    const [alice, bob] = [await side(true, quick), await side(true, quick)];
+    await pair(alice, bob);
+    await new Promise((resolve) => setTimeout(resolve, 1_000));
+    expect(alice.states).toEqual(["connecting", "connected"]);
+    expect(bob.states).toEqual(["connecting", "connected"]);
+    expect([...alice.frames, ...bob.frames]).toEqual([]);
+  });
+
+  test("drops a link whose peer went silent, as when its browser quits", async () => {
+    const [alice, bob] = [await side(true, quick), await side(true, { heartbeatMs: 60_000 })];
+    await pair(alice, bob);
+    await vi.waitFor(() => expect(alice.link.state()).toBe("disconnected"), { timeout: 2_000 });
+    expect(alice.link.send("late")).toBe(false);
+  });
+});
+
 describe("failures", () => {
   test("refuses an answer before an offer", async () => {
     const { link, states } = await side();
     await expect(link.acceptAnswer("v=0\r\n")).rejects.toThrow("Create an offer first.");
     expect(states).toEqual(["failed"]);
-    expect(link.diagnostics()).toContainEqual(expect.stringMatching(/ error Error$/));
   });
 
   test("refuses an answer on the side that answered", async () => {
@@ -136,23 +149,11 @@ describe("failures", () => {
     expect(bob.states).toEqual(["connecting", "failed"]);
   });
 
-  test("fails on an offer that is not SDP, naming only the error", async () => {
+  test("fails on an offer that is not SDP", async () => {
     const { link, states } = await side();
     const refused = await link.acceptOffer("not sdp").catch((error: unknown) => error);
     expect(refused).toBeInstanceOf(DOMException);
     expect(states).toEqual(["connecting", "failed"]);
-    const [error] = link.diagnostics().filter((entry) => entry.includes(" error "));
-    expect(error).toMatch(/ error \w+Error$/);
-  });
-
-  test("keeps only the last 200 diagnostics", async () => {
-    const { link } = await side();
-    for (let attempt = 0; attempt < 205; attempt += 1) {
-      await link.acceptAnswer("v=0\r\n").catch(() => undefined);
-    }
-    const log = link.diagnostics();
-    expect(log).toHaveLength(200);
-    expect(log.every((entry) => entry.endsWith(" error Error"))).toBe(true);
   });
 
   test("returns what was gathered when gathering stalls", async () => {

@@ -1,5 +1,4 @@
 import type { PeerChannel } from "@/background/peer-channel";
-import type { PairingFlow } from "@/background/pairing";
 import type { LinkCommand, PeerRequest } from "@/messaging/peer-messages";
 import type { FolderAccess } from "@/p2p/folder-store";
 import type { PeerMessage, SharedTabs } from "@/p2p/protocol";
@@ -17,7 +16,6 @@ export interface PeerRequestDependencies {
   channel: Pick<PeerChannel, "request" | "send">;
   /** Introduces this profile to the peer, as on every new link. */
   hello: () => Promise<void>;
-  pairing: PairingFlow;
   askLink: (command: LinkCommand) => Promise<unknown>;
   identity: () => Promise<ProfileIdentity>;
   rename: (identity: ProfileIdentity) => Promise<void>;
@@ -35,6 +33,8 @@ export interface PeerRequestDependencies {
     waiting: () => Promise<boolean>;
     start: () => Promise<void>;
     stop: () => Promise<void>;
+    /** Drops every handle to the folder, so Chrome may offer to keep it on every visit. */
+    release: () => Promise<void>;
   };
 }
 
@@ -92,12 +92,6 @@ async function status(deps: Deps) {
   return { identity, peer, link, peerSession: session, controlledByPeer, folder, folderPairing };
 }
 
-async function ping(deps: Deps) {
-  const sent = performance.now();
-  await deps.channel.request("PING", { timestamp: Date.now() });
-  return { latencyMs: Math.round(performance.now() - sent) };
-}
-
 /** Tells a verified peer the close is intended, so it does not report a failure, then closes. */
 async function close(deps: Deps) {
   // The channel sends only over a verified link; a peer already gone hears nothing.
@@ -120,6 +114,11 @@ async function forget(deps: Deps) {
   await deps.tabs.write(null);
 }
 
+/** A connected profile needs no folder, and its link lives in the handles' document. */
+async function releaseFolder(deps: Deps) {
+  if (!(await verified(deps))) await deps.folder.release();
+}
+
 async function rename(deps: Deps, displayName: string) {
   const identity = { ...(await deps.identity()), displayName };
   await deps.rename(identity);
@@ -134,14 +133,10 @@ type Handlers = {
 const HANDLERS: Handlers = {
   status: (deps) => status(deps),
   rename: (deps, { displayName }) => rename(deps, displayName),
-  "create-offer": (deps) => deps.pairing.createOffer(),
-  inspect: (deps, { code }) => deps.pairing.inspect(code),
-  accept: (deps, { code }) => deps.pairing.accept(code),
   disconnect: (deps) => disconnect(deps),
   forget: (deps) => forget(deps),
   "folder-pair": (deps) => deps.folder.start(),
-  ping: (deps) => ping(deps),
-  diagnostics: (deps) => deps.askLink({ type: "info" }),
+  "folder-release": (deps) => releaseFolder(deps),
   tabs: (deps) => peerTabs(deps),
   activate: (deps, { tabId }) => command(deps.channel.request("ACTIVATE_TAB", { tabId })),
   "session-start": (deps, { tabId }) => startRemote(deps, tabId),

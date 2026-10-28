@@ -11,13 +11,9 @@ export function peerServices(): PeerServices {
     client,
     tabs: remoteTabs(client),
     recordings: remoteRecordings(client, remoteRecordingRepository),
-    openPairing: async () => {
-      // Production builds have no pairing page, so the typed public paths leave it out.
-      const url = new URL("pairing.html", browser.runtime.getURL("/")).href;
-      await browser.tabs.create({ url });
-    },
     openFolder: async () => {
-      const url = new URL("pairing.html#folder", browser.runtime.getURL("/")).href;
+      // Production builds have no folder window, so the typed public paths leave it out.
+      const url = new URL("folder.html", browser.runtime.getURL("/")).href;
       await browser.windows.create({ url, type: "popup", width: 480, height: 360 });
     },
   };

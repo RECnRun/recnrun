@@ -111,7 +111,6 @@ const isCommand = (message: PeerMessage): message is Command => COMMANDS.has(mes
 export async function execute(message: PeerMessage, deps: ExecutorDependencies): Promise<void> {
   const { channel } = deps;
   const requestId = message.id;
-  if (message.type === "PING") await channel.send("PONG", { requestId, timestamp: Date.now() });
   if (message.type === "GET_TABS")
     await channel.send("TABS_SNAPSHOT", { requestId, ...(await sharedTabs(deps.tabs)) });
   // A new link starts with the session's state, so the controller never keeps a stale copy.

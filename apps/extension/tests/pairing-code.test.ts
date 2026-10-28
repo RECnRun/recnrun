@@ -1,11 +1,5 @@
 import { describe, expect, test } from "vite-plus/test";
-import {
-  PAIRING_TTL_MS,
-  decodePairing,
-  encodePairing,
-  fingerprintOf,
-  shortAuthenticationString,
-} from "@/p2p/pairing-code";
+import { PAIRING_TTL_MS, decodePairing, encodePairing, fingerprintOf } from "@/p2p/pairing-code";
 
 const NOW = 1_700_000_000_000;
 const FINGERPRINT = "AB:CD:EF:01";
@@ -63,19 +57,5 @@ describe("fingerprintOf", () => {
   test("finds nothing without a SHA-256 fingerprint", () => {
     expect(fingerprintOf("v=0\r\na=fingerprint:sha-1 AB:CD\r\n")).toBeUndefined();
     expect(fingerprintOf("v=0\r\n")).toBeUndefined();
-  });
-});
-
-describe("shortAuthenticationString", () => {
-  test("gives both sides the same six digits", async () => {
-    const mine = await shortAuthenticationString("AA:01", "BB:02");
-    expect(mine).toMatch(/^\d{6}$/);
-    expect(await shortAuthenticationString("BB:02", "AA:01")).toBe(mine);
-  });
-
-  test("changes when either certificate changes", async () => {
-    const original = await shortAuthenticationString("AA:01", "BB:02");
-    expect(await shortAuthenticationString("AA:01", "BB:03")).not.toBe(original);
-    expect(await shortAuthenticationString("AA:09", "BB:02")).not.toBe(original);
   });
 });

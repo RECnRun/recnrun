@@ -79,15 +79,13 @@ describe("what the executor shares", () => {
 });
 
 describe("queries", () => {
-  test("answers PING, GET_TABS, and HELLO, each naming the request", async () => {
+  test("answers GET_TABS and HELLO, each naming the request", async () => {
     const shop = await openTab("https://shop.example/");
     const { deps, sent } = executor({ tabs: [shop, PRIVATE] }, running(shop.id), PEER);
-    const ping = fromPeer("PING", { timestamp: 1 });
     const getTabs = fromPeer("GET_TABS", {});
     const hello = fromPeer("HELLO", { displayName: "Desk", extensionVersion: "0.1.0" });
-    for (const message of [ping, getTabs, hello]) await execute(message, deps);
+    for (const message of [getTabs, hello]) await execute(message, deps);
     expect(sent).toEqual([
-      { type: "PONG", payload: { requestId: ping.id, timestamp: expect.any(Number) } },
       {
         type: "TABS_SNAPSHOT",
         payload: { requestId: getTabs.id, tabs: [expect.objectContaining({ id: shop.id })] },

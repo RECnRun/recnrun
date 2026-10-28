@@ -18,23 +18,22 @@ export interface PeerLink {
   close: () => void;
   state: () => LinkState;
   remoteFingerprint: () => string | undefined;
-  /** Candidate types, states, and error names; never addresses or payloads. */
-  diagnostics: () => string[];
 }
 
 interface LinkOptions {
   certificate?: RTCCertificate;
   /** Host candidates gather in milliseconds; this bounds a stalled gathering. */
   gatherTimeoutMs?: number;
+  /** How often an open channel beats, so the peer can tell a browser that quit. */
+  heartbeatMs?: number;
+  /** Silence after which the peer counts as gone, well before ICE consent checks give up. */
+  silenceMs?: number;
 }
 
-/** "host (mDNS) udp" or "srflx udp": what a candidate is, without its address. */
-function describeCandidate(candidate: string): string {
-  const type = / typ (\w+)/.exec(candidate)?.[1] ?? "unknown";
-  const protocol = candidate.split(" ")[2]?.toLowerCase() ?? "?";
-  const mdns = /\s[\w-]+\.local\s/.test(candidate) ? " (mDNS)" : "";
-  return `${type}${mdns} ${protocol}`;
-}
+type Liveness = Required<Pick<LinkOptions, "heartbeatMs" | "silenceMs">>;
+
+// Binary, so the peer counts it as life and never forwards it to the background.
+const HEARTBEAT = new Uint8Array([0]);
 
 function gathered(pc: RTCPeerConnection, timeoutMs: number): Promise<void> {
   return new Promise((resolve) => {
@@ -49,43 +48,43 @@ function gathered(pc: RTCPeerConnection, timeoutMs: number): Promise<void> {
   });
 }
 
-/** The link's state and its bounded diagnostics log. */
+/** The link's state, reported once per change. */
 function createTracker(events: PeerLinkEvents) {
-  const log: string[] = [];
-  const started = Date.now();
   let current: LinkState = "idle";
-  const note = (entry: string) => {
-    log.push(`+${Date.now() - started}ms ${entry}`);
-    if (log.length > 200) log.shift();
-  };
   const set = (next: LinkState) => {
     if (next === current) return;
     current = next;
-    note(`link ${next}`);
     events.onState(next);
   };
-  return { log, note, set, state: () => current };
+  return { set, state: () => current };
 }
 
 type Tracker = ReturnType<typeof createTracker>;
 
 function watchConnection(pc: RTCPeerConnection, tracker: Tracker, isCurrent: () => boolean) {
-  pc.addEventListener("icecandidate", ({ candidate }) => {
-    if (candidate?.candidate) tracker.note(`candidate ${describeCandidate(candidate.candidate)}`);
-  });
-  pc.addEventListener("icegatheringstatechange", () =>
-    tracker.note(`gathering ${pc.iceGatheringState}`),
-  );
-  pc.addEventListener("iceconnectionstatechange", () =>
-    tracker.note(`ice ${pc.iceConnectionState}`),
-  );
   pc.addEventListener("connectionstatechange", () => {
-    tracker.note(`connection ${pc.connectionState}`);
     const { connectionState } = pc;
     if (!isCurrent()) return;
     if (connectionState === "failed" || connectionState === "disconnected")
       tracker.set(connectionState);
   });
+}
+
+/** Beats while the channel is open, and calls `silent` once nothing came from the peer for too long. */
+function keepAlive(
+  channel: RTCDataChannel,
+  { heartbeatMs, silenceMs }: Liveness,
+  silent: () => void,
+) {
+  let heard = Date.now();
+  channel.addEventListener("message", () => (heard = Date.now()));
+  const timer = setInterval(() => {
+    if (channel.readyState !== "open") clearInterval(timer);
+    else if (Date.now() - heard >= silenceMs) {
+      clearInterval(timer);
+      silent();
+    } else channel.send(HEARTBEAT);
+  }, heartbeatMs);
 }
 
 async function exportLocal(pc: RTCPeerConnection, timeoutMs: number): Promise<string> {
@@ -97,12 +96,29 @@ async function exportLocal(pc: RTCPeerConnection, timeoutMs: number): Promise<st
 }
 
 /** The current connection and its channel; a fresh one closes the previous. */
-function createSlot(tracker: Tracker, events: PeerLinkEvents, certificate?: RTCCertificate) {
+function createSlot(
+  tracker: Tracker,
+  events: PeerLinkEvents,
+  liveness: Liveness,
+  certificate?: RTCCertificate,
+) {
   let pc: RTCPeerConnection | undefined;
   let channel: RTCDataChannel | undefined;
+  const close = () => {
+    channel?.close();
+    channel = undefined;
+    pc?.close();
+  };
   const adopt = (opened: RTCDataChannel) => {
     channel = opened;
-    opened.addEventListener("open", () => tracker.set("connected"));
+    opened.addEventListener("open", () => {
+      tracker.set("connected");
+      keepAlive(opened, liveness, () => {
+        if (channel !== opened) return;
+        close();
+        tracker.set("disconnected");
+      });
+    });
     opened.addEventListener("close", () => {
       if (channel === opened) tracker.set("disconnected");
     });
@@ -124,21 +140,15 @@ function createSlot(tracker: Tracker, events: PeerLinkEvents, certificate?: RTCC
     tracker.set("connecting");
     return next;
   };
-  const close = () => {
-    channel?.close();
-    channel = undefined;
-    pc?.close();
-  };
   return { adopt, fresh, close, pc: () => pc, channel: () => channel };
 }
 
 export function createPeerLink(events: PeerLinkEvents, options: LinkOptions = {}): PeerLink {
-  const { certificate, gatherTimeoutMs = 10_000 } = options;
+  const { certificate, gatherTimeoutMs = 10_000, heartbeatMs = 1_000, silenceMs = 2_500 } = options;
   const tracker = createTracker(events);
-  const slot = createSlot(tracker, events, certificate);
+  const slot = createSlot(tracker, events, { heartbeatMs, silenceMs }, certificate);
   const guarded = <T>(work: () => Promise<T>) =>
     work().catch((error: unknown) => {
-      tracker.note(`error ${error instanceof Error ? error.name : "unknown"}`);
       tracker.set("failed");
       throw error;
     });
@@ -173,6 +183,5 @@ export function createPeerLink(events: PeerLinkEvents, options: LinkOptions = {}
     },
     state: tracker.state,
     remoteFingerprint: () => fingerprintOf(slot.pc()?.remoteDescription?.sdp ?? ""),
-    diagnostics: () => [...tracker.log],
   };
 }

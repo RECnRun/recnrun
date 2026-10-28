@@ -1,22 +1,29 @@
-import type { BrowserContext, Page } from "@playwright/test";
+import type { BrowserContext } from "@playwright/test";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect } from "./fixtures/extension.ts";
+import {
+  allowFolder,
+  chooseFolder,
+  folderBanner,
+  openFolderWindow,
+  pair,
+  WAITING,
+} from "./fixtures/folder.ts";
 import { test } from "./fixtures/native-dialogs.ts";
 import type { Native } from "./fixtures/native-dialogs.ts";
-import { dashboardIn } from "./fixtures/profiles.ts";
+import { linkStatus, pairingSection, reopen } from "./fixtures/profiles.ts";
 import type { Profile } from "./fixtures/profiles.ts";
+import { dashboardUrl } from "./fixtures/tabs.ts";
 
 /*
  * Both profiles choose one real folder on the container's disk through Chrome's own picker
- * and answer its prompts (H4), so the files one profile writes are the ones the other reads.
+ * and answer its prompts (H4), from the window each dashboard's folder banner opens.
  */
 
 interface ChromeGlobal {
   chrome: { storage: { local: { get(key: string): Promise<Record<string, unknown>> } } };
 }
-
-const WAITING = "Waiting for another profile in the folder…";
 
 const profileIdOf = (profile: Pick<Profile, "serviceWorker">) =>
   profile.serviceWorker.evaluate(async () => {
@@ -25,172 +32,140 @@ const profileIdOf = (profile: Pick<Profile, "serviceWorker">) =>
     return (profileIdentity as { profileId: string }).profileId;
   });
 
-const folderSection = (page: Page) => page.locator('section[aria-labelledby="folder-heading"]');
-
 const presenceOf = (folder: string, profileId: string) =>
   JSON.parse(readFileSync(join(folder, "pairing", profileId, "presence.json"), "utf8"));
-
-/** Chooses `folder` through Chrome's picker on `page`, then lets the site edit it. */
-async function chooseFolder(page: Page, { dialogs, folder }: Native) {
-  const native = await dialogs(page);
-  await page.getByRole("button", { name: "Choose folder" }).click();
-  await native.chooseFolder(folder);
-  await native.answerWritePrompt("allow");
-}
-
-/** Both profiles choose the folder; A's page stays open, or Chrome drops A's grant (H2). */
-async function pairThroughFolder(a: Profile, b: Profile, native: Native) {
-  await chooseFolder(a.pairing, native);
-  await expect(folderSection(a.pairing)).toContainText(WAITING);
-  await chooseFolder(b.pairing, native);
-  await expect(b.pairing.getByRole("status")).toHaveText(`Connected — ${a.name}`, {
-    timeout: 30_000,
-  });
-  await expect(folderSection(b.pairing)).toContainText(`Paired with ${a.name}`);
-}
-
-const extensionPage = async (
-  profile: Pick<Profile, "context" | "serviceWorker">,
-  path = "pairing.html",
-) => {
-  const page = await profile.context.newPage();
-  await page.goto(new URL(path, profile.serviceWorker.url()).href);
-  return page;
-};
-
-/** Quits the profile's browser, waits until `watching` saw it go, and starts it again. */
-async function restart(
-  profile: Profile,
-  watching: Page,
-  launch: (dir: string) => Promise<BrowserContext>,
-): Promise<Profile> {
-  await profile.context.close();
-  // No close message comes from a browser that quits; ICE consent checks find it gone.
-  await expect(watching.getByRole("status")).toHaveText(
-    /^(Disconnected|Not reachable) — Profile B$/,
-    { timeout: 45_000 },
-  );
-  const context = await launch(profile.dir);
-  const serviceWorker =
-    context.serviceWorkers()[0] ?? (await context.waitForEvent("serviceworker"));
-  return { ...profile, context, serviceWorker };
-}
-
-test("two profiles pair through one RECnRun folder on disk", async ({
-  profileA,
-  profileB,
-  native,
-}) => {
-  await pairThroughFolder(profileA, profileB, native);
-  await expect(profileA.pairing.getByRole("status")).toHaveText(`Connected — ${profileB.name}`);
-  await expect(folderSection(profileA.pairing)).toContainText(`Paired with ${profileB.name}`);
-  // Paired, each profile stays in the folder, so its peer finds it after a restart.
-  for (const profile of [profileA, profileB])
-    expect(presenceOf(native.folder, await profileIdOf(profile))).toMatchObject({
-      displayName: profile.name,
-    });
-});
 
 const extensionPages = (profile: Pick<Profile, "context">) =>
   profile.context.pages().filter((page) => page.url().startsWith("chrome-extension://"));
 
-/** Answers Chrome's restore prompt from the folder window, then waits until `watching` sees the link. */
-async function allowOnEveryVisit(profile: Profile, watching: Page, native: Native) {
-  const window = await extensionPage(profile, "pairing.html#folder");
-  const dialogs = await native.dialogs(window);
-  await window.getByRole("button", { name: "Allow folder" }).click();
-  await dialogs.answerRestorePrompt("every-visit");
-  await expect(watching.getByRole("status")).toHaveText(`Connected — ${profile.name}`, {
-    timeout: 120_000,
-  });
+type Launch = (dir: string) => Promise<BrowserContext>;
+
+/** Quits the profile's browser, waits until `watching` saw it go, and starts it again. */
+async function restart(profile: Profile, watching: Profile, launch: Launch): Promise<Profile> {
+  await profile.context.close();
+  // No close message comes from a browser that quits; ICE consent checks find it gone.
+  await expect(linkStatus(watching)).toHaveText(
+    new RegExp(`^(Disconnected|Not reachable) — ${profile.name}$`),
+    { timeout: 45_000 },
+  );
+  return reopen(profile, await launch(profile.dir));
 }
 
-test("a restarted profile allows the folder once more, keeps it with no page open, and reconnects with no click after later restarts", async ({
+const connected = async (a: Profile, b: Profile) => {
+  await expect(linkStatus(a)).toHaveText(`Connected — ${b.name}`, { timeout: 120_000 });
+  await expect(linkStatus(b)).toHaveText(`Connected — ${a.name}`, { timeout: 30_000 });
+};
+
+/**
+ * Restarts `profile` and reconnects it once it allows the folder on every visit, in the restore
+ * prompt (H1); `other` keeps its grant while its dashboard stays open (H2).
+ */
+async function restartAndAllow(profile: Profile, other: Profile, native: Native, launch: Launch) {
+  const restarted = await restart(profile, other, launch);
+  expect(await allowFolder(restarted, native)).toBe("restore");
+  await connected(other, restarted);
+  return restarted;
+}
+
+test("two profiles pair from their dashboards through one RECnRun folder on disk, in windows that close once paired", async ({
+  profileA,
+  profileB,
+  native,
+}) => {
+  const windows = await pair(profileA, profileB, native);
+  for (const window of windows)
+    await expect.poll(() => window.isClosed(), { timeout: 10_000 }).toBe(true);
+  await expect(
+    profileA.dashboard.getByRole("heading", { name: `Chrome — ${profileB.name} (Connected)` }),
+  ).toBeVisible();
+  // Connected, neither dashboard asks for the folder: each keeps the grant its window gave (H2).
+  for (const profile of [profileA, profileB]) {
+    await expect(folderBanner(profile.dashboard)).toHaveCount(0);
+    // Paired, each profile stays in the folder, so its peer finds it after a restart.
+    expect(presenceOf(native.folder, await profileIdOf(profile))).toMatchObject({
+      displayName: profile.name,
+    });
+  }
+});
+
+test("the folder grant ends with the last extension page, and allowing again keeps the folder on every visit", async ({
+  profileA,
+  native,
+}) => {
+  const window = await chooseFolder(profileA, native);
+  await window.close();
+  // The dashboard is an extension page too, so it keeps the grant (H2).
+  await expect(pairingSection(profileA.dashboard)).toContainText(WAITING);
+  await expect(folderBanner(profileA.dashboard)).toHaveCount(0);
+  for (const page of extensionPages(profileA)) await page.close();
+  const dashboard = await profileA.context.newPage();
+  await dashboard.goto(dashboardUrl(profileA.serviceWorker));
+  const reopened = { ...profileA, dashboard };
+  await expect(folderBanner(dashboard)).toContainText("Allow the RECnRun folder");
+  const { window: again, dialogs } = await openFolderWindow(reopened, native);
+  await again.getByRole("button", { name: "Allow folder" }).click();
+  expect(await dialogs.allowInEitherPrompt()).toBe("restore");
+  await expect(again.getByText("Keep this window open")).toBeVisible();
+  await again.close();
+  await dashboard.reload();
+  await expect(pairingSection(dashboard)).toContainText(WAITING);
+  await expect(folderBanner(dashboard)).toHaveCount(0);
+});
+
+test("profiles that both allowed the folder on every visit keep it with no page open, reconnect with no click after a restart, and within seconds after a Disconnect", async ({
   profileA,
   profileB,
   native,
   launch,
 }) => {
-  test.setTimeout(300_000);
-  await pairThroughFolder(profileA, profileB, native);
-  const watching = profileA.pairing;
-  // H1: after the first restart, Chrome asks once more; "Allow on every visit" ends that.
-  let restarted = await restart(profileB, watching, launch);
-  await allowOnEveryVisit(restarted, watching, native);
-  // "Allow on every visit" outlives B's pages: B refreshes its presence with none open.
-  for (const page of extensionPages(restarted)) await page.close();
-  expect(extensionPages(restarted)).toEqual([]);
-  const idB = await profileIdOf(restarted);
+  test.setTimeout(480_000);
+  await pair(profileA, profileB, native);
+  // Each allows the folder on every visit as it restarts; after that, a restart takes no click.
+  const b = await restartAndAllow(profileB, profileA, native, launch);
+  const a = await restartAndAllow(profileA, b, native, launch);
+  await expect(folderBanner(a.dashboard)).toHaveCount(0);
+  // "Allow on every visit" outlives every extension page: B refreshes its presence with none open.
+  for (const page of extensionPages(b)) await page.close();
+  const idB = await profileIdOf(b);
   const expiry = () => (presenceOf(native.folder, idB) as { expiresAt: number }).expiresAt;
   const before = expiry();
   await expect.poll(expiry, { timeout: 45_000 }).toBeGreaterThan(before);
-  await expect(watching.getByRole("status")).toHaveText(`Connected — ${profileB.name}`);
-  restarted = await restart(restarted, watching, launch);
-  await expect(watching.getByRole("status")).toHaveText(`Connected — ${profileB.name}`, {
-    timeout: 120_000,
+  const again = await restart(b, a, launch);
+  await connected(a, again);
+  await expect(folderBanner(again.dashboard)).toHaveCount(0);
+
+  // The lower profile id offers, and its last offer is still in the folder when the other,
+  // which answers, disconnects and reconnects.
+  const [offerer, answerer] = (await profileIdOf(a)) < idB ? [a, again] : [again, a];
+  const click = (name: string) =>
+    pairingSection(answerer.dashboard).getByRole("button", { name }).click();
+  await click("Disconnect");
+  await expect(linkStatus(offerer)).toHaveText(`Disconnected by ${answerer.name}`);
+  await click("Reconnect");
+  await expect(linkStatus(answerer)).toHaveText(`Connected — ${offerer.name}`, {
+    timeout: 10_000,
   });
-  const page = await extensionPage(restarted);
-  await expect(page.getByRole("status")).toHaveText(`Connected — ${profileA.name}`);
-  await expect(folderSection(page)).not.toContainText("Chrome asks again");
-});
-
-/** Chooses the folder from a dashboard tab, through the window the banner opens. */
-async function chooseFromDashboard(profile: Profile, native: Native) {
-  const dashboard = await dashboardIn(profile);
-  await expect(dashboard.getByRole("heading", { name: "Choose the RECnRun folder" })).toBeVisible();
-  const opened = profile.context.waitForEvent("page");
-  await dashboard.getByRole("button", { name: "Choose folder" }).click();
-  const window = await opened;
-  await window.waitForLoadState();
-  await expect(window.getByRole("heading", { name: "RECnRun folder" })).toBeVisible();
-  await chooseFolder(window, native);
-  // The window waits, open, since Chrome keeps the folder only while a page is open (H2).
-  await expect(window.getByText("Keep this window open")).toBeVisible();
-  return { dashboard, window };
-}
-
-test("two profiles pair from their dashboards, each in a folder window that closes once paired", async ({
-  profileA,
-  profileB,
-  native,
-}) => {
-  // With the fixture's pairing pages closed, the folder window is each profile's only page.
-  await profileA.pairing.close();
-  await profileB.pairing.close();
-  const a = await chooseFromDashboard(profileA, native);
-  await expect(
-    a.dashboard.getByText("Waiting for another profile in the RECnRun folder…"),
-  ).toBeVisible();
-  const b = await chooseFromDashboard(profileB, native);
-  await expect(
-    b.dashboard.getByRole("heading", { name: `Chrome — ${profileA.name} (Connected)` }),
-  ).toBeVisible({ timeout: 30_000 });
-  await expect(
-    a.dashboard.getByRole("heading", { name: `Chrome — ${profileB.name} (Connected)` }),
-  ).toBeVisible();
-  for (const window of [a.window, b.window])
-    await expect.poll(() => window.isClosed(), { timeout: 10_000 }).toBe(true);
 });
 
 test("a profile stays unpaired when the user cancels the picker or Chrome may not edit the folder", async ({
   profileA,
   native,
 }) => {
-  const page = profileA.pairing;
-  const dialogs = await native.dialogs(page);
-  const choose = page.getByRole("button", { name: "Choose folder" });
-  const aborted = page.getByRole("alert").filter({ hasText: "The user aborted a request." });
+  const { window, dialogs } = await openFolderWindow(profileA, native);
+  const choose = window.getByRole("button", { name: "Choose folder" });
+  const aborted = window.getByRole("alert").filter({ hasText: "The user aborted a request." });
   await choose.click();
   await dialogs.cancelPicker();
   await expect(aborted).toBeVisible();
-  await page.reload();
+  await window.reload();
   await choose.click();
   await dialogs.chooseFolder(native.folder);
   await dialogs.answerWritePrompt("deny");
   // Chrome reports a refused write prompt as an abort too.
   await expect(aborted).toBeVisible();
   await expect(choose).toBeVisible();
-  await expect(page.getByRole("status")).toHaveText("Not paired");
+  await expect(linkStatus(profileA)).toHaveText("Not paired");
+  await expect(folderBanner(profileA.dashboard)).toContainText("Choose the RECnRun folder");
   expect(existsSync(join(native.folder, "pairing"))).toBe(false);
 });
 
@@ -199,14 +174,12 @@ test("the folder window says so when Chrome refuses the folder after a restart",
   native,
   launch,
 }) => {
-  await chooseFolder(profileA.pairing, native);
-  await expect(folderSection(profileA.pairing)).toContainText(WAITING);
+  await chooseFolder(profileA, native);
+  await expect(pairingSection(profileA.dashboard)).toContainText(WAITING);
   await profileA.context.close();
-  const context = await launch(profileA.dir);
-  const serviceWorker =
-    context.serviceWorkers()[0] ?? (await context.waitForEvent("serviceworker"));
-  const window = await extensionPage({ context, serviceWorker }, "pairing.html#folder");
-  const dialogs = await native.dialogs(window);
+  const restarted = await reopen(profileA, await launch(profileA.dir));
+  await expect(folderBanner(restarted.dashboard)).toContainText("Allow the RECnRun folder");
+  const { window, dialogs } = await openFolderWindow(restarted, native);
   await window.getByRole("button", { name: "Allow folder" }).click();
   await dialogs.answerRestorePrompt("deny");
   await expect(window.getByRole("alert")).toHaveText(
@@ -235,20 +208,14 @@ test("a profile whose folder grant the user revokes in Chrome's settings allows 
   launch,
 }) => {
   test.setTimeout(300_000);
-  await pairThroughFolder(profileA, profileB, native);
-  const watching = profileA.pairing;
-  let restarted = await restart(profileB, watching, launch);
-  await allowOnEveryVisit(restarted, watching, native);
-  await revokeInSettings(restarted);
-  restarted = await restart(restarted, watching, launch);
-  const window = await extensionPage(restarted, "pairing.html#folder");
-  const allow = window.getByRole("button", { name: "Allow folder" });
-  await expect(allow).toBeVisible({ timeout: 30_000 });
-  const dialogs = await native.dialogs(window);
-  await allow.click();
-  // With the kept grant gone, Chrome shows its write prompt, not the restore prompt.
-  await dialogs.answerWritePrompt("allow");
-  await expect(watching.getByRole("status")).toHaveText(`Connected — ${profileB.name}`, {
-    timeout: 120_000,
+  await pair(profileA, profileB, native);
+  let b = await restartAndAllow(profileB, profileA, native, launch);
+  await revokeInSettings(b);
+  b = await restart(b, profileA, launch);
+  await expect(folderBanner(b.dashboard)).toContainText("Allow the RECnRun folder", {
+    timeout: 30_000,
   });
+  // With the kept grant gone, Chrome shows its write prompt, not the restore prompt.
+  expect(await allowFolder(b, native)).toBe("write");
+  await connected(profileA, b);
 });
