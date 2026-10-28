@@ -19,3 +19,11 @@ Ruled out on the way: a lock request that never settles (the click never reached
 **Cause.** Each popstate sends the route to the frame, and the frame published the route it shows back in a `location` message, which the content script applied with `history.pushState` whenever that path differed from the address bar. Preact publishes in an effect, after paint, so the answer to the first Back (`/`) could arrive after the second Back: the content script pushed `/`, then the second route again, and a reload between those two pushes reloaded `/`.
 
 **Solution.** The frame says which routes come from its own navigation: a link click sends a `navigate` message, the only one the content script turns into `history.pushState`. `location` only sets the title, and only while its path is still in the address bar, so a late answer to a Back changes nothing (`frame.browser.test.tsx`, "a location the address bar has moved past…").
+
+## A captured Blob cannot be written to the extension's IndexedDB
+
+**Symptom.** `poc-transport.spec.ts` failed in `captureIdentity` with `DataError: Failed to write blobs (InvalidBlob)`: a Blob that the origin agent read from an Incognito page's IndexedDB and sent to the service worker over its port (structured clone messaging) could not be stored in the extension's own IndexedDB.
+
+**Cause.** The service worker can read such a Blob (`arrayBuffer()` returns its bytes and `type` is kept), but IndexedDB refuses to write it. The Blob still refers to the Incognito page's blob data, which the extension's storage does not accept. The opposite direction, a Blob read from the extension's IndexedDB and sent to the agent, restores into the page without trouble.
+
+**Solution.** Before writing each part, the background replaces every Blob in it, at any depth, with a copy made from its bytes, keeping its `type` (and a File's `name` and `lastModified`) (`background/workspace/own-blobs.ts`, `own-blobs.test.ts`).

@@ -48,6 +48,8 @@ function run(port: OriginPort, stores: OriginStores, command: OriginCommand): Pr
         records,
       }),
   };
+  // The background checks that this Date arrives as one before it trusts any value.
+  port.postMessage({ type: "capture-started", operationId, generation, probe: new Date(0) });
   return replyAfter(port, command, async () => ({
     type: "captured",
     counts: await captureOrigin(stores.indexedDB, sink, command.chunk),

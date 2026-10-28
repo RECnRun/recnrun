@@ -51,11 +51,13 @@ const RestoredCountsSchema = v.object({
 export type RestoredCounts = v.InferOutput<typeof RestoredCountsSchema>;
 
 /**
- * The agent's answers: restore counts; a capture's schemas, records, and counts; or a failed step
+ * The agent's answers: restore counts; a capture's probe, schemas, records, and counts; or a failed step
  * and an error name, never a stored value.
  */
 export const OriginReplySchema = v.variant("type", [
   v.object({ type: v.literal("restored"), ...OPERATION, counts: RestoredCountsSchema }),
+  // Sent first: a `Date` that arrives as anything else means messages lost their structured types.
+  v.object({ type: v.literal("capture-started"), ...OPERATION, probe: v.unknown() }),
   // A database's schema comes before its records, and its stores carry no records of their own.
   v.object({ type: v.literal("capture-database"), ...OPERATION, database: DatabaseSchema }),
   v.object({

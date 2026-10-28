@@ -118,7 +118,9 @@ async function createApp() {
 
 const capture = { type: "capture", ...operation, chunk: 2 };
 
-test("captures on a capture command: each schema, its records in chunks, then the counts", async () => {
+const probeReply = { type: "capture-started", ...operation, probe: new Date(0) };
+
+test("captures on a capture command: a probe, each schema, its records in chunks, then the counts", async () => {
   await createApp();
   const agent = linked();
   agent.onMessage.emit(capture);
@@ -127,6 +129,7 @@ test("captures on a capture command: each schema, its records in chunks, then th
   await expect
     .poll(() => agent.posted)
     .toEqual([
+      probeReply,
       {
         type: "capture-database",
         ...operation,
@@ -145,6 +148,6 @@ test("a capture that fails replies failed with the step and an error name", asyn
   agent.onMessage.emit(capture);
   await expect
     .poll(() => agent.posted)
-    .toEqual([{ type: "failed", ...operation, error: "indexedDB: AbortError" }]);
+    .toEqual([probeReply, { type: "failed", ...operation, error: "indexedDB: AbortError" }]);
   vi.restoreAllMocks();
 });

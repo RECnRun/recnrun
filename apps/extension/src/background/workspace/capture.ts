@@ -5,6 +5,7 @@ import type { CaptureReceiver } from "@/background/workspace/agent-link";
 import { AGENT_SCRIPT } from "@/background/workspace/barrier";
 import type { BarrierOperation } from "@/background/workspace/barrier";
 import { WorkspaceError } from "@/background/workspace/errors";
+import { ownBlobs } from "@/background/workspace/own-blobs";
 import { collectValueTypes } from "@/background/workspace/value-types";
 import { ORIGIN_AGENT_PORT } from "@/messaging/origin-protocol";
 import type { OriginPort } from "@/messaging/origin-protocol";
@@ -117,9 +118,12 @@ function collector(captureId: string, origin: string, captures: CaptureDeps["cap
       );
       writing = writing.then(async () => {
         if (failure) return;
-        await captures
-          .append(captureId, { origin, database, store, records: part })
-          .catch((error: unknown) => (failure = { error }));
+        try {
+          await ownBlobs(part);
+          await captures.append(captureId, { origin, database, store, records: part });
+        } catch (error) {
+          failure = { error };
+        }
       });
     },
   };

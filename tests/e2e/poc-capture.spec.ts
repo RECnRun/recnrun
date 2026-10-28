@@ -1,32 +1,16 @@
-import type { BrowserContext, Page, Worker } from "@playwright/test";
 import { dumpDatabases, nextOrderKey, writeSchemaA, writeSchemaB } from "./fixtures/databases.ts";
+import { BLANK, closeWorkspace, openBlank } from "./fixtures/captures.ts";
 import { expect, test } from "./fixtures/extension.ts";
 import {
   barrierLeft,
   captureIdentity,
   incognitoWindows,
   startFromCapture,
-  startWithIdentity,
 } from "./fixtures/identity.ts";
 import { keep } from "./fixtures/keep.ts";
-import { APP, pageAt } from "./fixtures/workspace.ts";
+import { pageAt } from "./fixtures/workspace.ts";
 
 test.use({ incognitoAccess: true });
-
-const BLANK = `${APP}/blank`;
-const EMPTY = { cookies: [], site: { localStorage: {}, sessionStorage: {}, indexedDB: [] } };
-
-/** Opens the managed window at the blank page with nothing restored, as a first session would. */
-async function openBlank(context: BrowserContext, serviceWorker: Worker): Promise<Page> {
-  await startWithIdentity(serviceWorker, BLANK, EMPTY);
-  return pageAt(context, BLANK);
-}
-
-/** Closes the managed tab and waits until Chrome lists no Incognito window. */
-async function closeWorkspace(serviceWorker: Worker, page: Page): Promise<void> {
-  await page.close();
-  await expect.poll(() => incognitoWindows(serviceWorker)).toBe(0);
-}
 
 test("each identity's IndexedDB comes back with its own schema, keys, and records", async ({
   context,

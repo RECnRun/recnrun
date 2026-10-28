@@ -56,6 +56,7 @@ test("a capture answers each database's schema, its records, and the counts", ()
   const database = { name: "app", version: 3, stores: [store] };
   const records = { database: "app", store: "kv", records: [{ key: 1, value: new Date(0) }] };
   const replies = [
+    { type: "capture-started", ...operation, probe: new Date(0) },
     { type: "capture-database", ...operation, database },
     { type: "capture-records", ...operation, ...records },
     { type: "captured", ...operation, counts: { databases: 1, records: 1 } },

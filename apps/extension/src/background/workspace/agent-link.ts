@@ -132,6 +132,17 @@ export function restoreThroughAgent(
   });
 }
 
+/** Without structured clone, Chrome sends JSON: Dates become strings and Blobs `{}`, silently. */
+function requireStructuredClone(probe: unknown, settle: Settle<never>): void {
+  if (probe instanceof Date) return;
+  settle.reject(
+    new WorkspaceError(
+      "StructuredCloneUnavailable",
+      "Chrome did not keep the page's values intact; this build lacks structured clone messaging.",
+    ),
+  );
+}
+
 /** Receives a capture's messages as the agent reads them. */
 export interface CaptureReceiver {
   database: (database: OriginData["indexedDB"][number]) => void;
@@ -150,7 +161,8 @@ export function captureThroughAgent(
     boundMs: idleMs,
     idle: true,
     onReply: (reply, settle) => {
-      if (reply.type === "capture-database") receiver.database(reply.database);
+      if (reply.type === "capture-started") requireStructuredClone(reply.probe, settle);
+      else if (reply.type === "capture-database") receiver.database(reply.database);
       else if (reply.type === "capture-records") receiver.records(reply);
       else if (reply.type === "captured") settle.resolve(reply.counts);
       else failedWith(reply, settle, "capture");

@@ -39,7 +39,9 @@ async function captureAnswering(replies: object[], setup = chrome(), captures = 
   return { capturing, captures, ...setup };
 }
 
+const STARTED = { type: "capture-started", probe: new Date(0) };
 const completeReplies = [
+  STARTED,
   { type: "capture-database", database: DATABASE },
   { type: "capture-records", database: "app", store: "kv", records: RECORDS },
   { type: "captured", counts: { databases: 1, records: 2 } },
@@ -147,7 +149,7 @@ describe("captureIdentity", () => {
 
   test("discards a capture whose counts do not match what arrived", async () => {
     const short = [
-      ...completeReplies.slice(0, 2),
+      ...completeReplies.slice(0, 3),
       { type: "captured", counts: { databases: 1, records: 3 } },
     ];
     const { capturing, captures } = await captureAnswering(short);
@@ -161,15 +163,23 @@ describe("captureIdentity", () => {
       new DOMException("Quota exceeded.", "QuotaExceededError"),
     );
     const twice = [
-      completeReplies[0],
-      completeReplies[1],
-      completeReplies[1],
+      ...completeReplies.slice(0, 3),
+      completeReplies[2],
       { type: "captured", counts: { databases: 1, records: 4 } },
     ];
     const { capturing } = await captureAnswering(twice as object[], chrome(), captures);
     await expect(capturing).rejects.toMatchObject({ name: "QuotaExceededError" });
     expect(captures.append).toHaveBeenCalledOnce();
     expect(captures.discard).toHaveBeenCalledOnce();
+  });
+
+  test("fails as structured clone unavailable when the probe arrives as anything but a Date", async () => {
+    // Chrome's default JSON messaging turns the probe into its ISO string, and a Blob into {}.
+    const json = [{ ...STARTED, probe: new Date(0).toISOString() }, ...completeReplies.slice(1)];
+    const { capturing, captures, agent } = await captureAnswering(json);
+    await expect(capturing).rejects.toMatchObject({ name: "StructuredCloneUnavailable" });
+    expect(captures.calls).toEqual(["begin", "discard"]);
+    expect(agent.disconnected).toBe(true);
   });
 
   test("discards the capture when the page goes away or stops sending", async () => {

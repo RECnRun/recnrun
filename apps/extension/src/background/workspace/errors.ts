@@ -24,6 +24,7 @@ type WorkspaceErrorName =
   | "RecordingInProgress"
   | "RestoreFailed"
   | "RestoreTimedOut"
+  | "StructuredCloneUnavailable"
   | "TabClosed"
   | "TargetNotAllowed"
   | "WindowNotCreated"
