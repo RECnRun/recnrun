@@ -1,6 +1,7 @@
 import * as v from "valibot";
 import { IdSchema } from "./ids.ts";
 import { SiteCookieSchema } from "./identity-data.ts";
+import type { IdentityData } from "./identity-data.ts";
 import { TargetUrlSchema } from "./managed-window.ts";
 import { OriginDataSchema } from "./origin-data.ts";
 
@@ -137,3 +138,11 @@ export const IdentityCaptureSchema = v.pipe(
 );
 
 export type IdentityCapture = v.InferOutput<typeof IdentityCaptureSchema>;
+
+/** What a start from `capture` restores: its cookies, then the site data of its target's origin. */
+export function restorableData(capture: IdentityCapture): IdentityData {
+  const target = capture.origins.find(({ origin }) => isPageOf(capture.url, origin));
+  if (!target) throw new Error("The capture holds no data for its target's origin.");
+  const { localStorage, sessionStorage, indexedDB } = target;
+  return { cookies: capture.cookies, site: { localStorage, sessionStorage, indexedDB } };
+}

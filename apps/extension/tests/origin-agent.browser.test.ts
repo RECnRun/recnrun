@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, test, vi } from "vite-plus/test";
 import { ORIGIN_AGENT_PORT } from "@/messaging/origin-protocol";
 import { runOriginAgent, startOriginAgent } from "@/origin/agent";
 import { fakePort } from "./fake-port";
-import { clearDatabases, entriesOf, memoryStorage } from "./origin-storage";
+import { clearDatabases, entriesOf, memoryStorage, settled } from "./origin-storage";
 
 const port = vi.hoisted(() => ({ current: undefined as ReturnType<typeof fakePort> | undefined }));
 const browser = vi.hoisted(() => ({ runtime: { connect: vi.fn() } }));
@@ -105,3 +105,46 @@ function runBroken() {
   runOriginAgent(agent, broken);
   return agent;
 }
+
+/** A database `app` at version 2 with one out-of-line store holding three records. */
+async function createApp() {
+  const opening = indexedDB.open("app", 2);
+  opening.addEventListener("upgradeneeded", () => opening.result.createObjectStore("kv"));
+  const connection = await settled(opening);
+  const kv = connection.transaction("kv", "readwrite").objectStore("kv");
+  await Promise.all([1, 2, 3].map((key) => settled(kv.put(`value-${key}`, key))));
+  connection.close();
+}
+
+const capture = { type: "capture", ...operation, chunk: 2 };
+
+test("captures on a capture command: each schema, its records in chunks, then the counts", async () => {
+  await createApp();
+  const agent = linked();
+  agent.onMessage.emit(capture);
+  const kv = { name: "kv", keyPath: null, autoIncrement: false, indexes: [], records: [] };
+  const part = { type: "capture-records", ...operation, database: "app", store: "kv" };
+  await expect
+    .poll(() => agent.posted)
+    .toEqual([
+      {
+        type: "capture-database",
+        ...operation,
+        database: { name: "app", version: 2, stores: [kv] },
+      },
+      { ...part, records: [1, 2].map((key) => ({ key, value: `value-${key}` })) },
+      { ...part, records: [{ key: 3, value: "value-3" }] },
+      { type: "captured", ...operation, counts: { databases: 1, records: 3 } },
+    ]);
+  expect(agent.onMessage.listeners.size).toBe(0);
+});
+
+test("a capture that fails replies failed with the step and an error name", async () => {
+  vi.spyOn(indexedDB, "databases").mockResolvedValue([{ name: "ghost", version: 1 }]);
+  const agent = linked();
+  agent.onMessage.emit(capture);
+  await expect
+    .poll(() => agent.posted)
+    .toEqual([{ type: "failed", ...operation, error: "indexedDB: AbortError" }]);
+  vi.restoreAllMocks();
+});

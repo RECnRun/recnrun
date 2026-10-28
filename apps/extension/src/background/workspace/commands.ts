@@ -4,8 +4,15 @@ import { browser } from "wxt/browser";
 import { chromeBarrierApi } from "@/background/workspace/barrier";
 import { bootstrapIdentity } from "@/background/workspace/bootstrap";
 import type { BootstrapHooks, BootstrapPorts, StepTiming } from "@/background/workspace/bootstrap";
+import type { CaptureSummary } from "@/background/workspace/capture";
 import { chromeCookieApi } from "@/background/workspace/cookie-stores";
 import { WorkspaceError } from "@/background/workspace/errors";
+import {
+  captureManaged,
+  chromeIdentityDeps,
+  savedStart,
+} from "@/background/workspace/identity-commands";
+import type { IdentityDeps } from "@/background/workspace/identity-commands";
 import { chromeNavigationApi } from "@/background/workspace/navigation";
 import { recoverInterrupted } from "@/background/workspace/recovery";
 import type { RecoveryDeps } from "@/background/workspace/recovery";
@@ -28,6 +35,10 @@ export interface WorkspaceCommands {
   closeAndStart: (url: string, windowIds: readonly number[]) => Promise<void>;
   restart: (url: string) => Promise<void>;
   startWithIdentity: (url: string, data: IdentityData) => Promise<StepTiming[]>;
+  /** Saves the managed tab's page as `identityId`'s data (POC: IndexedDB only). */
+  captureIdentity: (identityId: string) => Promise<CaptureSummary>;
+  /** Starts a fresh managed window from `identityId`'s published capture. */
+  startFromCapture: (identityId: string) => Promise<StepTiming[]>;
   recover: () => Promise<void>;
 }
 
@@ -153,25 +164,51 @@ function recoverInto(
   return recovering.then(() => undefined);
 }
 
+type Exclusive = ReturnType<typeof createLock>["exclusive"];
+
+async function statusOf(
+  lock: ReturnType<typeof createLock>,
+  journal: OperationJournal,
+): Promise<WorkspaceStatus> {
+  await lock.ready;
+  const access = await browser.extension.isAllowedIncognitoAccess();
+  const { stored, foreign } = await classifiedWindows();
+  const summaries = foreign.map(({ id, tabs }) => ({ id, tabCount: tabs?.length ?? 0 }));
+  const operation = (await journal.read()) ?? undefined;
+  const { busy } = lock;
+  return { access, managed: stored, foreign: summaries, busy, ...(operation && { operation }) };
+}
+
+/** Opens a fresh managed window and restores what `load` yields, under the one-operation lock. */
+function restoringStart(
+  recordings: RecordingStore,
+  ports: BootstrapPorts,
+  journal: OperationJournal,
+  exclusive: Exclusive,
+) {
+  const windows = { create: createNeutralWindow, close: closeWindows };
+  return (load: () => Promise<{ url: string; data: IdentityData }>) =>
+    exclusive(async () => {
+      await requireNoRecording(recordings);
+      await requireAccess();
+      const { url, data } = await load();
+      const deps = { ...ports, windows, record: journal.write };
+      return bootstrapIdentity(url, data, deps, crypto.randomUUID());
+    });
+}
+
 export function createWorkspaceCommands(
   recordings: RecordingStore,
   ports: BootstrapPorts = chromeBootstrapPorts(),
   journal: OperationJournal = operationJournal,
+  identities: IdentityDeps = chromeIdentityDeps(),
 ): WorkspaceCommands {
   const lock = createLock(journal);
   const { exclusive } = lock;
-  const windows = { create: createNeutralWindow, close: closeWindows };
+  const startRestoring = restoringStart(recordings, ports, journal, exclusive);
   return {
     recover: () => recoverInto(lock, { journal, barrier: ports.barrier }),
-    status: async () => {
-      await lock.ready;
-      const access = await browser.extension.isAllowedIncognitoAccess();
-      const { stored, foreign } = await classifiedWindows();
-      const summaries = foreign.map(({ id, tabs }) => ({ id, tabCount: tabs?.length ?? 0 }));
-      const operation = (await journal.read()) ?? undefined;
-      const { busy } = lock;
-      return { access, managed: stored, foreign: summaries, busy, ...(operation && { operation }) };
-    },
+    status: () => statusOf(lock, journal),
     // Async, so a refused target rejects; the busy check still runs before the first await.
     start: async (url) => {
       requireTarget(url);
@@ -193,12 +230,14 @@ export function createWorkspaceCommands(
     },
     startWithIdentity: async (url, data) => {
       requireTarget(url);
-      return exclusive(async () => {
-        await requireNoRecording(recordings);
-        await requireAccess();
-        const deps = { ...ports, windows, record: journal.write };
-        return bootstrapIdentity(url, data, deps, crypto.randomUUID());
-      });
+      return startRestoring(async () => ({ url, data }));
     },
+    captureIdentity: (identityId) =>
+      exclusive(async () => {
+        await requireAccess();
+        return captureManaged(identityId, identities);
+      }),
+    startFromCapture: (identityId) =>
+      startRestoring(() => savedStart(identityId, identities.captures)),
   };
 }

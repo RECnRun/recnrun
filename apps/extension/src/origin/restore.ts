@@ -1,5 +1,6 @@
 import type { OriginData } from "@recnrun/domain";
 import type { RestoredCounts } from "@/messaging/origin-protocol";
+import { OriginFailure, step } from "@/origin/failure";
 
 /** The page's own storage, as the agent sees it from its isolated world. */
 export interface OriginStores {
@@ -9,31 +10,12 @@ export interface OriginStores {
 }
 
 type Database = OriginData["indexedDB"][number];
-type RestoreStep = "check" | "localStorage" | "sessionStorage" | "indexedDB";
-
-/** A failed step and an error name; the message never carries a stored value. */
-export class RestoreFailure extends Error {
-  constructor(step: RestoreStep, reason: string) {
-    super(`${step}: ${reason}`);
-    this.name = "RestoreFailure";
-  }
-}
-
-async function step<T>(name: RestoreStep, run: () => T | Promise<T>): Promise<T> {
-  try {
-    return await run();
-  } catch (error) {
-    if (error instanceof RestoreFailure) throw error;
-    // DOMException messages may quote keys, so only the name leaves the page.
-    throw new RestoreFailure(name, error instanceof Error ? error.name : "UnknownError");
-  }
-}
 
 /** Restoring merges into nothing: a fresh Incognito origin holds no data, so any data is a mistake. */
 async function requireEmpty(stores: OriginStores): Promise<void> {
   const databases = await stores.indexedDB.databases();
   if (stores.localStorage.length + stores.sessionStorage.length + databases.length > 0) {
-    throw new RestoreFailure("check", "OriginNotEmpty");
+    throw new OriginFailure("check", "OriginNotEmpty");
   }
 }
 
@@ -44,8 +26,11 @@ function writeEntries(storage: Storage, entries: Record<string, string>): number
 }
 
 function createStores(connection: IDBDatabase, database: Database): void {
-  for (const { name, keyPath, autoIncrement } of database.stores) {
-    connection.createObjectStore(name, { keyPath, autoIncrement });
+  for (const { name, keyPath, autoIncrement, indexes } of database.stores) {
+    const store = connection.createObjectStore(name, { keyPath, autoIncrement });
+    for (const { name: index, keyPath: path, unique, multiEntry } of indexes) {
+      store.createIndex(index, path, { unique, multiEntry });
+    }
   }
 }
 

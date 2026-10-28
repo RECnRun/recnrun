@@ -109,6 +109,9 @@ const page = (title: string, script: string) =>
   `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${title}</title></head>` +
   `<body><h1>${title}</h1><script type="module">${script}</script></body></html>`;
 
+/** A page with no script, so only what a test writes ends up in its origin's storage. */
+export const blankPage = page("Blank", "");
+
 export const sentinelPage = (tag: string) =>
   page("Sentinel", `(${writeSentinels.toString()})(${literal(tag)});`);
 

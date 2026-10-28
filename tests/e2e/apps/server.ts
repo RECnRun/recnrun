@@ -3,7 +3,7 @@ import { randomBytes } from "node:crypto";
 import { createServer } from "node:http";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { appFrame, appModule, appPage, appPixel, appWorker, siteCsp } from "./app-pages.ts";
-import { inspectPage, sentinelPage, serviceWorker } from "./pages.ts";
+import { blankPage, inspectPage, sentinelPage, serviceWorker } from "./pages.ts";
 
 const PORT = 5192;
 
@@ -95,6 +95,7 @@ const JS = "text/javascript";
 const routes: Record<string, (exchange: Exchange) => void | Promise<void>> = {
   "GET /health": ({ response }) => send(response, "text/plain", "ok"),
   "GET /sentinel": sentinel,
+  "GET /blank": ({ response }) => send(response, HTML, blankPage),
   "GET /inspect": ({ request, response, run }) =>
     send(response, HTML, inspectPage(cookiesOf(request), run ?? "")),
   "GET /sw.js": ({ response }) => send(response, JS, serviceWorker),

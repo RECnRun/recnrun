@@ -251,3 +251,5 @@ export function createIdentityCaptures(factory: IDBFactory) {
       }),
   };
 }
+
+export type IdentityCaptures = ReturnType<typeof createIdentityCaptures>;

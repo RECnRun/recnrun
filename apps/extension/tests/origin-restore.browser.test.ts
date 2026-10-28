@@ -27,7 +27,10 @@ const data: OriginData = {
           name: "people",
           keyPath: ["last", "first"],
           autoIncrement: false,
-          indexes: [],
+          indexes: [
+            { name: "byFirst", keyPath: "first", unique: true, multiEntry: false },
+            { name: "byTag", keyPath: "tags", unique: false, multiEntry: true },
+          ],
           records: [{ value: { last: "Doe", first: "Ann" } }],
         },
         {
@@ -79,6 +82,10 @@ test("restores Web Storage and IndexedDB, with versions, store shapes, and recor
 
   await expect(readStore("app", "people")).resolves.toMatchObject({
     keyPath: ["last", "first"],
+    indexes: [
+      { name: "byFirst", keyPath: "first", unique: true, multiEntry: false },
+      { name: "byTag", keyPath: "tags", unique: false, multiEntry: true },
+    ],
     records: [[["Doe", "Ann"], { last: "Doe", first: "Ann" }]],
   });
   await expect(readStore("app", "log")).resolves.toMatchObject({
@@ -96,7 +103,7 @@ test("restores Web Storage and IndexedDB, with versions, store shapes, and recor
 test("refuses an origin that already holds data, and writes nothing", async () => {
   stores.sessionStorage.setItem("left", "over");
   await expect(restoreOrigin(stores, data)).rejects.toMatchObject({
-    name: "RestoreFailure",
+    name: "OriginFailure",
     message: "check: OriginNotEmpty",
   });
   expect(entriesOf(stores.sessionStorage)).toEqual({ left: "over" });
@@ -133,7 +140,7 @@ test("a record that cannot be stored aborts its whole transaction, and the failu
   };
   const close = vi.spyOn(IDBDatabase.prototype, "close");
   const failure = await restoreOrigin(stores, unkeyed).catch((error: unknown) => error);
-  expect(failure).toMatchObject({ name: "RestoreFailure", message: "indexedDB: DataError" });
+  expect(failure).toMatchObject({ name: "OriginFailure", message: "indexedDB: DataError" });
   expect(close).toHaveBeenCalledOnce();
   await expect(readStore("app", "kv")).resolves.toMatchObject({ records: [] });
 });
@@ -154,7 +161,7 @@ test("a store the database cannot create fails the restore", async () => {
     ],
   };
   await expect(restoreOrigin(stores, twice)).rejects.toMatchObject({
-    name: "RestoreFailure",
+    name: "OriginFailure",
     message: expect.stringMatching(/^indexedDB: /),
   });
 });

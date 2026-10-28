@@ -13,7 +13,7 @@ export async function clearDatabases(): Promise<void> {
   }
 }
 
-/** Every record of a store as `[key, value]`, with the database's version and the store's shape. */
+/** Every record of a store as `[key, value]`, with the database's version and the store's shape and indexes. */
 export async function readStore(database: string, store: string) {
   const connection = await settled(indexedDB.open(database));
   try {
@@ -22,10 +22,15 @@ export async function readStore(database: string, store: string) {
       settled(objectStore.getAllKeys()),
       settled(objectStore.getAll()),
     ]);
+    const indexes = Array.from(objectStore.indexNames, (name) => {
+      const { keyPath, unique, multiEntry } = objectStore.index(name);
+      return { name, keyPath, unique, multiEntry };
+    });
     return {
       version: connection.version,
       keyPath: objectStore.keyPath,
       autoIncrement: objectStore.autoIncrement,
+      indexes,
       records: keys.map((key, index) => [key, values[index]]),
     };
   } finally {

@@ -1,6 +1,11 @@
 import * as v from "valibot";
 import { expect, test } from "vite-plus/test";
-import { IDENTITY_CAPTURE_VERSION, IdentityCaptureSchema } from "../src/index.ts";
+import {
+  IDENTITY_CAPTURE_VERSION,
+  IdentityCaptureSchema,
+  IdentityDataSchema,
+  restorableData,
+} from "../src/index.ts";
 import type { IdentityCapture } from "../src/index.ts";
 import { sampleCapture } from "./fixtures.ts";
 
@@ -122,4 +127,21 @@ test("rejects a declared cookie host that is not a bare host name", () => {
   for (const host of ["", "https://sso.localhost", "sso.localhost/path"]) {
     expect(valid({ ...capture, capabilities: { cookieHosts: [host] } }), host).toBe(false);
   }
+});
+
+test("restores a capture's cookies and its target origin's site data, without its caches", () => {
+  const capture = sampleCapture();
+  const other = { ...partsOf(capture).origin, origin: "http://other.localhost:5192" };
+  const { origin } = partsOf(capture);
+  const data = restorableData({ ...capture, origins: [other, origin] });
+  expect(data).toEqual({
+    cookies: capture.cookies,
+    site: {
+      localStorage: origin.localStorage,
+      sessionStorage: origin.sessionStorage,
+      indexedDB: origin.indexedDB,
+    },
+  });
+  expect(v.is(IdentityDataSchema, data)).toBe(true);
+  expect(() => restorableData({ ...capture, origins: [other] })).toThrow(/target's origin/);
 });

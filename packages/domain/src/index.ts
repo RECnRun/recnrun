@@ -26,5 +26,6 @@ export { WorkspaceOperationSchema, type WorkspaceOperation } from "./workspace-o
 export {
   IDENTITY_CAPTURE_VERSION,
   IdentityCaptureSchema,
+  restorableData,
   type IdentityCapture,
 } from "./identity-capture.ts";

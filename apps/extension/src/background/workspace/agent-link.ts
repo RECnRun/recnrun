@@ -3,7 +3,12 @@ import * as v from "valibot";
 import type { BarrierOperation } from "@/background/workspace/barrier";
 import { WorkspaceError } from "@/background/workspace/errors";
 import { ORIGIN_AGENT_PORT, OriginReplySchema } from "@/messaging/origin-protocol";
-import type { OriginPort, OriginReply, RestoredCounts } from "@/messaging/origin-protocol";
+import type {
+  CapturedCounts,
+  OriginPort,
+  OriginReply,
+  RestoredCounts,
+} from "@/messaging/origin-protocol";
 
 /** The one document an operation restores into: the barrier's tab, as Chrome committed it. */
 export interface AgentExpectation {
@@ -36,6 +41,76 @@ function replyTo(message: unknown, operation: BarrierOperation): OriginReply | u
     : undefined;
 }
 
+interface Settle<T> {
+  resolve: (value: T) => void;
+  reject: (error: Error) => void;
+}
+
+/** One command to the agent and the replies it waits for. */
+interface Exchange<T> {
+  command: { type: string } & Record<string, unknown>;
+  boundMs: number;
+  /** Restarts the bound at each reply, for an exchange of many messages. */
+  idle: boolean;
+  onReply: (reply: OriginReply, settle: Settle<T>) => void;
+  late: () => WorkspaceError;
+  gone: () => WorkspaceError;
+}
+
+/** Sends one command and settles on the replies of its own operation, a disconnect, or the bound. */
+function exchange<T>(port: OriginPort, operation: BarrierOperation, talk: Exchange<T>): Promise<T> {
+  return new Promise((resolve, reject) => {
+    let open = true;
+    const end = (finish: () => void) => {
+      if (!open) return;
+      open = false;
+      clearTimeout(timer);
+      try {
+        port.onMessage.removeListener(onMessage);
+        port.onDisconnect.removeListener(onGone);
+      } catch {
+        // A port whose page is gone has no listener left to remove.
+      }
+      finish();
+    };
+    const settle: Settle<T> = {
+      resolve: (value) => end(() => resolve(value)),
+      reject: (error) => end(() => reject(error)),
+    };
+    const onLate = () => {
+      port.disconnect();
+      settle.reject(talk.late());
+    };
+    let timer = setTimeout(onLate, talk.boundMs);
+    const onMessage = (message: unknown) => {
+      const reply = replyTo(message, operation);
+      if (!reply) return;
+      if (talk.idle) {
+        clearTimeout(timer);
+        timer = setTimeout(onLate, talk.boundMs);
+      }
+      talk.onReply(reply, settle);
+    };
+    const onGone = () => settle.reject(talk.gone());
+    const { id: operationId, generation } = operation;
+    // Chrome throws, rather than fires onDisconnect, when the page went before this port was used.
+    try {
+      port.onMessage.addListener(onMessage);
+      port.onDisconnect.addListener(onGone);
+      port.postMessage({ ...talk.command, operationId, generation });
+    } catch {
+      onGone();
+    }
+  });
+}
+
+function failedWith(reply: OriginReply, settle: Settle<never>, what: string): void {
+  if (reply.type !== "failed") return;
+  const failure = reply.error;
+  const name = what === "restore" ? "RestoreFailed" : "CaptureFailed";
+  settle.reject(new WorkspaceError(name, `The page could not ${what} its data (${failure}).`));
+}
+
 /** Sends the payload to a validated agent and waits, at most `boundMs`, for its own answer. */
 export function restoreThroughAgent(
   port: OriginPort,
@@ -43,42 +118,45 @@ export function restoreThroughAgent(
   payload: OriginData,
   boundMs: number,
 ): Promise<RestoredCounts> {
-  return new Promise((resolve, reject) => {
-    const settle = (finish: () => void) => {
-      clearTimeout(timer);
-      try {
-        port.onMessage.removeListener(onReply);
-        port.onDisconnect.removeListener(onGone);
-      } catch {
-        // A port whose page is gone has no listener left to remove.
-      }
-      finish();
-    };
-    const onReply = (message: unknown) => {
-      const reply = replyTo(message, operation);
-      if (reply?.type === "restored") settle(() => resolve(reply.counts));
-      if (reply?.type === "failed") {
-        const error = `The page could not restore its data (${reply.error}).`;
-        settle(() => reject(new WorkspaceError("RestoreFailed", error)));
-      }
-    };
-    const onGone = () => {
-      const error = "The page closed before its data was restored.";
-      settle(() => reject(new WorkspaceError("AgentDisconnected", error)));
-    };
-    const timer = setTimeout(() => {
-      port.disconnect();
-      const error = "The page did not restore its data in time.";
-      settle(() => reject(new WorkspaceError("RestoreTimedOut", error)));
-    }, boundMs);
-    const { id: operationId, generation } = operation;
-    // Chrome throws, rather than fires onDisconnect, when the page went before this port was used.
-    try {
-      port.onMessage.addListener(onReply);
-      port.onDisconnect.addListener(onGone);
-      port.postMessage({ type: "restore", operationId, generation, payload });
-    } catch {
-      onGone();
-    }
+  return exchange<RestoredCounts>(port, operation, {
+    command: { type: "restore", payload },
+    boundMs,
+    idle: false,
+    onReply: (reply, settle) => {
+      if (reply.type === "restored") settle.resolve(reply.counts);
+      else failedWith(reply, settle, "restore");
+    },
+    late: () => new WorkspaceError("RestoreTimedOut", "The page did not restore its data in time."),
+    gone: () =>
+      new WorkspaceError("AgentDisconnected", "The page closed before its data was restored."),
+  });
+}
+
+/** Receives a capture's messages as the agent reads them. */
+export interface CaptureReceiver {
+  database: (database: OriginData["indexedDB"][number]) => void;
+  records: (part: Extract<OriginReply, { type: "capture-records" }>) => void;
+}
+
+/** Asks a validated agent for its page's data; each message restarts the `idleMs` bound. */
+export function captureThroughAgent(
+  port: OriginPort,
+  operation: BarrierOperation,
+  receiver: CaptureReceiver,
+  idleMs: number,
+): Promise<CapturedCounts> {
+  return exchange<CapturedCounts>(port, operation, {
+    command: { type: "capture" },
+    boundMs: idleMs,
+    idle: true,
+    onReply: (reply, settle) => {
+      if (reply.type === "capture-database") receiver.database(reply.database);
+      else if (reply.type === "capture-records") receiver.records(reply);
+      else if (reply.type === "captured") settle.resolve(reply.counts);
+      else failedWith(reply, settle, "capture");
+    },
+    late: () => new WorkspaceError("CaptureTimedOut", "The page stopped sending its data."),
+    gone: () =>
+      new WorkspaceError("AgentDisconnected", "The page closed before its data was captured."),
   });
 }

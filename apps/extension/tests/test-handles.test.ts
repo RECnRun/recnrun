@@ -10,15 +10,22 @@ const DATA: IdentityData = {
   site: { localStorage: {}, sessionStorage: {}, indexedDB: [] },
 };
 const TIMINGS = [{ step: "window" as const, ms: 2 }];
+const SUMMARY = { captureId: "capture-1", databases: 1, records: 3, ms: 12 };
 
 function install() {
   const scope: { recnrunPoc?: PocHandles } = {};
   const startWithIdentity = vi.fn(async () => TIMINGS);
-  const commands = { startWithIdentity } as unknown as WorkspaceCommands;
+  const captureIdentity = vi.fn(async () => SUMMARY);
+  const startFromCapture = vi.fn(async () => TIMINGS);
+  const commands = {
+    startWithIdentity,
+    captureIdentity,
+    startFromCapture,
+  } as unknown as WorkspaceCommands;
   const hooks: BootstrapHooks = { beforeStep: async () => {} };
   installTestHandles(scope, commands, hooks);
   if (!scope.recnrunPoc) throw new Error("No handles installed");
-  return { handles: scope.recnrunPoc, hooks, startWithIdentity };
+  return { handles: scope.recnrunPoc, hooks, startWithIdentity, captureIdentity, startFromCapture };
 }
 
 afterEach(() => {
@@ -58,4 +65,13 @@ test("fails the next run of one step once", async () => {
   await expect(hooks.beforeStep("navigate")).resolves.toBeUndefined();
   await expect(hooks.beforeStep("restore")).rejects.toMatchObject({ name: "InjectedFailure" });
   await expect(hooks.beforeStep("restore")).resolves.toBeUndefined();
+});
+
+test("captures an identity and starts from its capture, keeping that start's timings", async () => {
+  const { handles, captureIdentity, startFromCapture } = install();
+  await expect(handles.captureIdentity("identity-a")).resolves.toEqual(SUMMARY);
+  expect(captureIdentity).toHaveBeenCalledWith("identity-a");
+  await expect(handles.startFromCapture("identity-a")).resolves.toEqual(TIMINGS);
+  expect(startFromCapture).toHaveBeenCalledWith("identity-a");
+  expect(handles.timings()).toEqual([TIMINGS]);
 });

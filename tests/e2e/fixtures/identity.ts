@@ -13,8 +13,32 @@ interface PocGlobal {
     startWithIdentity: (url: string, data: unknown) => Promise<StepTiming[]>;
     setRestoreDelay: (ms: number) => void;
     failNext: (step: string) => void;
+    captureIdentity: (identityId: string) => Promise<CaptureSummary>;
+    startFromCapture: (identityId: string) => Promise<StepTiming[]>;
   };
 }
+
+/** A published capture's id, size, and duration, as the test build reports it. */
+interface CaptureSummary {
+  captureId: string;
+  databases: number;
+  records: number;
+  ms: number;
+}
+
+/** Captures the managed tab's page as `identityId`. */
+export const captureIdentity = (serviceWorker: Worker, identityId: string) =>
+  serviceWorker.evaluate(
+    (id) => (globalThis as unknown as PocGlobal).recnrunPoc.captureIdentity(id),
+    identityId,
+  );
+
+/** Starts a fresh managed window from `identityId`'s published capture. */
+export const startFromCapture = (serviceWorker: Worker, identityId: string) =>
+  serviceWorker.evaluate(
+    (id) => (globalThis as unknown as PocGlobal).recnrunPoc.startFromCapture(id),
+    identityId,
+  );
 
 /** What a run restores: a script cookie, an HttpOnly one naming the run, and the app's storage. */
 export function identityFor(run: string) {
