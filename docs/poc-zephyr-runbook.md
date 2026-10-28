@@ -13,8 +13,8 @@ This runbook checks the Incognito identities POC against Zephyr with real test a
 1. Run `vp install`, then `vp run poc:zephyr` from the repository root.
 2. The script does the following:
    - Builds the extension in development mode with host access to `https://zephyr-tq.one.be` and `https://login-acc.one.be`, plus `one.be` itself, since cookies set for `.one.be` need it. It prints the host patterns and builds into `apps/extension/.output/chrome-mv3-dev`, so a running `vp run dev:extension` gets rebuilt.
-   - Starts the website at `http://localhost:5173/`, unless one is already running there.
-   - Opens headed Chromium on a new, empty profile with Developer mode on, showing RECnRun's details page and the site.
+   - Builds this checkout's website and serves it on a free port, which it prints (`This checkout's website is at http://localhost:<port>/.`). It never uses a server already running on port 5173, since that may be another checkout's site.
+   - Opens headed Chromium on a new, empty profile with Developer mode on, showing RECnRun's details page and that site.
 3. On the details page, turn on **Allow in Incognito**. The site tab then shows the dashboard with the **Incognito workspace** panel.
 4. If Zephyr's sign-in goes through another host, add its origin and run again, for example `RECNRUN_POC_HOSTS=https://zephyr-tq.one.be,https://login-acc.one.be,https://other.one.be vp run poc:zephyr`.
 
@@ -71,7 +71,7 @@ The panel shows an alert that names the command and the step where it stopped. R
 
 1. Click **Delete** on rows A, B, and C, then **Delete <label>** to confirm each one.
 2. Reload the normal tab and record whether it still shows N (see section 1).
-3. Close Chromium. The script prints `Deleted the run's profile, its captures, and the build.` Confirm that `.artifacts/poc-zephyr` no longer exists.
+3. Close Chromium. The script stops its website and prints `Deleted the run's profile, its captures, and the build.` Confirm that `.artifacts/poc-zephyr` no longer exists.
 4. Give the recorded names, counts, sizes, timings, and outcomes to the orchestrator for the report (task S4.5).
 
 ## Known limits to expect
