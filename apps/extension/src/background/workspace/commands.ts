@@ -10,11 +10,12 @@ export interface WorkspaceCommands {
   status: () => Promise<WorkspaceStatus>;
   start: (url: string) => Promise<void>;
   closeAndStart: (url: string, windowIds: readonly number[]) => Promise<void>;
+  restart: (url: string) => Promise<void>;
 }
 
-async function foreignWindows() {
+async function classifiedWindows() {
   const stored = (await managedWindowRepository.read()) ?? undefined;
-  return { stored, foreign: classifyIncognitoWindows(await inventory(), stored).foreign };
+  return { stored, ...classifyIncognitoWindows(await inventory(), stored) };
 }
 
 function requireTarget(url: string): void {
@@ -42,7 +43,7 @@ async function startAt(url: string): Promise<void> {
 /** The user decided on the windows they saw; any other set needs a fresh decision. */
 async function closeShownAndStart(url: string, windowIds: readonly number[]): Promise<void> {
   await requireAccess();
-  const { foreign } = await foreignWindows();
+  const { foreign } = await classifiedWindows();
   const shown = new Set(windowIds);
   if (shown.size !== foreign.length || !foreign.every((window) => shown.has(window.id))) {
     throw new WorkspaceError(
@@ -51,6 +52,20 @@ async function closeShownAndStart(url: string, windowIds: readonly number[]): Pr
     );
   }
   await closeWindows(windowIds);
+  await startAt(url);
+}
+
+/** Discards the managed window's Incognito data by replacing the window; other windows would keep it. */
+async function replaceManaged(url: string): Promise<void> {
+  await requireAccess();
+  const { managed, foreign } = await classifiedWindows();
+  if (foreign.length > 0) {
+    throw new WorkspaceError("IncognitoWindowsOpen", "Close the other Incognito windows first.");
+  }
+  if (managed === undefined) {
+    throw new WorkspaceError("NoManagedWindow", "No Incognito workspace is open; start one first.");
+  }
+  await closeWindows([managed.id]);
   await startAt(url);
 }
 
@@ -74,7 +89,7 @@ export function createWorkspaceCommands(): WorkspaceCommands {
   return {
     status: async () => {
       const access = await browser.extension.isAllowedIncognitoAccess();
-      const { stored, foreign } = await foreignWindows();
+      const { stored, foreign } = await classifiedWindows();
       const summaries = foreign.map(({ id, tabs }) => ({ id, tabCount: tabs?.length ?? 0 }));
       return { access, managed: stored, foreign: summaries, busy };
     },
@@ -86,6 +101,10 @@ export function createWorkspaceCommands(): WorkspaceCommands {
     closeAndStart: async (url, windowIds) => {
       requireTarget(url);
       await exclusive(() => closeShownAndStart(url, windowIds));
+    },
+    restart: async (url) => {
+      requireTarget(url);
+      await exclusive(() => replaceManaged(url));
     },
   };
 }

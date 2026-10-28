@@ -41,6 +41,8 @@ export function createRoutes({ extensionVersion, store, workspace }: RouteDepend
           from: OWN_PAGE,
           run: () => workspace.closeAndStart(message.url, message.windowIds),
         };
+      case "workspace-restart":
+        return { from: OWN_PAGE, run: () => workspace.restart(message.url) };
     }
   };
 }

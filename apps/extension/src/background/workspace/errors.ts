@@ -2,6 +2,7 @@
 type WorkspaceErrorName =
   | "IncognitoNotAllowed"
   | "IncognitoWindowsOpen"
+  | "NoManagedWindow"
   | "TargetNotAllowed"
   | "WindowNotCreated"
   | "WindowsChanged"

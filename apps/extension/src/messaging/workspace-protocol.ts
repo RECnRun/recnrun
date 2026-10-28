@@ -19,10 +19,17 @@ const WorkspaceCloseAndStartMessageSchema = v.object({
   windowIds: v.array(BrowserIdSchema),
 });
 
+/** The dashboard asks to replace the open managed window with a fresh one on a target. */
+const WorkspaceRestartMessageSchema = v.object({
+  type: v.literal("workspace-restart"),
+  url: v.string(),
+});
+
 export const WorkspaceRequestSchema = v.variant("type", [
   WorkspaceStatusMessageSchema,
   WorkspaceStartMessageSchema,
   WorkspaceCloseAndStartMessageSchema,
+  WorkspaceRestartMessageSchema,
 ]);
 
 /** The `workspace-status` result; foreign windows carry no title or URL. */
