@@ -33,3 +33,26 @@ export const frameCookies = [
 ];
 
 export const framePage = "<!doctype html><title>Frame</title><p>frame</p>";
+
+/** Two sibling hosts under `app.localhost`, a registrable domain to Chrome (see `domainJarCookies`). */
+export const SIBLINGS = { target: "www.app.localhost", sso: "sso.app.localhost" };
+
+/**
+ * The domain jar's Set-Cookie per host. Chrome treats a TLD missing from the PSL, such as
+ * `localhost`, as a one-label registry, so `app.localhost` is registrable and both siblings may
+ * scope a cookie to it, as `zephyr-tq.one.be` and `login-acc.one.be` do to `one.be`.
+ */
+export const domainJarCookies = (host: string) =>
+  host.startsWith(`${SIBLINGS.sso}:`)
+    ? [
+        "sso_domain=s1; Domain=app.localhost; Path=/; HttpOnly; SameSite=Lax",
+        "sso_only=s2; Path=/; HttpOnly; SameSite=Lax",
+      ]
+    : [
+        "d_lax=w1; Domain=app.localhost; Path=/; SameSite=Lax",
+        "d_dot=w2; Domain=.app.localhost; Path=/; HttpOnly; SameSite=Lax",
+        "d_secure=w3; Domain=app.localhost; Path=/; Secure; SameSite=None",
+        "d_persist=w4; Domain=app.localhost; Path=/; Max-Age=3600; SameSite=Lax",
+        "www_only=w5; Path=/; SameSite=Lax",
+        "d_suffix=w6; Domain=localhost; Path=/; SameSite=Lax",
+      ];
