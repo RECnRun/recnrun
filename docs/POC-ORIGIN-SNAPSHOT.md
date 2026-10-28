@@ -1,6 +1,6 @@
 # POC report: origin snapshots in sequential Incognito sessions
 
-Status: **Stage 2 done; stopped at Gate G2 for the user's go-ahead.** Gate G1 passed (go-ahead 2026-10-28). Plan: [poc-incognito-sessions-plan.md](poc-incognito-sessions-plan.md). Assignment: [poc-incognito-sessions-assignment.md](poc-incognito-sessions-assignment.md). Checklist: [poc-incognito-sessions-checklist.md](poc-incognito-sessions-checklist.md).
+Status: **Stage 3 in progress.** Gates G1 and G2 passed (go-ahead 2026-10-28); Gate G3 stops only on a NO-GO. Plan: [poc-incognito-sessions-plan.md](poc-incognito-sessions-plan.md). Assignment: [poc-incognito-sessions-assignment.md](poc-incognito-sessions-assignment.md). Checklist: [poc-incognito-sessions-checklist.md](poc-incognito-sessions-checklist.md).
 
 ## 1. Verdicts
 
@@ -46,17 +46,17 @@ Per decision OD-1, only test and development builds gain the POC's permissions; 
 
 Throwaway probe in a scratch worktree (nothing committed): the test build gained `declarativeNetRequest`, `scripting`, `cookies`, `webNavigation`, host access `http://*.localhost/*`, `"message_serialization": "structured_clone"`, and a WXT content script with `registration: "runtime"`. One Playwright spec (`incognitoAccess: true`) ran a local server on `app.localhost:5191`; the service worker created an Incognito window on `about:blank`, then did everything below. Command: `vp run test:e2e -- tests/e2e/zz-probe.spec.ts` (scratch copy, Docker), one run.
 
-| Question                                                                                                 | Observed                                                                                                                                                                             |
-| -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| WXT keeps `message_serialization` in the built manifest                                                  | Yes: `runtime.getManifest().message_serialization === "structured_clone"`                                                                                                            |
-| A port from an Incognito content script to the spanning worker carries structured values                 | Yes: `Date`, `Blob` (type and content), `ArrayBuffer`, `Uint16Array`, `Map`, and a 12 MiB string in one message arrived intact                                                       |
-| The port's sender identifies tab, document, origin                                                       | Yes: `sender.tab.id`, `sender.documentId`, `sender.origin` (`http://app.localhost:5191`), `sender.tab.incognito === true`                                                            |
-| `registration: "runtime"` entrypoint                                                                     | Emitted as `content-scripts/probe.js`, absent from the manifest's `content_scripts`; `scripting.registerContentScripts` ran it at `document_start` in the Incognito tab              |
-| Cookie store of the Incognito tab                                                                        | `getAllCookieStores()` listed store `"1"` with the new tab's id; `cookies.set` with that `storeId` reached the page (`document.cookie === "probe=v"`) and not the normal store `"0"` |
-| DNR session rule with `tabIds` appending `Content-Security-Policy: script-src 'none'; worker-src 'none'` | Applied in Incognito, through a 302 redirect: neither the inline script nor the module script ran, while the isolated-world script wrote `localStorage` on the origin                |
-| DNR block of every non-`main_frame` request for the tab                                                  | The server saw only `/redirect?csp=1` and `/page`: no module, no image request                                                                                                       |
-| Removing rules and scripts                                                                               | `getSessionRules()` and `getRegisteredContentScripts()` empty afterwards                                                                                                             |
-| Cookie store after the last Incognito window closes                                                      | Gone 6 ms after `windows.remove` in this single run. Corrected by S1.7's 50 timed cycles: the store disappears after `onRemoved`, not before it (§5)                                 |
+| Question                                                                                                 | Observed                                                                                                                                                                                                      |
+| -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| WXT keeps `message_serialization` in the built manifest                                                  | Yes: `runtime.getManifest().message_serialization === "structured_clone"`                                                                                                                                     |
+| A port from an Incognito content script to the spanning worker carries structured values                 | Yes: `Date`, `Blob` (type and content), `ArrayBuffer`, `Uint16Array`, `Map`, and a 12 MiB string in one message arrived intact                                                                                |
+| The port's sender identifies tab, document, origin                                                       | Yes: `sender.tab.id`, `sender.documentId`, `sender.origin` (`http://app.localhost:5191`), `sender.tab.incognito === true`                                                                                     |
+| `registration: "runtime"` entrypoint                                                                     | Emitted as `content-scripts/probe.js`, absent from the manifest's `content_scripts`; `scripting.registerContentScripts` ran it at `document_start` in the Incognito tab                                       |
+| Cookie store of the Incognito tab                                                                        | `getAllCookieStores()` listed store `"1"` with the new tab's id; `cookies.set` with that `storeId` reached the page (`document.cookie === "probe=v"`) and not the normal store `"0"`                          |
+| DNR session rule with `tabIds` appending `Content-Security-Policy: script-src 'none'; worker-src 'none'` | Applied in Incognito, through a 302 redirect: neither the inline script nor the module script ran, while the isolated-world script wrote `localStorage` on the origin                                         |
+| DNR block of every non-`main_frame` request for the tab                                                  | The server saw only `/redirect?csp=1` and `/page`: no module, no image request                                                                                                                                |
+| Removing rules and scripts                                                                               | `getSessionRules()` and `getRegisteredContentScripts()` empty afterwards                                                                                                                                      |
+| Cookie store after the last Incognito window closes                                                      | Gone 6 ms after `windows.remove` in this single run. Corrected by S1.7 (order) and by Chromium's source (meaning): the listing drops a store when its last tab closes, not when the profile is destroyed (§5) |
 
 Not shown by this probe: whether the appended CSP keeps a site's own CSP in force (the `?csp=1` header was on the redirect response, not the final document), workers and subframes, a Service Worker serving the document (none exists in a fresh context), and repeated runs. Stage 2 covers them.
 
@@ -102,7 +102,15 @@ The command waits for `windows.onRemoved` of every closed window and an inventor
 
 Order in all 50 cycles: remove call < `onRemoved` < no Incognito window listed < cookie store gone < create call < created. The cookie-store rows come from a scratch build with the `cookies` permission (50 of 50 empty, scratch run `2026-10-28T13-34-54.652Z-a5aba681-6986-4f7f-a33f-0fda09d2458e`), since the committed Stage 1 build lacks it.
 
-**Risk carried into Stage 2.** The product does not wait for the cookie store to go; the margin between the store going and the next create was 0.4–1.4 ms, which is what these runs happened to see, not a guarantee. The store's disappearance is the closest observable sign that Chrome destroyed the Incognito profile. Once S2.2 adds `cookies` to test and development builds, the bootstrap sequence (S2.5) should also wait until `getAllCookieStores()` lists no Incognito store before creating the window, with its own red/green.
+**Risk carried into Stage 2, and what Chromium's source says about it.** The product did not wait for anything after `onRemoved`; the margin between the store going and the next create was 0.4–1.4 ms. Reading Chromium 156.0.8078.4 (the tested version) shows the cookie-store listing was the wrong signal:
+
+- `cookies.getAllCookieStores()` lists only stores that have an open tab (`chrome/browser/extensions/api/cookies/cookies_api.cc:895-904`), so a missing Incognito store proves only that the last Incognito tab closed.
+- When the last Incognito browser closes, Chrome destroys the off-the-record profile only after its render processes exit, or after a 1 s timeout (`browser_manager_service.cc:145-161`; `profile_destroyer.cc:36-37, 335-343, 395-411`), and only then erases it (`profile_impl.cc:1094-1098`).
+- Until it is erased, `windows.create({ incognito: true })` gets the existing profile back (`tabs_api.cc:1044-1047`, `GetPrimaryOTRProfile(true)`; `profile_impl.cc:1063-1066`): a create in that interval reuses the dying session and its data.
+
+So the 50 of 50 above shows that renderers exited fast in these runs, not that a create right after `onRemoved` is always empty. The observable signal of an erased profile is a cookie call naming the old store id: `cookies.getAll({ storeId })` fails with "Invalid cookie store id" once the profile is gone, because the lookup never creates one (`cookies_helpers.cc:81-98`; `chrome_extensions_browser_client.cc:322-325`; `cookies_api.cc:63, 103-115`).
+
+**Correction (S2.5a, `a0ee35a`).** RECnRun remembers every Incognito store id it sees (`local:incognito-store-ids`, ids only), and before every window creation (Start, Close these windows and start, Close and start empty, the identity bootstrap, and every Stage 3 lifecycle command) it waits until no Incognito store is listed **and** `cookies.getAll` rejects for every remembered id, bounded at 10 s (`IncognitoNotGone`). The verdict stays **GO** on that basis. Residuals: an Incognito window the user opened and closed between two RECnRun commands was never seen, so its store id is not remembered; and the wait needs the `cookies` permission, which production lacks (OD-1), so production cannot run the workspace commands at all.
 
 ### Findings outside the POC's goal
 
@@ -122,7 +130,7 @@ Verdict: **GO.** In 100 of 100 recorded starts (50 with the restore returning at
 
 ### Mechanism
 
-1. Wait until `cookies.getAllCookieStores()` lists no Incognito store (Gate G1's carried risk).
+1. Wait until Chrome destroyed the previous Incognito profile: no Incognito store listed and `cookies.getAll` rejects for every remembered store id (S2.5a; the original step checked only the listing, see §5).
 2. Create RECnRun's Incognito window on `about:blank`, then find the cookie store whose `tabIds` hold the managed tab. The id is never `"0"` or a constant.
 3. Set the identity's cookies, HttpOnly ones included, with that `storeId`.
 4. Install the barrier: four DNR session rules scoped to the managed tab.
@@ -132,7 +140,7 @@ Verdict: **GO.** In 100 of 100 recorded starts (50 with the restore returning at
    - Register the origin agent: a runtime content script, top frame, `document_start`, the target origin only, `persistAcrossSessions: false`.
 5. Navigate. The document commits, but its scripts are blocked, and the agent connects over a port with structured clone. The background accepts the port only from the managed tab, the barrier navigation's `documentId`, the target origin, and the current operation id and generation.
 6. The agent restores Web Storage and IndexedDB, and answers `restored` only after every transaction completes and every connection closes. It refuses an origin that already holds data.
-7. Remove the barrier and check that Chrome lists no rule or script, then reload the same tab. Wait for a commit with a new `documentId` on the target origin, then release.
+7. Remove the barrier and check that Chrome lists no rule or script, then reload the same tab from inside the barrier's document (`scripting.executeScript` on its `documentId`, `location.reload()`; S3.7a). Wait for a commit with a new `documentId` on the target origin, then release.
 
 Any failure after the window exists records the operation as failed with its step, closes the window (so a partly restored identity is never used), removes the barrier, and shows "Start with an identity failed at the <step> step. <reason>" in the dashboard. The running operation is journaled in `local:workspace-operation`. When the service worker starts, an unfinished one is recorded as interrupted and cleaned up.
 
@@ -166,7 +174,7 @@ Step timings in ms (min / median / p95 / max), with the 2,000 ms hold excluded:
 | reload                                   | 7.5 / 9.2 / 13.6 / 14.9   | 7.6 / 14.1 / 17.1 / 26.8  |
 | Total per cycle (median / max)           | 97.5 / 142.0              | 95.2 / 137.1              |
 
-The store wait always ended after one listing. The old Incognito store was already gone by the time no Incognito window was listed, so the wait was never under pressure in these runs.
+The store wait always ended after one listing. The old Incognito store was already gone by the time no Incognito window was listed, so the wait was never under pressure in these runs. These timings predate S2.5a, which adds the per-id probe to this step.
 
 ### Failure paths (S2.7, `tests/e2e/poc-failure.spec.ts`)
 
@@ -186,9 +194,9 @@ Each case passed 5 of 5 (`--repeat-each 5`). Scratch copies without the journal 
 ### Not shown by Stage 2
 
 - **A real extension reload.** In the test Chromium, `chrome.runtime.reload()` unloads the command-line extension for good. The interrupted case stops the service worker through DevTools instead, which is the realistic worker-termination path, but not an update or reload.
-- **The store wait under pressure.** It never had to wait.
-- **Only the start with an identity waits for the store.** Stage 1's Start, Close and start, and Close and start empty do not. Stage 3's coordinator should route every window creation through the same sequence.
-- **No user-facing entry point yet.** The start with an identity is reachable only through the test-only `recnrunPoc` handles. Stage 3 connects it to saved identities.
+- **The teardown wait under pressure.** It never had to wait. Since S2.5a it waits for the profile's erasure (§5), which Chromium's source, not a measurement, shows is the right signal.
+- ~~Only the start with an identity waits for the store.~~ Since S2.5a every window creation waits.
+- ~~No user-facing entry point yet.~~ S3.8 and S3.9 connect it to saved identities in the dashboard (§7).
 - **Frames and workers under the barrier.** Their requests were blocked, but none could start while scripts were blocked, so no frame or worker ran under it.
 - **Browser restart during a start.** Recovery after a full browser restart, racing Chrome's startup window bookkeeping, was not tested. S3.11 covers browser restarts.
 - **Real applications.** Only the fixture app; Stage 4 covers the PWA and Zephyr.
