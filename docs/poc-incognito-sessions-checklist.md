@@ -8,7 +8,7 @@ Plan: [poc-incognito-sessions-plan.md](poc-incognito-sessions-plan.md). Assignme
 | Branch               | `poc/incognito-sessions`                                         |
 | Planned base         | `44c154da29860c7a8df829e902b177df5ce2ba2a` (2026-10-28)          |
 | Actual base (P0.1)   | `44c154d` (re-resolved 2026-10-28, unchanged)                    |
-| Last recorded commit | `f53791c`                                                        |
+| Last recorded commit | `3fbb8d5`                                                        |
 | Decisions OD-1…OD-4  | defaults of plan §3, accepted by the user ("Avance", 2026-10-28) |
 
 ## Status legend
@@ -119,7 +119,11 @@ Stage 1 verify: exit 0 on `1216339`, 220 unit/component, 53/53 e2e, coverage 99.
 
 ## Stage 2 — Restore before application bootstrap
 
-- [ ] S2.1 Conventional fixture app `/app/` + plain Incognito baseline
+- [i] S2.1 Conventional fixture app `/app/` + plain Incognito baseline
+  red: `vp run test:e2e -- tests/e2e/poc-app.spec.ts` → 2 failed in `pageAt`: `expect(received).toBe(expected) Expected: true Received: false … Timeout 5000ms exceeded` (no `/app/` route; the Start stayed on the 404 at `/app/redirect`; `.artifacts/docker/2026-10-28T14-00-50.581Z-4a70fd43-d04b-4fdf-9777-f8431d4c004c`)
+  green: same command → 2 passed (`.artifacts/docker/2026-10-28T14-02-00.774Z-a24d46c5-8816-4b98-ade0-a92edb163f74`): Start through the dashboard at `/app/redirect` lands on `/app/`; first reads (cookie, localStorage, sessionStorage, IndexedDB `app`/`kv`/`marker`) empty in `window.__app` and in the `phase: "first"` beacon; module, dedicated worker, subframe, image, fetch all ran; requests logged with `Sec-Fetch-Dest` (`document` ×2, `script`, `iframe`, `image`, `worker`, `empty`); with `?csp=1` the unnonced inline script did not run and one `script-src-elem` violation fired, without it the script ran
+  commit: 3fbb8d5 Serve a conventional fixture app and prove its plain Incognito start
+  notes: site CSP (`default-src 'self'; script-src 'self' 'nonce-…'; …`) sits on the final `/app/` response, not the redirect; curl smoke test of every route on the host; `vp check`, `deps`, `dead-code`, `duplication` (0 clones) pass
 - [ ] S2.2 Test/dev permissions (`declarativeNetRequest`, `scripting`, `cookies`, `webNavigation`, fixture hosts) + test-manifest guard; production unchanged
 - [ ] S2.3 Barrier module (append CSP, block subresources, bound redirects, register agent; verified removal)
 - [ ] S2.4 Origin agent (validated port, structured clone, transaction completion) + dependency rule + ARCHITECTURE
