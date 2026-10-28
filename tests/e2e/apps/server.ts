@@ -3,7 +3,10 @@ import { randomBytes } from "node:crypto";
 import { createServer } from "node:http";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { appFrame, appModule, appPage, appPixel, appWorker, siteCsp } from "./app-pages.ts";
+import { bodyOf, cookiesOf, HTML, JS, redirectTo, send } from "./http.ts";
+import type { Exchange } from "./http.ts";
 import { domainJarCookies, frameCookies, framePage, jarCookies, jarPage } from "./cookie-pages.ts";
+import { pwaRoutes } from "./pwa-routes.ts";
 import { blankPage, inspectPage, sentinelPage, serviceWorker } from "./pages.ts";
 import { writersHtml, writersServiceWorker, writersWorker } from "./writer-pages.ts";
 
@@ -23,47 +26,11 @@ type LogEntry =
 
 const logs = new Map<string, LogEntry[]>();
 
-function cookiesOf(request: IncomingMessage): Record<string, string> {
-  const pairs = (request.headers.cookie ?? "").split(/;\s*/).filter(Boolean);
-  return Object.fromEntries(
-    pairs.map((pair) => {
-      const [name = "", ...value] = pair.split("=");
-      return [name, value.join("=")];
-    }),
-  );
-}
-
 function record(run: string | undefined, entry: LogEntry): void {
   if (run === undefined) return;
   const entries = logs.get(run) ?? [];
   entries.push(entry);
   logs.set(run, entries);
-}
-
-function send(response: ServerResponse, type: string, body: string, headers = {}): void {
-  response.writeHead(200, { "content-type": type, "cache-control": "no-store", ...headers });
-  response.end(body);
-}
-
-async function bodyOf(request: IncomingMessage): Promise<unknown> {
-  const chunks: Buffer[] = [];
-  for await (const chunk of request) chunks.push(chunk as Buffer);
-  const text = Buffer.concat(chunks).toString("utf8");
-  try {
-    return JSON.parse(text) as unknown;
-  } catch {
-    return text;
-  }
-}
-
-const HTML = "text/html; charset=utf-8";
-
-interface Exchange {
-  request: IncomingMessage;
-  response: ServerResponse;
-  url: URL;
-  host: string;
-  run: string | undefined;
 }
 
 function sentinel({ response, url }: Exchange): void {
@@ -88,17 +55,14 @@ function app({ response, url, run }: Exchange): void {
 /** One hop before the app, as sign-in and locale redirects do; `?to=other` leaves the origin. */
 function redirect({ response, url }: Exchange): void {
   const away = url.searchParams.get("to") === "other" ? "http://other.localhost:5192" : "";
-  response.writeHead(302, { location: `${away}/app/${url.search}`, "cache-control": "no-store" });
-  response.end();
+  redirectTo(response, `${away}/app/${url.search}`);
 }
 
-const JS = "text/javascript";
 const APP_ORIGIN = "http://app.localhost:5192";
 
 /** A redirect to the cached page, as a sign-in or a moved resource answers. */
 function cacheRedirect({ response }: Exchange): void {
-  response.writeHead(302, { location: "/cache/basic?via=redirect", "cache-control": "no-store" });
-  response.end();
+  redirectTo(response, "/cache/basic?via=redirect");
 }
 
 /** A cross-site API the app may read: one exposed header, one the page never sees. */
@@ -149,6 +113,7 @@ const routes: Record<string, (exchange: Exchange) => void | Promise<void>> = {
     response.writeHead(204, { "x-kind": "none" });
     response.end();
   },
+  ...pwaRoutes,
   "POST /__log": report,
   "GET /__log": ({ response, run }) =>
     send(response, "application/json", JSON.stringify({ entries: logs.get(run ?? "") ?? [] })),
