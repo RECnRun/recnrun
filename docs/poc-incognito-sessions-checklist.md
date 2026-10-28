@@ -8,7 +8,7 @@ Plan: [poc-incognito-sessions-plan.md](poc-incognito-sessions-plan.md). Assignme
 | Branch               | `poc/incognito-sessions`                                         |
 | Planned base         | `44c154da29860c7a8df829e902b177df5ce2ba2a` (2026-10-28)          |
 | Actual base (P0.1)   | `44c154d` (re-resolved 2026-10-28, unchanged)                    |
-| Last recorded commit | `ba6e5d0`                                                        |
+| Last recorded commit | `dab2e94`                                                        |
 | Decisions OD-1…OD-4  | defaults of plan §3, accepted by the user ("Avance", 2026-10-28) |
 
 ## Status legend
@@ -169,7 +169,11 @@ Stage 2 verify: exit 0 on `dfb882d`, 302 unit/component, 61/61 e2e, coverage 99.
 
 ## Stage 3 — Snapshot fidelity and consistency
 
-- [ ] S3.1 Domain `IdentityCapture` v1
+- [i] S3.1 Domain `IdentityCapture` v1
+  red: `vp run test:unit` against a stub (`IdentityCaptureSchema = v.unknown()`, `OriginData` without indexes, `SiteCookie` without `partitionKey`) → 9 failed: `identity-capture.test.ts` "defaults a store's indexes to none…" `expected undefined to deeply equal []`, each "rejects …" case `expected true to be false`; `identity-data.test.ts` "keeps a partitioned cookie's partition key" (`partitionKey` stripped)
+  green: `vp run test:unit` → 43 files, 224 passed; `vp run test:components` → 82 passed
+  commit: dab2e94 Add the versioned IdentityCapture format to the domain
+  notes: `packages/domain/src/identity-capture.ts`, `formatVersion` 1, separate from `Snapshot`. Reconciled with Stage 2: the capture reuses `SiteCookieSchema` (gains optional `partitionKey`) and `OriginDataSchema` (stores gain `indexes` with `unique`/`multiEntry`, defaulting to `[]` so Stage 2 payloads still parse); per origin it adds `origin` and Cache Storage entries. `IdentityData` stays the restore payload (cookies + one origin's `OriginData`), a projection of a capture, not a second shape. Status rules: `complete` has `endedAt ≥ startedAt`, no failed adapter, no error, and an origin its `url` belongs to; `failed` has `endedAt` and `error`; `in-progress` has no `endedAt`. Origins, adapters, value types unique; reasons ≤ 200 chars. The domain has no `URL` (ES2023 lib only), so the origin is a regex and "page of origin" a prefix rule. `sampleCapture()` in `@recnrun/domain/testing`. `vp check`, `deps`, `dead-code`, `duplication` (0 clones) pass
 - [ ] S3.2 Capture repository in extension IndexedDB with atomic publish (+ `unlimitedStorage`)
 - [ ] S3.3 IndexedDB adapter, full schema and keys, `autoIncrement` case
 - [ ] S3.4 Transport fidelity round trip (+ scratch negative control without `message_serialization`)
