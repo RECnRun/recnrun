@@ -8,7 +8,7 @@ Plan: [poc-incognito-sessions-plan.md](poc-incognito-sessions-plan.md). Assignme
 | Branch               | `poc/incognito-sessions`                                         |
 | Planned base         | `44c154da29860c7a8df829e902b177df5ce2ba2a` (2026-10-28)          |
 | Actual base (P0.1)   | `44c154d` (re-resolved 2026-10-28, unchanged)                    |
-| Last recorded commit | `675b6a3`                                                        |
+| Last recorded commit | `b84af8d`                                                        |
 | Decisions OD-1…OD-4  | defaults of plan §3, accepted by the user ("Avance", 2026-10-28) |
 
 ## Status legend
@@ -94,6 +94,11 @@ Stage 0 verify: first run exit 1 — P0.3's server took port 5191, which `dashbo
   green: `vp run test:unit` → 29 files, 139 tests; `vp run test:components` → 72 tests; `vp run test:e2e -- tests/e2e/incognito-workspace.spec.ts` → 8 passed (`.artifacts/docker/2026-10-28T13-17-33.228Z-1c5bc2b2-0ee8-4a35-a7fa-8e960afd0528`)
   commit: 675b6a3 Refuse close-and-start up front while the workspace is open
   notes: new `WorkspaceOpen` error ("Close and start empty replaces the open workspace; close the other Incognito windows first."); new e2e step opens a foreign window beside the workspace, sees no button and the hint, closes it as the user, and Close and start empty returns; screenshot `.artifacts/screens/S1.5a/open-and-foreign.png` viewed; ARCHITECTURE and PRODUCT_BRIEF updated; `vp check`, `vp run deps` pass
+- [i] S1.5b PiP current tab across windows: prefer the focused window `windows.getLastFocused` names; restore the PiP e2e refocus step (orchestrator decision, OD-2 makes recording cross-window)
+  red: `vp run test:e2e -- tests/e2e/incognito.spec.ts -g "drops closed tabs" --repeat-each=2` → 2 failed: Current tab `Expected substring: "http://app.localhost:5192/inspect?run=recorded"`, `Received string: "Current tabPrivacy policy · RECnRunhttp://localhost:5190/privacy/?other"` (`.artifacts/docker/2026-10-28T13-19-17.822Z-c417c884-8d2d-47d3-8d62-f76fbb3a4014`); `vp run test:unit` → 2 failed in `tabs.test.ts` against a stub that ignored the last focused id, `expected 1 to be 2`
+  green: same e2e command → 2 passed (`.artifacts/docker/2026-10-28T13-23-30.136Z-8579479a-5c8c-4978-bfdf-d98586fda9b2`); `vp run test:unit` → 141 passed; `vp run test:e2e -- tests/e2e/incognito.spec.ts --repeat-each=10` → 50 passed (`.artifacts/docker/2026-10-28T13-23-40.024Z-5185afd2-fdc1-455e-aa61-48251ffae6d0`)
+  commit: b84af8d Take the last focused window when Chrome reports two focused
+  notes: probe (throwaway listener in the service worker): in `onFocusChanged` for the Incognito window, `getAll` reported the normal and the Incognito window both `focused` in 2 of 3 runs, `getLastFocused` named the Incognito one each time, `onActivated` did not fire, and a later `getAll` showed only the Incognito window focused; the PiP had read during the double report and no further event came. Does not explain the baseline flake (P0.1: "No tab in focus." on the PiP's first read, i.e. no browsing window focused at all, not two). Screenshot `.artifacts/screens/S1.5b/pip-recorded-current.png` viewed; ARCHITECTURE "Current tab" updated; `vp check`, `vp run deps` pass
 - [ ] S1.6 E2E reset experiment (six sentinel kinds, normal profile unchanged, repository readable) + negative control (foreign window keeps data, dashboard blocks)
 - [ ] S1.7 Stress loop (`POC_REPEATS=50`), teardown signal if survivors, report section
 
