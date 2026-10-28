@@ -6,7 +6,7 @@ import { fakeEvent } from "./fake-port";
 export function fakeNavigationApi() {
   const api = {
     updates: [] as { tabId: number; url: string }[],
-    reloads: [] as number[],
+    reloads: [] as { tabId: number; documentId: string }[],
     failUpdate: undefined as Error | undefined,
     onCommitted:
       fakeEvent<[{ tabId: number; frameId: number; url: string; documentId?: string }]>(),
@@ -17,8 +17,8 @@ export function fakeNavigationApi() {
       if (api.failUpdate) throw api.failUpdate;
       api.updates.push({ tabId, url });
     },
-    reload: async (tabId: number) => {
-      api.reloads.push(tabId);
+    reload: async (tabId: number, documentId: string) => {
+      api.reloads.push({ tabId, documentId });
     },
   };
   return api satisfies NavigationApi;

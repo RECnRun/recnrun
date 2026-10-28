@@ -109,10 +109,11 @@ test("the managed tab's cookies come back attribute for attribute, HttpOnly ones
   expect(after).toEqual(before.filter(({ domain }) => domain !== FRAME_HOSTS.undeclared));
   expect(first).toMatchObject({ path: "/blank", dest: "document" });
   expect(first?.cookies).toEqual(expect.arrayContaining(["h_session", "run"]));
-  // The barrier's navigation has the extension as initiator, and its reload inherits it, so
-  // neither document request carries the restored SameSite=Strict cookie, though the jar holds it.
+  // The barrier's navigation has the extension as initiator, so it lacks the SameSite=Strict
+  // cookie; the released document's reload starts in the page, so it carries every cookie.
   expect(first?.cookies).not.toContain("h_persist");
-  expect(reloaded).toMatchObject({ path: "/blank", dest: "document", cookies: first?.cookies });
+  expect(reloaded).toMatchObject({ path: "/blank", dest: "document" });
+  expect(reloaded?.cookies).toEqual([...(first?.cookies ?? []), "h_persist"].sort());
 
   await keep("capture-cookies", {
     summary,

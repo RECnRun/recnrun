@@ -25,7 +25,8 @@ interface NavigationError {
 /** The tab and navigation calls the bootstrap needs; fakeBrowser lacks webNavigation events. */
 export interface NavigationApi {
   update: (tabId: number, url: string) => Promise<void>;
-  reload: (tabId: number) => Promise<void>;
+  /** Reloads `documentId` from inside it, so the request is the page's own. */
+  reload: (tabId: number, documentId: string) => Promise<void>;
   onCommitted: ChromeEvent<[Commit]>;
   onErrorOccurred: ChromeEvent<[NavigationError]>;
   onTabRemoved: ChromeEvent<[number]>;
@@ -175,7 +176,7 @@ export function reloadAndCommit(
   const late = () => new WorkspaceError("NavigationTimedOut", "The page did not reload in time.");
   return watchTab<string>(
     api,
-    { tabId, boundMs, late, start: () => api.reload(tabId) },
+    { tabId, boundMs, late, start: () => api.reload(tabId, released.documentId) },
     (settle) => ({
       onCommit: (commit) => {
         if (commit.documentId === released.documentId) return;
@@ -186,12 +187,25 @@ export function reloadAndCommit(
   );
 }
 
+/** Runs in the barrier's document, serialized: it may use nothing from this module. */
+function reloadDocument(): void {
+  location.reload();
+}
+
 /** Tab navigation through Chrome; the getters reach `webNavigation` only in builds that have it. */
 export const chromeNavigationApi: NavigationApi = {
   update: async (tabId, url) => {
     await browser.tabs.update(tabId, { url });
   },
-  reload: (tabId) => browser.tabs.reload(tabId),
+  // A `tabs.reload` keeps the extension as the initiator (navigation_entry_impl.cc), so the request
+  // would lack SameSite=Strict cookies; the page's own reload names the page's origin instead.
+  reload: async (tabId, documentId) => {
+    await browser.scripting.executeScript({
+      target: { tabId, documentIds: [documentId] },
+      world: "ISOLATED",
+      func: reloadDocument,
+    });
+  },
   get onCommitted() {
     return browser.webNavigation.onCommitted;
   },

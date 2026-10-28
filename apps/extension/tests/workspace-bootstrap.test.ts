@@ -84,8 +84,8 @@ function harness(agentReply: "restored" | "failed" = "restored") {
     seen.rulesAtNavigation = barrier.rules.size;
     connectAgent(agentReply);
   };
-  navigation.reload = async (tabId) => {
-    navigation.reloads.push(tabId);
+  navigation.reload = async (tabId, documentId) => {
+    navigation.reloads.push({ tabId, documentId });
     seen.rulesAtReload = barrier.rules.size;
     seen.scriptsAtReload = barrier.scripts.size;
     navigation.onCommitted.emit({
@@ -131,7 +131,8 @@ describe("bootstrapIdentity", () => {
     expect(seen.rulesAtReload).toBe(0);
     expect(seen.scriptsAtReload).toBe(0);
     expect(navigation.updates).toEqual([{ tabId: 9, url: URL_ }]);
-    expect(navigation.reloads).toEqual([9]);
+    // The barrier's document starts the reload, so the released request is the page's own.
+    expect(navigation.reloads).toEqual([{ tabId: 9, documentId: "doc-1" }]);
     expect(timings.map(({ step }) => step)).toEqual(BOOTSTRAP_STEPS);
     expect(timings.every(({ ms }) => ms >= 0)).toBe(true);
   });

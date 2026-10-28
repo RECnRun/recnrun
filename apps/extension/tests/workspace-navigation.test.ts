@@ -108,7 +108,7 @@ describe("reloadAndCommit", () => {
       { tabId: TAB, origin: ORIGIN, documentId: "doc-1" },
       1_000,
     );
-    expect(api.reloads).toEqual([TAB]);
+    expect(api.reloads).toEqual([{ tabId: TAB, documentId: "doc-1" }]);
     commit(api, "doc-1");
     api.onCommitted.emit({ tabId: 3, frameId: 0, url: `${ORIGIN}/`, documentId: "doc-x" });
     commit(api, "doc-2");
@@ -130,14 +130,31 @@ describe("reloadAndCommit", () => {
 describe("chromeNavigationApi", () => {
   test("goes through tabs, webNavigation, and runtime ports", async () => {
     const update = vi.spyOn(fakeBrowser.tabs, "update").mockResolvedValue({} as never);
-    const reload = vi.spyOn(fakeBrowser.tabs, "reload").mockResolvedValue(undefined as never);
+    const inject = vi.spyOn(fakeBrowser.scripting, "executeScript").mockResolvedValue([] as never);
     await chromeNavigationApi.update(TAB, TARGET.url);
-    await chromeNavigationApi.reload(TAB);
+    await chromeNavigationApi.reload(TAB, "doc-1");
     expect(update).toHaveBeenCalledWith(TAB, { url: TARGET.url });
-    expect(reload).toHaveBeenCalledWith(TAB);
+    // The reload starts in the page's document, so Chrome names the page's origin its initiator.
+    expect(inject).toHaveBeenCalledWith({
+      target: { tabId: TAB, documentIds: ["doc-1"] },
+      world: "ISOLATED",
+      func: expect.any(Function),
+    });
     expect(chromeNavigationApi.onCommitted).toBe(fakeBrowser.webNavigation.onCommitted);
     expect(chromeNavigationApi.onErrorOccurred).toBe(fakeBrowser.webNavigation.onErrorOccurred);
     expect(chromeNavigationApi.onTabRemoved).toBe(fakeBrowser.tabs.onRemoved);
     expect(chromeNavigationApi.onConnect).toBe(fakeBrowser.runtime.onConnect);
+  });
+
+  test("the injected function reloads the document it runs in", async () => {
+    const inject = vi.spyOn(fakeBrowser.scripting, "executeScript").mockResolvedValue([] as never);
+    await chromeNavigationApi.reload(TAB, "doc-1");
+    const reload = vi.fn();
+    vi.stubGlobal("location", { reload });
+    const injection = inject.mock.calls[0]?.[0];
+    if (injection === undefined || !("func" in injection)) throw new Error("Nothing injected");
+    (injection.func as () => void)();
+    vi.unstubAllGlobals();
+    expect(reload).toHaveBeenCalledOnce();
   });
 });
