@@ -16,7 +16,7 @@ The events themselves (clicks, inputs, navigations, DOM changes) are not stored 
 
 1. A visitor opens recnrun.com (or a local dev server).
 2. The website asks whether the extension is installed. If it is missing, the website shows a banner explaining what the extension does, with a link to the install guide.
-3. With the extension installed, the extension shows its dashboard over the site, at the site's address. `recnrun.com/recordings/<id>` opens that recording, and Back, Forward, and reload work. The dashboard shows its recordings:
+3. With the extension installed, the extension shows its dashboard over the site, at the site's address, and the site's root brings the dashboard's own tab forward, or opens one, with an **Open dashboard** button that does it again. `recnrun.com/recordings/<id>` opens that recording, and Back, Forward, and reload work. The dashboard shows its recordings:
    - **Recordings:** grouped by workspace, the one with the newest recording first; each recording, newest first, with its start URL, date (in UTC), duration, and event count.
    - **Empty:** it says there are no recordings yet.
    - **Unreadable** (for example, stored data from an incompatible version): it shows the reason.

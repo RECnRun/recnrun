@@ -63,6 +63,18 @@ describe("request", () => {
     await expect(client.request("ping")).rejects.toThrow(new BridgeError("Storage unavailable"));
   });
 
+  test("asks the extension to bring its dashboard forward, which returns nothing to the page", async () => {
+    const { client, replyWith } = setup();
+    replyWith(messages.success("req-1", {}));
+    await expect(client.request("open-dashboard")).resolves.toEqual({});
+  });
+
+  test("rejects an open-dashboard result that is not an object", async () => {
+    const { client, replyWith } = setup();
+    replyWith(messages.success("req-1", null));
+    await expect(client.request("open-dashboard")).rejects.toThrow(/invalid open-dashboard result/);
+  });
+
   test("rejects a result that does not match the schema", async () => {
     const { client, replyWith } = setup();
     replyWith(messages.success("req-1", { extensionVersion: 1 }));

@@ -12,6 +12,7 @@ function deferredGateway() {
   let settle: (detection: ExtensionDetection) => void = () => {};
   const gateway: ExtensionGateway = {
     detect: () => new Promise((resolve) => (settle = resolve)),
+    openDashboard: async () => {},
   };
   return { gateway, settle: (detection: ExtensionDetection) => settle(detection) };
 }

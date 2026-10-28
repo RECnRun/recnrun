@@ -61,6 +61,7 @@ describe("createBridgeHost", () => {
 describe("RequestTypeSchema", () => {
   test("accepts only request types the protocol defines", () => {
     expect(v.is(RequestTypeSchema, "ping")).toBe(true);
+    expect(v.is(RequestTypeSchema, "open-dashboard")).toBe(true);
     // The dashboard reads storage itself, so no page can ask for the user's recordings.
     const others = [undefined, "", "getSnapshot", "deleteEverything", 1];
     expect(others.some((value) => v.is(RequestTypeSchema, value))).toBe(false);

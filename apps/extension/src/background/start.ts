@@ -6,7 +6,7 @@ import { createRoutes } from "@/background/routes";
 import { recordingSessionRepository } from "@/storage/recording-session-repository";
 
 /** Keeps a dashboard in front of the user: on the toolbar icon, on install, and as the profile opens. */
-function openDashboardOnDemand(): void {
+function openDashboardOnDemand() {
   const url = browser.runtime.getURL("/dashboard.html");
   const opener = createDashboardOpener(chromeDashboardBrowser(url), url);
   browser.action.onClicked.addListener(({ windowId, incognito }) => {
@@ -18,15 +18,17 @@ function openDashboardOnDemand(): void {
   browser.windows.onCreated.addListener(({ id = -1, type, incognito }) => {
     void opener.windowOpened({ id, type, incognito });
   });
+  return opener;
 }
 
 export function startBackground(): void {
+  const opener = openDashboardOnDemand();
   // Closing a tab never ends the session; only Stop, in a dashboard or the PiP window, does.
   const routes = createRoutes({
     extensionVersion: browser.runtime.getManifest().version,
     store: recordingSessionRepository,
+    showDashboard: opener.show,
   });
   const identity = { extensionId: browser.runtime.id, extensionUrl: browser.runtime.getURL("/") };
   browser.runtime.onMessage.addListener(createBackgroundListener(routes, identity));
-  openDashboardOnDemand();
 }

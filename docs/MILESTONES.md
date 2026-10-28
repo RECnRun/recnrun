@@ -16,6 +16,7 @@ Acceptance (all automated, run by `vp run verify`):
 - [x] The toolbar icon brings the first dashboard tab forward, or opens one in focus when none is open, and the extension has no popup, keyboard commands, or context menu (`tests/e2e/toolbar-action.spec.ts`).
 - [x] Installing RECnRun opens the dashboard as the first tab, in focus; a profile reopened with its tabs restored keeps one dashboard, moved first and focused; the first normal window after every other closed gets the dashboard, and another window does not (`tests/e2e/profile-start.spec.ts`).
 - [x] While RECnRun is off the toolbar, the dashboard tab asks to pin it from the Extensions menu (`tests/e2e/dashboard-tab.spec.ts`).
+- [x] With the extension, recnrun.com's root brings the dashboard tab forward, or opens one in focus, and the privacy policy never does (`tests/e2e/site-open-dashboard.spec.ts`).
 - [x] On the website, the extension covers the page with its dashboard instead of the banner, deep links open a recording, and the dashboard's navigation updates the address bar (`tests/e2e/dashboard-frame.spec.ts`).
 - [x] No other origin can frame the dashboard or the session page, and they refuse to render under a foreign ancestor (`tests/e2e/dashboard-embedding.spec.ts`).
 - [x] A page on another origin cannot get an answer from the extension by posting bridge messages to the website's window (`tests/e2e/origin-guard.spec.ts`).
