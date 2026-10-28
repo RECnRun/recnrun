@@ -60,6 +60,31 @@ test("an interrupted start is recorded failed at its step, then its barrier and 
   expect(await isOpen(windowId)).toBe(false);
 });
 
+test("the recorded error names the command the restart interrupted", async () => {
+  const named = {
+    "start-with-identity": "the start",
+    switch: "the switch",
+    suspend: "the suspension",
+    resume: "the resumption",
+    "new-identity": "the new identity's creation",
+    "delete-identity": "the deletion",
+  } as const;
+  for (const [kind, noun] of Object.entries(named)) {
+    const operation: WorkspaceOperation = {
+      id: "op-1",
+      kind: kind as WorkspaceOperation["kind"],
+      step: "capture",
+      status: "running",
+      started: 1,
+    };
+    const journal = memoryOperationJournal(operation);
+    await recover(journal);
+    expect((await journal.read())?.error, kind).toBe(
+      `Interrupted: RECnRun restarted before ${noun} finished.`,
+    );
+  }
+});
+
 test("a start interrupted before its window existed is recorded failed and removes nothing", async () => {
   const operation: WorkspaceOperation = {
     id: "op-1",

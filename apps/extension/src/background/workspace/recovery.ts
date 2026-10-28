@@ -11,7 +11,18 @@ export interface RecoveryDeps {
   closeWindow: (windowId: number, generation: number) => Promise<void>;
 }
 
-const INTERRUPTED = "Interrupted: RECnRun restarted before the start finished.";
+/** What each command is called in the error a restart leaves, so it names the one interrupted. */
+const INTERRUPTED_COMMAND: Record<WorkspaceOperation["kind"], string> = {
+  "start-with-identity": "the start",
+  switch: "the switch",
+  suspend: "the suspension",
+  resume: "the resumption",
+  "new-identity": "the new identity's creation",
+  "delete-identity": "the deletion",
+};
+
+const interrupted = ({ kind }: WorkspaceOperation) =>
+  `Interrupted: RECnRun restarted before ${INTERRUPTED_COMMAND[kind]} finished.`;
 
 /** Undoes what the interrupted start may have left: its window, then its barrier. */
 async function cleanUp(operation: WorkspaceOperation, deps: RecoveryDeps): Promise<string[]> {
@@ -24,8 +35,8 @@ async function cleanUp(operation: WorkspaceOperation, deps: RecoveryDeps): Promi
 }
 
 /**
- * Runs when the service worker starts: a start still journaled as running died with the previous
- * worker, so it is recorded failed at its step before its window and barrier are removed. Resolves
+ * Runs when the service worker starts: an operation still journaled as running died with the
+ * previous worker, so it is recorded failed at its step before its window and barrier are removed. Resolves
  * with the failed operation, or undefined when nothing was interrupted.
  */
 export async function recoverInterrupted(
@@ -33,13 +44,14 @@ export async function recoverInterrupted(
 ): Promise<WorkspaceOperation | undefined> {
   const operation = await deps.journal.read();
   if (operation?.status !== "running") return undefined;
-  const failed: WorkspaceOperation = { ...operation, status: "failed", error: INTERRUPTED };
+  const error = interrupted(operation);
+  const failed: WorkspaceOperation = { ...operation, status: "failed", error };
   await deps.journal.write(failed);
   const failures = await cleanUp(operation, deps);
   if (failures.length === 0) return failed;
   const reported = {
     ...failed,
-    error: `${INTERRUPTED} Cleanup also failed: ${failures.join(" ")}`,
+    error: `${error} Cleanup also failed: ${failures.join(" ")}`,
   };
   await deps.journal.write(reported);
   return reported;

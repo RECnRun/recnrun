@@ -71,7 +71,7 @@ test.describe("with a DevTools port", () => {
     expect(await journalOf(worker)).toMatchObject({
       step: "capture",
       status: "failed",
-      error: "Interrupted: RECnRun restarted before the start finished.",
+      error: "Interrupted: RECnRun restarted before the switch finished.",
     });
     // Nothing had closed yet, so B's window stays open with its data.
     expect(await incognitoWindows(worker)).toBe(1);
