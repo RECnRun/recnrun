@@ -92,9 +92,9 @@ function harness(agentReply: "restored" | "failed" = "restored") {
     barrier,
     windows: { create: vi.fn(async () => WINDOW), close: vi.fn(async () => {}) },
     hooks: { beforeStep: vi.fn(async () => {}) },
-    record: (operation: WorkspaceOperation) => {
+    record: vi.fn(async (operation: WorkspaceOperation) => {
       records.push(operation);
-    },
+    }),
   } satisfies BootstrapDeps;
 }
 
@@ -131,9 +131,15 @@ describe("bootstrapIdentity", () => {
     expect(vi.mocked(deps.hooks.beforeStep).mock.calls.map(([step]) => step)).toEqual(
       BOOTSTRAP_STEPS,
     );
-    expect(records.map(({ step, status }) => `${step} ${status}`)).toEqual([
-      ...BOOTSTRAP_STEPS.map((step) => `${step} running`),
-      "reload done",
+    // The window is recorded as soon as it exists, so a restart can close it.
+    const window = ["window running", "window running 5"];
+    expect(
+      records.map(({ step, status, windowId }) => `${step} ${status} ${windowId ?? ""}`.trim()),
+    ).toEqual([
+      "store-gone running",
+      ...window,
+      ...BOOTSTRAP_STEPS.slice(2).map((step) => `${step} running 5`),
+      "reload done 5",
     ]);
     expect(records.at(-1)).toMatchObject({
       id: "op-1",
@@ -162,6 +168,38 @@ describe("bootstrapIdentity", () => {
       status: "failed",
       error: "Injected at restore.",
     });
+  });
+
+  test("waits until each step is recorded before running it", async () => {
+    let release = () => {};
+    vi.mocked(deps.record).mockImplementation(async (operation) => {
+      records.push(operation);
+      if (operation.step === "window" && operation.windowId === undefined) {
+        await new Promise<void>((resolve) => {
+          release = resolve;
+        });
+      }
+    });
+    const starting = bootstrapIdentity(URL_, DATA, deps, "op-1");
+    await vi.waitFor(() => expect(records.at(-1)?.step).toBe("window"));
+    expect(deps.windows.create).not.toHaveBeenCalled();
+    release();
+    await starting;
+    expect(deps.windows.create).toHaveBeenCalledOnce();
+  });
+
+  test("cleans up even when the failure cannot be recorded", async () => {
+    vi.mocked(deps.hooks.beforeStep).mockImplementation(async (step) => {
+      if (step === "restore") throw new WorkspaceError("InjectedFailure", "Injected at restore.");
+    });
+    vi.mocked(deps.record).mockImplementation(async (operation) => {
+      if (operation.status === "failed") throw new Error("Storage is full.");
+    });
+    await expect(bootstrapIdentity(URL_, DATA, deps, "op-1")).rejects.toMatchObject({
+      name: "InjectedFailure",
+    });
+    expect(deps.windows.close).toHaveBeenCalledWith([5]);
+    expect(barrier.rules.size).toBe(0);
   });
 
   test("fails when the agent cannot restore, and leaves the app unreleased", async () => {

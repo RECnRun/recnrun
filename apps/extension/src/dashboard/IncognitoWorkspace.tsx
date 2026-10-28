@@ -4,9 +4,9 @@ import * as v from "valibot";
 import { ask } from "@/dashboard/ask";
 import { WorkspaceStatusSchema } from "@/messaging/workspace-protocol";
 import type { WorkspaceRequest, WorkspaceStatus } from "@/messaging/workspace-protocol";
-import type { IncognitoAccess, TabSource } from "@/ports/tabs";
+import type { TabSource } from "@/ports/tabs";
 import { coalesceReads } from "@/views/coalesce-reads";
-import type { SendRequest } from "@/views/extension-services";
+import type { ExtensionServices, SendRequest } from "@/views/extension-services";
 import { useBrowserTabs } from "@/views/use-browser-tabs";
 
 type StatusRead = { status: WorkspaceStatus } | { error: string };
@@ -18,12 +18,15 @@ export interface WorkspaceRead {
   refresh: () => void;
 }
 
-/** The background's workspace status, read again when a window or tab comes or goes. */
-export function useWorkspaceStatus(
-  access: IncognitoAccess,
-  tabs: TabSource,
-  send: SendRequest,
-): WorkspaceRead {
+type StatusSources = Pick<ExtensionServices, "incognito" | "tabs" | "send" | "operations">;
+
+/** The background's workspace status, read again when a window, a tab, or the operation changes. */
+export function useWorkspaceStatus({
+  incognito,
+  tabs,
+  send,
+  operations,
+}: StatusSources): WorkspaceRead {
   const [read, setRead] = useState<StatusRead>();
   const refresh = useRef(() => {});
   useEffect(() => {
@@ -36,14 +39,16 @@ export function useWorkspaceStatus(
     );
     refresh.current = reads.refresh;
     reads.refresh();
-    const unwatchWindows = access.watchWindows(reads.refresh);
+    const unwatchWindows = incognito.watchWindows(reads.refresh);
     const unwatchTabs = tabs.watch(reads.refresh);
+    const unwatchOperations = operations.watch(reads.refresh);
     return () => {
       reads.stop();
       unwatchWindows();
       unwatchTabs();
+      unwatchOperations();
     };
-  }, [access, tabs, send]);
+  }, [incognito, tabs, send, operations]);
   return {
     status: read && "status" in read ? read.status : undefined,
     readError: read && "error" in read ? read.error : undefined,
@@ -187,6 +192,13 @@ function WorkspaceBody({ status, tabs, target, onTarget, disabled, run }: BodyPr
   );
 }
 
+/** Why the last start with an identity stopped, kept until another command runs. */
+function failedStart(status: WorkspaceStatus | undefined): string | undefined {
+  const operation = status?.operation;
+  if (operation?.status !== "failed") return undefined;
+  return `Start with an identity failed at the ${operation.step} step. ${operation.error ?? ""}`;
+}
+
 /**
  * The one Incognito window RECnRun manages: what blocks it, and the command for each state. Every
  * command reads the status again when it ends, refused or not.
@@ -206,6 +218,7 @@ export function IncognitoWorkspace({ workspace, tabs, send, target, onTarget }: 
       });
   };
   const shown = error ?? readError;
+  const failed = failedStart(status);
   return (
     <section class="incognito-workspace" aria-labelledby="incognito-workspace-heading">
       <h3 id="incognito-workspace-heading">Incognito workspace</h3>
@@ -219,6 +232,7 @@ export function IncognitoWorkspace({ workspace, tabs, send, target, onTarget }: 
           run={run}
         />
       )}
+      {failed && <p role="alert">{failed}</p>}
       {shown && <p role="alert">{shown}</p>}
     </section>
   );

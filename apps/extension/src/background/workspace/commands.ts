@@ -1,5 +1,5 @@
 import { classifyIncognitoWindows, isAllowedTarget } from "@recnrun/domain";
-import type { IdentityData, WorkspaceOperation } from "@recnrun/domain";
+import type { IdentityData } from "@recnrun/domain";
 import { browser } from "wxt/browser";
 import { chromeBarrierApi } from "@/background/workspace/barrier";
 import { bootstrapIdentity } from "@/background/workspace/bootstrap";
@@ -7,10 +7,19 @@ import type { BootstrapHooks, BootstrapPorts, StepTiming } from "@/background/wo
 import { chromeCookieApi } from "@/background/workspace/cookie-stores";
 import { WorkspaceError } from "@/background/workspace/errors";
 import { chromeNavigationApi } from "@/background/workspace/navigation";
-import { closeWindows, createNeutralWindow, inventory } from "@/background/workspace/windows";
+import { recoverInterrupted } from "@/background/workspace/recovery";
+import type { RecoveryDeps } from "@/background/workspace/recovery";
+import {
+  closeManagedWindow,
+  closeWindows,
+  createNeutralWindow,
+  inventory,
+} from "@/background/workspace/windows";
 import type { WorkspaceStatus } from "@/messaging/workspace-protocol";
 import type { RecordingStore } from "@/ports/recording-store";
+import type { OperationJournal } from "@/ports/operation-journal";
 import { managedWindowRepository } from "@/storage/managed-window-repository";
+import { operationJournal } from "@/storage/operation-journal";
 
 /** What the dashboard can ask of the Incognito workspace. */
 export interface WorkspaceCommands {
@@ -19,6 +28,7 @@ export interface WorkspaceCommands {
   closeAndStart: (url: string, windowIds: readonly number[]) => Promise<void>;
   restart: (url: string) => Promise<void>;
   startWithIdentity: (url: string, data: IdentityData) => Promise<StepTiming[]>;
+  recover: () => Promise<void>;
 }
 
 async function classifiedWindows() {
@@ -103,12 +113,14 @@ export function chromeBootstrapPorts(
   };
 }
 
-/** One operation at a time, held in memory; a second one is refused rather than queued. */
-function createLock() {
+/**
+ * One operation at a time, held in memory; a second one is refused rather than queued. Every
+ * command and status read first waits for `ready`, the recovery of a start the last worker left.
+ */
+function createLock(journal: OperationJournal) {
   const lock = {
     busy: false,
-    /** The last start with an identity, failed or not, until another command runs. */
-    operation: undefined as WorkspaceOperation | undefined,
+    ready: Promise.resolve() as Promise<unknown>,
     exclusive: async <T>(run: () => Promise<T>): Promise<T> => {
       if (lock.busy) {
         throw new WorkspaceError(
@@ -117,8 +129,10 @@ function createLock() {
         );
       }
       lock.busy = true;
-      lock.operation = undefined;
       try {
+        await lock.ready;
+        // The last start's outcome is shown until another command runs.
+        await journal.clear();
         return await run();
       } finally {
         lock.busy = false;
@@ -128,22 +142,34 @@ function createLock() {
   return lock;
 }
 
+/** Starts the recovery and makes every later command and status read wait for it. */
+function recoverInto(
+  lock: ReturnType<typeof createLock>,
+  deps: Omit<RecoveryDeps, "closeWindow">,
+): Promise<void> {
+  const recovering = recoverInterrupted({ ...deps, closeWindow: closeManagedWindow });
+  // A failed recovery leaves the journal as it was; the status then shows it as it is.
+  lock.ready = recovering.catch(() => undefined);
+  return recovering.then(() => undefined);
+}
+
 export function createWorkspaceCommands(
   recordings: RecordingStore,
   ports: BootstrapPorts = chromeBootstrapPorts(),
+  journal: OperationJournal = operationJournal,
 ): WorkspaceCommands {
-  const lock = createLock();
+  const lock = createLock(journal);
   const { exclusive } = lock;
   const windows = { create: createNeutralWindow, close: closeWindows };
-  const record = (next: WorkspaceOperation) => {
-    lock.operation = next;
-  };
   return {
+    recover: () => recoverInto(lock, { journal, barrier: ports.barrier }),
     status: async () => {
+      await lock.ready;
       const access = await browser.extension.isAllowedIncognitoAccess();
       const { stored, foreign } = await classifiedWindows();
       const summaries = foreign.map(({ id, tabs }) => ({ id, tabCount: tabs?.length ?? 0 }));
-      const { busy, operation } = lock;
+      const operation = (await journal.read()) ?? undefined;
+      const { busy } = lock;
       return { access, managed: stored, foreign: summaries, busy, ...(operation && { operation }) };
     },
     // Async, so a refused target rejects; the busy check still runs before the first await.
@@ -170,7 +196,7 @@ export function createWorkspaceCommands(
       return exclusive(async () => {
         await requireNoRecording(recordings);
         await requireAccess();
-        const deps = { ...ports, windows, record };
+        const deps = { ...ports, windows, record: journal.write };
         return bootstrapIdentity(url, data, deps, crypto.randomUUID());
       });
     },

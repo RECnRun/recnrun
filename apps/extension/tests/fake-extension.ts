@@ -3,6 +3,7 @@ import { sampleSnapshot } from "@recnrun/domain/testing";
 import type { WorkspaceStatus } from "@/messaging/workspace-protocol";
 import type { RecordingStore } from "@/ports/recording-store";
 import type { ExtensionServices, PageRequest, SendRequest } from "@/views/extension-services";
+import { memoryOperationJournal } from "./fake-journal";
 import { DOCS, SHOP, fakeIncognito, fakeTabs } from "./fake-tabs";
 
 /** Stands in for extension session storage; every view given the same store sees each write. */
@@ -52,6 +53,7 @@ export function fakeExtension(overrides: Partial<ExtensionServices> = {}): Exten
     recordings: memoryRecordingStore(),
     tabs: fakeTabs({ tabs: [SHOP, DOCS] }).source,
     incognito: fakeIncognito(true).access,
+    operations: memoryOperationJournal(),
     holdSitePorts: () => {},
     send: fakeBackground().send,
     ...overrides,

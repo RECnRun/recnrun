@@ -61,7 +61,7 @@ export function Dashboard({ services, router, take }: DashboardProps) {
   const load = useSnapshot(services.loadSnapshot);
   const [route, setRoute] = useState(router.initialRoute);
   const [target, setTarget] = useState("");
-  const workspace = useWorkspaceStatus(services.incognito, services.tabs, services.send);
+  const workspace = useWorkspaceStatus(services);
   useEffect(() => router.subscribe(setRoute), [router]);
   const navigate = (path: string) => {
     router.navigate(path);

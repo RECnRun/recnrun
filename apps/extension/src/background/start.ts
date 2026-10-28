@@ -9,6 +9,8 @@ import { recordingSessionRepository } from "@/storage/recording-session-reposito
 export function startBackground(): void {
   const ports = chromeBootstrapPorts();
   const workspace = createWorkspaceCommands(recordingSessionRepository, ports);
+  // A start the previous worker left running died with it; an unhandled failure here is logged.
+  void workspace.recover();
   // A static check of the mode lets the production build drop the test handles entirely.
   if (import.meta.env.MODE === "test") installTestHandles(globalThis, workspace, ports.hooks);
   // Closing a tab never ends the session; only Stop, in a dashboard or the PiP window, does.

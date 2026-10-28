@@ -96,3 +96,14 @@ export function trackManagedWindow(): void {
   // Incognito windows never survive a restart, and Chrome reuses window ids after one.
   browser.runtime.onStartup.addListener(() => markClosed());
 }
+
+/**
+ * Closes `windowId` only while it is still the open managed window of `generation`; Chrome reuses
+ * window ids after a restart, so an id alone could name a window the user opened.
+ */
+export async function closeManagedWindow(windowId: number, generation: number): Promise<void> {
+  const managed = await managedWindowRepository.read();
+  const ours = managed?.status === "active" && managed.windowId === windowId;
+  if (!ours || managed.generation !== generation) return;
+  if ((await inventory()).some(({ id }) => id === windowId)) await closeWindows([windowId]);
+}

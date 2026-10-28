@@ -1,6 +1,7 @@
 import type { Snapshot } from "@recnrun/domain";
 import type { SessionRequest } from "@/messaging/session-protocol";
 import type { WorkspaceRequest } from "@/messaging/workspace-protocol";
+import type { OperationJournal } from "@/ports/operation-journal";
 import type { RecordingStore } from "@/ports/recording-store";
 import type { IncognitoAccess, TabSource } from "@/ports/tabs";
 
@@ -16,6 +17,8 @@ export interface ExtensionServices {
   recordings: RecordingStore;
   tabs: TabSource;
   incognito: IncognitoAccess;
+  /** The background's journal of workspace operations, watched so a failure shows when it happens. */
+  operations: Pick<OperationJournal, "watch">;
   /** Keeps the site tabs' ports open, so a site tab learns when RECnRun unloads. */
   holdSitePorts: () => void;
   send: SendRequest;

@@ -46,8 +46,12 @@ export function restoreThroughAgent(
   return new Promise((resolve, reject) => {
     const settle = (finish: () => void) => {
       clearTimeout(timer);
-      port.onMessage.removeListener(onReply);
-      port.onDisconnect.removeListener(onGone);
+      try {
+        port.onMessage.removeListener(onReply);
+        port.onDisconnect.removeListener(onGone);
+      } catch {
+        // A port whose page is gone has no listener left to remove.
+      }
       finish();
     };
     const onReply = (message: unknown) => {
@@ -67,9 +71,14 @@ export function restoreThroughAgent(
       const error = "The page did not restore its data in time.";
       settle(() => reject(new WorkspaceError("RestoreTimedOut", error)));
     }, boundMs);
-    port.onMessage.addListener(onReply);
-    port.onDisconnect.addListener(onGone);
     const { id: operationId, generation } = operation;
-    port.postMessage({ type: "restore", operationId, generation, payload });
+    // Chrome throws, rather than fires onDisconnect, when the page went before this port was used.
+    try {
+      port.onMessage.addListener(onReply);
+      port.onDisconnect.addListener(onGone);
+      port.postMessage({ type: "restore", operationId, generation, payload });
+    } catch {
+      onGone();
+    }
   });
 }

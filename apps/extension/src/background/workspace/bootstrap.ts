@@ -9,6 +9,7 @@ import {
   waitForNoIncognitoStore,
 } from "@/background/workspace/cookie-stores";
 import type { CookieApi } from "@/background/workspace/cookie-stores";
+import { collectFailures } from "@/background/workspace/errors";
 import { openBehindBarrier, reloadAndCommit } from "@/background/workspace/navigation";
 import type { NavigationApi } from "@/background/workspace/navigation";
 import type { OriginPort } from "@/messaging/origin-protocol";
@@ -53,7 +54,7 @@ export interface BootstrapDeps extends BootstrapPorts {
     close: (ids: readonly number[]) => Promise<void>;
   };
   /** Receives the operation at each step and at its end. */
-  record: (operation: WorkspaceOperation) => void;
+  record: (operation: WorkspaceOperation) => Promise<void>;
   storeBoundMs?: number;
 }
 
@@ -90,6 +91,8 @@ const STEP_RUNS: Record<BootstrapStep, (run: Run) => Promise<unknown>> = {
     run.window = await run.deps.windows.create();
     const { generation, windowId } = run.window;
     run.operation = { ...run.operation, generation, windowId };
+    // Journaled at once, so a restart from here on finds the window to close.
+    await run.deps.record(run.operation);
   },
   "cookie-store": async (run) => {
     run.storeId = await resolveTabStore(run.deps.cookies, tabOf(run));
@@ -131,14 +134,7 @@ const STEP_RUNS: Record<BootstrapStep, (run: Run) => Promise<unknown>> = {
 
 /** Undoes what the failed start left: the page link, the window, then the barrier. */
 async function cleanUp(run: Run): Promise<string[]> {
-  const failures: string[] = [];
-  const attempt = async (undo: () => Promise<void>) => {
-    try {
-      await undo();
-    } catch (error) {
-      failures.push(errorMessage(error));
-    }
-  };
+  const { failures, attempt } = collectFailures();
   run.agent?.disconnect();
   const { window, barrier } = run;
   if (window) await attempt(() => run.deps.windows.close([window.windowId]));
@@ -149,15 +145,17 @@ async function cleanUp(run: Run): Promise<string[]> {
 /** Records the failure before cleaning up, so whoever watches the window closing sees why. */
 async function fail(run: Run, error: unknown): Promise<never> {
   const message = errorMessage(error);
+  // A journal that cannot be written must not keep the window open; the caller still gets the error.
+  const record = () => run.deps.record(run.operation).catch(() => undefined);
   run.operation = { ...run.operation, status: "failed", error: message };
-  run.deps.record(run.operation);
+  await record();
   const failures = await cleanUp(run);
   if (failures.length > 0) {
     run.operation = {
       ...run.operation,
       error: `${message} Cleanup also failed: ${failures.join(" ")}`,
     };
-    run.deps.record(run.operation);
+    await record();
   }
   throw error;
 }
@@ -185,7 +183,7 @@ export async function bootstrapIdentity(
   try {
     for (const step of BOOTSTRAP_STEPS) {
       run.operation = { ...run.operation, step };
-      deps.record(run.operation);
+      await deps.record(run.operation);
       await deps.hooks.beforeStep(step);
       const started = performance.now();
       await STEP_RUNS[step](run);
@@ -195,6 +193,6 @@ export async function bootstrapIdentity(
     return fail(run, error);
   }
   run.operation = { ...run.operation, status: "done" };
-  deps.record(run.operation);
+  await deps.record(run.operation);
   return timings;
 }

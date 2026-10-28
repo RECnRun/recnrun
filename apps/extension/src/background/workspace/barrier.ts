@@ -104,9 +104,17 @@ function barrierRules(tabId: number, origin: string, generation: number): Barrie
   ];
 }
 
+const agentScriptId = (operationId: string) => `recnrun-origin-agent-${operationId}`;
+
+/** The rule and script ids an operation's barrier uses, known without the tab or the origin. */
+export function barrierOf({ id, generation }: BarrierOperation): Barrier {
+  const base = generation * RULES_PER_GENERATION;
+  return { ruleIds: [base + 1, base + 2, base + 3, base + 4], scriptId: agentScriptId(id) };
+}
+
 function agentScript(origin: string, operationId: string): AgentScript {
   return {
-    id: `recnrun-origin-agent-${operationId}`,
+    id: agentScriptId(operationId),
     js: [AGENT_SCRIPT],
     matches: [`${origin}/*`],
     runAt: "document_start",
@@ -136,7 +144,7 @@ export async function installBarrier(
   requireOrigin(targetOrigin);
   const rules = barrierRules(tabId, targetOrigin, operation.generation);
   const script = agentScript(targetOrigin, operation.id);
-  const barrier = { ruleIds: rules.map(({ id }) => id), scriptId: script.id };
+  const barrier = barrierOf(operation);
   await requireFree(barrier, api);
   await api.addSessionRules(rules);
   try {

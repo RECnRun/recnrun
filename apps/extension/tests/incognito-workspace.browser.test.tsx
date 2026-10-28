@@ -5,6 +5,7 @@ import type { DashboardRouter } from "@/dashboard/router";
 import type { WorkspaceStatus } from "@/messaging/workspace-protocol";
 import type { PageRequest } from "@/views/extension-services";
 import { NO_INCOGNITO_WINDOW, fakeBackground, fakeExtension } from "./fake-extension";
+import { memoryOperationJournal } from "./fake-journal";
 import { PRIVATE, SHOP, fakeIncognito, fakeTabs } from "./fake-tabs";
 import { button } from "./queries";
 
@@ -38,8 +39,10 @@ function mount(initial: WorkspaceStatus, answer: Answer = () => undefined) {
   });
   const incognito = fakeIncognito(initial.access);
   const send = (request: PageRequest) => answer(request) ?? background.send(request);
+  const operations = memoryOperationJournal();
   const services = fakeExtension({
     send,
+    operations,
     incognito: incognito.access,
     tabs: fakeTabs({ tabs: [SHOP, PRIVATE] }).source,
   });
@@ -50,7 +53,7 @@ function mount(initial: WorkspaceStatus, answer: Answer = () => undefined) {
   const setStatus = (next: WorkspaceStatus) => {
     status = next;
   };
-  return { root, sent: background.sent, reads: () => reads, setStatus, incognito };
+  return { root, sent: background.sent, reads: () => reads, setStatus, incognito, operations };
 }
 
 const panel = (root: HTMLElement) =>
@@ -210,6 +213,27 @@ test("a status the background cannot read is an alert in the panel", async () =>
   await expect
     .poll(() => panel(root)?.querySelector('[role="alert"]')?.textContent)
     .toBe("Stored state is invalid");
+});
+
+test("a failed start with an identity is an alert naming its step as soon as it is journaled", async () => {
+  const operation = {
+    id: "op-1",
+    kind: "start-with-identity" as const,
+    step: "restore",
+    status: "running" as const,
+    started: 1,
+  };
+  const { root, setStatus, operations } = mount({ ...NO_INCOGNITO_WINDOW, busy: true, operation });
+  await expect.poll(() => inPanel(root, "Start")).toBeDefined();
+  expect(panel(root)?.querySelector('[role="alert"]')).toBeNull();
+  const error = "Interrupted: RECnRun restarted before the start finished.";
+  const failed = { ...operation, status: "failed" as const, error };
+  setStatus({ ...NO_INCOGNITO_WINDOW, operation: failed });
+  // No window or tab changes: the journal's change alone must bring the failure in.
+  await operations.write(failed);
+  await expect
+    .poll(() => panel(root)?.querySelector('[role="alert"]')?.textContent)
+    .toBe(`Start with an identity failed at the restore step. ${error}`);
 });
 
 test("Use this tab's address fills the address from normal tabs only, without their data", async () => {

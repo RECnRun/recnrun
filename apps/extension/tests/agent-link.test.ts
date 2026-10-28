@@ -67,6 +67,22 @@ describe("restoreThroughAgent", () => {
     expect(port.onDisconnect.listeners.size).toBe(0);
   });
 
+  test("a port whose page went away while the restore waited fails as closed, not with Chrome's error", async () => {
+    // Chrome throws on a port whose context is gone, even when reading its events.
+    const gone = () => {
+      throw new Error("Extension context invalidated.");
+    };
+    const unreadable = Object.defineProperty(fakePort(SENDER), "onMessage", { get: gone });
+    const unwritable = { ...fakePort(SENDER), postMessage: gone };
+    for (const port of [unreadable, unwritable]) {
+      await expect(restoreThroughAgent(port, OPERATION, PAYLOAD, BOUND)).rejects.toMatchObject({
+        name: "AgentDisconnected",
+        message: "The page closed before its data was restored.",
+      });
+    }
+    expect(unwritable.onMessage.listeners.size).toBe(0);
+  });
+
   test("gives up and disconnects when no reply comes within the bound", async () => {
     vi.useFakeTimers();
     const port = fakePort(SENDER);

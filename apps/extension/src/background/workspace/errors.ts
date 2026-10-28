@@ -1,3 +1,5 @@
+import { errorMessage } from "@recnrun/domain";
+
 /** Why a workspace operation stopped; the name tells cases apart, the message is for the user. */
 type WorkspaceErrorName =
   | "AgentDisconnected"
@@ -31,4 +33,17 @@ export class WorkspaceError extends Error {
     super(message);
     this.name = name;
   }
+}
+
+/** Runs undo steps that must all be tried, collecting the messages of those that fail. */
+export function collectFailures() {
+  const failures: string[] = [];
+  const attempt = async (undo: () => Promise<void>) => {
+    try {
+      await undo();
+    } catch (error) {
+      failures.push(errorMessage(error));
+    }
+  };
+  return { failures, attempt };
 }

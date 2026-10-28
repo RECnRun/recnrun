@@ -1,4 +1,4 @@
-import type { Worker } from "@playwright/test";
+import type { BrowserContext, Worker } from "@playwright/test";
 import type { FirstReads } from "../apps/app-pages.ts";
 
 /** One step's duration, as the test build's service worker reports it. */
@@ -12,6 +12,7 @@ interface PocGlobal {
   recnrunPoc: {
     startWithIdentity: (url: string, data: unknown) => Promise<StepTiming[]>;
     setRestoreDelay: (ms: number) => void;
+    failNext: (step: string) => void;
   };
 }
 
@@ -70,8 +71,16 @@ export function startWithIdentity(
   );
 }
 
+/** Makes the test build fail the next run of `step` once. */
+export const failNext = (serviceWorker: Worker, step: string) =>
+  serviceWorker.evaluate((name) => {
+    (globalThis as unknown as PocGlobal).recnrunPoc.failNext(name);
+  }, step);
+
 interface ChromeGlobal {
   chrome: {
+    storage: { local: { get: (key: string) => Promise<Record<string, unknown>> } };
+    tabs: { remove: (tabId: number) => Promise<void> };
     windows: { getAll: () => Promise<{ incognito: boolean }[]> };
     declarativeNetRequest: { getSessionRules: () => Promise<unknown[]> };
     scripting: { getRegisteredContentScripts: () => Promise<unknown[]> };
@@ -111,3 +120,23 @@ export const setNormalCookie = (serviceWorker: Worker, url: string) =>
     const { chrome } = globalThis as unknown as ChromeGlobal;
     await chrome.cookies.set({ url: target, name: "normal", value: "kept" });
   }, url);
+
+/** The workspace operation the extension journaled, or null. */
+export const journalOf = (serviceWorker: Worker) =>
+  serviceWorker.evaluate(async () => {
+    const { chrome } = globalThis as unknown as ChromeGlobal;
+    const stored = await chrome.storage.local.get("workspace-operation");
+    return (stored["workspace-operation"] ?? null) as { step: string; status: string } | null;
+  });
+
+/** Closes a tab as the user would, from outside the start that uses it. */
+export const closeTab = (serviceWorker: Worker, tabId: number) =>
+  serviceWorker.evaluate(async (id) => {
+    await (globalThis as unknown as ChromeGlobal).chrome.tabs.remove(id);
+  }, tabId);
+
+/** The extension's running worker, or the next one Chrome starts. */
+export async function nextWorker(context: BrowserContext) {
+  const [running] = context.serviceWorkers();
+  return running ?? (await context.waitForEvent("serviceworker"));
+}

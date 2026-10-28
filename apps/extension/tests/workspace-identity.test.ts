@@ -8,6 +8,7 @@ import { WorkspaceStatusSchema } from "@/messaging/workspace-protocol";
 import { fakeBarrierApi } from "./fake-barrier";
 import { fakeCookieApi } from "./fake-cookies";
 import { memoryRecordingStore } from "./fake-extension";
+import { memoryOperationJournal } from "./fake-journal";
 import { fakeNavigationApi } from "./fake-navigation";
 import { openWindowsWithTabs } from "./fake-windows";
 import { allowIncognito } from "./workspace-harness";
@@ -76,7 +77,12 @@ describe("startWithIdentity", () => {
   });
 
   test("reports the failed operation in the status until another command runs", async () => {
-    const commands = createWorkspaceCommands(memoryRecordingStore(), ports(injected("window")));
+    const journal = memoryOperationJournal();
+    const commands = createWorkspaceCommands(
+      memoryRecordingStore(),
+      ports(injected("window")),
+      journal,
+    );
     await expect(commands.startWithIdentity(URL_, DATA)).rejects.toMatchObject({
       name: "InjectedFailure",
     });
@@ -87,7 +93,25 @@ describe("startWithIdentity", () => {
       status: "failed",
       error: "Injected at window.",
     });
+    expect(await journal.read()).toEqual(status.operation);
     await commands.start(URL_);
     expect((await commands.status()).operation).toBeUndefined();
+  });
+
+  test("recovers an interrupted start before the next status read or command", async () => {
+    const journal = memoryOperationJournal({
+      id: "op-1",
+      kind: "start-with-identity",
+      step: "restore",
+      status: "running",
+      started: 1,
+    });
+    const commands = createWorkspaceCommands(memoryRecordingStore(), ports(), journal);
+    const recovering = commands.recover();
+    const status = await commands.status();
+    expect(status).toMatchObject({ busy: false, operation: { step: "restore", status: "failed" } });
+    await recovering;
+    await commands.start(URL_);
+    expect(await journal.read()).toBeNull();
   });
 });
