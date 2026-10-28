@@ -17,7 +17,8 @@ const POC_PERMISSIONS = [
 ];
 
 /** The fixture origins of the end-to-end tests (`app.localhost`, `other.localhost`, …). */
-const FIXTURE_HOSTS = ["http://*.localhost/*"];
+// Chrome lists and sets a Secure cookie only with access to its https URL, even on http localhost.
+const FIXTURE_HOSTS = ["http://*.localhost/*", "https://*.localhost/*"];
 
 /** The manifest keys that differ between a published build and the POC's local builds. */
 export interface BuildAccess {

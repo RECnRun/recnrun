@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vite-plus/tes
 import { fakeBrowser } from "wxt/testing/fake-browser";
 import { captureIdentity, chromeCaptureApi } from "@/background/workspace/capture";
 import { chrome, memoryCaptures } from "./fake-capture";
+import { fakeCookieApi } from "./fake-cookies";
 import { fakePort } from "./fake-port";
 
 const ORIGIN = "http://app.localhost:5192";
@@ -29,11 +30,12 @@ async function commandOf(agent: ReturnType<typeof fakePort>) {
 
 /** Starts a capture and answers its command with `replies`, each tagged with the operation. */
 async function captureAnswering(replies: object[], setup = chrome(), captures = memoryCaptures()) {
-  const capturing = captureIdentity("identity-a", MANAGED, {
-    api: setup.api,
-    captures,
-    boundMs: BOUND,
-  });
+  const capturing = captureIdentity(
+    "identity-a",
+    MANAGED,
+    { api: setup.api, captures, cookies: setup.cookies, boundMs: BOUND },
+    { cookieHosts: ["sso.localhost"] },
+  );
   const { operation } = await commandOf(setup.agent);
   for (const reply of replies) setup.agent.onMessage.emit({ ...reply, ...operation });
   return { capturing, captures, ...setup };
@@ -50,6 +52,11 @@ const capturedWith = (counts: Partial<typeof COUNTS>) => ({
   counts: { ...COUNTS, ...counts },
 });
 const completeReplies = [STORAGE, SCHEMA, PART, capturedWith({})];
+const COOKIE = { value: "abc", path: "/", secure: false, httpOnly: true, sameSite: "lax" } as const;
+const SID = { ...COOKIE, name: "sid", domain: "app.localhost", hostOnly: true, session: true };
+const SITE_SSO = { ...COOKIE, name: "sso", expirationDate: 4_102_444_800 };
+const SSO = { ...SITE_SSO, domain: "sso.localhost", hostOnly: true, session: false };
+const ADS = { ...SID, name: "ads", domain: "other.localhost" };
 
 beforeEach(() => {
   fakeBrowser.reset();
@@ -62,7 +69,12 @@ afterEach(() => {
 
 describe("captureIdentity", () => {
   test("injects the agent into the tab's document and publishes what it sent", async () => {
-    const { capturing, captures, api, agent, onConnect } = await captureAnswering(completeReplies);
+    const setup = chrome();
+    setup.cookies.jar = [SID, SSO, ADS];
+    const { capturing, captures, api, agent, onConnect } = await captureAnswering(
+      completeReplies,
+      setup,
+    );
     const summary = await capturing;
     expect(api.inject).toHaveBeenCalledExactlyOnceWith(7, "doc-1");
     expect(agent.posted[0]).toMatchObject({ type: "capture", generation: 4 });
@@ -85,19 +97,28 @@ describe("captureIdentity", () => {
           caches: [],
         },
       ],
-      cookies: [],
-      unsupported: [],
+      capabilities: { cookieHosts: ["sso.localhost"] },
+      cookies: [
+        { name: "sid", value: "abc", path: "/", secure: false, httpOnly: true, sameSite: "lax" },
+        { ...SITE_SSO, host: "sso.localhost" },
+      ],
+      unsupported: [{ adapter: "cookies", item: "ads on other.localhost/" }],
     });
     expect(complete?.adapters).toEqual([
       { adapter: "localStorage", status: "captured" },
       { adapter: "sessionStorage", status: "captured" },
       { adapter: "indexedDB", status: "captured" },
-      { adapter: "cookies", status: "skipped" },
+      { adapter: "cookies", status: "captured" },
       { adapter: "cacheStorage", status: "skipped" },
     ]);
     expect(complete?.valueTypes.toSorted()).toEqual(["Date", "Object", "Set", "primitive"]);
     expect(complete?.endedAt).toBeGreaterThanOrEqual(complete?.startedAt ?? Infinity);
-    expect(summary).toMatchObject({ captureId: started?.id, ...COUNTS });
+    expect(summary).toMatchObject({
+      captureId: started?.id,
+      ...COUNTS,
+      cookies: 2,
+      unsupported: 1,
+    });
     expect(agent.disconnected).toBe(true);
     expect(onConnect.listeners.size).toBe(0);
   });
@@ -120,7 +141,7 @@ describe("captureIdentity", () => {
       const setup = chrome(frame);
       const captures = memoryCaptures();
       await expect(
-        captureIdentity("identity-a", MANAGED, { api: setup.api, captures }),
+        captureIdentity("identity-a", MANAGED, { ...setup, captures }),
       ).rejects.toMatchObject({ name: "TargetNotAllowed" });
       expect(setup.api.inject).not.toHaveBeenCalled();
       expect(captures.calls).toEqual([]);
@@ -129,10 +150,32 @@ describe("captureIdentity", () => {
 });
 
 describe("a failed capture", () => {
+  test("refuses a tab whose cookie store Chrome does not list as Incognito, before injecting", async () => {
+    const setup = chrome();
+    const captures = memoryCaptures();
+    const shared = fakeCookieApi([[{ id: "0", tabIds: [1, 7] }]], [1]);
+    await expect(
+      captureIdentity("identity-a", MANAGED, { api: setup.api, captures, cookies: shared }),
+    ).rejects.toMatchObject({ name: "CookieStoreNotFound" });
+    expect(setup.api.inject).not.toHaveBeenCalled();
+    expect(captures.calls).toEqual([]);
+  });
+
+  test("discards the capture when the cookies cannot be read", async () => {
+    const setup = chrome();
+    setup.cookies.jar = new Error("No cookie store.");
+    const { capturing, captures } = await captureAnswering(completeReplies, setup);
+    await expect(capturing).rejects.toMatchObject({
+      name: "CookiesNotCaptured",
+      message: "Chrome did not list the workspace's cookies.",
+    });
+    expect(captures.calls).toEqual(["begin", "append", "discard"]);
+  });
+
   test("fails as not connected when the agent does not run or does not connect in time", async () => {
     const refused = chrome();
     refused.api.inject.mockRejectedValue(new Error("Cannot access contents of the page."));
-    const deps = { api: refused.api, captures: memoryCaptures(), boundMs: BOUND };
+    const deps = { ...refused, captures: memoryCaptures(), boundMs: BOUND };
     await expect(captureIdentity("identity-a", MANAGED, deps)).rejects.toMatchObject({
       name: "AgentNotConnected",
     });
@@ -240,7 +283,7 @@ describe("a failed capture", () => {
     captures.begin.mockRejectedValueOnce(new Error("A stored capture does not match its schema."));
     captures.discard.mockRejectedValueOnce(new Error("The capture is not in progress."));
     const setup = chrome();
-    const deps = { api: setup.api, captures, boundMs: BOUND };
+    const deps = { ...setup, captures, boundMs: BOUND };
     await expect(captureIdentity("", MANAGED, deps)).rejects.toThrow(/does not match/);
     expect(captures.publish).not.toHaveBeenCalled();
     expect(setup.agent.disconnected).toBe(true);

@@ -70,7 +70,13 @@ test("fails the next run of one step once", async () => {
 test("captures an identity and starts from its capture, keeping that start's timings", async () => {
   const { handles, captureIdentity, startFromCapture } = install();
   await expect(handles.captureIdentity("identity-a")).resolves.toEqual(SUMMARY);
-  expect(captureIdentity).toHaveBeenCalledWith("identity-a");
+  expect(captureIdentity).toHaveBeenCalledWith("identity-a", { cookieHosts: [] });
+  const sso = { cookieHosts: ["sso.localhost"] };
+  await expect(handles.captureIdentity("identity-b", sso)).resolves.toEqual(SUMMARY);
+  expect(captureIdentity).toHaveBeenLastCalledWith("identity-b", sso);
+  // Declared hosts are input like any other, so they pass the schema before anything runs.
+  await expect(handles.captureIdentity("identity-c", { cookieHosts: ["a/b"] })).rejects.toThrow();
+  expect(captureIdentity).toHaveBeenCalledTimes(2);
   await expect(handles.startFromCapture("identity-a")).resolves.toEqual(TIMINGS);
   expect(startFromCapture).toHaveBeenCalledWith("identity-a");
   expect(handles.timings()).toEqual([TIMINGS]);

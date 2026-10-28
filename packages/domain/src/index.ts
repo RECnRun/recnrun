@@ -24,8 +24,10 @@ export {
 } from "./identity-data.ts";
 export { WorkspaceOperationSchema, type WorkspaceOperation } from "./workspace-operation.ts";
 export {
+  CaptureCapabilitiesSchema,
   IDENTITY_CAPTURE_VERSION,
   IdentityCaptureSchema,
   restorableData,
+  type CaptureCapabilities,
   type IdentityCapture,
 } from "./identity-capture.ts";

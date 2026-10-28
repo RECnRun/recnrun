@@ -42,6 +42,18 @@ test("keeps a partitioned cookie's partition key", () => {
   expect(v.is(SiteCookieSchema, { ...partitioned, partitionKey: { topLevelSite: 1 } })).toBe(false);
 });
 
+test("a host-only cookie may name its host, but never next to a domain", () => {
+  const other = { ...session, host: "sso.localhost" };
+  expect(v.parse(SiteCookieSchema, other)).toEqual(other);
+  for (const cookie of [
+    { ...lasting, host: "app.localhost" },
+    { ...session, host: "" },
+    { ...session, host: "sso.localhost/path" },
+  ]) {
+    expect(v.is(SiteCookieSchema, cookie), JSON.stringify(cookie)).toBe(false);
+  }
+});
+
 test("rejects a cookie without a path from the root, a known SameSite, or a numeric expiry", () => {
   for (const cookie of [
     { ...session, path: "app" },

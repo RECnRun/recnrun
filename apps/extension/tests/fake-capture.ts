@@ -1,6 +1,7 @@
 import type { IdentityCapture } from "@recnrun/domain";
 import { vi } from "vite-plus/test";
 import type { CapturePart } from "@/storage/identity-captures";
+import { fakeCookieApi } from "./fake-cookies";
 import { echoProbes, fakeEvent, fakePort } from "./fake-port";
 
 const ORIGIN = "http://app.localhost:5192";
@@ -8,8 +9,8 @@ const SENDER = { tab: { id: 7 }, frameId: 0, documentId: "doc-1", origin: ORIGIN
 const URL_ = `${ORIGIN}/app/`;
 
 /**
- * Chrome as a capture sees it: a tab's top document, and an agent that connects when injected and
- * echoes the link probe as `carry` delivers it.
+ * Chrome as a capture sees it: a tab's top document, an agent that connects when injected and
+ * echoes the link probe as `carry` delivers it, and the Incognito cookie store holding tab 7.
  */
 export function chrome(
   frame: { url: string; documentId: string } | null = { url: URL_, documentId: "doc-1" },
@@ -22,7 +23,16 @@ export function chrome(
     topFrame: vi.fn(async () => frame),
     inject: vi.fn(async () => onConnect.emit(agent)),
   };
-  return { api, agent, onConnect };
+  const cookies = fakeCookieApi(
+    [
+      [
+        { id: "0", tabIds: [1] },
+        { id: "1", tabIds: [7] },
+      ],
+    ],
+    [1],
+  );
+  return { api, agent, onConnect, cookies };
 }
 
 /** A repository that keeps what it was told, in order. */

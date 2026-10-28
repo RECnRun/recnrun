@@ -10,12 +10,21 @@ export interface CookieStore {
 }
 
 /** One `cookies.set` call: the cookie, the store it goes into, and the URL that scopes it. */
-export type CookieDetails = SiteCookie & { storeId: string; url: string };
+export type CookieDetails = Omit<SiteCookie, "host"> & { storeId: string; url: string };
 
-/** The cookie and tab calls the bootstrap needs, behind a port so tests can fake Chrome's answers. */
+/** A cookie as `cookies.getAll` lists it; `hostOnly` and `session` are not `cookies.set` fields. */
+export type StoredCookie = Omit<SiteCookie, "host"> & {
+  domain: string;
+  hostOnly: boolean;
+  session: boolean;
+};
+
+/** The cookie and tab calls the workspace needs, behind a port so tests can fake Chrome's answers. */
 export interface CookieApi {
   stores: () => Promise<CookieStore[]>;
   normalTabIds: () => Promise<number[]>;
+  /** Every cookie of `storeId`, partitioned ones included, that the host permissions reach. */
+  all: (storeId: string) => Promise<StoredCookie[]>;
   /** False when Chrome refused the cookie. */
   set: (details: CookieDetails) => Promise<boolean>;
 }
@@ -46,7 +55,10 @@ export async function waitForNoIncognitoStore(
 }
 
 /** The cookie store of the managed tab, never a guessed id nor the normal store. */
-export async function resolveTabStore(api: CookieApi, tabId: number): Promise<string> {
+export async function resolveTabStore(
+  api: Pick<CookieApi, "stores" | "normalTabIds">,
+  tabId: number,
+): Promise<string> {
   const normal = new Set(await api.normalTabIds());
   const store = (await api.stores()).find(({ tabIds }) => tabIds.includes(tabId));
   if (store === undefined || store.tabIds.some((id) => normal.has(id))) {
@@ -58,12 +70,17 @@ export async function resolveTabStore(api: CookieApi, tabId: number): Promise<st
   return store.id;
 }
 
-/** The URL Chrome scopes a cookie by: its domain, or the target's host for a host-only cookie. */
+/** The URL Chrome scopes a cookie by: its domain, else its own host, else the target's host. */
 function cookieUrl(origin: string, cookie: SiteCookie): string {
   const target = new URL(origin);
-  if (cookie.domain !== undefined) target.hostname = cookie.domain.replace(/^\./, "");
+  const host = cookie.domain?.replace(/^\./, "") ?? cookie.host;
+  if (host !== undefined) target.hostname = host;
   return `${target.origin}${cookie.path}`;
 }
+
+/** Chrome stores no cookie set past its expiry, and answers with none, as if it refused it. */
+const expired = ({ expirationDate }: SiteCookie, nowSeconds: number) =>
+  expirationDate !== undefined && expirationDate <= nowSeconds;
 
 async function setOne(api: CookieApi, details: CookieDetails): Promise<boolean> {
   try {
@@ -73,19 +90,24 @@ async function setOne(api: CookieApi, details: CookieDetails): Promise<boolean> 
   }
 }
 
-/** Sets each cookie in `storeId`, in order; diagnostics name the cookie, never its value. */
+/**
+ * Sets each cookie in `storeId`, in order, but those expired since their capture, and counts what it
+ * set; diagnostics name the cookie, never its value.
+ */
 export async function restoreCookies(
   api: CookieApi,
   storeId: string,
   origin: string,
   cookies: readonly SiteCookie[],
 ): Promise<number> {
-  for (const cookie of cookies) {
-    if (!(await setOne(api, { ...cookie, storeId, url: cookieUrl(origin, cookie) }))) {
+  const live = cookies.filter((cookie) => !expired(cookie, Date.now() / 1000));
+  for (const cookie of live) {
+    const { host: _host, ...details } = cookie;
+    if (!(await setOne(api, { ...details, storeId, url: cookieUrl(origin, cookie) }))) {
       throw new WorkspaceError("CookieNotSet", `Chrome refused the cookie "${cookie.name}".`);
     }
   }
-  return cookies.length;
+  return live.length;
 }
 
 /** The cookie calls through Chrome; `cookies` exists only in builds that ask for it. */
@@ -96,6 +118,9 @@ export const chromeCookieApi: CookieApi = {
     (await browser.tabs.query({}))
       .filter((tab) => !tab.incognito)
       .flatMap(({ id }) => (id === undefined ? [] : [id])),
-  set: async (details) =>
-    (await browser.cookies.set(details as Browser.cookies.SetDetails)) !== null,
+  // An empty partition key lists every partition's cookies and the unpartitioned ones.
+  all: async (storeId) =>
+    (await browser.cookies.getAll({ storeId, partitionKey: {} })) as StoredCookie[],
+  // Chrome answers null, or no value at all, when it stored no cookie.
+  set: async (details) => Boolean(await browser.cookies.set(details as Browser.cookies.SetDetails)),
 };

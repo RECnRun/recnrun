@@ -1,4 +1,4 @@
-import { IdentityDataSchema } from "@recnrun/domain";
+import { CaptureCapabilitiesSchema, IdentityDataSchema } from "@recnrun/domain";
 import * as v from "valibot";
 import type { BootstrapHooks, BootstrapStep, StepTiming } from "@/background/workspace/bootstrap";
 import type { CaptureSummary } from "@/background/workspace/capture";
@@ -9,7 +9,7 @@ import { WorkspaceError } from "@/background/workspace/errors";
 export interface PocHandles {
   startWithIdentity: (url: string, data: unknown) => Promise<StepTiming[]>;
   /** Captures the managed tab's page as `identityId`; the only way to capture in this POC stage. */
-  captureIdentity: (identityId: string) => Promise<CaptureSummary>;
+  captureIdentity: (identityId: string, capabilities?: unknown) => Promise<CaptureSummary>;
   /** Starts from `identityId`'s published capture, as `startWithIdentity` starts from data. */
   startFromCapture: (identityId: string) => Promise<StepTiming[]>;
   /** Holds the restore payload back this long, with the page already behind the barrier. */
@@ -49,7 +49,8 @@ export function installTestHandles(
     // Async, so data that fails its schema rejects rather than throws.
     startWithIdentity: async (url, data) =>
       kept(commands.startWithIdentity(url, v.parse(IdentityDataSchema, data))),
-    captureIdentity: (identityId) => commands.captureIdentity(identityId),
+    captureIdentity: async (identityId, capabilities = { cookieHosts: [] }) =>
+      commands.captureIdentity(identityId, v.parse(CaptureCapabilitiesSchema, capabilities)),
     startFromCapture: (identityId) => kept(commands.startFromCapture(identityId)),
     setRestoreDelay: (ms) => {
       restoreDelayMs = ms;

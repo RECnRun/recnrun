@@ -22,7 +22,8 @@ test("test and development builds add the POC set and the fixture hosts", () => 
   for (const mode of ["test", "development"]) {
     expect(buildAccess(mode)).toEqual({
       permissions: POC,
-      host_permissions: ["http://*.localhost/*"],
+      // Chrome lists a Secure cookie only with access to its https URL, even on http localhost.
+      host_permissions: ["http://*.localhost/*", "https://*.localhost/*"],
       message_serialization: "structured_clone",
     });
   }
@@ -35,6 +36,7 @@ test("RECNRUN_POC_HOSTS adds each origin as a match pattern", () => {
   );
   expect(access.host_permissions).toEqual([
     "http://*.localhost/*",
+    "https://*.localhost/*",
     "https://zephyr-tq.one.be/*",
     "https://login-acc.one.be/*",
   ]);

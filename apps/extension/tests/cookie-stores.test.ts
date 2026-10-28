@@ -83,6 +83,24 @@ describe("restoreCookies", () => {
     expect(api.written[0]).not.toHaveProperty("expirationDate");
   });
 
+  test("sets a host-only cookie of another host on that host, never passing the host to Chrome", async () => {
+    const api = fakeCookieApi([[]], []);
+    const sso: SiteCookie = { ...session, host: "sso.localhost", path: "/login" };
+    await expect(restoreCookies(api, "1", ORIGIN, [sso])).resolves.toBe(1);
+    const { host: _host, ...asSet } = sso;
+    expect(api.written).toEqual([
+      { ...asSet, storeId: "1", url: "http://sso.localhost:5192/login" },
+    ]);
+  });
+
+  test("leaves out a cookie that expired since its capture, as the browser would have", async () => {
+    // Chrome answers such a set with no cookie, which would read as a refusal (cookies_api.cc).
+    const api = fakeCookieApi([[]], []);
+    const expired: SiteCookie = { ...session, name: "old", expirationDate: Date.now() / 1000 - 1 };
+    await expect(restoreCookies(api, "1", ORIGIN, [expired, session])).resolves.toBe(1);
+    expect(api.written.map(({ name }) => name)).toEqual(["sid"]);
+  });
+
   test("fails on a refused cookie, naming it but never its value", async () => {
     for (const refusal of ["null", "reject"] as const) {
       const api = fakeCookieApi([[]], []);
@@ -111,5 +129,12 @@ describe("chromeCookieApi", () => {
     expect(set).toHaveBeenCalledWith(details);
     set.mockResolvedValueOnce(null as never);
     await expect(chromeCookieApi.set(details)).resolves.toBe(false);
+    // Chrome answers with no cookie at all when it stored none, as for one already expired.
+    set.mockResolvedValueOnce(undefined as never);
+    await expect(chromeCookieApi.set(details)).resolves.toBe(false);
+    const getAll = vi.spyOn(fakeBrowser.cookies, "getAll").mockResolvedValue([] as never);
+    await expect(chromeCookieApi.all("1")).resolves.toEqual([]);
+    // An empty partition key asks for every partition, and for unpartitioned cookies too.
+    expect(getAll).toHaveBeenCalledWith({ storeId: "1", partitionKey: {} });
   });
 });

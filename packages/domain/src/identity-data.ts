@@ -1,11 +1,19 @@
 import * as v from "valibot";
 import { OriginDataSchema } from "./origin-data.ts";
 
-/** One cookie to restore; no `domain` means a host-only cookie, no `expirationDate` a session one. */
-export const SiteCookieSchema = v.object({
+/** A host name as Chrome writes a cookie's host: letters, digits, dots, and hyphens. */
+export const HostSchema = v.pipe(v.string(), v.regex(/^[a-z0-9.-]+$/i));
+
+/**
+ * One cookie to restore; no `domain` means a host-only cookie, of `host` or else of the target's
+ * host, and no `expirationDate` a session one.
+ */
+const SiteCookieFieldsSchema = v.object({
   name: v.string(),
   value: v.string(),
   domain: v.optional(v.string()),
+  /** Present only on a host-only cookie of a host other than the target's. */
+  host: v.optional(HostSchema),
   path: v.pipe(v.string(), v.startsWith("/")),
   secure: v.boolean(),
   httpOnly: v.boolean(),
@@ -19,6 +27,14 @@ export const SiteCookieSchema = v.object({
     }),
   ),
 });
+
+export const SiteCookieSchema = v.pipe(
+  SiteCookieFieldsSchema,
+  v.check(
+    ({ domain, host }) => domain === undefined || host === undefined,
+    "A cookie is host-only or has a domain, never both.",
+  ),
+);
 
 export type SiteCookie = v.InferOutput<typeof SiteCookieSchema>;
 

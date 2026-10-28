@@ -13,6 +13,7 @@ type WorkspaceErrorName =
   | "CaptureTimedOut"
   | "CookieNotSet"
   | "CookieStoreNotFound"
+  | "CookiesNotCaptured"
   | "IncognitoNotAllowed"
   | "IncognitoNotGone"
   | "IncognitoWindowsOpen"

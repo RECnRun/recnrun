@@ -13,7 +13,7 @@ interface PocGlobal {
     startWithIdentity: (url: string, data: unknown) => Promise<StepTiming[]>;
     setRestoreDelay: (ms: number) => void;
     failNext: (step: string) => void;
-    captureIdentity: (identityId: string) => Promise<CaptureSummary>;
+    captureIdentity: (identityId: string, capabilities?: unknown) => Promise<CaptureSummary>;
     startFromCapture: (identityId: string) => Promise<StepTiming[]>;
   };
 }
@@ -25,14 +25,21 @@ interface CaptureSummary {
   sessionStorage: number;
   databases: number;
   records: number;
+  cookies: number;
+  unsupported: number;
   ms: number;
 }
 
-/** Captures the managed tab's page as `identityId`. */
-export const captureIdentity = (serviceWorker: Worker, identityId: string) =>
+/** Captures the managed tab's page as `identityId`, keeping the cookies of `cookieHosts` too. */
+export const captureIdentity = (
+  serviceWorker: Worker,
+  identityId: string,
+  cookieHosts: string[] = [],
+) =>
   serviceWorker.evaluate(
-    (id) => (globalThis as unknown as PocGlobal).recnrunPoc.captureIdentity(id),
-    identityId,
+    ([id, hosts]) =>
+      (globalThis as unknown as PocGlobal).recnrunPoc.captureIdentity(id, { cookieHosts: hosts }),
+    [identityId, cookieHosts] as const,
   );
 
 /** Starts a fresh managed window from `identityId`'s published capture. */

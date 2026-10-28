@@ -1,5 +1,5 @@
 import { classifyIncognitoWindows, isAllowedTarget } from "@recnrun/domain";
-import type { IdentityData } from "@recnrun/domain";
+import type { CaptureCapabilities, IdentityData } from "@recnrun/domain";
 import { browser } from "wxt/browser";
 import { chromeBarrierApi } from "@/background/workspace/barrier";
 import { bootstrapIdentity } from "@/background/workspace/bootstrap";
@@ -35,8 +35,11 @@ export interface WorkspaceCommands {
   closeAndStart: (url: string, windowIds: readonly number[]) => Promise<void>;
   restart: (url: string) => Promise<void>;
   startWithIdentity: (url: string, data: IdentityData) => Promise<StepTiming[]>;
-  /** Saves the managed tab's page as `identityId`'s data (POC: IndexedDB only). */
-  captureIdentity: (identityId: string) => Promise<CaptureSummary>;
+  /** Saves the managed tab's page and cookies as `identityId`'s data, widened by `capabilities`. */
+  captureIdentity: (
+    identityId: string,
+    capabilities: CaptureCapabilities,
+  ) => Promise<CaptureSummary>;
   /** Starts a fresh managed window from `identityId`'s published capture. */
   startFromCapture: (identityId: string) => Promise<StepTiming[]>;
   recover: () => Promise<void>;
@@ -232,10 +235,10 @@ export function createWorkspaceCommands(
       requireTarget(url);
       return startRestoring(async () => ({ url, data }));
     },
-    captureIdentity: (identityId) =>
+    captureIdentity: (identityId, capabilities) =>
       exclusive(async () => {
         await requireAccess();
-        return captureManaged(identityId, identities);
+        return captureManaged(identityId, identities, capabilities);
       }),
     startFromCapture: (identityId) =>
       startRestoring(() => savedStart(identityId, identities.captures)),

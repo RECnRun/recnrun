@@ -121,10 +121,11 @@ describe("startWithIdentity", () => {
 });
 
 describe("captureIdentity and startFromCapture", () => {
+  const NO_HOSTS = { cookieHosts: [] };
   const capturing = () => {
     const setup = chrome();
     const captures = memoryCaptures();
-    const identities = { api: setup.api, captures, boundMs: 5_000 };
+    const identities = { api: setup.api, cookies: setup.cookies, captures, boundMs: 5_000 };
     return { setup, captures, identities };
   };
 
@@ -132,16 +133,16 @@ describe("captureIdentity and startFromCapture", () => {
     const { setup, captures, identities } = capturing();
     const journal = memoryOperationJournal();
     const commands = createWorkspaceCommands(memoryRecordingStore(), ports(), journal, identities);
-    await expect(commands.captureIdentity("identity-a")).rejects.toMatchObject({
+    await expect(commands.captureIdentity("identity-a", NO_HOSTS)).rejects.toMatchObject({
       name: "NoManagedWindow",
     });
     await manageTab(7, 9);
     allowIncognito(false);
-    await expect(commands.captureIdentity("identity-a")).rejects.toMatchObject({
+    await expect(commands.captureIdentity("identity-a", NO_HOSTS)).rejects.toMatchObject({
       name: "IncognitoNotAllowed",
     });
     allowIncognito(true);
-    const captured = commands.captureIdentity("identity-a");
+    const captured = commands.captureIdentity("identity-a", { cookieHosts: ["sso.localhost"] });
     await vi.waitFor(() => expect(setup.agent.posted).toHaveLength(1));
     const { operationId, generation } = setup.agent.posted[0] as Record<string, unknown>;
     expect(generation).toBe(1);
@@ -157,8 +158,9 @@ describe("captureIdentity and startFromCapture", () => {
     ]) {
       setup.agent.onMessage.emit({ ...reply, operationId, generation });
     }
-    await expect(captured).resolves.toMatchObject({ databases: 1, records: 1 });
+    await expect(captured).resolves.toMatchObject({ databases: 1, records: 1, cookies: 0 });
     expect(captures.calls).toEqual(["begin", "append", "publish"]);
+    expect(captures.headers[1]?.capabilities).toEqual({ cookieHosts: ["sso.localhost"] });
   });
 
   test("starts from the identity's published capture, and refuses one it does not have", async () => {

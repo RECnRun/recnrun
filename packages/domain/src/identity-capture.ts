@@ -1,6 +1,6 @@
 import * as v from "valibot";
 import { IdSchema } from "./ids.ts";
-import { SiteCookieSchema } from "./identity-data.ts";
+import { HostSchema, SiteCookieSchema } from "./identity-data.ts";
 import type { IdentityData } from "./identity-data.ts";
 import { TargetUrlSchema } from "./managed-window.ts";
 import { OriginDataSchema } from "./origin-data.ts";
@@ -49,8 +49,6 @@ function isPageOf(url: string, origin: string): boolean {
   return url.startsWith(origin) && (rest === "" || "/?#".includes(rest.charAt(0)));
 }
 
-const HostSchema = v.pipe(v.string(), v.regex(/^[a-z0-9.-]+$/i));
-
 const HeadersSchema = v.array(v.tuple([v.string(), v.string()]));
 
 const CacheEntrySchema = v.object({
@@ -70,6 +68,11 @@ const OriginCaptureSchema = v.object({
   caches: v.array(v.object({ name: v.string(), entries: v.array(CacheEntrySchema) })),
 });
 
+/** Declared capabilities widen what is captured, such as the cookies of an SSO host. */
+export const CaptureCapabilitiesSchema = v.object({ cookieHosts: v.array(HostSchema) });
+
+export type CaptureCapabilities = v.InferOutput<typeof CaptureCapabilitiesSchema>;
+
 const AdapterResultSchema = v.object({
   adapter: AdapterSchema,
   status: v.picklist(["captured", "failed", "skipped"]),
@@ -81,8 +84,7 @@ const CaptureFieldsSchema = v.object({
   id: IdSchema,
   identityId: IdSchema,
   url: TargetUrlSchema,
-  /** Declared capabilities widen what is captured, such as the cookies of an SSO host. */
-  capabilities: v.object({ cookieHosts: v.array(HostSchema) }),
+  capabilities: CaptureCapabilitiesSchema,
   status: v.picklist(["in-progress", "complete", "failed"]),
   startedAt: TimeSchema,
   endedAt: v.optional(TimeSchema),
