@@ -8,7 +8,7 @@ Plan: [poc-incognito-sessions-plan.md](poc-incognito-sessions-plan.md). Assignme
 | Branch               | `poc/incognito-sessions`                                         |
 | Planned base         | `44c154da29860c7a8df829e902b177df5ce2ba2a` (2026-10-28)          |
 | Actual base (P0.1)   | `44c154d` (re-resolved 2026-10-28, unchanged)                    |
-| Last recorded commit | `33264a6`                                                        |
+| Last recorded commit | `f53791c`                                                        |
 | Decisions OD-1…OD-4  | defaults of plan §3, accepted by the user ("Avance", 2026-10-28) |
 
 ## Status legend
@@ -104,7 +104,11 @@ Stage 0 verify: first run exit 1 — P0.3's server took port 5191, which `dashbo
   green: `vp run test:e2e -- tests/e2e/poc-native-reset.spec.ts tests/e2e/poc-fixture.spec.ts` → 3 passed (`.artifacts/docker/2026-10-28T13-30-15.689Z-7c9528bc-93b7-4adc-b728-341880cac7a6`); observations kept as `reset-inspected.json` / `control-inspected.json` in each test's results
   commit: 33264a6 Prove the native reset of the Incognito workspace end to end
   notes: reset through the dashboard's Close and start empty to `/inspect`: every kind empty (sessionStorage is per tab, so its absence proves nothing), `/__log` report has empty `serverCookies`, generation +1; normal tab still `normal` everywhere; both seeded recordings listed. Control: foreign `about:blank` Incognito window → panel lists it, zero buttons (screenshot `.artifacts/screens/S1.6/blocked.png` viewed); service worker closes only the managed window, a new Incognito window's `/inspect` reads `incog-1` in every kind but sessionStorage, and the page is controlled by `sw.js`; the panel then lists 2 windows and no Start. Shared helpers moved to `tests/e2e/fixtures/sentinels.ts`; `vp check`, `deps`, `dead-code`, `duplication` (0 clones) pass
-- [ ] S1.7 Stress loop (`POC_REPEATS=50`), teardown signal if survivors, report section
+- [i] S1.7 Stress loop (`POC_REPEATS=50`), teardown signal if survivors, report section
+  red: no committed cycle leaked, so there is no product red and `closeWindows` waits on no new signal; the loop's assertion is the S1.6 one, whose scratch negative control (new window before the old one closed) fails it with every kind holding `incog-1`
+  green: `POC_REPEATS=50 vp run test:e2e -- tests/e2e/poc-native-reset.spec.ts` → 2 passed, 50 of 50 cycles empty (`.artifacts/docker/2026-10-28T13-36-22.690Z-cd60cc21-5853-4c9b-a4b8-0d80a9fa6808`, stats in the test's `teardown.json`); also with `cookies` added in a scratch build only → 2 passed, 50 of 50 empty (scratch run `2026-10-28T13-34-54.652Z-a5aba681-6986-4f7f-a33f-0fda09d2458e`)
+  commit: f53791c Stress the native reset and time its teardown signals
+  notes: Playwright 1.64.1 image, bundled Chromium 156.0.8078.4. Committed build (ms, min/median/p95/max): `windows.remove` call→`onRemoved` 4.3/4.7/5.7/6.1; call→first `getAll` without an Incognito window 12.7/13.9/16.1/16.6; `onRemoved`→next `windows.create` 10.4/11.6/12.7/14; create→`onCreated` 13.9/14.6/15.6/17; order in all 50: remove call < onRemoved < no window < create call < created. Scratch build with `cookies`: call→store count drops 14.5/15.8/20.3/20.5, store gone→create call 0.4/0.6/0.8/1.4, order remove call < onRemoved < no window < store gone < create call < created in all 50; the product does not wait on the store, so that margin is only what the run saw. The store count needs `cookies`, which arrives in S2.2. Probe in `tests/e2e/fixtures/teardown-probe.ts`; `vp check`, `deps`, `dead-code`, `duplication` (0 clones) pass
 
 Stage 1 verify: _pending_
 
