@@ -7,7 +7,7 @@ Plan: [poc-incognito-sessions-plan.md](poc-incognito-sessions-plan.md). Assignme
 | Worktree             | `/Users/dannyelcf/src/recnrun-incognito-sessions-poc`            |
 | Branch               | `poc/incognito-sessions`                                         |
 | Planned base         | `44c154da29860c7a8df829e902b177df5ce2ba2a` (2026-10-28)          |
-| Actual base (P0.1)   | _pending_                                                        |
+| Actual base (P0.1)   | `44c154d` (re-resolved 2026-10-28, unchanged)                    |
 | Last recorded commit | _none yet (plan files uncommitted)_                              |
 | Decisions OD-1…OD-4  | defaults of plan §3, accepted by the user ("Avance", 2026-10-28) |
 
@@ -35,8 +35,15 @@ Evidence format under each task:
 
 ## Stage 0 — Setup and reconnaissance
 
-- [ ] P0.1 Baseline: `vp install`, re-resolve `origin/master`, versions, baseline `vp run verify`, report skeleton
-- [ ] P0.2 Platform facts in a scratch copy (structured clone, runtime content script, DNR in Incognito, cookie stores)
+- [i] P0.1 Baseline: `vp install`, re-resolve `origin/master`, versions, baseline `vp run verify`, report skeleton
+  red: n/a (docs only)
+  green: `vp run verify` → run 1 exit 1 (pre-existing focus flake in `incognito.spec.ts`, then 25/25 with `--repeat-each=5`); run 2 exit 0 (`.artifacts/docker/2026-10-28T12-02-21.796Z-1433f9f5-2cce-4bf5-9a53-3c1e49edf6f6`)
+  commit: see the next checklist commit
+  notes: report sections 2 and 4
+- [i] P0.2 Platform facts in a scratch copy (structured clone, runtime content script, DNR in Incognito, cookie stores)
+  red: n/a (throwaway probe, nothing committed)
+  green: scratch `vp run test:e2e -- tests/e2e/zz-probe.spec.ts` → 1 passed; facts in report §4
+  commit: same commit as P0.1
 - [ ] P0.3 Fixture server (`/sentinel`, `/inspect`, `/sw.js`, logs) + second `webServer` + `POC_REPEATS` forwarding
 
 Stage 0 verify: _pending_
