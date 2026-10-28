@@ -8,7 +8,7 @@ Plan: [poc-incognito-sessions-plan.md](poc-incognito-sessions-plan.md). Assignme
 | Branch               | `poc/incognito-sessions`                                         |
 | Planned base         | `44c154da29860c7a8df829e902b177df5ce2ba2a` (2026-10-28)          |
 | Actual base (P0.1)   | `44c154d` (re-resolved 2026-10-28, unchanged)                    |
-| Last recorded commit | `0ebe6b4`                                                        |
+| Last recorded commit | `57af1cb`                                                        |
 | Decisions OD-1…OD-4  | defaults of plan §3, accepted by the user ("Avance", 2026-10-28) |
 
 ## Status legend
@@ -309,6 +309,11 @@ Stage 2 verify: exit 0 on `dfb882d`, 302 unit/component, 61/61 e2e, coverage 99.
   green: same unit command → 6 passed; `vp run test:e2e -- tests/e2e/poc-lifecycle-restarts.spec.ts tests/e2e/poc-failure.spec.ts` → 6 passed (`2026-10-28T20-24-46.705Z-85c4c4df`); `vp check`, `vp run deps` pass
   commit: 0ebe6b4 Name the interrupted command in the recovery error
   notes: `recovery.ts` names the journaled kind: the start, the switch, the suspension, the resumption, the new identity's creation, the deletion. The bootstrap's entries already carry the lifecycle command's kind (`lifecycle-effects.ts`), so a restart inside a switch's start also says "switch". ARCHITECTURE updated.
+- [i] S3.12c A restart during a lifecycle capture closes the window it was capturing (follow-up to S3.11)
+  red: `vp test run apps/extension/tests/lifecycle.test.ts` → new test "while the open window is captured and closed, the journal names it for recovery": `generation`/`windowId` `undefined` instead of `1`/`5` for capture, persist, close; `vp run test:e2e -- tests/e2e/poc-lifecycle-restarts.spec.ts -g "extension restart"` with the old `lifecycle.ts` → `expect.poll(incognitoWindows).toBe(0)` Expected 0 Received 1 (`.artifacts/docker/2026-10-28T20-28-45.741Z-ef8f99ed-f28c-49f7-8c04-b7a73d432fa7`)
+  green: same unit command → 18 passed; `vp run test:e2e -- tests/e2e/poc-lifecycle-restarts.spec.ts` → 3 passed (`2026-10-28T20-29-02.099Z-8959e125`); `vp check`, `vp run deps` pass
+  commit: 57af1cb Close the window a restart interrupted while capturing it
+  notes: `runSteps` journals the open managed window's `generation` and `windowId` on the capture, persist, and close entries (not on the start steps, whose bootstrap journals its own window). `recoverInterrupted` already closes only through `closeManagedWindow`, which requires the stored managed window to be `active` with the same id and generation, so a foreign or reused window id is never closed (unit "a window that is no longer the operation's managed window stays open"). Removing the barrier ids of that generation is a no-op here, since the window's start removed them. Trade-off, as specified: the closed window loses what it held since its last capture (in the e2e, B was never captured, so B's `B:1` is gone and the restore part of the test now uses B:2 saved by a later switch). ARCHITECTURE updated.
 
 Stage 3 verify: _pending_
 
