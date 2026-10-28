@@ -8,7 +8,7 @@ Plan: [poc-incognito-sessions-plan.md](poc-incognito-sessions-plan.md). Assignme
 | Branch               | `poc/incognito-sessions`                                         |
 | Planned base         | `44c154da29860c7a8df829e902b177df5ce2ba2a` (2026-10-28)          |
 | Actual base (P0.1)   | `44c154d` (re-resolved 2026-10-28, unchanged)                    |
-| Last recorded commit | `7386ad9`                                                        |
+| Last recorded commit | `496dd10`                                                        |
 | Decisions OD-1…OD-4  | defaults of plan §3, accepted by the user ("Avance", 2026-10-28) |
 
 ## Status legend
@@ -84,7 +84,11 @@ Stage 0 verify: first run exit 1 — P0.3's server took port 5191, which `dashbo
   green: same command → 8 files, 68 tests passed; `vp run test:unit` → 29 files, 135 tests; `vp run test:e2e -- tests/e2e/incognito-workspace.spec.ts tests/e2e/incognito.spec.ts tests/e2e/incognito-access.spec.ts` → 14 passed
   commit: 7386ad9 Add the Incognito workspace panel to the dashboard
   notes: panel replaces "New incognito window" (`IncognitoAccess.openWindow` became `watchWindows`); screenshots in `.artifacts/screens/S1.4/` (no-access, start, blocked, open, refused, address) viewed; `vp check`, `vp run deps`, `dead-code`, `duplication` pass; ARCHITECTURE, PRODUCT_BRIEF, MILESTONES updated as POC-branch behaviour. Pre-existing gap: `workspace-close-and-start` with an active managed window closes the foreign windows and then refuses, so the panel offers only "Close and start empty" in that state
-- [ ] S1.5 Record only the managed tab; existing e2e and product docs updated
+- [i] S1.5 Record only the managed tab; existing e2e and product docs updated
+  red: `vp run test:e2e -- tests/e2e/incognito.spec.ts -g "only the Incognito workspace"` → `toHaveCount` on the normal tab's Record: `Expected: 0, Received: 1`; `vp run test:unit` → 3 failed (`startSession` on an unmanaged tab: `promise resolved "undefined" instead of rejecting`; restart and close-and-start with a session: `expected { ok: true, result: undefined } to deeply equal { ok: false, …(1) }`); `vp run test:components` → 4 failed in `tab-list.browser.test.tsx`, `expected [ 'Record' ] to deeply equal []`
+  green: `vp run test:unit` → 29 files, 138 tests; `vp run test:components` → 71 tests (after 496dd10); `vp run test:e2e --` incognito, session-control, incognito-access, orphaned-tab, incognito-workspace specs → 26 passed; `incognito.spec.ts --repeat-each=5` → 25 passed; full `vp run test:e2e` → 50 passed; `vp run test:coverage` → exit 0 (all files 99.31% statements, 97.55% branches)
+  commit: 72e98a4 Record only the managed Incognito tab; 496dd10 Cover the dashboard control paths the shared ask helper left bare (control.ts fell under the per-file floor after S1.4 moved `ask`; validated by negative controls in a scratch worktree)
+  notes: OD-2 refusal ("Stop the recording first.") on `workspace-close-and-start` and `workspace-restart`; `workspace-start` is not refused. E2E `activeTabId` now reads the focused window's active tab. New issue, not fixed: with two windows Chrome briefly reports both `focused` when focus moves to the Incognito window, so `toBrowserTabs` (first focused window) shows the old normal tab and no later event corrects it; the PiP test step that refocuses the managed tab from a second normal window was dropped (probe evidence in the report). Screenshot `.artifacts/screens/S1.5/record-managed-only.png` viewed
 - [ ] S1.6 E2E reset experiment (six sentinel kinds, normal profile unchanged, repository readable) + negative control (foreign window keeps data, dashboard blocks)
 - [ ] S1.7 Stress loop (`POC_REPEATS=50`), teardown signal if survivors, report section
 
