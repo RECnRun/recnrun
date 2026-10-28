@@ -8,7 +8,7 @@ Plan: [poc-incognito-sessions-plan.md](poc-incognito-sessions-plan.md). Assignme
 | Branch               | `poc/incognito-sessions`                                         |
 | Planned base         | `44c154da29860c7a8df829e902b177df5ce2ba2a` (2026-10-28)          |
 | Actual base (P0.1)   | `44c154d` (re-resolved 2026-10-28, unchanged)                    |
-| Last recorded commit | `19d7088`                                                        |
+| Last recorded commit | `672a37b`                                                        |
 | Decisions OD-1…OD-4  | defaults of plan §3, accepted by the user ("Avance", 2026-10-28) |
 
 ## Status legend
@@ -44,7 +44,11 @@ Evidence format under each task:
   red: n/a (throwaway probe, nothing committed)
   green: scratch `vp run test:e2e -- tests/e2e/zz-probe.spec.ts` → 1 passed; facts in report §4
   commit: 19d7088 (with P0.1)
-- [ ] P0.3 Fixture server (`/sentinel`, `/inspect`, `/sw.js`, logs) + second `webServer` + `POC_REPEATS` forwarding
+- [i] P0.3 Fixture server (`/sentinel`, `/inspect`, `/sw.js`, logs) + second `webServer` + `POC_REPEATS` forwarding
+  red: `vp run test:e2e -- tests/e2e/poc-fixture.spec.ts` → `page.goto: net::ERR_CONNECTION_REFUSED at http://app.localhost:5191/sentinel?tag=normal-1…` (no fixture server; `.artifacts/docker/2026-10-28T12-05-56.444Z-acc5603c-fe1f-4809-aae5-795517fc417a`)
+  green: same command → 1 passed: JS and HttpOnly cookies, localStorage, sessionStorage, IndexedDB record, cache entry all `normal-1`, one SW at `http://app.localhost:5191/`; `other.localhost` sees none; log has the `/sentinel` request and two reports (`.artifacts/docker/2026-10-28T12-07-32.869Z-5051aa75-8829-48e2-84aa-009b83fd008d`)
+  commit: 672a37b Serve fixture origins for the Incognito sessions POC
+  notes: curl smoke test of every route on the host (Node 22 type stripping); `POC_REPEATS=7` reaches `docker create --env` (stub `docker` on PATH); `vp check`, `vp run deps`, `dead-code` (Knip reads the webServer command, no `knip.jsonc` change), `duplication` (0 clones), `test:container` (13 pass) all pass
 
 Stage 0 verify: _pending_
 
