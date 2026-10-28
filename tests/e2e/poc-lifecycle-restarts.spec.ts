@@ -56,7 +56,7 @@ test.describe("with a DevTools port", () => {
     remoteDebuggingPort,
   }) => {
     if (remoteDebuggingPort === undefined) throw new Error("No DevTools port");
-    const { driver, identities, next, tab } = await aSavedBOpen(context, serviceWorker);
+    const { driver, identities, next } = await aSavedBOpen(context, serviceWorker);
     // The command's own reply dies with the worker; the next command wakes a new one.
     const wake = async () => {
       await driver.command({ type: "workspace-status" });
@@ -73,22 +73,26 @@ test.describe("with a DevTools port", () => {
       status: "failed",
       error: "Interrupted: RECnRun restarted before the switch finished.",
     });
-    // Nothing had closed yet, so B's window stays open with its data.
-    expect(await incognitoWindows(worker)).toBe(1);
-    if (tab.page) expect(await readMarker(tab.page)).toEqual(marked("B:1"));
-    await identities.open("A");
+    // Recovery closes the window it was capturing, as for a start; B was never saved.
+    await expect.poll(() => incognitoWindows(worker)).toBe(0);
+    expect(await barrierLeft(worker)).toEqual({ rules: 0, scripts: 0 });
+    await identities.resume("A");
     expect(await readMarker(await next())).toEqual(marked("A:1"));
+    await identities.open("B");
+    await writeMarker(await next(), "B:2");
 
     const duringRestore = await stoppedAt(worker, remoteDebuggingPort, "restore", () =>
-      identities.open("B"),
+      identities.open("A"),
     );
     expect(duringRestore).not.toBe("finished");
     worker = await wake();
     expect(await journalOf(worker)).toMatchObject({ step: "restore", status: "failed" });
     await expect.poll(() => incognitoWindows(worker)).toBe(0);
     expect(await barrierLeft(worker)).toEqual({ rules: 0, scripts: 0 });
-    await identities.resume("B");
-    expect(await readMarker(await next())).toEqual(marked("B:1"));
+    await identities.resume("A");
+    expect(await readMarker(await next())).toEqual(marked("A:1"));
+    await identities.open("B");
+    expect(await readMarker(await next())).toEqual(marked("B:2"));
     await keep("lifecycle-extension-restart", { duringCapture, duringRestore });
   });
 });

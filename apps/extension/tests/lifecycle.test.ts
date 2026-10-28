@@ -47,6 +47,22 @@ test("switch saves the open identity before it closes, then starts the target fr
   expect(access).toHaveBeenCalledOnce();
 });
 
+test("while the open window is captured and closed, the journal names it for recovery", async () => {
+  const { lifecycle, journal } = setUp({ open: "a" });
+  await lifecycle.switchTo("b");
+  const held = journal.written.map(({ step, generation, windowId }) => ({
+    step,
+    generation,
+    windowId,
+  }));
+  expect(held).toEqual([
+    { step: "capture", generation: 1, windowId: 5 },
+    { step: "persist", generation: 1, windowId: 5 },
+    { step: "close", generation: 1, windowId: 5 },
+    { step: "start-from-capture", generation: undefined, windowId: undefined },
+  ]);
+});
+
 test("the test hook runs before each lifecycle step, and a step it fails is journaled failed", async () => {
   const seen: string[] = [];
   const beforeStep = vi.fn(async (step: string) => {

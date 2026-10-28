@@ -24,7 +24,7 @@ const INTERRUPTED_COMMAND: Record<WorkspaceOperation["kind"], string> = {
 const interrupted = ({ kind }: WorkspaceOperation) =>
   `Interrupted: RECnRun restarted before ${INTERRUPTED_COMMAND[kind]} finished.`;
 
-/** Undoes what the interrupted start may have left: its window, then its barrier. */
+/** Undoes what the interrupted operation may have left: its journaled window, then its barrier. */
 async function cleanUp(operation: WorkspaceOperation, deps: RecoveryDeps): Promise<string[]> {
   const { failures, attempt } = collectFailures();
   const { id, generation, windowId } = operation;

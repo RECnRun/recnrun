@@ -75,6 +75,14 @@ interface Run {
 }
 
 const START_STEPS: ReadonlySet<LifecycleStep> = new Set(["start-from-capture", "start-empty"]);
+const HOLDING_STEPS: ReadonlySet<LifecycleStep> = new Set(["capture", "persist", "close"]);
+
+/** Until it is closed, the open window is journaled, so a restart's recovery closes it. */
+function journaled(run: Run, step: LifecycleStep): WorkspaceOperation {
+  const managed = run.open?.managed;
+  if (managed === undefined || !HOLDING_STEPS.has(step)) return run.operation;
+  return { ...run.operation, generation: managed.generation, windowId: managed.windowId };
+}
 
 /** The window reads again: another Incognito window may have opened during the capture. */
 async function closeOpen(run: Run): Promise<void> {
@@ -137,7 +145,7 @@ async function recordFailure(run: Run, error: unknown): Promise<void> {
 async function runSteps(run: Run, steps: readonly LifecycleStep[]): Promise<void> {
   for (const step of steps) {
     run.operation = { ...run.operation, step };
-    await run.deps.journal.write(run.operation);
+    await run.deps.journal.write(journaled(run, step));
     try {
       await run.deps.effects.beforeStep?.(step);
       await STEP_RUNS[step](run);
