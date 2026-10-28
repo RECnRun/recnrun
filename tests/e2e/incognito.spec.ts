@@ -1,31 +1,26 @@
 import type { BrowserContext, Page, Worker } from "@playwright/test";
 import { expect, test } from "./fixtures/extension.ts";
-import {
-  clickInDashboard,
-  clickToOpenPanel,
-  dashboardOf,
-  openSite,
-  SESSION_FRAME,
-  tabItem,
-} from "./fixtures/session.ts";
+import { clickToOpenPanel, openDashboard, tabItem } from "./fixtures/session.ts";
 import {
   chromeTabs,
+  dashboardUrl,
   focusTab,
+  installedDashboard,
   openIncognitoTab,
   recordedTabId,
   storedText,
   tabIdOf,
 } from "./fixtures/tabs.ts";
 
-const tabsOf = (site: Page) => dashboardOf(site).getByRole("complementary", { name: "Tabs" });
+const tabsOf = (dashboard: Page) => dashboard.getByRole("complementary", { name: "Tabs" });
 
 /** The incognito control sits above the tab list, so it is found in the dashboard, not the list. */
-const incognitoWindowButton = (site: Page) =>
-  dashboardOf(site).getByRole("button", { name: "New incognito window" });
+const incognitoWindowButton = (dashboard: Page) =>
+  dashboard.getByRole("button", { name: "New incognito window" });
 
-/** What the session page in the PiP window shows of a tab: the current one, or the recorded one. */
+/** What the PiP window shows of a tab: the current one, or the recorded one. */
 const tabRegion = (pip: Page, name: "Current tab" | "Recorded tab") =>
-  pip.locator(SESSION_FRAME).contentFrame().getByRole("region", { name });
+  pip.getByRole("region", { name });
 
 /** The Playwright page of the tab Chrome opened at `url`, incognito ones included. */
 async function pageAt(context: BrowserContext, url: string): Promise<Page> {
@@ -42,11 +37,14 @@ async function idOf(serviceWorker: Worker, url: string): Promise<number> {
 }
 
 test.describe("without incognito access", () => {
-  test("lists the normal tabs and says how to allow incognito ones", async ({ context }) => {
-    const site = await openSite(context, "/");
-    await expect(dashboardOf(site).locator("body")).toContainText("Allow in Incognito");
-    await expect(incognitoWindowButton(site)).toHaveCount(0);
-    await expect(tabItem(dashboardOf(site), site.url())).not.toContainText("Incognito");
+  test("lists the normal tabs and says how to allow incognito ones", async ({
+    context,
+    serviceWorker,
+  }) => {
+    const dashboard = await openDashboard(context, serviceWorker);
+    await expect(dashboard.locator("body")).toContainText("Allow in Incognito");
+    await expect(incognitoWindowButton(dashboard)).toHaveCount(0);
+    await expect(tabItem(dashboard, dashboard.url())).not.toContainText("Incognito");
   });
 });
 
@@ -57,14 +55,14 @@ test.describe("with incognito access", () => {
     context,
     serviceWorker,
   }) => {
-    const site = await openSite(context, "/");
-    await expect(dashboardOf(site).locator("body")).not.toContainText("Allow in Incognito");
-    await clickInDashboard(incognitoWindowButton(site));
+    const dashboard = await openDashboard(context, serviceWorker);
+    await expect(dashboard.locator("body")).not.toContainText("Allow in Incognito");
+    await incognitoWindowButton(dashboard).click();
 
     await expect
       .poll(async () => (await chromeTabs(serviceWorker)).filter((tab) => tab.incognito).length)
       .toBe(1);
-    const incognito = tabsOf(site).getByRole("listitem").filter({ hasText: "Incognito" });
+    const incognito = tabsOf(dashboard).getByRole("listitem").filter({ hasText: "Incognito" });
     await expect(incognito).toHaveCount(1);
     await expect(incognito.getByRole("button")).toHaveText(["Record"]);
     expect(await recordedTabId(serviceWorker)).toBeNull();
@@ -78,8 +76,8 @@ test.describe("with incognito access", () => {
     const privateUrl = `${baseURL}/privacy/?private`;
     await openIncognitoTab(serviceWorker, privateUrl);
     const privatePage = await pageAt(context, privateUrl);
-    const site = await openSite(context, "/");
-    const row = tabItem(dashboardOf(site), privateUrl);
+    const dashboard = await openDashboard(context, serviceWorker);
+    const row = tabItem(dashboard, privateUrl);
     await expect(row).toContainText("Incognito");
 
     const pip = await clickToOpenPanel(context, row.getByRole("button", { name: "Record" }));
@@ -96,8 +94,8 @@ test.describe("with incognito access", () => {
     await privatePage.goto(otherUrl);
     await expect(current).toContainText(otherUrl);
 
-    await focusTab(serviceWorker, await idOf(serviceWorker, site.url()));
-    await expect(current).toContainText(site.url());
+    await focusTab(serviceWorker, await idOf(serviceWorker, dashboard.url()));
+    await expect(current).toContainText(dashboard.url());
     await expect(current).not.toContainText("Incognito");
     await expect(tabRegion(pip, "Recorded tab")).toContainText(otherUrl);
     await expect(tabRegion(pip, "Recorded tab")).toContainText("Incognito");
@@ -106,17 +104,22 @@ test.describe("with incognito access", () => {
     expect(await storedText(serviceWorker)).not.toMatch(/private|elsewhere/);
   });
 
-  test("an incognito site tab points to a normal window", async ({
+  test("the site in an incognito window opens the dashboard in a normal one", async ({
     baseURL,
     context,
     serviceWorker,
   }) => {
+    const dashboard = await installedDashboard(context, serviceWorker);
+    await dashboard.close();
     await openIncognitoTab(serviceWorker, `${baseURL}/`);
     const privateSite = await pageAt(context, `${baseURL}/`);
-    await expect(privateSite.getByRole("status").last()).toHaveText(
-      "RECnRun opens from a normal window. Open recnrun.com there to record incognito tabs.",
-    );
-    await expect(privateSite.locator('iframe[title="RECnRun dashboard"]')).toHaveCount(0);
+    await expect(privateSite.getByRole("button", { name: "Open dashboard" })).toBeVisible();
+
+    const url = dashboardUrl(serviceWorker);
+    await expect
+      .poll(async () => (await chromeTabs(serviceWorker)).filter((tab) => tab.url === url))
+      .toEqual([expect.objectContaining({ incognito: false, active: true })]);
+    await expect(privateSite.getByRole("status")).toHaveCount(0);
   });
 });
 
@@ -127,10 +130,10 @@ test("the PiP window tells the current tab from the recorded one, and drops clos
   serviceWorker,
 }) => {
   await page.goto("/privacy/?recorded");
-  const site = await openSite(context, "/");
+  const dashboard = await openDashboard(context, serviceWorker);
   const pip = await clickToOpenPanel(
     context,
-    tabItem(dashboardOf(site), page.url()).getByRole("button", { name: "Record" }),
+    tabItem(dashboard, page.url()).getByRole("button", { name: "Record" }),
   );
   const current = tabRegion(pip, "Current tab");
   await expect(current).toContainText(page.url());

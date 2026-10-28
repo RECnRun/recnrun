@@ -14,11 +14,16 @@ const contentScript = { id: "own-id", url: "https://recnrun.com/" };
 interface Sender {
   id?: string;
   url?: string;
-  tab?: { id?: number };
+  tab?: { id?: number; windowId?: number; incognito?: boolean };
 }
 
-function listen(message: unknown, sender: Sender, store = memoryRecordingStore()) {
-  const routes = createRoutes({ extensionVersion: "0.1.0", store });
+function listen(
+  message: unknown,
+  sender: Sender,
+  store = memoryRecordingStore(),
+  showDashboard = async (_from?: { windowId: number; incognito: boolean }) => {},
+) {
+  const routes = createRoutes({ extensionVersion: "0.1.0", store, showDashboard });
   const replies: BackgroundReply[] = [];
   const listener = createBackgroundListener(routes, identity);
   const answered = listener(message, sender as never, (reply) => replies.push(reply));
@@ -43,6 +48,22 @@ describe("bridge requests", () => {
         expect(replies).toEqual([{ ok: true, result: { extensionVersion: "0.1.0" } }]),
       );
     }
+  });
+
+  test("brings the dashboard forward for the site, from the site tab's window", async () => {
+    const shown: unknown[] = [];
+    const show = async (from?: { windowId: number; incognito: boolean }) => {
+      shown.push(from);
+    };
+    const siteTab = { ...contentScript, tab: { id: 3, windowId: 2, incognito: false } };
+    const { answered, replies } = listen({ type: "open-dashboard" }, siteTab, undefined, show);
+    expect(answered).toBe(true);
+    await vi.waitFor(() => expect(replies).toEqual([{ ok: true, result: {} }]));
+    expect(shown).toEqual([{ windowId: 2, incognito: false }]);
+
+    const untabbed = listen({ type: "open-dashboard" }, contentScript, undefined, show);
+    await vi.waitFor(() => expect(untabbed.replies).toEqual([{ ok: true, result: {} }]));
+    expect(shown).toEqual([{ windowId: 2, incognito: false }, undefined]);
   });
 
   test("ignores other extensions and unknown messages", () => {

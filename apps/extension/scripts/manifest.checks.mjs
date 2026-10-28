@@ -27,15 +27,8 @@ await test("the content script runs only in the top frame of a real document", (
   }
 });
 
-await test("only the RECnRun site may frame the dashboard and the session page", () => {
-  const manifest = productionManifest();
-  assert.deepEqual(manifest.web_accessible_resources, [
-    {
-      resources: ["dashboard.html", "session.html"],
-      matches: ["https://recnrun.com/*"],
-      use_dynamic_url: false,
-    },
-  ]);
+await test("no web page can load or frame an extension page", () => {
+  assert.equal(productionManifest().web_accessible_resources, undefined);
 });
 
 await test("the production build requests only storage and tabs", () => {

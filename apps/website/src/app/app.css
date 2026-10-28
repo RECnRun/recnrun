@@ -26,6 +26,12 @@ a:not(.button) {
   padding: var(--space);
 }
 
+button.button {
+  border: 0;
+  font: inherit;
+  cursor: pointer;
+}
+
 .button {
   display: inline-block;
   padding: 0.5rem 1rem;

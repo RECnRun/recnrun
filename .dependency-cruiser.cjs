@@ -143,30 +143,25 @@ module.exports = {
     {
       name: "extension-dashboard-isolated",
       severity: "error",
-      comment: "The dashboard starts a session through the background, never through its page.",
+      comment:
+        "The dashboard reaches the background and the site's content script only by messages.",
       from: { path: "^apps/extension/src/dashboard/" },
-      to: { path: "^apps/extension/src/(content|background|session)/" },
-    },
-    {
-      name: "extension-session-isolated",
-      severity: "error",
-      comment: "The session page and the dashboard share only views; the site frames each of them.",
-      from: { path: "^apps/extension/src/session/" },
-      to: { path: "^apps/extension/src/(content|background|dashboard)/" },
+      to: { path: "^apps/extension/src/(content|background)/" },
     },
     {
       name: "extension-views-shared",
       severity: "error",
-      comment: "Views are the components both pages render; they get their data injected.",
+      comment:
+        "Views are what the dashboard and its PiP window render; they get their data injected.",
       from: { path: "^apps/extension/src/views/" },
-      to: { path: "^apps/extension/src/(content|background|dashboard|session|storage)/" },
+      to: { path: "^apps/extension/src/(content|background|dashboard|storage)/" },
     },
     {
       name: "extension-tabs-is-model",
       severity: "error",
       comment: "src/tabs is the one tab model and watcher the dashboard and the PiP both read.",
       from: { path: "^apps/extension/src/tabs/" },
-      to: { path: "^apps/extension/src/(content|background|dashboard|session|storage|views)/" },
+      to: { path: "^apps/extension/src/(content|background|dashboard|storage|views)/" },
     },
     {
       name: "extension-ports-are-contracts",

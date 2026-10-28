@@ -1,6 +1,6 @@
 import type { RecordingStore } from "@/ports/recording-store";
 import type { TabSource } from "@/ports/tabs";
-import { SessionTabs } from "@/session/SessionTabs";
+import { SessionTabs } from "@/views/SessionTabs";
 import { RecordPanel } from "@/views/RecordPanel";
 import { useEnded, useRecording } from "@/views/recording";
 
@@ -11,7 +11,7 @@ interface FloatingSessionProps {
   onEnd: () => void;
 }
 
-/** The session framed in the PiP window the site opened; it asks to close the window at the end. */
+/** The session in a PiP window; it asks to close the window at the end. */
 export function FloatingSession(props: FloatingSessionProps) {
   const recording = useRecording(props.store);
   useEnded(recording.status, props.onEnd);

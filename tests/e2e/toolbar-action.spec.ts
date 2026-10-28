@@ -1,7 +1,9 @@
+import type { BrowserContext, Worker } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "./fixtures/extension.ts";
-import { recordedTabId } from "./fixtures/tabs.ts";
+import { activeTabId } from "./fixtures/session.ts";
+import { dashboardUrl, focusTab, recordedTabId, tabIdOf } from "./fixtures/tabs.ts";
 
 test.use({ remoteDebuggingPort: 9333 });
 
@@ -16,20 +18,47 @@ interface ChromeGlobal {
   >;
 }
 
-test("the toolbar icon does nothing", async ({
+/** The dashboard tabs open now, as Chrome lists them. */
+async function dashboards(context: BrowserContext, serviceWorker: Worker) {
+  const url = dashboardUrl(serviceWorker);
+  return context.pages().filter((each) => each.url().startsWith(url));
+}
+
+test("the toolbar icon brings the open dashboard forward instead of opening another", async ({
   context,
   page,
   serviceWorker,
   clickToolbarIcon,
 }) => {
   await page.goto("/privacy/");
-  const pages = context.pages().length;
+  await expect.poll(async () => (await dashboards(context, serviceWorker)).length).toBe(1);
+  await focusTab(serviceWorker, (await tabIdOf(serviceWorker, page.url())) ?? -1);
+  const [dashboard] = await dashboards(context, serviceWorker);
   await clickToolbarIcon(page);
 
-  // Give a handler, were there one, the time to open a tab, a window, or a session.
-  await page.waitForTimeout(500);
-  expect(context.pages()).toHaveLength(pages);
+  await expect
+    .poll(() => activeTabId(serviceWorker))
+    .toBe(await tabIdOf(serviceWorker, dashboard?.url() ?? ""));
+  expect(await dashboards(context, serviceWorker)).toHaveLength(1);
   expect(await recordedTabId(serviceWorker)).toBeNull();
+});
+
+test("with no dashboard open, the toolbar icon opens one in focus", async ({
+  context,
+  page,
+  serviceWorker,
+  clickToolbarIcon,
+}) => {
+  await page.goto("/privacy/");
+  await expect.poll(async () => (await dashboards(context, serviceWorker)).length).toBe(1);
+  for (const each of await dashboards(context, serviceWorker)) await each.close();
+  const [opened] = await Promise.all([context.waitForEvent("page"), clickToolbarIcon(page)]);
+
+  await expect(opened.getByRole("heading", { name: "Tabs" })).toBeVisible();
+  expect(opened.url()).toBe(dashboardUrl(serviceWorker));
+  await expect
+    .poll(() => activeTabId(serviceWorker))
+    .toBe(await tabIdOf(serviceWorker, opened.url()));
 });
 
 test("the extension has no popup, keyboard commands, or context menu", async ({

@@ -1,4 +1,11 @@
 import type { Snapshot } from "@recnrun/domain";
+import * as v from "valibot";
+
+export const PathSchema = v.pipe(
+  v.string(),
+  v.startsWith("/"),
+  v.check((path) => !path.startsWith("//"), "A path starts with one slash"),
+);
 
 const RECORDING_ROUTE = /^\/recordings\/([^/?#]+)/;
 

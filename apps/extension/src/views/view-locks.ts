@@ -1,7 +1,8 @@
 // Held by the dashboard that controls the session, from taking control until its PiP window closes.
 export const CONTROL_LOCK = "recnrun-control";
 
-function announce(name: string): void {
+/** Tells every view watching the lock to check it again. */
+export function announce(name: string): void {
   const channel = new BroadcastChannel(name);
   channel.postMessage("held");
   channel.close();

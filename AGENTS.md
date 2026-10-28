@@ -1,6 +1,6 @@
 # AGENTS.md
 
-RECnRun records and replays browser sessions for developers. The extension stores the user's data; the website at recnrun.com detects the extension and asks to install it when it is missing. When it is installed, the extension shows its own dashboard over the site. It is a Vite+ monorepo:
+RECnRun records and replays browser sessions for developers. The extension stores the user's data; the website at recnrun.com detects the extension and asks to install it when it is missing. When it is installed, the site brings the extension's dashboard, its own tab, to the front; the toolbar icon and the profile's first window open it too. It is a Vite+ monorepo:
 
 - `apps/extension`: WXT Chromium (MV3) extension with a Preact dashboard page. It owns the data and its UI.
 - `apps/website`: Preact SPA at recnrun.com, deployed to GitHub Pages. It never reads the user's data.
@@ -24,20 +24,20 @@ Update the relevant doc when a change alters what it describes.
 
 Vite+ (`vp`) is the only toolchain. `vp <name>` runs a built-in command and `vp run <name>` runs a `package.json` script or `vite.config.ts` task, so they can differ: `vp test` is plain Vitest, while `vp run test` is the project suite. Vite+ docs are in `node_modules/vite-plus/docs`. Run `vp env doctor` when setup or package-manager behavior looks wrong.
 
-| Command                                                      | Purpose                                                              |
-| ------------------------------------------------------------ | -------------------------------------------------------------------- |
-| `vp install`                                                 | After pulling, before starting work                                  |
-| `vp run dev`                                                 | Website (port 5173) and extension dev build in Chrome, together      |
-| `vp run dev:website`, `vp run dev:extension`                 | One of them alone; the extension's Chrome keeps a persistent profile |
-| `vp run clean`                                               | Delete builds, artifacts, caches, and the dev Chrome profile         |
-| `vp check` (`--fix` to format)                               | Format (Oxfmt), lint (Oxlint), and type check while editing          |
-| `vp run deps`                                                | Architecture boundaries (dependency-cruiser)                         |
-| `vp run test:unit`, `test:components`, `test:e2e`            | One test layer: Node, Vitest Browser Mode, Playwright with extension |
-| `vp run test`                                                | All three layers                                                     |
-| `vp run test:coverage`                                       | Coverage with thresholds                                             |
-| `vp run dead-code`, `vp run duplication`                     | Knip; jscpd                                                          |
-| `vp run test:e2e -- tests/e2e/dashboard-frame.spec.ts -g ''` | Targeted Playwright run (arguments go after `--`)                    |
-| `vp run verify`                                              | Full gate (`vp run ready` is an alias)                               |
+| Command                                                    | Purpose                                                              |
+| ---------------------------------------------------------- | -------------------------------------------------------------------- |
+| `vp install`                                               | After pulling, before starting work                                  |
+| `vp run dev`                                               | Website (port 5173) and extension dev build in Chrome, together      |
+| `vp run dev:website`, `vp run dev:extension`               | One of them alone; the extension's Chrome keeps a persistent profile |
+| `vp run clean`                                             | Delete builds, artifacts, caches, and the dev Chrome profile         |
+| `vp check` (`--fix` to format)                             | Format (Oxfmt), lint (Oxlint), and type check while editing          |
+| `vp run deps`                                              | Architecture boundaries (dependency-cruiser)                         |
+| `vp run test:unit`, `test:components`, `test:e2e`          | One test layer: Node, Vitest Browser Mode, Playwright with extension |
+| `vp run test`                                              | All three layers                                                     |
+| `vp run test:coverage`                                     | Coverage with thresholds                                             |
+| `vp run dead-code`, `vp run duplication`                   | Knip; jscpd                                                          |
+| `vp run test:e2e -- tests/e2e/dashboard-tab.spec.ts -g ''` | Targeted Playwright run (arguments go after `--`)                    |
+| `vp run verify`                                            | Full gate (`vp run ready` is an alias)                               |
 
 Test commands and `verify` run in Docker, so start Docker Desktop first. If Docker fails, the command fails; it never falls back to host browsers. `:local` variants (`vp run test:e2e:local`) and the built-in `vp test` run on the host and are for debugging only. Logs and failure artifacts are in `.artifacts/docker/<run-id>/`.
 

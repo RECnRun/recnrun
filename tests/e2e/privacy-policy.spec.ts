@@ -35,6 +35,6 @@ withExtension(
   async ({ page }) => {
     await page.goto(POLICY);
     await expect(page.getByRole("heading", { level: 1, name: "Privacy policy" })).toBeVisible();
-    await expect(page.locator('iframe[title="RECnRun dashboard"]')).toHaveCount(0);
+    await expect(page.locator("iframe")).toHaveCount(0);
   },
 );

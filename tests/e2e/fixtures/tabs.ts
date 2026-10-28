@@ -1,4 +1,5 @@
-import type { Worker } from "@playwright/test";
+import { expect } from "@playwright/test";
+import type { BrowserContext, Page, Worker } from "@playwright/test";
 
 interface ChromeTab {
   id?: number;
@@ -25,8 +26,17 @@ interface ChromeGlobal {
   };
 }
 
-export const sessionUrl = (serviceWorker: Worker) =>
-  new URL("session.html", serviceWorker.url()).href;
+/** The dashboard's own page, at the route in `hash`. */
+export const dashboardUrl = (serviceWorker: Worker, hash = "") =>
+  new URL(`dashboard.html${hash}`, serviceWorker.url()).href;
+
+/** The dashboard tab RECnRun opened as it was installed, first in the profile's window. */
+export async function installedDashboard(context: BrowserContext, serviceWorker: Worker) {
+  const url = dashboardUrl(serviceWorker);
+  const find = () => context.pages().find((each) => each.url() === url);
+  await expect.poll(find).toBeDefined();
+  return find() as Page;
+}
 
 /** Every tab as Chrome reports it; Playwright emulates focus, so Chrome's tab state is the truth. */
 export function chromeTabs(serviceWorker: Worker) {

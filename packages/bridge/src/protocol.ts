@@ -10,6 +10,8 @@ const envelope = {
 /** Result schema per request type. A new request type starts here. */
 export const RESULT_SCHEMAS = {
   ping: v.object({ extensionVersion: v.string() }),
+  /** Focuses or opens the dashboard tab; the page learns nothing about it. */
+  "open-dashboard": v.object({}),
 } as const;
 
 export type RequestType = keyof typeof RESULT_SCHEMAS;

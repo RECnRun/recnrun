@@ -6,7 +6,7 @@ Experiments that shaped a durable decision. Each ran on its own local branch wit
 
 **Problem.** The website at recnrun.com rendered the user's recordings, so every change to the stored data needed two deploys that had to stay in sync: the website on GitHub Pages and the extension on the Chrome Web Store. A website ahead of or behind the installed extension would show data it could not parse.
 
-**Decision.** The extension owns its UI: `dashboard.html` (POC 1). recnrun.com keeps its address and shows that page in a frame (POC 3). The website only detects the extension and asks to install it when it is missing, so it no longer depends on the data model. POC 2 is the fallback if the frame stops working; POC 4 is deferred.
+**Decision.** The extension owns its UI: `dashboard.html` (POC 1). recnrun.com keeps its address and shows that page in a frame (POC 3). The website only detects the extension and asks to install it when it is missing, so it no longer depends on the data model. POC 2 is the fallback if the frame stops working; POC 4 is deferred. The frame went on 2026-10-28: the dashboard became the extension's own top-level tab, which recnrun.com only brings forward ([POC 7](#poc-7-spike-on-the-top-level-dashboard)).
 
 | POC | Branch                    | Idea                                                         | Result                    |
 | --- | ------------------------- | ------------------------------------------------------------ | ------------------------- |
@@ -128,3 +128,24 @@ The dashboard header has a Record button (`dashboard/panel/RecordControls.tsx`).
   - The window stays on top after switching to another tab and to another Chrome window.
   - Stop brings back the dashboard tab (6A); note where the focus goes in 6C.
   - Whether `await`ing storage before `requestWindow()` still opens it, which decides whether Record can wait for the extension before opening the window.
+
+## The dashboard as a top-level tab (October 2026)
+
+**Problem.** The framed dashboard cannot show the folder picker or hold Chrome's folder grant, so the cross-profile POC needed a separate folder window and clicks in other profiles. [The plan](dashboard-top-level-plan.md) makes `dashboard.html` the extension's own top-level tab, opened by the toolbar icon and with the profile. Four risks needed an answer first.
+
+**Result.** All four hold. The dashboard needs no orphan handling, and its start-up logic must look at the windows already open instead of waiting for `windows.onCreated`.
+
+### POC 7: spike on the top-level dashboard
+
+A throwaway Playwright spec on a test build that logged the service worker's events (`runtime.onInstalled`, `runtime.onStartup`, `windows.onCreated`) with every tab at that moment into `storage.local`. Not merged.
+
+- **Findings.**
+  - **PiP from the dashboard tab works.** `documentPictureInPicture.requestWindow()` in a click opens the window; it is `about:blank` with the extension's origin, and the opener renders into it. The window has no `chrome.runtime`, so everything the panel needs comes from the opener. `pagehide` fires on the opener's reference when the window closes, and the window closes with its opener tab.
+  - **Reload and turn-off close the tab.** `runtime.reload()` and `management.setEnabled(id, false)` from `chrome://extensions` both close an open `dashboard.html` tab, so no stale dashboard survives an update or "Allow in Incognito".
+  - **A command-line unpacked build reinstalls on every launch.** A persistent context launched twice on one profile with `--load-extension` fires `onInstalled` with reason `install` both times, never `onStartup`. Tests therefore cannot tell install from start-up apart, and the background treats both the same way: make sure the dashboard is the first tab of a normal window.
+  - **Restored tabs are there before the worker starts.** With `session.restore_on_startup = 1`, the second launch's worker started with the restored tabs already open, the dashboard at index 1; `windows.onCreated` never fired for that window. Start-up must check the open windows, find the restored dashboard with `runtime.getContexts`, and move it to index 0.
+  - **`windows.onCreated` fires for a normal window opened while the profile has none** (only a popup left), with its tab's URL still empty.
+  - **A broadcast in flight is lost when the PiP window opens.** A `BroadcastChannel` message posted in the dashboard tab just before `requestWindow()` never reached that tab's own channels; posted before or after, it does. The control lock's announcement hit this, so the dashboard that took the control did not show it, until it announced again once the window opened (found in task 2).
+  - **`runtime.getContexts({ contextTypes: ["TAB"] })`** lists the open dashboard tab with `tabId` and `windowId`, and no tab once its window closes.
+  - **`action.getUserSettings()`** answers `{ isOnToolbar: false }` in the test browser, so the pin hint is testable.
+  - **Not checked here.** Whether focusing the dashboard on every visit to recnrun.com's root is acceptable: that is the user's manual check after task 8.
