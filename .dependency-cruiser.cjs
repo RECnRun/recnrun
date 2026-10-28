@@ -187,7 +187,7 @@ module.exports = {
         "Cross-profile POC: src/p2p is the peer protocol, pairing codes, and the WebRTC link, with no extension state.",
       from: { path: "^apps/extension/src/p2p/" },
       to: {
-        path: "^apps/extension/src/(content|background|dashboard|session|storage|views|peers|pairing|offscreen|messaging)/",
+        path: "^apps/extension/src/(content|background|dashboard|storage|views|peers|pairing|offscreen|messaging)/",
       },
     },
     {
@@ -198,7 +198,7 @@ module.exports = {
       from: { path: "^apps/extension/src/offscreen/" },
       to: {
         path: [
-          "^apps/extension/src/(content|background|dashboard|session|storage|views|peers|pairing)/",
+          "^apps/extension/src/(content|background|dashboard|storage|views|peers|pairing)/",
           "node_modules/wxt/.*storage",
         ],
       },
@@ -210,15 +210,15 @@ module.exports = {
         "Cross-profile POC: the pairing page reaches the link only through the background, as the dashboard does.",
       from: { path: "^apps/extension/src/pairing/" },
       to: {
-        path: "^apps/extension/src/(content|background|dashboard|session|storage|offscreen|peers)/",
+        path: "^apps/extension/src/(content|background|dashboard|storage|offscreen|peers)/",
       },
     },
     {
       name: "extension-poc-stays-out-of-the-main-flow",
       severity: "error",
       comment:
-        "Cross-profile POC: the content script and the session page never load it; entrypoints inject it.",
-      from: { path: "^apps/extension/src/(content|session|dashboard|tabs|ports)/" },
+        "Cross-profile POC: the content script and the dashboard never load it; entrypoints inject it.",
+      from: { path: "^apps/extension/src/(content|dashboard|tabs|ports)/" },
       to: { path: "^apps/extension/src/(offscreen|pairing|peers)/" },
     },
     {

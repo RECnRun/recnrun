@@ -2,7 +2,6 @@ import { render } from "preact";
 import { afterEach, expect, test } from "vite-plus/test";
 import { Dashboard } from "@/dashboard/Dashboard";
 import { startDashboard } from "@/dashboard/start";
-import { openPanelMessage } from "@/messaging/frame-protocol";
 import type { PeerStatus } from "@/messaging/peer-results";
 import { returnToDashboardMessage } from "@/messaging/session-protocol";
 import type { SessionRequest } from "@/messaging/session-protocol";
@@ -12,14 +11,7 @@ import { CONTROL_LOCK, tryHoldLock } from "@/views/view-locks";
 import { fakeExtension, memoryRecordingStore } from "./fake-extension";
 import { closedFor, fakePeerClient, statusOf, withPeerSession } from "./fake-peer-client";
 import { SHOP, fakeTabs } from "./fake-tabs";
-import {
-  alertText,
-  buttons,
-  closePanel,
-  expectControlFree,
-  framedPage,
-  item,
-} from "./framed-dashboard";
+import { alertText, buttons, expectControlFree, item, pipWindow, tabPage } from "./dashboard-page";
 import { button } from "./queries";
 
 const MAIL: OpenTab = { ...SHOP, id: 21, title: "Mail", url: "https://mail.example/" };
@@ -41,7 +33,7 @@ function peerServices(peer: ReturnType<typeof fakePeerClient>) {
   return { peers, opened, folders };
 }
 
-/** A framed dashboard in Alice's profile, with Bob's profile as `peer` answers for it. */
+/** A dashboard tab in Alice's profile, with Bob's profile as `peer` answers for it. */
 function mount(peer: ReturnType<typeof fakePeerClient>, recordings = memoryRecordingStore()) {
   const { peers, opened, folders } = peerServices(peer);
   const sent: SessionRequest[] = [];
@@ -49,14 +41,18 @@ function mount(peer: ReturnType<typeof fakePeerClient>, recordings = memoryRecor
     sent.push(request);
     return { ok: true };
   };
-  const page = framedPage();
+  const pips: Window[] = [];
+  const page = tabPage("", async () => {
+    pips.push(pipWindow());
+    return pips.at(-1) as Window;
+  });
   const root = document.body.appendChild(document.createElement("div"));
   startDashboard(
     root,
     fakeExtension({ tabs: fakeTabs({ tabs: [SHOP] }).source, send, peers, recordings }),
     page,
   );
-  return { root, sent, page, opened, folders };
+  return { root, sent, pips, opened, folders };
 }
 
 const headings = (root: HTMLElement) =>
@@ -68,12 +64,7 @@ const note = (scope: HTMLElement | undefined) => scope?.querySelector(".tab-note
 const banner = (root: HTMLElement) =>
   root.querySelector('section[aria-labelledby="folder-banner-heading"]')?.textContent ?? undefined;
 
-const posted: unknown[] = [];
-const onMessage = (event: MessageEvent) => posted.push(event.data);
-
 afterEach(() => {
-  window.removeEventListener("message", onMessage);
-  posted.length = 0;
   for (const root of document.body.children) render(null, root);
   document.body.replaceChildren();
 });
@@ -202,20 +193,19 @@ test("Show tab brings the other profile's tab to the front, or shows why it cann
 });
 
 test("Record on the other profile's tab takes the control and starts the session there", async () => {
-  window.addEventListener("message", onMessage);
   const peer = fakePeerClient(statusOf("connected"));
-  const { root, sent, page } = mount(peer);
+  const { root, sent, pips } = mount(peer);
   await expect.poll(() => button(remote(root) ?? root, "Record")).toBeDefined();
   button(remote(root) ?? root, "Record")?.click();
 
   await expect
     .poll(() => peer.asked("session-start"))
     .toEqual([{ type: "session-start", tabId: MAIL.id }]);
-  await expect.poll(() => posted).toContainEqual(openPanelMessage());
+  expect(pips).toHaveLength(1);
   expect(await tryHoldLock(CONTROL_LOCK)).toBeUndefined();
   expect(sent).toEqual([]);
 
-  closePanel(page);
+  pips[0]?.close();
   await expect.poll(() => sent).toEqual([returnToDashboardMessage()]);
   await expectControlFree();
 });

@@ -5,7 +5,7 @@ import { returnToDashboardMessage, startSessionMessage } from "@/messaging/sessi
 import type { SessionRequest } from "@/messaging/session-protocol";
 import type { ExtensionServices } from "@/views/extension-services";
 import { CONTROL_LOCK, tryHoldLock } from "@/views/view-locks";
-import { pipWindow, tabPage } from "./dashboard-page";
+import { alertText, buttons, expectControlFree, item, pipWindow, tabPage } from "./dashboard-page";
 import { fakeExtension, memoryRecordingStore } from "./fake-extension";
 import { DOCS, PRIVATE, SHOP, fakeIncognito, fakeTabs } from "./fake-tabs";
 import { button } from "./queries";
@@ -28,23 +28,6 @@ function mount(services: Partial<ExtensionServices> = {}) {
   const root = document.body.appendChild(document.createElement("div"));
   startDashboard(root, fakeExtension({ tabs: tabs.source, send, ...services }), page);
   return { root, sent, tabs, opened };
-}
-
-const item = (root: HTMLElement, title: string) =>
-  root.querySelector<HTMLElement>(`li[aria-label="${title}"]`) ?? undefined;
-const buttons = (scope: HTMLElement | undefined) =>
-  [...(scope?.querySelectorAll("button") ?? [])].map((each) => each.textContent);
-const alertText = (root: HTMLElement) => root.querySelector('[role="alert"]')?.textContent;
-/** Waits until no dashboard holds the control lock, which each test leaves free. */
-async function expectControlFree() {
-  let release: (() => void) | undefined;
-  await expect
-    .poll(async () => {
-      release = await tryHoldLock(CONTROL_LOCK);
-      return release !== undefined;
-    })
-    .toBe(true);
-  release?.();
 }
 
 const running = (tabId: number) => ({ tabId, status: "recording" as const, banked: 0, since: 0 });

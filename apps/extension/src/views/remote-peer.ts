@@ -11,7 +11,7 @@ export interface PeerServices {
   tabs: TabSource;
   recordings: RecordingStore;
   openPairing: () => Promise<void>;
-  /** Opens the window that grants the RECnRun folder, which a framed page cannot. */
+  /** Opens the window that grants the RECnRun folder. */
   openFolder: () => Promise<void>;
 }
 

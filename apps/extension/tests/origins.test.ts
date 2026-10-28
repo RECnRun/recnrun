@@ -1,5 +1,5 @@
 import { expect, test } from "vite-plus/test";
-import { contentScriptExcludes, contentScriptMatches } from "@/config/origins";
+import { contentScriptExcludes, contentScriptMatches, peersEnabled } from "@/config/origins";
 
 const PRODUCTION = ["https://recnrun.com/*"];
 
@@ -28,4 +28,9 @@ test("the content script skips the privacy policy on every origin it runs on", (
     "http://localhost/privacy/*",
     "http://127.0.0.1/privacy/*",
   ]);
+});
+
+test("only development and test builds carry the cross-profile POC", () => {
+  expect(["development", "test"].map(peersEnabled)).toEqual([true, true]);
+  expect(["production", "staging"].map(peersEnabled)).toEqual([false, false]);
 });

@@ -10,8 +10,8 @@ interface FolderPairingProps {
 }
 
 /**
- * Leads to the folder window, since the framed dashboard cannot show Chrome's folder picker or
- * the prompt Chrome shows once after a restart.
+ * Leads to the folder window, which shows Chrome's folder picker or the prompt Chrome shows once
+ * after a restart.
  */
 export function FolderBanner({ peers, status }: FolderPairingProps) {
   if (!status || status.folder === "granted") return null;

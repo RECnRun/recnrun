@@ -1,39 +1,28 @@
-import type { FrameLocator, Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
 import { expect } from "./fixtures/extension.ts";
-import { pair, test } from "./fixtures/profiles.ts";
+import { dashboardIn as openIn, pair, test } from "./fixtures/profiles.ts";
 import type { Profile } from "./fixtures/profiles.ts";
-import {
-  activeTabId,
-  clickInDashboard,
-  clickToOpenPanel,
-  dashboardOf,
-  panelIn,
-} from "./fixtures/session.ts";
+import { activeTabId, clickToOpenPanel, panelIn } from "./fixtures/session.ts";
 import { storedSession, tabIdOf } from "./fixtures/tabs.ts";
 
 const LOCAL = "Chrome — Profile A (Local)";
 const REMOTE = "Chrome — Profile B (Connected)";
 
-/** A site tab in a profile, A by default, whose dashboard lists both profiles. */
-async function dashboardIn(
-  profile: Profile,
-  local = LOCAL,
-): Promise<{ site: Page; dashboard: FrameLocator }> {
-  const site = await profile.context.newPage();
-  await site.goto("/");
-  const dashboard = dashboardOf(site);
+/** A dashboard tab in a profile, A by default, that lists both profiles. */
+async function dashboardIn(profile: Profile, local = LOCAL): Promise<{ dashboard: Page }> {
+  const dashboard = await openIn(profile);
   await expect(dashboard.getByRole("heading", { name: local })).toBeVisible();
-  return { site, dashboard };
+  return { dashboard };
 }
 
-/** A tab in profile B, at an address of its own; the privacy policy has no dashboard frame. */
-async function openInB(profile: Profile, name: string): Promise<Page> {
+/** A tab in a profile, at an address of its own; the privacy policy runs no RECnRun script. */
+async function openTab(profile: Profile, name: string): Promise<Page> {
   const page = await profile.context.newPage();
   await page.goto(`/privacy/?${name}`);
   return page;
 }
 
-const remoteTab = (dashboard: FrameLocator, url: string, heading = REMOTE) =>
+const remoteTab = (dashboard: Page, url: string, heading = REMOTE) =>
   dashboard
     .getByRole("complementary", { name: heading })
     .getByRole("listitem")
@@ -45,7 +34,7 @@ test("the dashboard lists the other profile's tabs as they open and close", asyn
 }) => {
   await pair(profileA, profileB);
   const { dashboard } = await dashboardIn(profileA);
-  const b = await openInB(profileB, "opened");
+  const b = await openTab(profileB, "opened");
   await expect(remoteTab(dashboard, b.url())).toBeVisible();
   // A's own list never shows B's tab.
   await expect(
@@ -61,13 +50,11 @@ test("Show tab brings the other profile's tab to the front there", async ({
 }) => {
   await pair(profileA, profileB);
   const { dashboard } = await dashboardIn(profileA);
-  const first = await openInB(profileB, "first");
-  await openInB(profileB, "second");
+  const first = await openTab(profileB, "first");
+  await openTab(profileB, "second");
   const firstId = await tabIdOf(profileB.serviceWorker, first.url());
   expect(await activeTabId(profileB.serviceWorker)).not.toBe(firstId);
-  await clickInDashboard(
-    remoteTab(dashboard, first.url()).getByRole("button", { name: "Show tab" }),
-  );
+  await remoteTab(dashboard, first.url()).getByRole("button", { name: "Show tab" }).click();
   await expect.poll(() => activeTabId(profileB.serviceWorker)).toBe(firstId);
 });
 
@@ -77,7 +64,7 @@ test("A records, pauses, and stops a session that runs in B, from its PiP window
 }) => {
   await pair(profileA, profileB);
   const { dashboard } = await dashboardIn(profileA);
-  const app = await openInB(profileB, "app");
+  const app = await openTab(profileB, "app");
   const appId = await tabIdOf(profileB.serviceWorker, app.url());
   const record = remoteTab(dashboard, app.url()).getByRole("button", { name: "Record" });
   const pip = await clickToOpenPanel(profileA.context, record);
@@ -127,8 +114,8 @@ test("a session in B outlives the link, and A shows B's tabs read only, as last 
   profileB,
 }) => {
   await pair(profileA, profileB);
-  const { site, dashboard } = await dashboardIn(profileA);
-  const app = await openInB(profileB, "app");
+  const { dashboard } = await dashboardIn(profileA);
+  const app = await openTab(profileB, "app");
   const record = remoteTab(dashboard, app.url()).getByRole("button", { name: "Record" });
   const pip = await clickToOpenPanel(profileA.context, record);
   await expect(panelIn(pip)).toContainText("Recording");
@@ -149,7 +136,7 @@ test("a session in B outlives the link, and A shows B's tabs read only, as last 
 
   // A worker that sleeps and wakes again still has the tabs last seen.
   await stopServiceWorker(profileA);
-  await site.reload();
+  await dashboard.reload();
   await readOnly();
   // Only an explicit Stop ends a session; B's keeps recording.
   expect(await storedSession(profileB.serviceWorker)).toMatchObject({ status: "recording" });
@@ -162,8 +149,8 @@ test("while B records a session of its own, neither dashboard offers Record", as
   await pair(profileA, profileB);
   const inA = (await dashboardIn(profileA)).dashboard;
   const inB = (await dashboardIn(profileB, "Chrome — Profile B (Local)")).dashboard;
-  const app = await openInB(profileB, "app");
-  const records = (dashboard: FrameLocator) => dashboard.getByRole("button", { name: "Record" });
+  const app = await openTab(profileB, "app");
+  const records = (dashboard: Page) => dashboard.getByRole("button", { name: "Record" });
   await expect(remoteTab(inA, app.url()).getByRole("button", { name: "Record" })).toBeVisible();
 
   const local = remoteTab(inB, app.url(), "Chrome — Profile B (Local)");
@@ -181,9 +168,11 @@ test("neither profile lists RECnRun's own pages, such as its pairing tab", async
   profileB,
 }) => {
   await pair(profileA, profileB);
-  const { site, dashboard } = await dashboardIn(profileA);
-  const app = await openInB(profileB, "app");
+  const { dashboard } = await dashboardIn(profileA);
+  const app = await openTab(profileB, "app");
+  const local = await openTab(profileA, "local");
   await expect(remoteTab(dashboard, app.url())).toBeVisible();
-  await expect(remoteTab(dashboard, site.url(), LOCAL)).toBeVisible();
+  await expect(remoteTab(dashboard, local.url(), LOCAL)).toBeVisible();
   await expect(dashboard.getByText("RECnRun pairing")).toHaveCount(0);
+  await expect(dashboard.getByText(dashboard.url())).toHaveCount(0);
 });

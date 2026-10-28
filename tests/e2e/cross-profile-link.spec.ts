@@ -1,7 +1,6 @@
 import { expect } from "./fixtures/extension.ts";
-import { framesOf, pair, test } from "./fixtures/profiles.ts";
+import { dashboardIn, framesOf, pair, test } from "./fixtures/profiles.ts";
 import type { Profile } from "./fixtures/profiles.ts";
-import { dashboardOf } from "./fixtures/session.ts";
 
 interface ChromeGlobal {
   chrome: {
@@ -141,9 +140,7 @@ test("a profile that disconnects tells the other, whose dashboard says so instea
   profileB,
 }) => {
   await pair(profileA, profileB);
-  const site = await profileB.context.newPage();
-  await site.goto("/");
-  const dashboard = dashboardOf(site);
+  const dashboard = await dashboardIn(profileB);
   const heading = (state: string) =>
     dashboard.getByRole("heading", { name: `Chrome — Profile A (${state})` });
   await expect(heading("Connected")).toBeVisible();

@@ -4,8 +4,8 @@ import { join } from "node:path";
 import { expect } from "./fixtures/extension.ts";
 import { test } from "./fixtures/native-dialogs.ts";
 import type { Native } from "./fixtures/native-dialogs.ts";
+import { dashboardIn } from "./fixtures/profiles.ts";
 import type { Profile } from "./fixtures/profiles.ts";
-import { dashboardOf } from "./fixtures/session.ts";
 
 /*
  * Both profiles choose one real folder on the container's disk through Chrome's own picker
@@ -134,11 +134,9 @@ test("a restarted profile allows the folder once more, keeps it with no page ope
   await expect(folderSection(page)).not.toContainText("Chrome asks again");
 });
 
-/** Chooses the folder from a site tab's dashboard, through the window the banner opens. */
+/** Chooses the folder from a dashboard tab, through the window the banner opens. */
 async function chooseFromDashboard(profile: Profile, native: Native) {
-  const site = await profile.context.newPage();
-  await site.goto("/");
-  const dashboard = dashboardOf(site);
+  const dashboard = await dashboardIn(profile);
   await expect(dashboard.getByRole("heading", { name: "Choose the RECnRun folder" })).toBeVisible();
   const opened = profile.context.waitForEvent("page");
   await dashboard.getByRole("button", { name: "Choose folder" }).click();

@@ -6,7 +6,7 @@ import type { PeerServices } from "@/views/remote-peer";
 import { memoryRecordingStore } from "./fake-extension";
 import { fakePeerClient, statusOf } from "./fake-peer-client";
 import { fakeTabs } from "./fake-tabs";
-import { alertText } from "./framed-dashboard";
+import { alertText } from "./dashboard-page";
 import { button } from "./queries";
 
 /** The dashboard's folder banner and pairing controls, as Alice's status has them. */

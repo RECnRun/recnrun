@@ -38,7 +38,7 @@ export async function folderAccess(
   return state === "granted" ? "granted" : "prompt";
 }
 
-/** Asks the user for the folder; only a top-level page may, so the framed dashboard cannot. */
+/** Asks the user for the folder; only a top-level page may. */
 export async function pickFolder(page: Window = window): Promise<FileSystemDirectoryHandle> {
   const { showDirectoryPicker } = page as unknown as PickerWindow;
   if (!showDirectoryPicker) throw new Error("This browser cannot share a folder with a page.");

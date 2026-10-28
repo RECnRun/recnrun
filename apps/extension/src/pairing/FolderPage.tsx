@@ -33,8 +33,8 @@ function useWait(status: PeerStatus | undefined, close: () => void) {
 }
 
 /**
- * The window the dashboard opens, since a framed page cannot show Chrome's folder picker or its
- * prompt: one click grants the folder and pairing starts. Chrome keeps the grant only while a
+ * The window the dashboard opens for Chrome's folder picker or its prompt: one click grants the
+ * folder and pairing starts. Chrome keeps the grant only while a
  * page of the extension is open, so the window waits and closes itself once the profiles pair.
  */
 export function FolderPage({

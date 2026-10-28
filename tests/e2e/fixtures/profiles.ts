@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect } from "./extension.ts";
+import { dashboardUrl } from "./tabs.ts";
 
 const extensionPath = fileURLToPath(
   new URL("../../../apps/extension/.output/chrome-mv3-test", import.meta.url),
@@ -121,3 +122,10 @@ interface PeerGlobal {
 /** Every frame the profile's background sent or received over the link, in the test build. */
 export const framesOf = (profile: Profile): Promise<string[]> =>
   profile.serviceWorker.evaluate(() => (globalThis as unknown as PeerGlobal).recnrunPeerFrames);
+
+/** A dashboard tab of its own in a profile, beside the one RECnRun opened as it was installed. */
+export async function dashboardIn(profile: Profile): Promise<Page> {
+  const dashboard = await profile.context.newPage();
+  await dashboard.goto(dashboardUrl(profile.serviceWorker));
+  return dashboard;
+}
