@@ -8,7 +8,7 @@ Plan: [poc-incognito-sessions-plan.md](poc-incognito-sessions-plan.md). Assignme
 | Branch               | `poc/incognito-sessions`                                         |
 | Planned base         | `44c154da29860c7a8df829e902b177df5ce2ba2a` (2026-10-28)          |
 | Actual base (P0.1)   | `44c154d` (re-resolved 2026-10-28, unchanged)                    |
-| Last recorded commit | `94e80cb`                                                        |
+| Last recorded commit | `b4ffcfe`                                                        |
 | Decisions OD-1…OD-4  | defaults of plan §3, accepted by the user ("Avance", 2026-10-28) |
 
 ## Status legend
@@ -64,7 +64,11 @@ Stage 0 verify: first run exit 1 — P0.3's server took port 5191, which `dashbo
   green: same command → 27 files, 115 tests passed
   commit: 94e80cb Add Incognito window primitives and the managed window repository
   notes: `vp check`, `vp run deps`, `vp run dead-code` pass; `fakeBrowser.windows.create` opens no tab, so `tests/fake-windows.ts` adds one; the tracker also marks the window closed on `runtime.onStartup` (Chrome reuses window ids after a restart); not exercised in a real browser (S1.6)
-- [ ] S1.3 Workspace commands, `OWN_PAGE` routes, single-operation lock, stale `windowIds` refusal
+- [i] S1.3 Workspace commands, `OWN_PAGE` routes, single-operation lock, stale `windowIds` refusal
+  red: `vp run test:unit` → 9 failed in `apps/extension/tests/workspace-routes.test.ts` against stub commands with no lock, target rule, or foreign-set check, e.g. `refuses a second operation while one runs: expected { access: true, foreign: [], …(1) } to match object { busy: true }`, `refuses when the windows changed …: expected { ok: true, result: undefined } to deeply equal { ok: false, …(1) }`, `refuses browser-internal and unparsable targets …: expected { ok: true, result: undefined } to deeply equal { ok: false, …(1) }`
+  green: same command → 28 files, 126 tests passed
+  commit: b4ffcfe Add Incognito workspace commands behind a single operation lock
+  notes: `vp check`, `vp run deps`, `dead-code`, `duplication` (0 clones), `test:extension-manifest` (6 pass, no permission added), `test:coverage` (per-file floor met; `commands.ts` 100/92.85/100/100, `windows.ts` 100/100/95.45/100) pass; `incognito.spec.ts` 5 passed; throwaway Docker probe (deleted) drove the real commands from `dashboard.html`: internal URL refused, foreign window blocks Start, stale `windowIds` refused, close-and-start closed the foreign window and opened the managed one on the target in 68 ms while a concurrent Start got busy, user closing the managed window → `closed`, next Start → generation 2; `extension.md` rule change loaded by Codex (`codex exec --ephemeral -s read-only`). Start also requires "Allow in Incognito"; an open managed window blocks both commands (closing it is left to the switch operations)
 - [ ] S1.4 Dashboard: access requirement, blockers + "Close these windows and start", Start, "Use this tab's address"
 - [ ] S1.5 Record only the managed tab; existing e2e and product docs updated
 - [ ] S1.6 E2E reset experiment (six sentinel kinds, normal profile unchanged, repository readable) + negative control (foreign window keeps data, dashboard blocks)
