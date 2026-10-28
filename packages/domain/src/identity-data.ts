@@ -11,6 +11,13 @@ export const SiteCookieSchema = v.object({
   httpOnly: v.boolean(),
   sameSite: v.picklist(["no_restriction", "lax", "strict", "unspecified"]),
   expirationDate: v.optional(v.number()),
+  /** Present only on a partitioned (CHIPS) cookie. */
+  partitionKey: v.optional(
+    v.object({
+      topLevelSite: v.optional(v.string()),
+      hasCrossSiteAncestor: v.optional(v.boolean()),
+    }),
+  ),
 });
 
 export type SiteCookie = v.InferOutput<typeof SiteCookieSchema>;

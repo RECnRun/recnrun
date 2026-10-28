@@ -39,7 +39,7 @@ export function classifyIncognitoWindows<W extends IncognitoWindowShape>(
 }
 
 // The scheme is checked on the raw text, so leading spaces the URL parser would strip are refused.
-const TargetUrlSchema = v.pipe(v.string(), v.url(), v.regex(/^https?:\/\//i));
+export const TargetUrlSchema = v.pipe(v.string(), v.url(), v.regex(/^https?:\/\//i));
 
 /** Only web pages may be recorded or run; browser-internal pages are temporary workspace pages. */
 export function isAllowedTarget(url: string): boolean {

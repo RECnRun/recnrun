@@ -23,3 +23,8 @@ export {
   type SiteCookie,
 } from "./identity-data.ts";
 export { WorkspaceOperationSchema, type WorkspaceOperation } from "./workspace-operation.ts";
+export {
+  IDENTITY_CAPTURE_VERSION,
+  IdentityCaptureSchema,
+  type IdentityCapture,
+} from "./identity-capture.ts";

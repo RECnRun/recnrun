@@ -31,6 +31,17 @@ test("accepts host-only, domain, session, and lasting cookies with every attribu
   ).toEqual({ ...session, sameSite: "no_restriction", secure: true });
 });
 
+test("keeps a partitioned cookie's partition key", () => {
+  const partitioned = {
+    ...session,
+    secure: true,
+    sameSite: "no_restriction" as const,
+    partitionKey: { topLevelSite: "http://app.localhost", hasCrossSiteAncestor: false },
+  };
+  expect(v.parse(SiteCookieSchema, partitioned)).toEqual(partitioned);
+  expect(v.is(SiteCookieSchema, { ...partitioned, partitionKey: { topLevelSite: 1 } })).toBe(false);
+});
+
 test("rejects a cookie without a path from the root, a known SameSite, or a numeric expiry", () => {
   for (const cookie of [
     { ...session, path: "app" },
