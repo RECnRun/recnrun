@@ -8,3 +8,10 @@ export {
   type RecordingSession,
 } from "./recording-session.ts";
 export { emptySnapshot, SnapshotSchema, type Snapshot } from "./snapshot.ts";
+export {
+  classifyIncognitoWindows,
+  isAllowedTarget,
+  ManagedWindowStateSchema,
+  type IncognitoWindowShape,
+  type ManagedWindowState,
+} from "./managed-window.ts";
