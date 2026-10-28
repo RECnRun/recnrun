@@ -46,7 +46,6 @@ function memoryFolder() {
     access: vi.fn(async (): Promise<FolderAccess> => "granted"),
     waiting: vi.fn(async () => false),
     paused: async () => [...paused],
-    present: vi.fn(async (): Promise<string[]> => []),
     start: vi.fn(async () => {}),
     pause: vi.fn(async (id: string) => void paused.add(id)),
     unpause: vi.fn(async (id: string) => void paused.delete(id)),

@@ -33,8 +33,6 @@ export interface PeerRequestDependencies {
     access: () => Promise<FolderAccess>;
     waiting: () => Promise<boolean>;
     paused: () => Promise<string[]>;
-    /** The other profiles in the folder, as it last looked. */
-    present: () => Promise<string[]>;
     start: () => Promise<void>;
     pause: (peer: string) => Promise<void>;
     unpause: (peer: string) => Promise<void>;
@@ -105,13 +103,12 @@ async function entry(deps: Deps, peer: AuthorizedPeer) {
 }
 
 async function status(deps: Deps) {
-  const [identity, authorized, controller, local, paused, present] = await Promise.all([
+  const [identity, authorized, controller, local, paused] = await Promise.all([
     deps.identity(),
     deps.authorized.all(),
     deps.controller.read(),
     deps.localSession.read(),
     deps.folder.paused(),
-    deps.folder.present(),
   ]);
   const peers = await Promise.all(Object.values(authorized).map((peer) => entry(deps, peer)));
   // Without the link the peer cannot stop it, so this profile's user gets the controls back.
@@ -122,12 +119,7 @@ async function status(deps: Deps) {
   // A folder the offscreen document cannot read is one the user has to choose again.
   const folder = await deps.folder.access().catch((): FolderAccess => "none");
   const folderPairing = await deps.folder.waiting();
-  const done = [
-    ...paused,
-    ...peers.filter(({ link }) => link.verified).map(({ peer }) => peer.profileId),
-  ];
-  const unpaired = present.filter((id) => !done.includes(id));
-  return { identity, peers, controlledBy, paused, folder, folderPairing, unpaired };
+  return { identity, peers, controlledBy, paused, folder, folderPairing };
 }
 
 /** Tells a verified peer the close is intended, so it does not report a failure, then closes. */

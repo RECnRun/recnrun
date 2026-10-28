@@ -194,7 +194,6 @@ function folderPairing(
     link,
     acted,
     state,
-    present: memoryRepository<string[]>(),
     log,
     now: () => NOW,
   });

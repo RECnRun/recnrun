@@ -25,7 +25,6 @@ export function statusOf(state?: Link["state"], verified = state === "connected"
     paused: [],
     folder: "granted",
     folderPairing: false,
-    unpaired: [],
   };
 }
 

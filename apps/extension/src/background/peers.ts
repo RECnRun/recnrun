@@ -22,7 +22,6 @@ import {
   authorizedPeersRepository,
   folderActedRepository,
   folderPairingRepository,
-  folderPresentRepository,
   identityRepository,
   meshMembersRepository,
   peerLinksRepository,
@@ -261,7 +260,6 @@ function requestDependencies(
         v.parse(FolderStatusSchema, await askLink({ type: "folder-status" })).access,
       waiting: async () => (await folderPairingRepository.read()) !== null,
       paused: folder.paused,
-      present: async () => (await folderPresentRepository.read()) ?? [],
       start: () => folder.start().then(notifyPages),
       pause: folder.pause,
       unpause: (peer) => folder.unpause(peer).then(viaMesh).then(notifyPages),
@@ -287,11 +285,6 @@ function createPairingFlows(channel: PeerChannel): PairingFlows {
     link: peerLinksRepository,
     acted: folderActedRepository,
     state: folderPairingRepository,
-    // A page waiting in the folder closes once nobody there is left to pair with.
-    present: {
-      read: folderPresentRepository.read,
-      write: (ids) => folderPresentRepository.write(ids).then(notifyPages),
-    },
     log,
   });
   const mesh = createMeshPairing({

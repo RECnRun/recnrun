@@ -6,7 +6,6 @@ import {
   authorizedPeersRepository,
   folderActedRepository,
   folderPairingRepository,
-  folderPresentRepository,
   identityRepository,
   peerLinksRepository,
   pendingOffersRepository,
@@ -266,10 +265,9 @@ describe("the folder", () => {
     expect(link.commands.at(-1)).toEqual({ type: "close", peer: PEER });
     await routes.link(sighting);
     expect(offers()).toBe(0);
-    // The sighting tells the pages who is in the folder, and Reconnect tells them too.
-    expect(await folderPresentRepository.read()).toEqual([PEER]);
+    // Pairing and Reconnect tell the pages; a sighting alone does not.
     await routes.request({ type: "reconnect", peer: PEER });
-    expect(link.notices).toHaveLength(3);
+    expect(link.notices).toHaveLength(2);
     await routes.link(sighting);
     expect(offers()).toBe(1);
   });

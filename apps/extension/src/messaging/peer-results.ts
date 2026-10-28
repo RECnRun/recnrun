@@ -56,7 +56,6 @@ export const PeerStatusSchema = v.object({
   /** Whether this profile waits in the folder to pair, or to reconnect with its peers. */
   folderPairing: v.boolean(),
   /** The profiles in the folder, as this one last looked, that it has no link with nor paused. */
-  unpaired: v.array(ProfileIdSchema),
 });
 
 export type PeerStatus = v.InferOutput<typeof PeerStatusSchema>;

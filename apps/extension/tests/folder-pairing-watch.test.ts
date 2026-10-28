@@ -15,7 +15,6 @@ const at = (profileId: string): Presence => ({
 /** Folder pairing as ME, waiting unless `state` is null, whose steps all fail. */
 function watching(state: FolderPairing | null = {}) {
   const askLink = vi.fn(async (_command: unknown): Promise<unknown> => undefined);
-  const present = memoryRepository<string[]>();
   const failing = vi.fn(async (_code: string): Promise<{ code: string }> => {
     throw new Error("No link here.");
   });
@@ -28,27 +27,10 @@ function watching(state: FolderPairing | null = {}) {
     link: memoryRecords(),
     acted: memoryRecords(),
     state: memoryRepository(state),
-    present,
     log,
   });
-  return { flow, present, failing, log, askLink };
+  return { flow, failing, log, askLink };
 }
-
-test("keeps the profiles each sighting finds in the folder, writing only a change", async () => {
-  const { flow, present } = watching();
-  await flow.seen({ presences: [at(STRANGER), at(PEER)], signals: [] });
-  expect(await present.read()).toEqual([PEER, STRANGER].sort());
-  await flow.seen({ presences: [at(PEER), at(STRANGER)], signals: [] });
-  expect(present.write).toHaveBeenCalledOnce();
-  await flow.seen({ presences: [], signals: [] });
-  expect(await present.read()).toEqual([]);
-});
-
-test("keeps nothing while not waiting in the folder", async () => {
-  const { flow, present } = watching(null);
-  await flow.seen({ presences: [at(PEER)], signals: [] });
-  expect(present.write).not.toHaveBeenCalled();
-});
 
 test("logs a step that fails, and handles the next sighting", async () => {
   const { flow, failing, log } = watching();
