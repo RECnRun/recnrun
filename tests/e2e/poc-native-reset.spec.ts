@@ -135,7 +135,8 @@ test("another Incognito window keeps the workspace's data, so the dashboard offe
   const panel = workspacePanel(site);
   await expect(panel).toContainText("1 Incognito window is open");
   await expect(panel).toContainText("Close the other Incognito windows yourself");
-  await expect(panel.getByRole("button")).toHaveCount(0);
+  // New identity stays in view, disabled, beside the conflict that explains why.
+  await expect(panel.getByRole("button", { disabled: false })).toHaveCount(0);
   await site.screenshot({ path: test.info().outputPath("blocked.png") });
 
   // What the dashboard refuses to do: close only the managed window while the other one lives.
