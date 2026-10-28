@@ -44,3 +44,11 @@ export function buildAccess(mode: string, pocHosts = ""): BuildAccess {
     message_serialization: "structured_clone",
   };
 }
+
+/** Entrypoints only the POC registers; a published build lacks `scripting` to ever run them. */
+const POC_ENTRYPOINTS = new Set(["origin-agent"]);
+
+/** Whether a build of `mode` leaves the entrypoint `name` out. */
+export function skipsEntrypoint(mode: string, name: string): boolean {
+  return !POC_MODES.has(mode) && POC_ENTRYPOINTS.has(name);
+}

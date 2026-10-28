@@ -141,6 +141,19 @@ module.exports = {
       to: { path: ["^apps/extension/src/storage/", "node_modules/wxt/.*storage"] },
     },
     {
+      name: "extension-origin-agent-isolated",
+      severity: "error",
+      comment:
+        "The origin agent runs in site pages and writes only that site's storage; it reaches the extension only through its port.",
+      from: { path: "^apps/extension/src/origin/" },
+      to: {
+        path: [
+          "^apps/extension/src/(background|content|dashboard|pip|session|storage|tabs|views)/",
+          "node_modules/wxt/.*storage",
+        ],
+      },
+    },
+    {
       name: "extension-dashboard-isolated",
       severity: "error",
       comment: "The dashboard starts a session through the background, never through its page.",

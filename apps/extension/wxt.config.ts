@@ -2,7 +2,7 @@ import { fileURLToPath } from "node:url";
 import preact from "@preact/preset-vite";
 import { defineConfig } from "wxt";
 import { contentScriptMatches } from "./src/config/origins.ts";
-import { buildAccess } from "./src/config/permissions.ts";
+import { buildAccess, skipsEntrypoint } from "./src/config/permissions.ts";
 
 const chromiumProfile = fileURLToPath(new URL("./.wxt/chrome-data", import.meta.url));
 
@@ -18,6 +18,11 @@ export default defineConfig({
     keepProfileChanges: true,
   },
   hooks: {
+    "entrypoints:resolved": (wxt, entrypoints) => {
+      for (const entrypoint of entrypoints) {
+        if (skipsEntrypoint(wxt.config.mode, entrypoint.name)) entrypoint.skipped = true;
+      }
+    },
     "server:started": async () => {
       // Chrome protects this preference on macOS and Windows; let Chrome save it itself.
       const { prepareDevChrome } = await import("./scripts/dev-chrome.ts");

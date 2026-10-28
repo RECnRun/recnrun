@@ -15,3 +15,4 @@ export {
   type IncognitoWindowShape,
   type ManagedWindowState,
 } from "./managed-window.ts";
+export { OriginDataSchema, type OriginData } from "./origin-data.ts";

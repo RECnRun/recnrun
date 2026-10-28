@@ -1,5 +1,6 @@
 /** Why a workspace operation stopped; the name tells cases apart, the message is for the user. */
 type WorkspaceErrorName =
+  | "AgentDisconnected"
   | "BarrierCollision"
   | "BarrierNotInstalled"
   | "BarrierNotRemoved"
@@ -7,6 +8,8 @@ type WorkspaceErrorName =
   | "IncognitoWindowsOpen"
   | "NoManagedWindow"
   | "RecordingInProgress"
+  | "RestoreFailed"
+  | "RestoreTimedOut"
   | "TargetNotAllowed"
   | "WindowNotCreated"
   | "WindowsChanged"

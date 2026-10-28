@@ -95,3 +95,11 @@ await test("the test build adds exactly the Incognito workspace POC permissions"
 await test("the production build keeps the default JSON messaging", () => {
   assert.equal(productionManifest().message_serialization, undefined);
 });
+
+await test("only the test build ships the origin agent, registered at run time", () => {
+  const agent = "content-scripts/origin-agent.js";
+  assert.ok(existsSync(new URL(`../.output/chrome-mv3-test/${agent}`, import.meta.url)), agent);
+  assert.ok(!existsSync(new URL(`../.output/chrome-mv3/${agent}`, import.meta.url)), agent);
+  const declared = testManifest().content_scripts.flatMap((script) => script.js);
+  assert.ok(!declared.includes(agent), "The origin agent is not a manifest content script.");
+});
