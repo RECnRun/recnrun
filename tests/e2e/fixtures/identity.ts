@@ -25,6 +25,8 @@ interface CaptureSummary {
   sessionStorage: number;
   databases: number;
   records: number;
+  caches: number;
+  cacheEntries: number;
   cookies: number;
   unsupported: number;
   ms: number;

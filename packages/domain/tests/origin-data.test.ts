@@ -36,6 +36,21 @@ const data: OriginData = {
       ],
     },
   ],
+  caches: [
+    {
+      name: "v1",
+      entries: [
+        {
+          request: { url: "http://app.localhost/a", method: "GET", headers: [["accept", "*/*"]] },
+          response: { status: 200, statusText: "OK", headers: [], body: bytes.buffer },
+        },
+        {
+          request: { url: "http://app.localhost/b", method: "GET", headers: [] },
+          response: { status: 204, statusText: "", headers: [], body: null },
+        },
+      ],
+    },
+  ],
 };
 
 test("accepts Web Storage entries and IndexedDB stores with any record value", () => {
@@ -93,4 +108,16 @@ test("rejects a database without a positive integer version or a store without i
   expect(
     v.is(OriginDataSchema, { ...data, indexedDB: [{ ...database, stores: [unvalued] }] }),
   ).toBe(false);
+});
+
+test("keeps each cache's entries, bodies as ArrayBuffers, and defaults to no cache at all", () => {
+  const parsed = v.parse(OriginDataSchema, data);
+  expect(parsed.caches[0]?.entries[0]?.response.body).toBe(bytes.buffer);
+  const { caches: _caches, ...older } = data;
+  expect(v.parse(OriginDataSchema, older).caches).toEqual([]);
+  const [entry] = data.caches[0]?.entries ?? [];
+  const opaque = { ...entry, response: { ...entry?.response, status: 0 } };
+  expect(v.is(OriginDataSchema, { ...data, caches: [{ name: "v1", entries: [opaque] }] })).toBe(
+    false,
+  );
 });

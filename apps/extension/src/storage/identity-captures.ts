@@ -4,14 +4,12 @@ import * as v from "valibot";
 
 type Origin = IdentityCapture["origins"][number];
 type StoreRecord = Origin["indexedDB"][number]["stores"][number]["records"][number];
+type Cache = Origin["caches"][number];
 
-/** The records of one object store, written as one part of a capture. */
-export interface CapturePart {
-  origin: string;
-  database: string;
-  store: string;
-  records: StoreRecord[];
-}
+/** One part of a capture: the records of one object store, or one whole cache. */
+export type CapturePart =
+  | { origin: string; database: string; store: string; records: StoreRecord[] }
+  | { origin: string; cache: Cache };
 
 const DATABASE = "recnrun-identity-captures";
 const CAPTURES = "captures";
@@ -21,16 +19,22 @@ const BY_CAPTURE = "byCapture";
 const BY_IDENTITY = "byIdentity";
 const EVERY_STORE = [CAPTURES, PARTS, POINTERS];
 
-const PartRowSchema = v.object({
+const RecordsRowSchema = v.object({
   captureId: v.string(),
   origin: v.string(),
   database: v.string(),
   store: v.string(),
   records: v.array(v.unknown()),
 });
+const CacheRowSchema = v.object({
+  captureId: v.string(),
+  origin: v.string(),
+  cache: v.object({ name: v.string(), entries: v.array(v.unknown()) }),
+});
+const PartRowSchema = v.union([RecordsRowSchema, CacheRowSchema]);
 const PointerSchema = v.object({ identityId: v.string(), captureId: v.string() });
 
-type PartRow = v.InferOutput<typeof PartRowSchema>;
+type RecordsRow = v.InferOutput<typeof RecordsRowSchema>;
 
 /** A refused repository call; the message names no stored value. */
 class CaptureStoreError extends Error {
@@ -93,24 +97,38 @@ function transact<T>(
   });
 }
 
-function storeOf(origins: Origin[], part: PartRow) {
-  return origins
-    .find(({ origin }) => origin === part.origin)
-    ?.indexedDB.find(({ name }) => name === part.database)
+function storeOf(origin: Origin | undefined, part: RecordsRow) {
+  return origin?.indexedDB
+    .find(({ name }) => name === part.database)
     ?.stores.find(({ name }) => name === part.store);
 }
 
-/** The header with every part's records appended to its store, in the order they were written. */
-function assemble(header: IdentityCapture, parts: unknown[]): IdentityCapture {
-  const origins = header.origins.map((origin) => ({
+/** Copies every list a part may append to, so assembling never changes the stored header. */
+function copyOrigin(origin: Origin): Origin {
+  return {
     ...origin,
     indexedDB: origin.indexedDB.map((database) => ({
       ...database,
       stores: database.stores.map((store) => ({ ...store, records: [...store.records] })),
     })),
-  }));
+    caches: [...origin.caches],
+  };
+}
+
+/**
+ * The header with every part appended in the order it was written: records to their store, caches
+ * to their origin. The whole capture is validated after.
+ */
+function assemble(header: IdentityCapture, parts: unknown[]): IdentityCapture {
+  const origins = header.origins.map(copyOrigin);
   for (const part of parts.map((row) => parsed(PartRowSchema, row))) {
-    const store = storeOf(origins, part);
+    const origin = origins.find(({ origin: name }) => name === part.origin);
+    if ("cache" in part) {
+      if (!origin) throw new CaptureStoreError("A part names an origin its capture lacks.");
+      origin.caches.push(part.cache as Cache);
+      continue;
+    }
+    const store = storeOf(origin, part);
     if (!store) throw new CaptureStoreError("A part names a store its capture lacks.");
     for (const record of part.records) store.records.push(record as StoreRecord);
   }
@@ -223,7 +241,7 @@ export function createIdentityCaptures(factory: IDBFactory) {
       const valid = validHeader(header, "in-progress");
       await run("readwrite", (tx) => request(tx.objectStore(CAPTURES).add(valid)));
     },
-    /** Adds one store's records to a capture in progress, in a transaction of its own. */
+    /** Adds one store's records, or one cache, to a capture in progress, in its own transaction. */
     append: (captureId: string, part: CapturePart): Promise<void> =>
       run("readwrite", async (tx) => {
         await openHeader(tx, captureId);

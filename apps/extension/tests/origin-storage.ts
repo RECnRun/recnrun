@@ -13,6 +13,11 @@ export async function clearDatabases(): Promise<void> {
   }
 }
 
+/** Deletes this page's caches, for the same reason. */
+export async function clearCaches(): Promise<void> {
+  for (const name of await caches.keys()) await caches.delete(name);
+}
+
 /** Every record of a store as `[key, value]`, with the database's version and the store's shape and indexes. */
 export async function readStore(database: string, store: string) {
   const connection = await settled(indexedDB.open(database));

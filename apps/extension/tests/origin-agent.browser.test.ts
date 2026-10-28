@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, expect, test, vi } from "vite-plus/test";
 import { ORIGIN_AGENT_PORT } from "@/messaging/origin-protocol";
 import { runOriginAgent, startOriginAgent } from "@/origin/agent";
+import type { OriginStores } from "@/origin/restore";
 import { fakePort } from "./fake-port";
-import { clearDatabases, entriesOf, memoryStorage, settled } from "./origin-storage";
+import { clearCaches, clearDatabases, entriesOf, memoryStorage, settled } from "./origin-storage";
 
 const port = vi.hoisted(() => ({ current: undefined as ReturnType<typeof fakePort> | undefined }));
 const browser = vi.hoisted(() => ({ runtime: { connect: vi.fn() } }));
@@ -10,12 +11,25 @@ const browser = vi.hoisted(() => ({ runtime: { connect: vi.fn() } }));
 vi.mock("wxt/browser", () => ({ browser }));
 
 const operation = { operationId: "op-1", generation: 2 };
-const payload = { localStorage: { token: "secret-1" }, sessionStorage: {}, indexedDB: [] };
+const payload = {
+  localStorage: { token: "secret-1" },
+  sessionStorage: {},
+  indexedDB: [],
+  caches: [],
+};
 const restore = { type: "restore", ...operation, payload };
 const probe = { type: "probe", ...operation, probe: new Date(0) };
 const echo = { ...probe, type: "probe-echo" };
+const NONE = {
+  localStorage: 0,
+  sessionStorage: 0,
+  databases: 0,
+  records: 0,
+  caches: 0,
+  cacheEntries: 0,
+};
 
-let stores: { localStorage: Storage; sessionStorage: Storage; indexedDB: IDBFactory };
+let stores: OriginStores;
 
 function started() {
   startOriginAgent();
@@ -34,7 +48,8 @@ function linked() {
 
 beforeEach(async () => {
   await clearDatabases();
-  stores = { localStorage: memoryStorage(), sessionStorage: memoryStorage(), indexedDB };
+  await clearCaches();
+  stores = { localStorage: memoryStorage(), sessionStorage: memoryStorage(), indexedDB, caches };
   browser.runtime.connect.mockImplementation(() => {
     port.current = fakePort();
     return port.current;
@@ -98,7 +113,7 @@ test("restores the first valid command, replies restored, and ignores any later 
       {
         type: "restored",
         ...operation,
-        counts: { localStorage: 1, sessionStorage: 0, databases: 0, records: 0 },
+        counts: { ...NONE, localStorage: 1 },
       },
     ]);
   expect(entriesOf(stores.localStorage)).toEqual(payload.localStorage);
@@ -178,10 +193,53 @@ test("captures on a capture command: Web Storage, each schema, its records in ch
       {
         type: "captured",
         ...operation,
-        counts: { localStorage: 1, sessionStorage: 1, databases: 1, records: 3 },
+        counts: { ...NONE, localStorage: 1, sessionStorage: 1, databases: 1, records: 3 },
       },
     ]);
   expect(agent.onMessage.listeners.size).toBe(0);
+});
+
+test("captures each cache after IndexedDB, one message per cache", async () => {
+  const v1 = await caches.open("v1");
+  await v1.put("/a", new Response("a", { status: 201, statusText: "Made" }));
+  const agent = linked();
+  agent.onMessage.emit(capture);
+  const entry = {
+    request: { url: `${location.origin}/a`, method: "GET", headers: [] },
+    response: {
+      status: 201,
+      statusText: "Made",
+      headers: [["content-type", "text/plain;charset=UTF-8"]],
+      body: new TextEncoder().encode("a").buffer,
+    },
+  };
+  await expect
+    .poll(() => agent.posted.slice(2))
+    .toEqual([
+      {
+        type: "capture-cache",
+        ...operation,
+        cache: { name: "v1", entries: [entry] },
+        unsupported: [],
+      },
+      { type: "captured", ...operation, counts: { ...NONE, caches: 1, cacheEntries: 1 } },
+    ]);
+});
+
+test("outside a secure context the agent has no Cache Storage and captures no cache", async () => {
+  await caches.open("v1");
+  vi.stubGlobal("isSecureContext", false);
+  const agent = started();
+  agent.onMessage.emit(probe);
+  agent.onMessage.emit(capture);
+  // The page's real Web Storage holds the runner's own keys; only the cache counts matter here.
+  await expect
+    .poll(() => agent.posted.at(-1))
+    .toMatchObject({ type: "captured", counts: { caches: 0, cacheEntries: 0 } });
+  expect(agent.posted.map((reply) => (reply as { type: string }).type)).not.toContain(
+    "capture-cache",
+  );
+  vi.unstubAllGlobals();
 });
 
 test("a capture that fails replies failed with the step and an error name", async () => {

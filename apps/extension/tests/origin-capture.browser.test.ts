@@ -69,6 +69,7 @@ const emptyStores = () => ({
   localStorage: memoryStorage(),
   sessionStorage: memoryStorage(),
   indexedDB,
+  caches: undefined,
 });
 
 /** Runs a capture and rebuilds its storage and databases from the messages it sent, in their order. */
@@ -86,6 +87,7 @@ async function captured(chunk: number, stores = emptyStores()) {
         target?.stores.find(({ name }) => name === store)?.records.push(...records);
         pages.push({ store, size: records.length });
       },
+      cache: vi.fn(),
     },
     chunk,
   );
@@ -111,7 +113,14 @@ test("captures every database's version, stores, key paths, indexes, and records
   await createShop();
   const close = vi.spyOn(IDBDatabase.prototype, "close");
   const { counts, databases } = await captured(500);
-  expect(counts).toEqual({ localStorage: 0, sessionStorage: 0, databases: 2, records: 11 });
+  expect(counts).toEqual({
+    localStorage: 0,
+    sessionStorage: 0,
+    databases: 2,
+    records: 11,
+    caches: 0,
+    cacheEntries: 0,
+  });
   expect(close).toHaveBeenCalledTimes(2);
 
   const blank = databases.find(({ name }) => name === "blank");
@@ -172,7 +181,7 @@ test("a captured origin restores into an empty one as it was, its schema and key
   const { databases } = await captured(2);
   await clearDatabases();
 
-  const site = { localStorage: {}, sessionStorage: {}, indexedDB: databases };
+  const site = { localStorage: {}, sessionStorage: {}, indexedDB: databases, caches: [] };
   await expect(restoreOrigin(emptyStores(), site)).resolves.toMatchObject({
     databases: 2,
     records: 11,
@@ -203,13 +212,14 @@ test("after the highest generated key was deleted, the restored generator contin
     localStorage: {},
     sessionStorage: {},
     indexedDB: databases,
+    caches: [],
   });
   await expect(nextKey()).resolves.toBe(3);
 });
 
 test("a database that vanished before it opened fails the capture and is not created", async () => {
   vi.spyOn(indexedDB, "databases").mockResolvedValue([{ name: "ghost", version: 1 }]);
-  const sink = { storage: vi.fn(), database: vi.fn(), records: vi.fn() };
+  const sink = { storage: vi.fn(), database: vi.fn(), records: vi.fn(), cache: vi.fn() };
   await expect(captureOrigin(emptyStores(), sink, 500)).rejects.toMatchObject({
     name: "OriginFailure",
     message: "indexedDB: AbortError",
@@ -220,12 +230,14 @@ test("a database that vanished before it opened fails the capture and is not cre
 });
 
 test("an origin without data captures nothing", async () => {
-  const sink = { storage: vi.fn(), database: vi.fn(), records: vi.fn() };
+  const sink = { storage: vi.fn(), database: vi.fn(), records: vi.fn(), cache: vi.fn() };
   await expect(captureOrigin(emptyStores(), sink, 500)).resolves.toEqual({
     localStorage: 0,
     sessionStorage: 0,
     databases: 0,
     records: 0,
+    caches: 0,
+    cacheEntries: 0,
   });
   expect(sink.storage).toHaveBeenCalledExactlyOnceWith({ localStorage: {}, sessionStorage: {} });
   expect(sink.database).not.toHaveBeenCalled();

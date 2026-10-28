@@ -46,13 +46,24 @@ export type OriginCommand = v.InferOutput<typeof OriginCommandSchema>;
 
 const DatabaseSchema = OriginDataSchema.entries.indexedDB.item;
 const StoreRecordsSchema = DatabaseSchema.entries.stores.item.entries.records;
+const CacheSchema = OriginDataSchema.entries.caches.wrapped.item;
 
-/** What a capture sent and a restore wrote: Web Storage entries, databases, and records. */
+/** A cache entry a capture met and could not keep: which one, and why, never its body. */
+const UnsupportedEntrySchema = v.object({
+  item: v.string(),
+  reason: v.pipe(v.string(), v.nonEmpty(), v.maxLength(200)),
+});
+
+export type UnsupportedEntry = v.InferOutput<typeof UnsupportedEntrySchema>;
+
+/** What a capture sent and a restore wrote: Web Storage entries, databases, records, and caches. */
 const CountsSchema = v.object({
   localStorage: CountSchema,
   sessionStorage: CountSchema,
   databases: CountSchema,
   records: CountSchema,
+  caches: CountSchema,
+  cacheEntries: CountSchema,
 });
 
 export type CapturedCounts = v.InferOutput<typeof CountsSchema>;
@@ -61,7 +72,7 @@ export type RestoredCounts = v.InferOutput<typeof CountsSchema>;
 
 /**
  * The agent's answers: the probe's echo; restore counts; a capture's Web Storage, schemas, records,
- * and counts; or a failed step and an error name, never a stored value.
+ * caches, and counts; or a failed step and an error name, never a stored value.
  */
 export const OriginReplySchema = v.variant("type", [
   v.object({ type: v.literal("probe-echo"), ...OPERATION, probe: v.unknown() }),
@@ -80,6 +91,13 @@ export const OriginReplySchema = v.variant("type", [
     database: v.string(),
     store: v.string(),
     records: StoreRecordsSchema,
+  }),
+  // One message per cache, with the entries no `Response` can rebuild named apart.
+  v.object({
+    type: v.literal("capture-cache"),
+    ...OPERATION,
+    cache: CacheSchema,
+    unsupported: v.array(UnsupportedEntrySchema),
   }),
   v.object({ type: v.literal("captured"), ...OPERATION, counts: CountsSchema }),
   v.object({

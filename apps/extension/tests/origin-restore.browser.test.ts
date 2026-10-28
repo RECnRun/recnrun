@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, test, vi } from "vite-plus/test";
 import type { OriginData } from "@recnrun/domain";
 import { restoreOrigin } from "@/origin/restore";
+import type { OriginStores } from "@/origin/restore";
 import { clearDatabases, entriesOf, memoryStorage, readStore, settled } from "./origin-storage";
 
 const avatar = new Blob(["avatar"], { type: "image/png" });
@@ -8,6 +9,7 @@ const avatar = new Blob(["avatar"], { type: "image/png" });
 const data: OriginData = {
   localStorage: { theme: "dark", token: "secret-1" },
   sessionStorage: { tab: "3" },
+  caches: [],
   indexedDB: [
     {
       name: "app",
@@ -46,11 +48,16 @@ const data: OriginData = {
   ],
 };
 
-let stores: { localStorage: Storage; sessionStorage: Storage; indexedDB: IDBFactory };
+let stores: OriginStores;
 
 beforeEach(async () => {
   await clearDatabases();
-  stores = { localStorage: memoryStorage(), sessionStorage: memoryStorage(), indexedDB };
+  stores = {
+    localStorage: memoryStorage(),
+    sessionStorage: memoryStorage(),
+    indexedDB,
+    caches: undefined,
+  };
 });
 
 afterEach(async () => {
@@ -65,6 +72,8 @@ test("restores Web Storage and IndexedDB, with versions, store shapes, and recor
     sessionStorage: 1,
     databases: 2,
     records: 4,
+    caches: 0,
+    cacheEntries: 0,
   });
   // Restoring closed its connection to each database before resolving.
   expect(close).toHaveBeenCalledTimes(2);
@@ -122,6 +131,7 @@ test("a record that cannot be stored aborts its whole transaction, and the failu
   const unkeyed: OriginData = {
     localStorage: {},
     sessionStorage: {},
+    caches: [],
     indexedDB: [
       {
         name: "app",
@@ -149,6 +159,7 @@ test("a store the database cannot create fails the restore", async () => {
   const twice: OriginData = {
     localStorage: {},
     sessionStorage: {},
+    caches: [],
     indexedDB: [
       {
         name: "app",

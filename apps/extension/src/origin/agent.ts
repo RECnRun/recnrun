@@ -53,6 +53,8 @@ function run(port: OriginPort, stores: OriginStores, command: OriginCommand): Pr
         store,
         records,
       }),
+    cache: (cache: unknown, unsupported: unknown[]) =>
+      port.postMessage({ type: "capture-cache", operationId, generation, cache, unsupported }),
   };
   return replyAfter(port, command, async () => ({
     type: "captured",
@@ -95,5 +97,7 @@ export function runOriginAgent(port: OriginPort, stores: OriginStores): void {
 /** The origin agent's content script: registered behind the barrier, or injected for a capture. */
 export function startOriginAgent(): void {
   const port = browser.runtime.connect({ name: ORIGIN_AGENT_PORT });
-  runOriginAgent(port, { localStorage, sessionStorage, indexedDB });
+  // `caches` exists only in a secure context; elsewhere naming it throws.
+  const cacheStorage = isSecureContext ? caches : undefined;
+  runOriginAgent(port, { localStorage, sessionStorage, indexedDB, caches: cacheStorage });
 }

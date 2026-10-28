@@ -7,7 +7,7 @@ import type { WorkspaceCommands } from "@/background/workspace/commands";
 
 const DATA: IdentityData = {
   cookies: [],
-  site: { localStorage: {}, sessionStorage: {}, indexedDB: [] },
+  site: { localStorage: {}, sessionStorage: {}, indexedDB: [], caches: [] },
 };
 const TIMINGS = [{ step: "window" as const, ms: 2 }];
 const SUMMARY = { captureId: "capture-1", databases: 1, records: 3, ms: 12 };

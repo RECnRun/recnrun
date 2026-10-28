@@ -91,7 +91,7 @@ export function sampleCapture(): IdentityCapture {
                   status: 200,
                   statusText: "OK",
                   headers: [["content-type", json]],
-                  body: new Uint8Array([123, 125]),
+                  body: new Uint8Array([123, 125]).buffer,
                 },
               },
             ],

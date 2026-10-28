@@ -2,6 +2,20 @@ import type { ManagedWindowState } from "@recnrun/domain";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vite-plus/test";
 import { fakeBrowser } from "wxt/testing/fake-browser";
 import { captureIdentity, chromeCaptureApi } from "@/background/workspace/capture";
+import {
+  CACHE,
+  COUNTS,
+  DATABASE,
+  LOCAL,
+  OPAQUE,
+  PART,
+  RECORDS,
+  SCHEMA,
+  SESSION,
+  STORAGE,
+  capturedWith,
+  completeReplies,
+} from "./capture-replies";
 import { chrome, memoryCaptures } from "./fake-capture";
 import { fakeCookieApi } from "./fake-cookies";
 import { fakePort } from "./fake-port";
@@ -11,13 +25,6 @@ const URL_ = `${ORIGIN}/app/`;
 const MANAGED: ManagedWindowState = { generation: 4, windowId: 9, tabId: 7, status: "active" };
 const SENDER = { tab: { id: 7 }, frameId: 0, documentId: "doc-1", origin: ORIGIN };
 const BOUND = 5_000;
-const KV = { name: "kv", keyPath: null, autoIncrement: false, indexes: [], records: [] };
-const DATABASE = { name: "app", version: 3, stores: [KV] };
-const RECORDS = [
-  { key: 1, value: { at: new Date(0), tags: new Set(["a"]) } },
-  { key: 2, value: "plain" },
-];
-
 /** The command the agent got, once it got one, with its operation. */
 async function commandOf(agent: ReturnType<typeof fakePort>) {
   await vi.waitFor(() => expect(agent.posted).toHaveLength(1));
@@ -41,17 +48,6 @@ async function captureAnswering(replies: object[], setup = chrome(), captures = 
   return { capturing, captures, ...setup };
 }
 
-const LOCAL = { theme: "dark", "": "", "ключ 🔑": "värde" };
-const SESSION = { tab: "" };
-const STORAGE = { type: "capture-storage", localStorage: LOCAL, sessionStorage: SESSION };
-const SCHEMA = { type: "capture-database", database: DATABASE };
-const PART = { type: "capture-records", database: "app", store: "kv", records: RECORDS };
-const COUNTS = { databases: 1, records: 2, localStorage: 3, sessionStorage: 1 };
-const capturedWith = (counts: Partial<typeof COUNTS>) => ({
-  type: "captured",
-  counts: { ...COUNTS, ...counts },
-});
-const completeReplies = [STORAGE, SCHEMA, PART, capturedWith({})];
 const COOKIE = { value: "abc", path: "/", secure: false, httpOnly: true, sameSite: "lax" } as const;
 const SID = { ...COOKIE, name: "sid", domain: "app.localhost", hostOnly: true, session: true };
 const SITE_SSO = { ...COOKIE, name: "sso", expirationDate: 4_102_444_800 };
@@ -78,9 +74,10 @@ describe("captureIdentity", () => {
     const summary = await capturing;
     expect(api.inject).toHaveBeenCalledExactlyOnceWith(7, "doc-1");
     expect(agent.posted[0]).toMatchObject({ type: "capture", generation: 4 });
-    expect(captures.calls).toEqual(["begin", "append", "publish"]);
+    expect(captures.calls).toEqual(["begin", "append", "append", "publish"]);
     expect(captures.parts).toEqual([
       { origin: ORIGIN, database: "app", store: "kv", records: RECORDS },
+      { origin: ORIGIN, cache: CACHE.cache },
     ]);
     const [started, complete] = captures.headers;
     expect(started).toMatchObject({ identityId: "identity-a", url: URL_, status: "in-progress" });
@@ -102,14 +99,17 @@ describe("captureIdentity", () => {
         { name: "sid", value: "abc", path: "/", secure: false, httpOnly: true, sameSite: "lax" },
         { ...SITE_SSO, host: "sso.localhost" },
       ],
-      unsupported: [{ adapter: "cookies", item: "ads on other.localhost/" }],
+      unsupported: [
+        { adapter: "cookies", item: "ads on other.localhost/" },
+        { adapter: "cacheStorage", ...OPAQUE },
+      ],
     });
     expect(complete?.adapters).toEqual([
       { adapter: "localStorage", status: "captured" },
       { adapter: "sessionStorage", status: "captured" },
       { adapter: "indexedDB", status: "captured" },
       { adapter: "cookies", status: "captured" },
-      { adapter: "cacheStorage", status: "skipped" },
+      { adapter: "cacheStorage", status: "captured" },
     ]);
     expect(complete?.valueTypes.toSorted()).toEqual(["Date", "Object", "Set", "primitive"]);
     expect(complete?.endedAt).toBeGreaterThanOrEqual(complete?.startedAt ?? Infinity);
@@ -117,7 +117,7 @@ describe("captureIdentity", () => {
       captureId: started?.id,
       ...COUNTS,
       cookies: 2,
-      unsupported: 1,
+      unsupported: 2,
     });
     expect(agent.disconnected).toBe(true);
     expect(onConnect.listeners.size).toBe(0);
@@ -169,7 +169,7 @@ describe("a failed capture", () => {
       name: "CookiesNotCaptured",
       message: "Chrome did not list the workspace's cookies.",
     });
-    expect(captures.calls).toEqual(["begin", "append", "discard"]);
+    expect(captures.calls).toEqual(["begin", "append", "append", "discard"]);
   });
 
   test("fails as not connected when the agent does not run or does not connect in time", async () => {
@@ -203,17 +203,19 @@ describe("a failed capture", () => {
   });
 
   test("discards a capture whose counts do not match what arrived", async () => {
-    const short = [...completeReplies.slice(0, 3), capturedWith({ records: 3 })];
-    const { capturing, captures } = await captureAnswering(short);
-    await expect(capturing).rejects.toMatchObject({ name: "CaptureIncomplete" });
-    expect(captures.calls).toEqual(["begin", "append", "discard"]);
+    for (const counts of [{ records: 3 }, { caches: 2 }, { cacheEntries: 2 }]) {
+      const short = [...completeReplies.slice(0, 4), capturedWith(counts)];
+      const { capturing, captures } = await captureAnswering(short);
+      await expect(capturing).rejects.toMatchObject({ name: "CaptureIncomplete" });
+      expect(captures.calls).toEqual(["begin", "append", "append", "discard"]);
+    }
   });
 
   test("discards a capture whose Web Storage did not arrive whole, or not at all", async () => {
     for (const replies of [
-      [{ ...STORAGE, localStorage: { theme: "dark" } }, SCHEMA, PART, capturedWith({})],
-      [STORAGE, SCHEMA, PART, capturedWith({ sessionStorage: 2 })],
-      [SCHEMA, PART, capturedWith({})],
+      [{ ...STORAGE, localStorage: { theme: "dark" } }, SCHEMA, PART, CACHE, capturedWith({})],
+      [STORAGE, SCHEMA, PART, CACHE, capturedWith({ sessionStorage: 2 })],
+      [SCHEMA, PART, CACHE, capturedWith({})],
     ]) {
       const { capturing, captures } = await captureAnswering(replies);
       await expect(capturing).rejects.toMatchObject({ name: "CaptureIncomplete" });
@@ -226,7 +228,7 @@ describe("a failed capture", () => {
     captures.append.mockRejectedValueOnce(
       new DOMException("Quota exceeded.", "QuotaExceededError"),
     );
-    const twice = [...completeReplies.slice(0, 3), PART, capturedWith({ records: 4 })];
+    const twice = [...completeReplies.slice(0, 3), PART, CACHE, capturedWith({ records: 4 })];
     const { capturing } = await captureAnswering(twice as object[], chrome(), captures);
     await expect(capturing).rejects.toMatchObject({ name: "QuotaExceededError" });
     expect(captures.append).toHaveBeenCalledOnce();

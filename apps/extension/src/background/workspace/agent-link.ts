@@ -178,6 +178,7 @@ export interface CaptureReceiver {
   storage: (entries: Pick<OriginData, "localStorage" | "sessionStorage">) => void;
   database: (database: OriginData["indexedDB"][number]) => void;
   records: (part: Extract<OriginReply, { type: "capture-records" }>) => void;
+  cache: (part: Extract<OriginReply, { type: "capture-cache" }>) => void;
 }
 
 const CAPTURE_ENDING: Ending = {
@@ -203,6 +204,7 @@ export async function captureThroughAgent(
       if (reply.type === "capture-storage") receiver.storage(reply);
       else if (reply.type === "capture-database") receiver.database(reply.database);
       else if (reply.type === "capture-records") receiver.records(reply);
+      else if (reply.type === "capture-cache") receiver.cache(reply);
       else if (reply.type === "captured") settle.resolve(reply.counts);
       else failedWith(reply, settle, "capture");
     },

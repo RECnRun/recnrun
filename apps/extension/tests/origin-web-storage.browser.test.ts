@@ -10,6 +10,7 @@ const emptyStores = () => ({
   localStorage: memoryStorage(),
   sessionStorage: memoryStorage(),
   indexedDB,
+  caches: undefined,
 });
 
 /** Captures `stores` and returns the Web Storage message the agent would send, and the counts. */
@@ -19,6 +20,7 @@ async function captured(stores: ReturnType<typeof emptyStores>) {
     storage: (entries: WebStorage) => sent.push(entries),
     database: vi.fn(),
     records: vi.fn(),
+    cache: vi.fn(),
   };
   const counts = await captureOrigin(stores, sink, 500);
   expect(sent).toHaveLength(1);
@@ -64,7 +66,7 @@ test("captured Web Storage restores into empty storage entry for entry", async (
   source.sessionStorage.setItem("tab", "");
   const { storage } = await captured(source);
   const target = emptyStores();
-  const site = { localStorage: {}, sessionStorage: {}, ...storage, indexedDB: [] };
+  const site = { localStorage: {}, sessionStorage: {}, ...storage, indexedDB: [], caches: [] };
   await expect(restoreOrigin(target, site)).resolves.toMatchObject({
     localStorage: ODD_ENTRIES.length,
     sessionStorage: 1,
@@ -94,7 +96,7 @@ test("a Storage that refuses to be read fails the capture at its step, before an
     throw new DOMException("denied", "SecurityError");
   });
   stores.sessionStorage.setItem("a", "b");
-  const sink = { storage: vi.fn(), database: vi.fn(), records: vi.fn() };
+  const sink = { storage: vi.fn(), database: vi.fn(), records: vi.fn(), cache: vi.fn() };
   await expect(captureOrigin(stores, sink, 500)).rejects.toMatchObject({
     message: "sessionStorage: SecurityError",
   });

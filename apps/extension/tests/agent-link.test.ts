@@ -6,8 +6,15 @@ const ORIGIN = "http://app.localhost:5192";
 const EXPECTED = { tabId: 7, documentId: "doc-1", origin: ORIGIN };
 const SENDER = { tab: { id: 7 }, frameId: 0, documentId: "doc-1", origin: ORIGIN };
 const OPERATION = { id: "op-1", generation: 2 };
-const PAYLOAD = { localStorage: { theme: "dark" }, sessionStorage: {}, indexedDB: [] };
-const COUNTS = { localStorage: 1, sessionStorage: 0, databases: 0, records: 0 };
+const PAYLOAD = { localStorage: { theme: "dark" }, sessionStorage: {}, indexedDB: [], caches: [] };
+const COUNTS = {
+  localStorage: 1,
+  sessionStorage: 0,
+  databases: 0,
+  records: 0,
+  caches: 0,
+  cacheEntries: 0,
+};
 const BOUND = 5000;
 const reply = { operationId: OPERATION.id, generation: OPERATION.generation };
 

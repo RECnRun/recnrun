@@ -16,9 +16,16 @@ const URL_ = `${ORIGIN}/app/redirect?run=1`;
 const WINDOW = { generation: 2, windowId: 5, tabId: 9, status: "active" as const };
 const DATA: IdentityData = {
   cookies: [{ name: "sid", value: "s", path: "/", secure: false, httpOnly: true, sameSite: "lax" }],
-  site: { localStorage: { theme: "dark" }, sessionStorage: {}, indexedDB: [] },
+  site: { localStorage: { theme: "dark" }, sessionStorage: {}, indexedDB: [], caches: [] },
 };
-const COUNTS = { localStorage: 1, sessionStorage: 0, databases: 0, records: 0 };
+const COUNTS = {
+  localStorage: 1,
+  sessionStorage: 0,
+  databases: 0,
+  records: 0,
+  caches: 0,
+  cacheEntries: 0,
+};
 
 interface Seen {
   cookiesAtNavigation: number;

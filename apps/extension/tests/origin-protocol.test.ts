@@ -6,9 +6,16 @@ import {
   OriginReplySchema,
 } from "@/messaging/origin-protocol";
 
-const payload = { localStorage: { theme: "dark" }, sessionStorage: {}, indexedDB: [] };
+const payload = { localStorage: { theme: "dark" }, sessionStorage: {}, indexedDB: [], caches: [] };
 const restore = { type: "restore", operationId: "op-1", generation: 2, payload };
-const counts = { localStorage: 1, sessionStorage: 0, databases: 0, records: 0 };
+const counts = {
+  localStorage: 1,
+  sessionStorage: 0,
+  databases: 0,
+  records: 0,
+  caches: 1,
+  cacheEntries: 1,
+};
 
 test("a restore command names its operation and carries the origin's data", () => {
   expect(v.is(OriginCommandSchema, restore)).toBe(true);
@@ -71,8 +78,35 @@ test("a capture answers Web Storage, each database's schema, its records, and th
     { type: "capture-records", ...operation, ...records, store: undefined },
     { type: "capture-records", ...operation, ...records, records: [{ key: 1 }, 2] },
     { type: "captured", ...operation, counts: { databases: 1, records: 1 } },
+    { type: "captured", ...operation, counts: { ...counts, cacheEntries: undefined } },
     { type: "capture-storage", ...operation, localStorage: { n: 1 }, sessionStorage: {} },
     { type: "capture-storage", ...operation, localStorage: {} },
+  ]) {
+    expect(v.is(OriginReplySchema, bad), JSON.stringify(bad)).toBe(false);
+  }
+});
+
+test("a capture answers each cache with its entries and the ones it could not keep", () => {
+  const operation = { operationId: "op-1", generation: 2 };
+  const entry = {
+    request: { url: "https://app.test/a", method: "GET", headers: [] },
+    response: { status: 204, statusText: "", headers: [["x-a", "1"]], body: null },
+  };
+  const opaque = { item: "v1 GET https://cdn.test/a", reason: "Opaque." };
+  const reply = {
+    type: "capture-cache",
+    ...operation,
+    cache: { name: "v1", entries: [entry] },
+    unsupported: [opaque],
+  };
+  expect(v.is(OriginReplySchema, reply)).toBe(true);
+  const opaqueEntry = { ...entry, response: { ...entry.response, status: 0 } };
+  for (const bad of [
+    { ...reply, cache: { name: "v1", entries: [opaqueEntry] } },
+    { ...reply, cache: { entries: [] } },
+    { ...reply, unsupported: [{ ...opaque, reason: "" }] },
+    { ...reply, unsupported: [{ ...opaque, reason: "x".repeat(201) }] },
+    { ...reply, unsupported: undefined },
   ]) {
     expect(v.is(OriginReplySchema, bad), JSON.stringify(bad)).toBe(false);
   }

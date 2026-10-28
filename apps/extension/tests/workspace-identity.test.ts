@@ -20,7 +20,7 @@ import { allowIncognito, manageTab } from "./workspace-harness";
 const URL_ = "http://app.localhost:5192/app/";
 const DATA: IdentityData = {
   cookies: [],
-  site: { localStorage: {}, sessionStorage: {}, indexedDB: [] },
+  site: { localStorage: {}, sessionStorage: {}, indexedDB: [], caches: [] },
 };
 
 function ports(beforeStep: (step: string) => Promise<void> = async () => {}) {
@@ -153,7 +153,14 @@ describe("captureIdentity and startFromCapture", () => {
       { type: "capture-records", database: "app", store: "kv", records: [{ key: 1, value: 1 }] },
       {
         type: "captured",
-        counts: { databases: 1, records: 1, localStorage: 0, sessionStorage: 0 },
+        counts: {
+          databases: 1,
+          records: 1,
+          localStorage: 0,
+          sessionStorage: 0,
+          caches: 0,
+          cacheEntries: 0,
+        },
       },
     ]) {
       setup.agent.onMessage.emit({ ...reply, operationId, generation });

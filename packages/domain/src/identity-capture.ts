@@ -49,24 +49,8 @@ function isPageOf(url: string, origin: string): boolean {
   return url.startsWith(origin) && (rest === "" || "/?#".includes(rest.charAt(0)));
 }
 
-const HeadersSchema = v.array(v.tuple([v.string(), v.string()]));
-
-const CacheEntrySchema = v.object({
-  request: v.object({ url: v.string(), method: v.string(), headers: HeadersSchema }),
-  response: v.object({
-    status: v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(599)),
-    statusText: v.string(),
-    headers: HeadersSchema,
-    body: v.unknown(),
-  }),
-});
-
-/** One origin's captured site data: what the origin agent restores, plus its Cache Storage. */
-const OriginCaptureSchema = v.object({
-  origin: OriginSchema,
-  ...OriginDataSchema.entries,
-  caches: v.array(v.object({ name: v.string(), entries: v.array(CacheEntrySchema) })),
-});
+/** One origin's captured site data, Cache Storage included: what the origin agent restores. */
+const OriginCaptureSchema = v.object({ origin: OriginSchema, ...OriginDataSchema.entries });
 
 /** Declared capabilities widen what is captured, such as the cookies of an SSO host. */
 export const CaptureCapabilitiesSchema = v.object({ cookieHosts: v.array(HostSchema) });
@@ -141,10 +125,10 @@ export const IdentityCaptureSchema = v.pipe(
 
 export type IdentityCapture = v.InferOutput<typeof IdentityCaptureSchema>;
 
-/** What a start from `capture` restores: its cookies, then the site data of its target's origin. */
+/** What a start from `capture` restores: its cookies, then all site data of its target's origin. */
 export function restorableData(capture: IdentityCapture): IdentityData {
   const target = capture.origins.find(({ origin }) => isPageOf(capture.url, origin));
   if (!target) throw new Error("The capture holds no data for its target's origin.");
-  const { localStorage, sessionStorage, indexedDB } = target;
-  return { cookies: capture.cookies, site: { localStorage, sessionStorage, indexedDB } };
+  const { origin: _origin, ...site } = target;
+  return { cookies: capture.cookies, site };
 }

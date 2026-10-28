@@ -92,6 +92,29 @@ function redirect({ response, url }: Exchange): void {
 }
 
 const JS = "text/javascript";
+const APP_ORIGIN = "http://app.localhost:5192";
+
+/** A redirect to the cached page, as a sign-in or a moved resource answers. */
+function cacheRedirect({ response }: Exchange): void {
+  response.writeHead(302, { location: "/cache/basic?via=redirect", "cache-control": "no-store" });
+  response.end();
+}
+
+/** A cross-site API the app may read: one exposed header, one the page never sees. */
+function cacheCors({ response }: Exchange): void {
+  send(response, "application/json", '{"api":true}', {
+    "access-control-allow-origin": APP_ORIGIN,
+    "access-control-expose-headers": "x-shown",
+    "x-shown": "1",
+    "x-hidden": "1",
+  });
+}
+
+/** A response that depends on a request header, and says so with Vary. */
+function cacheVary({ request, response }: Exchange): void {
+  const variant = String(request.headers["x-variant"] ?? "");
+  send(response, "text/plain", `variant ${variant}`, { vary: "x-variant", "x-kind": "vary" });
+}
 
 const routes: Record<string, (exchange: Exchange) => void | Promise<void>> = {
   "GET /health": ({ response }) => send(response, "text/plain", "ok"),
@@ -111,6 +134,15 @@ const routes: Record<string, (exchange: Exchange) => void | Promise<void>> = {
   "GET /app/frame": ({ response }) => send(response, HTML, appFrame),
   "GET /app/pixel.svg": ({ response }) => send(response, "image/svg+xml", appPixel),
   "GET /app/data.json": ({ response }) => send(response, "application/json", '{"status":"ok"}'),
+  "GET /cache/basic": ({ response }) =>
+    send(response, "application/json", '{"basic":true}', { "x-kind": "basic" }),
+  "GET /cache/redirect": cacheRedirect,
+  "GET /cache/cors": cacheCors,
+  "GET /cache/vary": cacheVary,
+  "GET /cache/none": ({ response }) => {
+    response.writeHead(204, { "x-kind": "none" });
+    response.end();
+  },
   "POST /__log": report,
   "GET /__log": ({ response, run }) =>
     send(response, "application/json", JSON.stringify({ entries: logs.get(run ?? "") ?? [] })),

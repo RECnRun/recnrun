@@ -13,12 +13,16 @@ beforeEach(async () => {
   await settled(indexedDB.deleteDatabase(DATABASE));
 });
 
-/** The sample as `id`, with every store's records moved out into parts, as a capture writes them. */
+/**
+ * The sample as `id`, with every store's records, then every cache, moved out into parts, as a
+ * capture writes them.
+ */
 function split(id: string, overrides: Partial<IdentityCapture> = {}) {
   const capture = { ...sampleCapture(), id, ...overrides };
   const parts: CapturePart[] = [];
   const origins = capture.origins.map((origin) => ({
     ...origin,
+    caches: [],
     indexedDB: origin.indexedDB.map((database) => ({
       ...database,
       stores: database.stores.map((store) => {
@@ -34,6 +38,9 @@ function split(id: string, overrides: Partial<IdentityCapture> = {}) {
       }),
     })),
   }));
+  for (const { origin, caches } of capture.origins) {
+    for (const cache of caches) parts.push({ origin, cache });
+  }
   const complete: IdentityCapture = { ...capture, origins };
   const { endedAt: _, ...rest } = complete;
   const started: IdentityCapture = { ...rest, status: "in-progress" };
@@ -77,7 +84,7 @@ test("reads back a published capture whole, with its parts in order and their ty
   };
   expect(orders.at).toBeInstanceOf(Date);
   expect(orders.lines).toBeInstanceOf(Map);
-  expect(read?.origins[0]?.caches[0]?.entries[0]?.response.body).toBeInstanceOf(Uint8Array);
+  expect(read?.origins[0]?.caches[0]?.entries[0]?.response.body).toBeInstanceOf(ArrayBuffer);
 });
 
 test("an interrupted write leaves the previous capture readable, from a fresh repository too", async () => {
@@ -117,6 +124,24 @@ test("a publish that does not validate changes nothing", async () => {
   expect(await repository.read("identity-a")).toEqual(previous);
 });
 
+test("a cache part must name the capture's origin and hold entries a page can rebuild", async () => {
+  const repository = createIdentityCaptures(indexedDB);
+  const { started, complete, parts } = split("capture-1");
+  const cachePart = parts.at(-1) as Extract<CapturePart, { cache: unknown }>;
+  const [entry] = cachePart.cache.entries;
+  const opaque = { ...entry, response: { ...entry?.response, status: 0 } };
+  for (const [part, error] of [
+    [{ ...cachePart, origin: "http://other.localhost:5192" }, /lacks/],
+    [{ ...cachePart, cache: { name: "v1", entries: [opaque] } }, /schema/],
+  ] as const) {
+    await repository.discard("capture-1").catch(() => undefined);
+    await repository.begin(started);
+    await repository.append("capture-1", part as CapturePart);
+    await expect(repository.publish(complete)).rejects.toThrow(error);
+  }
+  expect(await repository.read("identity-a")).toBeNull();
+});
+
 test("publishing removes the previous capture and abandoned ones with all their parts", async () => {
   const repository = createIdentityCaptures(indexedDB);
   await store(repository, "capture-1");
@@ -131,8 +156,8 @@ test("publishing removes the previous capture and abandoned ones with all their 
   const latest = await store(repository, "capture-3");
   expect(await repository.read("identity-a")).toEqual(latest);
   expect(await repository.read("identity-b")).toEqual(otherSplit.capture);
-  // One capture per identity, its two parts each, and one pointer per identity.
-  expect(await rowCounts()).toEqual({ captures: 2, parts: 4, pointers: 2 });
+  // One capture per identity, its two record parts and one cache part each, and one pointer each.
+  expect(await rowCounts()).toEqual({ captures: 2, parts: 6, pointers: 2 });
   await expect(repository.append("capture-2", abandoned.parts[0] as CapturePart)).rejects.toThrow(
     /not in progress/,
   );

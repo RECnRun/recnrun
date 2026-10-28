@@ -33,7 +33,7 @@ test("accepts a complete capture with its schema, cookies, Web Storage, caches, 
   // Values stay `unknown` and pass through by reference, so structured types keep their type.
   const source = partsOf(capture).database.stores[1]?.records[0]?.value;
   expect(database.stores[1]?.records[0]?.value).toBe(source);
-  expect(cache.entries[0]?.response.body).toBeInstanceOf(Uint8Array);
+  expect(cache.entries[0]?.response.body).toBeInstanceOf(ArrayBuffer);
 });
 
 test("accepts a capture in progress, without an end time, and a failed one with its error", () => {
@@ -113,6 +113,11 @@ test("rejects an origin with a path, an index without a key path, and a malforme
   expect(valid(withOrigin({ caches: [{ name: "v1", entries: [badStatus] }] }))).toBe(false);
   const badHeaders = { ...entry, request: { ...entry?.request, headers: [["accept"]] } };
   expect(valid(withOrigin({ caches: [{ name: "v1", entries: [badHeaders] }] }))).toBe(false);
+  // A Response can only be rebuilt with a status from 200 to 599, so an opaque one is never kept.
+  const opaque = { ...entry, response: { ...entry?.response, status: 0 } };
+  expect(valid(withOrigin({ caches: [{ name: "v1", entries: [opaque] }] }))).toBe(false);
+  const typed = { ...entry, response: { ...entry?.response, body: new Uint8Array([1]) } };
+  expect(valid(withOrigin({ caches: [{ name: "v1", entries: [typed] }] }))).toBe(false);
 });
 
 test("rejects an unsupported item without its adapter, or a reason long enough to carry a value", () => {
@@ -129,7 +134,7 @@ test("rejects a declared cookie host that is not a bare host name", () => {
   }
 });
 
-test("restores a capture's cookies and its target origin's site data, without its caches", () => {
+test("restores a capture's cookies and its target origin's site data, caches included", () => {
   const capture = sampleCapture();
   const other = { ...partsOf(capture).origin, origin: "http://other.localhost:5192" };
   const { origin } = partsOf(capture);
@@ -140,6 +145,7 @@ test("restores a capture's cookies and its target origin's site data, without it
       localStorage: origin.localStorage,
       sessionStorage: origin.sessionStorage,
       indexedDB: origin.indexedDB,
+      caches: origin.caches,
     },
   });
   expect(v.is(IdentityDataSchema, data)).toBe(true);

@@ -21,7 +21,7 @@ const lasting: SiteCookie = {
 };
 const identity: IdentityData = {
   cookies: [session, lasting],
-  site: { localStorage: {}, sessionStorage: {}, indexedDB: [] },
+  site: { localStorage: {}, sessionStorage: {}, indexedDB: [], caches: [] },
 };
 
 test("accepts host-only, domain, session, and lasting cookies with every attribute", () => {

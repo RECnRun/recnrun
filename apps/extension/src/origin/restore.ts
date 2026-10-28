@@ -1,5 +1,6 @@
 import type { OriginData } from "@recnrun/domain";
 import type { RestoredCounts } from "@/messaging/origin-protocol";
+import { cacheCount, writeCaches } from "@/origin/cache-storage";
 import { OriginFailure, step } from "@/origin/failure";
 import { writeEntries } from "@/origin/web-storage";
 
@@ -8,6 +9,8 @@ export interface OriginStores {
   localStorage: Storage;
   sessionStorage: Storage;
   indexedDB: IDBFactory;
+  /** Absent outside a secure context, where Chrome exposes no Cache Storage. */
+  caches: CacheStorage | undefined;
 }
 
 type Database = OriginData["indexedDB"][number];
@@ -15,7 +18,8 @@ type Database = OriginData["indexedDB"][number];
 /** Restoring merges into nothing: a fresh Incognito origin holds no data, so any data is a mistake. */
 async function requireEmpty(stores: OriginStores): Promise<void> {
   const databases = await stores.indexedDB.databases();
-  if (stores.localStorage.length + stores.sessionStorage.length + databases.length > 0) {
+  const caches = await cacheCount(stores.caches);
+  if (stores.localStorage.length + stores.sessionStorage.length + databases.length + caches > 0) {
     throw new OriginFailure("check", "OriginNotEmpty");
   }
 }
@@ -108,5 +112,13 @@ export async function restoreOrigin(
     // One database at a time, so a failure names no later database as half written.
     records += await step("indexedDB", () => restoreDatabase(stores.indexedDB, database));
   }
-  return { localStorage, sessionStorage, databases: data.indexedDB.length, records };
+  const cacheEntries = await step("cacheStorage", () => writeCaches(stores.caches, data.caches));
+  return {
+    localStorage,
+    sessionStorage,
+    databases: data.indexedDB.length,
+    records,
+    caches: data.caches.length,
+    cacheEntries,
+  };
 }

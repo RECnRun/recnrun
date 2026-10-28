@@ -1,5 +1,7 @@
 import type { OriginData } from "@recnrun/domain";
 import type { CapturedCounts } from "@/messaging/origin-protocol";
+import { readCaches } from "@/origin/cache-storage";
+import type { CacheSink } from "@/origin/cache-storage";
 import { step } from "@/origin/failure";
 import type { OriginStores } from "@/origin/restore";
 import { readEntries } from "@/origin/web-storage";
@@ -8,11 +10,15 @@ type Database = OriginData["indexedDB"][number];
 type Store = Database["stores"][number];
 type Records = Store["records"];
 
-/** Where a capture sends Web Storage, then each database's schema and its records, a chunk at a time. */
+/**
+ * Where a capture sends Web Storage, then each database's schema and its records, a chunk at a
+ * time, then each cache.
+ */
 export interface CaptureSink {
   storage: (entries: Pick<OriginData, "localStorage" | "sessionStorage">) => void;
   database: (database: Database) => void;
   records: (database: string, store: string, records: Records) => void;
+  cache: CacheSink;
 }
 
 function settled<T>(request: IDBRequest<T>): Promise<T> {
@@ -108,7 +114,7 @@ async function captureDatabases(factory: IDBFactory, sink: CaptureSink, chunk: n
   return { databases: listed.length, records };
 }
 
-/** Reads the page's Web Storage, then its IndexedDB, into `sink` and counts what it sent. */
+/** Reads the page's Web Storage, IndexedDB, then Cache Storage into `sink` and counts what it sent. */
 export async function captureOrigin(
   stores: OriginStores,
   sink: CaptureSink,
@@ -118,9 +124,11 @@ export async function captureOrigin(
   const sessionStorage = await step("sessionStorage", () => readEntries(stores.sessionStorage));
   sink.storage({ localStorage, sessionStorage });
   const counts = await captureDatabases(stores.indexedDB, sink, chunk);
+  const caches = await step("cacheStorage", () => readCaches(stores.caches, sink.cache));
   return {
     localStorage: Object.keys(localStorage).length,
     sessionStorage: Object.keys(sessionStorage).length,
     ...counts,
+    ...caches,
   };
 }

@@ -1,17 +1,16 @@
 import type { CaptureCapabilities, IdentityCapture, ManagedWindowState } from "@recnrun/domain";
 import { browser } from "wxt/browser";
 import { captureThroughAgent, isExpectedAgent } from "@/background/workspace/agent-link";
-import type { CaptureReceiver } from "@/background/workspace/agent-link";
 import { AGENT_SCRIPT } from "@/background/workspace/barrier";
 import type { BarrierOperation } from "@/background/workspace/barrier";
+import { checkWhole, collector } from "@/background/workspace/capture-collector";
+import type { Collected, WebStorage } from "@/background/workspace/capture-collector";
 import { captureCookies } from "@/background/workspace/cookie-capture";
 import { resolveTabStore } from "@/background/workspace/cookie-stores";
 import type { CookieApi } from "@/background/workspace/cookie-stores";
 import { WorkspaceError } from "@/background/workspace/errors";
-import { ownBlobs } from "@/background/workspace/own-blobs";
-import { collectValueTypes } from "@/background/workspace/value-types";
 import { ORIGIN_AGENT_PORT } from "@/messaging/origin-protocol";
-import type { CapturedCounts, OriginPort } from "@/messaging/origin-protocol";
+import type { OriginPort } from "@/messaging/origin-protocol";
 import type { IdentityCaptures } from "@/storage/identity-captures";
 
 interface ConnectEvent {
@@ -40,6 +39,8 @@ export interface CaptureSummary {
   sessionStorage: number;
   databases: number;
   records: number;
+  caches: number;
+  cacheEntries: number;
   cookies: number;
   unsupported: number;
   ms: number;
@@ -47,19 +48,6 @@ export interface CaptureSummary {
 
 /** How long the agent may take to connect, and to send its next message. */
 const CAPTURE_BOUND_MS = 15_000;
-
-type ValueType = IdentityCapture["valueTypes"][number];
-type OriginCapture = IdentityCapture["origins"][number];
-type Database = OriginCapture["indexedDB"][number];
-type WebStorage = Pick<OriginCapture, "localStorage" | "sessionStorage">;
-
-/** What the collector received, checked against the agent's counts before anything is published. */
-interface Collected {
-  storage?: WebStorage;
-  databases: Database[];
-  valueTypes: ValueType[];
-  records: number;
-}
 
 interface Target {
   tabId: number;
@@ -128,59 +116,13 @@ function startedHeader(
   };
 }
 
-/** Writes each received part in order; after one write fails, it writes no later part. */
-function collector(captureId: string, origin: string, captures: CaptureDeps["captures"]) {
-  const databases: Database[] = [];
-  const valueTypes = new Set<ValueType>();
-  let storage: WebStorage | undefined;
-  let records = 0;
-  let writing = Promise.resolve();
-  let failure: { error: unknown } | undefined;
-  const receiver: CaptureReceiver = {
-    storage: ({ localStorage, sessionStorage }) => {
-      storage = { localStorage, sessionStorage };
-    },
-    database: (database) => databases.push(database),
-    records: ({ database, store, records: part }) => {
-      records += part.length;
-      collectValueTypes(
-        part.flatMap(({ key, value }) => (key === undefined ? [value] : [key, value])),
-        valueTypes,
-      );
-      writing = writing.then(async () => {
-        if (failure) return;
-        try {
-          await ownBlobs(part);
-          await captures.append(captureId, { origin, database, store, records: part });
-        } catch (error) {
-          failure = { error };
-        }
-      });
-    },
-  };
-  const written = async (): Promise<Collected> => {
-    await writing;
-    if (failure) throw failure.error;
-    return { storage, databases, valueTypes: [...valueTypes], records };
-  };
-  return { receiver, written };
-}
-
-const SKIPPED = ["cacheStorage"] as const;
-const CAPTURED = ["localStorage", "sessionStorage", "indexedDB", "cookies"] as const;
-
-/** Every count the agent sent must match what arrived, or the capture is not whole. */
-function checkWhole(collected: Collected, counts: CapturedCounts): WebStorage {
-  const { storage, databases, records } = collected;
-  const whole =
-    storage !== undefined &&
-    Object.keys(storage.localStorage).length === counts.localStorage &&
-    Object.keys(storage.sessionStorage).length === counts.sessionStorage &&
-    databases.length === counts.databases &&
-    records === counts.records;
-  if (!whole) throw new WorkspaceError("CaptureIncomplete", "The page's data did not all arrive.");
-  return storage;
-}
+const ADAPTERS = [
+  "localStorage",
+  "sessionStorage",
+  "indexedDB",
+  "cookies",
+  "cacheStorage",
+] as const;
 
 function completeHeader(
   started: IdentityCapture,
@@ -193,12 +135,10 @@ function completeHeader(
     ...started,
     status: "complete",
     endedAt: Date.now(),
-    adapters: [
-      ...CAPTURED.map((adapter) => ({ adapter, status: "captured" as const })),
-      ...SKIPPED.map((adapter) => ({ adapter, status: "skipped" as const })),
-    ],
+    adapters: ADAPTERS.map((adapter) => ({ adapter, status: "captured" as const })),
     valueTypes: collected.valueTypes,
-    ...jar,
+    cookies: jar.cookies,
+    unsupported: [...jar.unsupported, ...collected.unsupported],
     origins: origin ? [{ ...origin, ...storage, indexedDB: collected.databases }] : [],
   };
 }
@@ -230,8 +170,9 @@ async function captureThrough(
     const collected = await written();
     const storage = checkWhole(collected, counts);
     const jar = await cookieJar(deps, target, started);
-    await captures.publish(completeHeader(started, storage, collected, jar));
-    return { ...counts, cookies: jar.cookies.length, unsupported: jar.unsupported.length };
+    const header = completeHeader(started, storage, collected, jar);
+    await captures.publish(header);
+    return { ...counts, cookies: jar.cookies.length, unsupported: header.unsupported.length };
   } catch (error) {
     await captures.discard(started.id).catch(() => undefined);
     throw error;

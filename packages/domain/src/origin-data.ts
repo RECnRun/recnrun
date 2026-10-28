@@ -43,14 +43,36 @@ const DatabaseSchema = v.object({
   stores: v.array(ObjectStoreSchema),
 });
 
+const HeadersSchema = v.array(v.tuple([v.string(), v.string()]));
+
 /**
- * One origin's site data, as the origin agent restores it. Record values stay `unknown` and pass
- * through untouched, so `Date`, `Blob`, and `ArrayBuffer` values keep their type.
+ * One Cache Storage entry as the page can rebuild it: a GET request and a response a `Response`
+ * constructor accepts again, so its status is 200 to 599 and an opaque response never appears.
+ */
+const CacheEntrySchema = v.object({
+  request: v.object({ url: v.string(), method: v.string(), headers: HeadersSchema }),
+  response: v.object({
+    status: v.pipe(v.number(), v.integer(), v.minValue(200), v.maxValue(599)),
+    statusText: v.string(),
+    headers: HeadersSchema,
+    // Null for a status that has no body, such as 204.
+    body: v.nullable(v.instance(ArrayBuffer)),
+  }),
+});
+
+const CacheSchema = v.object({ name: v.string(), entries: v.array(CacheEntrySchema) });
+
+/**
+ * One origin's site data, as the origin agent restores it: Web Storage, IndexedDB, and Cache
+ * Storage. Record values stay `unknown` and pass through untouched, so `Date`, `Blob`, and
+ * `ArrayBuffer` values keep their type.
  */
 export const OriginDataSchema = v.object({
   localStorage: StorageEntriesSchema,
   sessionStorage: StorageEntriesSchema,
   indexedDB: v.array(DatabaseSchema),
+  // Stage 2 payloads carried no caches; none is what they meant.
+  caches: v.optional(v.array(CacheSchema), []),
 });
 
 export type OriginData = v.InferOutput<typeof OriginDataSchema>;
