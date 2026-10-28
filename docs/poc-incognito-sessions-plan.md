@@ -101,7 +101,7 @@ Suspend = the first seven steps. Resume = from "create neutral window" with an e
 
 ## 8. Test infrastructure
 
-- **Fixture origins.** A small Node server, `tests/e2e/apps/server.ts`, started as a second Playwright `webServer` on port 5191, serves `http://app.localhost:5191` (the application), `http://other.localhost:5191` (negative checks), and later `http://sso.localhost:5191` (S4.3). `*.localhost` resolves to loopback and is a secure context (Service Workers and Cache Storage work), and the RECnRun content script does not match it (its test matches are `localhost` and `127.0.0.1` only).
+- **Fixture origins.** A small Node server, `tests/e2e/apps/server.ts`, started as a second Playwright `webServer` on port 5192 (5191 belongs to `dashboard-embedding.spec.ts`'s forged origin), serves `http://app.localhost:5192` (the application), `http://other.localhost:5192` (negative checks), and later `http://sso.localhost:5192` (S4.3). `*.localhost` resolves to loopback and is a secure context (Service Workers and Cache Storage work), and the RECnRun content script does not match it (its test matches are `localhost` and `127.0.0.1` only).
 - **Fixture pages** (observation only; none waits for the extension):
   - `/sentinel?tag=` writes a tagged cookie (plus an HttpOnly one set by the server), localStorage, sessionStorage, IndexedDB record, Cache Storage entry, and registers `/sw.js`.
   - `/inspect` reads all six kinds plus `navigator.serviceWorker.getRegistrations()` and the controller, registers nothing, and reports to `window.__inspected` and the server log.

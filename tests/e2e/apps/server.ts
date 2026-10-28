@@ -1,9 +1,9 @@
-// Fixture origins for the POC specs: app.localhost:5191 and other.localhost:5191 share these routes.
+// Fixture origins for the POC specs: app.localhost:5192 and other.localhost:5192 share these routes.
 import { createServer } from "node:http";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { inspectPage, sentinelPage, serviceWorker } from "./pages.ts";
 
-const PORT = 5191;
+const PORT = 5192;
 
 type LogEntry =
   | { kind: "request"; method: string; path: string; host: string; dest: string; time: number }

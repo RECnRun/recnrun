@@ -2,10 +2,10 @@ import type { Page } from "@playwright/test";
 import type { Inspected } from "./apps/pages.ts";
 import { expect, test } from "./fixtures/extension.ts";
 
-const APP = "http://app.localhost:5191";
-const OTHER = "http://other.localhost:5191";
+const APP = "http://app.localhost:5192";
+const OTHER = "http://other.localhost:5192";
 // Node may not resolve *.localhost, so the spec reaches the server log through plain localhost.
-const LOG = "http://localhost:5191/__log";
+const LOG = "http://localhost:5192/__log";
 const TAG = "normal-1";
 
 interface FixtureWindow {
@@ -78,7 +78,7 @@ test("the fixture server keeps every sentinel kind on its own origin", async ({
     entries: LogEntry[];
   };
   expect(entries).toContainEqual(
-    expect.objectContaining({ kind: "request", path: "/sentinel", host: "app.localhost:5191" }),
+    expect.objectContaining({ kind: "request", path: "/sentinel", host: "app.localhost:5192" }),
   );
   expect(entries.filter(({ kind }) => kind === "report")).toHaveLength(2);
 });

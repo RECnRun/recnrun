@@ -27,9 +27,9 @@ export default defineConfig({
       timeout: 120_000,
     },
     {
-      // Serves app.localhost:5191 and other.localhost:5191; Node may not resolve *.localhost.
+      // Serves app.localhost:5192 and other.localhost:5192; Node may not resolve *.localhost.
       command: "node tests/e2e/apps/server.ts",
-      url: "http://localhost:5191/health",
+      url: "http://localhost:5192/health",
       reuseExistingServer: !process.env.CI,
       timeout: 120_000,
     },
