@@ -1,6 +1,8 @@
 // Fixture origins for the POC specs: app.localhost:5192 and other.localhost:5192 share these routes.
+import { randomBytes } from "node:crypto";
 import { createServer } from "node:http";
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { appFrame, appModule, appPage, appPixel, appWorker, siteCsp } from "./app-pages.ts";
 import { inspectPage, sentinelPage, serviceWorker } from "./pages.ts";
 
 const PORT = 5192;
@@ -65,12 +67,35 @@ async function report({ request, response, host, run }: Exchange): Promise<void>
   send(response, "application/json", "{}");
 }
 
+/** `/app/`; `?csp=1` puts the site's own strict policy on the final document response. */
+function app({ response, url, run }: Exchange): void {
+  const nonce = randomBytes(16).toString("base64");
+  const csp =
+    url.searchParams.get("csp") === "1" ? { "content-security-policy": siteCsp(nonce) } : {};
+  send(response, HTML, appPage(run ?? "", nonce), csp);
+}
+
+/** One same-origin hop before the app, as sign-in and locale redirects do. */
+function redirect({ response, url }: Exchange): void {
+  response.writeHead(302, { location: `/app/${url.search}`, "cache-control": "no-store" });
+  response.end();
+}
+
+const JS = "text/javascript";
+
 const routes: Record<string, (exchange: Exchange) => void | Promise<void>> = {
   "GET /health": ({ response }) => send(response, "text/plain", "ok"),
   "GET /sentinel": sentinel,
   "GET /inspect": ({ request, response, run }) =>
     send(response, HTML, inspectPage(cookiesOf(request), run ?? "")),
-  "GET /sw.js": ({ response }) => send(response, "text/javascript", serviceWorker),
+  "GET /sw.js": ({ response }) => send(response, JS, serviceWorker),
+  "GET /app/": app,
+  "GET /app/redirect": redirect,
+  "GET /app/module.js": ({ response }) => send(response, JS, appModule),
+  "GET /app/worker.js": ({ response }) => send(response, JS, appWorker),
+  "GET /app/frame": ({ response }) => send(response, HTML, appFrame),
+  "GET /app/pixel.svg": ({ response }) => send(response, "image/svg+xml", appPixel),
+  "GET /app/data.json": ({ response }) => send(response, "application/json", '{"status":"ok"}'),
   "POST /__log": report,
   "GET /__log": ({ response, run }) =>
     send(response, "application/json", JSON.stringify({ entries: logs.get(run ?? "") ?? [] })),
