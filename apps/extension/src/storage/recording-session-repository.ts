@@ -15,7 +15,7 @@ async function read(): Promise<RecordingSession | null> {
   return parsed.output;
 }
 
-/** Shares the recording in progress between the dashboard tab, its frames, and the PiP panel. */
+/** Shares the recording in progress between the dashboard tabs and their PiP windows. */
 export const recordingSessionRepository = {
   read,
   write: (session: RecordingSession | null) => sessionItem.setValue(session),

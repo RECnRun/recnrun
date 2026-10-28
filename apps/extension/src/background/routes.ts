@@ -12,7 +12,7 @@ interface RouteDependencies {
 }
 
 const ANY: readonly Sender[] = ["contentScript", "ownPage"];
-/** Session requests come from the framed dashboard, never from the site's content script. */
+/** Session requests come from the dashboard tabs, never from the site's content script. */
 const OWN_PAGE: readonly Sender[] = ["ownPage"];
 /** Only the site asks for the dashboard; any script on it may, and it learns nothing back. */
 const SITE: readonly Sender[] = ["contentScript"];
@@ -40,7 +40,7 @@ export function createRoutes({
       case "start-session":
         return { from: OWN_PAGE, run: () => startSession(message.tabId, store) };
       case "return-to-dashboard":
-        // The sender's tab is the dashboard's own, or the site tab that frames it.
+        // The sender's tab is the dashboard whose PiP window closed.
         return {
           from: OWN_PAGE,
           run: ({ tab }) => (tab?.id === undefined ? Promise.resolve() : focusTab(tab.id)),
