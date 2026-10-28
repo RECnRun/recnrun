@@ -1,6 +1,7 @@
 import { browser } from "wxt/browser";
 import { createBackgroundListener } from "@/background/listener";
 import { createRoutes } from "@/background/routes";
+import { trackManagedWindow } from "@/background/workspace/windows";
 import { recordingSessionRepository } from "@/storage/recording-session-repository";
 
 export function startBackground(): void {
@@ -11,4 +12,5 @@ export function startBackground(): void {
   });
   const identity = { extensionId: browser.runtime.id, extensionUrl: browser.runtime.getURL("/") };
   browser.runtime.onMessage.addListener(createBackgroundListener(routes, identity));
+  trackManagedWindow();
 }

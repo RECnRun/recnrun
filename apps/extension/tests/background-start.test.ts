@@ -1,6 +1,7 @@
 import { beforeEach, expect, test, vi } from "vite-plus/test";
 import { fakeBrowser } from "wxt/testing/fake-browser";
 import { startBackground } from "@/background/start";
+import { managedWindowRepository } from "@/storage/managed-window-repository";
 import { recordingSessionRepository } from "@/storage/recording-session-repository";
 
 const manifest = { manifest_version: 3 as const, name: "RECnRun", version: "0.1.0" };
@@ -36,4 +37,12 @@ test("registers one listener that answers every message family", async () => {
   });
   expect(await deliver({ type: "start-session", tabId: shop.id }, ownPage)).toEqual({ ok: true });
   expect(await recordingSessionRepository.read()).toMatchObject({ tabId: shop.id });
+});
+
+test("tracks the managed Incognito window from the start", async () => {
+  startBackground();
+  const managed = { generation: 1, windowId: 4, tabId: 40, status: "active" as const };
+  await managedWindowRepository.update(() => managed);
+  await fakeBrowser.windows.onRemoved.trigger(4);
+  await expect.poll(() => managedWindowRepository.read()).toEqual({ ...managed, status: "closed" });
 });
