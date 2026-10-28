@@ -62,9 +62,9 @@ export async function pair(a: Profile, b: Profile, native: Native): Promise<Page
 /**
  * Lets a newcomer pair with a linked profile, whose folder grant ended with its window (H2). Its
  * links keep handles to the folder, so Chrome mostly asks with its write prompt; the window then
- * waits until the newcomer pairs.
+ * waits until the newcomer pairs. The newcomer reaches the rest of the mesh through that profile.
  */
-export async function letJoin(profile: Profile, native: Native): Promise<Page> {
+async function letJoin(profile: Profile, native: Native): Promise<Page> {
   const join = pairingSection(profile.dashboard).getByRole("button", {
     name: "Let another profile join",
   });
@@ -75,14 +75,17 @@ export async function letJoin(profile: Profile, native: Native): Promise<Page> {
   return window;
 }
 
-/** Pairs every profile with every other, one newcomer at a time, as a user adds profiles. */
+/**
+ * Pairs every profile with every other, one newcomer at a time, as a user adds profiles: only the
+ * last one to join lets the next in through the folder, and the mesh carries the rest.
+ */
 export async function pairAll(profiles: Profile[], native: Native): Promise<void> {
   const [first, second, ...rest] = profiles;
   if (!first || !second) throw new Error("Pairing takes two profiles.");
   await pair(first, second, native);
   const joined = [first, second];
   for (const next of rest) {
-    for (const member of joined) await letJoin(member, native);
+    await letJoin(joined.at(-1) ?? first, native);
     await chooseFolder(next, native);
     for (const member of joined) {
       await expect(peerStatus(member, next)).toHaveText(`Connected — ${next.name}`, {

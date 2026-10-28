@@ -38,7 +38,14 @@ const step = (me: string, seen: Seen, pending: { to: string } | null = null) =>
     seen,
     skip: [],
     pending: pending
-      ? { [pending.to]: { ...pending, pairingId: PAIRING, expiresAt: Date.now() + 60_000 } }
+      ? {
+          [pending.to]: {
+            ...pending,
+            pairingId: PAIRING,
+            expiresAt: Date.now() + 60_000,
+            code: "",
+          },
+        }
       : {},
     acted: {},
     now: Date.now(),

@@ -1,6 +1,6 @@
 import type { Locator, Page } from "@playwright/test";
 import { expect } from "./fixtures/extension.ts";
-import { letJoin, pairAll } from "./fixtures/folder.ts";
+import { pairAll } from "./fixtures/folder.ts";
 import { test } from "./fixtures/native-dialogs.ts";
 import { framesOf, peerLine, peerStatus, profileIdOf, sendRaw } from "./fixtures/profiles.ts";
 import type { Profile } from "./fixtures/profiles.ts";
@@ -8,8 +8,8 @@ import { clickToOpenPanel } from "./fixtures/session.ts";
 import { storedSession } from "./fixtures/tabs.ts";
 
 /*
- * Three profiles pair through one folder into a mesh, one link per pair, and each dashboard
- * shows the other two under their names.
+ * Five profiles pair into a mesh, one link per pair, and each dashboard shows the other four
+ * under their names. Each newcomer meets one profile through the folder and the rest through it.
  */
 
 /** A tab of the profile's own, at an address that names it; the privacy policy has no frame. */
@@ -29,53 +29,61 @@ const tabIn = (list: ReturnType<typeof listOf>, url: string) =>
 const clickLine = (profile: Profile, other: Profile, name: string) =>
   peerLine(profile, other).getByRole("button", { name }).click();
 
-test("three profiles link pairwise, list each other's tabs, and Disconnect or a quit ends one pair only", async ({
+/** Every pair of `profiles`, each way round. */
+const pairsOf = (profiles: Profile[]): [Profile, Profile][] =>
+  profiles.flatMap((one) =>
+    profiles.filter((other) => other !== one).map((other): [Profile, Profile] => [one, other]),
+  );
+
+async function expectConnected(pairs: [Profile, Profile][]) {
+  for (const [one, other] of pairs)
+    await expect(peerStatus(one, other)).toHaveText(`Connected — ${other.name}`);
+}
+
+/** Each profile lists, under each other profile's name, the tab that profile opened. */
+async function expectEveryTabListed(profiles: Profile[]) {
+  const urls = new Map(
+    await Promise.all(profiles.map(async (each) => [each, (await openIn(each)).url()] as const)),
+  );
+  for (const [one, other] of pairsOf(profiles))
+    await expect(tabIn(listOf(one, other), urls.get(other) ?? "")).toBeVisible();
+}
+
+test("five profiles link pairwise, list each other's tabs, and Disconnect or a quit ends one pair only", async ({
   profileA,
   profileB,
   profileC,
+  profileD,
+  profileE,
   native,
 }) => {
-  test.setTimeout(240_000);
-  const all = [profileA, profileB, profileC];
+  test.setTimeout(420_000);
+  const all = [profileA, profileB, profileC, profileD, profileE];
   await pairAll(all, native);
-  const pages = await Promise.all(all.map(openIn));
-  for (const profile of all) {
-    for (const [index, other] of all.entries()) {
-      if (other === profile) continue;
-      await expect(tabIn(listOf(profile, other), pages[index]?.url() ?? "")).toBeVisible();
-    }
-  }
+  await expectEveryTabListed(all);
 
   await clickLine(profileA, profileB, "Disconnect");
   await expect(peerStatus(profileA, profileB)).toHaveText("Disconnected — Profile B");
   await expect(peerStatus(profileB, profileA)).toHaveText("Disconnected by Profile A");
-  for (const [one, other] of [
-    [profileA, profileC],
-    [profileB, profileC],
-  ] as const) {
-    await expect(peerStatus(one, other)).toHaveText(`Connected — ${other.name}`);
-    await expect(peerStatus(other, one)).toHaveText(`Connected — ${one.name}`);
-  }
-  await clickLine(profileA, profileB, "Reconnect");
-  // Their folder grants ended with their windows (H2), so each allows the folder once more.
-  await expect(peerLine(profileA, profileB).getByRole("button", { name: "Reconnect" })).toHaveCount(
-    0,
+  await expectConnected(
+    pairsOf(all).filter((pair) => !pair.includes(profileA) || !pair.includes(profileB)),
   );
-  for (const profile of [profileA, profileB]) await letJoin(profile, native);
+  // The folder grants ended with their windows (H2); the profiles both still reach carry it.
+  await clickLine(profileA, profileB, "Reconnect");
   await expect(peerStatus(profileA, profileB)).toHaveText("Connected — Profile B", {
     timeout: 30_000,
   });
   await expect(peerStatus(profileB, profileA)).toHaveText("Connected — Profile A");
 
-  await profileC.context.close();
+  await profileE.context.close();
   // No close message comes from a browser that quits; its heartbeats stop.
-  for (const profile of [profileA, profileB]) {
-    await expect(peerStatus(profile, profileC)).toHaveText(
-      /^(Disconnected|Not reachable) — Profile C$/,
+  for (const profile of all.slice(0, 4)) {
+    await expect(peerStatus(profile, profileE)).toHaveText(
+      /^(Disconnected|Not reachable) — Profile E$/,
       { timeout: 5_000 },
     );
   }
-  await expect(peerStatus(profileA, profileB)).toHaveText("Connected — Profile B");
+  await expectConnected(pairsOf(all.slice(0, 4)));
 });
 
 /** The types of the frames `profile`, as `me`, sent to `to` since the tap held `from` frames. */
@@ -87,14 +95,16 @@ const sentTo = async (profile: Profile, me: string, to: string | undefined, from
     .filter((message) => message.from === me && (to === undefined || message.to === to))
     .map((message) => message.type);
 
-test("a session one profile runs in another blocks Record in the third, and a frame claiming another profile's id gets no answer", async ({
+test("a session one profile runs in another blocks Record in the rest, and a frame claiming another profile's id gets no answer", async ({
   profileA,
   profileB,
   profileC,
+  profileD,
+  profileE,
   native,
 }) => {
-  test.setTimeout(240_000);
-  await pairAll([profileA, profileB, profileC], native);
+  test.setTimeout(420_000);
+  await pairAll([profileA, profileB, profileC, profileD, profileE], native);
   const inC = await openIn(profileC);
   const records = (dashboard: Page | Locator) => dashboard.getByRole("button", { name: "Record" });
   const record = records(tabIn(listOf(profileA, profileC), inC.url()));
@@ -102,8 +112,11 @@ test("a session one profile runs in another blocks Record in the third, and a fr
   await expect
     .poll(() => storedSession(profileC.serviceWorker))
     .toMatchObject({ status: "recording" });
-  await expect(records(profileB.dashboard)).toHaveCount(0);
-  await expect(profileB.dashboard.getByText("Recording in Profile C")).toHaveCount(3);
+  // Each other profile's own list and its lists of the four others say so.
+  for (const profile of [profileB, profileD, profileE]) {
+    await expect(records(profile.dashboard)).toHaveCount(0);
+    await expect(profile.dashboard.getByText("Recording in Profile C")).toHaveCount(5);
+  }
 
   // A frame on A's own link to C that claims to come from B: C drops it and answers nothing.
   const [idA, idB, idC] = [

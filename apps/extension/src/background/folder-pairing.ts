@@ -34,7 +34,11 @@ interface Situation {
 }
 
 /** A signal counts when its code says what its file does and announces the partner's certificate. */
-function vouched(signal: SignalFile, partner: Presence, now: number): boolean {
+export function vouched(
+  signal: SignalFile,
+  partner: Pick<Presence, "profileId" | "fingerprint">,
+  now: number,
+): boolean {
   try {
     const { kind, pairingId, profileId, sdp } = decodePairing(signal.code, now);
     const same = kind === signal.kind && pairingId === signal.pairingId;
@@ -149,6 +153,11 @@ export function createFolderPairing(deps: FolderPairingDependencies) {
     if (await deps.state.read()) await watch();
   };
   const failed = (error: unknown) => deps.log(`folder pairing: ${errorMessage(error)}`);
+  // One piece of pairing work at a time, the mesh's too, so two never offer to one profile at once.
+  const exclusive = (work: () => Promise<void>) => {
+    queue = queue.then(work).catch(failed);
+    return queue;
+  };
   // Without the folder's grant the look fails; the window that grants it again starts one.
   const lookAgain = () => resume().catch(failed);
   const handle = async (seen: Seen) => {
@@ -187,10 +196,8 @@ export function createFolderPairing(deps: FolderPairingDependencies) {
       if (acted) await deps.acted.set(peer, { ...acted, at: 0 });
     },
     /** One sighting at a time, so two in a row never both offer. */
-    seen: (seen: Seen) => {
-      queue = queue.then(() => handle(seen)).catch(failed);
-      return queue;
-    },
+    seen: (seen: Seen) => exclusive(() => handle(seen)),
+    exclusive,
   };
 }
 

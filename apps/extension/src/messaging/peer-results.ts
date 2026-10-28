@@ -1,6 +1,6 @@
 import * as v from "valibot";
 import { LinkStateSchema } from "@/messaging/peer-messages";
-import { ProfileIdSchema } from "@/p2p/protocol";
+import { FingerprintSchema, ProfileIdSchema } from "@/p2p/protocol";
 import { DisplayNameSchema } from "@/p2p/pairing-code";
 
 /** Who this installation is to its peers: generated once, never the extension id. */
@@ -13,7 +13,7 @@ export const ProfileIdentitySchema = v.strictObject({
 export const AuthorizedPeerSchema = v.strictObject({
   profileId: ProfileIdSchema,
   displayName: DisplayNameSchema,
-  fingerprint: v.pipe(v.string(), v.regex(/^[0-9A-F:]+$/)),
+  fingerprint: FingerprintSchema,
 });
 
 export const PeerLinkSchema = v.strictObject({

@@ -5,11 +5,14 @@ const PEER_CHANNEL = "recnrun-peer";
 const PEER_PROTOCOL = 1;
 /** Bigger frames are dropped unread, so a peer cannot make the other parse megabytes. */
 export const MAX_FRAME_LENGTH = 256 * 1024;
+/** A pairing code's bound, in the folder and over a link alike. */
+export const MAX_CODE_LENGTH = 128 * 1024;
 
 const text = (max: number) => v.pipe(v.string(), v.maxLength(max));
 export const ProfileIdSchema = v.pipe(v.string(), v.uuid());
 const MessageIdSchema = v.pipe(v.string(), v.uuid());
 const TabIdSchema = v.pipe(v.number(), v.integer(), v.minValue(0));
+export const FingerprintSchema = v.pipe(v.string(), v.regex(/^[0-9A-F:]+$/), v.maxLength(200));
 
 const envelope = {
   channel: v.literal(PEER_CHANNEL),
@@ -49,6 +52,18 @@ const sessionStatus = {
 
 const reply = { requestId: MessageIdSchema };
 
+/** A profile the sender's verified links reach, as the sender pinned it. */
+export const MemberSchema = v.strictObject({
+  profileId: ProfileIdSchema,
+  displayName: text(64),
+  fingerprint: FingerprintSchema,
+});
+
+export type Member = v.InferOutput<typeof MemberSchema>;
+
+/** Carried by a profile linked to both `origin` and `target`, so those two need no folder. */
+const relay = { origin: ProfileIdSchema, target: ProfileIdSchema };
+
 /** The closed set of things a peer may say; anything else is dropped. */
 const PeerMessageSchema = v.variant("type", [
   message("HELLO", { displayName: text(64), extensionVersion: text(32) }),
@@ -64,6 +79,11 @@ const PeerMessageSchema = v.variant("type", [
   message("ERROR", { requestId: v.optional(MessageIdSchema), reason: text(200) }),
   // The sender closes the link on purpose next; without it, a close looks like a failure.
   message("BYE", {}),
+  message("MEMBERS", { members: v.pipe(v.array(MemberSchema), v.maxLength(64)) }),
+  // A pairing code, as the folder would hold it.
+  message("SIGNAL", { ...relay, code: text(MAX_CODE_LENGTH) }),
+  // Asks `target`, whose id is the lower, to offer to `origin`.
+  message("INVITE", relay),
 ]);
 
 export type PeerMessage = v.InferOutput<typeof PeerMessageSchema>;

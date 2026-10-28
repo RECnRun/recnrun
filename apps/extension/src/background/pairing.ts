@@ -49,8 +49,9 @@ export function createPairing(deps: PairingDependencies) {
   const createOffer = async (to: string) => {
     const pairingId = crypto.randomUUID();
     const sdp = sdpOf(await deps.askLink({ type: "offer", peer: to }));
-    await deps.pending.set(to, { pairingId, expiresAt: now() + PAIRING_TTL_MS, to });
-    return { code: await half("offer", pairingId, sdp) };
+    const code = await half("offer", pairingId, sdp);
+    await deps.pending.set(to, { pairingId, expiresAt: now() + PAIRING_TTL_MS, to, code });
+    return { code };
   };
   const accept = async (code: string): Promise<{ code?: string }> => {
     const { pairing, fingerprint } = await verifyCode(code, deps, now());

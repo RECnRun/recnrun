@@ -1,10 +1,9 @@
 import * as v from "valibot";
 import { DisplayNameSchema, decodePairing } from "@/p2p/pairing-code";
-import { ProfileIdSchema } from "@/p2p/protocol";
+import { FingerprintSchema, MAX_CODE_LENGTH, ProfileIdSchema } from "@/p2p/protocol";
 
 const PRESENCE_FILE = "presence.json";
 const SIGNAL_NAME = /^(offer|answer)-[0-9a-f-]{36}\.json$/;
-const MAX_FILE_BYTES = 128 * 1024;
 /** A presence lasts this long unless refreshed, so a profile that stopped waiting drops out. */
 export const PRESENCE_TTL_MS = 60 * 1000;
 
@@ -12,7 +11,7 @@ export const PRESENCE_TTL_MS = 60 * 1000;
 export const PresenceSchema = v.strictObject({
   profileId: ProfileIdSchema,
   displayName: DisplayNameSchema,
-  fingerprint: v.pipe(v.string(), v.regex(/^[0-9A-F:]+$/)),
+  fingerprint: FingerprintSchema,
   createdAt: v.number(),
   expiresAt: v.number(),
 });
@@ -26,7 +25,7 @@ export const SignalFileSchema = v.strictObject({
   /** The one profile it is for; every other ignores it. */
   to: ProfileIdSchema,
   expiresAt: v.number(),
-  code: v.pipe(v.string(), v.maxLength(MAX_FILE_BYTES)),
+  code: v.pipe(v.string(), v.maxLength(MAX_CODE_LENGTH)),
 });
 
 /**
@@ -54,7 +53,7 @@ export function signalFileOf(code: string, to: string, now = Date.now()): Signal
 
 async function readFile<T>(folder: Directory, name: string, schema: v.GenericSchema<T>) {
   const file = await (await folder.getFileHandle(name)).getFile();
-  if (file.size > MAX_FILE_BYTES) return undefined;
+  if (file.size > MAX_CODE_LENGTH) return undefined;
   const parsed = v.safeParse(schema, JSON.parse(await file.text()));
   return parsed.success ? parsed.output : undefined;
 }

@@ -52,6 +52,29 @@ describe("peerMessage", () => {
   });
 });
 
+describe("pairing through the mesh", () => {
+  const member = { profileId: route.to, displayName: "Desk", fingerprint: "AB:CD" };
+  const relayed = { origin: route.from, target: route.to };
+
+  test("carries whom a profile reaches, and signals and invitations for another", () => {
+    for (const message of [
+      peerMessage("MEMBERS", route, { members: [member] }),
+      peerMessage("SIGNAL", route, { ...relayed, code: "offer" }),
+      peerMessage("INVITE", route, relayed),
+    ])
+      expect(parsePeerFrame(frameOf(message))).toEqual(message);
+  });
+
+  test("drops a member without a certificate fingerprint, or a signal without a target", () => {
+    const unpinned = { ...member, fingerprint: "not a fingerprint" };
+    expect(parsePeerFrame(frameOf(peerMessage("MEMBERS", route, { members: [unpinned] })))).toBe(
+      undefined,
+    );
+    const { target: _target, ...untargeted } = peerMessage("INVITE", route, relayed);
+    expect(parsePeerFrame(frameOf(untargeted))).toBeUndefined();
+  });
+});
+
 describe("parsePeerFrame", () => {
   const valid = () => peerMessage("GET_TABS", route, {});
 

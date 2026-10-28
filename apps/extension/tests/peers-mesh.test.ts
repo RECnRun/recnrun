@@ -2,11 +2,12 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vite-plus/tes
 import { fakeBrowser } from "wxt/testing/fake-browser";
 import {
   authorizedPeersRepository,
+  folderPairingRepository,
   peerLinksRepository,
   peerTabsRepository,
   remoteRecordingsRepository,
 } from "@/storage/peer-repository";
-import { ME, PEER, STRANGER, fromPeer } from "./fake-peer";
+import { FINGERPRINT, ME, PEER, STRANGER, fromPeer } from "./fake-peer";
 import { peerBackground } from "./peer-background";
 
 const session = { tabId: 4, status: "recording" as const, banked: 0, since: 1 };
@@ -54,6 +55,38 @@ describe("two peers", () => {
     expect(await peerTabsRepository.all()).toEqual({ [PEER]: { tabs: [] } });
   });
 
+  const lab = { profileId: STRANGER, displayName: "Lab", fingerprint: OTHER_FINGERPRINT };
+  const desk = { profileId: PEER, displayName: "Desk", fingerprint: FINGERPRINT };
+  const membersSent = (frames: { type: string; to?: string; members?: unknown }[]) =>
+    frames.filter((frame) => frame.type === "MEMBERS").map(({ to, members }) => ({ to, members }));
+
+  test("each new link introduces the linked peers to each other, and a drop updates the rest", async () => {
+    const { routes, connect, receive, link } = await peerBackground();
+    await authorizedPeersRepository.set(STRANGER, lab);
+    await connect();
+    await receive(fromPeer("MEMBERS", { members: [] }));
+    await connect(OTHER_FINGERPRINT, STRANGER);
+    await receive(fromPeer("MEMBERS", { members: [] }, STRANGER), STRANGER);
+    await routes.link({ type: "state", peer: STRANGER, state: "disconnected" });
+    expect(membersSent(link.frames())).toEqual([
+      { to: PEER, members: [] },
+      { to: PEER, members: [lab] },
+      { to: STRANGER, members: [desk] },
+      { to: PEER, members: [] },
+    ]);
+  });
+
+  test("Reconnect pairs again through a peer that reaches the paused profile", async () => {
+    const { routes, connect, receive, link } = await peerBackground();
+    await authorizedPeersRepository.set(STRANGER, lab);
+    await folderPairingRepository.write({ paused: [STRANGER] });
+    await connect();
+    await receive(fromPeer("MEMBERS", { members: [lab] }));
+    expect(link.commands).not.toContainEqual({ type: "offer", peer: STRANGER });
+    await routes.request({ type: "reconnect", peer: STRANGER });
+    expect(link.commands).toContainEqual({ type: "offer", peer: STRANGER });
+  });
+
   test("a frame claiming one peer's id over the other's link is dropped", async () => {
     const { connect, receive, link } = await peerBackground();
     await authorizedPeersRepository.set(STRANGER, {
@@ -64,6 +97,6 @@ describe("two peers", () => {
     await connect();
     await connect(OTHER_FINGERPRINT, STRANGER);
     await receive(fromPeer("GET_TABS", {}), STRANGER);
-    expect(link.sentTypes()).toEqual(["HELLO", "HELLO"]);
+    expect(link.sentTypes().filter((type) => type !== "MEMBERS")).toEqual(["HELLO", "HELLO"]);
   });
 });

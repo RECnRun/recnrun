@@ -52,10 +52,12 @@ describe("this profile's tabs", () => {
     await fakeBrowser.windows.onFocusChanged.trigger(2);
     for (const listener of peers.moved) listener();
     await vi.advanceTimersByTimeAsync(149);
-    expect(peers.link.sentTypes()).toEqual(["HELLO"]);
+    expect(peers.link.sentTypes()).toEqual(["HELLO", "MEMBERS"]);
     await vi.advanceTimersByTimeAsync(1);
-    await vi.waitFor(() => expect(peers.link.sentTypes()).toEqual(["HELLO", "TABS_CHANGED"]));
-    const { tabs, currentId } = peers.link.frames()[1] as unknown as Record<string, unknown>;
+    await vi.waitFor(() =>
+      expect(peers.link.sentTypes()).toEqual(["HELLO", "MEMBERS", "TABS_CHANGED"]),
+    );
+    const { tabs, currentId } = peers.link.frames()[2] as unknown as Record<string, unknown>;
     expect(tabs).toEqual([
       { ...TAB, id: 5 },
       { ...TAB, id: 6 },
@@ -100,7 +102,7 @@ describe("unreadable state", () => {
     await vi.advanceTimersByTimeAsync(150);
     await fakeBrowser.storage.session.set({ recording: "unreadable" });
     await vi.advanceTimersByTimeAsync(10);
-    expect(peers.link.sentTypes()).toEqual(["HELLO"]);
+    expect(peers.link.sentTypes()).toEqual(["HELLO", "MEMBERS"]);
   });
 });
 

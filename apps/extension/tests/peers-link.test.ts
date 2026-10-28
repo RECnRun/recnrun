@@ -62,9 +62,11 @@ describe("a new link", () => {
         displayName: "Laptop",
         extensionVersion: "0.1.0",
       }),
+      // No other peer is linked, so this one reaches nobody through it yet.
+      expect.objectContaining({ type: "MEMBERS", to: PEER, members: [] }),
     ]);
     expect(link.notices).toContainEqual({ target: "pages", type: "peer-changed" });
-    expect(tappedFrames()).toHaveLength(1);
+    expect(tappedFrames()).toHaveLength(2);
   });
 
   test("stores a connecting link as unverified and tells the pages", async () => {
@@ -89,7 +91,7 @@ describe("frames", () => {
     const { connect, receive, link } = await peerBackground();
     await connect();
     await receive(fromPeer("GET_TABS", {}, STRANGER));
-    expect(link.sentTypes()).toEqual(["HELLO"]);
+    expect(link.sentTypes()).toEqual(["HELLO", "MEMBERS"]);
   });
 
   test("tells only a verified peer that a frame was invalid", async () => {
@@ -169,7 +171,7 @@ describe("an intended close", () => {
       const { routes, connect, link } = await peerBackground();
       await connect();
       await routes.request({ type, peer: PEER });
-      expect(link.sentTypes()).toEqual(["HELLO", "BYE"]);
+      expect(link.sentTypes()).toEqual(["HELLO", "MEMBERS", "BYE"]);
       expect(link.commands.at(-1)).toEqual({ type: "close", peer: PEER });
       await routes.link({ type: "state", peer: PEER, state: "disconnected" });
       expect(await peerLinksRepository.get(PEER)).toEqual({

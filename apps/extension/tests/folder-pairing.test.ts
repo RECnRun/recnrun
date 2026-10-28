@@ -50,6 +50,7 @@ const pendingFor = (to: string, expiresAt = NOW + 1000): PendingOffer => ({
   pairingId: OFFER_ID,
   expiresAt,
   to,
+  code: "offer-code",
 });
 const situation = (me: string, sighting: Seen) => ({
   me,
@@ -171,7 +172,12 @@ function folderPairing(
   const answer = signal("answer", me, PEER);
   const pairing = {
     createOffer: vi.fn(async (to: string) => {
-      await pending.set(to, { pairingId: OFFER_ID, expiresAt: NOW + PAIRING_TTL_MS, to });
+      await pending.set(to, {
+        pairingId: OFFER_ID,
+        expiresAt: NOW + PAIRING_TTL_MS,
+        to,
+        code: offer.code,
+      });
       return { code: offer.code };
     }),
     accept: vi.fn(async (_code: string): Promise<{ code?: string }> => ({ code: answer.code })),

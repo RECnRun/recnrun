@@ -41,9 +41,13 @@ export async function pixelAt(x: number, y: number): Promise<Rgb> {
   }
 }
 
-/** Polls `check` every 100 ms for up to ten seconds. */
-export async function until(check: () => Promise<boolean>, what: string): Promise<void> {
-  for (let left = 100; left > 0; left--) {
+/** Polls `check` every 100 ms for up to `ms`, ten seconds unless told otherwise. */
+export async function until(
+  check: () => Promise<boolean>,
+  what: string,
+  ms = 10_000,
+): Promise<void> {
+  for (let left = ms / 100; left > 0; left--) {
     if (await check()) return;
     await new Promise((resolve) => setTimeout(resolve, 100));
   }

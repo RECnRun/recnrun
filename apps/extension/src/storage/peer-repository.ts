@@ -7,7 +7,7 @@ import {
   PeerLinkSchema,
   ProfileIdentitySchema,
 } from "@/messaging/peer-results";
-import { ProfileIdSchema, SharedTabsSchema } from "@/p2p/protocol";
+import { MAX_CODE_LENGTH, MemberSchema, ProfileIdSchema, SharedTabsSchema } from "@/p2p/protocol";
 
 export type ProfileIdentity = v.InferOutput<typeof ProfileIdentitySchema>;
 export type AuthorizedPeer = v.InferOutput<typeof AuthorizedPeerSchema>;
@@ -15,11 +15,12 @@ export type PeerLink = v.InferOutput<typeof PeerLinkSchema>;
 
 const PairingIdSchema = v.pipe(v.string(), v.uuid());
 
-/** The offer this profile waits an answer for, and whom it is for. */
+/** The offer this profile waits an answer for, whom it is for, and its code to send again. */
 const PendingOfferSchema = v.strictObject({
   pairingId: PairingIdSchema,
   expiresAt: v.number(),
   to: ProfileIdSchema,
+  code: v.pipe(v.string(), v.maxLength(MAX_CODE_LENGTH)),
 });
 
 export type PendingOffer = v.InferOutput<typeof PendingOfferSchema>;
@@ -114,6 +115,8 @@ export const folderPresentRepository = repository(
 export const peerLinksRepository = peerRecords("session:peerLinks", PeerLinkSchema);
 export const pendingOffersRepository = peerRecords("session:pendingOffers", PendingOfferSchema);
 export const folderActedRepository = peerRecords("session:folderActed", FolderActedSchema);
+/** The profiles each linked peer said its links reach, under that peer. */
+export const meshMembersRepository = peerRecords("session:meshMembers", v.array(MemberSchema));
 export const remoteRecordingsRepository = peerRecords(
   "session:remoteRecordings",
   RemoteRecordingSchema,

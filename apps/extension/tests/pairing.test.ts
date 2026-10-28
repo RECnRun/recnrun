@@ -19,6 +19,7 @@ interface PendingOffer {
   pairingId: string;
   expiresAt: number;
   to: string;
+  code: string;
 }
 
 /** One profile's pairing flow over a fake link whose certificate is `fingerprint`. */
@@ -55,6 +56,7 @@ describe("a full pairing", () => {
       pairingId,
       expiresAt: NOW + PAIRING_TTL_MS,
       to: B.profileId,
+      code: offer,
     });
     expect(await b.authorized.all()).toEqual({});
 
@@ -133,12 +135,16 @@ describe("refused codes", () => {
     const wrong = "This answer is not for the offer this profile made.";
     const pairingId = "55555555-5555-4555-8555-555555555555";
     const to = B.profileId;
-    await a.pending.set(to, { pairingId, expiresAt: NOW + PAIRING_TTL_MS, to });
+    await a.pending.set(to, { pairingId, expiresAt: NOW + PAIRING_TTL_MS, to, code: offer });
     await expect(a.accept(answer)).rejects.toThrow(wrong);
     await a.pending.set(to, null);
     await expect(a.accept(answer)).rejects.toThrow(wrong);
     // An offer to another profile answers nothing from B.
-    const made = { pairingId: decodePairing(answer, NOW).pairingId, expiresAt: NOW + 1 };
+    const made = {
+      pairingId: decodePairing(answer, NOW).pairingId,
+      expiresAt: NOW + 1,
+      code: offer,
+    };
     await a.pending.set(STRANGER, { ...made, to: STRANGER });
     await expect(a.accept(answer)).rejects.toThrow(wrong);
     await a.pending.set(to, { ...made, expiresAt: NOW, to });

@@ -114,7 +114,7 @@ async function bubble(id: string, at: Spot, shown: (rgb: Rgb) => boolean) {
     at,
     visible: check,
     appears: () => until(check, "Chrome's prompt to show"),
-    closes: () => until(async () => !(await check()), "Chrome's prompt to close"),
+    closes: (ms?: number) => until(async () => !(await check()), "Chrome's prompt to close", ms),
   };
 }
 
@@ -133,16 +133,28 @@ async function firstShown(bubbles: Bubble[]): Promise<Bubble> {
 
 let windows = 0;
 
-/** Answers the write prompt from the keyboard, since it takes the focus. */
+/**
+ * Answers the write prompt from the keyboard, since it takes the focus. Allow clicks when space
+ * comes up, and with many windows the release sometimes goes astray, leaving Allow pressed and
+ * focused; space goes again until the prompt closes.
+ */
 async function answerWrite(id: string, prompt: Bubble, answer: "allow" | "deny") {
   await xdotool("windowfocus", "--sync", id);
-  if (answer === "deny") await xdotool("key", "Return");
-  else {
-    await xdotool("key", "Tab");
-    await pause(200);
-    await xdotool("key", "space");
+  if (answer === "deny") {
+    await xdotool("key", "Return");
+    return prompt.closes();
   }
-  await prompt.closes();
+  await xdotool("key", "Tab");
+  await pause(200);
+  for (let tries = 3; ; tries--) {
+    await xdotool("windowfocus", "--sync", id);
+    await xdotool("key", "space");
+    try {
+      return await prompt.closes(3_000);
+    } catch (error) {
+      if (tries === 1) throw error;
+    }
+  }
 }
 
 /** Clicks the restore prompt's button that `prompt` found shown. */

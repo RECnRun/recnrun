@@ -6,6 +6,8 @@ import type { ExecutorDependencies } from "@/background/executor";
 import { createFolderPairing } from "@/background/folder-pairing";
 import type { FolderPairingFlow } from "@/background/folder-pairing";
 import { askLink, closeOffscreen } from "@/background/link";
+import { createMeshPairing } from "@/background/mesh-pairing";
+import type { MeshPairingFlow } from "@/background/mesh-pairing";
 import { createPairing } from "@/background/pairing";
 import { createPeerChannel } from "@/background/peer-channel";
 import type { PeerChannel } from "@/background/peer-channel";
@@ -22,6 +24,7 @@ import {
   folderPairingRepository,
   folderPresentRepository,
   identityRepository,
+  meshMembersRepository,
   peerLinksRepository,
   peerTabsRepository,
   pendingOffersRepository,
@@ -93,8 +96,19 @@ async function hello(channel: PeerChannel, peer: string): Promise<void> {
   });
 }
 
+/** Pairing through the RECnRun folder, and through the peers linked already. */
+interface PairingFlows {
+  folder: FolderPairingFlow;
+  mesh: MeshPairingFlow;
+}
+
 /** The link to `peer` went down; every other peer's link, waiters, and reports stay. */
-async function linkDown(peer: string, state: LinkState, channel: PeerChannel) {
+async function linkDown(
+  peer: string,
+  state: LinkState,
+  channel: PeerChannel,
+  mesh: MeshPairingFlow,
+) {
   // The reason for an intended close or a refused certificate outlives the states that follow.
   const reason = (await peerLinksRepository.get(peer).catch(() => null))?.reason;
   await peerLinksRepository.set(peer, { state, verified: false, ...(reason && { reason }) });
@@ -102,12 +116,13 @@ async function linkDown(peer: string, state: LinkState, channel: PeerChannel) {
   // The last report stays, marked unknown: only the executor may say a session ended.
   const mirror = await remoteRecordingsRepository.get(peer).catch(() => null);
   if (mirror) await remoteRecordingsRepository.set(peer, { ...mirror, connected: false });
+  await mesh.dropped(peer);
   notifyPages();
 }
 
 type StateEvent = Extract<LinkEvent, { type: "state" }>;
 
-async function linkUp(event: StateEvent, channel: PeerChannel, folder: FolderPairingFlow) {
+async function linkUp(event: StateEvent, channel: PeerChannel, flows: PairingFlows) {
   const authorized = await authorizedPeersRepository.get(event.peer);
   // DTLS proved the other side holds this certificate; only the one the user accepted may talk.
   if (!authorized || event.remoteFingerprint !== authorized.fingerprint) {
@@ -118,19 +133,20 @@ async function linkUp(event: StateEvent, channel: PeerChannel, folder: FolderPai
     return;
   }
   await peerLinksRepository.set(event.peer, { state: "connected", verified: true });
-  await folder.linked(event.peer);
+  await flows.folder.linked(event.peer);
   await hello(channel, event.peer);
+  await flows.mesh.announce();
   notifyPages();
 }
 
 /** The peer said it closes the link on purpose, so this side closes too, without waiting for ICE. */
-async function closedByPeer(channel: PeerChannel, peer: string) {
+async function closedByPeer(channel: PeerChannel, peer: string, mesh: MeshPairingFlow) {
   await peerLinksRepository.set(peer, {
     state: "disconnected",
     verified: false,
     reason: "closed-by-peer",
   });
-  await linkDown(peer, "disconnected", channel);
+  await linkDown(peer, "disconnected", channel, mesh);
   await askLink({ type: "close", peer });
 }
 
@@ -138,7 +154,7 @@ function createLinkHandler(
   channel: PeerChannel,
   executor: ExecutorDependencies,
   tabs: TabsCache,
-  folder: FolderPairingFlow,
+  flows: PairingFlows,
 ) {
   const onFrame = async (frame: string, peer: string) => {
     tap?.push(frame);
@@ -150,15 +166,17 @@ function createLinkHandler(
         await channel.send(peer, "ERROR", { reason: "Invalid message." }).catch(() => {});
       return;
     }
-    if (received.message.type === "BYE") return closedByPeer(channel, received.message.from);
-    await execute(received.message, executor);
-    await observe(received.message, tabs);
+    const { message } = received;
+    if (message.type === "BYE") return closedByPeer(channel, message.from, flows.mesh);
+    await execute(message, executor);
+    await observe(message, tabs);
+    await flows.mesh.receive(message);
   };
   const handle = async (event: LinkEvent) => {
     if (event.type === "frame") return onFrame(event.frame, event.peer);
-    if (event.type === "folder") return folder.seen(event);
-    if (event.state === "connected") return linkUp(event, channel, folder);
-    if (event.state !== "connecting") return linkDown(event.peer, event.state, channel);
+    if (event.type === "folder") return flows.folder.seen(event);
+    if (event.state === "connected") return linkUp(event, channel, flows);
+    if (event.state !== "connecting") return linkDown(event.peer, event.state, channel, flows.mesh);
     await peerLinksRepository.set(event.peer, { state: "connecting", verified: false });
     notifyPages();
   };
@@ -222,8 +240,10 @@ const FolderStatusSchema = v.object({ access: FolderAccessSchema });
 function requestDependencies(
   channel: PeerChannel,
   tabs: TabsCache,
-  folder: FolderPairingFlow,
+  { folder, mesh }: PairingFlows,
 ): PeerRequestDependencies {
+  // Reconnect also asks the peers linked already, which need no folder.
+  const viaMesh = () => mesh.look("all");
   return {
     channel,
     hello: (peer) => hello(channel, peer),
@@ -244,22 +264,22 @@ function requestDependencies(
       present: async () => (await folderPresentRepository.read()) ?? [],
       start: () => folder.start().then(notifyPages),
       pause: folder.pause,
-      unpause: (peer) => folder.unpause(peer).then(notifyPages),
-      unpauseAll: () => folder.unpauseAll().then(notifyPages),
+      unpause: (peer) => folder.unpause(peer).then(viaMesh).then(notifyPages),
+      unpauseAll: () => folder.unpauseAll().then(viaMesh).then(notifyPages),
       release: closeOffscreen,
     },
   };
 }
 
-/** Pairing through the folder, which exchanges the offer and answer codes. */
-function createFolder(): FolderPairingFlow {
+/** Pairing through the folder and through the mesh, which exchange the same offer and answer codes. */
+function createPairingFlows(channel: PeerChannel): PairingFlows {
   const pairing = createPairing({
     askLink,
     identity: readIdentity,
     authorized: authorizedPeersRepository,
     pending: pendingOffersRepository,
   });
-  return createFolderPairing({
+  const folder = createFolderPairing({
     askLink,
     identity: readIdentity,
     pairing,
@@ -274,6 +294,20 @@ function createFolder(): FolderPairingFlow {
     },
     log,
   });
+  const mesh = createMeshPairing({
+    channel,
+    identity: readIdentity,
+    pairing,
+    authorized: authorizedPeersRepository,
+    link: peerLinksRepository,
+    pending: pendingOffersRepository,
+    acted: folderActedRepository,
+    members: meshMembersRepository,
+    state: folderPairingRepository,
+    exclusive: folder.exclusive,
+    log,
+  });
+  return { folder, mesh };
 }
 
 /**
@@ -296,15 +330,16 @@ export function startPeers(): PeerRoutes {
   };
   const tabs = createTabsCache();
   watchExecutor(channel, executor);
-  const folder = createFolder();
+  const flows = createPairingFlows(channel);
+  const { folder } = flows;
   // Chrome starts the worker with the browser only for a startup listener; starting resumes.
   browser.runtime.onStartup.addListener(() => {});
   void folder.resume().catch((error: unknown) => log(errorMessage(error)));
   // Chrome ends the folder's grant with the last extension page, so the pages read it again.
   browser.tabs.onRemoved.addListener(notifyPages);
-  const deps = requestDependencies(channel, tabs, folder);
+  const deps = requestDependencies(channel, tabs, flows);
   return {
     request: (request) => handlePeerRequest(deps, request),
-    link: createLinkHandler(channel, executor, tabs, folder),
+    link: createLinkHandler(channel, executor, tabs, flows),
   };
 }

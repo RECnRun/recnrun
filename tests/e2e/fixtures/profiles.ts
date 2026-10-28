@@ -25,8 +25,10 @@ export interface Profile {
 interface ProfileFixtures {
   profileA: Profile;
   profileB: Profile;
-  /** A third profile, for a mesh of three. */
+  /** Three more profiles, for a mesh of five. */
   profileC: Profile;
+  profileD: Profile;
+  profileE: Profile;
   /** Opens a new browser process on a profile's directory, as after a restart. */
   launch: (dir: string) => Promise<BrowserContext>;
 }
@@ -96,26 +98,25 @@ async function closeProfile(profile: Profile) {
   rmSync(profile.dir, { recursive: true, force: true });
 }
 
+/** A fixture that opens the profile named `name` for a test and removes it after. */
+const profileNamed =
+  (name: string) =>
+  async ({ headless }: { headless: boolean }, use: (profile: Profile) => Promise<void>) => {
+    const profile = await openProfile(name, headless);
+    await use(profile);
+    await closeProfile(profile);
+  };
+
 /**
  * Independent Chrome profiles, each a persistent context of its own on its own temporary
  * user data directory, never `browser.newContext()`, and never the user's own profile.
  */
 export const test = base.extend<ProfileFixtures>({
-  profileA: async ({ headless }, use) => {
-    const profile = await openProfile("Profile A", headless);
-    await use(profile);
-    await closeProfile(profile);
-  },
-  profileB: async ({ headless }, use) => {
-    const profile = await openProfile("Profile B", headless);
-    await use(profile);
-    await closeProfile(profile);
-  },
-  profileC: async ({ headless }, use) => {
-    const profile = await openProfile("Profile C", headless);
-    await use(profile);
-    await closeProfile(profile);
-  },
+  profileA: profileNamed("Profile A"),
+  profileB: profileNamed("Profile B"),
+  profileC: profileNamed("Profile C"),
+  profileD: profileNamed("Profile D"),
+  profileE: profileNamed("Profile E"),
   launch: async ({ headless }, use) => {
     const opened: BrowserContext[] = [];
     await use(async (dir) => {
