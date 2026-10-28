@@ -8,7 +8,7 @@ Plan: [poc-incognito-sessions-plan.md](poc-incognito-sessions-plan.md). Assignme
 | Branch               | `poc/incognito-sessions`                                         |
 | Planned base         | `44c154da29860c7a8df829e902b177df5ce2ba2a` (2026-10-28)          |
 | Actual base (P0.1)   | `44c154d` (re-resolved 2026-10-28, unchanged)                    |
-| Last recorded commit | `2b5124c`                                                        |
+| Last recorded commit | `038dfb4`                                                        |
 | Decisions OD-1…OD-4  | defaults of plan §3, accepted by the user ("Avance", 2026-10-28) |
 
 ## Status legend
@@ -74,7 +74,11 @@ Stage 0 verify: first run exit 1 — P0.3's server took port 5191, which `dashbo
   green: same command → 28 files, 127 tests passed
   commit: 2b5124c Count Incognito always-on-top windows as blocking the workspace
   notes: `vp check`, `vp run deps` pass; `workspace-windows.test.ts` inventory case now keeps the Incognito PiP; ARCHITECTURE's workspace paragraph states the rule
-- [ ] S1.3b `workspace-restart { url }` (orchestrator decision): close the managed window, open a fresh one, navigate; refusals for access, busy, internal URL, foreign windows, no active managed window
+- [i] S1.3b `workspace-restart { url }` (orchestrator decision): close the managed window, open a fresh one, navigate; refusals for access, busy, internal URL, foreign windows, no active managed window
+  red: `vp run test:unit` → 6 failed in `apps/extension/tests/workspace-restart.test.ts` against a stub `restart` that does nothing, e.g. `closes the managed window, then opens a fresh one, then navigates its tab: expected [] to deeply equal [ 1 ]`, `refuses while another Incognito window is open, and closes nothing: expected { ok: true, result: undefined } to deeply equal { ok: false, …(1) }`, busy case `expected "update" to be called at least once`
+  green: same command → 29 files, 134 tests passed
+  commit: 038dfb4 Add a workspace command that replaces the open managed window
+  notes: `vp check`, `vp run deps`, `dead-code`, `duplication` (0 clones) pass; shared route-test helpers moved to `tests/workspace-harness.ts`; ARCHITECTURE workspace paragraph documents the command and that it discards the window's Incognito data until Stage 3; not exercised in a real browser here (the dashboard's Close and start empty in S1.4 drives it end to end)
 - [ ] S1.4 Dashboard: access requirement, blockers + "Close these windows and start", Start, "Use this tab's address"
 - [ ] S1.5 Record only the managed tab; existing e2e and product docs updated
 - [ ] S1.6 E2E reset experiment (six sentinel kinds, normal profile unchanged, repository readable) + negative control (foreign window keeps data, dashboard blocks)
