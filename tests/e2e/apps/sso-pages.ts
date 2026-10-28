@@ -63,6 +63,22 @@ export const idpLoginHtml = (user: string, back: string) =>
   `<script>(${idpSignedIn.toString()})(${literal(user)}, ${literal(back)});</script>` +
   `</head><body></body></html>`;
 
+const attribute = (value: string) =>
+  value.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;");
+
+/** The provider's interactive sign-in page: a form that signs the typed user in at /sso/login. */
+export function idpSignInHtml(url: URL): string {
+  const hidden = ["run", "redirect_uri", "response_mode"]
+    .map((name) => [name, url.searchParams.get(name)] as const)
+    .filter((pair): pair is readonly [string, string] => pair[1] !== null)
+    .map(([name, value]) => `<input type="hidden" name="${name}" value="${attribute(value)}">`);
+  return (
+    `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Sign in</title></head>` +
+    `<body><form action="/sso/login"><label>User <input name="user"></label>${hidden.join("")}` +
+    `<button>Sign in</button></form></body></html>`
+  );
+}
+
 /** The provider's page for a spec to read what its origin holds: its localStorage. */
 export const idpStorageHtml =
   `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Provider storage</title>` +

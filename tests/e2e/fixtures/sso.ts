@@ -23,6 +23,18 @@ export async function ssoSignIn(page: Page, run: string, user: string): Promise<
   return ssoSettled(page);
 }
 
+/** The server client that sends a user without a session to its provider's sign-in page. */
+export const ssoInteractiveUrl = (run: string) => `${ssoServerUrl(run)}&interactive=1`;
+
+/** Signs `user` in on the provider's sign-in page, as a person would, and waits for the app. */
+export async function ssoFormSignIn(page: Page, user: string): Promise<SsoState> {
+  await expect(page).toHaveTitle("Sign in");
+  await page.getByRole("textbox", { name: "User" }).fill(user);
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.waitForURL(`${APP}/sso-app/**`);
+  return ssoSettled(page);
+}
+
 /** Signs `user` in for the server-session client: the provider answers its callback. */
 export async function ssoServerSignIn(page: Page, run: string, user: string): Promise<SsoState> {
   const back = `${APP}/sso-app/callback?run=${encodeURIComponent(run)}`;
@@ -31,13 +43,16 @@ export async function ssoServerSignIn(page: Page, run: string, user: string): Pr
   return ssoSettled(page);
 }
 
-/** Expires the server client's sessions of `run`; Node may not resolve *.localhost. */
-export async function expireServerSessions(run: string): Promise<void> {
-  const response = await fetch(`http://localhost:5192/sso-app/expire?run=${run}`, {
-    method: "POST",
-  });
-  if (!response.ok) throw new Error(`The SSO app answered ${response.status}.`);
+async function expireAt(path: string, run: string): Promise<void> {
+  const response = await fetch(`http://localhost:5192${path}?run=${run}`, { method: "POST" });
+  if (!response.ok) throw new Error(`${path} answered ${response.status}.`);
 }
+
+/** Expires the server client's sessions of `run`; Node may not resolve *.localhost. */
+export const expireServerSessions = (run: string) => expireAt("/sso-app/expire", run);
+
+/** Expires the provider's sessions of `run`, until a sign-in there. */
+export const expireProviderSessions = (run: string) => expireAt("/sso/expire", run);
 
 /** The managed tab once it shows the app or its provider, other than `previous`. */
 export async function ssoPage(context: BrowserContext, previous?: Page): Promise<Page> {

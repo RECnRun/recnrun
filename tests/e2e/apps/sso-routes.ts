@@ -3,7 +3,14 @@
 import { randomUUID } from "node:crypto";
 import { cookiesOf, HTML, JSON_TYPE, redirectTo, send } from "./http.ts";
 import type { Exchange } from "./http.ts";
-import { IDP, idpLoginHtml, idpStorageHtml, ssoAppHtml, ssoServerHtml } from "./sso-pages.ts";
+import {
+  IDP,
+  idpLoginHtml,
+  idpSignInHtml,
+  idpStorageHtml,
+  ssoAppHtml,
+  ssoServerHtml,
+} from "./sso-pages.ts";
 
 const APP = "http://app.localhost:5192";
 
@@ -19,28 +26,41 @@ function answerTo(url: URL, answer: Record<string, string>): string {
   return `${back}${back.includes("?") ? "&" : "?"}${params}`;
 }
 
+/** Runs whose provider sessions expired: their session cookies no longer sign anyone in. */
+const expiredAtProvider = new Set<string>();
+
 /** Signs `user` in at the provider and returns to `redirect_uri` with the user. */
-function login({ response, url }: Exchange): void {
+function login({ response, url, run = "" }: Exchange): void {
+  expiredAtProvider.delete(run);
   const user = url.searchParams.get("user") ?? "";
   const back = answerTo(url, { user });
   send(response, HTML, idpLoginHtml(user, back), { "set-cookie": session(user) });
 }
 
-/** Returns at once: the session's user, or `login_required` for a silent check without one. */
-function authorize({ request, response, url }: Exchange): void {
-  const user = cookiesOf(request).idp_session;
+/**
+ * Returns at once with the session's user, or `login_required` for a silent check without one;
+ * an interactive request without a session gets the sign-in page.
+ */
+function authorize({ request, response, url, run = "" }: Exchange): void {
+  const user = expiredAtProvider.has(run) ? undefined : cookiesOf(request).idp_session;
   if (user !== undefined) redirectTo(response, answerTo(url, { user }));
   else if (url.searchParams.get("prompt") === "none")
     redirectTo(response, answerTo(url, { error: "login_required" }));
-  else send(response, HTML, "<!doctype html><title>Sign in</title><p>Sign in</p>");
+  else send(response, HTML, idpSignInHtml(url));
 }
 
 /** The server client's sessions by id, per run, so a spec can expire them. */
 const sessions = new Map<string, { user: string; run: string }>();
 
-const serverPage = (run: string) => `/sso-app/?run=${encodeURIComponent(run)}&server=1`;
+/** The server client's page; an interactive client stays interactive through its callback. */
+const serverPage = (run: string, url: URL) =>
+  `/sso-app/?run=${encodeURIComponent(run)}&server=1` +
+  (url.searchParams.get("interactive") === "1" ? "&interactive=1" : "");
 
-/** The server client: its session's page, or a silent check at the provider without one. */
+/**
+ * The server client: its session's page, or without one a silent check at the provider, or its
+ * sign-in page with `interactive=1`.
+ */
 function serverApp({ request, response, url, run = "" }: Exchange): void {
   const id = cookiesOf(request).app_session;
   const user = id === undefined ? undefined : sessions.get(id)?.user;
@@ -49,9 +69,10 @@ function serverApp({ request, response, url, run = "" }: Exchange): void {
     send(response, HTML, ssoServerHtml(run, user ?? null, error));
     return;
   }
-  const back = `${APP}/sso-app/callback?run=${encodeURIComponent(run)}`;
-  const query = new URLSearchParams({ run, prompt: "none", response_mode: "query" });
-  query.set("redirect_uri", back);
+  const interactive = url.searchParams.get("interactive") === "1";
+  const back = `${APP}/sso-app/callback?run=${encodeURIComponent(run)}${interactive ? "&interactive=1" : ""}`;
+  const query = new URLSearchParams({ run, response_mode: "query", redirect_uri: back });
+  if (!interactive) query.set("prompt", "none");
   redirectTo(response, `${IDP}/sso/authorize?${query.toString()}`);
 }
 
@@ -60,13 +81,13 @@ function callback({ response, url, run = "" }: Exchange): void {
   const user = url.searchParams.get("user");
   if (user === null) {
     const error = encodeURIComponent(url.searchParams.get("error") ?? "unknown");
-    redirectTo(response, `${serverPage(run)}&error=${error}`);
+    redirectTo(response, `${serverPage(run, url)}&error=${error}`);
     return;
   }
   const id = randomUUID();
   sessions.set(id, { user, run });
   const cookie = `app_session=${id}; Path=/sso-app/; HttpOnly; SameSite=Lax`;
-  response.writeHead(302, { location: serverPage(run), "set-cookie": cookie });
+  response.writeHead(302, { location: serverPage(run, url), "set-cookie": cookie });
   response.end();
 }
 
@@ -76,9 +97,16 @@ function expire({ response, run }: Exchange): void {
   send(response, JSON_TYPE, "{}");
 }
 
+/** Expires the run's provider sessions, until someone signs in there again. */
+function expireAtProvider({ response, run = "" }: Exchange): void {
+  expiredAtProvider.add(run);
+  send(response, JSON_TYPE, "{}");
+}
+
 export const ssoRoutes: Record<string, (exchange: Exchange) => void> = {
   "GET /sso/login": login,
   "GET /sso/authorize": authorize,
+  "POST /sso/expire": expireAtProvider,
   "GET /sso/storage": ({ response }) => send(response, HTML, idpStorageHtml),
   "GET /sso-app/": (exchange) => {
     const { response, url, run } = exchange;
