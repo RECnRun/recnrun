@@ -98,7 +98,7 @@ test("accepts a running operation and a failed one with its error", () => {
 
 test("rejects an operation of an unknown kind or status, or without an id or a step", () => {
   for (const operation of [
-    { ...running, kind: "switch" },
+    { ...running, kind: "restart" },
     { ...running, status: "paused" },
     { ...running, id: "" },
     { ...running, step: undefined },

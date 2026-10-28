@@ -30,7 +30,12 @@ export function memoryRecordingStore(
 }
 
 /** With access and no Incognito window open, the workspace offers Start. */
-export const NO_INCOGNITO_WINDOW: WorkspaceStatus = { access: true, foreign: [], busy: false };
+export const NO_INCOGNITO_WINDOW: WorkspaceStatus = {
+  access: true,
+  foreign: [],
+  busy: false,
+  identities: [],
+};
 
 /**
  * A background that answers `workspace-status` with `status()` and accepts every other request,

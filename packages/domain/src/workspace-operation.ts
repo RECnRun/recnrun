@@ -3,7 +3,14 @@ import * as v from "valibot";
 /** A workspace operation as RECnRun records it while it runs and after it ends. */
 export const WorkspaceOperationSchema = v.object({
   id: v.pipe(v.string(), v.minLength(1)),
-  kind: v.picklist(["start-with-identity"]),
+  kind: v.picklist([
+    "start-with-identity",
+    "switch",
+    "suspend",
+    "resume",
+    "new-identity",
+    "delete-identity",
+  ]),
   step: v.string(),
   status: v.picklist(["running", "failed", "done"]),
   started: v.number(),

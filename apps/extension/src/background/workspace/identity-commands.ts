@@ -7,10 +7,13 @@ import { WorkspaceError } from "@/background/workspace/errors";
 import { managedWindowRepository } from "@/storage/managed-window-repository";
 import { createIdentityCaptures } from "@/storage/identity-captures";
 import type { IdentityCaptures } from "@/storage/identity-captures";
+import { identityRepository } from "@/storage/identity-repository";
+import type { IdentityRepository } from "@/ports/identities";
 
-/** A capture's Chrome APIs and the repository that also reads captures back. */
+/** A capture's Chrome APIs, the captures that are also read back and deleted, and the identities. */
 export interface IdentityDeps extends CaptureDeps {
-  captures: CaptureDeps["captures"] & Pick<IdentityCaptures, "read">;
+  captures: CaptureDeps["captures"] & Pick<IdentityCaptures, "read" | "remove">;
+  identities: IdentityRepository;
 }
 
 /** The capture APIs of Chrome and the extension's own IndexedDB; opened on first use only. */
@@ -19,6 +22,7 @@ export function chromeIdentityDeps(): IdentityDeps {
     api: chromeCaptureApi,
     cookies: chromeCookieApi,
     captures: createIdentityCaptures(globalThis.indexedDB),
+    identities: identityRepository,
   };
 }
 

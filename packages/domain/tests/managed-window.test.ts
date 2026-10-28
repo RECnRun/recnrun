@@ -17,6 +17,11 @@ describe("ManagedWindowStateSchema", () => {
     );
   });
 
+  test("may name the identity the window holds, never by an empty id", () => {
+    expect(v.is(ManagedWindowStateSchema, { ...active, identityId: "id-1" })).toBe(true);
+    expect(v.is(ManagedWindowStateSchema, { ...active, identityId: "" })).toBe(false);
+  });
+
   test("rejects an unknown status, negative or fractional numbers, and missing fields", () => {
     expect(v.is(ManagedWindowStateSchema, { ...active, status: "open" })).toBe(false);
     expect(v.is(ManagedWindowStateSchema, { ...active, generation: -1 })).toBe(false);

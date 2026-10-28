@@ -1,3 +1,4 @@
+import { approximateBytes } from "@recnrun/domain";
 import type { CaptureCapabilities, IdentityCapture, ManagedWindowState } from "@recnrun/domain";
 import { browser } from "wxt/browser";
 import { captureThroughAgent, isExpectedAgent } from "@/background/workspace/agent-link";
@@ -43,6 +44,8 @@ export interface CaptureSummary {
   cacheEntries: number;
   cookies: number;
   unsupported: number;
+  /** The approximate size of what was kept, as the dashboard shows it. */
+  bytes: number;
   ms: number;
 }
 
@@ -172,7 +175,14 @@ async function captureThrough(
     const jar = await cookieJar(deps, target, started);
     const header = completeHeader(started, storage, collected, jar);
     await captures.publish(header);
-    return { ...counts, cookies: jar.cookies.length, unsupported: header.unsupported.length };
+    const kept = [storage.localStorage, storage.sessionStorage, header.cookies];
+    const bytes = collected.bytes + approximateBytes(kept);
+    return {
+      ...counts,
+      cookies: jar.cookies.length,
+      unsupported: header.unsupported.length,
+      bytes,
+    };
   } catch (error) {
     await captures.discard(started.id).catch(() => undefined);
     throw error;

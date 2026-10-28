@@ -4,6 +4,7 @@ import { fakeBrowser } from "wxt/testing/fake-browser";
 import { createBackgroundListener } from "@/background/listener";
 import { createRoutes } from "@/background/routes";
 import { createWorkspaceCommands } from "@/background/workspace/commands";
+import type { IdentityDeps } from "@/background/workspace/identity-commands";
 import { managedWindowRepository } from "@/storage/managed-window-repository";
 import { BackgroundReplySchema } from "@/messaging/background-messages";
 import { WorkspaceStatusSchema } from "@/messaging/workspace-protocol";
@@ -35,12 +36,10 @@ export function fakeWorkspacePorts(
 export function workspaceBackground(
   store: RecordingStore = memoryRecordingStore(),
   ports = fakeWorkspacePorts(),
+  identities?: IdentityDeps,
 ): Send {
-  const routes = createRoutes({
-    extensionVersion: "0.1.0",
-    store,
-    workspace: createWorkspaceCommands(store, ports),
-  });
+  const workspace = createWorkspaceCommands(store, ports, undefined, identities);
+  const routes = createRoutes({ extensionVersion: "0.1.0", store, workspace });
   const listener = createBackgroundListener(routes, identity);
   return (message, sender = ownPage) =>
     new Promise<unknown>((resolve, reject) => {

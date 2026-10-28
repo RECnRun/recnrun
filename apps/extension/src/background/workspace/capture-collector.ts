@@ -1,3 +1,4 @@
+import { approximateBytes } from "@recnrun/domain";
 import type { IdentityCapture } from "@recnrun/domain";
 import type { CaptureReceiver } from "@/background/workspace/agent-link";
 import { WorkspaceError } from "@/background/workspace/errors";
@@ -21,6 +22,8 @@ export interface Collected {
   caches: number;
   cacheEntries: number;
   unsupported: Unsupported[];
+  /** The approximate size of the records and caches written. */
+  bytes: number;
 }
 
 /** Appends parts one after another; after one write fails, it writes no later part. */
@@ -58,6 +61,7 @@ export function collector(
     caches: 0,
     cacheEntries: 0,
     unsupported: [],
+    bytes: 0,
   };
   const valueTypes = new Set<ValueType>();
   const { write, settled } = orderedWriter(captureId, captures);
@@ -68,6 +72,7 @@ export function collector(
     database: (database) => collected.databases.push(database),
     records: ({ database, store, records }) => {
       collected.records += records.length;
+      collected.bytes += approximateBytes(records);
       collectValueTypes(
         records.flatMap(({ key, value }) => (key === undefined ? [value] : [key, value])),
         valueTypes,
@@ -77,6 +82,7 @@ export function collector(
     cache: ({ cache, unsupported }) => {
       collected.caches += 1;
       collected.cacheEntries += cache.entries.length;
+      collected.bytes += approximateBytes(cache);
       for (const item of unsupported)
         collected.unsupported.push({ adapter: "cacheStorage", ...item });
       write({ origin, cache });

@@ -1,3 +1,4 @@
+import { approximateBytes } from "@recnrun/domain";
 import type { ManagedWindowState } from "@recnrun/domain";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vite-plus/test";
 import { fakeBrowser } from "wxt/testing/fake-browser";
@@ -113,12 +114,16 @@ describe("captureIdentity", () => {
     ]);
     expect(complete?.valueTypes.toSorted()).toEqual(["Date", "Object", "Set", "primitive"]);
     expect(complete?.endedAt).toBeGreaterThanOrEqual(complete?.startedAt ?? Infinity);
+    // The size counts what was kept: Web Storage, each store's records and cache, and cookies.
+    const bytes = approximateBytes([LOCAL, SESSION, RECORDS, CACHE.cache, complete?.cookies]);
     expect(summary).toMatchObject({
       captureId: started?.id,
       ...COUNTS,
       cookies: 2,
       unsupported: 2,
+      bytes,
     });
+    expect(bytes).toBeGreaterThan(0);
     expect(agent.disconnected).toBe(true);
     expect(onConnect.listeners.size).toBe(0);
   });

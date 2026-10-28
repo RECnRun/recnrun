@@ -60,5 +60,8 @@ export function memoryCaptures() {
       calls.push("discard");
     }),
     read: vi.fn(async (_identityId: string): Promise<IdentityCapture | null> => null),
+    remove: vi.fn(async () => {
+      calls.push("remove");
+    }),
   };
 }

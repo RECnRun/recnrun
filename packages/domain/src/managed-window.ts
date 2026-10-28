@@ -1,4 +1,5 @@
 import * as v from "valibot";
+import { IdSchema } from "./ids.ts";
 
 const BrowserIdSchema = v.pipe(v.number(), v.integer(), v.minValue(0));
 
@@ -9,6 +10,8 @@ export const ManagedWindowStateSchema = v.object({
   windowId: BrowserIdSchema,
   tabId: BrowserIdSchema,
   status: v.picklist(["active", "closed"]),
+  /** The saved identity the window holds; none for a window started without one. */
+  identityId: v.optional(IdSchema),
 });
 
 export type ManagedWindowState = v.InferOutput<typeof ManagedWindowStateSchema>;

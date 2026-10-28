@@ -15,6 +15,7 @@ import { chrome, memoryCaptures } from "./fake-capture";
 import { fakeCookieApi, memoryStoreMemory } from "./fake-cookies";
 import { memoryRecordingStore } from "./fake-extension";
 import { memoryOperationJournal } from "./fake-journal";
+import { memoryIdentities } from "./fake-lifecycle";
 import { fakeNavigationApi } from "./fake-navigation";
 import { openWindowsWithTabs } from "./fake-windows";
 import { allowIncognito, manageTab } from "./workspace-harness";
@@ -171,7 +172,14 @@ describe("captureIdentity and startFromCapture", () => {
   const capturing = () => {
     const setup = chrome();
     const captures = memoryCaptures();
-    const identities = { api: setup.api, cookies: setup.cookies, captures, boundMs: 5_000 };
+    const { repository } = memoryIdentities();
+    const identities = {
+      api: setup.api,
+      cookies: setup.cookies,
+      captures,
+      identities: repository,
+      boundMs: 5_000,
+    };
     return { setup, captures, identities };
   };
 

@@ -18,6 +18,9 @@ import {
   savedStart,
 } from "@/background/workspace/identity-commands";
 import type { IdentityDeps } from "@/background/workspace/identity-commands";
+import { createLifecycle } from "@/background/workspace/lifecycle";
+import type { LifecycleCommands } from "@/background/workspace/lifecycle";
+import { chromeLifecycleEffects } from "@/background/workspace/lifecycle-effects";
 import { chromeNavigationApi } from "@/background/workspace/navigation";
 import { recoverInterrupted } from "@/background/workspace/recovery";
 import type { RecoveryDeps } from "@/background/workspace/recovery";
@@ -29,8 +32,8 @@ import type { OperationJournal } from "@/ports/operation-journal";
 import { managedWindowRepository } from "@/storage/managed-window-repository";
 import { operationJournal } from "@/storage/operation-journal";
 
-/** What the dashboard can ask of the Incognito workspace. */
-export interface WorkspaceCommands {
+/** What the dashboard can ask of the Incognito workspace and its saved identities. */
+export interface WorkspaceCommands extends LifecycleCommands {
   status: () => Promise<WorkspaceStatus>;
   start: (url: string) => Promise<void>;
   closeAndStart: (url: string, windowIds: readonly number[]) => Promise<void>;
@@ -182,14 +185,17 @@ type Exclusive = ReturnType<typeof createLock>["exclusive"];
 async function statusOf(
   lock: ReturnType<typeof createLock>,
   journal: OperationJournal,
+  identities: IdentityDeps["identities"],
 ): Promise<WorkspaceStatus> {
   await lock.ready;
   const access = await browser.extension.isAllowedIncognitoAccess();
   const { stored, foreign } = await classifiedWindows();
   const summaries = foreign.map(({ id, tabs }) => ({ id, tabCount: tabs?.length ?? 0 }));
   const operation = (await journal.read()) ?? undefined;
+  const saved = await identities.list();
   const { busy } = lock;
-  return { access, managed: stored, foreign: summaries, busy, ...(operation && { operation }) };
+  const status = { access, managed: stored, foreign: summaries, busy, identities: saved };
+  return { ...status, ...(operation && { operation }) };
 }
 
 /** Opens a fresh managed window and restores what `load` yields, under the one-operation lock. */
@@ -223,8 +229,15 @@ export function createWorkspaceCommands(
   const { exclusive } = lock;
   const startRestoring = restoringStart(recordings, ports, journal, exclusive);
   return {
+    ...createLifecycle({
+      recordings,
+      identities: identities.identities,
+      journal,
+      effects: chromeLifecycleEffects(ports, identities, journal),
+      guard: { exclusive, access: requireAccess },
+    }),
     recover: () => recoverInto(lock, { journal, barrier: ports.barrier }, ports),
-    status: () => statusOf(lock, journal),
+    status: () => statusOf(lock, journal, identities.identities),
     // Async, so a refused target rejects; the busy check still runs before the first await.
     start: async (url) => {
       requireTarget(url);

@@ -1,7 +1,9 @@
 import { errorMessage } from "@recnrun/domain";
+import type { LifecycleRefusalName } from "@recnrun/domain";
 
 /** Why a workspace operation stopped; the name tells cases apart, the message is for the user. */
 type WorkspaceErrorName =
+  | LifecycleRefusalName
   | "AgentDisconnected"
   | "AgentNotConnected"
   | "BarrierCollision"
@@ -17,7 +19,7 @@ type WorkspaceErrorName =
   | "CookiesUnavailable"
   | "IncognitoNotAllowed"
   | "IncognitoNotGone"
-  | "IncognitoWindowsOpen"
+  | "IdentityNotValid"
   | "InjectedFailure"
   | "NavigationFailed"
   | "NavigationTimedOut"

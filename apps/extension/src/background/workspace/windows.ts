@@ -60,8 +60,11 @@ export async function closeWindows(
   }
 }
 
-/** Opens RECnRun's Incognito window on a blank page, only when no other Incognito window exists. */
-export async function createNeutralWindow(): Promise<ManagedWindowState> {
+/**
+ * Opens RECnRun's Incognito window on a blank page, only when no other Incognito window exists,
+ * holding `identityId` when it is given.
+ */
+export async function createNeutralWindow(identityId?: string): Promise<ManagedWindowState> {
   if ((await inventory()).length > 0) {
     throw new WorkspaceError(
       "IncognitoWindowsOpen",
@@ -76,7 +79,7 @@ export async function createNeutralWindow(): Promise<ManagedWindowState> {
       throw new WorkspaceError("WindowNotCreated", "Chrome did not open the Incognito window.");
     }
     const generation = (previous?.generation ?? 0) + 1;
-    return { generation, windowId, tabId, status: "active" };
+    return { generation, windowId, tabId, status: "active", ...(identityId && { identityId }) };
   });
 }
 

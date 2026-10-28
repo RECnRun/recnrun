@@ -31,3 +31,13 @@ export {
   type CaptureCapabilities,
   type IdentityCapture,
 } from "./identity-capture.ts";
+export { approximateBytes, IdentityListSchema, IdentitySchema, type Identity } from "./identity.ts";
+export {
+  planLifecycle,
+  type LifecycleCommand,
+  type LifecyclePlan,
+  type LifecycleRefusal,
+  type LifecycleRefusalName,
+  type LifecycleState,
+  type LifecycleStep,
+} from "./workspace-lifecycle.ts";
