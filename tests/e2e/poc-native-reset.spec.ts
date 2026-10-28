@@ -12,7 +12,7 @@ import {
   sentinelsWritten,
   writeSentinels,
 } from "./fixtures/sentinels.ts";
-import { openIncognitoTab } from "./fixtures/tabs.ts";
+import { chromeTabs, openIncognitoTab } from "./fixtures/tabs.ts";
 import {
   installTeardownProbe,
   readTeardown,
@@ -29,7 +29,10 @@ import {
 } from "./fixtures/workspace.ts";
 
 interface WindowsGlobal {
-  chrome: { windows: { remove(windowId: number): Promise<void> } };
+  chrome: {
+    windows: { remove(windowId: number): Promise<void> };
+    storage: { local: { get(key: string): Promise<Record<string, unknown>> } };
+  };
 }
 
 /** Closes one window as the user would, through Chrome rather than through RECnRun. */
@@ -121,6 +124,33 @@ test("Close and start empty leaves the next managed window with no Incognito dat
   for (const { name } of sampleSnapshot().recordings) {
     await expect(dashboardOf(site).getByRole("article", { name })).toBeVisible();
   }
+});
+
+/** The Incognito cookie store ids RECnRun remembers, to wait for their profile before a start. */
+function rememberedStores(serviceWorker: Worker): Promise<unknown> {
+  return serviceWorker.evaluate(async () => {
+    const { chrome } = globalThis as unknown as WindowsGlobal;
+    return (await chrome.storage.local.get("incognito-store-ids"))["incognito-store-ids"] ?? [];
+  });
+}
+
+test("an Incognito window the user opened and closed before any command is waited for", async ({
+  context,
+  serviceWorker,
+}) => {
+  const run = `user-${Date.now()}`;
+  const site = await openSite(context, "/");
+  const user = `${APP}/sentinel?tag=user&run=${run}`;
+  await openIncognitoTab(serviceWorker, user);
+  await sentinelsWritten(await pageAt(context, user));
+  const windowId = (await chromeTabs(serviceWorker)).find(({ url }) => url === user)?.windowId;
+  await closeWindow(serviceWorker, windowId ?? -1);
+  // Chrome unlists the store with its last tab, so only the id noted when the tab opened is left.
+  expect(await rememberedStores(serviceWorker)).toEqual(["1"]);
+
+  const target = `${APP}/inspect?run=${run}`;
+  await runWorkspace(site, target, "Start");
+  expect(await inspected(await pageAt(context, target))).toEqual(NOTHING);
 });
 
 test("another Incognito window keeps the workspace's data, so the dashboard offers no reset", async ({

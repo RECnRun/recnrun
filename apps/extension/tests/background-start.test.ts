@@ -1,6 +1,8 @@
 import { beforeEach, expect, test, vi } from "vite-plus/test";
+import type { Browser } from "wxt/browser";
 import { fakeBrowser } from "wxt/testing/fake-browser";
 import { startBackground } from "@/background/start";
+import { incognitoStoreMemory } from "@/storage/incognito-stores";
 import { managedWindowRepository } from "@/storage/managed-window-repository";
 import { recordingSessionRepository } from "@/storage/recording-session-repository";
 import { manageTab } from "./workspace-harness";
@@ -47,6 +49,21 @@ test("tracks the managed Incognito window from the start", async () => {
   await managedWindowRepository.update(() => managed);
   await fakeBrowser.windows.onRemoved.trigger(4);
   await expect.poll(() => managedWindowRepository.read()).toEqual({ ...managed, status: "closed" });
+});
+
+test("remembers the cookie store of each new Incognito tab from the start", async () => {
+  startBackground();
+  const tabs = [
+    { id: 1, incognito: false },
+    { id: 9, incognito: true },
+  ] as Browser.tabs.Tab[];
+  vi.spyOn(fakeBrowser.tabs, "query").mockResolvedValue(tabs as never);
+  vi.spyOn(fakeBrowser.cookies, "getAllCookieStores").mockResolvedValue([
+    { id: "0", tabIds: [1] },
+    { id: "1", tabIds: [9] },
+  ] as never);
+  await fakeBrowser.tabs.onCreated.trigger(tabs[1] as Browser.tabs.Tab);
+  await expect.poll(() => incognitoStoreMemory.read()).toEqual(["1"]);
 });
 
 test("exposes the POC test handles in test builds only", () => {

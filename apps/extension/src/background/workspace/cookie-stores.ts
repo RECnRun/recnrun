@@ -67,6 +67,21 @@ export async function noteIncognitoStores(
   return incognito;
 }
 
+/**
+ * Remembers the store of each new Incognito tab, so a window the user opens and closes between two
+ * commands is still waited for. Chrome lists a store only while it has a tab (`cookies_api.cc:895`),
+ * and dispatches `tabs.onCreated` once the tab is in its window (`tabs_event_router.cc:461-471`).
+ */
+export function trackIncognitoStores(
+  api: Pick<CookieApi, "stores" | "normalTabIds" | "incognitoTabIds">,
+  memory: IncognitoStoreMemory,
+): void {
+  browser.tabs.onCreated.addListener(({ incognito }) => {
+    // Nothing waits on this listing; a failed one, or a build without `cookies`, leaves the next.
+    if (incognito) noteIncognitoStores(api, memory).catch(() => undefined);
+  });
+}
+
 async function anyAlive(api: Pick<CookieApi, "probe">, ids: readonly string[]): Promise<boolean> {
   for (const id of ids) if (await api.probe(id)) return true;
   return false;

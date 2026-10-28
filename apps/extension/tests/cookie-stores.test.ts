@@ -1,11 +1,13 @@
 import type { SiteCookie } from "@recnrun/domain";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vite-plus/test";
+import type { Browser } from "wxt/browser";
 import { fakeBrowser } from "wxt/testing/fake-browser";
 import {
   chromeCookieApi,
   noteIncognitoStores,
   resolveTabStore,
   restoreCookies,
+  trackIncognitoStores,
   waitForIncognitoGone,
 } from "@/background/workspace/cookie-stores";
 import { fakeCookieApi, memoryStoreMemory } from "./fake-cookies";
@@ -146,6 +148,33 @@ describe("restoreCookies", () => {
       await expect(failure).rejects.toThrow('"sid"');
       await expect(failure).rejects.not.toThrow("abc");
     }
+  });
+});
+
+/** A tab as `tabs.onCreated` reports it, with only the fields the tracker reads. */
+const createdTab = (id: number, incognito: boolean) => ({ id, incognito }) as Browser.tabs.Tab;
+
+describe("trackIncognitoStores", () => {
+  test("remembers the store of each new Incognito tab, and asks nothing for a normal one", async () => {
+    // A window opened and closed between two commands is otherwise never listed while RECnRun looks.
+    const api = fakeCookieApi([[NORMAL, { id: "1", tabIds: [9] }]], [1, 2], [9]);
+    const stores = vi.spyOn(api, "stores");
+    const memory = memoryStoreMemory();
+    trackIncognitoStores(api, memory);
+    await fakeBrowser.tabs.onCreated.trigger(createdTab(3, false));
+    expect(stores).not.toHaveBeenCalled();
+    await fakeBrowser.tabs.onCreated.trigger(createdTab(9, true));
+    await expect.poll(() => memory.ids).toEqual(["1"]);
+  });
+
+  test("drops a failed listing, and the next Incognito tab asks again", async () => {
+    const api = fakeCookieApi([[NORMAL, { id: "1", tabIds: [9, 10] }]], [1, 2], [9, 10]);
+    vi.spyOn(api, "stores").mockRejectedValueOnce(new Error("No cookies permission."));
+    const memory = memoryStoreMemory();
+    trackIncognitoStores(api, memory);
+    await fakeBrowser.tabs.onCreated.trigger(createdTab(9, true));
+    await fakeBrowser.tabs.onCreated.trigger(createdTab(10, true));
+    await expect.poll(() => memory.ids).toEqual(["1"]);
   });
 });
 
