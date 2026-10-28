@@ -1,17 +1,17 @@
 # POC report: origin snapshots in sequential Incognito sessions
 
-Status: **Stage 3 done; Stage 4 next.** Gates G1 and G2 passed (go-ahead 2026-10-28); Gate G3 stops only on a NO-GO. Plan: [poc-incognito-sessions-plan.md](poc-incognito-sessions-plan.md). Assignment: [poc-incognito-sessions-assignment.md](poc-incognito-sessions-assignment.md). Checklist: [poc-incognito-sessions-checklist.md](poc-incognito-sessions-checklist.md).
+Status: **Stage 4 done except the user's Zephyr run (S4.4, S4.5).** Gates G1 and G2 passed (go-ahead 2026-10-28); Gate G3 stops only on a NO-GO. Plan: [poc-incognito-sessions-plan.md](poc-incognito-sessions-plan.md). Assignment: [poc-incognito-sessions-assignment.md](poc-incognito-sessions-assignment.md). Checklist: [poc-incognito-sessions-checklist.md](poc-incognito-sessions-checklist.md).
 
 ## 1. Verdicts
 
-| Area                    | Verdict              | Evidence |
-| ----------------------- | -------------------- | -------- |
-| Native reset            | **GO**               | §5       |
-| Data fidelity           | **GO**               | §7       |
-| Startup barrier         | **GO**               | §6       |
-| Capture consistency     | **GO**, per database | §7       |
-| Local PWA compatibility | _pending_            |          |
-| Zephyr                  | _pending_            |          |
+| Area                    | Verdict                                 | Evidence |
+| ----------------------- | --------------------------------------- | -------- |
+| Native reset            | **GO**                                  | §5       |
+| Data fidelity           | **GO**                                  | §7       |
+| Startup barrier         | **GO**                                  | §6       |
+| Capture consistency     | **GO**, per database                    | §7       |
+| Local PWA compatibility | **GO**                                  | §8       |
+| Zephyr                  | not validated (awaiting the user's run) | §8       |
 
 ## 2. Commits and environment
 
@@ -269,7 +269,45 @@ Each with a red/green test (evidence in the checklist): Strict cookies missing o
 
 ## 8. Stage 4: PWA and Zephyr
 
-_pending_
+Verdicts: **local PWA compatibility GO**, with one non-claim (a resume needs the network for its first load); **Zephyr not validated** until the user's manual run (S4.4, S4.5). Stage 4 `vp run verify`: exit 0 on `f0ffb45`, 503 unit and component tests, 97 of 97 end-to-end, coverage 99.01% statements and 96.38% branches (`.artifacts/docker/2026-10-28T22-32-58.740Z-1bf5988f-205d-4024-84b8-429ae4447dde`).
+
+### PWA (S4.1, S4.2, `tests/e2e/poc-pwa.spec.ts`, `poc-pwa-lifecycle.spec.ts`)
+
+The fixture `/pwa/` has a manifest, a Service Worker that precaches the page, claims clients, serves navigations network-first with a cache fallback, and makes its own authenticated `fetch` with an HttpOnly cookie, plus worker IndexedDB and Cache Storage. The server can bump the version and drop connections to simulate offline.
+
+| Case                                   | Result                                                                                                                                                                                                                                                              |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Native Incognito baseline (no restore) | First load uncontrolled, then claimed; the worker's own fetch is authenticated; a controlled reload and an offline reload are served by the worker. Install 16 ms, controlled reload 3 ms, offline load 4 ms                                                        |
+| A→B→A→C→A through the lifecycle        | B and C start fresh. Each time A comes back, its first reads show its profile; the page registers the worker again and is claimed; the worker's own fetch answers A (restored HttpOnly cookie), and it reads A's page and worker IndexedDB and A's cached API entry |
+| App update between captures            | The resumed A loads v2; the new worker deletes the restored `pwa-v1` cache and answers A as v2; the restored API entry still says v1, as the app left it                                                                                                            |
+| Offline after the worker is back       | Served by the worker                                                                                                                                                                                                                                                |
+| Readiness                              | 17–31 ms from release to a controlling worker; a start command 104–117 ms, a switch 128–134 ms                                                                                                                                                                      |
+
+**Non-claim: Service Worker registrations are not restored.** No extension API writes a registration into another profile, and a registration needs its script fetched from the network (`content/browser/service_worker/service_worker_register_job.cc:674-716`; `service_worker_new_script_loader.cc:225-229, 438-447`). A resumed identity is uncontrolled until its first load registers the worker again, so a resume while offline fails at the `navigate` step and leaves no window open.
+
+### SSO on another site (S4.3, S4.3a–c)
+
+`app.localhost` and `sso.localhost` are different sites (an unlisted top-level domain is a one-label registry, `net/base/registry_controlled_domains/registry_controlled_domain.cc:186-196, 300-312`), so the fixture is a real cross-site single sign-on: a provider on `sso.localhost` with an HttpOnly session cookie, silent `prompt=none` checks and a sign-in form, an OIDC-style client that keeps its token in its own localStorage, and a server-rendered client with its own HttpOnly session.
+
+| Case                                                                              | Result                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Identity declares the provider as a cookie host, A→B→A→C→A                        | A comes back with its token and is signed in silently as A at the provider; C starts signed out                                                                                                                                                                                                                                                                                                                                                             |
+| Control: provider not declared                                                    | The resumed A keeps its token but the provider answers `login_required`: signed out at the provider                                                                                                                                                                                                                                                                                                                                                         |
+| App session expired at restore time; the server redirects to the provider (S4.3a) | **Defect, fixed.** The barrier blocked the redirect (`ERR_BLOCKED_BY_CLIENT`) and the start failed. Now a tab-scoped rule removes a `Location` toward declared hosts during the barrier only, so the barrier document commits script-free on the app origin and the restore runs; the release reload then follows the app's redirect to the provider (`request_params.cc:70-86`; `url_request_http_job.cc:1242-1246`; `http_response_headers.cc:1099-1112`) |
+| Both sessions expired (S4.3c)                                                     | The release lands on the provider's sign-in form; no app script ran before the restore; signing in returns to the app, whose first script reads the restored token                                                                                                                                                                                                                                                                                          |
+| Declaring hosts from the dashboard (S4.3b)                                        | **Gap, fixed.** New identity always sent no cookie hosts. A **Cookie hosts** field now declares them; a host the build cannot read is refused by name (`CookieHostNotAllowed`) instead of being captured as nothing                                                                                                                                                                                                                                         |
+
+**Non-claim: a declared host contributes its cookies only.** The provider's localStorage (`idp_user` in the fixture) is not captured; RECnRun reads storage only through a document of the managed tab's origin. The usual providers keep their session in cookies, which is what the fixture shows working.
+
+### Real browser defect found through the Zephyr script (S4.4b)
+
+In headed Chromium, 5 of 10 starts failed at `navigate` with `net::ERR_ABORTED`: `windows.create` replies before the new tab's `about:blank` commits (`chrome/browser/extensions/api/tabs/tabs_api.cc:1306-1311`), and the start navigated the tab before that. Every start now waits for the blank page to finish loading (bounded at 5 s); 6 of 6 then opened. Docker's end-to-end runs never hit this race, so the evidence is the headed probe. The exact place where Chromium aborts the later navigation was not found in the source.
+
+### Zephyr (S4.4, S4.5)
+
+`vp run poc:zephyr` builds a development extension with host access to `zephyr-tq.one.be`, `login-acc.one.be` and `one.be` (both schemes, S3.12a), builds and serves this checkout's website on a free port (S4.4a: it no longer reuses whatever serves port 5173, which was another checkout's site), opens headed Chromium on a fresh profile, and deletes that profile with its captures when Chromium closes. The script never opens Zephyr. The steps are in [poc-zephyr-runbook.md](poc-zephyr-runbook.md); only the user runs them, with authorized test accounts, and reports names, counts, sizes, timings and outcomes, never values.
+
+Result: **not validated**, pending the user's run.
 
 ## 9. Timings
 
