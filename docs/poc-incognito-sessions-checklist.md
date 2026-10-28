@@ -8,7 +8,7 @@ Plan: [poc-incognito-sessions-plan.md](poc-incognito-sessions-plan.md). Assignme
 | Branch               | `poc/incognito-sessions`                                         |
 | Planned base         | `44c154da29860c7a8df829e902b177df5ce2ba2a` (2026-10-28)          |
 | Actual base (P0.1)   | `44c154d` (re-resolved 2026-10-28, unchanged)                    |
-| Last recorded commit | `b84af8d`                                                        |
+| Last recorded commit | `33264a6`                                                        |
 | Decisions OD-1…OD-4  | defaults of plan §3, accepted by the user ("Avance", 2026-10-28) |
 
 ## Status legend
@@ -99,7 +99,11 @@ Stage 0 verify: first run exit 1 — P0.3's server took port 5191, which `dashbo
   green: same e2e command → 2 passed (`.artifacts/docker/2026-10-28T13-23-30.136Z-8579479a-5c8c-4978-bfdf-d98586fda9b2`); `vp run test:unit` → 141 passed; `vp run test:e2e -- tests/e2e/incognito.spec.ts --repeat-each=10` → 50 passed (`.artifacts/docker/2026-10-28T13-23-40.024Z-5185afd2-fdc1-455e-aa61-48251ffae6d0`)
   commit: b84af8d Take the last focused window when Chrome reports two focused
   notes: probe (throwaway listener in the service worker): in `onFocusChanged` for the Incognito window, `getAll` reported the normal and the Incognito window both `focused` in 2 of 3 runs, `getLastFocused` named the Incognito one each time, `onActivated` did not fire, and a later `getAll` showed only the Incognito window focused; the PiP had read during the double report and no further event came. Does not explain the baseline flake (P0.1: "No tab in focus." on the PiP's first read, i.e. no browsing window focused at all, not two). Screenshot `.artifacts/screens/S1.5b/pip-recorded-current.png` viewed; ARCHITECTURE "Current tab" updated; `vp check`, `vp run deps` pass
-- [ ] S1.6 E2E reset experiment (six sentinel kinds, normal profile unchanged, repository readable) + negative control (foreign window keeps data, dashboard blocks)
+- [i] S1.6 E2E reset experiment (six sentinel kinds, normal profile unchanged, repository readable) + negative control (foreign window keeps data, dashboard blocks)
+  red: scratch worktree (`git worktree` under the scratchpad, deleted) where `workspace-restart` opens the new window before closing the old one (inventory check bypassed): `vp run test:e2e -- tests/e2e/poc-native-reset.spec.ts -g "Close and start empty"` → `toEqual(NOTHING)` failed, received `sentinel_js` and server-side `sentinel_http` cookies, localStorage, IndexedDB record, cache entry all `incog-1`, registration `http://app.localhost:5192/`, controller `…/sw.js` (scratch run `2026-10-28T13-29-57.578Z-bbf3e90d-f87a-4f22-9d8d-6550b81d7156`)
+  green: `vp run test:e2e -- tests/e2e/poc-native-reset.spec.ts tests/e2e/poc-fixture.spec.ts` → 3 passed (`.artifacts/docker/2026-10-28T13-30-15.689Z-7c9528bc-93b7-4adc-b728-341880cac7a6`); observations kept as `reset-inspected.json` / `control-inspected.json` in each test's results
+  commit: 33264a6 Prove the native reset of the Incognito workspace end to end
+  notes: reset through the dashboard's Close and start empty to `/inspect`: every kind empty (sessionStorage is per tab, so its absence proves nothing), `/__log` report has empty `serverCookies`, generation +1; normal tab still `normal` everywhere; both seeded recordings listed. Control: foreign `about:blank` Incognito window → panel lists it, zero buttons (screenshot `.artifacts/screens/S1.6/blocked.png` viewed); service worker closes only the managed window, a new Incognito window's `/inspect` reads `incog-1` in every kind but sessionStorage, and the page is controlled by `sw.js`; the panel then lists 2 windows and no Start. Shared helpers moved to `tests/e2e/fixtures/sentinels.ts`; `vp check`, `deps`, `dead-code`, `duplication` (0 clones) pass
 - [ ] S1.7 Stress loop (`POC_REPEATS=50`), teardown signal if survivors, report section
 
 Stage 1 verify: _pending_
