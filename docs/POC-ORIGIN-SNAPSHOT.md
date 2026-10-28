@@ -1,17 +1,17 @@
 # POC report: origin snapshots in sequential Incognito sessions
 
-Status: **Stage 3 in progress.** Gates G1 and G2 passed (go-ahead 2026-10-28); Gate G3 stops only on a NO-GO. Plan: [poc-incognito-sessions-plan.md](poc-incognito-sessions-plan.md). Assignment: [poc-incognito-sessions-assignment.md](poc-incognito-sessions-assignment.md). Checklist: [poc-incognito-sessions-checklist.md](poc-incognito-sessions-checklist.md).
+Status: **Stage 3 done; Stage 4 next.** Gates G1 and G2 passed (go-ahead 2026-10-28); Gate G3 stops only on a NO-GO. Plan: [poc-incognito-sessions-plan.md](poc-incognito-sessions-plan.md). Assignment: [poc-incognito-sessions-assignment.md](poc-incognito-sessions-assignment.md). Checklist: [poc-incognito-sessions-checklist.md](poc-incognito-sessions-checklist.md).
 
 ## 1. Verdicts
 
-| Area                    | Verdict   | Evidence |
-| ----------------------- | --------- | -------- |
-| Native reset            | **GO**    | §5       |
-| Data fidelity           | _pending_ |          |
-| Startup barrier         | **GO**    | §6       |
-| Capture consistency     | _pending_ |          |
-| Local PWA compatibility | _pending_ |          |
-| Zephyr                  | _pending_ |          |
+| Area                    | Verdict              | Evidence |
+| ----------------------- | -------------------- | -------- |
+| Native reset            | **GO**               | §5       |
+| Data fidelity           | **GO**               | §7       |
+| Startup barrier         | **GO**               | §6       |
+| Capture consistency     | **GO**, per database | §7       |
+| Local PWA compatibility | _pending_            |          |
+| Zephyr                  | _pending_            |          |
 
 ## 2. Commits and environment
 
@@ -36,11 +36,11 @@ Status: **Stage 3 in progress.** Gates G1 and G2 passed (go-ahead 2026-10-28); G
 
 Per decision OD-1, only test and development builds gain the POC's permissions; `apps/extension/scripts/manifest.checks.mjs` checks both lists.
 
-| Build             | `permissions`                                                                       | `host_permissions`                                                                                             | Other                                                                                                                                                             |
-| ----------------- | ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Production        | `storage`, `tabs` (unchanged)                                                       | none                                                                                                           | `incognito: "spanning"`; no `message_serialization`; no origin agent script; no `recnrunPoc` test handles                                                         |
-| Test (Docker e2e) | `storage`, `tabs`, `declarativeNetRequest`, `scripting`, `cookies`, `webNavigation` | `http://*.localhost/*`                                                                                         | `message_serialization: "structured_clone"`; `content-scripts/origin-agent.js` (runtime-registered, not in `content_scripts`); `recnrunPoc` on the service worker |
-| Development       | as test                                                                             | as test, plus hosts from `RECNRUN_POC_HOSTS` (e.g. `https://zephyr-tq.one.be/*`, `https://login-acc.one.be/*`) | as test, without `recnrunPoc`                                                                                                                                     |
+| Build             | `permissions`                                                                                           | `host_permissions`                                                                                                                                                                                                                                                                                                                                                                       | Other                                                                                                                                                             |
+| ----------------- | ------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Production        | `storage`, `tabs` (unchanged)                                                                           | none                                                                                                                                                                                                                                                                                                                                                                                     | `incognito: "spanning"`; no `message_serialization`; no origin agent script; no `recnrunPoc` test handles                                                         |
+| Test (Docker e2e) | `storage`, `tabs`, `declarativeNetRequest`, `scripting`, `cookies`, `webNavigation`, `unlimitedStorage` | `http://*.localhost/*`, `https://*.localhost/*` (S3.6: `cookies.getAll` hides a `Secure` cookie without https access)                                                                                                                                                                                                                                                                    | `message_serialization: "structured_clone"`; `content-scripts/origin-agent.js` (runtime-registered, not in `content_scripts`); `recnrunPoc` on the service worker |
+| Development       | as test                                                                                                 | as test, plus each `RECNRUN_POC_HOSTS` host and every parent domain of two or more labels, as `https://<d>/*` and `http://<d>/*` without a port (S3.12a). For Zephyr: `zephyr-tq.one.be`, `login-acc.one.be`, `one.be`. Without a public suffix list, a multi-label suffix such as `co.uk` would also be granted; Chrome stores no cookie there, but it is wider page access than needed | as test, without `recnrunPoc`                                                                                                                                     |
 
 ## 4. Stage 0: platform facts (P0.2)
 
@@ -110,7 +110,7 @@ Order in all 50 cycles: remove call < `onRemoved` < no Incognito window listed <
 
 So the 50 of 50 above shows that renderers exited fast in these runs, not that a create right after `onRemoved` is always empty. The observable signal of an erased profile is a cookie call naming the old store id: `cookies.getAll({ storeId })` fails with "Invalid cookie store id" once the profile is gone, because the lookup never creates one (`cookies_helpers.cc:81-98`; `chrome_extensions_browser_client.cc:322-325`; `cookies_api.cc:63, 103-115`).
 
-**Correction (S2.5a, `a0ee35a`).** RECnRun remembers every Incognito store id it sees (`local:incognito-store-ids`, ids only), and before every window creation (Start, Close these windows and start, Close and start empty, the identity bootstrap, and every Stage 3 lifecycle command) it waits until no Incognito store is listed **and** `cookies.getAll` rejects for every remembered id, bounded at 10 s (`IncognitoNotGone`). The verdict stays **GO** on that basis. Residuals: an Incognito window the user opened and closed between two RECnRun commands was never seen, so its store id is not remembered; and the wait needs the `cookies` permission, which production lacks (OD-1), so production cannot run the workspace commands at all.
+**Correction (S2.5a, `a0ee35a`).** RECnRun remembers every Incognito store id it sees (`local:incognito-store-ids`, ids only), and before every window creation (Start, Close these windows and start, Close and start empty, the identity bootstrap, and every Stage 3 lifecycle command) it waits until no Incognito store is listed **and** `cookies.getAll` rejects for every remembered id, bounded at 10 s (`IncognitoNotGone`). The verdict stays **GO** on that basis. Two gaps found here were fixed in Stage 3: an Incognito window the user opens and closes between two commands is now remembered from `tabs.onCreated` (S3.12g, `3d444ea`), and builds without the `cookies` permission (production, OD-1) show the workspace as unavailable and refuse every command before any side effect (S2.5b, `09487be`).
 
 ### Findings outside the POC's goal
 
@@ -203,7 +203,69 @@ Each case passed 5 of 5 (`--repeat-each 5`). Scratch copies without the journal 
 
 ## 7. Stage 3: fidelity and consistency
 
-_pending_
+Verdicts: **data fidelity GO**, with the losses listed below, every one either reported by the capture or proved unobservable by the page; **capture consistency GO for one database at a time**, not across databases or storage kinds. Stage 3 `vp run verify`: exit 0 on `8f2647e`, 485 unit and component tests, 86 of 86 end-to-end, coverage 98.99% statements and 96.28% branches (`.artifacts/docker/2026-10-28T21-09-29.348Z-0afb40df-8ffb-472d-8002-6ddcc43b41f4`).
+
+### What was built (S3.1–S3.9, S3.12)
+
+- **Format.** `IdentityCapture` v1 in `@recnrun/domain` (`formatVersion` 1, separate from `Snapshot`): cookies, and per origin Web Storage, IndexedDB with schema and indexes, and Cache Storage, plus `unsupported` items named without values.
+- **Storage.** Extension IndexedDB `recnrun-identity-captures` (`unlimitedStorage` in test and development builds). A capture is written in parts and published in one transaction. Since S3.12d it is published tentatively and settled only when the identity's `lastCapture` names it, so a failed or interrupted persist puts the previous capture back.
+- **Transport.** Page agent ↔ service worker over a port with `message_serialization: "structured_clone"`, probed with a `Date` round trip on every link before any payload (S3.4a). Without that manifest key the probe fails as `StructuredCloneUnavailable`.
+- **Lifecycle (S3.8).** Switch to, Suspend, Resume, New identity, Delete, one at a time under the workspace lock, each step journaled. The open identity is captured and saved before its window closes. Since S3.12e the target's capture is read and validated before anything is touched, and since S3.12f the backend refuses while the managed window has other tabs.
+- **Dashboard (S3.9).** Saved identities with time and approximate size, one command per row, a conflict banner that disables every command but Delete when another Incognito window or tab is open, and one alert per failure naming the step.
+
+### Fidelity, per storage kind
+
+Every case is an end-to-end round trip: write in the Incognito page, capture, close, start from capture in a new Incognito session, read back in the released page.
+
+| Kind                   | Came back exactly                                                                                                                                                                                                                                   | Lost or changed, and how it surfaces                                                                                                                                                                                                                                                                                                                                                                                    |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| IndexedDB (S3.3, S3.4) | Databases, versions, stores, key paths, indexes (`unique`, `multiEntry`), keys, and values: `Date`, `Blob` and `File` with type, `ArrayBuffer`, typed arrays with `-0` and `NaN`, `DataView`, `Map`, `Set`, `undefined`, an 8 MiB record            | An `autoIncrement` store's next key is not carried: the source would issue 4, the restored store issues 3. A Blob from the Incognito page cannot be written to the extension's IndexedDB (`InvalidBlob`: the Blob registry is per browser context, `storage/browser/blob/blob_storage_context.cc:727-738`), so its bytes are copied first (`own-blobs.ts`)                                                              |
+| Web Storage (S3.5)     | localStorage and sessionStorage: keys `__proto__`, `constructor`, `""`, lone surrogates, empty values, 2,000,000-character values                                                                                                                   | Nothing observed                                                                                                                                                                                                                                                                                                                                                                                                        |
+| Cookies (S3.6, S3.6a)  | Every attribute: HttpOnly, Secure, SameSite, session, expiry to the microsecond, path shadowing, `__Host-`/`__Secure-`, partitioned (first-party and cross-site key), and domain cookies (`hostOnly:false`, sent to the sibling host after restore) | Cookies of hosts outside the target and its declared hosts go to `unsupported`. A cookie expired since capture is skipped, as Chrome would not store it. Cookies the host permissions hide fail the capture by name when the page can see them (`CookiesNotReadable`, S3.12a); an HttpOnly cookie outside the permissions cannot be detected, so the development build grants every parent domain the cookies need (§3) |
+| Cache Storage (S3.7)   | Caches in order, keys, request headers, status, status text, response headers, bodies (4 MiB binary by SHA-256), `Vary` matching                                                                                                                    | Opaque and opaque-redirect entries cannot be rebuilt and go to `unsupported`. A rebuilt response reads as type `default`, `url` `""`, `redirected` false (`fetch_response_data.cc:279-284`, `response.cc:482-494`). Unobservable by the page, from source only: a CORS entry's hidden headers                                                                                                                           |
+| First request (S3.7a)  | The released document's request carries every restored cookie, `SameSite=Strict` included, because its reload is started by the barrier's own document (`location.cc:262-272`, `frame_load_request.cc:97-101`)                                      | The barrier document's own request lacks Strict cookies (`tabs.update` makes the extension the initiator, `tabs_api.cc:2966-2971`); only the agent runs in that document                                                                                                                                                                                                                                                |
+
+The cookie row needs a correction to an earlier statement of this POC: `localhost` is not in the public suffix list, but Chrome treats an unlisted top-level domain as a one-label registry (`net/base/registry_controlled_domains/registry_controlled_domain.cc:188-195, 308`), so `app.localhost` is registrable and `Domain=app.localhost` makes a real domain cookie. A scratch probe on a listed suffix (`*.recnrun-poc.be` through `--host-resolver-rules`) confirmed the same behaviour and the permission rule: `cookies.getAll` keeps a cookie only with page access to its bare domain, with `https` only when the cookie is `Secure` and no port (`chrome/browser/extensions/api/cookies/cookies_helpers.cc:51-56, 201-206`; `net/cookies/cookie_util.cc:664-692`). Before S3.12a, host patterns limited to `zephyr-tq.one.be` and `login-acc.one.be` lost every `.one.be` cookie without a word.
+
+### Consistency boundary (S3.10)
+
+A page, a dedicated worker, and a Service Worker each wrote every ~10 ms during the captures (20 runs × 3 restores). Capture step min 11, median 15, p95 21, max 24 ms.
+
+- **Supported:** each IndexedDB database comes back as one state that existed. The capture reads it in one `readonly` transaction; a writer's `readwrite` transaction on an overlapping store waits for it and commits after it (`content/browser/indexed_db/instance/database.cc:74-104`, `:108-138`, chosen at `:243-244`). Every write committed before the capture started is in it; every write committed after the capture was published is not.
+- **Not supported:** atomicity across databases or across storage kinds. Databases are read one after another, after Web Storage. The page's database and a mirror database differed in 5 of 60 restores, and the database and localStorage in 8 of 60. An application that keeps one invariant across two of them can come back in a state that never existed at once. Making it atomic would need the application's cooperation, since RECnRun cannot pause a page, a worker and a Service Worker without changing them.
+- **Lost by design:** writes committed after their database was read, up to the window's close: 0–2 per writer at a 10 ms write rate.
+
+### Lifecycle (S3.8, S3.11, S3.12)
+
+| Scenario                                                       | Result                                                                                                                                                                                                                                  |
+| -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A→B→A→C→A ×10 (`2026-10-28T20-09-58.428Z-c402de22`)            | 41 openings, 40 switches, every identity read back exactly its own last marker in cookie, localStorage, sessionStorage and IndexedDB; a new identity read nothing; the normal profile unchanged. Switch median 137 ms, p95 153, max 157 |
+| 10,000 IndexedDB records (`2026-10-28T20-02-19.386Z-24ff228b`) | Capture 4.46 MB (~446 B per record) in 70 ms; restore 168 ms                                                                                                                                                                            |
+| Two dashboards at once                                         | One runs; the other gets "RECnRun is busy with another Incognito workspace"                                                                                                                                                             |
+| A user's Incognito window or tab                               | Before a command: refused with nothing done. During a capture: the capture is saved, the window is not closed, the user's window is untouched                                                                                           |
+| Broken target capture (bad schema, incomplete, missing)        | Refused before anything is captured or closed (S3.12e)                                                                                                                                                                                  |
+| A step fails (capture, persist, restore)                       | Capture or persist failing keeps the open window and the previous capture (S3.12d); restore failing leaves no window or barrier, and the next Resume works                                                                              |
+| Tab closed during capture or restore                           | The command fails at its step; nothing is left open                                                                                                                                                                                     |
+| Extension restart during capture or restore                    | Recovery names the interrupted command (S3.12b) and closes RECnRun's own window of that generation, never a foreign one (S3.12c); no barrier rule or script remains                                                                     |
+| Stale agent replies replayed into every command                | Dropped by the operation id and generation check; every marker right                                                                                                                                                                    |
+| Browser restart                                                | Saved identities resume; an identity that was open but never saved has no data, since Chrome discards Incognito data at exit                                                                                                            |
+
+Per-step medians in the rounds, ms: capture 6, persist 1, close 16, store-gone 1, window 3, cookie-store 3, cookies 1, barrier 2, navigate 15, restore 7, unbarrier 2, reload 12.
+
+### Defects found and fixed in this stage
+
+Each with a red/green test (evidence in the checklist): Strict cookies missing on the released document (S3.7a); the teardown signal (S2.5a, §5); production showing commands that could only fail (S2.5b); the silent loss of domain cookies (S3.12a); the recovery message naming "start" for a switch (S3.12b); a window left open after a restart during a capture (S3.12c); a capture left published after a failed persist (S3.12d); a switch to a broken capture closing the open identity first (S3.12e); a second tab in the managed window refused only by the UI (S3.12f); an Incognito window opened and closed outside RECnRun not waited for (S3.12g).
+
+### Limits that are not defects
+
+- **Data written after the last capture is lost** when the user closes the tab or the browser exits: Chrome discards the Incognito session with its last window, and a capture cannot run once the renderer is gone. A mitigation without new permissions, not built: capture again after each top-level navigation in the managed tab and when its window loses focus, debounced and skipped while a command runs.
+- **Storage of a second origin.** Only the managed tab's top-level origin is captured. An SSO provider on another origin is covered through its cookies (the usual case), not its localStorage or IndexedDB; Stage 4 (S4.3) tests a cross-site SSO.
+
+### Not shown by Stage 3
+
+- A real HTTPS registrable domain end to end in the committed tests (the `.recnrun-poc.be` probe was scratch and over http, so `Secure`, `SameSite=None` and partitioned domain cookies on a listed suffix were not exercised).
+- Host Chrome on macOS; every run was Chrome for Testing 156 on Linux.
+- A real application: Stage 4.
 
 ## 8. Stage 4: PWA and Zephyr
 
