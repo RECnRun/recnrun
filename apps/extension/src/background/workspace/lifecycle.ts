@@ -1,7 +1,6 @@
 import { errorMessage, planLifecycle } from "@recnrun/domain";
 import type {
   Identity,
-  IdentityData,
   LifecycleCommand,
   LifecycleState,
   LifecycleStep,
@@ -12,60 +11,12 @@ import type { StepTiming } from "@/background/workspace/bootstrap";
 import type { CaptureSummary } from "@/background/workspace/capture";
 import { WorkspaceError } from "@/background/workspace/errors";
 import { validIdentity } from "@/background/workspace/identity-draft";
-import type { IdentityDraft } from "@/background/workspace/identity-draft";
-import type { IdentityRepository } from "@/ports/identities";
-import type { OperationJournal } from "@/ports/operation-journal";
-import type { RecordingStore } from "@/ports/recording-store";
-
-type LifecycleKind = LifecycleCommand["kind"];
-
-/** Where a start opens and what it restores there: the saved capture's, or nothing. */
-export interface Opening {
-  from: "capture" | "empty";
-  url: string;
-  data: IdentityData;
-}
-
-/** Chrome's side of each lifecycle step; tests replace it with fakes. */
-export interface LifecycleEffects {
-  /** The managed window while its window is still open, and every other Incognito window. */
-  windows: () => Promise<{ managed?: ManagedWindowState; foreign: readonly number[] }>;
-  capture: (identity: Identity, managed: ManagedWindowState) => Promise<CaptureSummary>;
-  close: (windowIds: readonly number[]) => Promise<void>;
-  /** Reads and validates what a start of `identity` restores, before any step runs. */
-  load: (identity: Identity, from: Opening["from"]) => Promise<Opening>;
-  /** Opens a fresh managed window for `identity`, journaling its steps under `operation`. */
-  start: (
-    identity: Identity,
-    opening: Opening,
-    operation: { id: string; kind: LifecycleKind },
-  ) => Promise<StepTiming[]>;
-  removeCaptures: (identityId: string) => Promise<void>;
-  /** Ends a tentative capture: kept when it is `committedId`, else the one before comes back. */
-  settle: (identityId: string, committedId: string | undefined) => Promise<void>;
-  /** Runs before each step; the test build delays or fails a step through it. */
-  beforeStep?: (step: LifecycleStep) => Promise<void>;
-}
-
-export interface LifecycleDeps {
-  recordings: RecordingStore;
-  identities: IdentityRepository;
-  journal: OperationJournal;
-  effects: LifecycleEffects;
-  /** The workspace's one-operation lock and the Incognito access check. */
-  guard: { exclusive: <T>(run: () => Promise<T>) => Promise<T>; access: () => Promise<void> };
-  now?: () => number;
-}
-
-/** Switch to, Suspend, Resume, New identity, and Delete, each one operation under the lock. */
-export interface LifecycleCommands {
-  switchTo: (identityId: string) => Promise<StepTiming[]>;
-  suspend: () => Promise<void>;
-  resume: (identityId: string) => Promise<StepTiming[]>;
-  /** Closes `closeWindowIds` without saving them first when given; they must be every other window. */
-  newIdentity: (draft: IdentityDraft, closeWindowIds?: readonly number[]) => Promise<Identity>;
-  deleteIdentity: (identityId: string) => Promise<void>;
-}
+import type {
+  LifecycleCommands,
+  LifecycleDeps,
+  LifecycleKind,
+  Opening,
+} from "@/background/workspace/lifecycle-types";
 
 interface Run {
   deps: LifecycleDeps;
@@ -96,10 +47,14 @@ function journaled(run: Run, step: LifecycleStep): WorkspaceOperation {
 
 /** The window reads again: another Incognito window may have opened during the capture. */
 async function closeOpen(run: Run): Promise<void> {
-  const { managed, foreign } = await run.deps.effects.windows();
+  const { managed, foreign, otherTabs } = await run.deps.effects.windows();
   if (foreign.length > 0) {
     const message = "The capture is saved; close the other Incognito windows first.";
     throw new WorkspaceError("IncognitoWindowsOpen", message);
+  }
+  if (otherTabs > 0) {
+    const message = "The capture is saved; close the other tabs in the Incognito workspace first.";
+    throw new WorkspaceError("IncognitoTabsOpen", message);
   }
   if (managed !== undefined) await run.deps.effects.close([managed.windowId]);
 }
@@ -186,10 +141,11 @@ async function runSteps(run: Run, steps: readonly LifecycleStep[]): Promise<void
 /** What the plan decides on, read fresh under the lock. */
 async function readState(deps: LifecycleDeps, adding: Identity | undefined) {
   const list = [...(await deps.identities.list()), ...(adding ? [adding] : [])];
-  const { managed, foreign } = await deps.effects.windows();
+  const { managed, foreign, otherTabs } = await deps.effects.windows();
   const state: LifecycleState = {
     recording: (await deps.recordings.read()) !== null,
     foreignWindows: foreign.length,
+    otherTabs,
     open: managed && (managed.identityId === undefined ? {} : { identityId: managed.identityId }),
     identities: list.map(({ id, lastCapture }) => ({ id, captured: lastCapture !== undefined })),
   };
@@ -249,11 +205,17 @@ function operationFor(command: LifecycleCommand, deps: LifecycleDeps): Workspace
 
 /** The user decided on the windows they saw; any other set needs a fresh decision. */
 async function closeShown(deps: LifecycleDeps, windowIds: readonly number[]): Promise<void> {
-  const { foreign } = await deps.effects.windows();
+  const { foreign, otherTabs } = await deps.effects.windows();
   const shown = new Set(windowIds);
   if (shown.size !== foreign.length || !foreign.every((id) => shown.has(id))) {
     const message = "The Incognito windows changed; review them again before closing them.";
     throw new WorkspaceError("WindowsChanged", message);
+  }
+  // The plan would refuse these tabs after the close; refusing first closes nothing.
+  if (otherTabs > 0) {
+    const message =
+      "Close the other tabs in the Incognito workspace first; RECnRun saves only its own tab.";
+    throw new WorkspaceError("IncognitoTabsOpen", message);
   }
   if ((await deps.recordings.read()) !== null) {
     throw new WorkspaceError("RecordingInProgress", "Stop the recording first.");

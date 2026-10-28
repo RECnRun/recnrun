@@ -140,6 +140,30 @@ test("an Incognito window opened during the capture stops the close, with the ca
   expect(journal.written.at(-1)).toMatchObject({ step: "close", status: "failed" });
 });
 
+test("another tab in the workspace's window refuses before the capture and stops the close after it", async () => {
+  const { lifecycle, chrome, journal, saved } = setUp({ open: "a" });
+  chrome.state.otherTabs = 1;
+  await expect(lifecycle.switchTo("b")).rejects.toThrow("RECnRun saves only its own tab.");
+  chrome.state.foreign = [9];
+  const draft = { label: "D", url: "https://d.example/", capabilities: { cookieHosts: [] } };
+  await expect(lifecycle.newIdentity(draft, [9])).rejects.toThrow(
+    "RECnRun saves only its own tab.",
+  );
+  expect(chrome.state.foreign).toEqual([9]);
+  expect(journal.written).toEqual([]);
+  chrome.state.foreign = [];
+  chrome.state.otherTabs = 0;
+  vi.mocked(chrome.effects.capture).mockImplementationOnce(async () => {
+    chrome.state.otherTabs = 1;
+    return { ...SUMMARY, captureId: "cap-a-3" };
+  });
+  await expect(lifecycle.switchTo("b")).rejects.toThrow(
+    "The capture is saved; close the other tabs in the Incognito workspace first.",
+  );
+  expect(chrome.calls).toEqual([]);
+  expect(saved("a")?.lastCapture?.id).toBe("cap-a-3");
+});
+
 test("a failed start leaves the previous identity's capture saved", async () => {
   const { lifecycle, chrome, journal, saved } = setUp({ open: "a" });
   chrome.state.failAt = "start";

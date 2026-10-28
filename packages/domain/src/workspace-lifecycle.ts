@@ -13,6 +13,8 @@ export interface LifecycleState {
   recording: boolean;
   /** Incognito windows other than the managed one. */
   foreignWindows: number;
+  /** Tabs in the managed window besides its own; RECnRun saves only its own tab. */
+  otherTabs: number;
   /** The open managed window, and the identity it holds when it holds one. */
   open: { identityId?: string } | undefined;
   identities: readonly { id: string; captured: boolean }[];
@@ -34,6 +36,7 @@ export type LifecycleStep =
 export type LifecycleRefusalName =
   | "RecordingInProgress"
   | "IncognitoWindowsOpen"
+  | "IncognitoTabsOpen"
   | "IdentityNotFound"
   | "IdentityOpen"
   | "NoManagedWindow"
@@ -60,6 +63,10 @@ const refuse = (name: LifecycleRefusalName, message: string): LifecyclePlan => (
 const REFUSALS = {
   recording: refuse("RecordingInProgress", "Stop the recording first."),
   foreign: refuse("IncognitoWindowsOpen", "Close the other Incognito windows first."),
+  tabs: refuse(
+    "IncognitoTabsOpen",
+    "Close the other tabs in the Incognito workspace first; RECnRun saves only its own tab.",
+  ),
   unknown: refuse("IdentityNotFound", "RECnRun has no such identity."),
   open: refuse("IdentityOpen", "This identity is open; suspend it or switch to another first."),
   closed: refuse("NoManagedWindow", "No Incognito workspace is open; start one first."),
@@ -79,10 +86,14 @@ function leaving(state: LifecycleState): LifecyclePlan {
   return state.open.identityId === undefined ? REFUSALS.anonymous : plan(LEAVE);
 }
 
-/** Commands that open or close windows: refused while recording (OD-2) or beside other windows. */
+/**
+ * Commands that open or close windows: refused while recording (OD-2), beside other windows, or
+ * with other tabs in the managed window, whose data a capture of its own tab would not save.
+ */
 function windowGuard(state: LifecycleState): LifecyclePlan | undefined {
   if (state.recording) return REFUSALS.recording;
   if (state.foreignWindows > 0) return REFUSALS.foreign;
+  if (state.otherTabs > 0) return REFUSALS.tabs;
   return undefined;
 }
 

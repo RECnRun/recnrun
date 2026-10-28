@@ -20,7 +20,7 @@ import {
 } from "@/background/workspace/identity-commands";
 import type { IdentityDeps } from "@/background/workspace/identity-commands";
 import { createLifecycle } from "@/background/workspace/lifecycle";
-import type { LifecycleCommands } from "@/background/workspace/lifecycle";
+import type { LifecycleCommands } from "@/background/workspace/lifecycle-types";
 import { chromeLifecycleEffects } from "@/background/workspace/lifecycle-effects";
 import { chromeNavigationApi } from "@/background/workspace/navigation";
 import { recoverInterrupted } from "@/background/workspace/recovery";

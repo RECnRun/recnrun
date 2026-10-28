@@ -21,6 +21,7 @@ interface ChromeGlobal {
   chrome: {
     tabs: {
       query(filter: object): Promise<ChromeTab[]>;
+      create(properties: object): Promise<ChromeTab>;
       update(tabId: number, properties: object): Promise<ChromeTab>;
     };
     windows: {
@@ -116,6 +117,19 @@ export function openIncognitoTab(serviceWorker: Worker, url: string): Promise<nu
     const created = await chrome.windows.create({ incognito: true, url: address });
     return created.tabs?.[0]?.id;
   }, url);
+}
+
+/** Opens `url` in another tab of the window `windowId`, as the user would, and returns its id. */
+export function openTabIn(serviceWorker: Worker, windowId: number, url: string): Promise<number> {
+  return serviceWorker.evaluate(
+    async ([id, address]) => {
+      const { chrome } = globalThis as unknown as ChromeGlobal;
+      const created = await chrome.tabs.create({ windowId: id, url: address, active: false });
+      if (created.id === undefined) throw new Error("The tab has no id.");
+      return created.id;
+    },
+    [windowId, url] as const,
+  );
 }
 
 /** Activates the tab and focuses its window, as a click on it would. */

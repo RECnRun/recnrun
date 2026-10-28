@@ -36,13 +36,16 @@ afterEach(() => {
 
 test("lists the managed window, with its identity, only while its window is open", async () => {
   const { effects: chromeSide } = effects();
-  expect(await chromeSide.windows()).toEqual({ foreign: [] });
+  expect(await chromeSide.windows()).toEqual({ foreign: [], otherTabs: 0 });
   const managed = await createNeutralWindow("a");
   expect(managed.identityId).toBe("a");
   const foreign = await openIncognitoWindow();
-  expect(await chromeSide.windows()).toEqual({ managed, foreign: [foreign] });
+  expect(await chromeSide.windows()).toEqual({ managed, foreign: [foreign], otherTabs: 0 });
+  // A tab the user opened beside the managed one is counted, the managed one never.
+  await fakeBrowser.tabs.create({ windowId: managed.windowId, url: "about:blank" });
+  expect(await chromeSide.windows()).toMatchObject({ otherTabs: 1 });
   await chromeSide.close([managed.windowId, foreign]);
-  expect(await chromeSide.windows()).toEqual({ foreign: [] });
+  expect(await chromeSide.windows()).toEqual({ foreign: [], otherTabs: 0 });
 });
 
 test("a start journals the bootstrap's steps under the command's kind, in a window of the identity", async () => {

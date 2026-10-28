@@ -6,7 +6,7 @@ import { captureIdentity } from "@/background/workspace/capture";
 import { closeRemembering } from "@/background/workspace/fresh-window";
 import { savedStart } from "@/background/workspace/identity-commands";
 import type { IdentityDeps } from "@/background/workspace/identity-commands";
-import type { LifecycleEffects, Opening } from "@/background/workspace/lifecycle";
+import type { LifecycleEffects, Opening } from "@/background/workspace/lifecycle-types";
 import { createNeutralWindow, inventory } from "@/background/workspace/windows";
 import type { OperationJournal } from "@/ports/operation-journal";
 import { managedWindowRepository } from "@/storage/managed-window-repository";
@@ -35,7 +35,8 @@ export function chromeLifecycleEffects(
       const { managed, foreign } = classifyIncognitoWindows(await inventory(), stored);
       // The stored state counts only while its window is still open.
       const open = managed === undefined || stored === undefined ? {} : { managed: stored };
-      return { ...open, foreign: foreign.map(({ id }) => id) };
+      const otherTabs = (managed?.tabs ?? []).filter(({ id }) => id !== stored?.tabId).length;
+      return { ...open, foreign: foreign.map(({ id }) => id), otherTabs };
     },
     capture: async (identity, managed) => {
       await deps.captures.settle(identity.id, identity.lastCapture?.id);

@@ -2,7 +2,7 @@ import type { Identity, ManagedWindowState } from "@recnrun/domain";
 import { vi } from "vite-plus/test";
 import { WorkspaceError } from "@/background/workspace/errors";
 import type { CaptureSummary } from "@/background/workspace/capture";
-import type { LifecycleEffects } from "@/background/workspace/lifecycle";
+import type { LifecycleEffects } from "@/background/workspace/lifecycle-types";
 import type { IdentityRepository } from "@/ports/identities";
 
 export const identity = (id: string, captured = true): Identity => ({
@@ -63,13 +63,18 @@ export function fakeEffects(open?: { identityId?: string }) {
   const state = {
     managed: open ? window(open) : undefined,
     foreign: [] as number[],
+    otherTabs: 0,
     failAt: undefined as string | undefined,
   };
   const fail = (step: string) => {
     if (state.failAt === step) throw new WorkspaceError("InjectedFailure", `Injected at ${step}.`);
   };
   const effects: LifecycleEffects = {
-    windows: vi.fn(async () => ({ managed: state.managed, foreign: state.foreign })),
+    windows: vi.fn(async () => ({
+      managed: state.managed,
+      foreign: state.foreign,
+      otherTabs: state.otherTabs,
+    })),
     capture: vi.fn(async (saved: Identity) => {
       calls.push(`capture ${saved.id}`);
       fail("capture");
