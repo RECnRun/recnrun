@@ -8,7 +8,7 @@ Plan: [poc-incognito-sessions-plan.md](poc-incognito-sessions-plan.md). Assignme
 | Branch               | `poc/incognito-sessions`                                         |
 | Planned base         | `44c154da29860c7a8df829e902b177df5ce2ba2a` (2026-10-28)          |
 | Actual base (P0.1)   | `44c154d` (re-resolved 2026-10-28, unchanged)                    |
-| Last recorded commit | `b4ffcfe`                                                        |
+| Last recorded commit | `2b5124c`                                                        |
 | Decisions OD-1…OD-4  | defaults of plan §3, accepted by the user ("Avance", 2026-10-28) |
 
 ## Status legend
@@ -69,6 +69,12 @@ Stage 0 verify: first run exit 1 — P0.3's server took port 5191, which `dashbo
   green: same command → 28 files, 126 tests passed
   commit: b4ffcfe Add Incognito workspace commands behind a single operation lock
   notes: `vp check`, `vp run deps`, `dead-code`, `duplication` (0 clones), `test:extension-manifest` (6 pass, no permission added), `test:coverage` (per-file floor met; `commands.ts` 100/92.85/100/100, `windows.ts` 100/100/95.45/100) pass; `incognito.spec.ts` 5 passed; throwaway Docker probe (deleted) drove the real commands from `dashboard.html`: internal URL refused, foreign window blocks Start, stale `windowIds` refused, close-and-start closed the foreign window and opened the managed one on the target in 68 ms while a concurrent Start got busy, user closing the managed window → `closed`, next Start → generation 2; `extension.md` rule change loaded by Codex (`codex exec --ephemeral -s read-only`). Start also requires "Allow in Incognito"; an open managed window blocks both commands (closing it is left to the switch operations)
+- [i] S1.3a Incognito `alwaysOnTop` windows block (orchestrator decision): only DevTools windows stay out of the inventory
+  red: `vp run test:unit` → `classifyIncognitoWindows > counts an Incognito always-on-top window, such as a Document PiP, as foreign: expected { managed: undefined, foreign: [] } to deeply equal { managed: undefined, …(1) }`
+  green: same command → 28 files, 127 tests passed
+  commit: 2b5124c Count Incognito always-on-top windows as blocking the workspace
+  notes: `vp check`, `vp run deps` pass; `workspace-windows.test.ts` inventory case now keeps the Incognito PiP; ARCHITECTURE's workspace paragraph states the rule
+- [ ] S1.3b `workspace-restart { url }` (orchestrator decision): close the managed window, open a fresh one, navigate; refusals for access, busy, internal URL, foreign windows, no active managed window
 - [ ] S1.4 Dashboard: access requirement, blockers + "Close these windows and start", Start, "Use this tab's address"
 - [ ] S1.5 Record only the managed tab; existing e2e and product docs updated
 - [ ] S1.6 E2E reset experiment (six sentinel kinds, normal profile unchanged, repository readable) + negative control (foreign window keeps data, dashboard blocks)
