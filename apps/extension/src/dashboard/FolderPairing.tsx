@@ -15,10 +15,42 @@ interface FolderPairingProps {
   status: PeerStatus | undefined;
 }
 
-/**
- * Leads to the folder window, which shows Chrome's folder picker or the prompt Chrome shows once
- * the folder's grant ended.
- */
+/** Chrome's folder picker, or its prompt once the grant ended, in the click; then pairing starts. */
+async function grantFolder(peers: PeerServices, again: boolean) {
+  if (again) {
+    // Chrome offers "Allow on every visit" only once no old handle holds the picker's grant.
+    await peers.client.ask({ type: "folder-release" }, v.unknown());
+    await peers.allowFolder();
+  } else await peers.chooseFolder();
+  await peers.client.ask({ type: "folder-pair" }, v.unknown());
+}
+
+/** A button that grants the folder, and the alert when Chrome or the user refuses. */
+function GrantButton({
+  peers,
+  again,
+  label,
+}: {
+  peers: PeerServices;
+  again: boolean;
+  label: string;
+}) {
+  const action = useAction();
+  return (
+    <>
+      <button
+        type="button"
+        disabled={action.busy}
+        onClick={() => void action.run(() => grantFolder(peers, again))}
+      >
+        {label}
+      </button>
+      {action.error && <p role="alert">{action.error}</p>}
+    </>
+  );
+}
+
+/** Asks for the folder in the dashboard, which holds Chrome's grant while it is open. */
 export function FolderBanner({ peers, status }: FolderPairingProps) {
   if (!status || status.folder === "granted" || anyLinked(status)) return null;
   const again = status.folder === "prompt";
@@ -29,12 +61,10 @@ export function FolderBanner({ peers, status }: FolderPairingProps) {
       </h3>
       <p>
         {again
-          ? "Chrome asks once more before RECnRun may use the folder, since its windows closed."
-          : "Your Chrome profiles pair through a folder named RECnRun in Documents."}
+          ? "Chrome asks once more before RECnRun may use the folder. Choose Allow on every visit, and it will not ask again."
+          : "Your Chrome profiles pair through a folder named RECnRun in Documents. Create it there, or choose it if another profile already did."}
       </p>
-      <button type="button" onClick={() => void peers.openFolder()}>
-        {again ? "Allow folder" : "Choose folder"}
-      </button>
+      <GrantButton peers={peers} again={again} label={again ? "Allow folder" : "Choose folder"} />
     </section>
   );
 }
@@ -116,9 +146,11 @@ function PeerLine({ view, ask, busy }: { view: PeerView; ask: Ask; busy: boolean
 function JoinButton({ peers, status }: FolderPairingProps) {
   if (status?.folder === "granted" || !anyLinked(status)) return null;
   return (
-    <button type="button" onClick={() => void peers.openFolder()}>
-      Let another profile join
-    </button>
+    <GrantButton
+      peers={peers}
+      again={status?.folder === "prompt"}
+      label="Let another profile join"
+    />
   );
 }
 

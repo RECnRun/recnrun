@@ -19,13 +19,8 @@ import { test as base } from "./profiles.ts";
 
 const exec = promisify(execFile);
 const PICKER_TITLE = "^Select (a folder|where) this site";
-/**
- * Where the restore prompt's buttons sit, from the browser window's corner, at its default size.
- * A popup window has no toolbar, so the prompt hangs higher than from a normal window's omnibox;
- * the popup's spots come first, since a normal window's spot for one button falls on another.
- */
+/** Where the restore prompt's buttons sit, from the browser window's corner, at its default size. */
 const RESTORE_BUTTONS = [
-  { x: 90, y: { "this-time": 177, "every-visit": 220, deny: 263 } },
   { x: 290, y: { "this-time": 268, "every-visit": 310, deny: 353 } },
 ] as const;
 /** A spot of page background under the toolbar, which the write prompt dims. */

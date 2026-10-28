@@ -23,8 +23,11 @@ export function peerServices(peer: ReturnType<typeof fakePeerClient>) {
     recordingsOf: () => memoryRecordingStore(),
     recordings: memoryRecordingStore(),
     sessionTabs: fakeTabs({ tabs: [] }).source,
-    openFolder: async () => {
-      folders.push(true);
+    chooseFolder: async () => {
+      folders.push("choose");
+    },
+    allowFolder: async () => {
+      folders.push("allow");
     },
   };
   return { peers, folders };

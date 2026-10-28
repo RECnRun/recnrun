@@ -52,13 +52,13 @@ test("before the background answers, the dashboard is the local one", async () =
   expect(banner(root)).toBeUndefined();
 });
 
-test("until Chrome grants the RECnRun folder, a banner opens the window that chooses it", async () => {
+test("until Chrome grants the RECnRun folder, a banner shows Chrome's picker in the dashboard", async () => {
   const { root, folders } = mount(fakePeerClient({ ...statusOf(), folder: "none" }));
   await expect.poll(() => banner(root)).toContain("Choose the RECnRun folder");
   // Recording needs no folder.
   expect(buttons(item(root, "Shop"))).toEqual(["Record"]);
   button(root, "Choose folder")?.click();
-  await expect.poll(() => folders).toHaveLength(1);
+  await expect.poll(() => folders).toEqual(["choose"]);
 });
 
 test("the paired profile's tabs follow under its name and the link's state", async () => {

@@ -16,8 +16,10 @@ export interface PeerServices {
   recordings: RecordingStore;
   /** The tabs of the peer that session runs in. */
   sessionTabs: TabSource;
-  /** Opens the window that grants the RECnRun folder. */
-  openFolder: () => Promise<void>;
+  /** Shows Chrome's folder picker and keeps the RECnRun folder; only a click may. */
+  chooseFolder: () => Promise<void>;
+  /** Asks Chrome again for the folder chosen before, once its grant ended; only a click may. */
+  allowFolder: () => Promise<void>;
 }
 
 /** The background's copy of the executor's last report, as session storage keeps it. */

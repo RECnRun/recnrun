@@ -172,19 +172,17 @@ test("while B records a session of its own, neither dashboard offers Record", as
   await expect(records(inB)).toHaveCount(0);
 });
 
-test("neither profile lists RECnRun's own pages, such as its folder window", async ({
+test("neither profile lists RECnRun's own pages, such as its dashboard", async ({
   profileA,
   profileB,
   native,
 }) => {
   await pair(profileA, profileB, native);
   const { site, dashboard } = await dashboardIn(profileA);
-  // The folder window, opened by hand in B before the tab A must list next.
-  const window = await profileB.context.newPage();
-  await window.goto(new URL("folder.html", profileB.serviceWorker.url()).href);
+  // B's dashboard is open before the tab A must list next.
+  await expect(profileB.dashboard).toHaveURL(/^chrome-extension:/);
   const app = await openInB(profileB, "app");
   await expect(remoteTab(dashboard, app.url())).toBeVisible();
   await expect(remoteTab(dashboard, site.url(), LOCAL)).toBeVisible();
   await expect(dashboard.getByText("chrome-extension://")).toHaveCount(0);
-  await expect(dashboard.getByText("RECnRun folder")).toHaveCount(0);
 });

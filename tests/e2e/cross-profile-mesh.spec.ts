@@ -68,7 +68,7 @@ test("five profiles link pairwise, list each other's tabs, and Disconnect or a q
   await expectConnected(
     pairsOf(all).filter((pair) => !pair.includes(profileA) || !pair.includes(profileB)),
   );
-  // The folder grants ended with their windows (H2); the profiles both still reach carry it.
+  // Every open dashboard holds its folder grant (H2), and the profiles both still reach vouch.
   await clickLine(profileA, profileB, "Reconnect");
   await expect(peerStatus(profileA, profileB)).toHaveText("Connected — Profile B", {
     timeout: 30_000,

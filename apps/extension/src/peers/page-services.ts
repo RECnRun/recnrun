@@ -1,4 +1,4 @@
-import { browser } from "wxt/browser";
+import { allowFolder, chooseFolder } from "@/p2p/folder-store";
 import { remoteRecordingsRepository } from "@/storage/peer-repository";
 import { createPeerClient } from "@/views/peer-client";
 import { remoteRecordings, remoteSessionTabs, remoteTabs } from "@/views/remote-peer";
@@ -23,10 +23,7 @@ export function peerServices(): PeerServices {
     recordingsOf: (peer) => remoteRecordings(client, mirrorOf(peer)),
     recordings: remoteRecordings(client, mirror),
     sessionTabs: remoteSessionTabs(client, mirror),
-    openFolder: async () => {
-      // Production builds have no folder window, so the typed public paths leave it out.
-      const url = new URL("folder.html", browser.runtime.getURL("/")).href;
-      await browser.windows.create({ url, type: "popup", width: 480, height: 360 });
-    },
+    chooseFolder,
+    allowFolder,
   };
 }

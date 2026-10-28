@@ -138,12 +138,14 @@ Three clicks in every linked profile per newcomer was too many, and the user cho
 
 On `dashboard-top-level` the dashboard is a top-level extension tab, so it holds the folder grant after the folder window closes (H2). A linked profile with its dashboard open finds a newcomer with no click, and `pairAll` no longer clicks **Let another profile join**, which shows only once a linked profile's grant ended. Red: `cross-profile-mesh.spec.ts` waited for that button until it timed out.
 
+The folder picker then moved into the dashboard, and `folder.html` and its window went: the banner's **Choose folder** and **Allow folder**, and **Let another profile join**, ask Chrome in the click. Each costs one click fewer than through the window. Red: `dashboard-folder.browser.test.tsx` failed 4 tests that expect the picker and the prompt in the dashboard.
+
 Clicks with three profiles, from the end-to-end tests, before the mesh relayed pairing: the first pairing costs each profile five, as before; a third profile joining costs it five and each linked profile three (**Let another profile join**, **Allow folder**, **Allow**); Reconnect after the grants ended costs one plus those three in each profile of the pair. Quitting a profile shows it down in the others within 5 s. The count in branded Chrome is the manual check below.
 
 ## Manual check for the user
 
 In five profiles of branded Chrome, choose the RECnRun folder in two; once they link, choose it in each new profile, with the linked profiles' dashboards open. Count the clicks until each dashboard lists the other four. Then:
 
-1. Disconnect one pair and Reconnect it; no folder window should open.
+1. Disconnect one pair and Reconnect it; Chrome should not ask for the folder.
 2. Quit one profile and time how long the other four take to show it down.
 3. Record in one profile from another, and see that the other three offer no Record.

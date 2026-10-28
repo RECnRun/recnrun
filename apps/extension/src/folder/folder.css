@@ -1,7 +1,0 @@
-.folder {
-  display: grid;
-  gap: var(--space);
-  max-width: 40rem;
-  margin: 0 auto;
-  padding: var(--space);
-}

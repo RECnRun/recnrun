@@ -1,4 +1,4 @@
-import { afterEach, expect, test } from "vite-plus/test";
+import { afterEach, expect, test, vi } from "vite-plus/test";
 import { render } from "preact";
 import { FolderBanner, PairingSection } from "@/dashboard/FolderPairing";
 import type { PeerStatus } from "@/messaging/peer-results";
@@ -12,14 +12,17 @@ import { button, field, type } from "./queries";
 /** The dashboard's folder banner and pairing controls, as Alice's status has them. */
 function mount(status: PeerStatus, answers: Parameters<typeof fakePeerClient>[1] = {}) {
   const peer = fakePeerClient(status, answers);
-  const opened = { folder: 0 };
+  // What the folder steps saw of the requests the background already had.
+  const grants: string[] = [];
+  const asked = () => peer.asked("folder-release").length;
   const peers: PeerServices = {
     client: peer.client,
     tabsOf: () => fakeTabs({ tabs: [] }).source,
     recordingsOf: () => memoryRecordingStore(),
     recordings: memoryRecordingStore(),
     sessionTabs: fakeTabs({ tabs: [] }).source,
-    openFolder: async () => void opened.folder++,
+    chooseFolder: vi.fn(async () => void grants.push(`choose after ${asked()} releases`)),
+    allowFolder: vi.fn(async () => void grants.push(`allow after ${asked()} releases`)),
   };
   const root = document.body.appendChild(document.createElement("div"));
   const show = (next: PeerStatus | undefined) =>
@@ -31,7 +34,7 @@ function mount(status: PeerStatus, answers: Parameters<typeof fakePeerClient>[1]
       root,
     );
   show(status);
-  return { peer, opened, root, show };
+  return { peer, peers, grants, root, show };
 }
 
 const banner = (root: HTMLElement) =>
@@ -42,16 +45,13 @@ afterEach(() => {
   document.body.replaceChildren();
 });
 
-test("without the folder, the banner opens the window that chooses it", async () => {
-  const { opened, root, show } = mount({ ...statusOf(), folder: "none" });
+test("without the folder, the banner shows Chrome's picker in the click, then pairing starts", async () => {
+  const { peer, grants, root, show } = mount({ ...statusOf(), folder: "none" });
   expect(banner(root)).toContain("Choose the RECnRun folder");
   expect(button(root, "Pair with another profile")).toBeUndefined();
   button(root, "Choose folder")?.click();
-  await expect.poll(() => opened.folder).toBe(1);
-  show({ ...statusOf(), folder: "prompt" });
-  expect(banner(root)).toContain("Allow the RECnRun folder");
-  button(root, "Allow folder")?.click();
-  await expect.poll(() => opened.folder).toBe(2);
+  await expect.poll(() => peer.asked("folder-pair")).toHaveLength(1);
+  expect(grants).toEqual(["choose after 0 releases"]);
   // Connected, the profile needs the folder only once the link drops.
   show({ ...statusOf("connected"), folder: "prompt" });
   expect(banner(root)).toBeUndefined();
@@ -61,11 +61,33 @@ test("without the folder, the banner opens the window that chooses it", async ()
   expect(banner(root)).toBeUndefined();
 });
 
+test("once the grant ended, the banner asks Chrome again, on every visit, after the old handles go", async () => {
+  const { peer, grants, root } = mount({ ...statusOf(), folder: "prompt" });
+  expect(banner(root)).toContain("Allow the RECnRun folder");
+  expect(banner(root)).toContain("Allow on every visit");
+  button(root, "Allow folder")?.click();
+  await expect.poll(() => peer.asked("folder-pair")).toHaveLength(1);
+  // Chrome offers "Allow on every visit" only once no old handle holds the picker's grant.
+  expect(grants).toEqual(["allow after 1 releases"]);
+});
+
+test("a folder Chrome does not allow, or a picker the user cancels, is an alert, and pairing waits", async () => {
+  const { peer, peers, root } = mount({ ...statusOf(), folder: "prompt" });
+  vi.mocked(peers.allowFolder).mockRejectedValueOnce(
+    new Error("Chrome did not allow RECnRun to use the folder."),
+  );
+  button(root, "Allow folder")?.click();
+  await expect.poll(() => alertText(root)).toBe("Chrome did not allow RECnRun to use the folder.");
+  expect(button(root, "Allow folder")?.disabled).toBe(false);
+  expect(peer.asked("folder-pair")).toEqual([]);
+});
+
 test("a linked profile without the folder lets another profile join, from the pairing section", async () => {
-  const { opened, root, show } = mount({ ...statusOf("connected"), folder: "prompt" });
+  const { peer, grants, root, show } = mount({ ...statusOf("connected"), folder: "prompt" });
   expect(banner(root)).toBeUndefined();
   button(root, "Let another profile join")?.click();
-  await expect.poll(() => opened.folder).toBe(1);
+  await expect.poll(() => peer.asked("folder-pair")).toHaveLength(1);
+  expect(grants).toEqual(["allow after 1 releases"]);
   show(statusOf("connected"));
   expect(button(root, "Let another profile join")).toBeUndefined();
   show({ ...statusOf(), folder: "prompt" });

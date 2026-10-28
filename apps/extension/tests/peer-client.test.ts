@@ -2,6 +2,7 @@ import * as v from "valibot";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vite-plus/test";
 import { fakeBrowser } from "wxt/testing/fake-browser";
 import { peerNotice } from "@/messaging/peer-messages";
+import { allowFolder, chooseFolder } from "@/p2p/folder-store";
 import { peerServices } from "@/peers/page-services";
 import { remoteRecordingsRepository } from "@/storage/peer-repository";
 import { createPeerClient } from "@/views/peer-client";
@@ -120,14 +121,9 @@ describe("peerServices", () => {
     expect(await services.recordings.read()).toEqual(session);
   });
 
-  test("opens the folder window, small and of its own", async () => {
-    const create = vi.spyOn(fakeBrowser.windows, "create");
-    await peerServices().openFolder();
-    expect(create).toHaveBeenCalledWith({
-      url: fakeBrowser.runtime.getURL("/folder.html"),
-      type: "popup",
-      width: 480,
-      height: 360,
-    });
+  test("asks for the folder in the dashboard itself, through the folder store", () => {
+    const services = peerServices();
+    expect(services.chooseFolder).toBe(chooseFolder);
+    expect(services.allowFolder).toBe(allowFolder);
   });
 });
