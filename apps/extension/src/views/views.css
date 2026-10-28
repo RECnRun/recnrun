@@ -38,8 +38,7 @@ dd {
 }
 
 .record-panel button,
-.tab-actions button,
-.tab-new-window {
+.tab-actions button {
   font: inherit;
   color: var(--text);
   background: var(--card);
@@ -53,7 +52,8 @@ dd {
 }
 
 button.record-button,
-.incognito-banner button {
+.incognito-banner button,
+.incognito-workspace button {
   font: inherit;
   background: var(--accent);
   color: var(--accent-text);

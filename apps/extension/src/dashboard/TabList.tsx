@@ -1,4 +1,4 @@
-import { errorMessage } from "@recnrun/domain";
+import { errorMessage, isAllowedTarget } from "@recnrun/domain";
 import { useState } from "preact/hooks";
 import type { RecordingStore } from "@/ports/recording-store";
 import type { OpenTab, TabSource } from "@/ports/tabs";
@@ -22,6 +22,8 @@ interface TabListProps {
   tabs: TabSource;
   store: RecordingStore;
   take: TakeControl;
+  /** Fills the Incognito workspace's address; absent while the workspace cannot start. */
+  onAddress?: (url: string) => void;
 }
 
 interface TabProps {
@@ -30,6 +32,7 @@ interface TabProps {
   /** Whether a dashboard has the control, so the session floats in its PiP window. */
   controlled: boolean;
   take: () => void;
+  onAddress?: (url: string) => void;
 }
 
 /**
@@ -64,7 +67,17 @@ function SessionControls({
   );
 }
 
-function TabItem({ tab, recording, controlled, take }: TabProps) {
+/** Only a normal tab's address, never its cookies or storage, can seed the Incognito workspace. */
+function AddressButton({ tab, onAddress }: Pick<TabProps, "tab" | "onAddress">) {
+  if (!onAddress || tab.incognito || !isAllowedTarget(tab.url)) return null;
+  return (
+    <button type="button" onClick={() => onAddress(tab.url)}>
+      Use this tab's address
+    </button>
+  );
+}
+
+function TabItem({ tab, recording, controlled, take, onAddress }: TabProps) {
   const recorded = recording.status !== "idle" && recording.tabId === tab.id;
   const idle = recording.loaded && recording.status === "idle" && !controlled;
   return (
@@ -77,6 +90,7 @@ function TabItem({ tab, recording, controlled, take }: TabProps) {
             Record
           </button>
         )}
+        <AddressButton tab={tab} onAddress={onAddress} />
       </div>
     </li>
   );
@@ -96,7 +110,7 @@ function ClosedTabItem({ recording, controlled }: Omit<TabProps, "tab" | "take">
 }
 
 /** Every open tab; with no session each can start one, and the recorded tab shows the session. */
-export function TabList({ tabs, store, take }: TabListProps) {
+export function TabList({ tabs, store, take, onAddress }: TabListProps) {
   const openTabs = useBrowserTabs(tabs)?.tabs;
   const recording = useRecording(store);
   const controlled = useLockHeld(CONTROL_LOCK);
@@ -120,6 +134,7 @@ export function TabList({ tabs, store, take }: TabListProps) {
             recording={recording}
             controlled={controlled}
             take={takeOn(tab.id)}
+            onAddress={onAddress}
           />
         ))}
         {closed && <ClosedTabItem recording={recording} controlled={controlled} />}

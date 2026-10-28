@@ -1,20 +1,12 @@
-import * as v from "valibot";
+import { ask } from "@/dashboard/ask";
 import type { TakeControl } from "@/dashboard/TabList";
-import { BackgroundReplySchema } from "@/messaging/background-messages";
 import { subscribeFrame } from "@/messaging/frame-channel";
 import { openPanelMessage } from "@/messaging/frame-protocol";
 import { returnToDashboardMessage, startSessionMessage } from "@/messaging/session-protocol";
-import type { SessionRequest } from "@/messaging/session-protocol";
 import type { SendRequest } from "@/views/extension-services";
 import { CONTROL_LOCK, tryHoldLock } from "@/views/view-locks";
 
 const CONTROLLED_ELSEWHERE = "Another RECnRun tab controls the session.";
-
-/** Rejects with the background's error, or when the reply is not one. */
-async function ask(send: SendRequest, request: SessionRequest): Promise<void> {
-  const reply = v.parse(BackgroundReplySchema, await send(request));
-  if (!reply.ok) throw new Error(reply.error);
-}
 
 /**
  * The control lock, taken atomically across every dashboard, makes this one the only one with a

@@ -32,6 +32,8 @@ export const WorkspaceRequestSchema = v.variant("type", [
   WorkspaceRestartMessageSchema,
 ]);
 
+export type WorkspaceRequest = v.InferOutput<typeof WorkspaceRequestSchema>;
+
 /** The `workspace-status` result; foreign windows carry no title or URL. */
 export const WorkspaceStatusSchema = v.object({
   access: v.boolean(),

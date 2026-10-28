@@ -2,6 +2,7 @@ import { errorMessage } from "@recnrun/domain";
 import type { Snapshot } from "@recnrun/domain";
 import { useEffect, useState } from "preact/hooks";
 import { IncognitoControl } from "@/dashboard/IncognitoControl";
+import { IncognitoWorkspace } from "@/dashboard/IncognitoWorkspace";
 import { RecordingDetail } from "@/dashboard/RecordingDetail";
 import { EmptyState, RecordingList } from "@/dashboard/RecordingList";
 import { selectedRecordingId, titleFor } from "@/dashboard/route";
@@ -55,6 +56,7 @@ function Content(props: { load: Load; route: string; nav: Navigation }) {
 export function Dashboard({ services, router, take }: DashboardProps) {
   const load = useSnapshot(services.loadSnapshot);
   const [route, setRoute] = useState(router.initialRoute);
+  const [target, setTarget] = useState("");
   useEffect(() => router.subscribe(setRoute), [router]);
   const navigate = (path: string) => {
     router.navigate(path);
@@ -73,7 +75,23 @@ export function Dashboard({ services, router, take }: DashboardProps) {
       <main>
         <div class="session-panel">
           <IncognitoControl access={services.incognito}>
-            <TabList tabs={services.tabs} store={services.recordings} take={take} />
+            {(allowed) => (
+              <>
+                <IncognitoWorkspace
+                  access={services.incognito}
+                  tabs={services.tabs}
+                  send={services.send}
+                  target={target}
+                  onTarget={setTarget}
+                />
+                <TabList
+                  tabs={services.tabs}
+                  store={services.recordings}
+                  take={take}
+                  onAddress={allowed === true ? setTarget : undefined}
+                />
+              </>
+            )}
           </IncognitoControl>
         </div>
         <Content load={load} route={route} nav={{ router, navigate }} />

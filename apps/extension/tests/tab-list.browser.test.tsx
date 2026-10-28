@@ -3,10 +3,9 @@ import { afterEach, expect, test, vi } from "vite-plus/test";
 import { startDashboard } from "@/dashboard/start";
 import { openPanelMessage, panelClosedMessage } from "@/messaging/frame-protocol";
 import { returnToDashboardMessage, startSessionMessage } from "@/messaging/session-protocol";
-import type { SessionRequest } from "@/messaging/session-protocol";
 import type { ExtensionServices } from "@/views/extension-services";
 import { CONTROL_LOCK, tryHoldLock } from "@/views/view-locks";
-import { fakeExtension, memoryRecordingStore } from "./fake-extension";
+import { fakeBackground, fakeExtension, memoryRecordingStore } from "./fake-extension";
 import { DOCS, PRIVATE, SHOP, fakeIncognito, fakeTabs } from "./fake-tabs";
 import { button } from "./queries";
 
@@ -31,12 +30,8 @@ const closePanel = (page: Window) =>
 
 function mount(services: Partial<ExtensionServices> = {}) {
   const tabs = fakeTabs({ tabs: [SHOP, DOCS] });
-  const sent: SessionRequest[] = [];
+  const { send, sent } = fakeBackground();
   const page = framedPage();
-  const send = async (request: SessionRequest) => {
-    sent.push(request);
-    return { ok: true };
-  };
   const root = document.body.appendChild(document.createElement("div"));
   startDashboard(root, fakeExtension({ tabs: tabs.source, send, ...services }), page);
   return { root, sent, tabs, page };
@@ -47,8 +42,11 @@ const onMessage = (event: MessageEvent) => posted.push(event.data);
 
 const item = (root: HTMLElement, title: string) =>
   root.querySelector<HTMLElement>(`li[aria-label="${title}"]`) ?? undefined;
+/** The session's buttons; the address button belongs to the Incognito workspace's tests. */
 const buttons = (scope: HTMLElement | undefined) =>
-  [...(scope?.querySelectorAll("button") ?? [])].map((each) => each.textContent);
+  [...(scope?.querySelectorAll("button") ?? [])]
+    .map((each) => each.textContent)
+    .filter((name) => name !== "Use this tab's address");
 const alertText = (root: HTMLElement) => root.querySelector('[role="alert"]')?.textContent;
 /** Waits until no dashboard holds the control lock, which each test leaves free. */
 async function expectControlFree() {
@@ -205,14 +203,13 @@ test("marks incognito tabs, shows only the icons it may load, and records them a
 const banner = (root: HTMLElement) =>
   root.querySelector<HTMLElement>('section[aria-labelledby="incognito-heading"]') ?? undefined;
 
-test("without incognito access, a banner opens RECnRun's details and no window is offered", async () => {
+test("without incognito access, a banner opens RECnRun's details", async () => {
   const incognito = fakeIncognito(false);
   const { root } = mount({ incognito: incognito.access });
   await expect.poll(() => banner(root)?.textContent).toContain("Enable Incognito Mode");
   expect(banner(root)?.textContent).toContain(
     "Open the extension settings and enable “Allow in Incognito”.",
   );
-  expect(button(root, "New incognito window")).toBeUndefined();
   button(root, "Open Extension Config")?.click();
   await expect.poll(() => incognito.settings).toHaveLength(1);
 });
@@ -249,7 +246,7 @@ test("details Chrome refuses to open are an alert", async () => {
   await expect.poll(() => alertText(root)).toContain("Cannot open chrome://extensions.");
 });
 
-test("an access Chrome fails to report shows neither the banner nor the window", async () => {
+test("an access Chrome fails to report shows no banner", async () => {
   const access = {
     ...fakeIncognito(false).access,
     allowed: async () => Promise.reject(new Error("Extension context invalidated.")),
@@ -257,27 +254,6 @@ test("an access Chrome fails to report shows neither the banner nor the window",
   const { root } = mount({ incognito: access });
   await expect.poll(() => item(root, "Shop")).toBeDefined();
   expect(banner(root)).toBeUndefined();
-  expect(button(root, "New incognito window")).toBeUndefined();
-});
-
-test("with incognito access, a new incognito window opens without starting a session", async () => {
-  const incognito = fakeIncognito(true);
-  const { root, sent } = mount({ incognito: incognito.access });
-  await expect.poll(() => button(root, "New incognito window")).toBeDefined();
-  expect(banner(root)).toBeUndefined();
-  button(root, "New incognito window")?.click();
-  await expect.poll(() => incognito.opened).toHaveLength(1);
-  expect(sent).toEqual([]);
-});
-
-test("a window Chrome refuses to open is an alert", async () => {
-  const refused = fakeIncognito(true, async () => {
-    throw new Error("Incognito mode is disabled.");
-  });
-  const { root } = mount({ incognito: refused.access });
-  await expect.poll(() => button(root, "New incognito window")).toBeDefined();
-  button(root, "New incognito window")?.click();
-  await expect.poll(() => alertText(root)).toContain("Incognito mode is disabled.");
 });
 
 test("only a framed dashboard holds the site tabs' ports", async () => {

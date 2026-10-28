@@ -1,7 +1,6 @@
 import type { BrowserContext, Page, Worker } from "@playwright/test";
 import { expect, test } from "./fixtures/extension.ts";
 import {
-  clickInDashboard,
   clickToOpenPanel,
   dashboardOf,
   openSite,
@@ -16,12 +15,9 @@ import {
   storedText,
   tabIdOf,
 } from "./fixtures/tabs.ts";
+import { APP, startWorkspace, workspacePanel } from "./fixtures/workspace.ts";
 
 const tabsOf = (site: Page) => dashboardOf(site).getByRole("complementary", { name: "Tabs" });
-
-/** The incognito control sits above the tab list, so it is found in the dashboard, not the list. */
-const incognitoWindowButton = (site: Page) =>
-  dashboardOf(site).getByRole("button", { name: "New incognito window" });
 
 /** What the session page in the PiP window shows of a tab: the current one, or the recorded one. */
 const tabRegion = (pip: Page, name: "Current tab" | "Recorded tab") =>
@@ -45,7 +41,9 @@ test.describe("without incognito access", () => {
   test("lists the normal tabs and says how to allow incognito ones", async ({ context }) => {
     const site = await openSite(context, "/");
     await expect(dashboardOf(site).locator("body")).toContainText("Allow in Incognito");
-    await expect(incognitoWindowButton(site)).toHaveCount(0);
+    await expect(
+      workspacePanel(site).getByRole("button", { name: "Start", exact: true }),
+    ).toHaveCount(0);
     await expect(tabItem(dashboardOf(site), site.url())).not.toContainText("Incognito");
   });
 });
@@ -53,13 +51,13 @@ test.describe("without incognito access", () => {
 test.describe("with incognito access", () => {
   test.use({ incognitoAccess: true });
 
-  test("a new incognito window from the dashboard lists its tab, ready to record", async ({
+  test("the Incognito workspace started from the dashboard lists its tab, ready to record", async ({
     context,
     serviceWorker,
   }) => {
     const site = await openSite(context, "/");
     await expect(dashboardOf(site).locator("body")).not.toContainText("Allow in Incognito");
-    await clickInDashboard(incognitoWindowButton(site));
+    await startWorkspace(site, serviceWorker, `${APP}/inspect?run=listed`);
 
     await expect
       .poll(async () => (await chromeTabs(serviceWorker)).filter((tab) => tab.incognito).length)

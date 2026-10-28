@@ -134,6 +134,46 @@
   font-size: 0.875rem;
 }
 
-.tab-new-window {
-  justify-self: start;
+.incognito-workspace {
+  display: grid;
+  justify-items: start;
+  gap: 0.5rem;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space);
+}
+
+.incognito-workspace h3,
+.incognito-workspace p,
+.incognito-workspace ul {
+  margin: 0;
+}
+
+.incognito-workspace h3 {
+  font-size: 1rem;
+}
+
+.incognito-windows {
+  padding-left: 1.25rem;
+}
+
+.workspace-address {
+  display: grid;
+  gap: 0.25rem;
+  justify-self: stretch;
+}
+
+.workspace-address input {
+  font: inherit;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.25rem 0.75rem;
+}
+
+.workspace-hint {
+  color: var(--muted);
+  font-size: 0.875rem;
 }

@@ -22,10 +22,11 @@ export interface TabSource {
   watch: (onChange: () => void) => () => void;
 }
 
-/** Whether the user allowed RECnRun in Incognito, where to allow it, and an incognito window. */
+/** Whether the user allowed RECnRun in Incognito, where to allow it, and when windows come and go. */
 export interface IncognitoAccess {
   allowed: () => Promise<boolean>;
   /** Opens RECnRun's details in chrome://extensions, where "Allow in Incognito" is. */
   openSettings: () => Promise<void>;
-  openWindow: () => Promise<void>;
+  /** Calls back when a window opens or closes; returns the unsubscribe function. */
+  watchWindows: (onChange: () => void) => () => void;
 }
