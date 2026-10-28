@@ -8,7 +8,16 @@ interface ChromeTab {
   windowId: number;
 }
 
+interface ChromeWindow {
+  id?: number;
+  focused: boolean;
+  alwaysOnTop: boolean;
+  tabs?: ChromeTab[];
+}
+
 interface ChromeGlobal {
+  /** Window ids in the order Chrome gave them the focus, since `watchFocus` ran. */
+  focusOrder?: number[];
   chrome: {
     tabs: {
       query(filter: object): Promise<ChromeTab[]>;
@@ -16,8 +25,9 @@ interface ChromeGlobal {
     };
     windows: {
       create(data: object): Promise<{ id?: number; tabs?: ChromeTab[] }>;
-      getAll(filter: object): Promise<{ focused: boolean; tabs?: ChromeTab[] }[]>;
+      getAll(filter: object): Promise<ChromeWindow[]>;
       update(windowId: number, properties: object): Promise<unknown>;
+      onFocusChanged: { addListener(listener: (windowId: number) => void): void };
     };
     storage: Record<
       "local" | "session",
@@ -43,12 +53,37 @@ export function chromeTabs(serviceWorker: Worker) {
   });
 }
 
-/** The tab the user sees: the active one of the focused window, normal or Incognito. */
-export function focusedTabId(serviceWorker: Worker): Promise<number | undefined> {
+/**
+ * Records, in the service worker, every window Chrome gives the focus to from now on. Call it
+ * before the action whose result `shownTabId` reads.
+ */
+export function watchFocus(serviceWorker: Worker): Promise<void> {
+  return serviceWorker.evaluate(() => {
+    const scope = globalThis as unknown as ChromeGlobal;
+    if (scope.focusOrder) return;
+    const order: number[] = [];
+    scope.focusOrder = order;
+    scope.chrome.windows.onFocusChanged.addListener((windowId) => order.push(windowId));
+  });
+}
+
+/**
+ * The tab the user sees: the active one of the browsing window that got the focus last. A PiP
+ * window (always on top) may take the focus after it, so the focused window alone cannot tell.
+ */
+export function shownTabId(serviceWorker: Worker): Promise<number | undefined> {
   return serviceWorker.evaluate(async () => {
-    const { chrome } = globalThis as unknown as ChromeGlobal;
+    const { chrome, focusOrder } = globalThis as unknown as ChromeGlobal;
+    if (!focusOrder) throw new Error("Call watchFocus first.");
     const windows = await chrome.windows.getAll({ populate: true });
-    return windows.find((each) => each.focused)?.tabs?.find((tab) => tab.active)?.id;
+    const browsing = new Map(
+      windows.filter((each) => !each.alwaysOnTop).map((each) => [each.id, each]),
+    );
+    // Closed windows and Chrome's "no window" id are no longer listed, so they are skipped.
+    const last =
+      focusOrder.findLast((id) => browsing.has(id)) ??
+      windows.find((each) => each.focused && !each.alwaysOnTop)?.id;
+    return browsing.get(last)?.tabs?.find((tab) => tab.active)?.id;
   });
 }
 

@@ -12,7 +12,7 @@ import {
   SESSION_FRAME,
   tabItem,
 } from "./fixtures/session.ts";
-import { recordedTabId, sessionUrl, storedSession, tabIdOf } from "./fixtures/tabs.ts";
+import { recordedTabId, sessionUrl, storedSession, tabIdOf, watchFocus } from "./fixtures/tabs.ts";
 import { APP, openWorkspaceApp } from "./fixtures/workspace.ts";
 import type { WorkspaceApp } from "./fixtures/workspace.ts";
 
@@ -23,6 +23,7 @@ import type { WorkspaceApp } from "./fixtures/workspace.ts";
 const test = base.extend<{ app: WorkspaceApp }>({
   app: async ({ page, serviceWorker, seedSnapshot }, use) => {
     await seedSnapshot(sampleSnapshot());
+    await watchFocus(serviceWorker);
     await page.goto("/");
     await expect(dashboardOf(page).getByRole("heading", { name: "Tabs" })).toBeVisible();
     await use(await openWorkspaceApp(page, serviceWorker, `${APP}/inspect?run=session`));
