@@ -89,7 +89,7 @@ async function buildImage() {
 }
 
 async function startTests(image) {
-  const environment = ["CI", "DEBUG", "FORCE_COLOR"].flatMap((key) =>
+  const environment = ["CI", "DEBUG", "FORCE_COLOR", "POC_REPEATS"].flatMap((key) =>
     process.env[key] === undefined ? [] : ["--env", `${key}=${process.env[key]}`],
   );
   const result = await docker(

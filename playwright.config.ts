@@ -19,10 +19,19 @@ export default defineConfig({
     video: "retain-on-failure",
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
-  webServer: {
-    command: "vp run website#preview -- --port 5190 --strictPort --host localhost",
-    url: baseURL,
-    reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
-  },
+  webServer: [
+    {
+      command: "vp run website#preview -- --port 5190 --strictPort --host localhost",
+      url: baseURL,
+      reuseExistingServer: !process.env.CI,
+      timeout: 120_000,
+    },
+    {
+      // Serves app.localhost:5191 and other.localhost:5191; Node may not resolve *.localhost.
+      command: "node tests/e2e/apps/server.ts",
+      url: "http://localhost:5191/health",
+      reuseExistingServer: !process.env.CI,
+      timeout: 120_000,
+    },
+  ],
 });
