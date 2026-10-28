@@ -7,10 +7,12 @@ import { fakeBrowser } from "wxt/testing/fake-browser";
 import { createWorkspaceCommands } from "@/background/workspace/commands";
 import { WorkspaceError } from "@/background/workspace/errors";
 import { savedStart } from "@/background/workspace/identity-commands";
+import { createNeutralWindow } from "@/background/workspace/windows";
 import { WorkspaceStatusSchema } from "@/messaging/workspace-protocol";
+import { managedWindowRepository } from "@/storage/managed-window-repository";
 import { fakeBarrierApi } from "./fake-barrier";
 import { chrome, memoryCaptures } from "./fake-capture";
-import { fakeCookieApi } from "./fake-cookies";
+import { fakeCookieApi, memoryStoreMemory } from "./fake-cookies";
 import { memoryRecordingStore } from "./fake-extension";
 import { memoryOperationJournal } from "./fake-journal";
 import { fakeNavigationApi } from "./fake-navigation";
@@ -26,9 +28,25 @@ const DATA: IdentityData = {
 function ports(beforeStep: (step: string) => Promise<void> = async () => {}) {
   return {
     cookies: fakeCookieApi([[{ id: "0", tabIds: [1] }]], [1]),
+    stores: memoryStoreMemory(),
     navigation: fakeNavigationApi(),
     barrier: fakeBarrierApi(),
     hooks: { beforeStep },
+  };
+}
+
+/** Chrome lists store "1" for the managed tab while its window is open, as the real API does. */
+function listManagedStore(cookies: ReturnType<typeof ports>["cookies"]) {
+  const managedTabs = async () => {
+    const managed = await managedWindowRepository.read();
+    return managed?.status === "active" ? [managed.tabId] : [];
+  };
+  // A normal tab id fakeBrowser never hands out, so it cannot equal the managed tab's.
+  cookies.normalTabs = [1000];
+  cookies.incognitoTabIds = managedTabs;
+  cookies.stores = async () => {
+    const tabIds = await managedTabs();
+    return [{ id: "0", tabIds: [1000] }, ...(tabIds.length > 0 ? [{ id: "1", tabIds }] : [])];
   };
 }
 
@@ -100,6 +118,34 @@ describe("startWithIdentity", () => {
     expect(await journal.read()).toEqual(status.operation);
     await commands.start(URL_);
     expect((await commands.status()).operation).toBeUndefined();
+  });
+
+  test("a start that fails before naming its store still remembers it before closing", async () => {
+    const failing = ports(injected("cookie-store"));
+    listManagedStore(failing.cookies);
+    const commands = createWorkspaceCommands(memoryRecordingStore(), failing);
+    await expect(commands.startWithIdentity(URL_, DATA)).rejects.toMatchObject({
+      name: "InjectedFailure",
+    });
+    expect(failing.stores.ids).toEqual(["1"]);
+  });
+
+  test("recovery remembers the interrupted window's store before closing it", async () => {
+    const recovering = ports();
+    listManagedStore(recovering.cookies);
+    const { generation, windowId } = await createNeutralWindow();
+    const journal = memoryOperationJournal({
+      id: "op-1",
+      kind: "start-with-identity",
+      step: "restore",
+      status: "running",
+      started: 1,
+      generation,
+      windowId,
+    });
+    await createWorkspaceCommands(memoryRecordingStore(), recovering, journal).recover();
+    expect(recovering.stores.ids).toEqual(["1"]);
+    expect((await fakeBrowser.windows.getAll()).map(({ id }) => id)).not.toContain(windowId);
   });
 
   test("recovers an interrupted start before the next status read or command", async () => {

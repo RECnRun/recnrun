@@ -5,7 +5,7 @@ import type { BootstrapDeps } from "@/background/workspace/bootstrap";
 import { WorkspaceError } from "@/background/workspace/errors";
 import { fakeBarrierApi } from "./fake-barrier";
 import type { FakeBarrierApi } from "./fake-barrier";
-import { fakeCookieApi } from "./fake-cookies";
+import { fakeCookieApi, memoryStoreMemory } from "./fake-cookies";
 import type { FakeCookieApi } from "./fake-cookies";
 import { fakeNavigationApi } from "./fake-navigation";
 import type { FakeNavigationApi } from "./fake-navigation";
@@ -71,6 +71,7 @@ function harness(agentReply: "restored" | "failed" = "restored") {
       ],
     ],
     [1],
+    [9],
   );
   // The previous Incognito store is gone before the window opens.
   cookies.listings.unshift([{ id: "0", tabIds: [1] }]);
@@ -96,6 +97,7 @@ function harness(agentReply: "restored" | "failed" = "restored") {
   };
   return {
     cookies,
+    stores: memoryStoreMemory(),
     navigation,
     barrier,
     windows: { create: vi.fn(async () => WINDOW), close: vi.fn(async () => {}) },
@@ -132,6 +134,31 @@ describe("bootstrapIdentity", () => {
     expect(navigation.reloads).toEqual([9]);
     expect(timings.map(({ step }) => step)).toEqual(BOOTSTRAP_STEPS);
     expect(timings.every(({ ms }) => ms >= 0)).toBe(true);
+  });
+
+  test("opens the window only once Chrome forgot every remembered Incognito store", async () => {
+    const events: string[] = [];
+    const probe = cookies.probe;
+    cookies.probe = async (storeId) => {
+      const answer = await probe(storeId);
+      events.push(`probe ${storeId} ${answer}`);
+      return answer;
+    };
+    cookies.alive.set("1", [true, true, false]);
+    // Chrome lists no Incognito store on any of the three checks.
+    cookies.listings.unshift([{ id: "0", tabIds: [1] }], [{ id: "0", tabIds: [1] }]);
+    vi.mocked(deps.windows.create).mockImplementation(async () => {
+      events.push("create");
+      return WINDOW;
+    });
+    await bootstrapIdentity(URL_, DATA, { ...deps, stores: memoryStoreMemory(["1"]) }, "op-1");
+    expect(events).toEqual(["probe 1 true", "probe 1 true", "probe 1 false", "create"]);
+  });
+
+  test("remembers the new window's Incognito store, so the next start can wait for it", async () => {
+    const memory = memoryStoreMemory();
+    await bootstrapIdentity(URL_, DATA, { ...deps, stores: memory }, "op-1");
+    expect(memory.ids).toEqual(["1"]);
   });
 
   test("runs the test hook before each step and records each step, then done", async () => {

@@ -4,15 +4,17 @@ import { restoreThroughAgent } from "@/background/workspace/agent-link";
 import { installBarrier, removeBarrier } from "@/background/workspace/barrier";
 import type { Barrier, BarrierApi } from "@/background/workspace/barrier";
 import {
+  noteIncognitoStores,
   resolveTabStore,
   restoreCookies,
-  waitForNoIncognitoStore,
+  waitForIncognitoGone,
 } from "@/background/workspace/cookie-stores";
 import type { CookieApi } from "@/background/workspace/cookie-stores";
 import { collectFailures } from "@/background/workspace/errors";
 import { openBehindBarrier, reloadAndCommit } from "@/background/workspace/navigation";
 import type { NavigationApi } from "@/background/workspace/navigation";
 import type { OriginPort } from "@/messaging/origin-protocol";
+import type { IncognitoStoreMemory } from "@/ports/incognito-stores";
 
 /** The steps of a start with an identity, in order; the journal and the timings name them. */
 export const BOOTSTRAP_STEPS = [
@@ -43,6 +45,8 @@ export interface BootstrapHooks {
 /** Chrome, behind ports, plus the test hook. */
 export interface BootstrapPorts {
   cookies: CookieApi;
+  /** Every Incognito store id Chrome listed, probed until Chrome no longer knows any of them. */
+  stores: IncognitoStoreMemory;
   navigation: NavigationApi;
   barrier: BarrierApi;
   hooks: BootstrapHooks;
@@ -86,7 +90,8 @@ const barrierOperation = (run: Run) => ({
 });
 
 const STEP_RUNS: Record<BootstrapStep, (run: Run) => Promise<unknown>> = {
-  "store-gone": (run) => waitForNoIncognitoStore(run.deps.cookies, run.deps.storeBoundMs),
+  "store-gone": (run) =>
+    waitForIncognitoGone(run.deps.cookies, run.deps.stores, run.deps.storeBoundMs),
   window: async (run) => {
     run.window = await run.deps.windows.create();
     const { generation, windowId } = run.window;
@@ -96,6 +101,7 @@ const STEP_RUNS: Record<BootstrapStep, (run: Run) => Promise<unknown>> = {
   },
   "cookie-store": async (run) => {
     run.storeId = await resolveTabStore(run.deps.cookies, tabOf(run));
+    await noteIncognitoStores(run.deps.cookies, run.deps.stores);
   },
   cookies: (run) =>
     restoreCookies(

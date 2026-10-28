@@ -3,11 +3,12 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vite-plus/tes
 import { fakeBrowser } from "wxt/testing/fake-browser";
 import {
   chromeCookieApi,
+  noteIncognitoStores,
   resolveTabStore,
   restoreCookies,
-  waitForNoIncognitoStore,
+  waitForIncognitoGone,
 } from "@/background/workspace/cookie-stores";
-import { fakeCookieApi } from "./fake-cookies";
+import { fakeCookieApi, memoryStoreMemory } from "./fake-cookies";
 
 const NORMAL = { id: "0", tabIds: [1, 2] };
 const ORIGIN = "http://app.localhost:5192";
@@ -28,22 +29,57 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("waitForNoIncognitoStore", () => {
+describe("waitForIncognitoGone", () => {
   test("asks again until no listed store is Incognito, and counts the checks", async () => {
     const closing = { id: "1", tabIds: [] };
     const api = fakeCookieApi([[NORMAL, closing], [NORMAL, closing], [NORMAL]], [1, 2]);
-    await expect(waitForNoIncognitoStore(api)).resolves.toBe(3);
+    await expect(waitForIncognitoGone(api, memoryStoreMemory())).resolves.toBe(3);
   });
 
-  test("returns at once when only the normal store is listed", async () => {
-    await expect(waitForNoIncognitoStore(fakeCookieApi([[NORMAL]], [1, 2]))).resolves.toBe(1);
+  test("returns at once when only the normal store is listed and no known store lives", async () => {
+    const api = fakeCookieApi([[NORMAL]], [1, 2]);
+    await expect(waitForIncognitoGone(api, memoryStoreMemory(["1"]))).resolves.toBe(1);
+    expect(api.probes).toEqual(["1"]);
   });
 
-  test("fails explicitly when the Incognito store outlives the bound", async () => {
-    const api = fakeCookieApi([[NORMAL, { id: "1", tabIds: [] }]], [1, 2]);
-    await expect(waitForNoIncognitoStore(api, 0)).rejects.toMatchObject({
+  test("waits until Chrome no longer knows a remembered store, not only until it is unlisted", async () => {
+    // Chrome lists a store only while it has a tab (cookies_api.cc:895-904), but destroys the
+    // Incognito profile later (profile_destroyer.cc:340-343, 395-411).
+    const api = fakeCookieApi([[NORMAL]], [1, 2]);
+    api.alive.set("1", [true, true, false]);
+    await expect(waitForIncognitoGone(api, memoryStoreMemory(["1"]))).resolves.toBe(3);
+    expect(api.probes).toEqual(["1", "1", "1"]);
+  });
+
+  test("remembers an Incognito store it sees listed, then waits for Chrome to forget it", async () => {
+    const api = fakeCookieApi([[NORMAL, { id: "1", tabIds: [9] }], [NORMAL]], [1, 2], [9]);
+    api.alive.set("1", [true, false]);
+    const memory = memoryStoreMemory();
+    await expect(waitForIncognitoGone(api, memory)).resolves.toBe(3);
+    expect(memory.ids).toEqual(["1"]);
+  });
+
+  test("fails explicitly when an Incognito store outlives the bound, listed or not", async () => {
+    const listed = fakeCookieApi([[NORMAL, { id: "1", tabIds: [] }]], [1, 2]);
+    await expect(waitForIncognitoGone(listed, memoryStoreMemory(), 0)).rejects.toMatchObject({
       name: "IncognitoNotGone",
     });
+    const unlisted = fakeCookieApi([[NORMAL]], [1, 2]);
+    unlisted.alive.set("1", [true]);
+    await expect(waitForIncognitoGone(unlisted, memoryStoreMemory(["1"]), 0)).rejects.toMatchObject(
+      { name: "IncognitoNotGone" },
+    );
+  });
+});
+
+describe("noteIncognitoStores", () => {
+  test("remembers only stores whose every tab is a known Incognito tab", async () => {
+    const stores = [NORMAL, { id: "1", tabIds: [9, 10] }, { id: "7", tabIds: [9, 11] }];
+    const api = fakeCookieApi([stores], [1, 2], [9, 10]);
+    const memory = memoryStoreMemory();
+    // Tab 11 closed between the two reads: its store is not proven Incognito, so it is not kept.
+    await expect(noteIncognitoStores(api, memory)).resolves.toEqual(["1"]);
+    expect(memory.ids).toEqual(["1"]);
   });
 });
 
@@ -124,6 +160,7 @@ describe("chromeCookieApi", () => {
 
     await expect(chromeCookieApi.stores()).resolves.toEqual([{ id: "0", tabIds: [1] }]);
     await expect(chromeCookieApi.normalTabIds()).resolves.toEqual([1]);
+    await expect(chromeCookieApi.incognitoTabIds()).resolves.toEqual([2]);
     const details = { ...session, storeId: "1", url: `${ORIGIN}/` };
     await expect(chromeCookieApi.set(details)).resolves.toBe(true);
     expect(set).toHaveBeenCalledWith(details);
@@ -136,5 +173,31 @@ describe("chromeCookieApi", () => {
     await expect(chromeCookieApi.all("1")).resolves.toEqual([]);
     // An empty partition key asks for every partition, and for unpartitioned cookies too.
     expect(getAll).toHaveBeenCalledWith({ storeId: "1", partitionKey: {} });
+  });
+});
+
+describe("chromeCookieApi.probe", () => {
+  test("answers whether Chrome still knows the store, and fails on any other error", async () => {
+    const getAll = vi.spyOn(fakeBrowser.cookies, "getAll").mockResolvedValueOnce([] as never);
+    await expect(chromeCookieApi.probe("1")).resolves.toBe(true);
+    expect(getAll).toHaveBeenCalledWith({ storeId: "1", domain: "recnrun.invalid" });
+    // Chrome rejects an id once its profile is gone (cookies_api.cc:63, 103-115).
+    getAll.mockRejectedValueOnce(new Error('Invalid cookie store id: "1".'));
+    await expect(chromeCookieApi.probe("1")).resolves.toBe(false);
+    getAll.mockRejectedValueOnce(new Error("No host permissions."));
+    await expect(chromeCookieApi.probe("1")).rejects.toThrow("No host permissions.");
+  });
+
+  test("refuses to answer in a build without the cookies API", async () => {
+    const { cookies } = fakeBrowser;
+    Object.assign(fakeBrowser, { cookies: undefined });
+    try {
+      await expect(chromeCookieApi.stores()).rejects.toMatchObject({ name: "CookiesUnavailable" });
+      await expect(chromeCookieApi.probe("1")).rejects.toMatchObject({
+        name: "CookiesUnavailable",
+      });
+    } finally {
+      Object.assign(fakeBrowser, { cookies });
+    }
   });
 });

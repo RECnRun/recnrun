@@ -2,6 +2,7 @@ import type { SiteCookie } from "@recnrun/domain";
 import { browser } from "wxt/browser";
 import type { Browser } from "wxt/browser";
 import { WorkspaceError } from "@/background/workspace/errors";
+import type { IncognitoStoreMemory } from "@/ports/incognito-stores";
 
 /** A cookie store as Chrome lists it: its id and the tabs that use it. */
 export interface CookieStore {
@@ -23,28 +24,69 @@ export type StoredCookie = Omit<SiteCookie, "host"> & {
 export interface CookieApi {
   stores: () => Promise<CookieStore[]>;
   normalTabIds: () => Promise<number[]>;
+  incognitoTabIds: () => Promise<number[]>;
+  /** Whether Chrome still knows `storeId`: true while its profile exists, even with no tab left. */
+  probe: (storeId: string) => Promise<boolean>;
   /** Every cookie of `storeId`, partitioned ones included, that the host permissions reach. */
   all: (storeId: string) => Promise<StoredCookie[]>;
   /** False when Chrome refused the cookie. */
   set: (details: CookieDetails) => Promise<boolean>;
 }
 
-/** How long a closed Incognito profile may stay listed before a start gives up. */
+/** How long a closed Incognito profile may stay alive before a start gives up. */
 const STORE_GONE_BOUND_MS = 10_000;
 
+/** The listed stores, split into those Chrome may still keep alive and those proven Incognito. */
+async function classifyStores(api: Pick<CookieApi, "stores" | "normalTabIds" | "incognitoTabIds">) {
+  // Stores first: every tab a store lists then existed before the tab queries that follow.
+  const stores = await api.stores();
+  const normal = new Set(await api.normalTabIds());
+  const incognito = new Set(await api.incognitoTabIds());
+  const isNormal = ({ tabIds }: CookieStore) =>
+    tabIds.length > 0 && tabIds.every((id) => normal.has(id));
+  const isIncognito = ({ tabIds }: CookieStore) =>
+    tabIds.length > 0 && tabIds.every((id) => incognito.has(id));
+  return {
+    blocking: stores.filter((store) => !isNormal(store)),
+    incognito: stores.filter(isIncognito).map(({ id }) => id),
+  };
+}
+
 /**
- * Waits until Chrome lists no Incognito cookie store, the closest sign that it destroyed the last
- * Incognito profile. Chrome fires no event for it, so each answer leads to the next question.
- * Resolves with the number of listings it took.
+ * Remembers every listed store whose tabs are all Incognito, so a later wait can probe it once its
+ * last tab is gone. A store with a tab of unknown kind is left out: remembering the normal store
+ * would make every wait run out. Resolves with the ids it saw.
  */
-export async function waitForNoIncognitoStore(
+export async function noteIncognitoStores(
+  api: Pick<CookieApi, "stores" | "normalTabIds" | "incognitoTabIds">,
+  memory: IncognitoStoreMemory,
+): Promise<string[]> {
+  const { incognito } = await classifyStores(api);
+  if (incognito.length > 0) await memory.remember(incognito);
+  return incognito;
+}
+
+async function anyAlive(api: Pick<CookieApi, "probe">, ids: readonly string[]): Promise<boolean> {
+  for (const id of ids) if (await api.probe(id)) return true;
+  return false;
+}
+
+/**
+ * Waits until Chrome lists no Incognito store and no longer knows any Incognito store it ever
+ * listed. Chrome unlists a store with its last tab, but destroys the Incognito profile only once
+ * its renderers exit, and until then a new Incognito window reuses that profile. Chrome fires no
+ * event for either, so each answer leads to the next question. Resolves with the checks it took.
+ */
+export async function waitForIncognitoGone(
   api: CookieApi,
+  memory: IncognitoStoreMemory,
   boundMs = STORE_GONE_BOUND_MS,
 ): Promise<number> {
   const deadline = performance.now() + boundMs;
   for (let checks = 1; ; checks += 1) {
-    // The normal profile always lists its store, even with no tab; any other store is Incognito's.
-    if ((await api.stores()).length <= 1) return checks;
+    const { blocking, incognito } = await classifyStores(api);
+    if (incognito.length > 0) await memory.remember(incognito);
+    if (blocking.length === 0 && !(await anyAlive(api, await memory.read()))) return checks;
     if (performance.now() >= deadline) {
       throw new WorkspaceError(
         "IncognitoNotGone",
@@ -110,17 +152,47 @@ export async function restoreCookies(
   return live.length;
 }
 
+/** Chrome's cookies API, which only builds that ask for the `cookies` permission have. */
+function cookiesApi(): typeof browser.cookies {
+  const { cookies } = browser as Partial<typeof browser>;
+  if (cookies === undefined) {
+    throw new WorkspaceError(
+      "CookiesUnavailable",
+      "This build of RECnRun cannot tell when Chrome has cleared an Incognito session.",
+    );
+  }
+  return cookies;
+}
+
+async function tabIds(incognito: boolean): Promise<number[]> {
+  return (await browser.tabs.query({}))
+    .filter((tab) => tab.incognito === incognito)
+    .flatMap(({ id }) => (id === undefined ? [] : [id]));
+}
+
+// Chrome's text for a store whose profile is gone (cookies_api.cc).
+const UNKNOWN_STORE = "Invalid cookie store id";
+
 /** The cookie calls through Chrome; `cookies` exists only in builds that ask for it. */
 export const chromeCookieApi: CookieApi = {
   stores: async () =>
-    (await browser.cookies.getAllCookieStores()).map(({ id, tabIds }) => ({ id, tabIds })),
-  normalTabIds: async () =>
-    (await browser.tabs.query({}))
-      .filter((tab) => !tab.incognito)
-      .flatMap(({ id }) => (id === undefined ? [] : [id])),
+    (await cookiesApi().getAllCookieStores()).map(({ id, tabIds }) => ({ id, tabIds })),
+  normalTabIds: () => tabIds(false),
+  incognitoTabIds: () => tabIds(true),
+  // The domain matches no cookie, so the answer carries none; only the store id is checked.
+  probe: async (storeId) => {
+    const cookies = cookiesApi();
+    try {
+      await cookies.getAll({ storeId, domain: "recnrun.invalid" });
+      return true;
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith(UNKNOWN_STORE)) return false;
+      throw error;
+    }
+  },
   // An empty partition key lists every partition's cookies and the unpartitioned ones.
   all: async (storeId) =>
-    (await browser.cookies.getAll({ storeId, partitionKey: {} })) as StoredCookie[],
+    (await cookiesApi().getAll({ storeId, partitionKey: {} })) as StoredCookie[],
   // Chrome answers null, or no value at all, when it stored no cookie.
-  set: async (details) => Boolean(await browser.cookies.set(details as Browser.cookies.SetDetails)),
+  set: async (details) => Boolean(await cookiesApi().set(details as Browser.cookies.SetDetails)),
 };

@@ -1,12 +1,14 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vite-plus/test";
 import { fakeBrowser } from "wxt/testing/fake-browser";
 import { managedWindowRepository } from "@/storage/managed-window-repository";
+import { fakeCookieApi, memoryStoreMemory } from "./fake-cookies";
 import { memoryRecordingStore } from "./fake-extension";
 import { openIncognitoWindow, openWindowsWithTabs } from "./fake-windows";
 import {
   allowIncognito,
   busyReply,
   contentScript,
+  fakeWorkspacePorts,
   holdNextNavigation,
   RECORDING_FIRST,
   readStatus,
@@ -61,6 +63,25 @@ describe("workspace-restart", () => {
     );
     expect(managed).toMatchObject({ status: "active", generation: previous.generation + 1 });
     expect(managed?.windowId).not.toBe(previous.windowId);
+  });
+
+  test("remembers the managed window's store before closing it, and waits for Chrome to forget it", async () => {
+    // A tab id fakeBrowser never hands out, so the normal store cannot share the managed tab's id.
+    const normal = { id: "0", tabIds: [1000] };
+    const cookies = fakeCookieApi([[normal]], [1000]);
+    const memory = memoryStoreMemory();
+    send = workspaceBackground(memoryRecordingStore(), fakeWorkspacePorts(cookies, memory));
+    const previous = await startManaged();
+    // Chrome lists the managed tab's store only while its window is open, and forgets it a probe later.
+    const listed = async () =>
+      (await fakeBrowser.windows.getAll()).some(({ id }) => id === previous.windowId);
+    cookies.stores = async () =>
+      (await listed()) ? [normal, { id: "1", tabIds: [previous.tabId] }] : [normal];
+    cookies.incognitoTabIds = async () => ((await listed()) ? [previous.tabId] : []);
+    cookies.alive.set("1", [true, false]);
+    expect(await send(restart)).toEqual({ ok: true });
+    expect(memory.ids).toEqual(["1"]);
+    expect(cookies.probes).toEqual(["1", "1"]);
   });
 
   test("refuses without an active managed window, and opens nothing", async () => {

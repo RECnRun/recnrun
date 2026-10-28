@@ -8,7 +8,11 @@ import { managedWindowRepository } from "@/storage/managed-window-repository";
 import { BackgroundReplySchema } from "@/messaging/background-messages";
 import { WorkspaceStatusSchema } from "@/messaging/workspace-protocol";
 import type { RecordingStore } from "@/ports/recording-store";
+import { fakeBarrierApi } from "./fake-barrier";
+import { fakeCookieApi, memoryStoreMemory } from "./fake-cookies";
+import type { FakeCookieApi } from "./fake-cookies";
 import { memoryRecordingStore } from "./fake-extension";
+import { fakeNavigationApi } from "./fake-navigation";
 
 const EXTENSION_URL = "chrome-extension://own-id/";
 const identity = { extensionId: "own-id", extensionUrl: EXTENSION_URL };
@@ -18,12 +22,24 @@ export const TARGET = "https://app.example/";
 
 export type Send = (message: unknown, sender?: object) => Promise<unknown>;
 
+/** Chrome behind fakes: by default only the normal store is listed and no Incognito profile lives. */
+export function fakeWorkspacePorts(
+  cookies: FakeCookieApi = fakeCookieApi([[{ id: "0", tabIds: [1] }]], [1]),
+  stores = memoryStoreMemory(),
+) {
+  const hooks = { beforeStep: async () => {} };
+  return { cookies, stores, navigation: fakeNavigationApi(), barrier: fakeBarrierApi(), hooks };
+}
+
 /** Delivers messages to one background, as Chrome would, and resolves with the validated reply. */
-export function workspaceBackground(store: RecordingStore = memoryRecordingStore()): Send {
+export function workspaceBackground(
+  store: RecordingStore = memoryRecordingStore(),
+  ports = fakeWorkspacePorts(),
+): Send {
   const routes = createRoutes({
     extensionVersion: "0.1.0",
     store,
-    workspace: createWorkspaceCommands(store),
+    workspace: createWorkspaceCommands(store, ports),
   });
   const listener = createBackgroundListener(routes, identity);
   return (message, sender = ownPage) =>

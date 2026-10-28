@@ -1,12 +1,14 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vite-plus/test";
 import { fakeBrowser } from "wxt/testing/fake-browser";
 import { managedWindowRepository } from "@/storage/managed-window-repository";
+import { fakeCookieApi, memoryStoreMemory } from "./fake-cookies";
 import { memoryRecordingStore } from "./fake-extension";
 import { openIncognitoWindow, openWindowsWithTabs } from "./fake-windows";
 import {
   allowIncognito,
   busyReply,
   contentScript,
+  fakeWorkspacePorts,
   holdNextNavigation,
   RECORDING_FIRST,
   readStatus,
@@ -54,6 +56,21 @@ describe("workspace-status", () => {
 });
 
 describe("workspace-start", () => {
+  test("opens no window until Chrome forgot the previous Incognito profile", async () => {
+    // Unlisted once its last tab closed (cookies_api.cc:895-904), the profile is destroyed later.
+    const cookies = fakeCookieApi([[{ id: "0", tabIds: [1] }]], [1]);
+    cookies.alive.set("1", [true, false]);
+    const probe = vi.spyOn(cookies, "probe");
+    send = workspaceBackground(
+      memoryRecordingStore(),
+      fakeWorkspacePorts(cookies, memoryStoreMemory(["1"])),
+    );
+    const create = vi.mocked(fakeBrowser.windows.create);
+    expect(await send({ type: "workspace-start", url: TARGET })).toEqual({ ok: true });
+    expect(cookies.probes).toEqual(["1", "1"]);
+    expect(probe.mock.invocationCallOrder[1]).toBeLessThan(create.mock.invocationCallOrder[0] ?? 0);
+  });
+
   test("opens the managed window on a blank page, then navigates its tab to the target", async () => {
     const update = vi.spyOn(fakeBrowser.tabs, "update");
     expect(await send({ type: "workspace-start", url: TARGET })).toEqual({ ok: true });
