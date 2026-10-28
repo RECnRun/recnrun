@@ -8,7 +8,7 @@ Plan: [poc-incognito-sessions-plan.md](poc-incognito-sessions-plan.md). Assignme
 | Branch               | `poc/incognito-sessions`                                         |
 | Planned base         | `44c154da29860c7a8df829e902b177df5ce2ba2a` (2026-10-28)          |
 | Actual base (P0.1)   | `44c154d` (re-resolved 2026-10-28, unchanged)                    |
-| Last recorded commit | `48c1b2a`                                                        |
+| Last recorded commit | `52a98cb`                                                        |
 | Decisions OD-1…OD-4  | defaults of plan §3, accepted by the user ("Avance", 2026-10-28) |
 
 ## Status legend
@@ -253,7 +253,15 @@ Stage 2 verify: exit 0 on `dfb882d`, 302 unit/component, 61/61 e2e, coverage 99.
   - Stale messages: dropped by the existing agent link and navigation: `apps/extension/tests/agent-link.test.ts:26` (top frame of the expected document only), `:68-80` (replies of another operation id or generation dropped), `tests/workspace-navigation.test.ts:44` (links from other tabs, frames, documents ended), `tests/workspace-capture.test.ts:131`. The lifecycle adds no new message path.
   - Size: `approximateBytes` (UTF-16 strings ×2, Blob size, binary byte length, 8 per number/date/bigint, 4 per boolean, containers summed) over Web Storage, records, caches, and cookies; shown as approximate.
   - Exercised in real Chrome (scratch probe `zz-lifecycle-probe.spec.ts`, runtime messages from the dashboard page): new A 146 ms, new B 143 ms (A saved, B empty), switch A 118 ms (marker A back), suspend 31 ms (no Incognito window left; A and B each 8 bytes), resume B 102 ms (marker B back), delete B while open refused, delete A 12 ms. Per-command e2e through the dashboard comes with S3.9.
-- [ ] S3.9 Dashboard identities, persistence note, delete, conflicts, failures
+- [i] S3.9 Dashboard identities, persistence note, delete, conflicts, failures
+  red: `vp run test:components` in the scratch worktree with `Identities` rendering null, `approximateSize` stubbed, the failure name fixed, and the held identity not shown → 11 failed; `vp run test:components -- apps/extension/tests/identities.browser.test.tsx` → "a command's error that its failed operation already names shows once" failed with a second alert (`+ "The test build failed the restore step."`); `vp run test:e2e -- tests/e2e/identities.spec.ts` in the scratch worktree with `Identities` rendering null → 3 failed waiting for the Label textbox
+  green: `vp run test:components` → 126 passed; `vp run test:e2e -- tests/e2e/identities.spec.ts tests/e2e/incognito-workspace.spec.ts` → 11 passed; `vp check`, `vp run deps` pass; pre-commit unit 322 passed
+  commit: 52a98cb Show saved identities and their commands in the dashboard
+  notes: `dashboard/Identities.tsx` lists each identity with "Saved <time>, about <size>" or "Not saved yet", and the persistence note "Saved on this computer in RECnRun, kept after Incognito closes." One row command from the status: nothing open → Resume (captured) or Switch to (never captured, opens empty); identity open → Suspend on its row (marked Open), Switch to on others; anonymous window → none. Delete asks again ("Delete <label>" / Keep) and is absent on the open row. New identity takes Label and the panel's Address, sends `cookieHosts: []`. While the window holds an identity the panel says "Incognito workspace open: <label>" instead of Close and start empty.
+  - Conflicts: a foreign Incognito window or a second tab in the managed window (live tab model; the backend refuses only the first) shows "Another Incognito window or tab is open. Close it to switch identities; RECnRun saves only its own tab." and disables every row command and New identity, not Delete. Disabled workspace buttons now look disabled (`views.css`); `incognito-workspace.spec.ts` "leaves no command" now counts enabled buttons and checks New identity disabled.
+  - Failures: one alert "<Command> failed at the <step> step. <error>"; the command's own refusal is not repeated when the journal already names it (found in the screenshot, fixed red/green).
+  - E2E through the dashboard (`tests/e2e/identities.spec.ts`, kept as `identity-commands-ms.json`): switch 227–335 ms, suspend 184–305 ms, resume 191–318 ms over 3 runs (click to the row's Suspend enabled, after the barrier reload); localStorage marker per identity survives Switch and Resume; failed resume (`failNext("restore")`) opens no window and the next Resume works. Screens: `.artifacts/screens/S3.9/{guest-open,conflict,suspended,failed-resume}.png`.
+  - Residuals: `closeWindowIds` not offered by the UI (New identity is disabled beside foreign windows); the extra-tab conflict is UI-only.
 - [ ] S3.10 Writers during capture (page, worker, Service Worker) and the consistency boundary
 - [ ] S3.11 Lifecycle E2E suite (A→B→A→C→A ×10, failures, restarts, stale messages, concurrency, 10,000 records)
 
