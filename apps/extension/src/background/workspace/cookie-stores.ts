@@ -1,6 +1,7 @@
 import type { SiteCookie } from "@recnrun/domain";
 import { browser } from "wxt/browser";
 import type { Browser } from "wxt/browser";
+import { workspaceUnavailable } from "@/background/workspace/availability";
 import { WorkspaceError } from "@/background/workspace/errors";
 import type { IncognitoStoreMemory } from "@/ports/incognito-stores";
 
@@ -155,12 +156,7 @@ export async function restoreCookies(
 /** Chrome's cookies API, which only builds that ask for the `cookies` permission have. */
 function cookiesApi(): typeof browser.cookies {
   const { cookies } = browser as Partial<typeof browser>;
-  if (cookies === undefined) {
-    throw new WorkspaceError(
-      "CookiesUnavailable",
-      "This build of RECnRun cannot tell when Chrome has cleared an Incognito session.",
-    );
-  }
+  if (cookies === undefined) throw workspaceUnavailable();
   return cookies;
 }
 

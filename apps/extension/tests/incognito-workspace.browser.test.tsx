@@ -1,6 +1,7 @@
 import { expect, test } from "vite-plus/test";
 import type { PageRequest } from "@/views/extension-services";
 import { NO_INCOGNITO_WINDOW } from "./fake-extension";
+import { identity } from "./fake-lifecycle";
 import { SHOP } from "./fake-tabs";
 import { button } from "./queries";
 import { inPanel, mount, panel, panelText, row, typeAddress } from "./workspace-panel";
@@ -27,6 +28,16 @@ test("without access, the panel states the requirement and offers no Start", asy
   expect(inPanel(root, "Start")).toBeUndefined();
   expect(panel(root)?.querySelector("input")).toBeNull();
   expect(button(root, "Use this tab's address")).toBeUndefined();
+});
+
+test("in a build without the workspace's APIs, the panel says so once and offers no command", async () => {
+  const { root } = mount({ ...NO_INCOGNITO_WINDOW, available: false, identities: [identity("a")] });
+  await expect
+    .poll(() => panelText(root))
+    .toBe("Incognito workspaceThe Incognito workspace is not available in this build.");
+  expect(panel(root)?.querySelectorAll("button, input")).toHaveLength(0);
+  expect(button(root, "Use this tab's address")).toBeUndefined();
+  expect(root.querySelector("aside h2")?.textContent).toBe("Tabs");
 });
 
 test("with no Incognito window, Start opens the workspace at the address, then reads again", async () => {

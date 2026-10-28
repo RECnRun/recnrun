@@ -62,6 +62,8 @@ export function Dashboard({ services, router, take }: DashboardProps) {
   const [route, setRoute] = useState(router.initialRoute);
   const [target, setTarget] = useState("");
   const workspace = useWorkspaceStatus(services);
+  // A build without the workspace has no address to fill.
+  const addressable = workspace.status?.available !== false;
   useEffect(() => router.subscribe(setRoute), [router]);
   const navigate = (path: string) => {
     router.navigate(path);
@@ -94,7 +96,7 @@ export function Dashboard({ services, router, take }: DashboardProps) {
                   store={services.recordings}
                   take={take}
                   recordable={managedTabId(workspace.status)}
-                  onAddress={allowed === true ? setTarget : undefined}
+                  onAddress={allowed === true && addressable ? setTarget : undefined}
                 />
               </>
             )}

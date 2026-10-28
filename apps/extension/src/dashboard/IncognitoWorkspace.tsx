@@ -244,7 +244,10 @@ export function IncognitoWorkspace({ workspace, tabs, send, target, onTarget }: 
   return (
     <section class="incognito-workspace" aria-labelledby="incognito-workspace-heading">
       <h3 id="incognito-workspace-heading">Incognito workspace</h3>
-      {status && (
+      {status && !status.available && (
+        <p>The Incognito workspace is not available in this build.</p>
+      )}
+      {status?.available && (
         <>
           <WorkspaceBody
             status={status}

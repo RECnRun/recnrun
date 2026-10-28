@@ -34,12 +34,19 @@ afterEach(() => {
 
 describe("workspace-status", () => {
   test("reports access, the managed window, and foreign windows by id and tab count", async () => {
-    expect(await status()).toEqual({ access: true, foreign: [], busy: false, identities: [] });
+    expect(await status()).toEqual({
+      available: true,
+      access: true,
+      foreign: [],
+      busy: false,
+      identities: [],
+    });
     await send({ type: "workspace-start", url: TARGET });
     const foreign = await openIncognitoWindow();
     const { managed, ...rest } = await status();
     expect(managed).toEqual(await managedWindowRepository.read());
     expect(rest).toEqual({
+      available: true,
       access: true,
       foreign: [{ id: foreign, tabCount: 1 }],
       busy: false,
