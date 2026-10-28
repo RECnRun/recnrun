@@ -1,21 +1,9 @@
-import type { Page, Worker } from "@playwright/test";
-import type { Snapshot } from "@recnrun/domain";
+import type { Worker } from "@playwright/test";
 import { sampleSnapshot } from "@recnrun/domain/testing";
-import { expect, test } from "./fixtures/extension.ts";
+import { blockedLoads, expect, test } from "./fixtures/extension.ts";
 import { clickInDashboard, FRAME } from "./fixtures/session.ts";
 
 const extensionOrigin = (worker: Worker) => `chrome-extension://${new URL(worker.url()).host}`;
-
-/** Keeps the console lines that report a blocked load or a CSP violation. */
-function blockedLoads(page: Page): string[] {
-  const blocked: string[] = [];
-  page.on("console", (message) => {
-    if (/Content Security Policy|Denying load|ERR_BLOCKED/i.test(message.text())) {
-      blocked.push(message.text());
-    }
-  });
-  return blocked;
-}
 
 test.beforeEach(async ({ seedSnapshot }) => {
   await seedSnapshot(sampleSnapshot());
@@ -25,14 +13,7 @@ test("covers the site with the extension dashboard", async ({ page, serviceWorke
   const blocked = blockedLoads(page);
   await page.goto("/");
   const frame = page.locator(FRAME);
-  const recordings = frame.contentFrame().getByRole("article");
-  await expect(recordings).toHaveCount(2);
-  await expect(recordings.first()).toHaveAccessibleName("Checkout with saved card");
-  await expect(recordings.first()).toContainText("https://staging.shop.example/cart");
-  await expect(recordings.first()).toContainText("31 events");
-  await expect(
-    frame.contentFrame().getByRole("article", { name: "Log in as admin" }),
-  ).toContainText("12 s");
+  await expect(frame.contentFrame().getByRole("article")).toHaveCount(2);
   await expect(frame).toHaveAttribute(
     "src",
     `${extensionOrigin(serviceWorker)}/dashboard.html?route=%2F`,
@@ -85,19 +66,6 @@ test("routes deep links into the dashboard and its navigation to the address bar
   await expect(page.locator(FRAME).contentFrame().getByRole("article")).toHaveAccessibleName(
     "Log in as admin",
   );
-});
-
-test("explains an empty extension and unreadable data", async ({ page, seedSnapshot }) => {
-  await seedSnapshot({ ...sampleSnapshot(), recordings: [] });
-  await page.goto("/");
-  const dashboard = page.locator(FRAME).contentFrame();
-  await expect(dashboard.getByRole("heading", { name: "No recordings yet" })).toBeVisible();
-
-  await seedSnapshot({ schemaVersion: 99 } as unknown as Snapshot);
-  await page.reload();
-  await expect(
-    page.locator(FRAME).contentFrame().getByRole("heading", { name: "Could not read your data" }),
-  ).toBeVisible();
 });
 
 test("opened on its own, session.html points to the site", async ({ context, serviceWorker }) => {

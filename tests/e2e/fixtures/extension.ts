@@ -115,3 +115,14 @@ export const test = base.extend<ExtensionFixtures & ExtensionOptions>({
 });
 
 export { expect } from "@playwright/test";
+
+/** Keeps the console lines that report a blocked load or a CSP violation. */
+export function blockedLoads(page: Page): string[] {
+  const blocked: string[] = [];
+  page.on("console", (message) => {
+    if (/Content Security Policy|Denying load|ERR_BLOCKED/i.test(message.text())) {
+      blocked.push(message.text());
+    }
+  });
+  return blocked;
+}

@@ -26,9 +26,6 @@ interface ChromeGlobal {
   };
 }
 
-export const sessionUrl = (serviceWorker: Worker) =>
-  new URL("session.html", serviceWorker.url()).href;
-
 /** The dashboard's own page, at the route in `hash`. */
 export const dashboardUrl = (serviceWorker: Worker, hash = "") =>
   new URL(`dashboard.html${hash}`, serviceWorker.url()).href;

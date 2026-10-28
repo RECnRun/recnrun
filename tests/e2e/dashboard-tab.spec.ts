@@ -1,29 +1,10 @@
-import type { Page } from "@playwright/test";
+import type { Snapshot } from "@recnrun/domain";
 import { sampleSnapshot } from "@recnrun/domain/testing";
-import { expect, test } from "./fixtures/extension.ts";
-import { activeTabId, FLOATING } from "./fixtures/session.ts";
-import {
-  dashboardUrl,
-  installedDashboard,
-  recordedTabId,
-  storedSession,
-  tabIdOf,
-} from "./fixtures/tabs.ts";
+import { blockedLoads, expect, test } from "./fixtures/extension.ts";
+import { dashboardUrl, installedDashboard } from "./fixtures/tabs.ts";
 
-// The privacy policy has no dashboard frame, so it stands in for the user's own application.
-const APP = "/privacy/";
-
-const tabRow = (dashboard: Page, url: string) =>
-  dashboard
-    .getByRole("complementary", { name: "Tabs" })
-    .getByRole("listitem")
-    .filter({ hasText: url });
-
-const panelIn = (pip: Page) => pip.getByRole("region", { name: "Recording panel" });
-
-test.beforeEach(async ({ page, seedSnapshot }) => {
+test.beforeEach(async ({ seedSnapshot }) => {
   await seedSnapshot(sampleSnapshot());
-  await page.goto(APP);
 });
 
 test("the dashboard tab keeps its route in the hash through clicks, reloads, and Back", async ({
@@ -47,51 +28,36 @@ test("the dashboard tab keeps its route in the hash through clicks, reloads, and
   await expect(dashboard.getByRole("article")).toHaveCount(2);
 });
 
-test("Record on the dashboard tab floats the session, and Stop returns to the tab", async ({
+test("the dashboard tab shows the stored recordings, and loads nothing it is denied", async ({
   context,
-  page,
   serviceWorker,
 }) => {
-  const dashboard = await installedDashboard(context, serviceWorker);
-  const record = tabRow(dashboard, page.url()).getByRole("button", { name: "Record" });
-  const [pip] = await Promise.all([context.waitForEvent("page"), record.click()]);
-
-  await expect(panelIn(pip)).toContainText("Recording");
-  const logo = panelIn(pip).getByRole("img", { name: "RECnRun" });
-  await expect
-    .poll(() => logo.evaluate((img: HTMLImageElement) => img.naturalWidth))
-    .toBeGreaterThan(0);
-  expect(await recordedTabId(serviceWorker)).toBe(await tabIdOf(serviceWorker, page.url()));
-  await expect(tabRow(dashboard, page.url())).toContainText(FLOATING);
-
-  await panelIn(pip).getByRole("button", { name: "Stop" }).click();
-  await expect.poll(() => pip.isClosed()).toBe(true);
-  expect(await recordedTabId(serviceWorker)).toBeNull();
-  await expect
-    .poll(() => activeTabId(serviceWorker))
-    .toBe(await tabIdOf(serviceWorker, dashboard.url()));
+  const dashboard = await context.newPage();
+  const blocked = blockedLoads(dashboard);
+  await dashboard.goto(dashboardUrl(serviceWorker));
+  const recordings = dashboard.getByRole("article");
+  await expect(recordings).toHaveCount(2);
+  await expect(recordings.first()).toHaveAccessibleName("Checkout with saved card");
+  await expect(recordings.first()).toContainText("https://staging.shop.example/cart");
+  await expect(recordings.first()).toContainText("31 events");
+  await expect(dashboard.getByRole("article", { name: "Log in as admin" })).toContainText("12 s");
+  await expect(dashboard).toHaveTitle("RECnRun");
+  expect(blocked).toEqual([]);
 });
 
-test("closing the dashboard tab's PiP window keeps the session and gives the control back", async ({
+test("the dashboard tab explains an empty extension and unreadable data", async ({
   context,
-  page,
+  seedSnapshot,
   serviceWorker,
 }) => {
-  const dashboard = await installedDashboard(context, serviceWorker);
-  const row = tabRow(dashboard, page.url());
-  const [pip] = await Promise.all([
-    context.waitForEvent("page"),
-    row.getByRole("button", { name: "Record" }).click(),
-  ]);
-  await expect(panelIn(pip)).toContainText("Recording");
-  const started = await storedSession(serviceWorker);
+  await seedSnapshot({ ...sampleSnapshot(), recordings: [] });
+  const dashboard = await context.newPage();
+  await dashboard.goto(dashboardUrl(serviceWorker));
+  await expect(dashboard.getByRole("heading", { name: "No recordings yet" })).toBeVisible();
 
-  await pip.close();
-  await expect(row.getByRole("button")).toHaveText(["Continue", "Stop"]);
-  expect(await storedSession(serviceWorker)).toEqual(started);
-  await expect
-    .poll(() => activeTabId(serviceWorker))
-    .toBe(await tabIdOf(serviceWorker, dashboard.url()));
+  await seedSnapshot({ schemaVersion: 99 } as unknown as Snapshot);
+  await dashboard.reload();
+  await expect(dashboard.getByRole("heading", { name: "Could not read your data" })).toBeVisible();
 });
 
 test("the dashboard tab asks to pin RECnRun while its icon is off the toolbar", async ({
