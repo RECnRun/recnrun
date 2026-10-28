@@ -1,6 +1,7 @@
 import { RequestTypeSchema } from "@recnrun/bridge";
 import * as v from "valibot";
 import { SessionRequestSchema } from "@/messaging/session-protocol";
+import { WorkspaceRequestSchema } from "@/messaging/workspace-protocol";
 
 /** What the content script relays from the website: a bridge request type, and nothing else. */
 const BridgeRequestSchema = v.object({ type: RequestTypeSchema });
@@ -9,11 +10,12 @@ const BridgeRequestSchema = v.object({ type: RequestTypeSchema });
 export const BackgroundMessageSchema = v.variant("type", [
   BridgeRequestSchema,
   SessionRequestSchema,
+  WorkspaceRequestSchema,
 ]);
 
 export type BackgroundMessage = v.InferOutput<typeof BackgroundMessageSchema>;
 
-/** The one reply shape: a bridge request gets a `result`, a session request only `ok`. */
+/** The one reply shape: a bridge request and `workspace-status` get a `result`, the others only `ok`. */
 export const BackgroundReplySchema = v.variant("ok", [
   v.object({ ok: v.literal(true), result: v.optional(v.unknown()) }),
   v.object({ ok: v.literal(false), error: v.string() }),

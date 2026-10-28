@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, test, vi } from "vite-plus/test";
 import { fakeBrowser } from "wxt/testing/fake-browser";
 import { createBackgroundListener } from "@/background/listener";
 import { createRoutes } from "@/background/routes";
+import { createWorkspaceCommands } from "@/background/workspace/commands";
 import type { BackgroundReply } from "@/messaging/background-messages";
 import { returnToDashboardMessage, startSessionMessage } from "@/messaging/session-protocol";
 import { memoryRecordingStore } from "./fake-extension";
@@ -18,7 +19,11 @@ interface Sender {
 }
 
 function listen(message: unknown, sender: Sender, store = memoryRecordingStore()) {
-  const routes = createRoutes({ extensionVersion: "0.1.0", store });
+  const routes = createRoutes({
+    extensionVersion: "0.1.0",
+    store,
+    workspace: createWorkspaceCommands(),
+  });
   const replies: BackgroundReply[] = [];
   const listener = createBackgroundListener(routes, identity);
   const answered = listener(message, sender as never, (reply) => replies.push(reply));
