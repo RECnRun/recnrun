@@ -1,12 +1,12 @@
 # POC report: origin snapshots in sequential Incognito sessions
 
-Status: **Stage 0 done; Stage 1 not started.** Plan: [poc-incognito-sessions-plan.md](poc-incognito-sessions-plan.md). Assignment: [poc-incognito-sessions-assignment.md](poc-incognito-sessions-assignment.md). Checklist: [poc-incognito-sessions-checklist.md](poc-incognito-sessions-checklist.md).
+Status: **Stage 1 done; stopped at Gate G1 for the user's go-ahead.** Plan: [poc-incognito-sessions-plan.md](poc-incognito-sessions-plan.md). Assignment: [poc-incognito-sessions-assignment.md](poc-incognito-sessions-assignment.md). Checklist: [poc-incognito-sessions-checklist.md](poc-incognito-sessions-checklist.md).
 
 ## 1. Verdicts
 
 | Area                    | Verdict   | Evidence |
 | ----------------------- | --------- | -------- |
-| Native reset            | _pending_ |          |
+| Native reset            | **GO**    | §5       |
 | Data fidelity           | _pending_ |          |
 | Startup barrier         | _pending_ |          |
 | Capture consistency     | _pending_ |          |
@@ -50,13 +50,65 @@ Throwaway probe in a scratch worktree (nothing committed): the test build gained
 | DNR session rule with `tabIds` appending `Content-Security-Policy: script-src 'none'; worker-src 'none'` | Applied in Incognito, through a 302 redirect: neither the inline script nor the module script ran, while the isolated-world script wrote `localStorage` on the origin                |
 | DNR block of every non-`main_frame` request for the tab                                                  | The server saw only `/redirect?csp=1` and `/page`: no module, no image request                                                                                                       |
 | Removing rules and scripts                                                                               | `getSessionRules()` and `getRegisteredContentScripts()` empty afterwards                                                                                                             |
-| Cookie store after the last Incognito window closes                                                      | Store `"1"` was already gone when `windows.onRemoved` fired (6 ms after `windows.remove`). Whether all other teardown is complete by then is Stage 1's question                      |
+| Cookie store after the last Incognito window closes                                                      | Gone 6 ms after `windows.remove` in this single run. Corrected by S1.7's 50 timed cycles: the store disappears after `onRemoved`, not before it (§5)                                 |
 
 Not shown by this probe: whether the appended CSP keeps a site's own CSP in force (the `?csp=1` header was on the redirect response, not the final document), workers and subframes, a Service Worker serving the document (none exists in a fresh context), and repeated runs. Stage 2 covers them.
 
 ## 5. Stage 1: native reset
 
-_pending_
+Verdict: **GO.** With no other Incognito window open, closing RECnRun's Incognito window and opening a new one right away gives a window with no site data, 50 times in a row, while the normal profile and the extension's own data stay intact. Stage 1 `vp run verify`: exit 0, 220 unit and component tests, 53 of 53 end-to-end, coverage 99.32% statements and 97.6% branches (`.artifacts/docker/2026-10-28T13-40-19.702Z-9d6e4aa9-d8a8-4096-97a4-2032ccf009d8`).
+
+### What was built (S1.1–S1.5b)
+
+- One managed Incognito window per browser (`local:managed-window`: generation, window id, tab id, active or closed). Every other Incognito window, Document PiP included, counts as foreign; only DevTools windows are left out.
+- Commands from the dashboard only, one at a time (a second one is refused, not queued): Start, Close these windows and start (only the windows the user was shown; a changed set is refused), Close and start empty (replaces the managed window). Each refuses without "Allow in Incognito", since Chrome then hides Incognito windows and the inventory could prove nothing. Nothing is closed by a command that will then refuse.
+- The dashboard's Incognito workspace panel lists foreign windows, never closes them silently, and offers a single action per state. Normal tabs offer "Use this tab's address" (the address only; no data is copied).
+- Record is offered only on the managed tab (OD-2); while a recording exists, the commands that close windows are refused.
+
+### Reset experiment (S1.6, `tests/e2e/poc-native-reset.spec.ts`)
+
+The fixture's `/sentinel` writes a tagged value in each storage kind; `/inspect` reads them back, and the server reports the `Cookie` header it received, so the HttpOnly cookie is checked server-side.
+
+| Observation                                                                                 | Result                                                                                                                                                                                                      |
+| ------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| New managed window after "Close and start empty"                                            | Empty in every kind: JS cookie, HttpOnly cookie (server saw no `Cookie`), localStorage, IndexedDB database and record, Cache Storage entry, Service Worker registration and controller. Generation +1       |
+| sessionStorage                                                                              | Empty, but it is per tab, so this proves nothing about the reset                                                                                                                                            |
+| Normal tab on the same origin                                                               | Still reads `normal` in every kind                                                                                                                                                                          |
+| Extension data                                                                              | Both seeded recordings still listed by the dashboard                                                                                                                                                        |
+| Control: another Incognito window open                                                      | Panel lists it and offers no button                                                                                                                                                                         |
+| Control: close only the managed window while the other stays, then open a new Incognito tab | Every kind but sessionStorage still holds `incog-1`, and the page is controlled by the old `sw.js`. Chrome keeps the Incognito session while any Incognito window lives, which is why foreign windows block |
+| Scratch negative condition (new window opened before the old one closed)                    | The emptiness assertion fails with every kind holding `incog-1`, so the assertion catches leaks                                                                                                             |
+
+### Stress and teardown signal (S1.7)
+
+`POC_REPEATS=50`: one test runs 50 cycles of sentinel `incog-k` → reset issued as soon as the writes finished (no pause) → `/inspect`. **50 of 50 empty** (`.artifacts/docker/2026-10-28T13-36-22.690Z-cd60cc21-5853-4c9b-a4b8-0d80a9fa6808`, per-cycle data in the test's `teardown.json`). No product wait was added, because nothing leaked.
+
+The command waits for `windows.onRemoved` of every closed window and an inventory that no longer lists them, then creates the new window. Timings from the service worker clock, ms, min / median / p95 / max:
+
+| Step                                               | min  | median | p95  | max  |
+| -------------------------------------------------- | ---- | ------ | ---- | ---- |
+| `windows.remove` call → `onRemoved`                | 4.3  | 4.7    | 5.7  | 6.1  |
+| call → first `getAll` with no Incognito window     | 12.7 | 13.9   | 16.1 | 16.6 |
+| `onRemoved` → next `windows.create` call           | 10.4 | 11.6   | 12.7 | 14.0 |
+| `create` call → `onCreated`                        | 13.9 | 14.6   | 15.6 | 17.0 |
+| call → Incognito cookie store gone (scratch build) | 14.5 | 15.8   | 20.3 | 20.5 |
+| store gone → `create` call (scratch build)         | 0.4  | 0.6    | 0.8  | 1.4  |
+
+Order in all 50 cycles: remove call < `onRemoved` < no Incognito window listed < cookie store gone < create call < created. The cookie-store rows come from a scratch build with the `cookies` permission (50 of 50 empty, scratch run `2026-10-28T13-34-54.652Z-a5aba681-6986-4f7f-a33f-0fda09d2458e`), since the committed Stage 1 build lacks it.
+
+**Risk carried into Stage 2.** The product does not wait for the cookie store to go; the margin between the store going and the next create was 0.4–1.4 ms, which is what these runs happened to see, not a guarantee. The store's disappearance is the closest observable sign that Chrome destroyed the Incognito profile. Once S2.2 adds `cookies` to test and development builds, the bootstrap sequence (S2.5) should also wait until `getAllCookieStores()` lists no Incognito store before creating the window, with its own red/green.
+
+### Findings outside the POC's goal
+
+- **PiP current tab across windows (fixed in S1.5b).** When focus moves between a normal and an Incognito window, `windows.getAll` can briefly report both as focused (2 of 3 probe runs); the PiP took the first and kept showing the old tab. It now prefers `windows.getLastFocused`. The restored end-to-end step passed 50 of 50 (`incognito.spec.ts --repeat-each=10`). This does not explain the baseline flake (§2), whose symptom was "No tab in focus." (no window focused); it did not recur in this stage's runs.
+- **Synchronous throws in the message listener.** A route in `apps/extension/src/messaging/listener.ts` whose `run` throws synchronously gets no reply. The workspace commands avoid it by being `async`; the listener itself is unchanged (pre-existing, out of scope).
+- Foreign windows on `about:blank` show as "about:blank" in the panel's list.
+
+### Not shown by Stage 1
+
+- Host Chrome on macOS (every run was Chrome for Testing 156 on Linux, Xvfb).
+- Other keep-alives of the Incognito profile than an open window: a detached DevTools window inspecting an Incognito target, downloads in progress, or another extension's Incognito pages.
+- Data held outside the site's storage (HTTP cache, DNS, TLS session, autofill): only the storage kinds above were checked.
 
 ## 6. Stage 2: startup barrier
 
