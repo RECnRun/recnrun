@@ -20,7 +20,7 @@ export function approximateSize(bytes: number): string {
 }
 
 /** The hosts typed into the field, split on commas and spaces, lowercased, once each. */
-export function cookieHostsOf(text: string): string[] {
+function cookieHostsOf(text: string): string[] {
   const hosts = text
     .split(/[\s,]+/)
     .filter(Boolean)

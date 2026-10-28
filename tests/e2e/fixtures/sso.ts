@@ -5,8 +5,6 @@ import { expect } from "./extension.ts";
 import { identitiesAt, lifecycleDriver } from "./lifecycle.ts";
 import { APP } from "./workspace.ts";
 
-export { IDP };
-
 /** The capability every SSO identity declares when its provider's session must come back. */
 export const SSO_HOSTS = { cookieHosts: ["sso.localhost"] };
 /** What the app settles on when the provider has no session for it. */
