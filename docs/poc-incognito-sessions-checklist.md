@@ -165,7 +165,7 @@ Stage 2 verify: exit 0 on `dfb882d`, 302 unit/component, 61/61 e2e, coverage 99.
 ### Gate G2 — startup barrier
 
 - [x] Report section and verdict written: startup barrier **GO** (report §6); carried into S3.8: every window creation goes through the store wait
-- [ ] User go-ahead for Stage 3: _pending_
+- [x] User go-ahead for Stage 3: 2026-10-28, user answered "Sim, pode seguir" to "Posso seguir para a Etapa 3?"
 
 ## Stage 3 — Snapshot fidelity and consistency
 
