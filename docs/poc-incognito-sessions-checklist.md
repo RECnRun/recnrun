@@ -8,7 +8,7 @@ Plan: [poc-incognito-sessions-plan.md](poc-incognito-sessions-plan.md). Assignme
 | Branch               | `poc/incognito-sessions`                                         |
 | Planned base         | `44c154da29860c7a8df829e902b177df5ce2ba2a` (2026-10-28)          |
 | Actual base (P0.1)   | `44c154d` (re-resolved 2026-10-28, unchanged)                    |
-| Last recorded commit | `5d477da`                                                        |
+| Last recorded commit | `22e9eb3`                                                        |
 | Decisions OD-1…OD-4  | defaults of plan §3, accepted by the user ("Avance", 2026-10-28) |
 
 ## Status legend
@@ -324,6 +324,11 @@ Stage 2 verify: exit 0 on `dfb882d`, 302 unit/component, 61/61 e2e, coverage 99.
   green: `vp test run apps/extension/tests/lifecycle.test.ts apps/extension/tests/lifecycle-effects.test.ts apps/extension/tests/lifecycle-routes.test.ts apps/extension/tests/workspace-identity.test.ts` → 39 passed; `vp run test:e2e -- tests/e2e/poc-lifecycle-faults.spec.ts tests/e2e/poc-lifecycle.spec.ts tests/e2e/identities.spec.ts tests/e2e/poc-lifecycle-restarts.spec.ts` → 15 passed (`2026-10-28T20-41-34.171Z-3fdda4de`); `vp check`, `vp run deps` pass
   commit: 5d477da Read the target's capture before a switch touches the open identity
   notes: `LifecycleEffects.load(identity, from)` returns the `Opening` (`from`, `url`, `data`): for `capture` it is `savedStart` (settles the identity's tentative capture, reads, validates the whole capture), for `empty` the identity's URL and nothing. `execute` loads it after the plan and before `runSteps`, so a missing, invalid, incomplete, or unpublished target capture refuses with nothing journaled, captured, or closed; `start` then restores exactly the loaded data. E2E (B tampered `invalid`): the switch rejects with `A stored capture does not match its schema.`, the journal is empty, A's window stays with `A:2`; after untampering, B opens with `B:1` and A with `A:2`. The Resume refusals (bad-captures test) now also refuse before the bootstrap, still with no window or barrier. `identity-draft.ts` takes `validIdentity` out of `lifecycle.ts` (file limit). ARCHITECTURE updated.
+- [i] S3.12f A tab the user opens in the managed window stops a command that would close it (follow-up to S3.11)
+  red: `vp test run packages/domain/tests/workspace-lifecycle.test.ts apps/extension/tests/lifecycle.test.ts` → `expected undefined to be 'IncognitoTabsOpen'` (guard) and "another tab in the workspace's window refuses before the capture and stops the close after it": `promise resolved … instead of rejecting`; `vp run test:e2e -- tests/e2e/poc-lifecycle-faults.spec.ts -g "another tab"` with the old `lifecycle.ts`/`lifecycle-effects.ts` → "Received promise resolved instead of rejected" at the first Suspend (`.artifacts/docker/2026-10-28T20-45-03.164Z-30ba8774-434b-4bb8-b20d-aae24052541a`)
+  green: `vp run test:unit` → 338 passed; `vp run test:e2e -- tests/e2e/poc-lifecycle-faults.spec.ts tests/e2e/poc-lifecycle.spec.ts tests/e2e/identities.spec.ts tests/e2e/poc-lifecycle-restarts.spec.ts` → 16 passed (`2026-10-28T20-48-45.811Z-cdf20490`); `vp check`, `vp run deps` pass
+  commit: 22e9eb3 Refuse window commands while the managed window has other tabs
+  notes: `LifecycleState.otherTabs` (the managed window's tabs but its own) feeds `windowGuard`, which refuses Switch, Suspend, and New identity (even with `closeWindowIds`) with `IncognitoTabsOpen` before anything is captured; `closeOpen` reads the windows again after the capture and stops with `IncognitoTabsOpen` ("The capture is saved; …"), the capture kept and the window open. Delete and Resume are unaffected (Resume already needs no managed window). The commit body names `poc-identities.spec.ts`, which does not exist (the filter then ran 10 tests); the green above is the rerun with the right file names. `lifecycle-types.ts` takes the lifecycle types out of `lifecycle.ts` (file limit). ARCHITECTURE updated (table and dashboard paragraph).
 
 Stage 3 verify: _pending_
 
