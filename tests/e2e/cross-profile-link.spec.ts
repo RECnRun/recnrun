@@ -47,7 +47,7 @@ test("two profiles pair from their dashboards and exchange their tabs over the l
     [profileB, profileA],
   ] as const) {
     const heading = `Chrome — ${other.name} (Connected)`;
-    // The other profile's site tab, as its background reported it over the link.
+    // The other profile's own tab, as its background reported it over the link.
     const tabs = profile.dashboard.getByRole("complementary", { name: heading });
     await expect(tabs.getByRole("listitem").filter({ hasText: other.site.url() })).toBeVisible();
     const types = typesOf(await framesOf(profile));
@@ -132,9 +132,8 @@ test("a profile that quits drops the link, and after a restart reconnects as its
     timeout: 5_000,
   });
 
-  // Chrome kept neither folder grant past its folder window (H2), so both allow it again.
+  // A's dashboard kept its folder grant (H2); B's ended with its browser, so B allows it again.
   const restarted = await reopen(profileB, await launch(profileB.dir));
-  await allowFolder(profileA, native);
   expect(await allowFolder(restarted, native)).toBe("restore");
   await expect(linkStatus(profileA)).toHaveText("Connected — Profile B", { timeout: 90_000 });
   await expect(linkStatus(restarted)).toHaveText("Connected — Profile A");

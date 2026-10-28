@@ -4,7 +4,7 @@ Branch `poc/dashboard-only-pairing`, stacked on `poc/cross-profile-webrtc-v2` (P
 
 ## Goal
 
-In each Chrome profile the user opens the site and clicks the dashboard's button to set up the RECnRun folder, and pairing completes with nothing else to do. After a disconnect, the dashboard offers the same step again. `pairing.html` goes away. What stays is the smallest top-level extension window Chrome needs for its picker and prompts (H2): it grants the folder, waits until the profiles pair, and closes itself.
+In each Chrome profile the user clicks the dashboard's button to set up the RECnRun folder, and pairing completes with nothing else to do. After a disconnect, the dashboard offers the same step again. `pairing.html` goes away. What stays is the smallest top-level extension window Chrome needs for its picker and prompts (H2): it grants the folder, waits until the profiles pair, and closes itself.
 
 ## Decisions
 
@@ -50,4 +50,4 @@ Clicks per case are in `POC-CROSS-PROFILE-WEBRTC.md`. The count in branded Chrom
 
 ## Manual check for the user
 
-In two profiles of branded Chrome: open the site, click **Choose folder** in the dashboard, choose `Documents/RECnRun`, and allow. Count the clicks until both dashboards list the other profile's tabs. Then **Disconnect**, and see the same step offered again.
+In two profiles of branded Chrome: click **Choose folder** in the dashboard, choose `Documents/RECnRun`, and allow. Count the clicks until both dashboards list the other profile's tabs. Then **Disconnect**, and see the same step offered again.

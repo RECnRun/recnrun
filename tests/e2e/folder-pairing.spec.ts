@@ -14,7 +14,7 @@ import { test } from "./fixtures/native-dialogs.ts";
 import type { Native } from "./fixtures/native-dialogs.ts";
 import { linkStatus, pairingSection, reopen } from "./fixtures/profiles.ts";
 import type { Profile } from "./fixtures/profiles.ts";
-import { clickInDashboard } from "./fixtures/session.ts";
+import { dashboardUrl } from "./fixtures/tabs.ts";
 
 /*
  * Both profiles choose one real folder on the container's disk through Chrome's own picker
@@ -57,12 +57,11 @@ const connected = async (a: Profile, b: Profile) => {
 };
 
 /**
- * Restarts `profile` and reconnects it: `other` allows the folder again, since its grant ended
- * with its folder window (H2), and both on every visit, in the restore prompt (H1).
+ * Restarts `profile` and reconnects it once it allows the folder on every visit, in the restore
+ * prompt (H1); `other` keeps its grant while its dashboard stays open (H2).
  */
 async function restartAndAllow(profile: Profile, other: Profile, native: Native, launch: Launch) {
   const restarted = await restart(profile, other, launch);
-  expect(await allowFolder(other, native)).toBe("restore");
   expect(await allowFolder(restarted, native)).toBe("restore");
   await connected(other, restarted);
   return restarted;
@@ -79,7 +78,7 @@ test("two profiles pair from their dashboards through one RECnRun folder on disk
   await expect(
     profileA.dashboard.getByRole("heading", { name: `Chrome — ${profileB.name} (Connected)` }),
   ).toBeVisible();
-  // Connected, neither dashboard asks for the folder, though Chrome dropped the grant (H2).
+  // Connected, neither dashboard asks for the folder: each keeps the grant its window gave (H2).
   for (const profile of [profileA, profileB]) {
     await expect(folderBanner(profile.dashboard)).toHaveCount(0);
     // Paired, each profile stays in the folder, so its peer finds it after a restart.
@@ -89,22 +88,28 @@ test("two profiles pair from their dashboards through one RECnRun folder on disk
   }
 });
 
-test("a folder window closed before pairing brings the banner back, and allowing again keeps the folder on every visit", async ({
+test("the folder grant ends with the last extension page, and allowing again keeps the folder on every visit", async ({
   profileA,
   native,
 }) => {
   const window = await chooseFolder(profileA, native);
   await window.close();
-  // Chrome ends the grant with the last extension page (H2), and the dashboard hears of it.
-  await expect(folderBanner(profileA.dashboard)).toContainText("Allow the RECnRun folder");
-  const { window: again, dialogs } = await openFolderWindow(profileA, native);
+  // The dashboard is an extension page too, so it keeps the grant (H2).
+  await expect(pairingSection(profileA.dashboard)).toContainText(WAITING);
+  await expect(folderBanner(profileA.dashboard)).toHaveCount(0);
+  for (const page of extensionPages(profileA)) await page.close();
+  const dashboard = await profileA.context.newPage();
+  await dashboard.goto(dashboardUrl(profileA.serviceWorker));
+  const reopened = { ...profileA, dashboard };
+  await expect(folderBanner(dashboard)).toContainText("Allow the RECnRun folder");
+  const { window: again, dialogs } = await openFolderWindow(reopened, native);
   await again.getByRole("button", { name: "Allow folder" }).click();
   expect(await dialogs.allowInEitherPrompt()).toBe("restore");
   await expect(again.getByText("Keep this window open")).toBeVisible();
   await again.close();
-  await profileA.site.reload();
-  await expect(pairingSection(profileA.dashboard)).toContainText(WAITING);
-  await expect(folderBanner(profileA.dashboard)).toHaveCount(0);
+  await dashboard.reload();
+  await expect(pairingSection(dashboard)).toContainText(WAITING);
+  await expect(folderBanner(dashboard)).toHaveCount(0);
 });
 
 test("profiles that both allowed the folder on every visit keep it with no page open, reconnect with no click after a restart, and within seconds after a Disconnect", async ({
@@ -115,26 +120,25 @@ test("profiles that both allowed the folder on every visit keep it with no page 
 }) => {
   test.setTimeout(480_000);
   await pair(profileA, profileB, native);
-  // Both allow the folder on every visit when B reconnects, so A's restart takes no click.
+  // Each allows the folder on every visit as it restarts; after that, a restart takes no click.
   const b = await restartAndAllow(profileB, profileA, native, launch);
-  const a = await restart(profileA, b, launch);
-  await connected(b, a);
+  const a = await restartAndAllow(profileA, b, native, launch);
   await expect(folderBanner(a.dashboard)).toHaveCount(0);
-  // "Allow on every visit" outlives the folder windows: B refreshes its presence with none open.
-  await expect.poll(() => extensionPages(b), { timeout: 15_000 }).toEqual([]);
+  // "Allow on every visit" outlives every extension page: B refreshes its presence with none open.
+  for (const page of extensionPages(b)) await page.close();
   const idB = await profileIdOf(b);
   const expiry = () => (presenceOf(native.folder, idB) as { expiresAt: number }).expiresAt;
   const before = expiry();
   await expect.poll(expiry, { timeout: 45_000 }).toBeGreaterThan(before);
   const again = await restart(b, a, launch);
   await connected(a, again);
-  expect(extensionPages(again)).toEqual([]);
+  await expect(folderBanner(again.dashboard)).toHaveCount(0);
 
   // The lower profile id offers, and its last offer is still in the folder when the other,
   // which answers, disconnects and reconnects.
   const [offerer, answerer] = (await profileIdOf(a)) < idB ? [a, again] : [again, a];
   const click = (name: string) =>
-    clickInDashboard(pairingSection(answerer.dashboard).getByRole("button", { name }));
+    pairingSection(answerer.dashboard).getByRole("button", { name }).click();
   await click("Disconnect");
   await expect(linkStatus(offerer)).toHaveText(`Disconnected by ${answerer.name}`);
   await click("Reconnect");
