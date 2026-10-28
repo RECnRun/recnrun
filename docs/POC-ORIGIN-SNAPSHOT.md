@@ -1,6 +1,6 @@
 # POC report: origin snapshots in sequential Incognito sessions
 
-Status: **Stage 1 done; stopped at Gate G1 for the user's go-ahead.** Plan: [poc-incognito-sessions-plan.md](poc-incognito-sessions-plan.md). Assignment: [poc-incognito-sessions-assignment.md](poc-incognito-sessions-assignment.md). Checklist: [poc-incognito-sessions-checklist.md](poc-incognito-sessions-checklist.md).
+Status: **Stage 2 done; stopped at Gate G2 for the user's go-ahead.** Gate G1 passed (go-ahead 2026-10-28). Plan: [poc-incognito-sessions-plan.md](poc-incognito-sessions-plan.md). Assignment: [poc-incognito-sessions-assignment.md](poc-incognito-sessions-assignment.md). Checklist: [poc-incognito-sessions-checklist.md](poc-incognito-sessions-checklist.md).
 
 ## 1. Verdicts
 
@@ -8,7 +8,7 @@ Status: **Stage 1 done; stopped at Gate G1 for the user's go-ahead.** Plan: [poc
 | ----------------------- | --------- | -------- |
 | Native reset            | **GO**    | §5       |
 | Data fidelity           | _pending_ |          |
-| Startup barrier         | _pending_ |          |
+| Startup barrier         | **GO**    | §6       |
 | Capture consistency     | _pending_ |          |
 | Local PWA compatibility | _pending_ |          |
 | Zephyr                  | _pending_ |          |
@@ -34,7 +34,13 @@ Status: **Stage 1 done; stopped at Gate G1 for the user's go-ahead.** Plan: [poc
 
 ## 3. Permissions per build
 
-Production: unchanged (`storage`, `tabs`, `incognito: "spanning"`), per decision OD-1. Test and development builds: _added per task; listed here as they land._
+Per decision OD-1, only test and development builds gain the POC's permissions; `apps/extension/scripts/manifest.checks.mjs` checks both lists.
+
+| Build             | `permissions`                                                                       | `host_permissions`                                                                                             | Other                                                                                                                                                             |
+| ----------------- | ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Production        | `storage`, `tabs` (unchanged)                                                       | none                                                                                                           | `incognito: "spanning"`; no `message_serialization`; no origin agent script; no `recnrunPoc` test handles                                                         |
+| Test (Docker e2e) | `storage`, `tabs`, `declarativeNetRequest`, `scripting`, `cookies`, `webNavigation` | `http://*.localhost/*`                                                                                         | `message_serialization: "structured_clone"`; `content-scripts/origin-agent.js` (runtime-registered, not in `content_scripts`); `recnrunPoc` on the service worker |
+| Development       | as test                                                                             | as test, plus hosts from `RECNRUN_POC_HOSTS` (e.g. `https://zephyr-tq.one.be/*`, `https://login-acc.one.be/*`) | as test, without `recnrunPoc`                                                                                                                                     |
 
 ## 4. Stage 0: platform facts (P0.2)
 
@@ -112,7 +118,80 @@ Order in all 50 cycles: remove call < `onRemoved` < no Incognito window listed <
 
 ## 6. Stage 2: startup barrier
 
-_pending_
+Verdict: **GO.** In 100 of 100 recorded starts (50 with the restore returning at once, 50 with it held 2,000 ms), the application's first inline script read the restored cookie, localStorage, sessionStorage, and IndexedDB record, and nothing of the application ran or loaded before the data was in place. Without the barrier, the same 2,000 ms start lets the application run first and read empty values. Stage 2 `vp run verify`: exit 0, 302 unit and component tests, 61 of 61 end-to-end, coverage 99.27% statements and 96.78% branches (`.artifacts/docker/2026-10-28T15-55-19.650Z-116c118b-e472-4701-99a5-fa7c76dbe93c`).
+
+### Mechanism
+
+1. Wait until `cookies.getAllCookieStores()` lists no Incognito store (Gate G1's carried risk).
+2. Create RECnRun's Incognito window on `about:blank`, then find the cookie store whose `tabIds` hold the managed tab. The id is never `"0"` or a constant.
+3. Set the identity's cookies, HttpOnly ones included, with that `storeId`.
+4. Install the barrier: four DNR session rules scoped to the managed tab.
+   - Block every request type but `main_frame`.
+   - Block `main_frame`, and allow it again only on the target origin. An off-origin redirect stays blocked.
+   - Append `Content-Security-Policy: script-src 'none'; worker-src 'none'; object-src 'none'; frame-src 'none'` to `main_frame` and `sub_frame`, at a priority above the allow rule.
+   - Register the origin agent: a runtime content script, top frame, `document_start`, the target origin only, `persistAcrossSessions: false`.
+5. Navigate. The document commits, but its scripts are blocked, and the agent connects over a port with structured clone. The background accepts the port only from the managed tab, the barrier navigation's `documentId`, the target origin, and the current operation id and generation.
+6. The agent restores Web Storage and IndexedDB, and answers `restored` only after every transaction completes and every connection closes. It refuses an origin that already holds data.
+7. Remove the barrier and check that Chrome lists no rule or script, then reload the same tab. Wait for a commit with a new `documentId` on the target origin, then release.
+
+Any failure after the window exists records the operation as failed with its step, closes the window (so a partly restored identity is never used), removes the barrier, and shows "Start with an identity failed at the <step> step. <reason>" in the dashboard. The running operation is journaled in `local:workspace-operation`. When the service worker starts, an unfinished one is recorded as interrupted and cleaned up.
+
+### Barrier proof (S2.6, `tests/e2e/poc-barrier.spec.ts`)
+
+The run is `POC_REPEATS=50`, 50 cycles per delay (`.artifacts/docker/2026-10-28T15-22-37.170Z-fd7a8577-8aa5-41f8-8afa-7257624e347c`).
+
+| Check, every cycle                                                                          | Result                                                                                                                                                                  |
+| ------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The application's first reads (synchronous inline `<head>` script, then its IndexedDB read) | Equal the restored cookie, localStorage, sessionStorage, and IndexedDB record                                                                                           |
+| Requests the server saw before the release                                                  | Only `/app/redirect` and the barrier's `/app/` document, both carrying exactly the restored cookie names. No module, worker, subframe, image, fetch, favicon, or beacon |
+| Site CSP (`?csp=1`, on the final document) after the release                                | Still enforced: the `script-src-elem` violation the site's policy forbids still fires                                                                                   |
+| `navigator.serviceWorker.controller` at bootstrap                                           | `null`                                                                                                                                                                  |
+| Normal profile's cookie store                                                               | Unchanged                                                                                                                                                               |
+| Rules and scripts after the release                                                         | None listed                                                                                                                                                             |
+| Redirect from the target to `other.localhost:5192` under the barrier                        | The start fails explicitly, the window closes, nothing is released                                                                                                      |
+| Negative control (scratch worktree): no barrier rules, restore held 2,000 ms                | The application runs first. Its first reads are empty (`idbRecord: null`, empty storages), and the restore refuses the now non-empty origin (`OriginNotEmpty`)          |
+
+Step timings in ms (min / median / p95 / max), with the 2,000 ms hold excluded:
+
+| Step                                     | Delay 0 ms                | Delay 2,000 ms            |
+| ---------------------------------------- | ------------------------- | ------------------------- |
+| store-gone (wait for no Incognito store) | 0.0 / 0.2 / 0.2 / 0.3     | 0.0 / 0.1 / 0.3 / 0.4     |
+| window                                   | 25.6 / 27.4 / 32.9 / 43.9 | 27.0 / 29.4 / 41.1 / 45.7 |
+| cookie-store                             | 7.3 / 9.9 / 12.6 / 13.9   | 5.8 / 10.2 / 14.8 / 18.9  |
+| cookies                                  | 3.6 / 6.1 / 9.0 / 13.0    | 3.5 / 6.8 / 14.0 / 15.5   |
+| barrier                                  | 1.3 / 1.7 / 4.5 / 6.7     | 1.4 / 1.9 / 4.9 / 9.7     |
+| navigate                                 | 14.1 / 16.6 / 21.5 / 24.1 | 14.2 / 16.7 / 24.6 / 27.6 |
+| restore                                  | 23.0 / 25.2 / 30.8 / 34.5 | 4.0 / 13.4 / 19.1 / 23.7  |
+| unbarrier                                | 1.0 / 1.2 / 4.4 / 5.8     | 1.1 / 2.7 / 4.1 / 4.8     |
+| reload                                   | 7.5 / 9.2 / 13.6 / 14.9   | 7.6 / 14.1 / 17.1 / 26.8  |
+| Total per cycle (median / max)           | 97.5 / 142.0              | 95.2 / 137.1              |
+
+The store wait always ended after one listing. The old Incognito store was already gone by the time no Incognito window was listed, so the wait was never under pressure in these runs.
+
+### Failure paths (S2.7, `tests/e2e/poc-failure.spec.ts`)
+
+| Case                                           | Observed                                                                                                                                                                                                                                                 |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Restore failure injected                       | Dashboard alert names the step and the reason. No Incognito window, no rule, no script. The server saw only the redirect and the barrier document, with no beacon                                                                                        |
+| Tab closed during the held restore             | Same. Chrome threw "Extension context invalidated" on the port instead of firing `onDisconnect`, so the start now fails as `AgentDisconnected`, "The page closed before its data was restored."                                                          |
+| Service worker stopped during the held restore | Session rules and the registered script survive the stop. On restart the journal is recorded as interrupted at its step, and recovery closes the window (only if it is still that generation's managed window, since Chrome reuses ids) and removes both |
+
+Each case passed 5 of 5 (`--repeat-each 5`). Scratch copies without the journal watch or without recovery left the alert missing, and in the second case 4 rules, 1 script and the window behind.
+
+### Findings outside the POC's goal
+
+- **Session-control flake introduced by S1.5, fixed in tests (S2.4a).** "Closing the PiP window keeps the session…" passed 20 of 20 on the base and failed 2 of 20 after S1.5 (6 of 40 under a probe). The recorded tab now lives in the Incognito window, and a PiP that opens after the test focuses that tab keeps the focus, so the test's focused-window helper read the PiP's tab. The helpers now read the active tab of the browsing window Chrome focused last. After the fix, 40 of 40 passed and the whole spec passed 90 of 90.
+- **Vitest UI writes to the test origin's localStorage** (`vitest-ui_task-tree-opened`), so the Browser Mode tests use in-memory Web Storage. A `deleteDatabase` "blocked" check was unreliable, so the tests count `IDBDatabase.close` calls instead.
+
+### Not shown by Stage 2
+
+- **A real extension reload.** In the test Chromium, `chrome.runtime.reload()` unloads the command-line extension for good. The interrupted case stops the service worker through DevTools instead, which is the realistic worker-termination path, but not an update or reload.
+- **The store wait under pressure.** It never had to wait.
+- **Only the start with an identity waits for the store.** Stage 1's Start, Close and start, and Close and start empty do not. Stage 3's coordinator should route every window creation through the same sequence.
+- **No user-facing entry point yet.** The start with an identity is reachable only through the test-only `recnrunPoc` handles. Stage 3 connects it to saved identities.
+- **Frames and workers under the barrier.** Their requests were blocked, but none could start while scripts were blocked, so no frame or worker ran under it.
+- **Browser restart during a start.** Recovery after a full browser restart, racing Chrome's startup window bookkeeping, was not tested. S3.11 covers browser restarts.
+- **Real applications.** Only the fixture app; Stage 4 covers the PWA and Zephyr.
 
 ## 7. Stage 3: fidelity and consistency
 
