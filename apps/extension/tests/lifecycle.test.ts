@@ -77,6 +77,17 @@ test("the test hook runs before each lifecycle step, and a step it fails is jour
   expect(journal.written.at(-1)).toMatchObject({ step: "persist", status: "failed" });
 });
 
+test("a target whose capture cannot be read refuses before anything is captured or closed", async () => {
+  const { lifecycle, chrome, journal, saved } = setUp({ open: "a" });
+  chrome.state.failAt = "load";
+  await expect(lifecycle.switchTo("b")).rejects.toThrow("Injected at load.");
+  expect(chrome.effects.load).toHaveBeenCalledWith(saved("b"), "capture");
+  expect(chrome.calls).toEqual([]);
+  expect(journal.written).toEqual([]);
+  expect(chrome.state.managed).toBeDefined();
+  expect(saved("a")?.lastCapture?.id).toBe("cap-a");
+});
+
 test("switch to an identity never captured opens it empty", async () => {
   const { lifecycle, chrome } = setUp();
   await lifecycle.switchTo("c");

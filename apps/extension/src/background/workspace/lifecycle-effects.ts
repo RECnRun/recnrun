@@ -6,7 +6,7 @@ import { captureIdentity } from "@/background/workspace/capture";
 import { closeRemembering } from "@/background/workspace/fresh-window";
 import { savedStart } from "@/background/workspace/identity-commands";
 import type { IdentityDeps } from "@/background/workspace/identity-commands";
-import type { LifecycleEffects } from "@/background/workspace/lifecycle";
+import type { LifecycleEffects, Opening } from "@/background/workspace/lifecycle";
 import { createNeutralWindow, inventory } from "@/background/workspace/windows";
 import type { OperationJournal } from "@/ports/operation-journal";
 import { managedWindowRepository } from "@/storage/managed-window-repository";
@@ -17,9 +17,9 @@ const NOTHING: IdentityData = {
   site: { localStorage: {}, sessionStorage: {}, indexedDB: [], caches: [] },
 };
 
-async function startData(identity: Identity, from: "capture" | "empty", deps: IdentityDeps) {
-  if (from === "capture") return savedStart(identity.id, deps);
-  return { url: identity.url, data: NOTHING };
+async function load(identity: Identity, from: Opening["from"], deps: IdentityDeps) {
+  if (from === "capture") return { from, ...(await savedStart(identity.id, deps)) };
+  return { from, url: identity.url, data: NOTHING };
 }
 
 /** The lifecycle's steps on Chrome: the window inventory, capture, close, bootstrap, and delete. */
@@ -46,8 +46,8 @@ export function chromeLifecycleEffects(
       return captureIdentity(identity.id, managed, { ...deps, captures }, identity.capabilities);
     },
     close,
-    start: async (identity, from, operation) => {
-      const { url, data } = await startData(identity, from, deps);
+    load: (identity, from) => load(identity, from, deps),
+    start: async (identity, { url, data }, operation) => {
       const windows = { create: () => createNeutralWindow(identity.id), close };
       // The bootstrap's journal entries carry the command that started it.
       const record = (written: Parameters<OperationJournal["write"]>[0]) =>

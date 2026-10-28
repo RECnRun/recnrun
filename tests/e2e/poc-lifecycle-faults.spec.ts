@@ -75,21 +75,21 @@ test("a missing, invalid, or incomplete capture refuses Resume, opens no window,
   await keep("lifecycle-bad-captures", refusals);
 });
 
-test("a switch to an identity whose capture is broken saves the open one before it fails", async ({
+test("a switch to an identity whose capture is broken refuses before it saves or closes the open one", async ({
   context,
   serviceWorker,
 }) => {
-  const { identities, next } = await bothSaved(context, serviceWorker);
+  const { identities, next, tab } = await bothSaved(context, serviceWorker);
   await tamperCapture(serviceWorker, identities.idOf("B"), "invalid");
   await expect(identities.open("B")).rejects.toThrow(REFUSED.invalid);
-  expect(await journalOf(serviceWorker)).toMatchObject({
-    step: "start-from-capture",
-    status: "failed",
-  });
-  // The plan sees only that B has a capture, so A closed before B's capture was read.
-  await nothingLeft(serviceWorker);
+  // B's capture is read before any step, so nothing ran: A's window stays open with its data.
+  expect(await journalOf(serviceWorker)).toBeNull();
+  expect(await incognitoWindows(serviceWorker)).toBe(1);
+  if (tab.page) expect(await readMarker(tab.page)).toEqual(marked("A:2"));
   await untamperCapture(serviceWorker);
-  await identities.resume("A");
+  await identities.open("B");
+  expect(await readMarker(await next())).toEqual(marked("B:1"));
+  await identities.open("A");
   expect(await readMarker(await next())).toEqual(marked("A:2"));
 });
 

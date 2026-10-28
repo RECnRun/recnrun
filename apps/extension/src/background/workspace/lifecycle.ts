@@ -1,22 +1,30 @@
-import { errorMessage, IdentitySchema, planLifecycle } from "@recnrun/domain";
+import { errorMessage, planLifecycle } from "@recnrun/domain";
 import type {
-  CaptureCapabilities,
   Identity,
+  IdentityData,
   LifecycleCommand,
   LifecycleState,
   LifecycleStep,
   ManagedWindowState,
   WorkspaceOperation,
 } from "@recnrun/domain";
-import * as v from "valibot";
 import type { StepTiming } from "@/background/workspace/bootstrap";
 import type { CaptureSummary } from "@/background/workspace/capture";
 import { WorkspaceError } from "@/background/workspace/errors";
+import { validIdentity } from "@/background/workspace/identity-draft";
+import type { IdentityDraft } from "@/background/workspace/identity-draft";
 import type { IdentityRepository } from "@/ports/identities";
 import type { OperationJournal } from "@/ports/operation-journal";
 import type { RecordingStore } from "@/ports/recording-store";
 
 type LifecycleKind = LifecycleCommand["kind"];
+
+/** Where a start opens and what it restores there: the saved capture's, or nothing. */
+export interface Opening {
+  from: "capture" | "empty";
+  url: string;
+  data: IdentityData;
+}
 
 /** Chrome's side of each lifecycle step; tests replace it with fakes. */
 export interface LifecycleEffects {
@@ -24,10 +32,12 @@ export interface LifecycleEffects {
   windows: () => Promise<{ managed?: ManagedWindowState; foreign: readonly number[] }>;
   capture: (identity: Identity, managed: ManagedWindowState) => Promise<CaptureSummary>;
   close: (windowIds: readonly number[]) => Promise<void>;
+  /** Reads and validates what a start of `identity` restores, before any step runs. */
+  load: (identity: Identity, from: Opening["from"]) => Promise<Opening>;
   /** Opens a fresh managed window for `identity`, journaling its steps under `operation`. */
   start: (
     identity: Identity,
-    from: "capture" | "empty",
+    opening: Opening,
     operation: { id: string; kind: LifecycleKind },
   ) => Promise<StepTiming[]>;
   removeCaptures: (identityId: string) => Promise<void>;
@@ -45,12 +55,6 @@ export interface LifecycleDeps {
   /** The workspace's one-operation lock and the Incognito access check. */
   guard: { exclusive: <T>(run: () => Promise<T>) => Promise<T>; access: () => Promise<void> };
   now?: () => number;
-}
-
-interface IdentityDraft {
-  label: string;
-  url: string;
-  capabilities: CaptureCapabilities;
 }
 
 /** Switch to, Suspend, Resume, New identity, and Delete, each one operation under the lock. */
@@ -72,6 +76,8 @@ interface Run {
   target?: Identity;
   /** A new identity, saved only once the open one is saved and closed. */
   adding?: Identity;
+  /** The target's start, loaded before the open identity is captured or closed. */
+  opening?: Opening;
   captured?: CaptureSummary;
   /** Set once the open identity names the new capture as its last one. */
   persisted?: boolean;
@@ -123,11 +129,11 @@ async function takeBack(run: Run): Promise<void> {
   await deps.effects.settle(open.identity.id, previous).catch(() => undefined);
 }
 
-async function start(run: Run, from: "capture" | "empty"): Promise<void> {
-  const { target, adding, deps, kind } = run;
-  if (target === undefined) return;
+async function start(run: Run): Promise<void> {
+  const { target, adding, opening, deps, kind } = run;
+  if (target === undefined || opening === undefined) return;
   if (adding) await deps.identities.update((current) => [...current, adding]);
-  run.timings = await deps.effects.start(target, from, { id: run.operation.id, kind });
+  run.timings = await deps.effects.start(target, opening, { id: run.operation.id, kind });
 }
 
 const STEP_RUNS: Record<LifecycleStep, (run: Run) => Promise<void>> = {
@@ -137,8 +143,8 @@ const STEP_RUNS: Record<LifecycleStep, (run: Run) => Promise<void>> = {
   },
   persist,
   close: closeOpen,
-  "start-from-capture": (run) => start(run, "capture"),
-  "start-empty": (run) => start(run, "empty"),
+  "start-from-capture": start,
+  "start-empty": start,
   remove: async (run) => {
     if (run.target === undefined) return;
     const { id } = run.target;
@@ -221,6 +227,12 @@ async function execute(
     ...(adding && { adding }),
     timings: [],
   };
+  // A target whose capture cannot be read refuses here, before the open identity is touched.
+  const startStep = plan.steps.find((step) => START_STEPS.has(step));
+  if (startStep !== undefined && run.target !== undefined) {
+    const from = startStep === "start-from-capture" ? "capture" : "empty";
+    run.opening = await deps.effects.load(run.target, from);
+  }
   await runSteps(run, plan.steps);
   return run.timings;
 }
@@ -233,15 +245,6 @@ function operationFor(command: LifecycleCommand, deps: LifecycleDeps): Workspace
     status: "running",
     started: (deps.now ?? Date.now)(),
   };
-}
-
-function validIdentity(draft: IdentityDraft, created: number): Identity {
-  const parsed = v.safeParse(IdentitySchema, { id: crypto.randomUUID(), created, ...draft });
-  if (!parsed.success) {
-    const message = "Give the identity a label and an http or https address.";
-    throw new WorkspaceError("IdentityNotValid", message);
-  }
-  return parsed.output;
 }
 
 /** The user decided on the windows they saw; any other set needs a fresh decision. */

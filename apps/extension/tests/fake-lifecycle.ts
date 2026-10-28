@@ -31,6 +31,11 @@ export function memoryIdentities(initial: Identity[] = []) {
   return { memory, repository };
 }
 
+const NOTHING = {
+  cookies: [],
+  site: { localStorage: {}, sessionStorage: {}, indexedDB: [], caches: [] },
+};
+
 const SUMMARY: CaptureSummary = {
   captureId: "",
   localStorage: 1,
@@ -76,7 +81,11 @@ export function fakeEffects(open?: { identityId?: string }) {
       if (state.managed && ids.includes(state.managed.windowId)) state.managed = undefined;
       state.foreign = state.foreign.filter((id) => !ids.includes(id));
     }),
-    start: vi.fn(async (target: Identity, from: "capture" | "empty") => {
+    load: vi.fn(async (target: Identity, from: "capture" | "empty") => {
+      fail("load");
+      return { from, url: target.url, data: NOTHING };
+    }),
+    start: vi.fn(async (target: Identity, { from }: { from: "capture" | "empty" }) => {
       calls.push(`start ${target.id} ${from}`);
       fail("start");
       state.managed = window({ identityId: target.id });

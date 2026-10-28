@@ -1,3 +1,5 @@
+import { restorableData } from "@recnrun/domain";
+import { sampleCapture } from "@recnrun/domain/testing";
 import { afterEach, beforeEach, expect, test, vi } from "vite-plus/test";
 import { fakeBrowser } from "wxt/testing/fake-browser";
 import { WorkspaceError } from "@/background/workspace/errors";
@@ -46,9 +48,9 @@ test("lists the managed window, with its identity, only while its window is open
 test("a start journals the bootstrap's steps under the command's kind, in a window of the identity", async () => {
   const { effects: chromeSide, journal } = effects("cookie-store");
   const operation = { id: "op-1", kind: "switch" as const };
-  await expect(chromeSide.start(identity("a"), "empty", operation)).rejects.toThrow(
-    "Injected at cookie-store.",
-  );
+  await expect(
+    chromeSide.start(identity("a"), await chromeSide.load(identity("a"), "empty"), operation),
+  ).rejects.toThrow("Injected at cookie-store.");
   expect(new Set(journal.written.map(({ id, kind }) => `${id} ${kind}`))).toEqual(
     new Set(["op-1 switch"]),
   );
@@ -56,16 +58,22 @@ test("a start journals the bootstrap's steps under the command's kind, in a wind
   expect((await managedWindowRepository.read())?.identityId).toBe("a");
 });
 
-test("a start from a capture RECnRun does not have opens no window", async () => {
+test("loading a start from a capture RECnRun does not have refuses and opens no window", async () => {
   const { effects: chromeSide, captures } = effects();
-  const operation = { id: "op-1", kind: "resume" as const };
-  await expect(chromeSide.start(identity("a"), "capture", operation)).rejects.toMatchObject({
+  await expect(chromeSide.load(identity("a"), "capture")).rejects.toMatchObject({
     name: "CaptureMissing",
   });
   expect(captures.calls).toEqual(["settle"]);
   expect(captures.settle).toHaveBeenCalledWith("a", "cap-a");
   expect(captures.read).toHaveBeenCalledWith("a");
   expect(fakeBrowser.windows.create).not.toHaveBeenCalled();
+  const capture = sampleCapture();
+  captures.read.mockResolvedValue(capture);
+  await expect(chromeSide.load(identity("a"), "capture")).resolves.toEqual({
+    from: "capture",
+    url: capture.url,
+    data: restorableData(capture),
+  });
 });
 
 test("captures the managed tab with the identity's capabilities, and deletes its captures", async () => {
