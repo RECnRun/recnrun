@@ -115,7 +115,7 @@ Stage 1 verify: exit 0 on `1216339`, 220 unit/component, 53/53 e2e, coverage 99.
 ### Gate G1 — native reset
 
 - [x] Report section and verdict written: native reset **GO** (report §5); carried risk: S2.5 waits until no Incognito cookie store is listed before creating the window
-- [ ] User go-ahead for Stage 2: _pending_
+- [x] User go-ahead for Stage 2: 2026-10-28, user answered "Sim" to "Posso seguir para a Etapa 2?"
 
 ## Stage 2 — Restore before application bootstrap
 
