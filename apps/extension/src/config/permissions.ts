@@ -43,6 +43,11 @@ function cookieDomains(hostname: string): string[] {
     .map((_, index) => labels.slice(index).join("."));
 }
 
+/** The match patterns a build needs to list and set every cookie `hostname` can set. */
+export function cookieHostPatterns(hostname: string): string[] {
+  return cookieDomains(hostname).flatMap((domain) => [`https://${domain}/*`, `http://${domain}/*`]);
+}
+
 /**
  * `RECNRUN_POC_HOSTS`, comma-separated `http(s)` origins, as match patterns for each host and the
  * domains its cookies can name. `cookies.getAll` and `cookies.set` need access to a cookie's
@@ -61,8 +66,7 @@ function pocHostPatterns(pocHosts: string): string[] {
       }
       return url.hostname;
     });
-  const domains = hostnames.flatMap(cookieDomains);
-  return [...new Set(domains.flatMap((domain) => [`https://${domain}/*`, `http://${domain}/*`]))];
+  return [...new Set(hostnames.flatMap(cookieHostPatterns))];
 }
 
 /** Published builds keep only the product's permissions; local builds add the POC's set. */

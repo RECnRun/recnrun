@@ -12,6 +12,7 @@ import type {
 } from "@/background/workspace/bootstrap";
 import type { CaptureSummary } from "@/background/workspace/capture";
 import { chromeCookieApi } from "@/background/workspace/cookie-stores";
+import { requireCookieHosts } from "@/background/workspace/cookie-host-access";
 import { WorkspaceError } from "@/background/workspace/errors";
 import {
   closeManagedRemembering,
@@ -252,7 +253,7 @@ export function createWorkspaceCommands(
       identities: identities.identities,
       journal,
       effects: chromeLifecycleEffects(ports, identities, journal),
-      guard: { exclusive, access: requireAccess },
+      guard: { exclusive, access: requireAccess, hosts: requireCookieHosts },
     }),
     recover: () => recoverInto(lock, { journal, barrier: ports.barrier }, ports),
     status: () => statusOf(lock, journal, identities.identities),

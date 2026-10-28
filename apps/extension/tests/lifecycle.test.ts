@@ -15,16 +15,17 @@ function setUp(options: { open?: string; saved?: Identity[]; recording?: boolean
   const chrome = fakeEffects(options.open === undefined ? undefined : { identityId: options.open });
   const journal = memoryOperationJournal();
   const access = vi.fn(async () => {});
+  const hosts = vi.fn(async (_hosts: readonly string[]) => {});
   const lifecycle = createLifecycle({
     recordings: memoryRecordingStore(options.recording ? RECORDING : null),
     identities: repository,
     journal,
     effects: chrome.effects,
-    guard: { exclusive: (run) => run(), access },
+    guard: { exclusive: (run) => run(), access, hosts },
     now: () => NOW,
   });
   const saved = (id: string) => memory.saved.find((each) => each.id === id);
-  return { lifecycle, chrome, journal, memory, saved, access };
+  return { lifecycle, chrome, journal, memory, saved, access, hosts };
 }
 
 const steps = (journal: ReturnType<typeof memoryOperationJournal>) =>

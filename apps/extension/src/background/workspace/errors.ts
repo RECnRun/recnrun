@@ -13,6 +13,7 @@ type WorkspaceErrorName =
   | "CaptureIncomplete"
   | "CaptureMissing"
   | "CaptureTimedOut"
+  | "CookieHostNotAllowed"
   | "CookieNotSet"
   | "CookieStoreNotFound"
   | "CookiesNotCaptured"

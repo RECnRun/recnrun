@@ -53,8 +53,12 @@ export interface LifecycleDeps {
   identities: IdentityRepository;
   journal: OperationJournal;
   effects: LifecycleEffects;
-  /** The workspace's one-operation lock and the Incognito access check. */
-  guard: { exclusive: <T>(run: () => Promise<T>) => Promise<T>; access: () => Promise<void> };
+  /** The workspace's one-operation lock, the Incognito access check, and the cookie hosts check. */
+  guard: {
+    exclusive: <T>(run: () => Promise<T>) => Promise<T>;
+    access: () => Promise<void>;
+    hosts: (cookieHosts: readonly string[]) => Promise<void>;
+  };
   now?: () => number;
 }
 
