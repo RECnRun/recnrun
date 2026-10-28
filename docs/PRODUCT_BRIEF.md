@@ -16,12 +16,12 @@ The events themselves (clicks, inputs, navigations, DOM changes) are not stored 
 
 1. A visitor opens recnrun.com (or a local dev server).
 2. The website asks whether the extension is installed. If it is missing, the website shows a banner explaining what the extension does, with a link to the install guide.
-3. With the extension installed, the website is the only way in: the extension shows its dashboard over the site, at the site's address. `recnrun.com/recordings/<id>` opens that recording, and Back, Forward, and reload work. The dashboard shows its recordings:
+3. With the extension installed, the extension shows its dashboard over the site, at the site's address. `recnrun.com/recordings/<id>` opens that recording, and Back, Forward, and reload work. The dashboard shows its recordings:
    - **Recordings:** grouped by workspace, the one with the newest recording first; each recording, newest first, with its start URL, date (in UTC), duration, and event count.
    - **Empty:** it says there are no recordings yet.
    - **Unreadable** (for example, stored data from an incompatible version): it shows the reason.
 
-   Opened on their own, outside the site, the extension's pages only point to recnrun.com. The toolbar icon has no menu and does nothing; the extension has no keyboard shortcuts or context menu items.
+   The dashboard is also the extension's own tab, with its route in the address's hash. The toolbar icon has no menu: it brings the first dashboard tab forward, or opens one when none is open. Installing RECnRun opens the dashboard in a focused tab, and a profile's first window opens with the dashboard as its first tab, in focus; a further window (Ctrl+N) gets none. The extension has no keyboard shortcuts or context menu items.
 
 4. The dashboard also lists every open tab. With no recording in progress, each tab offers **Record**. Record starts the **session**, the recording in progress, one per Chrome profile: the session opens in a floating window (Document Picture-in-Picture) with the state, the elapsed time, Pause or Resume, and Stop, and the recorded tab comes to the front. The site tab that started it **controls** the session. Any number of site tabs can be open; they all show the same session, but only one controls it at a time. While one does, the recorded tab shows the state and elapsed time in every dashboard, and the other tabs offer nothing.
 

@@ -2,6 +2,7 @@ import { chromium } from "@playwright/test";
 import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures/extension.ts";
 import { dashboardOf, FRAME, openSite, tabItem } from "./fixtures/session.ts";
+import { installedDashboard } from "./fixtures/tabs.ts";
 
 const NOTICE = "RECnRun was reloaded or turned off. Reload this page to use it.";
 
@@ -41,14 +42,18 @@ test("a site tab showing the dashboard when RECnRun reloads says to reload, and 
   serviceWorker,
 }) => {
   const site = await openSite(context, "/");
-  const pages = context.pages().length;
+  await installedDashboard(context, serviceWorker);
+  // The reload closes RECnRun's own dashboard tab; only other pages count.
+  const extension = new URL("/", serviceWorker.url()).href;
+  const pages = () => context.pages().filter((each) => !each.url().startsWith(extension));
+  const before = pages().length;
   await serviceWorker.evaluate(() =>
     (globalThis as unknown as { chrome: { runtime: { reload(): void } } }).chrome.runtime.reload(),
   );
 
   await expect(site.getByRole("status").filter({ hasText: NOTICE })).toBeVisible();
   await expect(site.locator(FRAME)).toHaveCount(0);
-  expect(context.pages()).toHaveLength(pages);
+  expect(pages()).toHaveLength(before);
 });
 
 test.describe("with a DevTools port", () => {

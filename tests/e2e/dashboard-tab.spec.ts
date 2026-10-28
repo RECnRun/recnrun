@@ -2,7 +2,13 @@ import type { Page } from "@playwright/test";
 import { sampleSnapshot } from "@recnrun/domain/testing";
 import { expect, test } from "./fixtures/extension.ts";
 import { activeTabId, FLOATING } from "./fixtures/session.ts";
-import { dashboardUrl, recordedTabId, storedSession, tabIdOf } from "./fixtures/tabs.ts";
+import {
+  dashboardUrl,
+  installedDashboard,
+  recordedTabId,
+  storedSession,
+  tabIdOf,
+} from "./fixtures/tabs.ts";
 
 // The privacy policy has no dashboard frame, so it stands in for the user's own application.
 const APP = "/privacy/";
@@ -24,7 +30,7 @@ test("the dashboard tab keeps its route in the hash through clicks, reloads, and
   context,
   serviceWorker,
 }) => {
-  const dashboard = await context.newPage();
+  const dashboard = await installedDashboard(context, serviceWorker);
   await dashboard.goto(dashboardUrl(serviceWorker, "#/recordings/rec-login"));
   await expect(dashboard.getByRole("heading", { name: "Log in as admin" })).toBeVisible();
   await expect(dashboard).toHaveTitle("Log in as admin · RECnRun");
@@ -46,8 +52,7 @@ test("Record on the dashboard tab floats the session, and Stop returns to the ta
   page,
   serviceWorker,
 }) => {
-  const dashboard = await context.newPage();
-  await dashboard.goto(dashboardUrl(serviceWorker));
+  const dashboard = await installedDashboard(context, serviceWorker);
   const record = tabRow(dashboard, page.url()).getByRole("button", { name: "Record" });
   const [pip] = await Promise.all([context.waitForEvent("page"), record.click()]);
 
@@ -72,8 +77,7 @@ test("closing the dashboard tab's PiP window keeps the session and gives the con
   page,
   serviceWorker,
 }) => {
-  const dashboard = await context.newPage();
-  await dashboard.goto(dashboardUrl(serviceWorker));
+  const dashboard = await installedDashboard(context, serviceWorker);
   const row = tabRow(dashboard, page.url());
   const [pip] = await Promise.all([
     context.waitForEvent("page"),

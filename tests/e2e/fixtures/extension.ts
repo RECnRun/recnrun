@@ -55,6 +55,17 @@ function incognitoProfile(): string {
   return dir;
 }
 
+/** Chromium on `profile` (a fresh one when empty) with the test build of the extension loaded. */
+export const launchWithExtension = (profile: string, headless: boolean, args: string[] = []) =>
+  chromium.launchPersistentContext(profile, {
+    headless,
+    args: [
+      `--disable-extensions-except=${extensionPath}`,
+      `--load-extension=${extensionPath}`,
+      ...args,
+    ],
+  });
+
 /** A Chromium profile with the test build of the extension loaded. */
 export const test = base.extend<ExtensionFixtures & ExtensionOptions>({
   remoteDebuggingPort: [undefined, { option: true }],
@@ -63,14 +74,7 @@ export const test = base.extend<ExtensionFixtures & ExtensionOptions>({
     const port =
       remoteDebuggingPort === undefined ? [] : [`--remote-debugging-port=${remoteDebuggingPort}`];
     const profile = incognitoAccess ? incognitoProfile() : "";
-    const context: BrowserContext = await chromium.launchPersistentContext(profile, {
-      headless,
-      args: [
-        `--disable-extensions-except=${extensionPath}`,
-        `--load-extension=${extensionPath}`,
-        ...port,
-      ],
-    });
+    const context: BrowserContext = await launchWithExtension(profile, headless, port);
     await use(context);
     await context.close();
     if (profile) rmSync(profile, { recursive: true, force: true });

@@ -37,3 +37,21 @@ test("registers one listener that answers every message family", async () => {
   expect(await deliver({ type: "start-session", tabId: shop.id }, ownPage)).toEqual({ ok: true });
   expect(await recordingSessionRepository.read()).toMatchObject({ tabId: shop.id });
 });
+
+test("keeps one dashboard in front on install, start-up, a new window, and the toolbar icon", async () => {
+  startBackground();
+  const url = fakeBrowser.runtime.getURL("/dashboard.html");
+  const dashboards = async () =>
+    (await fakeBrowser.tabs.query({})).filter((each) => each.url === url);
+  const focused = vi.spyOn(fakeBrowser.tabs, "update");
+
+  await fakeBrowser.runtime.onInstalled.trigger({ reason: "install" });
+  await vi.waitFor(async () => expect(await dashboards()).toHaveLength(1));
+  const [dashboard] = await dashboards();
+  await fakeBrowser.runtime.onStartup.trigger();
+  await fakeBrowser.windows.create({});
+  if (dashboard) await fakeBrowser.action.onClicked.trigger(dashboard);
+
+  await vi.waitFor(() => expect(focused).toHaveBeenCalledTimes(3));
+  expect(await dashboards()).toHaveLength(1);
+});
