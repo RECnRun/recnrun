@@ -58,3 +58,11 @@ test("titles the tab itself", () => {
   router.publish("/recordings/rec-login", "Log in as admin · RECnRun");
   expect(page.document.title).toBe("Log in as admin · RECnRun");
 });
+
+test("hears a hash that moved between the first render and subscribing", () => {
+  const { router, page } = tabPage("");
+  page.location.hash = "#/recordings/rec-login";
+  const seen: string[] = [];
+  router.subscribe((path) => seen.push(path));
+  expect(seen).toEqual(["/recordings/rec-login"]);
+});

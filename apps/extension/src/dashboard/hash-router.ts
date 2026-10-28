@@ -10,12 +10,15 @@ function hashRoute(hash: string): string {
 
 /** Routes in the dashboard tab's hash: the extension serves files by path, so reloads keep only the hash. */
 export function createHashRouter(page: Window = window): DashboardRouter {
+  const initialRoute = hashRoute(page.location.hash);
   return {
-    initialRoute: hashRoute(page.location.hash),
+    initialRoute,
     href: (path) => `#${path}`,
     subscribe(listener) {
       const onChange = () => listener(hashRoute(page.location.hash));
       page.addEventListener("hashchange", onChange);
+      // The dashboard subscribes after its first render; a hash that moved before then would go unheard.
+      if (hashRoute(page.location.hash) !== initialRoute) onChange();
       return () => page.removeEventListener("hashchange", onChange);
     },
     navigate(path) {
