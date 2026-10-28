@@ -1,6 +1,6 @@
 # AGENTS.md
 
-RECnRun records and replays browser sessions for developers. The extension stores the user's data; the website at recnrun.com detects the extension and asks to install it when it is missing. When it is installed, the extension shows its own dashboard over the site. It is a Vite+ monorepo:
+RECnRun records and replays browser sessions for developers. The extension stores the user's data; the website at recnrun.com detects the extension and asks to install it when it is missing. When it is installed, the site brings the extension's dashboard, its own tab, to the front; the toolbar icon and the profile's first window open it too. It is a Vite+ monorepo:
 
 - `apps/extension`: WXT Chromium (MV3) extension with a Preact dashboard page. It owns the data and its UI.
 - `apps/website`: Preact SPA at recnrun.com, deployed to GitHub Pages. It never reads the user's data.
