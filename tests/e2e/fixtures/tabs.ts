@@ -28,6 +28,10 @@ interface ChromeGlobal {
 export const sessionUrl = (serviceWorker: Worker) =>
   new URL("session.html", serviceWorker.url()).href;
 
+/** The dashboard's own page, at the route in `hash`. */
+export const dashboardUrl = (serviceWorker: Worker, hash = "") =>
+  new URL(`dashboard.html${hash}`, serviceWorker.url()).href;
+
 /** Every tab as Chrome reports it; Playwright emulates focus, so Chrome's tab state is the truth. */
 export function chromeTabs(serviceWorker: Worker) {
   return serviceWorker.evaluate(async () => {

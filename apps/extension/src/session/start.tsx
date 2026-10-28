@@ -1,5 +1,5 @@
 import { closePanelMessage } from "@/messaging/frame-protocol";
-import { FloatingSession } from "@/session/FloatingSession";
+import { FloatingSession } from "@/views/FloatingSession";
 import type { ExtensionServices } from "@/views/extension-services";
 import { renderFramed } from "@/views/framed";
 

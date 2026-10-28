@@ -25,7 +25,7 @@ export function createRoutes({ extensionVersion, store }: RouteDependencies): Ro
       case "start-session":
         return { from: OWN_PAGE, run: () => startSession(message.tabId, store) };
       case "return-to-dashboard":
-        // The dashboard is framed in a site tab, which is the tab it gets the focus back to.
+        // The sender's tab is the dashboard's own, or the site tab that frames it.
         return {
           from: OWN_PAGE,
           run: ({ tab }) => (tab?.id === undefined ? Promise.resolve() : focusTab(tab.id)),

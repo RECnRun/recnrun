@@ -286,16 +286,3 @@ test("only a framed dashboard holds the site tabs' ports", async () => {
   await expect.poll(() => root.querySelector("main")).not.toBeNull();
   expect(held).toBe(1);
 });
-
-test("opened on its own, outside the site, the dashboard points to the site", () => {
-  const root = document.body.appendChild(document.createElement("div"));
-  const page = Object.assign(new EventTarget(), {
-    document,
-    location: { ancestorOrigins: [], search: "" },
-  }) as unknown as Window;
-  startDashboard(root, fakeExtension(), page);
-  expect(root.querySelector('[role="status"]')?.textContent).toBe(
-    "Open recnrun.com to use RECnRun.",
-  );
-  expect(root.querySelector("aside")).toBeNull();
-});

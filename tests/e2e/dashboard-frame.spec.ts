@@ -100,11 +100,9 @@ test("explains an empty extension and unreadable data", async ({ page, seedSnaps
   ).toBeVisible();
 });
 
-for (const path of ["dashboard.html", "session.html"]) {
-  test(`opened on its own, ${path} points to the site`, async ({ context, serviceWorker }) => {
-    const page = await context.newPage();
-    await page.goto(`${extensionOrigin(serviceWorker)}/${path}`);
-    await expect(page.getByRole("status")).toHaveText("Open recnrun.com to use RECnRun.");
-    await expect(page.getByRole("article")).toHaveCount(0);
-  });
-}
+test("opened on its own, session.html points to the site", async ({ context, serviceWorker }) => {
+  const page = await context.newPage();
+  await page.goto(`${extensionOrigin(serviceWorker)}/session.html`);
+  await expect(page.getByRole("status")).toHaveText("Open recnrun.com to use RECnRun.");
+  await expect(page.getByRole("article")).toHaveCount(0);
+});
