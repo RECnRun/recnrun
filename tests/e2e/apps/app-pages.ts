@@ -113,7 +113,7 @@ function frameReady(): void {
 }
 
 /** A value inlined into a script element; `<` is escaped so it cannot close the element. */
-const literal = (value: unknown) => JSON.stringify(value).replaceAll("<", "\\u003c");
+export const literal = (value: unknown) => JSON.stringify(value).replaceAll("<", "\\u003c");
 
 /** The site's own strict policy for `?csp=1`: same-origin resources and the nonced inline script. */
 export const siteCsp = (nonce: string) =>

@@ -5,6 +5,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { appFrame, appModule, appPage, appPixel, appWorker, siteCsp } from "./app-pages.ts";
 import { domainJarCookies, frameCookies, framePage, jarCookies, jarPage } from "./cookie-pages.ts";
 import { blankPage, inspectPage, sentinelPage, serviceWorker } from "./pages.ts";
+import { writersHtml, writersServiceWorker, writersWorker } from "./writer-pages.ts";
 
 const PORT = 5192;
 
@@ -136,6 +137,9 @@ const routes: Record<string, (exchange: Exchange) => void | Promise<void>> = {
   "GET /app/frame": ({ response }) => send(response, HTML, appFrame),
   "GET /app/pixel.svg": ({ response }) => send(response, "image/svg+xml", appPixel),
   "GET /app/data.json": ({ response }) => send(response, "application/json", '{"status":"ok"}'),
+  "GET /writers/": ({ response, run }) => send(response, HTML, writersHtml(run ?? "")),
+  "GET /writers/worker.js": ({ response }) => send(response, JS, writersWorker),
+  "GET /writers/sw.js": ({ response }) => send(response, JS, writersServiceWorker),
   "GET /cache/basic": ({ response }) =>
     send(response, "application/json", '{"basic":true}', { "x-kind": "basic" }),
   "GET /cache/redirect": cacheRedirect,
