@@ -16,6 +16,7 @@ interface ChromeGlobal {
     };
     windows: {
       create(data: object): Promise<{ id?: number; tabs?: ChromeTab[] }>;
+      getAll(filter: object): Promise<{ focused: boolean; tabs?: ChromeTab[] }[]>;
       update(windowId: number, properties: object): Promise<unknown>;
     };
     storage: Record<
@@ -39,6 +40,15 @@ export function chromeTabs(serviceWorker: Worker) {
       incognito,
       windowId,
     }));
+  });
+}
+
+/** The tab the user sees: the active one of the focused window, normal or Incognito. */
+export function focusedTabId(serviceWorker: Worker): Promise<number | undefined> {
+  return serviceWorker.evaluate(async () => {
+    const { chrome } = globalThis as unknown as ChromeGlobal;
+    const windows = await chrome.windows.getAll({ populate: true });
+    return windows.find((each) => each.focused)?.tabs?.find((tab) => tab.active)?.id;
   });
 }
 

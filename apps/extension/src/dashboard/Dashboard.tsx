@@ -2,7 +2,11 @@ import { errorMessage } from "@recnrun/domain";
 import type { Snapshot } from "@recnrun/domain";
 import { useEffect, useState } from "preact/hooks";
 import { IncognitoControl } from "@/dashboard/IncognitoControl";
-import { IncognitoWorkspace } from "@/dashboard/IncognitoWorkspace";
+import {
+  IncognitoWorkspace,
+  managedTabId,
+  useWorkspaceStatus,
+} from "@/dashboard/IncognitoWorkspace";
 import { RecordingDetail } from "@/dashboard/RecordingDetail";
 import { EmptyState, RecordingList } from "@/dashboard/RecordingList";
 import { selectedRecordingId, titleFor } from "@/dashboard/route";
@@ -57,6 +61,7 @@ export function Dashboard({ services, router, take }: DashboardProps) {
   const load = useSnapshot(services.loadSnapshot);
   const [route, setRoute] = useState(router.initialRoute);
   const [target, setTarget] = useState("");
+  const workspace = useWorkspaceStatus(services.incognito, services.tabs, services.send);
   useEffect(() => router.subscribe(setRoute), [router]);
   const navigate = (path: string) => {
     router.navigate(path);
@@ -78,7 +83,7 @@ export function Dashboard({ services, router, take }: DashboardProps) {
             {(allowed) => (
               <>
                 <IncognitoWorkspace
-                  access={services.incognito}
+                  workspace={workspace}
                   tabs={services.tabs}
                   send={services.send}
                   target={target}
@@ -88,6 +93,7 @@ export function Dashboard({ services, router, take }: DashboardProps) {
                   tabs={services.tabs}
                   store={services.recordings}
                   take={take}
+                  recordable={managedTabId(workspace.status)}
                   onAddress={allowed === true ? setTarget : undefined}
                 />
               </>

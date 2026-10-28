@@ -40,9 +40,9 @@ test("without incognito access, the banner opens RECnRun's details, and every si
     );
     await expect(startButton(site)).toHaveCount(0);
   }
-  await expect(
-    tabItem(dashboardOf(first), second.url()).getByRole("button", { name: "Record" }),
-  ).toBeVisible();
+  const listed = tabItem(dashboardOf(first), second.url());
+  await expect(listed).toBeVisible();
+  await expect(listed.getByRole("button", { name: "Record" })).toHaveCount(0);
 
   const [details] = await Promise.all([
     context.waitForEvent("page"),

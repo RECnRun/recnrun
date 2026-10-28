@@ -3,6 +3,7 @@ import { browser } from "wxt/browser";
 import { WorkspaceError } from "@/background/workspace/errors";
 import { closeWindows, createNeutralWindow, inventory } from "@/background/workspace/windows";
 import type { WorkspaceStatus } from "@/messaging/workspace-protocol";
+import type { RecordingStore } from "@/ports/recording-store";
 import { managedWindowRepository } from "@/storage/managed-window-repository";
 
 /** What the dashboard can ask of the Incognito workspace. */
@@ -69,8 +70,15 @@ async function replaceManaged(url: string): Promise<void> {
   await startAt(url);
 }
 
+/** Closing an Incognito window could end the recorded tab; following it across windows is undecided (OD-2). */
+async function requireNoRecording(recordings: RecordingStore): Promise<void> {
+  if ((await recordings.read()) !== null) {
+    throw new WorkspaceError("RecordingInProgress", "Stop the recording first.");
+  }
+}
+
 /** One operation at a time, held in memory; a second one is refused rather than queued. */
-export function createWorkspaceCommands(): WorkspaceCommands {
+export function createWorkspaceCommands(recordings: RecordingStore): WorkspaceCommands {
   let busy = false;
   const exclusive = async (operation: () => Promise<void>) => {
     if (busy) {
@@ -100,11 +108,17 @@ export function createWorkspaceCommands(): WorkspaceCommands {
     },
     closeAndStart: async (url, windowIds) => {
       requireTarget(url);
-      await exclusive(() => closeShownAndStart(url, windowIds));
+      await exclusive(async () => {
+        await requireNoRecording(recordings);
+        await closeShownAndStart(url, windowIds);
+      });
     },
     restart: async (url) => {
       requireTarget(url);
-      await exclusive(() => replaceManaged(url));
+      await exclusive(async () => {
+        await requireNoRecording(recordings);
+        await replaceManaged(url);
+      });
     },
   };
 }

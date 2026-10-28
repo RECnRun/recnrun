@@ -4,6 +4,7 @@ import { fakeBrowser } from "wxt/testing/fake-browser";
 import { createBackgroundListener } from "@/background/listener";
 import { createRoutes } from "@/background/routes";
 import { createWorkspaceCommands } from "@/background/workspace/commands";
+import { managedWindowRepository } from "@/storage/managed-window-repository";
 import { BackgroundReplySchema } from "@/messaging/background-messages";
 import { WorkspaceStatusSchema } from "@/messaging/workspace-protocol";
 import type { RecordingStore } from "@/ports/recording-store";
@@ -22,7 +23,7 @@ export function workspaceBackground(store: RecordingStore = memoryRecordingStore
   const routes = createRoutes({
     extensionVersion: "0.1.0",
     store,
-    workspace: createWorkspaceCommands(),
+    workspace: createWorkspaceCommands(store),
   });
   const listener = createBackgroundListener(routes, identity);
   return (message, sender = ownPage) =>
@@ -33,6 +34,18 @@ export function workspaceBackground(store: RecordingStore = memoryRecordingStore
       if (!answered) reject(new Error("No answer"));
     });
 }
+
+/** Stores `tabId` as the active managed Incognito window's tab, the only one RECnRun records. */
+export function manageTab(tabId: number, windowId = 1) {
+  return managedWindowRepository.update(() => ({
+    generation: 1,
+    windowId,
+    tabId,
+    status: "active",
+  }));
+}
+
+export const RECORDING_FIRST = { ok: false, error: "Stop the recording first." };
 
 /** Chrome's "Allow in Incognito" toggle; the spy takes the callback overload's type. */
 export function allowIncognito(allowed: boolean) {

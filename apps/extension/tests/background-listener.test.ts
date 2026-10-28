@@ -6,6 +6,7 @@ import { createWorkspaceCommands } from "@/background/workspace/commands";
 import type { BackgroundReply } from "@/messaging/background-messages";
 import { returnToDashboardMessage, startSessionMessage } from "@/messaging/session-protocol";
 import { memoryRecordingStore } from "./fake-extension";
+import { manageTab } from "./workspace-harness";
 
 const EXTENSION_URL = "chrome-extension://own-id/";
 const identity = { extensionId: "own-id", extensionUrl: EXTENSION_URL };
@@ -22,7 +23,7 @@ function listen(message: unknown, sender: Sender, store = memoryRecordingStore()
   const routes = createRoutes({
     extensionVersion: "0.1.0",
     store,
-    workspace: createWorkspaceCommands(),
+    workspace: createWorkspaceCommands(store),
   });
   const replies: BackgroundReply[] = [];
   const listener = createBackgroundListener(routes, identity);
@@ -67,6 +68,7 @@ describe("bridge requests", () => {
 describe("session requests", () => {
   test("starts a session for the extension's own pages and replies once it runs", async () => {
     const shop = await fakeBrowser.tabs.create({ url: "https://shop.example/" });
+    await manageTab(shop.id ?? -1);
     const { store, answered, replies } = listen(startSessionMessage(shop.id ?? -1), ownPage);
     expect(answered).toBe(true);
     await vi.waitFor(() => expect(replies).toEqual([{ ok: true }]));
@@ -103,6 +105,7 @@ describe("session requests", () => {
   });
 
   test("a tab that closed meanwhile is an error reply, and no session", async () => {
+    await manageTab(999);
     const { store, replies } = listen(startSessionMessage(999), ownPage);
     await vi.waitFor(() => expect(replies).toHaveLength(1));
     expect(await store.read()).toBeNull();

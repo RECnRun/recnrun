@@ -3,6 +3,7 @@ type WorkspaceErrorName =
   | "IncognitoNotAllowed"
   | "IncognitoWindowsOpen"
   | "NoManagedWindow"
+  | "RecordingInProgress"
   | "TargetNotAllowed"
   | "WindowNotCreated"
   | "WindowsChanged"

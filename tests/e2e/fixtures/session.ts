@@ -1,6 +1,6 @@
 import type { BrowserContext, FrameLocator, Locator, Page, Worker } from "@playwright/test";
 import { expect } from "./extension.ts";
-import { chromeTabs } from "./tabs.ts";
+import { focusedTabId } from "./tabs.ts";
 
 export const FRAME = 'iframe[title="RECnRun dashboard"]';
 export const SESSION_FRAME = 'iframe[title="RECnRun session"]';
@@ -60,6 +60,5 @@ export async function clickToOpenPanel(context: BrowserContext, button: Locator)
   return pip;
 }
 
-/** Playwright emulates focus, so Chrome's active tab is read from the service worker. */
-export const activeTabId = async (serviceWorker: Worker) =>
-  (await chromeTabs(serviceWorker)).find((tab) => tab.active)?.id;
+/** Playwright emulates focus, so the tab Chrome shows is read from the service worker. */
+export const activeTabId = (serviceWorker: Worker) => focusedTabId(serviceWorker);

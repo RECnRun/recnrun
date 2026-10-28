@@ -1,12 +1,14 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vite-plus/test";
 import { fakeBrowser } from "wxt/testing/fake-browser";
 import { managedWindowRepository } from "@/storage/managed-window-repository";
+import { memoryRecordingStore } from "./fake-extension";
 import { openIncognitoWindow, openWindowsWithTabs } from "./fake-windows";
 import {
   allowIncognito,
   busyReply,
   contentScript,
   holdNextNavigation,
+  RECORDING_FIRST,
   readStatus,
   TARGET,
   workspaceBackground,
@@ -79,6 +81,16 @@ describe("workspace-restart", () => {
       error: "Close the other Incognito windows first.",
     });
     expect(remove).not.toHaveBeenCalled();
+  });
+
+  test("refuses while a recording session exists, and closes nothing", async () => {
+    const session = { tabId: 1, status: "paused" as const, banked: 0, since: 0 };
+    send = workspaceBackground(memoryRecordingStore(session));
+    await startManaged();
+    const remove = vi.spyOn(fakeBrowser.windows, "remove");
+    expect(await send(restart)).toEqual(RECORDING_FIRST);
+    expect(remove).not.toHaveBeenCalled();
+    expect(fakeBrowser.windows.create).not.toHaveBeenCalled();
   });
 
   test("refuses without access to Incognito, and closes nothing", async () => {

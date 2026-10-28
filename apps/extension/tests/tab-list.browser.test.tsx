@@ -3,9 +3,15 @@ import { afterEach, expect, test, vi } from "vite-plus/test";
 import { startDashboard } from "@/dashboard/start";
 import { openPanelMessage, panelClosedMessage } from "@/messaging/frame-protocol";
 import { returnToDashboardMessage, startSessionMessage } from "@/messaging/session-protocol";
+import type { WorkspaceStatus } from "@/messaging/workspace-protocol";
 import type { ExtensionServices } from "@/views/extension-services";
 import { CONTROL_LOCK, tryHoldLock } from "@/views/view-locks";
-import { fakeBackground, fakeExtension, memoryRecordingStore } from "./fake-extension";
+import {
+  NO_INCOGNITO_WINDOW,
+  fakeBackground,
+  fakeExtension,
+  memoryRecordingStore,
+} from "./fake-extension";
 import { DOCS, PRIVATE, SHOP, fakeIncognito, fakeTabs } from "./fake-tabs";
 import { button } from "./queries";
 
@@ -28,9 +34,18 @@ const closePanel = (page: Window) =>
     }),
   );
 
-function mount(services: Partial<ExtensionServices> = {}) {
+/** The workspace status with `tabId` as the managed window's tab, the only one RECnRun records. */
+const managing = (tabId: number, status: "active" | "closed" = "active"): WorkspaceStatus => ({
+  ...NO_INCOGNITO_WINDOW,
+  managed: { generation: 1, windowId: 1, tabId, status },
+});
+
+function mount(
+  services: Partial<ExtensionServices> = {},
+  status: () => WorkspaceStatus = () => managing(SHOP.id),
+) {
   const tabs = fakeTabs({ tabs: [SHOP, DOCS] });
-  const { send, sent } = fakeBackground();
+  const { send, sent } = fakeBackground(status);
   const page = framedPage();
   const root = document.body.appendChild(document.createElement("div"));
   startDashboard(root, fakeExtension({ tabs: tabs.source, send, ...services }), page);
@@ -69,15 +84,34 @@ afterEach(() => {
   document.body.replaceChildren();
 });
 
-test("lists the browser's tabs as they change, each able to start a session", async () => {
+test("lists the browser's tabs as they change; only the workspace's tab can start a session", async () => {
   const { root, tabs } = mount();
   await expect.poll(() => buttons(item(root, "Shop"))).toEqual(["Record"]);
+  expect(buttons(item(root, "Docs"))).toEqual([]);
   expect(root.querySelector("aside h2")?.textContent).toBe("Tabs");
   expect(item(root, "Shop")?.textContent).toContain("https://shop.example/");
 
   tabs.change({ tabs: [DOCS] });
   await expect.poll(() => item(root, "Shop")).toBeUndefined();
-  expect(buttons(item(root, "Docs"))).toEqual(["Record"]);
+  expect(buttons(item(root, "Docs"))).toEqual([]);
+});
+
+test("Record follows the managed tab while its window is open, and no other tab offers it", async () => {
+  let status = managing(PRIVATE.id);
+  const incognito = fakeIncognito(true);
+  const tabs = fakeTabs({ tabs: [SHOP, PRIVATE] }).source;
+  const { root } = mount({ tabs, incognito: incognito.access }, () => status);
+  await expect.poll(() => buttons(item(root, "Private"))).toEqual(["Record"]);
+  expect(buttons(item(root, "Shop"))).toEqual([]);
+
+  status = managing(PRIVATE.id, "closed");
+  incognito.windowsChanged();
+  await expect.poll(() => buttons(item(root, "Private"))).toEqual([]);
+  status = NO_INCOGNITO_WINDOW;
+  incognito.windowsChanged();
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  expect(buttons(item(root, "Private"))).toEqual([]);
+  expect(buttons(item(root, "Shop"))).toEqual([]);
 });
 
 test("Record takes the control, asks the site for the PiP window, and records the tab", async () => {
@@ -101,12 +135,15 @@ test("the dashboard listens to the frame channel once for its route and its cont
   const added = vi.spyOn(page, "addEventListener");
   const root = document.body.appendChild(document.createElement("div"));
   startDashboard(root, fakeExtension({ tabs: fakeTabs({ tabs: [SHOP] }).source }), page);
-  await expect.poll(() => button(item(root, "Shop") ?? root, "Record")).toBeDefined();
+  await expect.poll(() => item(root, "Shop")).toBeDefined();
   expect(added.mock.calls.filter(([type]) => type === "message")).toHaveLength(1);
 });
 
 test("a session the background cannot start frees the control and shows the error", async () => {
-  const send = async () => ({ ok: false as const, error: "Quota exceeded" });
+  const send = async (request: { type: string }) =>
+    request.type === "workspace-status"
+      ? { ok: true as const, result: managing(SHOP.id) }
+      : { ok: false as const, error: "Quota exceeded" };
   const { root } = mount({ send });
   await expect.poll(() => button(item(root, "Shop") ?? root, "Record")).toBeDefined();
   button(item(root, "Shop") ?? root, "Record")?.click();
@@ -146,7 +183,8 @@ test("a session left without control can be continued or stopped from any dashbo
   await expect.poll(() => buttons(item(root, "Shop"))).toEqual(["Continue", "Stop"]);
 
   button(item(root, "Shop") ?? root, "Stop")?.click();
-  await expect.poll(() => buttons(item(root, "Docs"))).toEqual(["Record"]);
+  await expect.poll(() => buttons(item(root, "Shop"))).toEqual(["Record"]);
+  expect(buttons(item(root, "Docs"))).toEqual([]);
   expect(await recordings.read()).toBeNull();
 });
 
@@ -173,9 +211,9 @@ test("a session whose tab closed stays until stopped, and only floats while cont
 test("of two dashboards starting at once, only one takes the control", async () => {
   const first = mount();
   const second = mount();
-  await expect.poll(() => button(item(second.root, "Docs") ?? second.root, "Record")).toBeDefined();
+  await expect.poll(() => button(item(second.root, "Shop") ?? second.root, "Record")).toBeDefined();
   button(item(first.root, "Shop") ?? first.root, "Record")?.click();
-  button(item(second.root, "Docs") ?? second.root, "Record")?.click();
+  button(item(second.root, "Shop") ?? second.root, "Record")?.click();
 
   await expect.poll(() => alertText(second.root)).toBe("Another RECnRun tab controls the session.");
   expect(first.sent).toEqual([startSessionMessage(SHOP.id)]);
@@ -184,10 +222,12 @@ test("of two dashboards starting at once, only one takes the control", async () 
   await expectControlFree();
 });
 
-test("marks incognito tabs, shows only the icons it may load, and records them alike", async () => {
+test("marks incognito tabs, shows only the icons it may load, and records the managed one", async () => {
   const shop = { ...SHOP, favicon: "data:image/png;base64,AA==" };
-  const { root, sent, page } = mount({ tabs: fakeTabs({ tabs: [shop, PRIVATE] }).source });
+  const tabs = fakeTabs({ tabs: [shop, PRIVATE] }).source;
+  const { root, sent, page } = mount({ tabs }, () => managing(PRIVATE.id));
   await expect.poll(() => buttons(item(root, "Private"))).toEqual(["Record"]);
+  expect(buttons(item(root, "Shop"))).toEqual([]);
   expect(item(root, "Private")?.textContent).toContain("Incognito");
   expect(item(root, "Shop")?.textContent).not.toContain("Incognito");
   expect(item(root, "Shop")?.querySelector("img")?.getAttribute("src")).toBe(shop.favicon);

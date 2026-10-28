@@ -1,4 +1,4 @@
-import type { Page, Worker } from "@playwright/test";
+import type { BrowserContext, Page, Worker } from "@playwright/test";
 import { expect } from "./extension.ts";
 import { clickInDashboard, dashboardOf } from "./session.ts";
 
@@ -42,4 +42,29 @@ export async function startWorkspace(site: Page, serviceWorker: Worker, url: str
   const managed = await managedWindow(serviceWorker);
   if (managed?.status !== "active") throw new Error("No managed window opened.");
   return managed.tabId;
+}
+
+/** The Playwright page of the tab Chrome opened at `url`, incognito ones included. */
+export async function pageAt(context: BrowserContext, url: string): Promise<Page> {
+  await expect.poll(() => context.pages().some((each) => each.url() === url)).toBe(true);
+  const found = context.pages().find((each) => each.url() === url);
+  if (!found) throw new Error(`No page shows ${url}.`);
+  return found;
+}
+
+/** The managed tab, the only one RECnRun records: its Playwright page, address, and Chrome id. */
+export interface WorkspaceApp {
+  page: Page;
+  url: string;
+  id: number;
+}
+
+/** Starts the managed window at `url` from the site's dashboard and finds its tab. */
+export async function openWorkspaceApp(
+  site: Page,
+  serviceWorker: Worker,
+  url: string,
+): Promise<WorkspaceApp> {
+  const id = await startWorkspace(site, serviceWorker, url);
+  return { id, url, page: await pageAt(site.context(), url) };
 }

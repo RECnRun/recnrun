@@ -3,6 +3,7 @@ import { fakeBrowser } from "wxt/testing/fake-browser";
 import { startBackground } from "@/background/start";
 import { managedWindowRepository } from "@/storage/managed-window-repository";
 import { recordingSessionRepository } from "@/storage/recording-session-repository";
+import { manageTab } from "./workspace-harness";
 
 const manifest = { manifest_version: 3 as const, name: "RECnRun", version: "0.1.0" };
 const ownPage = { id: fakeBrowser.runtime.id, url: fakeBrowser.runtime.getURL("/dashboard.html") };
@@ -31,6 +32,7 @@ test("registers one listener that answers every message family", async () => {
   expect(added).toHaveBeenCalledTimes(1);
 
   const shop = await fakeBrowser.tabs.create({ url: "https://shop.example/" });
+  await manageTab(shop.id ?? -1);
   expect(await deliver({ type: "ping" }, contentScript)).toEqual({
     ok: true,
     result: { extensionVersion: "0.1.0" },

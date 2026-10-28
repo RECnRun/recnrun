@@ -22,6 +22,8 @@ interface TabListProps {
   tabs: TabSource;
   store: RecordingStore;
   take: TakeControl;
+  /** The managed Incognito tab, the only one a session may start on; absent while none is open. */
+  recordable?: number;
   /** Fills the Incognito workspace's address; absent while the workspace cannot start. */
   onAddress?: (url: string) => void;
 }
@@ -31,6 +33,8 @@ interface TabProps {
   recording: Recording;
   /** Whether a dashboard has the control, so the session floats in its PiP window. */
   controlled: boolean;
+  /** Whether this tab is the managed one, so it may start a session. */
+  recordable: boolean;
   take: () => void;
   onAddress?: (url: string) => void;
 }
@@ -43,7 +47,7 @@ function SessionControls({
   recording,
   controlled,
   take,
-}: Omit<TabProps, "tab" | "take"> & { take?: () => void }) {
+}: Omit<TabProps, "tab" | "take" | "recordable"> & { take?: () => void }) {
   return (
     <>
       <p>
@@ -77,9 +81,9 @@ function AddressButton({ tab, onAddress }: Pick<TabProps, "tab" | "onAddress">) 
   );
 }
 
-function TabItem({ tab, recording, controlled, take, onAddress }: TabProps) {
+function TabItem({ tab, recording, controlled, recordable, take, onAddress }: TabProps) {
   const recorded = recording.status !== "idle" && recording.tabId === tab.id;
-  const idle = recording.loaded && recording.status === "idle" && !controlled;
+  const idle = recordable && recording.loaded && recording.status === "idle" && !controlled;
   return (
     <li class="tab" aria-label={tab.title}>
       <TabSummary tab={tab} />
@@ -97,7 +101,7 @@ function TabItem({ tab, recording, controlled, take, onAddress }: TabProps) {
 }
 
 /** The session outlives the tab it records, which only an explicit Stop ends. */
-function ClosedTabItem({ recording, controlled }: Omit<TabProps, "tab" | "take">) {
+function ClosedTabItem({ recording, controlled }: Omit<TabProps, "tab" | "take" | "recordable">) {
   return (
     <li class="tab" aria-label="Closed tab">
       <span class="tab-title">Closed tab</span>
@@ -109,8 +113,8 @@ function ClosedTabItem({ recording, controlled }: Omit<TabProps, "tab" | "take">
   );
 }
 
-/** Every open tab; with no session each can start one, and the recorded tab shows the session. */
-export function TabList({ tabs, store, take, onAddress }: TabListProps) {
+/** Every open tab; with no session the managed one can start one, and the recorded tab shows it. */
+export function TabList({ tabs, store, take, recordable, onAddress }: TabListProps) {
   const openTabs = useBrowserTabs(tabs)?.tabs;
   const recording = useRecording(store);
   const controlled = useLockHeld(CONTROL_LOCK);
@@ -133,6 +137,7 @@ export function TabList({ tabs, store, take, onAddress }: TabListProps) {
             tab={tab}
             recording={recording}
             controlled={controlled}
+            recordable={tab.id === recordable}
             take={takeOn(tab.id)}
             onAddress={onAddress}
           />

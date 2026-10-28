@@ -1,12 +1,14 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vite-plus/test";
 import { fakeBrowser } from "wxt/testing/fake-browser";
 import { managedWindowRepository } from "@/storage/managed-window-repository";
+import { memoryRecordingStore } from "./fake-extension";
 import { openIncognitoWindow, openWindowsWithTabs } from "./fake-windows";
 import {
   allowIncognito,
   busyReply,
   contentScript,
   holdNextNavigation,
+  RECORDING_FIRST,
   readStatus,
   TARGET,
   workspaceBackground,
@@ -141,6 +143,17 @@ describe("workspace-close-and-start", () => {
     }
     expect(remove).not.toHaveBeenCalled();
     expect((await status()).foreign.map((each) => each.id)).toEqual([shown, appeared]);
+  });
+
+  test("refuses while a recording session exists, and closes none", async () => {
+    send = workspaceBackground(
+      memoryRecordingStore({ tabId: 1, status: "recording", banked: 0, since: 0 }),
+    );
+    const shown = await openIncognitoWindow();
+    const remove = vi.spyOn(fakeBrowser.windows, "remove");
+    const message = { type: "workspace-close-and-start", url: TARGET, windowIds: [shown] };
+    expect(await send(message)).toEqual(RECORDING_FIRST);
+    expect(remove).not.toHaveBeenCalled();
   });
 
   test("refuses an internal target before closing anything", async () => {

@@ -9,19 +9,21 @@ import { coalesceReads } from "@/views/coalesce-reads";
 import type { SendRequest } from "@/views/extension-services";
 import { useBrowserTabs } from "@/views/use-browser-tabs";
 
-interface WorkspaceProps {
-  access: IncognitoAccess;
-  tabs: TabSource;
-  send: SendRequest;
-  /** The address the workspace opens, which a normal tab in the list may also supply. */
-  target: string;
-  onTarget: (url: string) => void;
-}
-
 type StatusRead = { status: WorkspaceStatus } | { error: string };
 
+/** The workspace status as the dashboard last read it, and how to read it again. */
+export interface WorkspaceRead {
+  status: WorkspaceStatus | undefined;
+  readError: string | undefined;
+  refresh: () => void;
+}
+
 /** The background's workspace status, read again when a window or tab comes or goes. */
-function useWorkspaceStatus({ access, tabs, send }: Omit<WorkspaceProps, "target" | "onTarget">) {
+export function useWorkspaceStatus(
+  access: IncognitoAccess,
+  tabs: TabSource,
+  send: SendRequest,
+): WorkspaceRead {
   const [read, setRead] = useState<StatusRead>();
   const refresh = useRef(() => {});
   useEffect(() => {
@@ -47,6 +49,21 @@ function useWorkspaceStatus({ access, tabs, send }: Omit<WorkspaceProps, "target
     readError: read && "error" in read ? read.error : undefined,
     refresh: () => refresh.current(),
   };
+}
+
+/** The tab RECnRun may record: the managed window's, while that window is open. */
+export function managedTabId(status: WorkspaceStatus | undefined): number | undefined {
+  const managed = status?.managed;
+  return managed?.status === "active" ? managed.tabId : undefined;
+}
+
+interface WorkspaceProps {
+  workspace: WorkspaceRead;
+  tabs: TabSource;
+  send: SendRequest;
+  /** The address the workspace opens, which a normal tab in the list may also supply. */
+  target: string;
+  onTarget: (url: string) => void;
 }
 
 const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
@@ -163,14 +180,14 @@ function WorkspaceBody({ status, tabs, target, onTarget, disabled, run }: BodyPr
  * The one Incognito window RECnRun manages: what blocks it, and the command for each state. Every
  * command reads the status again when it ends, refused or not.
  */
-export function IncognitoWorkspace({ target, onTarget, ...sources }: WorkspaceProps) {
-  const { status, readError, refresh } = useWorkspaceStatus(sources);
+export function IncognitoWorkspace({ workspace, tabs, send, target, onTarget }: WorkspaceProps) {
+  const { status, readError, refresh } = workspace;
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string>();
   const run = (request: WorkspaceRequest) => {
     setPending(true);
     setError(undefined);
-    void ask(sources.send, request)
+    void ask(send, request)
       .catch((caught: unknown) => setError(errorMessage(caught)))
       .finally(() => {
         setPending(false);
@@ -184,7 +201,7 @@ export function IncognitoWorkspace({ target, onTarget, ...sources }: WorkspacePr
       {status && (
         <WorkspaceBody
           status={status}
-          tabs={sources.tabs}
+          tabs={tabs}
           target={target}
           onTarget={onTarget}
           disabled={pending}

@@ -72,9 +72,8 @@ test.describe("with a DevTools port", () => {
     await expect.poll(async () => (await workers()).length).toBe(0);
     await remote.close();
 
-    await expect(
-      tabItem(dashboardOf(site), site.url()).getByRole("button", { name: "Record" }),
-    ).toBeVisible();
+    await expect(tabItem(dashboardOf(site), site.url())).toBeVisible();
+    await expect(site.locator(FRAME)).toHaveCount(1);
     await expect(site.getByRole("status").filter({ hasText: NOTICE })).toHaveCount(0);
   });
 });

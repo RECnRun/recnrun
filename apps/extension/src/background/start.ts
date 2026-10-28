@@ -10,7 +10,7 @@ export function startBackground(): void {
   const routes = createRoutes({
     extensionVersion: browser.runtime.getManifest().version,
     store: recordingSessionRepository,
-    workspace: createWorkspaceCommands(),
+    workspace: createWorkspaceCommands(recordingSessionRepository),
   });
   const identity = { extensionId: browser.runtime.id, extensionUrl: browser.runtime.getURL("/") };
   browser.runtime.onMessage.addListener(createBackgroundListener(routes, identity));
