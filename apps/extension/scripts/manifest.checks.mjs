@@ -103,3 +103,14 @@ await test("only the test build ships the origin agent, registered at run time",
   const declared = testManifest().content_scripts.flatMap((script) => script.js);
   assert.ok(!declared.includes(agent), "The origin agent is not a manifest content script.");
 });
+
+await test("only the test build exposes the POC test handles on the service worker", () => {
+  const background = (dir) =>
+    readFileSync(
+      fileURLToPath(new URL(`../.output/${dir}/background.js`, import.meta.url)),
+      "utf8",
+    );
+  // includes() rather than match(), so a failure does not print the whole bundle.
+  assert.ok(background("chrome-mv3-test").includes("recnrunPoc"), "The test build lacks them.");
+  assert.ok(!background("chrome-mv3").includes("recnrunPoc"), "The production build has them.");
+});

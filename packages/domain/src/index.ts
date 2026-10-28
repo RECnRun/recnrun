@@ -16,3 +16,10 @@ export {
   type ManagedWindowState,
 } from "./managed-window.ts";
 export { OriginDataSchema, type OriginData } from "./origin-data.ts";
+export {
+  IdentityDataSchema,
+  SiteCookieSchema,
+  type IdentityData,
+  type SiteCookie,
+} from "./identity-data.ts";
+export { WorkspaceOperationSchema, type WorkspaceOperation } from "./workspace-operation.ts";

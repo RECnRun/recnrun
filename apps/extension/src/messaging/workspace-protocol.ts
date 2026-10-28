@@ -1,4 +1,4 @@
-import { ManagedWindowStateSchema } from "@recnrun/domain";
+import { ManagedWindowStateSchema, WorkspaceOperationSchema } from "@recnrun/domain";
 import * as v from "valibot";
 
 const BrowserIdSchema = v.pipe(v.number(), v.integer(), v.minValue(0));
@@ -40,6 +40,8 @@ export const WorkspaceStatusSchema = v.object({
   managed: v.optional(ManagedWindowStateSchema),
   foreign: v.array(v.object({ id: BrowserIdSchema, tabCount: BrowserIdSchema })),
   busy: v.boolean(),
+  /** The last start with an identity, while it runs and after it ends. */
+  operation: v.optional(WorkspaceOperationSchema),
 });
 
 export type WorkspaceStatus = v.InferOutput<typeof WorkspaceStatusSchema>;

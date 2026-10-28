@@ -48,3 +48,16 @@ test("tracks the managed Incognito window from the start", async () => {
   await fakeBrowser.windows.onRemoved.trigger(4);
   await expect.poll(() => managedWindowRepository.read()).toEqual({ ...managed, status: "closed" });
 });
+
+test("exposes the POC test handles in test builds only", () => {
+  const scope = globalThis as { recnrunPoc?: unknown };
+  delete scope.recnrunPoc;
+  vi.stubEnv("MODE", "production");
+  startBackground();
+  expect(scope.recnrunPoc).toBeUndefined();
+  vi.stubEnv("MODE", "test");
+  startBackground();
+  expect(scope.recnrunPoc).toMatchObject({ startWithIdentity: expect.any(Function) });
+  vi.unstubAllEnvs();
+  delete scope.recnrunPoc;
+});

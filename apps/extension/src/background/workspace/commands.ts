@@ -1,6 +1,12 @@
 import { classifyIncognitoWindows, isAllowedTarget } from "@recnrun/domain";
+import type { IdentityData, WorkspaceOperation } from "@recnrun/domain";
 import { browser } from "wxt/browser";
+import { chromeBarrierApi } from "@/background/workspace/barrier";
+import { bootstrapIdentity } from "@/background/workspace/bootstrap";
+import type { BootstrapHooks, BootstrapPorts, StepTiming } from "@/background/workspace/bootstrap";
+import { chromeCookieApi } from "@/background/workspace/cookie-stores";
 import { WorkspaceError } from "@/background/workspace/errors";
+import { chromeNavigationApi } from "@/background/workspace/navigation";
 import { closeWindows, createNeutralWindow, inventory } from "@/background/workspace/windows";
 import type { WorkspaceStatus } from "@/messaging/workspace-protocol";
 import type { RecordingStore } from "@/ports/recording-store";
@@ -12,6 +18,7 @@ export interface WorkspaceCommands {
   start: (url: string) => Promise<void>;
   closeAndStart: (url: string, windowIds: readonly number[]) => Promise<void>;
   restart: (url: string) => Promise<void>;
+  startWithIdentity: (url: string, data: IdentityData) => Promise<StepTiming[]>;
 }
 
 async function classifiedWindows() {
@@ -84,29 +91,60 @@ async function requireNoRecording(recordings: RecordingStore): Promise<void> {
   }
 }
 
+/** The bootstrap's Chrome APIs; `hooks` lets a test build delay or fail a step. */
+export function chromeBootstrapPorts(
+  hooks: BootstrapHooks = { beforeStep: async () => {} },
+): BootstrapPorts {
+  return {
+    cookies: chromeCookieApi,
+    navigation: chromeNavigationApi,
+    barrier: chromeBarrierApi,
+    hooks,
+  };
+}
+
 /** One operation at a time, held in memory; a second one is refused rather than queued. */
-export function createWorkspaceCommands(recordings: RecordingStore): WorkspaceCommands {
-  let busy = false;
-  const exclusive = async (operation: () => Promise<void>) => {
-    if (busy) {
-      throw new WorkspaceError(
-        "WorkspaceBusy",
-        "RECnRun is busy with another Incognito workspace operation.",
-      );
-    }
-    busy = true;
-    try {
-      await operation();
-    } finally {
-      busy = false;
-    }
+function createLock() {
+  const lock = {
+    busy: false,
+    /** The last start with an identity, failed or not, until another command runs. */
+    operation: undefined as WorkspaceOperation | undefined,
+    exclusive: async <T>(run: () => Promise<T>): Promise<T> => {
+      if (lock.busy) {
+        throw new WorkspaceError(
+          "WorkspaceBusy",
+          "RECnRun is busy with another Incognito workspace operation.",
+        );
+      }
+      lock.busy = true;
+      lock.operation = undefined;
+      try {
+        return await run();
+      } finally {
+        lock.busy = false;
+      }
+    },
+  };
+  return lock;
+}
+
+export function createWorkspaceCommands(
+  recordings: RecordingStore,
+  ports: BootstrapPorts = chromeBootstrapPorts(),
+): WorkspaceCommands {
+  const lock = createLock();
+  const { exclusive } = lock;
+  const windows = { create: createNeutralWindow, close: closeWindows };
+  const record = (next: WorkspaceOperation) => {
+    lock.operation = next;
   };
   return {
     status: async () => {
       const access = await browser.extension.isAllowedIncognitoAccess();
       const { stored, foreign } = await classifiedWindows();
       const summaries = foreign.map(({ id, tabs }) => ({ id, tabCount: tabs?.length ?? 0 }));
-      return { access, managed: stored, foreign: summaries, busy };
+      const { busy, operation } = lock;
+      return { access, managed: stored, foreign: summaries, busy, ...(operation && { operation }) };
     },
     // Async, so a refused target rejects; the busy check still runs before the first await.
     start: async (url) => {
@@ -125,6 +163,15 @@ export function createWorkspaceCommands(recordings: RecordingStore): WorkspaceCo
       await exclusive(async () => {
         await requireNoRecording(recordings);
         await replaceManaged(url);
+      });
+    },
+    startWithIdentity: async (url, data) => {
+      requireTarget(url);
+      return exclusive(async () => {
+        await requireNoRecording(recordings);
+        await requireAccess();
+        const deps = { ...ports, windows, record };
+        return bootstrapIdentity(url, data, deps, crypto.randomUUID());
       });
     },
   };

@@ -1,0 +1,200 @@
+import { errorMessage } from "@recnrun/domain";
+import type { IdentityData, ManagedWindowState, WorkspaceOperation } from "@recnrun/domain";
+import { restoreThroughAgent } from "@/background/workspace/agent-link";
+import { installBarrier, removeBarrier } from "@/background/workspace/barrier";
+import type { Barrier, BarrierApi } from "@/background/workspace/barrier";
+import {
+  resolveTabStore,
+  restoreCookies,
+  waitForNoIncognitoStore,
+} from "@/background/workspace/cookie-stores";
+import type { CookieApi } from "@/background/workspace/cookie-stores";
+import { openBehindBarrier, reloadAndCommit } from "@/background/workspace/navigation";
+import type { NavigationApi } from "@/background/workspace/navigation";
+import type { OriginPort } from "@/messaging/origin-protocol";
+
+/** The steps of a start with an identity, in order; the journal and the timings name them. */
+export const BOOTSTRAP_STEPS = [
+  "store-gone",
+  "window",
+  "cookie-store",
+  "cookies",
+  "barrier",
+  "navigate",
+  "restore",
+  "unbarrier",
+  "reload",
+] as const;
+
+export type BootstrapStep = (typeof BOOTSTRAP_STEPS)[number];
+
+/** How long one step took, in milliseconds; no payload, so timings can be logged and reported. */
+export interface StepTiming {
+  step: BootstrapStep;
+  ms: number;
+}
+
+/** Runs before each step; test builds delay or fail a step through it, product builds do nothing. */
+export interface BootstrapHooks {
+  beforeStep: (step: BootstrapStep) => Promise<void>;
+}
+
+/** Chrome, behind ports, plus the test hook. */
+export interface BootstrapPorts {
+  cookies: CookieApi;
+  navigation: NavigationApi;
+  barrier: BarrierApi;
+  hooks: BootstrapHooks;
+}
+
+export interface BootstrapDeps extends BootstrapPorts {
+  windows: {
+    create: () => Promise<ManagedWindowState>;
+    close: (ids: readonly number[]) => Promise<void>;
+  };
+  /** Receives the operation at each step and at its end. */
+  record: (operation: WorkspaceOperation) => void;
+  storeBoundMs?: number;
+}
+
+const NAVIGATION_BOUND_MS = 15_000;
+const RESTORE_BOUND_MS = 15_000;
+
+/** What the steps learn as they run. */
+interface Run {
+  url: string;
+  origin: string;
+  data: IdentityData;
+  deps: BootstrapDeps;
+  operation: WorkspaceOperation;
+  window?: ManagedWindowState;
+  storeId?: string;
+  barrier?: Barrier;
+  agent?: OriginPort;
+}
+
+function known<T>(value: T | undefined, what: string): T {
+  if (value === undefined) throw new Error(`The start lost its ${what}.`);
+  return value;
+}
+
+const tabOf = (run: Run) => known(run.window, "window").tabId;
+const barrierOperation = (run: Run) => ({
+  id: run.operation.id,
+  generation: known(run.window, "window").generation,
+});
+
+const STEP_RUNS: Record<BootstrapStep, (run: Run) => Promise<unknown>> = {
+  "store-gone": (run) => waitForNoIncognitoStore(run.deps.cookies, run.deps.storeBoundMs),
+  window: async (run) => {
+    run.window = await run.deps.windows.create();
+    const { generation, windowId } = run.window;
+    run.operation = { ...run.operation, generation, windowId };
+  },
+  "cookie-store": async (run) => {
+    run.storeId = await resolveTabStore(run.deps.cookies, tabOf(run));
+  },
+  cookies: (run) =>
+    restoreCookies(
+      run.deps.cookies,
+      known(run.storeId, "cookie store"),
+      run.origin,
+      run.data.cookies,
+    ),
+  barrier: async (run) => {
+    run.barrier = await installBarrier(
+      tabOf(run),
+      run.origin,
+      barrierOperation(run),
+      run.deps.barrier,
+    );
+  },
+  navigate: async (run) => {
+    const target = { tabId: tabOf(run), url: run.url, origin: run.origin };
+    run.agent = await openBehindBarrier(run.deps.navigation, target, NAVIGATION_BOUND_MS);
+  },
+  restore: async (run) => {
+    const agent = known(run.agent, "page link");
+    await restoreThroughAgent(agent, barrierOperation(run), run.data.site, RESTORE_BOUND_MS);
+    agent.disconnect();
+  },
+  unbarrier: async (run) => {
+    await removeBarrier(known(run.barrier, "barrier"), run.deps.barrier);
+    run.barrier = undefined;
+  },
+  reload: (run) => {
+    const documentId = known(run.agent?.sender?.documentId, "document");
+    const released = { tabId: tabOf(run), origin: run.origin, documentId };
+    return reloadAndCommit(run.deps.navigation, released, NAVIGATION_BOUND_MS);
+  },
+};
+
+/** Undoes what the failed start left: the page link, the window, then the barrier. */
+async function cleanUp(run: Run): Promise<string[]> {
+  const failures: string[] = [];
+  const attempt = async (undo: () => Promise<void>) => {
+    try {
+      await undo();
+    } catch (error) {
+      failures.push(errorMessage(error));
+    }
+  };
+  run.agent?.disconnect();
+  const { window, barrier } = run;
+  if (window) await attempt(() => run.deps.windows.close([window.windowId]));
+  if (barrier) await attempt(() => removeBarrier(barrier, run.deps.barrier));
+  return failures;
+}
+
+/** Records the failure before cleaning up, so whoever watches the window closing sees why. */
+async function fail(run: Run, error: unknown): Promise<never> {
+  const message = errorMessage(error);
+  run.operation = { ...run.operation, status: "failed", error: message };
+  run.deps.record(run.operation);
+  const failures = await cleanUp(run);
+  if (failures.length > 0) {
+    run.operation = {
+      ...run.operation,
+      error: `${message} Cleanup also failed: ${failures.join(" ")}`,
+    };
+    run.deps.record(run.operation);
+  }
+  throw error;
+}
+
+/**
+ * Opens a fresh managed window and restores `data` into it before the app at `url` runs: cookies
+ * into the tab's own store, then site data behind the barrier, then a reload of the same tab
+ * releases the app. Any failure closes the window, so no partly restored app is ever released.
+ */
+export async function bootstrapIdentity(
+  url: string,
+  data: IdentityData,
+  deps: BootstrapDeps,
+  operationId: string,
+): Promise<StepTiming[]> {
+  const operation: WorkspaceOperation = {
+    id: operationId,
+    kind: "start-with-identity",
+    step: "store-gone",
+    status: "running",
+    started: Date.now(),
+  };
+  const run: Run = { url, origin: new URL(url).origin, data, deps, operation };
+  const timings: StepTiming[] = [];
+  try {
+    for (const step of BOOTSTRAP_STEPS) {
+      run.operation = { ...run.operation, step };
+      deps.record(run.operation);
+      await deps.hooks.beforeStep(step);
+      const started = performance.now();
+      await STEP_RUNS[step](run);
+      timings.push({ step, ms: performance.now() - started });
+    }
+  } catch (error) {
+    return fail(run, error);
+  }
+  run.operation = { ...run.operation, status: "done" };
+  deps.record(run.operation);
+  return timings;
+}

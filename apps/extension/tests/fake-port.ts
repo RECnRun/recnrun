@@ -3,7 +3,7 @@ import type { OriginPort, OriginSender } from "@/messaging/origin-protocol";
 
 type Listener<A extends unknown[]> = (...args: A) => void;
 
-function fakeEvent<A extends unknown[]>() {
+export function fakeEvent<A extends unknown[]>() {
   const listeners = new Set<Listener<A>>();
   return {
     listeners,
