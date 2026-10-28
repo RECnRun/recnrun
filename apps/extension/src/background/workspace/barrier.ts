@@ -1,0 +1,183 @@
+import { browser } from "wxt/browser";
+import type { Browser } from "wxt/browser";
+import { WorkspaceError } from "@/background/workspace/errors";
+
+type ResourceType = `${Browser.declarativeNetRequest.ResourceType}`;
+
+export interface BarrierRule {
+  id: number;
+  priority: number;
+  action: {
+    type: "allow" | "block" | "modifyHeaders";
+    responseHeaders?: { header: string; operation: "append"; value: string }[];
+  };
+  condition: {
+    tabIds: number[];
+    resourceTypes?: ResourceType[];
+    excludedResourceTypes?: ResourceType[];
+    urlFilter?: string;
+  };
+}
+
+export interface AgentScript {
+  id: string;
+  js: string[];
+  matches: string[];
+  runAt: "document_start";
+  allFrames: false;
+  persistAcrossSessions: false;
+}
+
+export interface BarrierApi {
+  addSessionRules: (rules: BarrierRule[]) => Promise<void>;
+  removeSessionRules: (ids: number[]) => Promise<void>;
+  sessionRuleIds: () => Promise<number[]>;
+  registerScript: (script: AgentScript) => Promise<void>;
+  unregisterScript: (id: string) => Promise<void>;
+  registeredScriptIds: () => Promise<string[]>;
+}
+
+export interface BarrierOperation {
+  id: string;
+  generation: number;
+}
+
+export interface Barrier {
+  ruleIds: number[];
+  scriptId: string;
+}
+
+/** Appended to the tab's documents: the site's own scripts never run before the agent restores. */
+export const BARRIER_CSP =
+  "script-src 'none'; worker-src 'none'; object-src 'none'; frame-src 'none'";
+/** Where WXT emits the runtime-registered origin agent. */
+export const AGENT_SCRIPT = "content-scripts/origin-agent.js";
+
+const RULES_PER_GENERATION = 10;
+
+function requireOrigin(target: string): void {
+  const url = URL.parse(target);
+  const web = url?.protocol === "http:" || url?.protocol === "https:";
+  if (!web || url.origin !== target) {
+    throw new WorkspaceError(
+      "TargetNotAllowed",
+      "The barrier guards one http or https origin only.",
+    );
+  }
+}
+
+/** Blocks everything in the tab, then lets only the target origin's documents through, script-free. */
+function barrierRules(tabId: number, origin: string, generation: number): BarrierRule[] {
+  const base = generation * RULES_PER_GENERATION;
+  const tabIds = [tabId];
+  return [
+    {
+      id: base + 1,
+      priority: 1,
+      action: { type: "block" },
+      condition: { tabIds, excludedResourceTypes: ["main_frame"] },
+    },
+    {
+      id: base + 2,
+      priority: 1,
+      action: { type: "block" },
+      condition: { tabIds, resourceTypes: ["main_frame"] },
+    },
+    {
+      id: base + 3,
+      priority: 2,
+      action: { type: "allow" },
+      condition: { tabIds, resourceTypes: ["main_frame"], urlFilter: `|${origin}/` },
+    },
+    // Above the allow rule: an allow that outranks a modifyHeaders rule suppresses it.
+    {
+      id: base + 4,
+      priority: 3,
+      action: {
+        type: "modifyHeaders",
+        responseHeaders: [
+          { header: "Content-Security-Policy", operation: "append", value: BARRIER_CSP },
+        ],
+      },
+      condition: { tabIds, resourceTypes: ["main_frame", "sub_frame"] },
+    },
+  ];
+}
+
+function agentScript(origin: string, operationId: string): AgentScript {
+  return {
+    id: `recnrun-origin-agent-${operationId}`,
+    js: [AGENT_SCRIPT],
+    matches: [`${origin}/*`],
+    runAt: "document_start",
+    allFrames: false,
+    persistAcrossSessions: false,
+  };
+}
+
+async function requireFree(barrier: Barrier, api: BarrierApi): Promise<void> {
+  const rules = new Set(await api.sessionRuleIds());
+  const scripts = new Set(await api.registeredScriptIds());
+  if (barrier.ruleIds.some((id) => rules.has(id)) || scripts.has(barrier.scriptId)) {
+    throw new WorkspaceError(
+      "BarrierCollision",
+      "Another workspace operation still holds this barrier.",
+    );
+  }
+}
+
+/** Installs the tab's barrier and the origin agent; on failure, leaves nothing behind. */
+export async function installBarrier(
+  tabId: number,
+  targetOrigin: string,
+  operation: BarrierOperation,
+  api: BarrierApi,
+): Promise<Barrier> {
+  requireOrigin(targetOrigin);
+  const rules = barrierRules(tabId, targetOrigin, operation.generation);
+  const script = agentScript(targetOrigin, operation.id);
+  const barrier = { ruleIds: rules.map(({ id }) => id), scriptId: script.id };
+  await requireFree(barrier, api);
+  await api.addSessionRules(rules);
+  try {
+    await api.registerScript(script);
+  } catch {
+    await api.removeSessionRules(barrier.ruleIds);
+    throw new WorkspaceError("BarrierNotInstalled", "Chrome did not register the origin agent.");
+  }
+  return barrier;
+}
+
+/** Removes this barrier only, then asks Chrome again to prove it is gone. */
+export async function removeBarrier(barrier: Barrier, api: BarrierApi): Promise<void> {
+  await api.removeSessionRules(barrier.ruleIds);
+  // Chrome rejects unregistering an id it does not know, as after an earlier removal.
+  if ((await api.registeredScriptIds()).includes(barrier.scriptId)) {
+    await api.unregisterScript(barrier.scriptId);
+  }
+  const rules = new Set(await api.sessionRuleIds());
+  const scripts = await api.registeredScriptIds();
+  if (barrier.ruleIds.some((id) => rules.has(id)) || scripts.includes(barrier.scriptId)) {
+    throw new WorkspaceError(
+      "BarrierNotRemoved",
+      "Chrome still lists the barrier after removing it.",
+    );
+  }
+}
+
+/** The barrier's Chrome APIs; the rule and script shapes above are Chrome's, minus its enum types. */
+export const chromeBarrierApi: BarrierApi = {
+  addSessionRules: (rules) =>
+    browser.declarativeNetRequest.updateSessionRules({
+      addRules: rules as unknown as Browser.declarativeNetRequest.Rule[],
+    }),
+  removeSessionRules: (ids) =>
+    browser.declarativeNetRequest.updateSessionRules({ removeRuleIds: ids }),
+  sessionRuleIds: async () =>
+    (await browser.declarativeNetRequest.getSessionRules()).map(({ id }) => id),
+  registerScript: (script) =>
+    browser.scripting.registerContentScripts([script as Browser.scripting.RegisteredContentScript]),
+  unregisterScript: (id) => browser.scripting.unregisterContentScripts({ ids: [id] }),
+  registeredScriptIds: async () =>
+    (await browser.scripting.getRegisteredContentScripts()).map(({ id }) => id),
+};

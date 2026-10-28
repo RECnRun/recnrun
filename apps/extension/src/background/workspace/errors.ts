@@ -1,5 +1,8 @@
 /** Why a workspace operation stopped; the name tells cases apart, the message is for the user. */
 type WorkspaceErrorName =
+  | "BarrierCollision"
+  | "BarrierNotInstalled"
+  | "BarrierNotRemoved"
   | "IncognitoNotAllowed"
   | "IncognitoWindowsOpen"
   | "NoManagedWindow"
