@@ -8,7 +8,7 @@ Plan: [poc-incognito-sessions-plan.md](poc-incognito-sessions-plan.md). Assignme
 | Branch               | `poc/incognito-sessions`                                         |
 | Planned base         | `44c154da29860c7a8df829e902b177df5ce2ba2a` (2026-10-28)          |
 | Actual base (P0.1)   | `44c154d` (re-resolved 2026-10-28, unchanged)                    |
-| Last recorded commit | `52a98cb`                                                        |
+| Last recorded commit | `2cbd7f4`                                                        |
 | Decisions OD-1…OD-4  | defaults of plan §3, accepted by the user ("Avance", 2026-10-28) |
 
 ## Status legend
@@ -257,6 +257,8 @@ Stage 2 verify: exit 0 on `dfb882d`, 302 unit/component, 61/61 e2e, coverage 99.
   red: `vp run test:components` in the scratch worktree with `Identities` rendering null, `approximateSize` stubbed, the failure name fixed, and the held identity not shown → 11 failed; `vp run test:components -- apps/extension/tests/identities.browser.test.tsx` → "a command's error that its failed operation already names shows once" failed with a second alert (`+ "The test build failed the restore step."`); `vp run test:e2e -- tests/e2e/identities.spec.ts` in the scratch worktree with `Identities` rendering null → 3 failed waiting for the Label textbox
   green: `vp run test:components` → 126 passed; `vp run test:e2e -- tests/e2e/identities.spec.ts tests/e2e/incognito-workspace.spec.ts` → 11 passed; `vp check`, `vp run deps` pass; pre-commit unit 322 passed
   commit: 52a98cb Show saved identities and their commands in the dashboard
+  commit: 1636e67 Count only enabled buttons in the native reset conflict test (full `vp run test:e2e` red: the same "no command" count in `poc-native-reset.spec.ts` met the disabled New identity; green: that spec 2 passed, then the full suite 70 passed twice)
+  commit: 2cbd7f4 Stop exporting the conflict check and the identity draft type (`vp run dead-code` red on `hasConflict` and `IdentityDraft` (the latter from S3.8), green after)
   notes: `dashboard/Identities.tsx` lists each identity with "Saved <time>, about <size>" or "Not saved yet", and the persistence note "Saved on this computer in RECnRun, kept after Incognito closes." One row command from the status: nothing open → Resume (captured) or Switch to (never captured, opens empty); identity open → Suspend on its row (marked Open), Switch to on others; anonymous window → none. Delete asks again ("Delete <label>" / Keep) and is absent on the open row. New identity takes Label and the panel's Address, sends `cookieHosts: []`. While the window holds an identity the panel says "Incognito workspace open: <label>" instead of Close and start empty.
   - Conflicts: a foreign Incognito window or a second tab in the managed window (live tab model; the backend refuses only the first) shows "Another Incognito window or tab is open. Close it to switch identities; RECnRun saves only its own tab." and disables every row command and New identity, not Delete. Disabled workspace buttons now look disabled (`views.css`); `incognito-workspace.spec.ts` "leaves no command" now counts enabled buttons and checks New identity disabled.
   - Failures: one alert "<Command> failed at the <step> step. <error>"; the command's own refusal is not repeated when the journal already names it (found in the screenshot, fixed red/green).
