@@ -35,7 +35,7 @@ describe("inventory", () => {
     expect(windows[0]?.tabs?.map((tab) => tab.url)).toEqual(["https://app.example/"]);
   });
 
-  test("asks Chrome for normal and popup windows, and leaves out PiP, DevTools, and id-less ones", async () => {
+  test("asks Chrome for normal and popup windows, keeps Incognito PiP, and leaves out DevTools and id-less ones", async () => {
     const getAll = vi
       .spyOn(fakeBrowser.windows, "getAll")
       .mockResolvedValue([
@@ -45,7 +45,7 @@ describe("inventory", () => {
         browserWindow({ id: 4, type: "normal", alwaysOnTop: true }),
         browserWindow({ type: "normal" }),
       ] as never);
-    expect((await inventory()).map((each) => each.id)).toEqual([1, 2]);
+    expect((await inventory()).map((each) => each.id)).toEqual([1, 2, 4]);
     expect(getAll).toHaveBeenCalledWith({ populate: true, windowTypes: ["normal", "popup"] });
   });
 });

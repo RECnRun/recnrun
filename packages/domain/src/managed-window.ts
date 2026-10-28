@@ -18,12 +18,11 @@ export interface IncognitoWindowShape {
   id: number;
   incognito: boolean;
   type?: string;
-  alwaysOnTop?: boolean;
 }
 
-/** DevTools windows close with their page; always-on-top windows are the dashboard's PiP, as in the tab model. */
+/** DevTools windows close with their page; any other one, a Document PiP included, keeps the Incognito session alive. */
 function isIncognitoBrowsingWindow(window: IncognitoWindowShape): boolean {
-  return window.incognito && window.type !== "devtools" && window.alwaysOnTop !== true;
+  return window.incognito && window.type !== "devtools";
 }
 
 /** Splits the Incognito windows into the active managed one, if open, and every other one. */

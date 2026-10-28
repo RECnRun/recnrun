@@ -49,13 +49,14 @@ describe("classifyIncognitoWindows", () => {
     expect(classifyIncognitoWindows(windows, { ...active, status: "closed" })).toEqual(none);
   });
 
-  test("leaves out normal, DevTools, and always-on-top windows", () => {
-    const windows = [
-      normal,
-      { id: 2, incognito: true, type: "devtools" },
-      { id: 3, incognito: true, type: "normal", alwaysOnTop: true },
-    ];
+  test("leaves out normal and DevTools windows", () => {
+    const windows = [normal, { id: 2, incognito: true, type: "devtools" }];
     expect(classifyIncognitoWindows(windows, active)).toEqual({ managed: undefined, foreign: [] });
+  });
+
+  test("counts an Incognito always-on-top window, such as a Document PiP, as foreign", () => {
+    const pip = { id: 3, incognito: true, type: "normal", alwaysOnTop: true };
+    expect(classifyIncognitoWindows([pip], active)).toEqual({ managed: undefined, foreign: [pip] });
   });
 
   test("keeps an Incognito window of an unreported type, since it would still block a reset", () => {
