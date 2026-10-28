@@ -1,7 +1,7 @@
 import { render } from "preact";
 import { afterEach, expect, test, vi } from "vite-plus/test";
 import { startDashboard } from "@/dashboard/start";
-import { openPanelMessage, panelClosedMessage } from "@/messaging/frame-protocol";
+import { openPanelMessage } from "@/messaging/frame-protocol";
 import { returnToDashboardMessage, startSessionMessage } from "@/messaging/session-protocol";
 import type { WorkspaceStatus } from "@/messaging/workspace-protocol";
 import type { ExtensionServices } from "@/views/extension-services";
@@ -13,26 +13,8 @@ import {
   memoryRecordingStore,
 } from "./fake-extension";
 import { DOCS, PRIVATE, SHOP, fakeIncognito, fakeTabs } from "./fake-tabs";
+import { closePanel, framedPage } from "./framed-page";
 import { button } from "./queries";
-
-/** A dashboard frame stand-in whose parent, the site, is this test page. */
-function framedPage() {
-  return Object.assign(new EventTarget(), {
-    parent: window,
-    document,
-    location: { ancestorOrigins: [location.origin], search: "" },
-  }) as unknown as Window;
-}
-
-/** What the site's content script would send the frame once the PiP window closes. */
-const closePanel = (page: Window) =>
-  page.dispatchEvent(
-    new MessageEvent("message", {
-      data: panelClosedMessage(),
-      origin: location.origin,
-      source: window,
-    }),
-  );
 
 /** The workspace status with `tabId` as the managed window's tab, the only one RECnRun records. */
 const managing = (tabId: number, status: "active" | "closed" = "active"): WorkspaceStatus => ({
