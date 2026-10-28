@@ -1,5 +1,5 @@
 import { writeFileSync } from "node:fs";
-import type { Worker } from "@playwright/test";
+import type { Page, Worker } from "@playwright/test";
 import { sampleSnapshot } from "@recnrun/domain/testing";
 import { expect, test } from "./fixtures/extension.ts";
 import { dashboardOf, openSite } from "./fixtures/session.ts";
@@ -13,6 +13,12 @@ import {
   writeSentinels,
 } from "./fixtures/sentinels.ts";
 import { openIncognitoTab } from "./fixtures/tabs.ts";
+import {
+  installTeardownProbe,
+  readTeardown,
+  spread,
+  teardownGaps,
+} from "./fixtures/teardown-probe.ts";
 import {
   APP,
   managedWindow,
@@ -49,31 +55,74 @@ async function keep(name: string, value: unknown): Promise<void> {
 
 test.use({ incognitoAccess: true });
 
+/** Reset cycles in one test; the recorded stress run sets `POC_REPEATS=50`. */
+const CYCLES = Number(process.env.POC_REPEATS ?? "1");
+
+const sentinelAt = (run: string, cycle: number) =>
+  `${APP}/sentinel?tag=incog-${cycle}&run=${run}-${cycle}`;
+
+interface Stress {
+  site: Page;
+  serviceWorker: Worker;
+  run: string;
+}
+
+/** One cycle: the managed tab holds `incog-<cycle>`, the dashboard resets, and `/inspect` reads. */
+async function resetCycle(stress: Stress, managed: Page, cycle: number) {
+  const { site, serviceWorker, run } = stress;
+  await sentinelsWritten(managed);
+  const generation = await managedGeneration(serviceWorker);
+  const target = `${APP}/inspect?run=${run}-${cycle}-inspect`;
+  // Issued as soon as the writes finished, with no pause, to stress the teardown.
+  await runWorkspace(site, target, "Close and start empty");
+  const page = await pageAt(managed.context(), target);
+  const fresh = await inspected(page);
+  // The HttpOnly cookie shows in serverCookies, the Cookie header the server received.
+  expect(fresh, `cycle ${cycle}`).toEqual(NOTHING);
+  expect(await managedGeneration(serviceWorker)).toBe(generation + 1);
+  const { entries } = (await (await fetch(`${LOG}?run=${run}-${cycle}-inspect`)).json()) as {
+    entries: { kind: string; body?: { serverCookies?: object } }[];
+  };
+  expect(entries.find(({ kind }) => kind === "report")?.body?.serverCookies).toEqual({});
+  return { page, teardown: teardownGaps(await readTeardown(serviceWorker)) };
+}
+
 test("Close and start empty leaves the next managed window with no Incognito data", async ({
   context,
   page,
   serviceWorker,
   seedSnapshot,
 }) => {
+  test.setTimeout(30_000 + CYCLES * 10_000);
   const run = `reset-${Date.now()}`;
   await seedSnapshot(sampleSnapshot());
   await writeSentinels(page, APP, `tag=normal&run=${run}`);
   const site = await openSite(context, "/");
-  const app = await openWorkspaceApp(site, serviceWorker, `${APP}/sentinel?tag=incog-1&run=${run}`);
-  await sentinelsWritten(app.page);
-  const generation = await managedGeneration(serviceWorker);
-
-  const target = `${APP}/inspect?run=${run}-1`;
-  await runWorkspace(site, target, "Close and start empty");
-  const fresh = await inspected(await pageAt(context, target));
-  await keep("reset-inspected", fresh);
-  // The HttpOnly cookie shows in serverCookies, the Cookie header the server received.
-  expect(fresh).toEqual(NOTHING);
-  expect(await managedGeneration(serviceWorker)).toBe(generation + 1);
-  const { entries } = (await (await fetch(`${LOG}?run=${run}-1`)).json()) as {
-    entries: { kind: string; body?: { serverCookies?: object } }[];
-  };
-  expect(entries.find(({ kind }) => kind === "report")?.body?.serverCookies).toEqual({});
+  let managed = (await openWorkspaceApp(site, serviceWorker, sentinelAt(run, 1))).page;
+  await installTeardownProbe(serviceWorker);
+  const stress = { site, serviceWorker, run };
+  const cycles: ReturnType<typeof teardownGaps>[] = [];
+  for (let cycle = 1; cycle <= CYCLES; cycle += 1) {
+    const { page: next, teardown } = await resetCycle(stress, managed, cycle);
+    cycles.push(teardown);
+    managed = next;
+    if (cycle < CYCLES) await managed.goto(sentinelAt(run, cycle + 1));
+  }
+  const gaps = [
+    "closeToRemoved",
+    "closeToWindowLastSeen",
+    "closeToNoWindow",
+    "closeToStoreLastSeen",
+    "closeToStoreGone",
+    "removedToCreate",
+    "storeGoneToCreate",
+    "createToCreated",
+  ] as const;
+  const stats = Object.fromEntries(
+    gaps.map((gap) => [gap, spread(cycles.map((each) => each[gap]))]),
+  );
+  const orders = [...new Set(cycles.map((each) => each.order))];
+  await keep("teardown", { cycles: cycles.length, stats, orders, perCycle: cycles });
 
   expect(await inspect(page, APP, `${run}-normal`)).toMatchObject(holding("normal", APP));
   for (const { name } of sampleSnapshot().recordings) {
