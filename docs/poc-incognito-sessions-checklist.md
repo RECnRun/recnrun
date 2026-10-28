@@ -8,7 +8,7 @@ Plan: [poc-incognito-sessions-plan.md](poc-incognito-sessions-plan.md). Assignme
 | Branch               | `poc/incognito-sessions`                                         |
 | Planned base         | `44c154da29860c7a8df829e902b177df5ce2ba2a` (2026-10-28)          |
 | Actual base (P0.1)   | `44c154d` (re-resolved 2026-10-28, unchanged)                    |
-| Last recorded commit | `038dfb4`                                                        |
+| Last recorded commit | `7386ad9`                                                        |
 | Decisions OD-1…OD-4  | defaults of plan §3, accepted by the user ("Avance", 2026-10-28) |
 
 ## Status legend
@@ -79,7 +79,11 @@ Stage 0 verify: first run exit 1 — P0.3's server took port 5191, which `dashbo
   green: same command → 29 files, 134 tests passed
   commit: 038dfb4 Add a workspace command that replaces the open managed window
   notes: `vp check`, `vp run deps`, `dead-code`, `duplication` (0 clones) pass; shared route-test helpers moved to `tests/workspace-harness.ts`; ARCHITECTURE workspace paragraph documents the command and that it discards the window's Incognito data until Stage 3; not exercised in a real browser here (the dashboard's Close and start empty in S1.4 drives it end to end)
-- [ ] S1.4 Dashboard: access requirement, blockers + "Close these windows and start", Start, "Use this tab's address"
+- [i] S1.4 Dashboard: access requirement, blockers + "Close these windows and start", Start, "Use this tab's address"
+  red: `vp run test:components` → 13 failed in `apps/extension/tests/incognito-workspace.browser.test.tsx` against a stub `IncognitoWorkspace` that rendered nothing, e.g. `expected undefined to be 'Incognito workspace'` and `expected '' to contain '2 Incognito windows are open'`
+  green: same command → 8 files, 68 tests passed; `vp run test:unit` → 29 files, 135 tests; `vp run test:e2e -- tests/e2e/incognito-workspace.spec.ts tests/e2e/incognito.spec.ts tests/e2e/incognito-access.spec.ts` → 14 passed
+  commit: 7386ad9 Add the Incognito workspace panel to the dashboard
+  notes: panel replaces "New incognito window" (`IncognitoAccess.openWindow` became `watchWindows`); screenshots in `.artifacts/screens/S1.4/` (no-access, start, blocked, open, refused, address) viewed; `vp check`, `vp run deps`, `dead-code`, `duplication` pass; ARCHITECTURE, PRODUCT_BRIEF, MILESTONES updated as POC-branch behaviour. Pre-existing gap: `workspace-close-and-start` with an active managed window closes the foreign windows and then refuses, so the panel offers only "Close and start empty" in that state
 - [ ] S1.5 Record only the managed tab; existing e2e and product docs updated
 - [ ] S1.6 E2E reset experiment (six sentinel kinds, normal profile unchanged, repository readable) + negative control (foreign window keeps data, dashboard blocks)
 - [ ] S1.7 Stress loop (`POC_REPEATS=50`), teardown signal if survivors, report section
