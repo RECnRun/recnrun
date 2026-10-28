@@ -83,6 +83,7 @@ await test("the test build adds exactly the Incognito workspace POC permissions"
     "scripting",
     "cookies",
     "webNavigation",
+    "unlimitedStorage",
   ]);
   assert.deepEqual(manifest.host_permissions, ["http://*.localhost/*"]);
   assert.equal(manifest.message_serialization, "structured_clone");

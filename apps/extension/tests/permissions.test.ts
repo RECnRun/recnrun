@@ -1,7 +1,15 @@
 import { expect, test } from "vite-plus/test";
 import { buildAccess, skipsEntrypoint } from "@/config/permissions";
 
-const POC = ["storage", "tabs", "declarativeNetRequest", "scripting", "cookies", "webNavigation"];
+const POC = [
+  "storage",
+  "tabs",
+  "declarativeNetRequest",
+  "scripting",
+  "cookies",
+  "webNavigation",
+  "unlimitedStorage",
+];
 
 test("a production build asks only for storage and tabs, whatever hosts are passed", () => {
   expect(buildAccess("production")).toEqual({ permissions: ["storage", "tabs"] });

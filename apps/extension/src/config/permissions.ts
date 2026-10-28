@@ -5,9 +5,16 @@ const PRODUCT_PERMISSIONS = ["storage", "tabs"];
 
 /**
  * The Incognito workspace POC (OD-1): tab-scoped session rules for the bootstrap barrier, the
- * runtime-registered origin agent, the managed tab's cookie store, and the bootstrap commit.
+ * runtime-registered origin agent, the managed tab's cookie store, the bootstrap commit, and room
+ * for identity captures past the default extension quota.
  */
-const POC_PERMISSIONS = ["declarativeNetRequest", "scripting", "cookies", "webNavigation"];
+const POC_PERMISSIONS = [
+  "declarativeNetRequest",
+  "scripting",
+  "cookies",
+  "webNavigation",
+  "unlimitedStorage",
+];
 
 /** The fixture origins of the end-to-end tests (`app.localhost`, `other.localhost`, …). */
 const FIXTURE_HOSTS = ["http://*.localhost/*"];

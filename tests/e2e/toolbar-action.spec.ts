@@ -47,6 +47,7 @@ test("the extension has no popup, keyboard commands, or context menu", async ({
     "scripting",
     "cookies",
     "webNavigation",
+    "unlimitedStorage",
   ]);
 
   const surface = await serviceWorker.evaluate(async () => {
