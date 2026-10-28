@@ -12,6 +12,8 @@ vi.mock("wxt/browser", () => ({ browser }));
 const operation = { operationId: "op-1", generation: 2 };
 const payload = { localStorage: { token: "secret-1" }, sessionStorage: {}, indexedDB: [] };
 const restore = { type: "restore", ...operation, payload };
+const probe = { type: "probe", ...operation, probe: new Date(0) };
+const echo = { ...probe, type: "probe-echo" };
 
 let stores: { localStorage: Storage; sessionStorage: Storage; indexedDB: IDBFactory };
 
@@ -22,9 +24,11 @@ function started() {
   return connected;
 }
 
+/** An agent past the link probe, its echo already posted. */
 function linked() {
   const agent = fakePort();
   runOriginAgent(agent, stores);
+  agent.onMessage.emit(probe);
   return agent;
 }
 
@@ -49,12 +53,38 @@ test("connects to the background and waits, touching nothing, until it gets a co
   expect(agent.onMessage.listeners.size).toBe(1);
 });
 
-test("disconnects on a malformed first command and restores nothing", () => {
-  const agent = started();
-  agent.onMessage.emit({ ...restore, generation: -1 });
-  expect(agent.disconnected).toBe(true);
-  expect(agent.onMessage.listeners.size).toBe(0);
-  expect(agent.posted).toEqual([]);
+test("disconnects, restoring nothing, when the first message is not a valid probe", () => {
+  for (const first of [restore, { ...probe, generation: -1 }, "probe"]) {
+    const agent = started();
+    agent.onMessage.emit(first);
+    expect(agent.disconnected, JSON.stringify(first)).toBe(true);
+    expect(agent.onMessage.listeners.size).toBe(0);
+    expect(agent.posted).toEqual([]);
+  }
+});
+
+test("echoes the probe as it arrived, Date included, then waits for one command", () => {
+  const agent = linked();
+  expect(agent.posted).toEqual([echo]);
+  expect((agent.posted[0] as typeof echo).probe).toBeInstanceOf(Date);
+  expect(agent.onMessage.listeners.size).toBe(1);
+  expect(agent.disconnected).toBe(false);
+});
+
+test("after the probe, disconnects on a malformed command or one of another operation", () => {
+  for (const command of [
+    { ...restore, generation: -1 },
+    { ...restore, operationId: "op-0" },
+    { ...restore, generation: 3 },
+    probe,
+  ]) {
+    const agent = linked();
+    agent.onMessage.emit(command);
+    expect(agent.disconnected, JSON.stringify(command)).toBe(true);
+    expect(agent.onMessage.listeners.size).toBe(0);
+    expect(agent.posted).toEqual([echo]);
+  }
+  expect(stores.localStorage.length).toBe(0);
 });
 
 test("restores the first valid command, replies restored, and ignores any later one", async () => {
@@ -64,6 +94,7 @@ test("restores the first valid command, replies restored, and ignores any later 
   await expect
     .poll(() => agent.posted)
     .toEqual([
+      echo,
       {
         type: "restored",
         ...operation,
@@ -80,7 +111,7 @@ test("replies failed with the step and reason only, never a stored value", async
   agent.onMessage.emit(restore);
   await expect
     .poll(() => agent.posted)
-    .toEqual([{ type: "failed", ...operation, error: "check: OriginNotEmpty" }]);
+    .toEqual([echo, { type: "failed", ...operation, error: "check: OriginNotEmpty" }]);
   expect(JSON.stringify(agent.posted)).not.toMatch(/secret/);
   expect(stores.localStorage.length).toBe(0);
 });
@@ -90,7 +121,7 @@ test("names a thrown value that is no Error only as UnknownError", async () => {
   agent.onMessage.emit(restore);
   await expect
     .poll(() => agent.posted)
-    .toEqual([{ type: "failed", ...operation, error: "check: UnknownError" }]);
+    .toEqual([echo, { type: "failed", ...operation, error: "check: UnknownError" }]);
 });
 
 /** An agent whose storage throws a plain value instead of an Error. */
@@ -103,6 +134,7 @@ function runBroken() {
     },
   };
   runOriginAgent(agent, broken);
+  agent.onMessage.emit(probe);
   return agent;
 }
 
@@ -118,9 +150,7 @@ async function createApp() {
 
 const capture = { type: "capture", ...operation, chunk: 2 };
 
-const probeReply = { type: "capture-started", ...operation, probe: new Date(0) };
-
-test("captures on a capture command: a probe, each schema, its records in chunks, then the counts", async () => {
+test("captures on a capture command: each schema, its records in chunks, then the counts", async () => {
   await createApp();
   const agent = linked();
   agent.onMessage.emit(capture);
@@ -129,7 +159,7 @@ test("captures on a capture command: a probe, each schema, its records in chunks
   await expect
     .poll(() => agent.posted)
     .toEqual([
-      probeReply,
+      echo,
       {
         type: "capture-database",
         ...operation,
@@ -148,6 +178,6 @@ test("a capture that fails replies failed with the step and an error name", asyn
   agent.onMessage.emit(capture);
   await expect
     .poll(() => agent.posted)
-    .toEqual([probeReply, { type: "failed", ...operation, error: "indexedDB: AbortError" }]);
+    .toEqual([echo, { type: "failed", ...operation, error: "indexedDB: AbortError" }]);
   vi.restoreAllMocks();
 });

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, vi } from "vite-plus/test";
 import { isExpectedAgent, restoreThroughAgent } from "@/background/workspace/agent-link";
-import { fakePort } from "./fake-port";
+import { echoProbes, fakePort } from "./fake-port";
 
 const ORIGIN = "http://app.localhost:5192";
 const EXPECTED = { tabId: 7, documentId: "doc-1", origin: ORIGIN };
@@ -33,9 +33,35 @@ describe("isExpectedAgent", () => {
 });
 
 describe("restoreThroughAgent", () => {
-  test("sends the payload and resolves with the counts of its own operation's reply", async () => {
+  test("probes the link with a Date and sends the payload only once the Date comes back", async () => {
     const port = fakePort(SENDER);
     const restored = restoreThroughAgent(port, OPERATION, PAYLOAD, BOUND);
+    expect(port.posted).toEqual([{ type: "probe", ...reply, probe: new Date(0) }]);
+    // A probe echo of another operation is dropped like any other reply.
+    port.onMessage.emit({ type: "probe-echo", ...reply, generation: 1, probe: new Date(0) });
+    port.onMessage.emit({ type: "probe-echo", ...reply, probe: new Date(0) });
+    await vi.waitFor(() => expect(port.posted).toHaveLength(2));
+    expect(port.posted[1]).toEqual({ type: "restore", ...reply, payload: PAYLOAD });
+    port.onMessage.emit({ type: "restored", ...reply, counts: COUNTS });
+    await expect(restored).resolves.toEqual(COUNTS);
+  });
+
+  test("fails as structured clone unavailable, and never sends the payload, when the probe loses its type", async () => {
+    // Chrome's default JSON messaging turns a Date into its ISO string, silently.
+    for (const probe of [new Date(0).toISOString(), {}, undefined]) {
+      const port = fakePort(SENDER);
+      const restored = restoreThroughAgent(port, OPERATION, PAYLOAD, BOUND);
+      port.onMessage.emit({ type: "probe-echo", ...reply, probe });
+      await expect(restored).rejects.toMatchObject({ name: "StructuredCloneUnavailable" });
+      expect(port.posted).toEqual([{ type: "probe", ...reply, probe: new Date(0) }]);
+      expect(port.onMessage.listeners.size).toBe(0);
+    }
+  });
+
+  test("sends the payload and resolves with the counts of its own operation's reply", async () => {
+    const port = echoProbes(fakePort(SENDER));
+    const restored = restoreThroughAgent(port, OPERATION, PAYLOAD, BOUND);
+    await vi.waitFor(() => expect(port.posted).toHaveLength(1));
     expect(port.posted).toEqual([{ type: "restore", ...reply, payload: PAYLOAD }]);
     // Replies of another operation or generation, and anything malformed, are dropped.
     port.onMessage.emit({ type: "restored", ...reply, operationId: "op-0", counts: COUNTS });

@@ -1,6 +1,10 @@
 import * as v from "valibot";
 import { browser } from "wxt/browser";
-import { ORIGIN_AGENT_PORT, OriginCommandSchema } from "@/messaging/origin-protocol";
+import {
+  ORIGIN_AGENT_PORT,
+  OriginCommandSchema,
+  OriginProbeSchema,
+} from "@/messaging/origin-protocol";
 import type { OriginCommand, OriginPort } from "@/messaging/origin-protocol";
 import { captureOrigin } from "@/origin/capture";
 import { OriginFailure } from "@/origin/failure";
@@ -48,27 +52,42 @@ function run(port: OriginPort, stores: OriginStores, command: OriginCommand): Pr
         records,
       }),
   };
-  // The background checks that this Date arrives as one before it trusts any value.
-  port.postMessage({ type: "capture-started", operationId, generation, probe: new Date(0) });
   return replyAfter(port, command, async () => ({
     type: "captured",
     counts: await captureOrigin(stores.indexedDB, sink, command.chunk),
   }));
 }
 
+/** Calls `next` with the one message that follows, removing itself first. */
+function once(port: OriginPort, next: (message: unknown) => void): void {
+  const listener = (message: unknown) => {
+    port.onMessage.removeListener(listener);
+    next(message);
+  };
+  port.onMessage.addListener(listener);
+}
+
 /**
- * Acts on the first message only: a valid restore or capture runs once, anything else ends the
- * link. Until then the agent touches nothing, which matters since it may run in any page of the
- * origin.
+ * Echoes the background's probe as it arrived, then acts on the next message only: a valid restore
+ * or capture of the probe's operation runs once, anything else ends the link. Until then the agent
+ * touches nothing, which matters since it may run in any page of the origin.
  */
 export function runOriginAgent(port: OriginPort, stores: OriginStores): void {
-  const onCommand = (message: unknown) => {
-    port.onMessage.removeListener(onCommand);
-    const command = v.safeParse(OriginCommandSchema, message);
-    if (command.success) void run(port, stores, command.output);
-    else port.disconnect();
-  };
-  port.onMessage.addListener(onCommand);
+  once(port, (message) => {
+    const probe = v.safeParse(OriginProbeSchema, message);
+    if (!probe.success) return port.disconnect();
+    const { operationId, generation } = probe.output;
+    port.postMessage({ ...probe.output, type: "probe-echo" });
+    once(port, (next) => {
+      const command = v.safeParse(OriginCommandSchema, next);
+      const ours =
+        command.success &&
+        command.output.operationId === operationId &&
+        command.output.generation === generation;
+      if (ours) void run(port, stores, command.output);
+      else port.disconnect();
+    });
+  });
 }
 
 /** The origin agent's content script: registered behind the barrier, or injected for a capture. */

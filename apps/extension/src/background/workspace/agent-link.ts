@@ -104,20 +104,62 @@ function exchange<T>(port: OriginPort, operation: BarrierOperation, talk: Exchan
   });
 }
 
-function failedWith(reply: OriginReply, settle: Settle<never>, what: string): void {
+function failedWith(reply: OriginReply, settle: Settle<never>, what: Ending["what"]): void {
   if (reply.type !== "failed") return;
   const failure = reply.error;
-  const name = what === "restore" ? "RestoreFailed" : "CaptureFailed";
+  const name = what === "capture" ? "CaptureFailed" : "RestoreFailed";
   settle.reject(new WorkspaceError(name, `The page could not ${what} its data (${failure}).`));
 }
 
-/** Sends the payload to a validated agent and waits, at most `boundMs`, for its own answer. */
-export function restoreThroughAgent(
+/** What an operation does, and how its exchanges end when the page fails, goes quiet, or goes. */
+interface Ending extends Pick<Exchange<unknown>, "late" | "gone"> {
+  what: "restore" | "capture";
+}
+
+/**
+ * Sends a `Date` and waits for the agent's echo before any payload goes either way. Without
+ * structured clone, Chrome sends JSON: Dates come back as strings, Blobs as `{}`, silently.
+ */
+function probeLink(
+  port: OriginPort,
+  operation: BarrierOperation,
+  boundMs: number,
+  { what, late, gone }: Ending,
+): Promise<void> {
+  return exchange<void>(port, operation, {
+    command: { type: "probe", probe: new Date(0) },
+    boundMs,
+    idle: false,
+    onReply: (reply, settle) => {
+      if (reply.type !== "probe-echo") return failedWith(reply, settle, what);
+      if (reply.probe instanceof Date) return settle.resolve();
+      settle.reject(
+        new WorkspaceError(
+          "StructuredCloneUnavailable",
+          "Chrome did not keep the page's values intact; this build lacks structured clone messaging.",
+        ),
+      );
+    },
+    late,
+    gone,
+  });
+}
+
+const RESTORE_ENDING: Ending = {
+  what: "restore",
+  late: () => new WorkspaceError("RestoreTimedOut", "The page did not restore its data in time."),
+  gone: () =>
+    new WorkspaceError("AgentDisconnected", "The page closed before its data was restored."),
+};
+
+/** Probes a validated agent, sends it the payload, and waits, at most `boundMs`, for its answer. */
+export async function restoreThroughAgent(
   port: OriginPort,
   operation: BarrierOperation,
   payload: OriginData,
   boundMs: number,
 ): Promise<RestoredCounts> {
+  await probeLink(port, operation, boundMs, RESTORE_ENDING);
   return exchange<RestoredCounts>(port, operation, {
     command: { type: "restore", payload },
     boundMs,
@@ -126,21 +168,9 @@ export function restoreThroughAgent(
       if (reply.type === "restored") settle.resolve(reply.counts);
       else failedWith(reply, settle, "restore");
     },
-    late: () => new WorkspaceError("RestoreTimedOut", "The page did not restore its data in time."),
-    gone: () =>
-      new WorkspaceError("AgentDisconnected", "The page closed before its data was restored."),
+    late: RESTORE_ENDING.late,
+    gone: RESTORE_ENDING.gone,
   });
-}
-
-/** Without structured clone, Chrome sends JSON: Dates become strings and Blobs `{}`, silently. */
-function requireStructuredClone(probe: unknown, settle: Settle<never>): void {
-  if (probe instanceof Date) return;
-  settle.reject(
-    new WorkspaceError(
-      "StructuredCloneUnavailable",
-      "Chrome did not keep the page's values intact; this build lacks structured clone messaging.",
-    ),
-  );
 }
 
 /** Receives a capture's messages as the agent reads them. */
@@ -149,26 +179,32 @@ export interface CaptureReceiver {
   records: (part: Extract<OriginReply, { type: "capture-records" }>) => void;
 }
 
-/** Asks a validated agent for its page's data; each message restarts the `idleMs` bound. */
-export function captureThroughAgent(
+const CAPTURE_ENDING: Ending = {
+  what: "capture",
+  late: () => new WorkspaceError("CaptureTimedOut", "The page stopped sending its data."),
+  gone: () =>
+    new WorkspaceError("AgentDisconnected", "The page closed before its data was captured."),
+};
+
+/** Probes a validated agent and asks it for its page's data; each message restarts `idleMs`. */
+export async function captureThroughAgent(
   port: OriginPort,
   operation: BarrierOperation,
   receiver: CaptureReceiver,
   idleMs: number,
 ): Promise<CapturedCounts> {
+  await probeLink(port, operation, idleMs, CAPTURE_ENDING);
   return exchange<CapturedCounts>(port, operation, {
     command: { type: "capture" },
     boundMs: idleMs,
     idle: true,
     onReply: (reply, settle) => {
-      if (reply.type === "capture-started") requireStructuredClone(reply.probe, settle);
-      else if (reply.type === "capture-database") receiver.database(reply.database);
+      if (reply.type === "capture-database") receiver.database(reply.database);
       else if (reply.type === "capture-records") receiver.records(reply);
       else if (reply.type === "captured") settle.resolve(reply.counts);
       else failedWith(reply, settle, "capture");
     },
-    late: () => new WorkspaceError("CaptureTimedOut", "The page stopped sending its data."),
-    gone: () =>
-      new WorkspaceError("AgentDisconnected", "The page closed before its data was captured."),
+    late: CAPTURE_ENDING.late,
+    gone: CAPTURE_ENDING.gone,
   });
 }

@@ -9,7 +9,7 @@ import { fakeCookieApi } from "./fake-cookies";
 import type { FakeCookieApi } from "./fake-cookies";
 import { fakeNavigationApi } from "./fake-navigation";
 import type { FakeNavigationApi } from "./fake-navigation";
-import { fakePort } from "./fake-port";
+import { echoProbes, fakePort } from "./fake-port";
 
 const ORIGIN = "http://app.localhost:5192";
 const URL_ = `${ORIGIN}/app/redirect?run=1`;
@@ -35,7 +35,7 @@ let records: WorkspaceOperation[];
 let seen: Seen;
 let deps: BootstrapDeps;
 
-/** The origin agent's port: connects on navigation and answers the restore command. */
+/** The origin agent's port: connects on navigation, echoes the probe, and answers the restore. */
 function connectAgent(reply: "restored" | "failed" = "restored") {
   const agent = fakePort({ tab: { id: 9 }, frameId: 0, documentId: "doc-1", origin: ORIGIN });
   agent.postMessage = (message: unknown) => {
@@ -44,6 +44,7 @@ function connectAgent(reply: "restored" | "failed" = "restored") {
     const answer = reply === "restored" ? { counts: COUNTS } : { error: "QuotaExceededError" };
     queueMicrotask(() => agent.onMessage.emit({ type: reply, operationId, generation, ...answer }));
   };
+  echoProbes(agent);
   navigation.onConnect.emit(agent);
   navigation.onCommitted.emit({
     tabId: 9,

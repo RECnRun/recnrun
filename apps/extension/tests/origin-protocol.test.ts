@@ -1,6 +1,10 @@
 import * as v from "valibot";
 import { expect, test } from "vite-plus/test";
-import { OriginCommandSchema, OriginReplySchema } from "@/messaging/origin-protocol";
+import {
+  OriginCommandSchema,
+  OriginProbeSchema,
+  OriginReplySchema,
+} from "@/messaging/origin-protocol";
 
 const payload = { localStorage: { theme: "dark" }, sessionStorage: {}, indexedDB: [] };
 const restore = { type: "restore", operationId: "op-1", generation: 2, payload };
@@ -56,7 +60,6 @@ test("a capture answers each database's schema, its records, and the counts", ()
   const database = { name: "app", version: 3, stores: [store] };
   const records = { database: "app", store: "kv", records: [{ key: 1, value: new Date(0) }] };
   const replies = [
-    { type: "capture-started", ...operation, probe: new Date(0) },
     { type: "capture-database", ...operation, database },
     { type: "capture-records", ...operation, ...records },
     { type: "captured", ...operation, counts: { databases: 1, records: 1 } },
@@ -70,4 +73,19 @@ test("a capture answers each database's schema, its records, and the counts", ()
   ]) {
     expect(v.is(OriginReplySchema, bad), JSON.stringify(bad)).toBe(false);
   }
+});
+
+test("every link opens with a probe of its operation, and the agent echoes it", () => {
+  const operation = { operationId: "op-1", generation: 2 };
+  const probe = { type: "probe", ...operation, probe: new Date(0) };
+  expect(v.parse(OriginProbeSchema, probe).probe).toBeInstanceOf(Date);
+  expect(v.is(OriginReplySchema, { ...probe, type: "probe-echo" })).toBe(true);
+  for (const bad of [
+    { ...probe, type: "restore" },
+    { ...probe, operationId: "" },
+  ]) {
+    expect(v.is(OriginProbeSchema, bad), JSON.stringify(bad)).toBe(false);
+  }
+  // A probe is not a command, so it can never start a restore or a capture.
+  expect(v.is(OriginCommandSchema, probe)).toBe(false);
 });

@@ -39,9 +39,7 @@ async function captureAnswering(replies: object[], setup = chrome(), captures = 
   return { capturing, captures, ...setup };
 }
 
-const STARTED = { type: "capture-started", probe: new Date(0) };
 const completeReplies = [
-  STARTED,
   { type: "capture-database", database: DATABASE },
   { type: "capture-records", database: "app", store: "kv", records: RECORDS },
   { type: "captured", counts: { databases: 1, records: 2 } },
@@ -116,7 +114,9 @@ describe("captureIdentity", () => {
       expect(captures.calls).toEqual([]);
     }
   });
+});
 
+describe("a failed capture", () => {
   test("fails as not connected when the agent does not run or does not connect in time", async () => {
     const refused = chrome();
     refused.api.inject.mockRejectedValue(new Error("Cannot access contents of the page."));
@@ -149,7 +149,7 @@ describe("captureIdentity", () => {
 
   test("discards a capture whose counts do not match what arrived", async () => {
     const short = [
-      ...completeReplies.slice(0, 3),
+      ...completeReplies.slice(0, 2),
       { type: "captured", counts: { databases: 1, records: 3 } },
     ];
     const { capturing, captures } = await captureAnswering(short);
@@ -163,8 +163,8 @@ describe("captureIdentity", () => {
       new DOMException("Quota exceeded.", "QuotaExceededError"),
     );
     const twice = [
-      ...completeReplies.slice(0, 3),
-      completeReplies[2],
+      ...completeReplies.slice(0, 2),
+      completeReplies[1],
       { type: "captured", counts: { databases: 1, records: 4 } },
     ];
     const { capturing } = await captureAnswering(twice as object[], chrome(), captures);
@@ -173,13 +173,20 @@ describe("captureIdentity", () => {
     expect(captures.discard).toHaveBeenCalledOnce();
   });
 
-  test("fails as structured clone unavailable when the probe arrives as anything but a Date", async () => {
+  test("fails as structured clone unavailable, asking for nothing, when the probe comes back as anything but a Date", async () => {
     // Chrome's default JSON messaging turns the probe into its ISO string, and a Blob into {}.
-    const json = [{ ...STARTED, probe: new Date(0).toISOString() }, ...completeReplies.slice(1)];
-    const { capturing, captures, agent } = await captureAnswering(json);
+    const setup = chrome(undefined, (probe) => (probe as Date).toISOString());
+    const captures = memoryCaptures();
+    const capturing = captureIdentity("identity-a", MANAGED, {
+      ...setup,
+      captures,
+      boundMs: BOUND,
+    });
     await expect(capturing).rejects.toMatchObject({ name: "StructuredCloneUnavailable" });
+    expect(setup.agent.probes).toHaveLength(1);
+    expect(setup.agent.posted).toEqual([]);
     expect(captures.calls).toEqual(["begin", "discard"]);
-    expect(agent.disconnected).toBe(true);
+    expect(setup.agent.disconnected).toBe(true);
   });
 
   test("discards the capture when the page goes away or stops sending", async () => {
@@ -191,8 +198,12 @@ describe("captureIdentity", () => {
     vi.useFakeTimers();
     const quiet = { ...chrome(), captures: memoryCaptures() };
     // Awaiting the command itself, since `vi.waitFor` advances fake timers while it polls.
+    const echoing = quiet.agent.postMessage;
     const sent = new Promise<{ operationId: string; generation: number }>((resolve) => {
-      quiet.agent.postMessage = (message) => resolve(message as never);
+      quiet.agent.postMessage = (message) => {
+        echoing(message);
+        if ((message as { type: string }).type === "capture") resolve(message as never);
+      };
     });
     const capturing = captureIdentity("identity-a", MANAGED, { ...quiet, boundMs: BOUND });
     const { operationId, generation } = await sent;
