@@ -1,7 +1,7 @@
 import type { ManagedWindowState } from "@recnrun/domain";
 import { beforeEach, expect, test, vi } from "vite-plus/test";
 import { fakeBrowser } from "wxt/testing/fake-browser";
-import { trackVisitedOrigins } from "@/background/workspace/visited-origins";
+import { trackFocusedWindow, trackVisitedOrigins } from "@/background/workspace/visited-origins";
 import { managedWindowRepository } from "@/storage/managed-window-repository";
 import { visitedOrigins } from "@/storage/visited-origins";
 import { memoryVisits } from "./fake-helper";
@@ -158,5 +158,74 @@ test("Chrome's tracking reads the managed window and the tab's Incognito flag", 
     url: `${APP}/`,
   } as never);
   await vi.waitFor(async () => expect(await visitedOrigins.visited(3)).toEqual([at(APP)]));
+  expect(get).toHaveBeenCalledWith(2);
+});
+
+/** The focus tracker over fakes: windows 5 and 6 are Incognito ones, window 1 a normal one. */
+function focusTracked(managed: ManagedWindowState | null = MANAGED) {
+  const onFocusChanged = fakeEvent<[number]>();
+  const visits = memoryVisits();
+  const state = { managed };
+  const incognitoWindow = vi.fn(async (windowId: number) => [5, 6].includes(windowId));
+  trackFocusedWindow({
+    onFocusChanged,
+    incognitoWindow,
+    managed: async () => state.managed,
+    visits,
+  });
+  const focus = (windowId: number) => onFocusChanged.emit(windowId);
+  return { visits, state, focus, incognitoWindow };
+}
+
+test("keeps the Incognito window that had the focus last, past a normal window and no window", async () => {
+  const { visits, focus, incognitoWindow } = focusTracked();
+  focus(6);
+  await vi.waitFor(() => expect(visits.focus).toEqual({ generation: 3, windowId: 6 }));
+  // Clicking into the dashboard focuses a normal window, or none while Chrome is in the background.
+  focus(1);
+  focus(-1);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(visits.noteFocus.mock.calls).toEqual([[3, 6]]);
+  expect(incognitoWindow.mock.calls).toEqual([[6], [1]]);
+});
+
+test("notes no focus while no identity's window is open", async () => {
+  const { visits, state, focus } = focusTracked({ ...MANAGED, status: "closed" });
+  focus(5);
+  state.managed = null;
+  focus(6);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(visits.noteFocus).not.toHaveBeenCalled();
+});
+
+test("keeps one focused window per generation beside the visits", async () => {
+  expect(await visitedOrigins.focusedWindow(7)).toBeUndefined();
+  await visitedOrigins.note(7, [at(APP)]);
+  await visitedOrigins.noteFocus(7, 12);
+  await visitedOrigins.noteFocus(7, 14);
+  expect(await visitedOrigins.focusedWindow(7)).toBe(14);
+  expect(await visitedOrigins.visited(7)).toEqual([at(APP)]);
+  expect(await visitedOrigins.focusedWindow(8)).toBeUndefined();
+  await visitedOrigins.noteFocus(8, 20);
+  expect(await visitedOrigins.focusedWindow(7)).toBeUndefined();
+  expect(await visitedOrigins.visited(8)).toEqual([]);
+});
+
+test("Chrome's focus tracking reads the managed window and the window's Incognito flag", async () => {
+  await managedWindowRepository.update(() => MANAGED);
+  // fakeBrowser implements no in-memory onFocusChanged.
+  const focus = fakeEvent<[number]>();
+  vi.spyOn(fakeBrowser.windows.onFocusChanged, "addListener").mockImplementation(
+    focus.addListener as never,
+  );
+  const get = vi.spyOn(fakeBrowser.windows, "get");
+  get.mockImplementation((async (windowId: number) => {
+    if (windowId === 5) return { id: 5, incognito: true };
+    throw new Error("No window with id.");
+  }) as never);
+  trackFocusedWindow();
+  focus.emit(2);
+  focus.emit(5);
+  await vi.waitFor(async () => expect(await visitedOrigins.focusedWindow(3)).toBe(5));
   expect(get).toHaveBeenCalledWith(2);
 });

@@ -26,7 +26,10 @@ export interface CaptureDeps {
   >;
   cookies: Pick<CookieApi, "stores" | "normalTabIds" | "all">;
   /** The other origins the session visited, each tab's own, and the helper tab they load in. */
-  origins: { visits: Pick<VisitedOrigins, "visited" | "tabVisits">; helper: HelperDeps };
+  origins: {
+    visits: Pick<VisitedOrigins, "visited" | "tabVisits" | "focusedWindow">;
+    helper: HelperDeps;
+  };
   boundMs?: number;
   /** Set when the session's windows close after the capture, so the tabs it moved stay as they are. */
   closing?: boolean;
@@ -241,6 +244,12 @@ async function captureThrough(
 const boundOf = (deps: CaptureDeps) => deps.boundMs ?? CAPTURE_BOUND_MS;
 const since = (began: number) => Math.round(performance.now() - began);
 
+/** The session's tabs, the window that had the focus last marked focused when none has it now. */
+async function sessionTabsOf(deps: CaptureDeps, managed: ManagedWindowState) {
+  const lastFocused = await deps.origins.visits.focusedWindow(managed.generation);
+  return findSessionTabs(deps.api, managed.tabId, lastFocused);
+}
+
 /**
  * Captures the session's primary tab in full, every other origin it visited, every other tab's
  * sessionStorage and place, and the cookies as `identityId`'s saved data; `operationId` names the helper tab's barriers, so a restart's
@@ -253,7 +262,7 @@ export async function captureIdentity(
   operationId: string = crypto.randomUUID(),
 ): Promise<CaptureSummary> {
   const began = performance.now();
-  const found = await findSessionTabs(deps.api, managed.tabId);
+  const found = await sessionTabsOf(deps, managed);
   const target = await targetOf(deps, found.primary);
   const port = await connectAgent(deps.api, target, boundOf(deps));
   const started = startedHeader(identityId, target);

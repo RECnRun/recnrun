@@ -31,6 +31,7 @@ const VisitedSchema = v.object({
   visits: v.array(VisitSchema),
   // Optional, so a list stored before tabs were tracked still reads.
   tabs: v.optional(v.array(TabVisitsSchema), []),
+  focused: v.optional(v.pipe(v.number(), v.integer())),
 });
 
 type Visited = v.InferOutput<typeof VisitedSchema>;
@@ -108,5 +109,20 @@ async function tabVisits(generation: number): Promise<TabVisits[]> {
   return current?.generation === generation ? current.tabs : [];
 }
 
+const noteFocus: VisitedOrigins["noteFocus"] = (generation, windowId) =>
+  change(generation, (current) => ({ ...current, focused: windowId }));
+
+async function focusedWindow(generation: number): Promise<number | undefined> {
+  const current = await read();
+  return current?.generation === generation ? current.focused : undefined;
+}
+
 /** The origins each managed window visited, validated like every stored value. */
-export const visitedOrigins: VisitedOrigins = { note, visited, noteTab, tabVisits };
+export const visitedOrigins: VisitedOrigins = {
+  note,
+  visited,
+  noteTab,
+  tabVisits,
+  noteFocus,
+  focusedWindow,
+};

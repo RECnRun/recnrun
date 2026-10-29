@@ -50,17 +50,28 @@ async function webTabsOf(api: TabReadApi, window: SessionWindow, at: number, lef
   return tabs;
 }
 
+/** The window Chrome reports focused, else the one noted focused last while it is still open. */
+function focusedOf(all: readonly SessionWindow[], lastFocused: number | undefined) {
+  return all.find(({ focused }) => focused)?.id ?? lastFocused;
+}
+
 /**
  * Every web tab of the session in order, and the one a capture reads in full: the managed tab while
- * it is open, else the focused window's active tab, else the first.
+ * it is open, else the focused window's active tab, else the first. `lastFocused` is the Incognito
+ * window that had the focus last, since the dashboard holds it when the user asks to save.
  */
-export async function findSessionTabs(api: TabReadApi, managedTabId: number): Promise<SessionTabs> {
+export async function findSessionTabs(
+  api: TabReadApi,
+  managedTabId: number,
+  lastFocused?: number,
+): Promise<SessionTabs> {
   const unsupported: Unsupported[] = [];
   const windows: SessionTabs["windows"] = [];
   const all = await api.windows();
+  const focusedId = focusedOf(all, lastFocused);
   for (const [at, window] of all.entries()) {
     const tabs = await webTabsOf(api, window, at, unsupported);
-    if (tabs.length > 0) windows.push({ focused: window.focused, tabs });
+    if (tabs.length > 0) windows.push({ focused: window.id === focusedId, tabs });
   }
   const web = windows.flatMap(({ tabs }) => tabs);
   const focused = windows.find(({ focused: has }) => has)?.tabs.find(({ active }) => active);

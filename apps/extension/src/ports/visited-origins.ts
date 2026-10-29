@@ -42,4 +42,8 @@ export interface VisitedOrigins {
   ) => Promise<void>;
   /** Each tab's visits in `generation`; none when the lists belong to another generation. */
   tabVisits: (generation: number) => Promise<TabVisits[]>;
+  /** Keeps `windowId` as the Incognito window of `generation` that had the focus last. */
+  noteFocus: (generation: number, windowId: number) => Promise<void>;
+  /** The Incognito window of `generation` that had the focus last, if one did. */
+  focusedWindow: (generation: number) => Promise<number | undefined>;
 }

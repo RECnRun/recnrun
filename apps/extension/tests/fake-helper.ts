@@ -64,6 +64,13 @@ export function memoryVisits(generation = 0, initial: Visit[] = [], tabs: TabVis
     tabVisits: vi.fn(async (asked: number) =>
       visits.tabs.generation === asked ? [...visits.tabs.tabs] : [],
     ),
+    focus: { generation, windowId: undefined as number | undefined },
+    noteFocus: vi.fn(async (noted: number, windowId: number) => {
+      visits.focus = { generation: noted, windowId };
+    }),
+    focusedWindow: vi.fn(async (asked: number) =>
+      visits.focus.generation === asked ? visits.focus.windowId : undefined,
+    ),
   };
   return visits satisfies VisitedOrigins;
 }

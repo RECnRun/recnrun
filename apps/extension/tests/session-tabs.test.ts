@@ -123,6 +123,18 @@ test("reads the managed tab in full while it is open, else the focused window's 
   });
 });
 
+test("marks the Incognito window focused last when Chrome reports none focused, else Chrome's", async () => {
+  const unfocused = TWO_WINDOWS.map((window) => ({ ...window, focused: false }));
+  const last = await findSessionTabs(sessionChrome(unfocused, FRAMES), 10, 2);
+  expect(last.windows.map(({ focused }) => focused)).toEqual([false, true]);
+  // The window Chrome reports focused now wins over the one noted before.
+  const now = await findSessionTabs(sessionChrome(TWO_WINDOWS, FRAMES), 10, 1);
+  expect(now.windows.map(({ focused }) => focused)).toEqual([false, true]);
+  // A window noted but closed since leaves the layout unfocused, as before.
+  const gone = await findSessionTabs(sessionChrome(unfocused, FRAMES), 10, 9);
+  expect(gone.windows.map(({ focused }) => focused)).toEqual([false, false]);
+});
+
 test("lays out every web tab, each other tab with its own sessionStorage, the primary one without", async () => {
   const api = sessionChrome(TWO_WINDOWS, FRAMES, { 11: { tab: "second" }, 20: {} });
   const found = await findSessionTabs(api, 10);

@@ -66,3 +66,43 @@ function chromeVisitTracking(): VisitTracking {
     visits: visitedOrigins,
   };
 }
+
+/** What tracking the focus needs from Chrome and storage; tests replace each. */
+export interface FocusTracking {
+  onFocusChanged: { addListener: (listener: (windowId: number) => void) => void };
+  /** Whether the window is an Incognito one; false for a window Chrome no longer knows. */
+  incognitoWindow: (windowId: number) => Promise<boolean>;
+  managed: () => Promise<ManagedWindowState | null>;
+  visits: Pick<VisitedOrigins, "noteFocus">;
+}
+
+async function noteFocus(tracking: FocusTracking, windowId: number): Promise<void> {
+  const managed = await tracking.managed();
+  if (managed?.status !== "active") return;
+  if (!(await tracking.incognitoWindow(windowId))) return;
+  await tracking.visits.noteFocus(managed.generation, windowId);
+}
+
+/**
+ * Notes the Incognito window that takes the focus while the managed window is open, so a capture
+ * saves it as focused though the dashboard holds the focus then; a failure is logged as unhandled.
+ */
+export function trackFocusedWindow(tracking: FocusTracking = chromeFocusTracking()): void {
+  tracking.onFocusChanged.addListener((windowId) => {
+    // No window has the focus while Chrome is in the background.
+    if (windowId !== browser.windows.WINDOW_ID_NONE) void noteFocus(tracking, windowId);
+  });
+}
+
+/** Chrome's focus events and windows, the managed window's state, and the session list. */
+function chromeFocusTracking(): FocusTracking {
+  return {
+    onFocusChanged: browser.windows.onFocusChanged,
+    incognitoWindow: async (windowId) => {
+      const window = await browser.windows.get(windowId).catch(() => undefined);
+      return window?.incognito === true;
+    },
+    managed: managedWindowRepository.read,
+    visits: visitedOrigins,
+  };
+}

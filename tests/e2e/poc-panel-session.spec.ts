@@ -6,7 +6,7 @@ import { incognitoLayout, shapeOf, tabSession, writeTabSession } from "./fixture
 import { nextPageAt } from "./fixtures/lifecycle.ts";
 import { askBeforeLeaving, newIdentity, opened, switchTo } from "./fixtures/panel.ts";
 import { openSite } from "./fixtures/session.ts";
-import { openIncognitoTab, openTabIn } from "./fixtures/tabs.ts";
+import { chromeTabs, focusTab, openIncognitoTab, openTabIn } from "./fixtures/tabs.ts";
 import { APP, managedWindow, pageAt } from "./fixtures/workspace.ts";
 
 test.use({ incognitoAccess: true, viewport: { width: 1280, height: 1400 } });
@@ -19,6 +19,13 @@ const THIRD = `${OTHER}/blank?tab=third`;
 /** Saves what the dashboard shows next to the test's results, for a person to look at. */
 const screen = (site: Page, name: string) =>
   site.screenshot({ path: test.info().outputPath(`${name}.png`) });
+
+/** Focuses the dashboard's normal window, as a click there does for a person. */
+async function focusDashboard(serviceWorker: Worker, site: Page) {
+  const dashboard = (await chromeTabs(serviceWorker)).find(({ url }) => url === site.url());
+  if (dashboard?.id === undefined) throw new Error("No normal tab is open.");
+  await focusTab(serviceWorker, dashboard.id);
+}
 
 /** Opens A through the panel with two tabs in one window, a third in another, and storage in each. */
 async function openA(context: BrowserContext, serviceWorker: Worker, site: Page) {
@@ -66,6 +73,8 @@ test("the panel alone saves A's tabs, windows, and each tab's storage, and bring
   ]);
   await screen(site, "1-a-open");
 
+  // THIRD's window had the focus last in A; the dashboard holds it when the user saves.
+  await focusDashboard(serviceWorker, site);
   await newIdentity(site, BLANK);
   await opened(site, "B");
   const b = await nextPageAt(context, BLANK, main);
@@ -78,9 +87,9 @@ test("the panel alone saves A's tabs, windows, and each tab's storage, and bring
 
   await switchTo(site, "A");
   await opened(site, "A");
-  // The dashboard held the focus when A was saved, so no Incognito window's focus was there to keep.
-  const tabsOf = async () => shapeOf(await incognitoLayout(serviceWorker)).map(({ tabs }) => tabs);
-  await expect.poll(tabsOf).toEqual(saved.map(({ tabs }) => tabs));
+  // The window focused last in A has the focus again, with its active tab.
+  const back = saved.map(({ tabs }, at) => ({ focused: at === 1, tabs }));
+  await expect.poll(async () => shapeOf(await incognitoLayout(serviceWorker))).toEqual(back);
   await expectStorageBack(context);
   expect(dialogs).toEqual([]);
   expect(await incognitoWindows(serviceWorker)).toBe(2);
