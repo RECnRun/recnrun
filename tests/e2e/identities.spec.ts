@@ -42,7 +42,7 @@ async function opened(site: Page, label: string) {
 /** Creates an identity from the panel at the blank page; RECnRun names it `label`, the next letter. */
 async function newIdentity(site: Page, label: string) {
   const panel = workspacePanel(site);
-  await panel.getByRole("textbox", { name: "Address" }).fill(BLANK);
+  await panel.getByRole("combobox", { name: "Address" }).fill(BLANK);
   await clickInDashboard(panel.getByRole("button", { name: "New identity", exact: true }));
   await opened(site, label);
 }

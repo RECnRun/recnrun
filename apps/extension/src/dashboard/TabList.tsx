@@ -1,4 +1,4 @@
-import { errorMessage, isAllowedTarget } from "@recnrun/domain";
+import { errorMessage } from "@recnrun/domain";
 import { useState } from "preact/hooks";
 import type { RecordingStore } from "@/ports/recording-store";
 import type { OpenTab, TabSource } from "@/ports/tabs";
@@ -24,8 +24,6 @@ interface TabListProps {
   take: TakeControl;
   /** The managed Incognito tab, the only one a session may start on; absent while none is open. */
   recordable?: number;
-  /** Fills the Incognito workspace's address; absent while the workspace cannot start. */
-  onAddress?: (url: string) => void;
 }
 
 interface TabProps {
@@ -36,7 +34,6 @@ interface TabProps {
   /** Whether this tab is the managed one, so it may start a session. */
   recordable: boolean;
   take: () => void;
-  onAddress?: (url: string) => void;
 }
 
 /**
@@ -71,17 +68,7 @@ function SessionControls({
   );
 }
 
-/** Only a normal tab's address, never its cookies or storage, can seed the Incognito workspace. */
-function AddressButton({ tab, onAddress }: Pick<TabProps, "tab" | "onAddress">) {
-  if (!onAddress || tab.incognito || !isAllowedTarget(tab.url)) return null;
-  return (
-    <button type="button" onClick={() => onAddress(tab.url)}>
-      Use this tab's address
-    </button>
-  );
-}
-
-function TabItem({ tab, recording, controlled, recordable, take, onAddress }: TabProps) {
+function TabItem({ tab, recording, controlled, recordable, take }: TabProps) {
   const recorded = recording.status !== "idle" && recording.tabId === tab.id;
   const idle = recordable && recording.loaded && recording.status === "idle" && !controlled;
   return (
@@ -94,7 +81,6 @@ function TabItem({ tab, recording, controlled, recordable, take, onAddress }: Ta
             Record
           </button>
         )}
-        <AddressButton tab={tab} onAddress={onAddress} />
       </div>
     </li>
   );
@@ -114,7 +100,7 @@ function ClosedTabItem({ recording, controlled }: Omit<TabProps, "tab" | "take" 
 }
 
 /** Every open tab; with no session the managed one can start one, and the recorded tab shows it. */
-export function TabList({ tabs, store, take, recordable, onAddress }: TabListProps) {
+export function TabList({ tabs, store, take, recordable }: TabListProps) {
   const openTabs = useBrowserTabs(tabs)?.tabs;
   const recording = useRecording(store);
   const controlled = useLockHeld(CONTROL_LOCK);
@@ -139,7 +125,6 @@ export function TabList({ tabs, store, take, recordable, onAddress }: TabListPro
             controlled={controlled}
             recordable={tab.id === recordable}
             take={takeOn(tab.id)}
-            onAddress={onAddress}
           />
         ))}
         {closed && <ClosedTabItem recording={recording} controlled={controlled} />}

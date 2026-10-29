@@ -1,8 +1,8 @@
 /**
  * What every build asks for. The recorder: `tabs` lists the tabs to record, `storage` keeps the
  * recordings. The Incognito workspace: tab-scoped session rules for the bootstrap barrier, the
- * runtime-registered origin agent, the managed tab's cookie store, the bootstrap commit, and room
- * for identity captures past the default extension quota.
+ * runtime-registered origin agent, the managed tab's cookie store, the bootstrap commit, room for
+ * identity captures past the default extension quota, and history for the Address suggestions.
  */
 const PERMISSIONS = [
   "storage",
@@ -12,6 +12,7 @@ const PERMISSIONS = [
   "cookies",
   "webNavigation",
   "unlimitedStorage",
+  "history",
 ];
 
 /**

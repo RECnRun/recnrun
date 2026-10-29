@@ -1,4 +1,5 @@
 import { browser } from "wxt/browser";
+import { browserHistory } from "@/dashboard/browser-history";
 import { browserIncognito } from "@/dashboard/incognito-access";
 import { holdSitePorts } from "@/dashboard/site-ports";
 import { startDashboard } from "@/dashboard/start";
@@ -18,6 +19,7 @@ if (root) {
     recordings: recordingSessionRepository,
     tabs: browserTabs(),
     incognito: browserIncognito,
+    history: browserHistory,
     operations: operationJournal,
     holdSitePorts,
     send: (request) => browser.runtime.sendMessage(request),

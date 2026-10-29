@@ -2,7 +2,6 @@ import { expect, test } from "vite-plus/test";
 import type { PageRequest } from "@/views/extension-services";
 import { NO_INCOGNITO_WINDOW } from "./fake-extension";
 import { identity } from "./fake-lifecycle";
-import { SHOP } from "./fake-tabs";
 import { button } from "./queries";
 import {
   alertText,
@@ -36,7 +35,6 @@ test("without access, the panel states the requirement and offers no New identit
   expect(root.textContent).toContain("Enable Incognito Mode");
   expect(inPanel(root, "New identity")).toBeUndefined();
   expect(panel(root)?.querySelector("input")).toBeNull();
-  expect(button(root, "Use this tab's address")).toBeUndefined();
 });
 
 test("with site access withheld, the panel says where to restore it and offers only Delete", async () => {
@@ -51,7 +49,6 @@ test("with site access withheld, the panel says where to restore it and offers o
       "RECnRun saves every site's cookies with an identity, so it needs Site access “On all sites”.",
     );
   expect(panel(root)?.querySelector("input")).toBeNull();
-  expect(button(root, "Use this tab's address")).toBeUndefined();
   expect(enabledButtons(root)).toEqual(["Open RECnRun's details", "Delete"]);
   expect(button(row(root, "A"), "Switch to")?.disabled).toBe(true);
   inPanel(root, "Open RECnRun's details")?.click();
@@ -79,7 +76,9 @@ test("the panel offers only the address and New identity, which sends no label",
   await expect.poll(() => inPanel(root, "New identity")).toBeDefined();
   expect(enabledButtons(root)).toEqual(["New identity"]);
   expect(panel(root)?.querySelectorAll("input")).toHaveLength(1);
-  expect(panelText(root)).toContain("Saves the open identity first, then opens the address empty.");
+  expect(panelText(root)).toContain(
+    "New identity saves the open identity first, then opens the address empty.",
+  );
   await typeAddress(root, TARGET);
   const before = reads();
   inPanel(root, "New identity")?.click();
@@ -202,13 +201,4 @@ test("a failed start with an identity is an alert naming its step as soon as it 
   await expect
     .poll(() => alertText(root))
     .toEqual([`Start with an identity failed at the restore step. ${error}`]);
-});
-
-test("Use this tab's address fills the address from normal tabs only, without their data", async () => {
-  const { root } = mount(NO_INCOGNITO_WINDOW);
-  await expect.poll(() => button(row(root, "Shop"), "Use this tab's address")).toBeDefined();
-  expect(button(row(root, "Private"), "Use this tab's address")).toBeUndefined();
-  expect(panelText(root)).toContain("never its cookies or storage");
-  button(row(root, "Shop"), "Use this tab's address")?.click();
-  await expect.poll(() => panel(root)?.querySelector("input")?.value).toBe(SHOP.url);
 });

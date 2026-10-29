@@ -24,9 +24,7 @@ test.describe("without incognito access", () => {
     const panel = workspacePanel(site);
     await expect(panel).toContainText("The Incognito workspace requires “Allow in Incognito”.");
     await expect(panel.getByRole("button")).toHaveCount(0);
-    await expect(
-      dashboardOf(site).getByRole("button", { name: "Use this tab's address" }),
-    ).toHaveCount(0);
+    await expect(panel.getByRole("combobox", { name: "Address" })).toHaveCount(0);
     await screen(site, "no-access");
   });
 });
@@ -121,21 +119,29 @@ test.describe("with incognito access", () => {
     await screen(site, "refused");
   });
 
-  test("Use this tab's address copies a normal tab's address into the panel", async ({
+  test("Address suggests a normal tab and a visited page, and New identity opens the pick", async ({
     context,
     page,
+    serviceWorker,
   }) => {
-    await page.goto(`${APP}/inspect?run=address`);
+    const visited = `${APP}/inspect?run=suggest-visited`;
+    const open = `${APP}/inspect?run=suggest-open`;
+    await page.goto(visited);
+    await page.goto(open);
     const site = await openSite(context, "/");
-    const row = dashboardOf(site)
-      .getByRole("complementary", { name: "Tabs" })
-      .getByRole("listitem")
-      .filter({ hasText: `${APP}/inspect?run=address` });
-    await clickInDashboard(row.getByRole("button", { name: "Use this tab's address" }));
-    await expect(workspacePanel(site).getByRole("textbox", { name: "Address" })).toHaveValue(
-      `${APP}/inspect?run=address`,
-    );
-    await expect(workspacePanel(site)).toContainText("never its cookies or storage");
-    await screen(site, "address");
+    const panel = workspacePanel(site);
+    const address = panel.getByRole("combobox", { name: "Address" });
+    await address.fill("run=suggest");
+    const options = panel.getByRole("listbox", { name: "Address suggestions" }).getByRole("option");
+    await expect(options.filter({ hasText: open })).toContainText("Open tab");
+    await expect(options.filter({ hasText: visited })).toContainText("History");
+    await expect(panel).toContainText("never cookies or storage");
+    await screen(site, "address-suggestions");
+
+    await clickInDashboard(options.filter({ hasText: visited }));
+    await expect(address).toHaveValue(visited);
+    await expect(options).toHaveCount(0);
+    await clickInDashboard(panel.getByRole("button", { name: "New identity", exact: true }));
+    await expect.poll(() => incognitoUrls(serviceWorker)).toEqual([visited]);
   });
 });

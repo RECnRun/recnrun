@@ -19,7 +19,7 @@ const identity = (site: Page, label: string) =>
 /** Fills the panel's address with the SSO app of `run` and returns New identity. */
 async function fillNew(site: Page, run: string) {
   const panel = workspacePanel(site);
-  await panel.getByRole("textbox", { name: "Address" }).fill(ssoAppUrl(run));
+  await panel.getByRole("combobox", { name: "Address" }).fill(ssoAppUrl(run));
   return panel.getByRole("button", { name: "New identity", exact: true });
 }
 

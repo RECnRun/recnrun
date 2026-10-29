@@ -39,11 +39,9 @@ const onMessage = (event: MessageEvent) => posted.push(event.data);
 
 const item = (root: HTMLElement, title: string) =>
   root.querySelector<HTMLElement>(`li[aria-label="${title}"]`) ?? undefined;
-/** The session's buttons; the address button belongs to the Incognito workspace's tests. */
+/** The session's buttons. */
 const buttons = (scope: HTMLElement | undefined) =>
-  [...(scope?.querySelectorAll("button") ?? [])]
-    .map((each) => each.textContent)
-    .filter((name) => name !== "Use this tab's address");
+  [...(scope?.querySelectorAll("button") ?? [])].map((each) => each.textContent);
 const alertText = (root: HTMLElement) => root.querySelector('[role="alert"]')?.textContent;
 /** Waits until no dashboard holds the control lock, which each test leaves free. */
 async function expectControlFree() {

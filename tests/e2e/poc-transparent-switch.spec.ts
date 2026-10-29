@@ -38,7 +38,7 @@ async function opened(site: Page, label: string) {
 /** Types `url` in the panel's Address and clicks New identity, as the user would. */
 async function newIdentity(site: Page, url: string) {
   const panel = workspacePanel(site);
-  await panel.getByRole("textbox", { name: "Address" }).fill(url);
+  await panel.getByRole("combobox", { name: "Address" }).fill(url);
   await clickInDashboard(panel.getByRole("button", { name: "New identity", exact: true }));
 }
 

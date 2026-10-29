@@ -13,6 +13,7 @@ test("every build asks for the recorder's and the workspace's permissions and ev
       "cookies",
       "webNavigation",
       "unlimitedStorage",
+      "history",
     ],
     host_permissions: ["http://*/*", "https://*/*"],
     message_serialization: "structured_clone",

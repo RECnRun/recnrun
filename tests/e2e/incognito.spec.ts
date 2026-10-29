@@ -66,8 +66,8 @@ test.describe("with incognito access", () => {
     expect(await recordedTabId(serviceWorker)).toBeNull();
 
     const normal = tabItem(dashboardOf(site), site.url());
-    await expect(normal.getByRole("button", { name: "Use this tab's address" })).toBeVisible();
-    await expect(normal.getByRole("button", { name: "Record" })).toHaveCount(0);
+    await expect(normal).toBeVisible();
+    await expect(normal.getByRole("button")).toHaveCount(0);
     const foreignUrl = `${APP}/inspect?run=foreign`;
     await openIncognitoTab(serviceWorker, foreignUrl);
     const foreign = tabItem(dashboardOf(site), foreignUrl);

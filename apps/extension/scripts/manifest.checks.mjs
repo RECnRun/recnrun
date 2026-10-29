@@ -59,6 +59,7 @@ const PERMISSIONS = [
   "cookies",
   "webNavigation",
   "unlimitedStorage",
+  "history",
 ];
 
 await test("the production build requests the recorder's and the Incognito workspace's permissions", () => {

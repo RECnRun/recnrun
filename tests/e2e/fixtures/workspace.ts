@@ -31,7 +31,7 @@ export function managedWindow(serviceWorker: Worker): Promise<ManagedWindow | nu
 /** Types the address in the dashboard's workspace panel and clicks one of its buttons. */
 export async function runWorkspace(site: Page, url: string, action: string): Promise<void> {
   const panel = workspacePanel(site);
-  await panel.getByRole("textbox", { name: "Address" }).fill(url);
+  await panel.getByRole("combobox", { name: "Address" }).fill(url);
   await clickInDashboard(panel.getByRole("button", { name: action, exact: true }));
 }
 

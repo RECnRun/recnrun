@@ -1,6 +1,7 @@
 import { errorMessage } from "@recnrun/domain";
 import { useEffect, useRef, useState } from "preact/hooks";
 import * as v from "valibot";
+import { AddressField } from "@/dashboard/AddressField";
 import { ask } from "@/dashboard/ask";
 import { Identities } from "@/dashboard/Identities";
 import { panelAlert } from "@/dashboard/workspace-alert";
@@ -8,7 +9,8 @@ import type { CommandFailure, PanelRequest } from "@/dashboard/workspace-alert";
 import { WorkspaceConflict, hasConflict } from "@/dashboard/WorkspaceConflict";
 import { WorkspaceStatusSchema } from "@/messaging/workspace-protocol";
 import type { WorkspaceStatus } from "@/messaging/workspace-protocol";
-import type { TabSource } from "@/ports/tabs";
+import type { HistorySource } from "@/ports/history";
+import type { OpenTab, TabSource } from "@/ports/tabs";
 import { coalesceReads } from "@/views/coalesce-reads";
 import type { ExtensionServices, SendRequest } from "@/views/extension-services";
 import { useBrowserTabs } from "@/views/use-browser-tabs";
@@ -77,9 +79,7 @@ interface WorkspaceProps {
   send: SendRequest;
   /** Opens RECnRun's details in chrome://extensions, where Site access is. */
   openDetails: () => Promise<void>;
-  /** The address the workspace opens, which a normal tab in the list may also supply. */
-  target: string;
-  onTarget: (url: string) => void;
+  history: HistorySource;
 }
 
 interface CommandProps {
@@ -87,34 +87,40 @@ interface CommandProps {
   run: (request: PanelRequest) => void;
 }
 
-function NewIdentity({
-  target,
-  onTarget,
-  disabled,
-  run,
-}: Pick<WorkspaceProps, "target" | "onTarget"> & CommandProps) {
+interface NewIdentityProps extends CommandProps {
+  history: HistorySource;
+  tabs: readonly OpenTab[];
+  status: WorkspaceStatus;
+}
+
+function NewIdentity({ history, tabs, status, disabled, run }: NewIdentityProps) {
+  const [target, setTarget] = useState("");
   return (
     <div class="new-identity">
-      <label class="workspace-address">
-        Address
-        <input
-          type="url"
+      {/* The button sits beside the field, so the suggestions below it never cover the button. */}
+      <div class="address-row">
+        <AddressField
           value={target}
-          placeholder="https://"
-          onInput={(event) => onTarget(event.currentTarget.value)}
+          onValue={setTarget}
+          history={history}
+          tabs={tabs}
+          identities={status.identities}
         />
-      </label>
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => run({ type: "workspace-new-identity", url: target.trim() })}
+        >
+          New identity
+        </button>
+      </div>
       <p class="workspace-hint">
-        “Use this tab's address” copies only a normal tab's address, never its cookies or storage.
+        Suggestions come from your normal tabs, saved identities, and history; only the address is
+        copied, never cookies or storage.
       </p>
-      <button
-        type="button"
-        disabled={disabled}
-        onClick={() => run({ type: "workspace-new-identity", url: target.trim() })}
-      >
-        New identity
-      </button>
-      <p class="workspace-hint">Saves the open identity first, then opens the address empty.</p>
+      <p class="workspace-hint">
+        New identity saves the open identity first, then opens the address empty.
+      </p>
     </div>
   );
 }
@@ -150,11 +156,11 @@ function Requirements({
   );
 }
 
-type BodyProps = Pick<WorkspaceProps, "tabs" | "target" | "onTarget"> &
+type BodyProps = Pick<WorkspaceProps, "tabs" | "history"> &
   CommandProps & { status: WorkspaceStatus; openDetails: () => void };
 
 function WorkspaceBody(props: BodyProps) {
-  const { status, tabs, target, onTarget, disabled, run, openDetails } = props;
+  const { status, tabs, history, disabled, run, openDetails } = props;
   const open = useBrowserTabs(tabs)?.tabs ?? [];
   const granted = status.access && status.siteAccess;
   // Chrome hides Incognito windows without access, so only Delete stays possible then.
@@ -163,7 +169,13 @@ function WorkspaceBody(props: BodyProps) {
     <>
       <Requirements status={status} openDetails={openDetails} />
       {granted && (
-        <NewIdentity target={target} onTarget={onTarget} disabled={disabled || blocked} run={run} />
+        <NewIdentity
+          history={history}
+          tabs={open}
+          status={status}
+          disabled={disabled || blocked}
+          run={run}
+        />
       )}
       {granted && blocked && (
         <WorkspaceConflict status={status} tabs={open} disabled={disabled} run={run} />
@@ -178,7 +190,7 @@ function WorkspaceBody(props: BodyProps) {
  * command reads the status again when it ends, refused or not.
  */
 export function IncognitoWorkspace(props: WorkspaceProps) {
-  const { workspace, tabs, send, target, onTarget, openDetails } = props;
+  const { workspace, tabs, send, history, openDetails } = props;
   const { status, readError, refresh } = workspace;
   const [pending, setPending] = useState(false);
   const [failure, setFailure] = useState<CommandFailure>();
@@ -212,8 +224,7 @@ export function IncognitoWorkspace(props: WorkspaceProps) {
         <WorkspaceBody
           status={status}
           tabs={tabs}
-          target={target}
-          onTarget={onTarget}
+          history={history}
           disabled={pending || status.busy}
           run={run}
           openDetails={details}

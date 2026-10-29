@@ -6,6 +6,7 @@ import type { WorkspaceStatus } from "@/messaging/workspace-protocol";
 import type { OpenTab } from "@/ports/tabs";
 import type { PageRequest } from "@/views/extension-services";
 import { fakeBackground, fakeExtension } from "./fake-extension";
+import { fakeHistory } from "./fake-history";
 import { memoryOperationJournal } from "./fake-journal";
 import { PRIVATE, SHOP, fakeIncognito, fakeTabs } from "./fake-tabs";
 import { button } from "./queries";
@@ -33,6 +34,7 @@ export function mount(
   initial: WorkspaceStatus,
   answer: Answer = () => undefined,
   tabs: OpenTab[] = [SHOP, PRIVATE],
+  history = fakeHistory(),
 ) {
   let status = initial;
   let reads = 0;
@@ -48,6 +50,7 @@ export function mount(
     operations,
     incognito: incognito.access,
     tabs: fakeTabs({ tabs }).source,
+    history: history.source,
   });
   const root = document.createElement("div");
   document.body.replaceChildren(root);

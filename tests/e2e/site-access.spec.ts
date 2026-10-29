@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures/extension.ts";
-import { clickInDashboard, dashboardOf, openSite } from "./fixtures/session.ts";
+import { clickInDashboard, openSite } from "./fixtures/session.ts";
 import { workspacePanel } from "./fixtures/workspace.ts";
 
 test.use({ incognitoAccess: true });
@@ -30,10 +30,8 @@ test("withheld Site access hides New identity and leads to RECnRun's details, un
   // The details page stays in front: only Chrome's permissions event can bring the change in.
   await expect(panel).toContainText(NOTICE);
   await expect(newIdentity).toHaveCount(0);
+  await expect(panel.getByRole("combobox", { name: "Address" })).toHaveCount(0);
   await site.bringToFront();
-  await expect(
-    dashboardOf(site).getByRole("button", { name: "Use this tab's address" }),
-  ).toHaveCount(0);
   await site.screenshot({ path: test.info().outputPath("site-access-withheld.png") });
 
   const [opened] = await Promise.all([
