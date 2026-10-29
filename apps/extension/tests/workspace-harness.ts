@@ -63,8 +63,15 @@ export function manageTab(tabId: number, windowId = 1) {
 export const RECORDING_FIRST = { ok: false, error: "Stop the recording first." };
 
 /** Chrome's "Allow in Incognito" toggle; the spy takes the callback overload's type. */
+/** The user's grants in chrome://extensions: "Allow in Incognito", and Site access on all sites. */
 export function allowIncognito(allowed: boolean) {
   vi.spyOn(fakeBrowser.extension, "isAllowedIncognitoAccess").mockResolvedValue(allowed as never);
+  grantSiteAccess(true);
+}
+
+/** Site access "On all sites" (`true`), or withheld by "On click" or "On specific sites". */
+export function grantSiteAccess(granted: boolean) {
+  return vi.spyOn(fakeBrowser.permissions, "contains").mockResolvedValue(granted as never);
 }
 
 export async function readStatus(send: Send) {

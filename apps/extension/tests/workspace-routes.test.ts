@@ -35,7 +35,7 @@ afterEach(() => {
 describe("workspace-status", () => {
   test("reports access, the managed window, and foreign windows by id and tab count", async () => {
     expect(await status()).toEqual({
-      available: true,
+      siteAccess: true,
       access: true,
       foreign: [],
       busy: false,
@@ -46,7 +46,7 @@ describe("workspace-status", () => {
     const { managed, ...rest } = await status();
     expect(managed).toEqual(await managedWindowRepository.read());
     expect(rest).toEqual({
-      available: true,
+      siteAccess: true,
       access: true,
       foreign: [{ id: foreign, tabCount: 1 }],
       busy: false,

@@ -1,7 +1,7 @@
 import { browser } from "wxt/browser";
 import type { IncognitoAccess } from "@/ports/tabs";
 
-/** Chrome's "Allow in Incognito" toggle, as the dashboard reads it and leads to it, and window events. */
+/** Chrome's "Allow in Incognito" toggle, where to turn it on, and window and Site access events. */
 export const browserIncognito: IncognitoAccess = {
   allowed: () => browser.extension.isAllowedIncognitoAccess(),
   // Only Chrome may flip the toggle, on RECnRun's details page; the id works for dev and store builds.
@@ -15,6 +15,16 @@ export const browserIncognito: IncognitoAccess = {
     return () => {
       browser.windows.onCreated.removeListener(listener);
       browser.windows.onRemoved.removeListener(listener);
+    };
+  },
+  // Chrome reports Site access withheld or granted as host permissions removed or added.
+  watchSiteAccess: (onChange) => {
+    const listener = () => onChange();
+    browser.permissions.onAdded.addListener(listener);
+    browser.permissions.onRemoved.addListener(listener);
+    return () => {
+      browser.permissions.onAdded.removeListener(listener);
+      browser.permissions.onRemoved.removeListener(listener);
     };
   },
 };

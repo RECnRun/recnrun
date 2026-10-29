@@ -41,20 +41,34 @@ export function fakeTabs(initial: BrowserTabs) {
 /** Incognito access as Chrome would grant it, with each details page it opens counted. */
 export function fakeIncognito(allowed: boolean) {
   const settings: unknown[] = [];
+  let settingsError: Error | undefined;
   const listeners = new Set<() => void>();
+  const grants = new Set<() => void>();
   const access: IncognitoAccess = {
     allowed: async () => allowed,
     openSettings: async () => {
+      if (settingsError) throw settingsError;
       settings.push(true);
     },
     watchWindows: (onChange) => {
       listeners.add(onChange);
       return () => listeners.delete(onChange);
     },
+    watchSiteAccess: (onChange) => {
+      grants.add(onChange);
+      return () => grants.delete(onChange);
+    },
   };
   /** What Chrome's windows.onCreated and onRemoved would do. */
   const windowsChanged = () => {
     for (const listener of listeners) listener();
   };
-  return { access, settings, windowsChanged };
+  /** What Chrome's permissions.onAdded and onRemoved would do. */
+  const siteAccessChanged = () => {
+    for (const listener of grants) listener();
+  };
+  const failSettings = (error: Error) => {
+    settingsError = error;
+  };
+  return { access, settings, windowsChanged, siteAccessChanged, failSettings };
 }

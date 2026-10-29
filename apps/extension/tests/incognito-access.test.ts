@@ -34,3 +34,40 @@ test("opens RECnRun's own details in chrome://extensions, by its runtime id", as
   await browserIncognito.openSettings();
   expect(create).toHaveBeenCalledWith({ url: `chrome://extensions/?id=${fakeBrowser.runtime.id}` });
 });
+
+/** Chrome's permissions events; the fake browser leaves them unimplemented. */
+function permissionEvents() {
+  const added = new Set<() => void>();
+  const removed = new Set<() => void>();
+  const event = (listeners: Set<() => void>) => ({
+    addListener: (listener: () => void) => listeners.add(listener),
+    removeListener: (listener: () => void) => listeners.delete(listener),
+  });
+  const fire = (listeners: Set<() => void>) => {
+    for (const listener of listeners) listener();
+  };
+  Object.assign(fakeBrowser, {
+    permissions: { onAdded: event(added), onRemoved: event(removed) },
+  });
+  return {
+    add: () => fire(added),
+    remove: () => fire(removed),
+    listening: () => added.size + removed.size,
+  };
+}
+
+test("calls back when the user withholds or grants site access, until unsubscribed", () => {
+  const { permissions } = fakeBrowser;
+  const events = permissionEvents();
+  try {
+    let changes = 0;
+    const unwatch = browserIncognito.watchSiteAccess(() => (changes += 1));
+    events.remove();
+    events.add();
+    expect(changes).toBe(2);
+    unwatch();
+    expect(events.listening()).toBe(0);
+  } finally {
+    Object.assign(fakeBrowser, { permissions });
+  }
+});

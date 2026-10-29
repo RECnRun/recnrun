@@ -2,7 +2,7 @@ import { fileURLToPath } from "node:url";
 import preact from "@preact/preset-vite";
 import { defineConfig } from "wxt";
 import { contentScriptMatches } from "./src/config/origins.ts";
-import { buildAccess, skipsEntrypoint } from "./src/config/permissions.ts";
+import { MANIFEST_ACCESS } from "./src/config/permissions.ts";
 
 const chromiumProfile = fileURLToPath(new URL("./.wxt/chrome-data", import.meta.url));
 
@@ -18,11 +18,6 @@ export default defineConfig({
     keepProfileChanges: true,
   },
   hooks: {
-    "entrypoints:resolved": (wxt, entrypoints) => {
-      for (const entrypoint of entrypoints) {
-        if (skipsEntrypoint(wxt.config.mode, entrypoint.name)) entrypoint.skipped = true;
-      }
-    },
     "server:started": async () => {
       // Chrome protects this preference on macOS and Windows; let Chrome save it itself.
       const { prepareDevChrome } = await import("./scripts/dev-chrome.ts");
@@ -32,9 +27,8 @@ export default defineConfig({
   manifest: ({ mode }) => ({
     name: "RECnRun",
     description: "Records and replays browser sessions for developers.",
-    // tabs lets the dashboard list every tab, with its title and address, to record one; test and
-    // development builds add the Incognito workspace POC's permissions (src/config/permissions.ts).
-    ...buildAccess(mode),
+    // The recorder's and the Incognito workspace's permissions (src/config/permissions.ts).
+    ...MANIFEST_ACCESS,
     // One extension context spans normal and incognito windows, so the dashboard and the PiP
     // window see incognito tabs once the user turns on "Allow in Incognito".
     incognito: "spanning",

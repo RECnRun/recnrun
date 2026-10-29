@@ -1,28 +1,20 @@
 import type { IdentityData } from "@recnrun/domain";
 import { afterEach, beforeEach, expect, test, vi } from "vite-plus/test";
 import { fakeBrowser } from "wxt/testing/fake-browser";
-import { workspaceAvailable } from "@/background/workspace/availability";
+import { hasSiteAccess } from "@/background/workspace/site-access";
 import { createWorkspaceCommands } from "@/background/workspace/commands";
 import { chrome, memoryCaptures } from "./fake-capture";
 import { memoryRecordingStore } from "./fake-extension";
 import { identity, memoryIdentities } from "./fake-lifecycle";
 import { openWindowsWithTabs } from "./fake-windows";
-import { allowIncognito, fakeWorkspacePorts, TARGET } from "./workspace-harness";
+import { allowIncognito, fakeWorkspacePorts, grantSiteAccess, TARGET } from "./workspace-harness";
 
-const APIS = ["cookies", "declarativeNetRequest", "scripting", "webNavigation"] as const;
-const UNAVAILABLE =
-  "This build of RECnRun cannot tell when Chrome has cleared an Incognito session.";
+const WITHHELD =
+  "Set RECnRun's Site access to “On all sites” in its details in chrome://extensions, so it can save every site's cookies.";
 const EMPTY: IdentityData = {
   cookies: [],
   site: { localStorage: {}, sessionStorage: {}, indexedDB: [], caches: [] },
 };
-
-const saved = { cookies: fakeBrowser.cookies };
-
-/** A production build: Chrome exposes no `cookies` API without its permission. */
-function withoutCookies() {
-  Reflect.deleteProperty(fakeBrowser, "cookies");
-}
 
 function commands() {
   const { api, cookies } = chrome();
@@ -45,27 +37,25 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  fakeBrowser.cookies = saved.cookies;
   vi.restoreAllMocks();
 });
 
-test("the workspace is available only when Chrome exposes every API it needs", () => {
-  const all = Object.fromEntries(APIS.map((name) => [name, {}]));
-  expect(workspaceAvailable(all)).toBe(true);
-  for (const name of APIS) {
-    const { [name]: _missing, ...rest } = all;
-    expect(workspaceAvailable(rest)).toBe(false);
-  }
+test("site access asks Chrome for every http and https host", async () => {
+  const contains = grantSiteAccess(true);
+  expect(await hasSiteAccess()).toBe(true);
+  expect(contains).toHaveBeenCalledWith({ origins: ["http://*/*", "https://*/*"] });
+  grantSiteAccess(false);
+  expect(await hasSiteAccess()).toBe(false);
 });
 
-test("the status says whether this build can run the workspace", async () => {
-  expect(await commands().workspace.status()).toMatchObject({ available: true });
-  withoutCookies();
-  expect(await commands().workspace.status()).toMatchObject({ available: false, access: true });
+test("the status says whether the user left RECnRun on all sites", async () => {
+  expect(await commands().workspace.status()).toMatchObject({ siteAccess: true });
+  grantSiteAccess(false);
+  expect(await commands().workspace.status()).toMatchObject({ siteAccess: false, access: true });
 });
 
-test("without the cookies API every command that opens a window is refused before acting", async () => {
-  withoutCookies();
+test("with site access withheld every command that opens a window is refused before acting", async () => {
+  grantSiteAccess(false);
   const { workspace, captures, memory } = commands();
   const update = vi.spyOn(fakeBrowser.tabs, "update");
   const draft = { label: "Admin", url: TARGET };
@@ -82,7 +72,7 @@ test("without the cookies API every command that opens a window is refused befor
     () => workspace.suspend(),
     () => workspace.newIdentity(draft),
   ];
-  for (const attempt of attempts) await expect(attempt()).rejects.toThrow(UNAVAILABLE);
+  for (const attempt of attempts) await expect(attempt()).rejects.toThrow(WITHHELD);
   expect(fakeBrowser.windows.create).not.toHaveBeenCalled();
   expect(update).not.toHaveBeenCalled();
   expect(captures.calls).toEqual([]);

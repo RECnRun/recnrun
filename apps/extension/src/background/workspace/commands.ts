@@ -1,7 +1,7 @@
 import { classifyIncognitoWindows, isAllowedTarget } from "@recnrun/domain";
 import type { IdentityData } from "@recnrun/domain";
 import { browser } from "wxt/browser";
-import { workspaceAvailable, workspaceUnavailable } from "@/background/workspace/availability";
+import { hasSiteAccess, siteAccessWithheld } from "@/background/workspace/site-access";
 import { chromeBarrierApi } from "@/background/workspace/barrier";
 import { bootstrapIdentity } from "@/background/workspace/bootstrap";
 import type { BootstrapHooks, BootstrapPorts, StepTiming } from "@/background/workspace/bootstrap";
@@ -62,11 +62,11 @@ function requireTarget(url: string): void {
 }
 
 /**
- * A build without the workspace's APIs refuses first. Without access, Chrome hides Incognito
- * windows, so the inventory could not prove none is open.
+ * Withheld site access refuses first, since a capture would drop cookies. Without Incognito access,
+ * Chrome hides Incognito windows, so the inventory could not prove none is open.
  */
 async function requireAccess(): Promise<void> {
-  if (!workspaceAvailable()) throw workspaceUnavailable();
+  if (!(await hasSiteAccess())) throw siteAccessWithheld();
   if (!(await browser.extension.isAllowedIncognitoAccess())) {
     throw new WorkspaceError("IncognitoNotAllowed", "Allow RECnRun in Incognito first.");
   }
@@ -196,9 +196,9 @@ async function statusOf(
   const operation = (await journal.read()) ?? undefined;
   const saved = await identities.list();
   const { busy } = lock;
-  const available = workspaceAvailable();
+  const siteAccess = await hasSiteAccess();
   const status = {
-    available,
+    siteAccess,
     access,
     managed: stored,
     foreign: summaries,

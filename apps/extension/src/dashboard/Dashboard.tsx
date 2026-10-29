@@ -62,8 +62,8 @@ export function Dashboard({ services, router, take }: DashboardProps) {
   const [route, setRoute] = useState(router.initialRoute);
   const [target, setTarget] = useState("");
   const workspace = useWorkspaceStatus(services);
-  // A build without the workspace has no address to fill.
-  const addressable = workspace.status?.available !== false;
+  // Without Site access the panel has no address to fill.
+  const addressable = workspace.status?.siteAccess !== false;
   useEffect(() => router.subscribe(setRoute), [router]);
   const navigate = (path: string) => {
     router.navigate(path);
@@ -88,6 +88,7 @@ export function Dashboard({ services, router, take }: DashboardProps) {
                   workspace={workspace}
                   tabs={services.tabs}
                   send={services.send}
+                  openDetails={services.incognito.openSettings}
                   target={target}
                   onTarget={setTarget}
                 />

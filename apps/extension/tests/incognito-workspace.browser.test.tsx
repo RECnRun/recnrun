@@ -39,14 +39,39 @@ test("without access, the panel states the requirement and offers no New identit
   expect(button(root, "Use this tab's address")).toBeUndefined();
 });
 
-test("in a build without the workspace's APIs, the panel says so once and offers no command", async () => {
-  const { root } = mount({ ...NO_INCOGNITO_WINDOW, available: false, identities: [identity("a")] });
+test("with site access withheld, the panel says where to restore it and offers only Delete", async () => {
+  const { root, incognito } = mount({
+    ...NO_INCOGNITO_WINDOW,
+    siteAccess: false,
+    identities: [identity("a")],
+  });
   await expect
     .poll(() => panelText(root))
-    .toBe("Incognito workspaceThe Incognito workspace is not available in this build.");
-  expect(panel(root)?.querySelectorAll("button, input")).toHaveLength(0);
+    .toContain(
+      "RECnRun saves every site's cookies with an identity, so it needs Site access “On all sites”.",
+    );
+  expect(panel(root)?.querySelector("input")).toBeNull();
   expect(button(root, "Use this tab's address")).toBeUndefined();
-  expect(root.querySelector("aside h2")?.textContent).toBe("Tabs");
+  expect(enabledButtons(root)).toEqual(["Open RECnRun's details", "Delete"]);
+  expect(button(row(root, "A"), "Switch to")?.disabled).toBe(true);
+  inPanel(root, "Open RECnRun's details")?.click();
+  await expect.poll(() => incognito.settings).toHaveLength(1);
+});
+
+test("site access coming back reads the status again and brings back New identity", async () => {
+  const { root, setStatus, incognito } = mount({ ...NO_INCOGNITO_WINDOW, siteAccess: false });
+  await expect.poll(() => inPanel(root, "Open RECnRun's details")).toBeDefined();
+  setStatus(NO_INCOGNITO_WINDOW);
+  incognito.siteAccessChanged();
+  await expect.poll(() => enabledButtons(root)).toEqual(["New identity"]);
+});
+
+test("a details page Chrome fails to open is the panel's alert", async () => {
+  const { root, incognito } = mount({ ...NO_INCOGNITO_WINDOW, siteAccess: false });
+  incognito.failSettings(new Error("No tab."));
+  await expect.poll(() => inPanel(root, "Open RECnRun's details")).toBeDefined();
+  inPanel(root, "Open RECnRun's details")?.click();
+  await expect.poll(() => alertText(root)).toEqual(["No tab."]);
 });
 
 test("the panel offers only the address and New identity, which sends no label", async () => {

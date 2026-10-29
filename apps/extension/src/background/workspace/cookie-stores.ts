@@ -1,7 +1,6 @@
 import type { SiteCookie } from "@recnrun/domain";
 import { browser } from "wxt/browser";
 import type { Browser } from "wxt/browser";
-import { workspaceUnavailable } from "@/background/workspace/availability";
 import { WorkspaceError } from "@/background/workspace/errors";
 import type { IncognitoStoreMemory } from "@/ports/incognito-stores";
 
@@ -168,13 +167,6 @@ export async function restoreCookies(
   return live.length;
 }
 
-/** Chrome's cookies API, which only builds that ask for the `cookies` permission have. */
-function cookiesApi(): typeof browser.cookies {
-  const { cookies } = browser as Partial<typeof browser>;
-  if (cookies === undefined) throw workspaceUnavailable();
-  return cookies;
-}
-
 async function tabIds(incognito: boolean): Promise<number[]> {
   return (await browser.tabs.query({}))
     .filter((tab) => tab.incognito === incognito)
@@ -184,17 +176,16 @@ async function tabIds(incognito: boolean): Promise<number[]> {
 // Chrome's text for a store whose profile is gone (cookies_api.cc).
 const UNKNOWN_STORE = "Invalid cookie store id";
 
-/** The cookie calls through Chrome; `cookies` exists only in builds that ask for it. */
+/** The cookie calls through Chrome. */
 export const chromeCookieApi: CookieApi = {
   stores: async () =>
-    (await cookiesApi().getAllCookieStores()).map(({ id, tabIds }) => ({ id, tabIds })),
+    (await browser.cookies.getAllCookieStores()).map(({ id, tabIds }) => ({ id, tabIds })),
   normalTabIds: () => tabIds(false),
   incognitoTabIds: () => tabIds(true),
   // The domain matches no cookie, so the answer carries none; only the store id is checked.
   probe: async (storeId) => {
-    const cookies = cookiesApi();
     try {
-      await cookies.getAll({ storeId, domain: "recnrun.invalid" });
+      await browser.cookies.getAll({ storeId, domain: "recnrun.invalid" });
       return true;
     } catch (error) {
       if (error instanceof Error && error.message.startsWith(UNKNOWN_STORE)) return false;
@@ -203,7 +194,7 @@ export const chromeCookieApi: CookieApi = {
   },
   // An empty partition key lists every partition's cookies and the unpartitioned ones.
   all: async (storeId) =>
-    (await cookiesApi().getAll({ storeId, partitionKey: {} })) as StoredCookie[],
+    (await browser.cookies.getAll({ storeId, partitionKey: {} })) as StoredCookie[],
   // Chrome answers null, or no value at all, when it stored no cookie.
-  set: async (details) => Boolean(await cookiesApi().set(details as Browser.cookies.SetDetails)),
+  set: async (details) => Boolean(await browser.cookies.set(details as Browser.cookies.SetDetails)),
 };

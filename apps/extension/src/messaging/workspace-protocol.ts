@@ -85,8 +85,8 @@ export type WorkspaceRequest = v.InferOutput<typeof WorkspaceRequestSchema>;
 
 /** The `workspace-status` result; foreign windows carry no title or URL. */
 export const WorkspaceStatusSchema = v.object({
-  /** Whether this build has the workspace's APIs; a production build has none of them (OD-1). */
-  available: v.boolean(),
+  /** Whether the user leaves RECnRun on all sites, which a capture needs for every cookie. */
+  siteAccess: v.boolean(),
   access: v.boolean(),
   managed: v.optional(ManagedWindowStateSchema),
   foreign: v.array(v.object({ id: BrowserIdSchema, tabCount: BrowserIdSchema })),

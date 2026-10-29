@@ -24,7 +24,10 @@ export interface WorkspaceRead {
 
 type StatusSources = Pick<ExtensionServices, "incognito" | "tabs" | "send" | "operations">;
 
-/** The background's workspace status, read again when a window, a tab, or the operation changes. */
+/**
+ * The background's workspace status, read again when a window, a tab, the operation, or Site access
+ * changes.
+ */
 export function useWorkspaceStatus({
   incognito,
   tabs,
@@ -46,11 +49,13 @@ export function useWorkspaceStatus({
     const unwatchWindows = incognito.watchWindows(reads.refresh);
     const unwatchTabs = tabs.watch(reads.refresh);
     const unwatchOperations = operations.watch(reads.refresh);
+    const unwatchSiteAccess = incognito.watchSiteAccess(reads.refresh);
     return () => {
       reads.stop();
       unwatchWindows();
       unwatchTabs();
       unwatchOperations();
+      unwatchSiteAccess();
     };
   }, [incognito, tabs, send, operations]);
   return {
@@ -70,6 +75,8 @@ interface WorkspaceProps {
   workspace: WorkspaceRead;
   tabs: TabSource;
   send: SendRequest;
+  /** Opens RECnRun's details in chrome://extensions, where Site access is. */
+  openDetails: () => Promise<void>;
   /** The address the workspace opens, which a normal tab in the list may also supply. */
   target: string;
   onTarget: (url: string) => void;
@@ -112,21 +119,53 @@ function NewIdentity({
   );
 }
 
-type BodyProps = Pick<WorkspaceProps, "tabs" | "target" | "onTarget"> &
-  CommandProps & { status: WorkspaceStatus };
+/** Only Chrome may give Site access back, on RECnRun's details page. */
+function SiteAccessWithheld({ openDetails }: { openDetails: () => void }) {
+  return (
+    <div class="workspace-requirement">
+      <p>
+        RECnRun saves every site's cookies with an identity, so it needs Site access “On all sites”.
+        Set it in RECnRun's details.
+      </p>
+      <button type="button" onClick={openDetails}>
+        Open RECnRun's details
+      </button>
+    </div>
+  );
+}
 
-function WorkspaceBody({ status, tabs, target, onTarget, disabled, run }: BodyProps) {
-  const open = useBrowserTabs(tabs)?.tabs ?? [];
-  // Chrome hides Incognito windows without access, so only Delete stays possible then.
-  const blocked = !status.access || hasConflict(status, open);
+/** What the user must turn on in chrome://extensions before RECnRun opens a window. */
+function Requirements({
+  status,
+  openDetails,
+}: {
+  status: WorkspaceStatus;
+  openDetails: () => void;
+}) {
   return (
     <>
-      {status.access ? (
+      {!status.access && <p>The Incognito workspace requires “Allow in Incognito”.</p>}
+      {!status.siteAccess && <SiteAccessWithheld openDetails={openDetails} />}
+    </>
+  );
+}
+
+type BodyProps = Pick<WorkspaceProps, "tabs" | "target" | "onTarget"> &
+  CommandProps & { status: WorkspaceStatus; openDetails: () => void };
+
+function WorkspaceBody(props: BodyProps) {
+  const { status, tabs, target, onTarget, disabled, run, openDetails } = props;
+  const open = useBrowserTabs(tabs)?.tabs ?? [];
+  const granted = status.access && status.siteAccess;
+  // Chrome hides Incognito windows without access, so only Delete stays possible then.
+  const blocked = !granted || hasConflict(status, open);
+  return (
+    <>
+      <Requirements status={status} openDetails={openDetails} />
+      {granted && (
         <NewIdentity target={target} onTarget={onTarget} disabled={disabled || blocked} run={run} />
-      ) : (
-        <p>The Incognito workspace requires “Allow in Incognito”.</p>
       )}
-      {status.access && blocked && (
+      {granted && blocked && (
         <WorkspaceConflict status={status} tabs={open} disabled={disabled} run={run} />
       )}
       <Identities status={status} blocked={blocked} disabled={disabled} run={run} />
@@ -138,11 +177,17 @@ function WorkspaceBody({ status, tabs, target, onTarget, disabled, run }: BodyPr
  * The one Incognito window RECnRun manages, its saved identities, and what blocks switching. Every
  * command reads the status again when it ends, refused or not.
  */
-export function IncognitoWorkspace({ workspace, tabs, send, target, onTarget }: WorkspaceProps) {
+export function IncognitoWorkspace(props: WorkspaceProps) {
+  const { workspace, tabs, send, target, onTarget, openDetails } = props;
   const { status, readError, refresh } = workspace;
   const [pending, setPending] = useState(false);
   const [failure, setFailure] = useState<CommandFailure>();
   const [dismissed, setDismissed] = useState<string>();
+  const [detailsError, setDetailsError] = useState<string>();
+  const details = () => {
+    setDetailsError(undefined);
+    openDetails().catch((caught: unknown) => setDetailsError(errorMessage(caught)));
+  };
   const run = (request: PanelRequest) => {
     setPending(true);
     setFailure(undefined);
@@ -154,7 +199,7 @@ export function IncognitoWorkspace({ workspace, tabs, send, target, onTarget }: 
         refresh();
       });
   };
-  const alert = panelAlert({ status, dismissed, failure, readError });
+  const alert = panelAlert({ status, dismissed, failure, readError }) ?? detailsError;
   return (
     <section class="incognito-workspace" aria-labelledby="incognito-workspace-heading">
       <h3 id="incognito-workspace-heading">Incognito workspace</h3>
@@ -163,10 +208,7 @@ export function IncognitoWorkspace({ workspace, tabs, send, target, onTarget }: 
           {alert}
         </p>
       )}
-      {status && !status.available && (
-        <p>The Incognito workspace is not available in this build.</p>
-      )}
-      {status?.available && (
+      {status && (
         <WorkspaceBody
           status={status}
           tabs={tabs}
@@ -174,6 +216,7 @@ export function IncognitoWorkspace({ workspace, tabs, send, target, onTarget }: 
           onTarget={onTarget}
           disabled={pending || status.busy}
           run={run}
+          openDetails={details}
         />
       )}
     </section>

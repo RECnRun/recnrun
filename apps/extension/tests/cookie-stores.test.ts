@@ -216,17 +216,4 @@ describe("chromeCookieApi.probe", () => {
     getAll.mockRejectedValueOnce(new Error("No host permissions."));
     await expect(chromeCookieApi.probe("1")).rejects.toThrow("No host permissions.");
   });
-
-  test("refuses to answer in a build without the cookies API", async () => {
-    const { cookies } = fakeBrowser;
-    Object.assign(fakeBrowser, { cookies: undefined });
-    try {
-      await expect(chromeCookieApi.stores()).rejects.toMatchObject({ name: "CookiesUnavailable" });
-      await expect(chromeCookieApi.probe("1")).rejects.toMatchObject({
-        name: "CookiesUnavailable",
-      });
-    } finally {
-      Object.assign(fakeBrowser, { cookies });
-    }
-  });
 });

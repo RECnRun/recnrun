@@ -29,4 +29,6 @@ export interface IncognitoAccess {
   openSettings: () => Promise<void>;
   /** Calls back when a window opens or closes; returns the unsubscribe function. */
   watchWindows: (onChange: () => void) => () => void;
+  /** Calls back when the user changes RECnRun's Site access; returns the unsubscribe function. */
+  watchSiteAccess: (onChange: () => void) => () => void;
 }

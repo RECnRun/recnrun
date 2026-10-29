@@ -31,7 +31,7 @@ export function memoryRecordingStore(
 
 /** With access and no Incognito window open, the workspace offers Start. */
 export const NO_INCOGNITO_WINDOW: WorkspaceStatus = {
-  available: true,
+  siteAccess: true,
   access: true,
   foreign: [],
   busy: false,
