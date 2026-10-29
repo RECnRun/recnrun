@@ -66,15 +66,23 @@ Ruled out on the way: a lock request that never settles (the click never reached
 
 **Cause.** `cookies.getAll` keeps a cookie only with host access to its bare domain as a URL: no port, and `https` only when the cookie is `Secure` (`chrome/browser/extensions/api/cookies/cookies_helpers.cc:51-56, 201-206`, `net/cookies/cookie_util.cc:664-692`). A missing pattern hides the cookie silently. Chrome also treats an unlisted top-level domain such as `localhost` as a one-label registry (`net/base/registry_controlled_domains/registry_controlled_domain.cc:188-195, 308`), so `Domain=app.localhost` is a real domain cookie.
 
-**Solution.** Development builds grant each `RECNRUN_POC_HOSTS` host and every parent domain of two labels or more, both schemes, no port (`cookieHostPatterns` in `config/permissions.ts`). A capture compares the page's `document.cookie` names with the listed cookies and fails with `CookiesNotReadable` naming the missing ones; New identity refuses a cookie host the build cannot read (`CookieHostNotAllowed`). An HttpOnly cookie outside the permissions still cannot be detected.
+**Solution.** At first, development builds granted each host the identity declared and its parent domains. Declaring hosts proved unworkable (the user had to know every sign-in provider in advance), so every build now asks for access to all sites (`http://*/*`, `https://*/*`, `config/permissions.ts`) and an identity keeps the whole Incognito cookie store. A capture still compares the page's `document.cookie` names with the listed cookies and fails with `CookiesNotReadable` naming the missing ones, which now only a site the user or a policy blocks can cause (`extensions/common/permissions/permissions_data.cc:391-395, 658-689`). An HttpOnly cookie hidden that way still cannot be detected.
 
-## The barrier blocks a redirect to a declared sign-in host
+## Withheld Site access hides cookies without an error
 
-**Symptom.** A start of a server-rendered app whose own session had expired failed with `ERR_BLOCKED_BY_CLIENT`, although the identity declared the provider's host and its cookies were restored.
+**Symptom.** With every build asking for all sites, a capture could still miss cookies, httpOnly ones silently, after the user set RECnRun's Site access to "On click" or "On specific sites" in chrome://extensions.
+
+**Cause.** Withholding Site access removes the hosts from the extension's active permissions (`chrome/browser/extensions/scripting_permissions_modifier.cc:39-58, 183-192`, `permissions_updater.cc:362`), and `cookies.getAll` keeps only cookies of hosts it can access.
+
+**Solution.** The workspace reads `permissions.contains` for both all-sites patterns (`background/workspace/site-access.ts`, `permissions_api.cc:167-188`), refuses every command but Delete with `SiteAccessWithheld` before opening any window, and the panel asks the user to set Site access "On all sites" in RECnRun's details. It reads it again on `permissions.onAdded` and `onRemoved` (`tests/e2e/site-access.spec.ts`).
+
+## The barrier blocks a redirect to a sign-in provider
+
+**Symptom.** A start of a server-rendered app whose own session had expired failed with `ERR_BLOCKED_BY_CLIENT`, although the provider's cookies were restored.
 
 **Cause.** The app answers the barrier navigation with a redirect to its provider, and the barrier blocks every main-frame request off the target origin.
 
-**Solution.** When the identity declares cookie hosts, a fifth tab-scoped rule removes a main-frame `Location` that names one of them, during the barrier only (`background/workspace/barrier.ts`, `declaredLocations`). Chrome applies header changes before it checks for a redirect (`url_request_http_job.cc:1242-1246`), and a response without `Location` is none (`http_response_headers.cc:1099-1112`), so the response commits as the target origin's script-free document and the restore runs. The release reload then follows the app's redirect, now with the provider's cookies. Chrome matches the whole lowercased value with `*` and `?` wildcards (`request_params.cc:70-86`).
+**Solution.** A fifth tab-scoped rule removes a main-frame `Location` that may leave the target origin, during the barrier only (`background/workspace/barrier.ts`): it matches any value with a colon, `//`, a backslash, or a tab, and excludes the origin itself and its paths, queries, and fragments. Chrome applies header changes before it checks for a redirect (`url_request_http_job.cc:1242-1246`), and a response without `Location` is none (`http_response_headers.cc:1099-1112`), so the response commits as the target origin's script-free document and the restore runs. The release reload then follows the app's redirect, now with the provider's cookies. Chrome matches the whole lowercased value with `*` and `?` wildcards (`request_params.cc:70-86`, `base/strings/pattern.cc`); a redirect the patterns miss stays blocked, never followed.
 
 ## A start fails with `net::ERR_ABORTED` in headed Chromium
 
@@ -83,3 +91,19 @@ Ruled out on the way: a lock request that never settles (the click never reached
 **Cause.** `windows.create` replies while the new tab's `about:blank` navigation is still running (`chrome/browser/extensions/api/tabs/tabs_api.cc:1306-1311`), and the start navigated the tab before that committed. Where Chromium aborts the later navigation was not found in the source.
 
 **Solution.** `createNeutralWindow` (`background/workspace/windows.ts`) returns once the new tab reports `status: "complete"`, within 5 s, with its listener registered before `tabs.get`. The same probe then opened 6 of 6.
+
+## History suggestions miss pages visited before today
+
+**Symptom.** The Address field suggested pages from open tabs and saved identities, but from history only pages visited the same day.
+
+**Cause.** `history.search` searches only the last 24 hours unless the call sets `startTime` (`chrome/browser/extensions/api/history/history_api.cc:309, 317-319`).
+
+**Solution.** `dashboard/browser-history.ts` passes `startTime: 0` with the typed text and `maxResults: 20`.
+
+## A visited site that does not answer blocks every Switch
+
+**Symptom.** Once the managed window had shown a site that later stopped answering (a dropped connection, `net::ERR_EMPTY_RESPONSE`), every Switch and Close of that identity failed at the `navigate` step, and so did the start of an identity that had saved the site.
+
+**Cause.** A save reads each site the window showed by loading it in a helper tab; a start restores each one the same way. Any failure ended the command, so one unreachable site held the whole identity hostage.
+
+**Solution.** A save tries the site's root, then once the last page's path the window showed there, and when neither answers keeps the identity's last saved storage of that site, or names it as unsupported when there is none; a start skips the site and the next save keeps its saved storage without visiting it (`background/workspace/origin-reads.ts`, `bootstrap.ts`). The identity's row and the operation journal name each site left out and the step (`tests/e2e/poc-unreachable-origin.spec.ts`).
