@@ -178,6 +178,25 @@ test("a capture the windows outlast leaves every tab on its page and keeps the l
   ]);
 });
 
+test("leaves a blank or New Tab page where it is, whatever it visited before", async () => {
+  const { deps, run, found, read } = reading([{ tabId: 12, visits: [{ origin: OTHER }] }], {
+    [OTHER]: { step: "2" },
+  });
+  const blank = {
+    tabId: 12,
+    windowId: 1,
+    active: false,
+    url: "about:blank" as const,
+    place: "window 1, tab 3",
+  };
+  found.windows[0]?.tabs.push(blank);
+  read.layout.windows[0]?.tabs.push({ url: "about:blank", active: false, sessionStorage: [] });
+  await readTabOrigins(found, read, run, deps);
+  expect(deps.api.discard).not.toHaveBeenCalled();
+  expect(read.layout.windows[0]?.tabs[2]?.sessionStorage).toEqual([]);
+  expect(read.unsupported).toEqual([]);
+});
+
 test("brings each moved tab back to its page, past one that cannot load it", async () => {
   const navigate = vi.fn(async (tabId: number, _url: string) => {
     if (tabId === 1) throw new Error("No tab with id: 1.");

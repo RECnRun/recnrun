@@ -54,9 +54,24 @@ test("rejects a missing primary tab, an empty window, two focused windows, or tw
   expect(() => primaryTab({ ...layout, primary: { window: 3, tab: 0 } })).toThrow(/no primary/);
 });
 
-test("rejects an internal page and an origin named twice in one tab", () => {
+test("accepts a blank tab and a New Tab page beside the target, without sessionStorage", () => {
+  const plain = (url: string, sessionStorage: unknown[] = []) => ({
+    ...layout,
+    windows: [{ ...first, tabs: [...(first?.tabs ?? []), { url, active: false, sessionStorage }] }],
+  });
+  expect(valid(plain("about:blank"))).toBe(true);
+  expect(valid(plain("chrome://newtab/"))).toBe(true);
+  expect(valid(plain("about:blank", [{ origin: APP, entries: {} }]))).toBe(false);
+  // The primary tab is the start's target, so it is always a web page.
+  const blankFirst = { url: "about:blank", active: true, sessionStorage: [] };
+  expect(valid({ ...layout, windows: [{ ...first, tabs: [blankFirst] }, second] })).toBe(false);
+});
+
+test("rejects any other internal page and an origin named twice in one tab", () => {
   const tab = (fields: object) => ({ ...layout, windows: [{ ...first, tabs: [fields] }] });
-  expect(valid(tab({ url: "chrome://newtab/", active: true, sessionStorage: [] }))).toBe(false);
+  for (const url of ["chrome://settings/", "about:srcdoc", "file:///tmp/x.html"]) {
+    expect(valid(tab({ url, active: true, sessionStorage: [] }))).toBe(false);
+  }
   const twice = [
     { origin: APP, entries: {} },
     { origin: APP, entries: { b: "2" } },

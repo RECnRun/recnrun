@@ -3,7 +3,7 @@ import { expect, test } from "./fixtures/extension.ts";
 import { keep } from "./fixtures/keep.ts";
 import { incognitoLayout, shapeOf, tabSession, writeTabSession } from "./fixtures/layout.ts";
 import { lifecycleSetUp } from "./fixtures/lifecycle.ts";
-import { openIncognitoTab, openTabIn } from "./fixtures/tabs.ts";
+import { openIncognitoTab, openNewTabIn, openTabIn } from "./fixtures/tabs.ts";
 import { APP, managedWindow, pageAt } from "./fixtures/workspace.ts";
 
 test.use({ incognitoAccess: true });
@@ -13,6 +13,7 @@ const OTHER = "http://other.localhost:5192";
 const SECOND = `${APP}/blank?tab=second`;
 const THIRD = `${OTHER}/blank?tab=third`;
 const KEPT = `${APP}/blank?tab=kept`;
+const NEW_TAB = "chrome://newtab/";
 
 async function managedWindowId(serviceWorker: Parameters<typeof managedWindow>[0]) {
   const managed = await managedWindow(serviceWorker);
@@ -75,4 +76,32 @@ test("Switch works after the managed tab closed while another Incognito tab stay
     .poll(async () => shapeOf(await incognitoLayout(serviceWorker)))
     .toEqual([{ focused: expect.any(Boolean), tabs: [{ url: KEPT, active: true }] }]);
   expect(await tabSession(await pageAt(context, KEPT))).toBe("kept");
+});
+
+test("a New Tab page and a blank tab of A come back at their places", async ({
+  context,
+  serviceWorker,
+}) => {
+  const { identities, next } = await lifecycleSetUp(context, serviceWorker);
+  await identities.open("A");
+  await next();
+  const windowId = await managedWindowId(serviceWorker);
+  await openTabIn(serviceWorker, windowId, "about:blank");
+  await openNewTabIn(serviceWorker, windowId);
+  const saved = [
+    {
+      focused: expect.any(Boolean),
+      tabs: [
+        { url: BLANK, active: true },
+        { url: "about:blank", active: false },
+        { url: NEW_TAB, active: false },
+      ],
+    },
+  ];
+  await expect.poll(async () => shapeOf(await incognitoLayout(serviceWorker))).toEqual(saved);
+
+  await identities.open("B");
+  await next();
+  await identities.open("A");
+  await expect.poll(async () => shapeOf(await incognitoLayout(serviceWorker))).toEqual(saved);
 });

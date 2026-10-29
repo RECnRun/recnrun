@@ -28,7 +28,13 @@ export {
   type IdentityData,
   type SiteCookie,
 } from "./identity-data.ts";
-export { primaryTab, SessionLayoutSchema, type SessionLayout } from "./session-layout.ts";
+export {
+  isPlainPage,
+  PLAIN_PAGES,
+  primaryTab,
+  SessionLayoutSchema,
+  type SessionLayout,
+} from "./session-layout.ts";
 export { SKIP_STEPS, SkippedOriginSchema, type SkippedOrigin } from "./skipped-origin.ts";
 export { WorkspaceOperationSchema, type WorkspaceOperation } from "./workspace-operation.ts";
 export {

@@ -75,6 +75,7 @@ const LAYOUT: SessionLayout = {
 
 function restoring(
   reply: (tabId: number) => object = () => ({ type: "restored", counts: COUNTS }),
+  layout: SessionLayout = LAYOUT,
 ) {
   const deps = {
     layout: fakeLayoutApi(),
@@ -85,7 +86,7 @@ function restoring(
   const restores = agentsAnswer(deps.navigation, reply);
   const opened: number[] = [];
   const run = { primary: PRIMARY, operation: OPERATION, opened: (id: number) => opened.push(id) };
-  return { deps, restores, opened, running: restoreLayout(LAYOUT, run, deps) };
+  return { deps, restores, opened, running: restoreLayout(layout, run, deps) };
 }
 
 describe("restoreLayout", () => {
@@ -126,6 +127,28 @@ describe("restoreLayout", () => {
       { tabId: 200, from: { window: 0, tab: 1 }, visits: [{ origin: APP }] },
       { tabId: 201, from: { window: 1, tab: 1 }, visits: [{ origin: OTHER }] },
     ]);
+  });
+
+  test("reopens a blank tab and a New Tab page at their places, as they are", async () => {
+    const plain = (url: string, active = false) => ({ url, active, sessionStorage: [] });
+    const layout: SessionLayout = {
+      windows: [
+        { focused: false, tabs: [plain(`${APP}/app/`, true), plain("about:blank")] },
+        { focused: true, tabs: [plain("chrome://newtab/", true), plain("chrome://newtab/")] },
+      ],
+      primary: { window: 0, tab: 0 },
+    };
+    const run = restoring(undefined, layout);
+    await expect(run.running).resolves.toEqual([]);
+    expect(run.deps.layout.calls).toEqual([
+      "tab 200 in 5 at 1",
+      "activate 9",
+      "new window 50",
+      "new tab 201 in 50 at 1",
+      "activate 500",
+      "focus 50",
+    ]);
+    expect(run.deps.navigation.updates).toEqual([]);
   });
 
   test("a tab whose sessionStorage of another origin is not taken still opens, and is named", async () => {
@@ -174,21 +197,39 @@ describe("chromeLayoutApi", () => {
     const get = vi
       .spyOn(fakeBrowser.tabs, "get")
       .mockResolvedValue({ status: "complete" } as never);
-    await expect(chromeLayoutApi.openWindow()).resolves.toEqual({ windowId: 3, tabId: 30 });
+    await expect(chromeLayoutApi.openWindow(false)).resolves.toEqual({ windowId: 3, tabId: 30 });
     expect(create).toHaveBeenCalledWith({ incognito: true, url: "about:blank", focused: false });
     const tab = vi.spyOn(fakeBrowser.tabs, "create").mockResolvedValue({ id: 31 } as never);
-    await expect(chromeLayoutApi.openTab(3, 1)).resolves.toBe(31);
+    await expect(chromeLayoutApi.openTab(3, 1, false)).resolves.toBe(31);
     expect(tab).toHaveBeenCalledWith({ windowId: 3, index: 1, url: "about:blank", active: false });
     expect(get.mock.calls).toEqual([[30], [31]]);
   });
 
+  test("opens Chrome's New Tab page in a window or tab by giving it no address", async () => {
+    const create = vi
+      .spyOn(fakeBrowser.windows, "create")
+      .mockResolvedValue({ id: 3, tabs: [{ id: 30 }] } as never);
+    vi.spyOn(fakeBrowser.tabs, "get").mockResolvedValue({ status: "complete" } as never);
+    await chromeLayoutApi.openWindow(true);
+    expect(create).toHaveBeenCalledWith({ incognito: true, focused: false });
+    const tab = vi.spyOn(fakeBrowser.tabs, "create").mockResolvedValue({ id: 31 } as never);
+    await chromeLayoutApi.openTab(3, 2, true);
+    expect(tab).toHaveBeenCalledWith({ windowId: 3, index: 2, active: false });
+  });
+
   test("refuses a window or tab Chrome returned without an id", async () => {
     vi.spyOn(fakeBrowser.windows, "create").mockResolvedValueOnce({} as never);
-    await expect(chromeLayoutApi.openWindow()).rejects.toThrow("Chrome did not open the window.");
+    await expect(chromeLayoutApi.openWindow(false)).rejects.toThrow(
+      "Chrome did not open the window.",
+    );
     vi.spyOn(fakeBrowser.windows, "create").mockResolvedValueOnce({ id: 3, tabs: [] } as never);
-    await expect(chromeLayoutApi.openWindow()).rejects.toThrow("Chrome did not open the window.");
+    await expect(chromeLayoutApi.openWindow(false)).rejects.toThrow(
+      "Chrome did not open the window.",
+    );
     vi.spyOn(fakeBrowser.tabs, "create").mockResolvedValueOnce({} as never);
-    await expect(chromeLayoutApi.openTab(3, 0)).rejects.toThrow("Chrome did not open the tab.");
+    await expect(chromeLayoutApi.openTab(3, 0, false)).rejects.toThrow(
+      "Chrome did not open the tab.",
+    );
   });
 
   test("navigates, activates, and focuses through tabs and windows updates", async () => {

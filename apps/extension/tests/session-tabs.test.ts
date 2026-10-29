@@ -84,29 +84,48 @@ const FRAMES: Record<number, Frame> = {
   30: null,
 };
 
-test("finds each web tab in order and names the others by place, never by address", async () => {
+test("finds each web, blank, and New Tab page in order and names the others by place and scheme", async () => {
   const found = await findSessionTabs(sessionChrome(TWO_WINDOWS, FRAMES), 10);
   expect(
     found.windows.map(({ focused, tabs }) => [focused, tabs.map(({ tabId }) => tabId)]),
   ).toEqual([
-    [false, [10, 11]],
+    [false, [10, 11, 12]],
     [true, [20]],
   ]);
   expect(found.primary).toMatchObject({ tabId: 10, windowId: 1, origin: APP, url: `${APP}/app/` });
   // Every tab counts as seen, a page RECnRun does not reopen too, so the close can tell a new one.
   expect(found.seen).toEqual([10, 11, 12, 20, 30]);
   expect(found.unsupported).toEqual([
-    {
-      adapter: "tabs",
-      item: "window 1, tab 3",
-      reason: "RECnRun reopens only http and https pages.",
-    },
-    {
-      adapter: "tabs",
-      item: "window 3, tab 1",
-      reason: "RECnRun reopens only http and https pages.",
-    },
+    { adapter: "tabs", item: "window 3, tab 1", reason: "RECnRun could not read the tab's page." },
   ]);
+});
+
+test("names a tab of another scheme by its scheme only, never its address", async () => {
+  const windows: SessionWindow[] = [
+    {
+      id: 1,
+      focused: true,
+      tabs: [10, 11, 12, 13].map((id) => ({ id, active: id === 10 })),
+    },
+    { id: 2, focused: false, tabs: [{ id: 14, active: true }] },
+  ];
+  const frames: Record<number, Frame> = {
+    10: page(`${APP}/app/`, "doc-10"),
+    11: page("about:blank", "doc-11"),
+    12: page("chrome://settings/?secret=1", "doc-12"),
+    13: page("chrome://newtab/", "doc-13"),
+    14: page("file:///home/secret.html", "doc-14"),
+  };
+  const found = await findSessionTabs(sessionChrome(windows, frames), 10);
+  expect(found.windows.map(({ tabs }) => tabs.map(({ url }) => url))).toEqual([
+    [`${APP}/app/`, "about:blank", "chrome://newtab/"],
+  ]);
+  const reopens = "RECnRun reopens web pages, blank tabs, and New Tab pages";
+  expect(found.unsupported).toEqual([
+    { adapter: "tabs", item: "window 1, tab 3", reason: `${reopens}, not chrome: pages.` },
+    { adapter: "tabs", item: "window 2, tab 1", reason: `${reopens}, not file: pages.` },
+  ]);
+  expect(JSON.stringify(found.unsupported)).not.toContain("secret");
 });
 
 test("reads the managed tab in full while it is open, else the focused window's active tab, else the first", async () => {
@@ -150,6 +169,8 @@ test("lays out every web tab, each other tab with its own sessionStorage, the pr
             active: true,
             sessionStorage: [{ origin: APP, entries: { tab: "second" } }],
           },
+          // A New Tab page reopens as one, with nothing read from it.
+          { url: "chrome://newtab/", active: false, sessionStorage: [] },
         ],
       },
       {
@@ -184,6 +205,7 @@ test("a tab whose page does not hand its sessionStorage over reopens without it,
   expect(read.layout.windows[0]?.tabs.map(({ sessionStorage }) => sessionStorage)).toEqual([
     [],
     [{ origin: APP, entries: { tab: "second" } }],
+    [],
   ]);
   expect(read.unsupported).toEqual([
     { adapter: "tabs", item: "window 1, tab 1", reason: "The page stopped sending its data." },

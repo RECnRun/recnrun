@@ -132,6 +132,16 @@ export function openTabIn(serviceWorker: Worker, windowId: number, url: string):
   );
 }
 
+/** Opens Chrome's New Tab page in the background of the window `windowId`, as Ctrl+T would. */
+export function openNewTabIn(serviceWorker: Worker, windowId: number): Promise<number> {
+  return serviceWorker.evaluate(async (id) => {
+    const { chrome } = globalThis as unknown as ChromeGlobal;
+    const created = await chrome.tabs.create({ windowId: id, active: false });
+    if (created.id === undefined) throw new Error("The tab has no id.");
+    return created.id;
+  }, windowId);
+}
+
 /** Activates the tab and focuses its window, as a click on it would. */
 export function focusTab(serviceWorker: Worker, tabId: number): Promise<void> {
   return serviceWorker.evaluate(async (id) => {

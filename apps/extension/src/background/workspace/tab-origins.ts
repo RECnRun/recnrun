@@ -3,7 +3,7 @@ import type { BarrierApi, BarrierOperation } from "@/background/workspace/barrie
 import type { CaptureApi } from "@/background/workspace/capture-api";
 import { visitInTab } from "@/background/workspace/helper-tab";
 import type { NavigationApi } from "@/background/workspace/navigation";
-import { sessionThrough } from "@/background/workspace/session-tabs";
+import { isWebTab, sessionThrough } from "@/background/workspace/session-tabs";
 import type { LayoutRead, SessionTab, SessionTabs } from "@/background/workspace/session-tabs";
 import type { LayoutPlace, Visit, VisitedOrigins } from "@/ports/visited-origins";
 
@@ -141,6 +141,8 @@ export async function readTabOrigins(
   const reading = { run, deps, found, read };
   for (const [at, window] of found.windows.entries()) {
     for (const [index, tab] of window.tabs.entries()) {
+      // A blank or New Tab page reopens empty, so what it visited before is not read.
+      if (!isWebTab(tab)) continue;
       const list = lists.find(({ tabId }) => tabId === tab.tabId);
       const visits = (list?.visits ?? []).filter(({ origin }) => origin !== tab.origin);
       const laid = read.layout.windows[at]?.tabs[index];

@@ -1,3 +1,4 @@
+import { isPlainPage } from "@recnrun/domain";
 import type { SessionLayout, SkippedOrigin } from "@recnrun/domain";
 import { browser } from "wxt/browser";
 import { restoreThroughAgent } from "@/background/workspace/agent-link";
@@ -7,12 +8,15 @@ import type { NavigationApi } from "@/background/workspace/navigation";
 import { BLANK_BOUND_MS, loaded } from "@/background/workspace/windows";
 import type { LayoutPlace, Visit, VisitedOrigins } from "@/ports/visited-origins";
 
-/** The windows and tabs a start reopens beside the one it restored, each on a blank page first. */
+/**
+ * The windows and tabs a start reopens beside the one it restored, each on a blank page first, or
+ * on Chrome's New Tab page when `newTab` is set.
+ */
 export interface LayoutApi {
-  /** Opens an unfocused Incognito window on a blank page; resolves once it loaded. */
-  openWindow: () => Promise<{ windowId: number; tabId: number }>;
-  /** Opens a background tab on a blank page at `index` of the window; resolves once it loaded. */
-  openTab: (windowId: number, index: number) => Promise<number>;
+  /** Opens an unfocused Incognito window; resolves once its first page loaded. */
+  openWindow: (newTab: boolean) => Promise<{ windowId: number; tabId: number }>;
+  /** Opens a background tab at `index` of the window; resolves once its page loaded. */
+  openTab: (windowId: number, index: number, newTab: boolean) => Promise<number>;
   navigate: (tabId: number, url: string) => Promise<void>;
   activate: (tabId: number) => Promise<void>;
   focus: (windowId: number) => Promise<void>;
@@ -40,6 +44,9 @@ export interface LayoutRun {
 type LaidTab = SessionLayout["windows"][number]["tabs"][number];
 
 const RESTORE_BOUND_MS = 15_000;
+const NEW_TAB = "chrome://newtab/";
+
+const isNewTab = (laid: LaidTab | undefined) => laid?.url === NEW_TAB;
 
 /** Writes one origin's entries into the tab's sessionStorage behind the anonymous barrier. */
 function restoreSession(
@@ -87,32 +94,49 @@ export async function restoreTabSessions(
 async function openTabs(
   windowId: number,
   held: { tabId: number; index: number },
-  count: number,
+  tabs: readonly LaidTab[],
   deps: LayoutDeps,
 ): Promise<number[]> {
   const ids: number[] = [];
-  for (let index = 0; index < count; index += 1) {
-    ids.push(index === held.index ? held.tabId : await deps.layout.openTab(windowId, index));
+  for (const [index, laid] of tabs.entries()) {
+    const open = () => deps.layout.openTab(windowId, index, isNewTab(laid));
+    ids.push(index === held.index ? held.tabId : await open());
   }
   return ids;
 }
 
+/** Loads one reopened web tab's page, its own sessionStorage written first; what was not taken. */
+async function loadTab(
+  tab: { tabId: number; laid: LaidTab; from: LayoutPlace },
+  run: LayoutRun,
+  deps: LayoutDeps,
+) {
+  const skipped = await restoreTabSessions(tab, run.operation, deps);
+  await deps.layout.navigate(tab.tabId, tab.laid.url);
+  return skipped;
+}
+
+/** The start's own window with the primary tab at its place, or a saved window opened anew. */
+async function windowFor(at: number, layout: SessionLayout, run: LayoutRun, deps: LayoutDeps) {
+  if (at === layout.primary.window) return { ...run.primary, primaryIndex: layout.primary.tab };
+  const opened = await deps.layout.openWindow(isNewTab(layout.windows[at]?.tabs[0]));
+  run.opened(opened.windowId);
+  return { ...opened, primaryIndex: -1 };
+}
+
 /** Opens one saved window, or fills the start's own, and reopens each of its tabs but the primary. */
 async function reopenWindow(at: number, layout: SessionLayout, run: LayoutRun, deps: LayoutDeps) {
-  const { tabs } = layout.windows[at] ?? { tabs: [] };
-  const own = at === layout.primary.window;
-  const opened = own ? run.primary : await deps.layout.openWindow();
-  if (!own) run.opened(opened.windowId);
-  const held = { tabId: opened.tabId, index: own ? layout.primary.tab : 0 };
-  const ids = await openTabs(opened.windowId, held, tabs.length, deps);
+  const tabs = layout.windows[at]?.tabs ?? [];
+  const opened = await windowFor(at, layout, run, deps);
+  const held = { tabId: opened.tabId, index: Math.max(opened.primaryIndex, 0) };
+  const ids = await openTabs(opened.windowId, held, tabs, deps);
   const skipped: SkippedOrigin[] = [];
   for (const [index, laid] of tabs.entries()) {
     const tabId = ids[index] ?? -1;
-    if (!(own && index === held.index)) {
-      const from = { window: at, tab: index };
-      skipped.push(...(await restoreTabSessions({ tabId, laid, from }, run.operation, deps)));
-      await deps.layout.navigate(tabId, laid.url);
-    }
+    // A blank or New Tab page opened as it was saved; the primary tab is already restored.
+    const loads = !isPlainPage(laid.url) && index !== opened.primaryIndex;
+    const from = { window: at, tab: index };
+    if (loads) skipped.push(...(await loadTab({ tabId, laid, from }, run, deps)));
     if (laid.active) await deps.layout.activate(tabId);
   }
   return { windowId: opened.windowId, skipped };
@@ -148,17 +172,16 @@ async function blankTabOf(tab: { id?: number } | undefined, what: string): Promi
 
 /** Chrome's windows and tabs. */
 export const chromeLayoutApi: LayoutApi = {
-  openWindow: async () => {
-    const window = await browser.windows.create({
-      incognito: true,
-      url: "about:blank",
-      focused: false,
-    });
+  openWindow: async (newTab) => {
+    // Without an address, Chrome opens its New Tab page.
+    const page = newTab ? {} : { url: "about:blank" };
+    const window = await browser.windows.create({ incognito: true, ...page, focused: false });
     if (window?.id === undefined) throw new Error("Chrome did not open the window.");
     return { windowId: window.id, tabId: await blankTabOf(window.tabs?.[0], "window") };
   },
-  openTab: async (windowId, index) => {
-    const tab = await browser.tabs.create({ windowId, index, url: "about:blank", active: false });
+  openTab: async (windowId, index, newTab) => {
+    const page = newTab ? {} : { url: "about:blank" };
+    const tab = await browser.tabs.create({ windowId, index, ...page, active: false });
     return blankTabOf(tab, "tab");
   },
   navigate: async (tabId, url) => {

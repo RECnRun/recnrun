@@ -10,12 +10,23 @@ const TabSessionSchema = v.object({
   entries: OriginDataSchema.entries.sessionStorage,
 });
 
+/** Pages a start reopens as Chrome opens them, empty: a blank tab and the New Tab page. */
+export const PLAIN_PAGES = ["about:blank", "chrome://newtab/"] as const;
+
+/** Whether `url` is a page a start reopens empty rather than loads. */
+export const isPlainPage = (url: string): url is (typeof PLAIN_PAGES)[number] =>
+  (PLAIN_PAGES as readonly string[]).includes(url);
+
 const LayoutTabSchema = v.pipe(
   v.object({
-    url: TargetUrlSchema,
+    url: v.union([TargetUrlSchema, v.picklist(PLAIN_PAGES)]),
     active: v.boolean(),
     sessionStorage: v.array(TabSessionSchema),
   }),
+  v.check(
+    ({ url, sessionStorage }) => !isPlainPage(url) || sessionStorage.length === 0,
+    "A blank or New Tab page holds no sessionStorage.",
+  ),
   v.check(
     ({ sessionStorage }) =>
       new Set(sessionStorage.map(({ origin }) => origin)).size === sessionStorage.length,
@@ -29,7 +40,8 @@ const LayoutWindowSchema = v.pipe(
 );
 
 /**
- * Every Incognito window a capture saved, in order, each with its tabs in order, and where the
+ * Every Incognito window a capture saved, in order, each with its tabs in order (a web page, a blank
+ * tab, or the New Tab page), and where the
  * capture's own target sits: its window and its place there. The URLs stay in the capture; they
  * are never logged or sent over the website bridge.
  */
@@ -38,10 +50,10 @@ export const SessionLayoutSchema = v.pipe(
     windows: v.pipe(v.array(LayoutWindowSchema), v.minLength(1)),
     primary: v.object({ window: IndexSchema, tab: IndexSchema }),
   }),
-  v.check(
-    ({ windows, primary }) => windows[primary.window]?.tabs[primary.tab] !== undefined,
-    "The primary tab is not in the layout.",
-  ),
+  v.check(({ windows, primary }) => {
+    const tab = windows[primary.window]?.tabs[primary.tab];
+    return tab !== undefined && !isPlainPage(tab.url);
+  }, "The primary tab is not a web page in the layout."),
   v.check(
     ({ windows }) => windows.filter(({ focused }) => focused).length <= 1,
     "Two focused windows.",
