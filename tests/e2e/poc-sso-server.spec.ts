@@ -68,7 +68,7 @@ test("a start whose app and provider sessions both expired releases on the provi
   await expireServerSessions(run);
   await expireProviderSessions(run);
   const page = await signInPage("A");
-  expect(await journalOf(serviceWorker)).toMatchObject({ step: "reload", status: "done" });
+  expect(await journalOf(serviceWorker)).toMatchObject({ step: "layout", status: "done" });
   // Released on the provider's page: no app page has rendered since B's.
   expect(await reportedTokens(run)).toEqual([null, null]);
 
