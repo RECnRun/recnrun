@@ -32,6 +32,7 @@ type WorkspaceErrorName =
   | "StructuredCloneUnavailable"
   | "TabClosed"
   | "TargetNotAllowed"
+  | "VisitedOriginFailed"
   | "WindowNotCreated"
   | "WindowsChanged"
   | "WindowsNotClosed"

@@ -76,3 +76,14 @@ export const OriginDataSchema = v.object({
 });
 
 export type OriginData = v.InferOutput<typeof OriginDataSchema>;
+
+/** `scheme://host[:port]` as `URL.origin` writes it: lower case, no path; the domain has no `URL`. */
+export const OriginSchema = v.pipe(
+  v.string(),
+  v.regex(/^https?:\/\/([a-z0-9.-]+|\[[0-9a-f:]+\])(:\d{1,5})?$/),
+);
+
+/** One origin's site data, named by its origin: what the origin agent captures and restores. */
+export const OriginCaptureSchema = v.object({ origin: OriginSchema, ...OriginDataSchema.entries });
+
+export type OriginCapture = v.InferOutput<typeof OriginCaptureSchema>;

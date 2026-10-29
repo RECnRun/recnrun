@@ -16,6 +16,7 @@ import { fakeCookieApi, memoryStoreMemory } from "./fake-cookies";
 import { memoryRecordingStore } from "./fake-extension";
 import { memoryOperationJournal } from "./fake-journal";
 import { memoryIdentities } from "./fake-lifecycle";
+import { fakeHelperTabs, memoryVisits } from "./fake-helper";
 import { fakeNavigationApi } from "./fake-navigation";
 import { openWindowsWithTabs } from "./fake-windows";
 import { allowIncognito, manageTab } from "./workspace-harness";
@@ -24,6 +25,7 @@ const URL_ = "http://app.localhost:5192/app/";
 const DATA: IdentityData = {
   cookies: [],
   site: { localStorage: {}, sessionStorage: {}, indexedDB: [], caches: [] },
+  origins: [],
 };
 
 function ports(beforeStep: (step: string) => Promise<void> = async () => {}) {
@@ -32,6 +34,8 @@ function ports(beforeStep: (step: string) => Promise<void> = async () => {}) {
     stores: memoryStoreMemory(),
     navigation: fakeNavigationApi(),
     barrier: fakeBarrierApi(),
+    helperTabs: fakeHelperTabs(),
+    visits: memoryVisits(),
     hooks: { beforeStep },
   };
 }

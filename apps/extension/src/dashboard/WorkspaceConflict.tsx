@@ -2,11 +2,15 @@ import type { PanelRequest } from "@/dashboard/workspace-alert";
 import type { WorkspaceStatus } from "@/messaging/workspace-protocol";
 import type { OpenTab } from "@/ports/tabs";
 
-/** An Incognito window, or a tab in the managed window, that RECnRun did not open. */
+/**
+ * An Incognito window, or a tab in the managed window, that RECnRun did not open. While an
+ * operation runs, the managed window's other tab is RECnRun's helper; one the user opened then
+ * shows once it ends.
+ */
 export function hasConflict(status: WorkspaceStatus, tabs: readonly OpenTab[]): boolean {
   if (status.foreign.length > 0) return true;
   const { managed } = status;
-  if (managed?.status !== "active") return false;
+  if (managed?.status !== "active" || status.busy) return false;
   return tabs.some(({ windowId, id }) => windowId === managed.windowId && id !== managed.tabId);
 }
 

@@ -9,6 +9,7 @@ import { ORIGIN_AGENT_PORT } from "@/messaging/origin-protocol";
 const DATA: IdentityData = {
   cookies: [],
   site: { localStorage: {}, sessionStorage: {}, indexedDB: [], caches: [] },
+  origins: [],
 };
 const TIMINGS = [{ step: "window" as const, ms: 2 }];
 const SUMMARY = { captureId: "capture-1", databases: 1, records: 3, ms: 12 };

@@ -127,7 +127,7 @@ test("rejects an unsupported item without its adapter, or a reason long enough t
   expect(valid({ ...capture, unsupported: [{ ...item, reason: "x".repeat(201) }] })).toBe(false);
 });
 
-test("restores a capture's cookies and its target origin's site data, caches included", () => {
+test("restores a capture's cookies, its target origin's site data, and every other origin", () => {
   const capture = sampleCapture();
   const other = { ...partsOf(capture).origin, origin: "http://other.localhost:5192" };
   const { origin } = partsOf(capture);
@@ -140,6 +140,7 @@ test("restores a capture's cookies and its target origin's site data, caches inc
       indexedDB: origin.indexedDB,
       caches: origin.caches,
     },
+    origins: [other],
   });
   expect(v.is(IdentityDataSchema, data)).toBe(true);
   expect(() => restorableData({ ...capture, origins: [other] })).toThrow(/target's origin/);

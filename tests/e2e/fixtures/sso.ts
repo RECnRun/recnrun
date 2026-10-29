@@ -78,13 +78,18 @@ export async function ssoSettled(page: Page): Promise<SsoState> {
   return (await handle.jsonValue()) as SsoState;
 }
 
-/** What the provider's own origin holds in localStorage, read on its page in the managed tab. */
-export async function idpStorage(page: Page): Promise<Record<string, string>> {
+/** What the provider's own origin holds, read on its page in the managed tab. */
+interface IdpHeld {
+  localStorage: Record<string, string>;
+  /** The user its IndexedDB keeps; null when it has no database. */
+  indexedDB: unknown;
+}
+
+/** Reads the provider's localStorage and IndexedDB on its page in the managed tab. */
+export async function idpStorage(page: Page): Promise<IdpHeld> {
   await page.goto(`${IDP}/sso/storage`);
-  return page.evaluate(
-    () =>
-      (window as { __idp?: { localStorage: Record<string, string> } }).__idp?.localStorage ?? {},
-  );
+  const handle = await page.waitForFunction(() => (window as { __idp?: IdpHeld }).__idp);
+  return (await handle.jsonValue()) as IdpHeld;
 }
 
 /** Identities by label at `url`. */

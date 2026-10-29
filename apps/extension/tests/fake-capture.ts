@@ -2,6 +2,7 @@ import type { IdentityCapture } from "@recnrun/domain";
 import { vi } from "vite-plus/test";
 import type { CapturePart } from "@/storage/identity-captures";
 import { fakeCookieApi } from "./fake-cookies";
+import { noVisits } from "./fake-helper";
 import { echoProbes, fakeEvent, fakePort } from "./fake-port";
 
 const ORIGIN = "http://app.localhost:5192";
@@ -32,7 +33,7 @@ export function chrome(
     ],
     [1],
   );
-  return { api, agent, onConnect, cookies };
+  return { api, agent, onConnect, cookies, origins: noVisits() };
 }
 
 /** A repository that keeps what it was told, in order. */

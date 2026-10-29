@@ -13,6 +13,7 @@ import { fakeBarrierApi } from "./fake-barrier";
 import { fakeCookieApi, memoryStoreMemory } from "./fake-cookies";
 import type { FakeCookieApi } from "./fake-cookies";
 import { memoryRecordingStore } from "./fake-extension";
+import { fakeHelperTabs, memoryVisits } from "./fake-helper";
 import { fakeNavigationApi } from "./fake-navigation";
 
 const EXTENSION_URL = "chrome-extension://own-id/";
@@ -29,7 +30,15 @@ export function fakeWorkspacePorts(
   stores = memoryStoreMemory(),
 ) {
   const hooks = { beforeStep: async () => {} };
-  return { cookies, stores, navigation: fakeNavigationApi(), barrier: fakeBarrierApi(), hooks };
+  return {
+    cookies,
+    stores,
+    navigation: fakeNavigationApi(),
+    barrier: fakeBarrierApi(),
+    helperTabs: fakeHelperTabs(),
+    visits: memoryVisits(),
+    hooks,
+  };
 }
 
 /** Delivers messages to one background, as Chrome would, and resolves with the validated reply. */

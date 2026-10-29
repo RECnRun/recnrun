@@ -108,7 +108,9 @@ describe("captureCookies", () => {
   test("fails when the page shows a cookie Chrome did not list, naming it, never its value", async () => {
     // getAll leaves out a cookie of a site the user withheld from RECnRun (cookies_helpers.cc:51-56).
     const api = jarOf([stored({ name: "theme", httpOnly: false })]);
-    const capturing = captureCookies(api, "1", TARGET, ["theme", "d_lax", "d_lax", "sid"]);
+    const capturing = captureCookies(api, "1", TARGET, [
+      { host: TARGET, names: ["theme", "d_lax", "d_lax", "sid"] },
+    ]);
     await expect(capturing).rejects.toMatchObject({
       name: "CookiesNotReadable",
       message:
@@ -126,12 +128,30 @@ describe("captureCookies", () => {
       stored({ name: "secret" }),
     ]);
     await expect(
-      captureCookies(api, "1", TARGET, ["dup", "dup", "wide", ""]),
+      captureCookies(api, "1", TARGET, [{ host: TARGET, names: ["dup", "dup", "wide", ""] }]),
     ).resolves.toHaveLength(6);
-    for (const seen of [["dup", "dup", "dup"], ["sso"], ["secret"]]) {
-      await expect(captureCookies(api, "1", TARGET, seen), seen.join()).rejects.toMatchObject({
+    for (const names of [["dup", "dup", "dup"], ["sso"], ["secret"]]) {
+      const seen = [{ host: TARGET, names }];
+      await expect(captureCookies(api, "1", TARGET, seen), names.join()).rejects.toMatchObject({
         name: "CookiesNotReadable",
       });
     }
+  });
+
+  test("checks each visited origin's page against its own host's cookies", async () => {
+    const api = jarOf([
+      stored({ name: "theme", httpOnly: false }),
+      stored({ name: "sso", domain: "sso.localhost", httpOnly: false }),
+    ]);
+    const seen = [
+      { host: TARGET, names: ["theme"] },
+      { host: "sso.localhost", names: ["sso"] },
+    ];
+    await expect(captureCookies(api, "1", TARGET, seen)).resolves.toHaveLength(2);
+    const lost = [...seen, { host: "other.localhost", names: ["sso", "gone"] }];
+    await expect(captureCookies(api, "1", TARGET, lost)).rejects.toMatchObject({
+      name: "CookiesNotReadable",
+      message: expect.stringContaining('"sso", "gone"'),
+    });
   });
 });

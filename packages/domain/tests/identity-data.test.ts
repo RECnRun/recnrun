@@ -19,10 +19,19 @@ const lasting: SiteCookie = {
   sameSite: "lax",
   expirationDate: 4_102_444_800,
 };
-const identity: IdentityData = {
-  cookies: [session, lasting],
-  site: { localStorage: {}, sessionStorage: {}, indexedDB: [], caches: [] },
-};
+const EMPTY_SITE = { localStorage: {}, sessionStorage: {}, indexedDB: [], caches: [] };
+const identity: IdentityData = { cookies: [session, lasting], site: EMPTY_SITE, origins: [] };
+
+test("data saved before visited origins were kept restores no other origin", () => {
+  const { origins: _origins, ...older } = identity;
+  expect(v.parse(IdentityDataSchema, older)).toEqual(identity);
+  const provider = { origin: "http://sso.localhost:5192", ...EMPTY_SITE };
+  expect(v.parse(IdentityDataSchema, { ...identity, origins: [provider] }).origins).toEqual([
+    provider,
+  ]);
+  const internal = { ...provider, origin: "chrome://settings" };
+  expect(v.is(IdentityDataSchema, { ...identity, origins: [internal] })).toBe(false);
+});
 
 test("accepts host-only, domain, session, and lasting cookies with every attribute", () => {
   expect(v.parse(IdentityDataSchema, identity)).toEqual(identity);

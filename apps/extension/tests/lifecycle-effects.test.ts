@@ -82,7 +82,7 @@ test("loading a start from a capture RECnRun does not have refuses and opens no 
 test("captures the managed tab, and deletes its captures", async () => {
   const { effects: chromeSide, captures, api } = effects(undefined, null);
   const managed = await createNeutralWindow("a");
-  await expect(chromeSide.capture(identity("a"), managed)).rejects.toMatchObject({
+  await expect(chromeSide.capture(identity("a"), managed, "op-7")).rejects.toMatchObject({
     name: "TargetNotAllowed",
   });
   expect(api.topFrame).toHaveBeenCalledWith(managed.tabId);
@@ -93,9 +93,11 @@ test("captures the managed tab, and deletes its captures", async () => {
 test("a capture first settles the identity's earlier one, then publishes tentatively", async () => {
   const { effects: chromeSide, captures, agent } = effects();
   const managed = { generation: 1, windowId: 5, tabId: 7, status: "active" as const };
-  const capturing = chromeSide.capture(identity("a"), { ...managed, identityId: "a" });
+  const capturing = chromeSide.capture(identity("a"), { ...managed, identityId: "a" }, "op-7");
   await vi.waitFor(() => expect(agent.posted).toHaveLength(1));
   const { operationId, generation } = agent.posted[0] as Record<string, unknown>;
+  // The lifecycle's operation names the capture, so a restart's recovery finds its helper barriers.
+  expect(operationId).toBe("op-7");
   for (const reply of completeReplies) agent.onMessage.emit({ ...reply, operationId, generation });
   await expect(capturing).resolves.toMatchObject({ records: 2 });
   expect(captures.calls.slice(0, 2)).toEqual(["settle", "begin"]);

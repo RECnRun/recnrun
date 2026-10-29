@@ -16,10 +16,13 @@ import {
 } from "@/background/workspace/cookie-stores";
 import type { CookieApi } from "@/background/workspace/cookie-stores";
 import { collectFailures } from "@/background/workspace/errors";
+import { visitOrigins } from "@/background/workspace/helper-tab";
+import type { HelperTabApi } from "@/background/workspace/helper-tab";
 import { openBehindBarrier, reloadAndCommit } from "@/background/workspace/navigation";
 import type { NavigationApi } from "@/background/workspace/navigation";
 import type { OriginPort } from "@/messaging/origin-protocol";
 import type { IncognitoStoreMemory } from "@/ports/incognito-stores";
+import type { VisitedOrigins } from "@/ports/visited-origins";
 
 /** The steps of a start with an identity, in order; the journal and the timings name them. */
 export const BOOTSTRAP_STEPS = [
@@ -27,6 +30,7 @@ export const BOOTSTRAP_STEPS = [
   "window",
   "cookie-store",
   "cookies",
+  "origins",
   "barrier",
   "navigate",
   "restore",
@@ -57,6 +61,9 @@ export interface BootstrapPorts {
   stores: IncognitoStoreMemory;
   navigation: NavigationApi;
   barrier: BarrierApi;
+  /** The hidden tab the other visited origins are restored in. */
+  helperTabs: HelperTabApi;
+  visits: VisitedOrigins;
   hooks: BootstrapHooks;
 }
 
@@ -118,6 +125,19 @@ const STEP_RUNS: Record<BootstrapStep, (run: Run) => Promise<unknown>> = {
       run.origin,
       run.data.cookies,
     ),
+  origins: async (run) => {
+    const { generation, windowId } = known(run.window, "window");
+    const others = run.data.origins;
+    // Noted first, so the next capture keeps them even when the app never loads them again.
+    await run.deps.visits.note(generation, [run.origin, ...others.map(({ origin }) => origin)]);
+    const operation = barrierOperation(run);
+    const { helperTabs: tabs, barrier, navigation } = run.deps;
+    const visiting = { windowId, operation, work: "restore" as const };
+    await visitOrigins(others, visiting, { tabs, barrier, navigation }, (agent, other) => {
+      const { origin: _origin, ...site } = other;
+      return restoreThroughAgent(agent, operation, site, RESTORE_BOUND_MS);
+    });
+  },
   barrier: async (run) => {
     const operation = barrierOperation(run);
     run.barrier = await installBarrier(tabOf(run), run.origin, operation, run.deps.barrier);
@@ -172,8 +192,9 @@ async function fail(run: Run, error: unknown): Promise<never> {
 
 /**
  * Opens a fresh managed window and restores `data` into it before the app at `url` runs: cookies
- * into the tab's own store, then site data behind the barrier, then a reload of the same tab
- * releases the app. Any failure closes the window, so no partly restored app is ever released.
+ * into the tab's own store, the other visited origins' site data in a helper tab, then the target's
+ * behind the barrier, then a reload of the same tab releases the app. Any failure closes the
+ * window, so no partly restored app is ever released.
  */
 export async function bootstrapIdentity(
   url: string,

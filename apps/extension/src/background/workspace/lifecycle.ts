@@ -94,7 +94,11 @@ async function start(run: Run): Promise<void> {
 const STEP_RUNS: Record<LifecycleStep, (run: Run) => Promise<void>> = {
   capture: async (run) => {
     if (run.open)
-      run.captured = await run.deps.effects.capture(run.open.identity, run.open.managed);
+      run.captured = await run.deps.effects.capture(
+        run.open.identity,
+        run.open.managed,
+        run.operation.id,
+      );
   },
   persist,
   close: closeOpen,

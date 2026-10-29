@@ -29,7 +29,12 @@ export interface LifecycleEffects {
     foreign: readonly number[];
     otherTabs: number;
   }>;
-  capture: (identity: Identity, managed: ManagedWindowState) => Promise<CaptureSummary>;
+  /** Saves the open identity; `operationId` names the barriers its helper tab installs. */
+  capture: (
+    identity: Identity,
+    managed: ManagedWindowState,
+    operationId: string,
+  ) => Promise<CaptureSummary>;
   close: (windowIds: readonly number[]) => Promise<void>;
   /** Reads and validates what a start of `identity` restores, before any step runs. */
   load: (identity: Identity, from: Opening["from"]) => Promise<Opening>;

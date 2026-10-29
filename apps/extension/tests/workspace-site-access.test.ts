@@ -14,6 +14,7 @@ const WITHHELD =
 const EMPTY: IdentityData = {
   cookies: [],
   site: { localStorage: {}, sessionStorage: {}, indexedDB: [], caches: [] },
+  origins: [],
 };
 
 function commands() {

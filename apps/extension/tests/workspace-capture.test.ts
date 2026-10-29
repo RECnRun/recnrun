@@ -42,6 +42,7 @@ async function captureAnswering(replies: object[], setup = chrome(), captures = 
     api: setup.api,
     captures,
     cookies: setup.cookies,
+    origins: setup.origins,
     boundMs: BOUND,
   });
   const { operation } = await commandOf(setup.agent);
@@ -158,7 +159,7 @@ describe("a failed capture", () => {
     const captures = memoryCaptures();
     const shared = fakeCookieApi([[{ id: "0", tabIds: [1, 7] }]], [1]);
     await expect(
-      captureIdentity("identity-a", MANAGED, { api: setup.api, captures, cookies: shared }),
+      captureIdentity("identity-a", MANAGED, { ...setup, captures, cookies: shared }),
     ).rejects.toMatchObject({ name: "CookieStoreNotFound" });
     expect(setup.api.inject).not.toHaveBeenCalled();
     expect(captures.calls).toEqual([]);

@@ -1,6 +1,6 @@
 import { restorableData } from "@recnrun/domain";
 import type { IdentityData } from "@recnrun/domain";
-import { captureIdentity, chromeCaptureApi } from "@/background/workspace/capture";
+import { captureIdentity, captureOrigins, chromeCaptureApi } from "@/background/workspace/capture";
 import type { CaptureDeps, CaptureSummary } from "@/background/workspace/capture";
 import { chromeCookieApi } from "@/background/workspace/cookie-stores";
 import { WorkspaceError } from "@/background/workspace/errors";
@@ -11,7 +11,7 @@ import { identityRepository } from "@/storage/identity-repository";
 import type { IdentityRepository } from "@/ports/identities";
 
 /** A capture's Chrome APIs, the captures that are also read back and deleted, and the identities. */
-export interface IdentityDeps extends CaptureDeps {
+export interface IdentityDeps extends Omit<CaptureDeps, "origins"> {
   captures: CaptureDeps["captures"] & Pick<IdentityCaptures, "read" | "remove" | "settle">;
   identities: IdentityRepository;
 }
@@ -30,12 +30,13 @@ export function chromeIdentityDeps(): IdentityDeps {
 export async function captureManaged(
   identityId: string,
   deps: IdentityDeps,
+  ports: Parameters<typeof captureOrigins>[0],
 ): Promise<CaptureSummary> {
   const managed = await managedWindowRepository.read();
   if (managed?.status !== "active") {
     throw new WorkspaceError("NoManagedWindow", "No Incognito workspace is open to capture.");
   }
-  return captureIdentity(identityId, managed, deps);
+  return captureIdentity(identityId, managed, { ...deps, origins: captureOrigins(ports) });
 }
 
 /**

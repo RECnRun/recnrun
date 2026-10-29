@@ -3,7 +3,7 @@ import { IdSchema } from "./ids.ts";
 import { SiteCookieSchema } from "./identity-data.ts";
 import type { IdentityData } from "./identity-data.ts";
 import { TargetUrlSchema } from "./managed-window.ts";
-import { OriginDataSchema } from "./origin-data.ts";
+import { OriginCaptureSchema } from "./origin-data.ts";
 
 /** The capture format's own version, apart from `Snapshot`'s; a breaking change bumps it. */
 export const IDENTITY_CAPTURE_VERSION = 1;
@@ -37,20 +37,11 @@ const TimeSchema = v.pipe(v.number(), v.minValue(0));
 /** An error name or a short reason; never long enough to hold a stored value. */
 const ReasonSchema = v.pipe(v.string(), v.nonEmpty(), v.maxLength(200));
 
-/** `scheme://host[:port]` as `URL.origin` writes it: lower case, no path; the domain has no `URL`. */
-const OriginSchema = v.pipe(
-  v.string(),
-  v.regex(/^https?:\/\/([a-z0-9.-]+|\[[0-9a-f:]+\])(:\d{1,5})?$/),
-);
-
 /** Whether `url` is a page of `origin`: the origin, then nothing or a path, query, or fragment. */
 function isPageOf(url: string, origin: string): boolean {
   const rest = url.slice(origin.length);
   return url.startsWith(origin) && (rest === "" || "/?#".includes(rest.charAt(0)));
 }
-
-/** One origin's captured site data, Cache Storage included: what the origin agent restores. */
-const OriginCaptureSchema = v.object({ origin: OriginSchema, ...OriginDataSchema.entries });
 
 const AdapterResultSchema = v.object({
   adapter: AdapterSchema,
@@ -119,10 +110,11 @@ export const IdentityCaptureSchema = v.pipe(
 
 export type IdentityCapture = v.InferOutput<typeof IdentityCaptureSchema>;
 
-/** What a start from `capture` restores: its cookies, then all site data of its target's origin. */
+/** What a start from `capture` restores: its cookies, its target origin's site data, then the rest. */
 export function restorableData(capture: IdentityCapture): IdentityData {
   const target = capture.origins.find(({ origin }) => isPageOf(capture.url, origin));
   if (!target) throw new Error("The capture holds no data for its target's origin.");
   const { origin: _origin, ...site } = target;
-  return { cookies: capture.cookies, site };
+  const origins = capture.origins.filter((each) => each !== target);
+  return { cookies: capture.cookies, site, origins };
 }

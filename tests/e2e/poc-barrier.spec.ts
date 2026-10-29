@@ -26,6 +26,7 @@ const STEPS = [
   "window",
   "cookie-store",
   "cookies",
+  "origins",
   "barrier",
   "navigate",
   "restore",

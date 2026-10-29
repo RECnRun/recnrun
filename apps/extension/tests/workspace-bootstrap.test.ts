@@ -1,40 +1,14 @@
-import type { IdentityData, WorkspaceOperation } from "@recnrun/domain";
+import type { WorkspaceOperation } from "@recnrun/domain";
 import { beforeEach, describe, expect, test, vi } from "vite-plus/test";
 import { BOOTSTRAP_STEPS, bootstrapIdentity } from "@/background/workspace/bootstrap";
 import type { BootstrapDeps } from "@/background/workspace/bootstrap";
 import { WorkspaceError } from "@/background/workspace/errors";
-import { fakeBarrierApi } from "./fake-barrier";
+import { DATA, ORIGIN, START, WINDOW, bootstrapHarness } from "./bootstrap-harness";
+import type { Seen } from "./bootstrap-harness";
 import type { FakeBarrierApi } from "./fake-barrier";
-import { fakeCookieApi, memoryStoreMemory } from "./fake-cookies";
+import { memoryStoreMemory } from "./fake-cookies";
 import type { FakeCookieApi } from "./fake-cookies";
-import { fakeNavigationApi } from "./fake-navigation";
 import type { FakeNavigationApi } from "./fake-navigation";
-import { echoProbes, fakePort } from "./fake-port";
-
-const ORIGIN = "http://app.localhost:5192";
-const URL_ = `${ORIGIN}/app/redirect?run=1`;
-const START = URL_;
-const WINDOW = { generation: 2, windowId: 5, tabId: 9, status: "active" as const };
-const DATA: IdentityData = {
-  cookies: [{ name: "sid", value: "s", path: "/", secure: false, httpOnly: true, sameSite: "lax" }],
-  site: { localStorage: { theme: "dark" }, sessionStorage: {}, indexedDB: [], caches: [] },
-};
-const COUNTS = {
-  localStorage: 1,
-  sessionStorage: 0,
-  databases: 0,
-  records: 0,
-  caches: 0,
-  cacheEntries: 0,
-};
-
-interface Seen {
-  cookiesAtNavigation: number;
-  rulesAtNavigation: number;
-  rulesAtReload: number;
-  scriptsAtReload: number;
-  restorePayload: unknown;
-}
 
 let cookies: FakeCookieApi;
 let navigation: FakeNavigationApi;
@@ -43,82 +17,12 @@ let records: WorkspaceOperation[];
 let seen: Seen;
 let deps: BootstrapDeps;
 
-/** The origin agent's port: connects on navigation, echoes the probe, and answers the restore. */
-function connectAgent(reply: "restored" | "failed" = "restored") {
-  const agent = fakePort({ tab: { id: 9 }, frameId: 0, documentId: "doc-1", origin: ORIGIN });
-  agent.postMessage = (message: unknown) => {
-    const { operationId, generation, payload } = message as Record<string, unknown>;
-    seen.restorePayload = payload;
-    const answer = reply === "restored" ? { counts: COUNTS } : { error: "QuotaExceededError" };
-    queueMicrotask(() => agent.onMessage.emit({ type: reply, operationId, generation, ...answer }));
-  };
-  echoProbes(agent);
-  navigation.onConnect.emit(agent);
-  navigation.onCommitted.emit({
-    tabId: 9,
-    frameId: 0,
-    url: `${ORIGIN}/app/?run=1`,
-    documentId: "doc-1",
-  });
-  return agent;
-}
-
-function harness(agentReply: "restored" | "failed" = "restored") {
-  cookies = fakeCookieApi(
-    [
-      [
-        { id: "0", tabIds: [1] },
-        { id: "1", tabIds: [9] },
-      ],
-    ],
-    [1],
-    [9],
-  );
-  // The previous Incognito store is gone before the window opens.
-  cookies.listings.unshift([{ id: "0", tabIds: [1] }]);
-  navigation = fakeNavigationApi();
-  barrier = fakeBarrierApi();
-  const update = navigation.update;
-  navigation.update = async (tabId, url) => {
-    await update(tabId, url);
-    seen.cookiesAtNavigation = cookies.written.length;
-    seen.rulesAtNavigation = barrier.rules.size;
-    connectAgent(agentReply);
-  };
-  navigation.reload = async (tabId, documentId) => {
-    navigation.reloads.push({ tabId, documentId });
-    seen.rulesAtReload = barrier.rules.size;
-    seen.scriptsAtReload = barrier.scripts.size;
-    navigation.onCommitted.emit({
-      tabId,
-      frameId: 0,
-      url: `${ORIGIN}/app/?run=1`,
-      documentId: "doc-2",
-    });
-  };
-  return {
-    cookies,
-    stores: memoryStoreMemory(),
-    navigation,
-    barrier,
-    windows: { create: vi.fn(async () => WINDOW), close: vi.fn(async () => {}) },
-    hooks: { beforeStep: vi.fn(async () => {}) },
-    record: vi.fn(async (operation: WorkspaceOperation) => {
-      records.push(operation);
-    }),
-  } satisfies BootstrapDeps;
+function use(harness: ReturnType<typeof bootstrapHarness>) {
+  ({ cookies, navigation, barrier, records, seen, deps } = harness);
 }
 
 beforeEach(() => {
-  records = [];
-  seen = {
-    cookiesAtNavigation: -1,
-    rulesAtNavigation: -1,
-    rulesAtReload: -1,
-    scriptsAtReload: -1,
-    restorePayload: undefined,
-  };
-  deps = harness();
+  use(bootstrapHarness());
 });
 
 describe("bootstrapIdentity", () => {
@@ -131,7 +35,7 @@ describe("bootstrapIdentity", () => {
     expect(seen.restorePayload).toEqual(DATA.site);
     expect(seen.rulesAtReload).toBe(0);
     expect(seen.scriptsAtReload).toBe(0);
-    expect(navigation.updates).toEqual([{ tabId: 9, url: URL_ }]);
+    expect(navigation.updates).toEqual([{ tabId: 9, url: START }]);
     // The barrier's document starts the reload, so the released request is the page's own.
     expect(navigation.reloads).toEqual([{ tabId: 9, documentId: "doc-1" }]);
     expect(timings.map(({ step }) => step)).toEqual(BOOTSTRAP_STEPS);
@@ -240,7 +144,7 @@ describe("bootstrapIdentity", () => {
   });
 
   test("fails when the agent cannot restore, and leaves the app unreleased", async () => {
-    deps = harness("failed");
+    use(bootstrapHarness("failed"));
     await expect(bootstrapIdentity(START, DATA, deps, "op-1")).rejects.toMatchObject({
       name: "RestoreFailed",
     });

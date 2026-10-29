@@ -9,6 +9,7 @@ export interface BarrierRule {
   priority: number;
   action: {
     type: "allow" | "block" | "modifyHeaders";
+    requestHeaders?: { header: string; operation: "remove" }[];
     responseHeaders?: (
       | { header: string; operation: "append"; value: string }
       | { header: string; operation: "remove" }
@@ -58,7 +59,7 @@ export const BARRIER_CSP =
 export const AGENT_SCRIPT = "content-scripts/origin-agent.js";
 
 const RULES_PER_GENERATION = 10;
-const RULES_PER_BARRIER = 5;
+const RULES_PER_BARRIER = 6;
 
 function requireOrigin(target: string): void {
   const url = URL.parse(target);
@@ -104,6 +105,23 @@ function handOverRule(id: number, tabIds: number[], origin: string): BarrierRule
   };
 }
 
+/**
+ * A helper tab's document loads as no one: its request sends no cookie, so the site acts on no
+ * session, and a `Set-Cookie` in its response never reaches the identity's store.
+ */
+function anonymousRule(id: number, tabIds: number[]): BarrierRule {
+  return {
+    id,
+    priority: 3,
+    action: {
+      type: "modifyHeaders",
+      requestHeaders: [{ header: "cookie", operation: "remove" }],
+      responseHeaders: [{ header: "set-cookie", operation: "remove" }],
+    },
+    condition: { tabIds, resourceTypes: ["main_frame"] },
+  };
+}
+
 /** Blocks everything in the tab, then lets only the target origin's documents through, script-free. */
 function barrierRules(tabId: number, origin: string, generation: number): BarrierRule[] {
   const base = generation * RULES_PER_GENERATION;
@@ -145,7 +163,11 @@ function barrierRules(tabId: number, origin: string, generation: number): Barrie
 
 const agentScriptId = (operationId: string) => `recnrun-origin-agent-${operationId}`;
 
-/** The rule and script ids an operation's barrier uses, known without the tab or the origin. */
+/**
+ * The rule and script ids an operation's barrier uses, known without the tab or the origin; the
+ * anonymous rule's id is always among them, and Chrome ignores removing an id it lacks
+ * (rules_monitor_service.cc:817-819).
+ */
 export function barrierOf({ id, generation }: BarrierOperation): Barrier {
   const base = generation * RULES_PER_GENERATION;
   const ruleIds = Array.from({ length: RULES_PER_BARRIER }, (_, index) => base + index + 1);
@@ -174,17 +196,13 @@ async function requireFree(barrier: Barrier, api: BarrierApi): Promise<void> {
   }
 }
 
-/** Installs the tab's barrier and the origin agent; on failure, leaves nothing behind. */
-export async function installBarrier(
-  tabId: number,
-  origin: string,
-  operation: BarrierOperation,
+/** Installs the rules and the origin agent; on failure, leaves nothing behind. */
+async function install(
+  rules: BarrierRule[],
+  script: AgentScript,
+  barrier: Barrier,
   api: BarrierApi,
 ): Promise<Barrier> {
-  requireOrigin(origin);
-  const rules = barrierRules(tabId, origin, operation.generation);
-  const script = agentScript(origin, operation.id);
-  const barrier = barrierOf(operation);
   await requireFree(barrier, api);
   await api.addSessionRules(rules);
   try {
@@ -194,6 +212,32 @@ export async function installBarrier(
     throw new WorkspaceError("BarrierNotInstalled", "Chrome did not register the origin agent.");
   }
   return barrier;
+}
+
+/** Installs the tab's barrier and the origin agent; on failure, leaves nothing behind. */
+export async function installBarrier(
+  tabId: number,
+  origin: string,
+  operation: BarrierOperation,
+  api: BarrierApi,
+): Promise<Barrier> {
+  requireOrigin(origin);
+  const rules = barrierRules(tabId, origin, operation.generation);
+  return await install(rules, agentScript(origin, operation.id), barrierOf(operation), api);
+}
+
+/** The barrier for a helper tab, which also keeps the identity's cookies out of its document's exchange. */
+export async function installAnonymousBarrier(
+  tabId: number,
+  origin: string,
+  operation: BarrierOperation,
+  api: BarrierApi,
+): Promise<Barrier> {
+  requireOrigin(origin);
+  const barrier = barrierOf(operation);
+  const rules = barrierRules(tabId, origin, operation.generation);
+  rules.push(anonymousRule(barrier.ruleIds[RULES_PER_BARRIER - 1] ?? 0, [tabId]));
+  return await install(rules, agentScript(origin, operation.id), barrier, api);
 }
 
 /** Removes this barrier only, then asks Chrome again to prove it is gone. */

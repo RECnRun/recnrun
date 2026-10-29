@@ -1,17 +1,21 @@
 import { approximateBytes } from "@recnrun/domain";
-import type { IdentityCapture, ManagedWindowState } from "@recnrun/domain";
+import type { IdentityCapture, ManagedWindowState, OriginCapture } from "@recnrun/domain";
 import { browser } from "wxt/browser";
 import { captureThroughAgent, isExpectedAgent } from "@/background/workspace/agent-link";
 import { AGENT_SCRIPT } from "@/background/workspace/barrier";
 import type { BarrierOperation } from "@/background/workspace/barrier";
+import type { BootstrapPorts } from "@/background/workspace/bootstrap";
 import { checkWhole, collector } from "@/background/workspace/capture-collector";
-import type { Collected, WebStorage } from "@/background/workspace/capture-collector";
+import type { Collected } from "@/background/workspace/capture-collector";
 import { captureCookies } from "@/background/workspace/cookie-capture";
 import { resolveTabStore } from "@/background/workspace/cookie-stores";
 import type { CookieApi } from "@/background/workspace/cookie-stores";
 import { WorkspaceError } from "@/background/workspace/errors";
+import { visitOrigins } from "@/background/workspace/helper-tab";
+import type { HelperDeps } from "@/background/workspace/helper-tab";
 import { ORIGIN_AGENT_PORT } from "@/messaging/origin-protocol";
-import type { OriginPort } from "@/messaging/origin-protocol";
+import type { CapturedCounts, CapturedPage, OriginPort } from "@/messaging/origin-protocol";
+import type { VisitedOrigins } from "@/ports/visited-origins";
 import type { IdentityCaptures } from "@/storage/identity-captures";
 
 interface ConnectEvent {
@@ -30,6 +34,8 @@ export interface CaptureDeps {
   api: CaptureApi;
   captures: Pick<IdentityCaptures, "begin" | "append" | "publish" | "discard">;
   cookies: Pick<CookieApi, "stores" | "normalTabIds" | "all">;
+  /** The other origins the window visited, and the helper tab each one loads in. */
+  origins: { visits: Pick<VisitedOrigins, "visited">; helper: HelperDeps };
   boundMs?: number;
 }
 
@@ -122,54 +128,111 @@ const ADAPTERS = [
   "cacheStorage",
 ] as const;
 
-function completeHeader(
-  started: IdentityCapture,
-  storage: WebStorage,
-  collected: Collected,
-  jar: Jar,
-): IdentityCapture {
-  const [origin] = started.origins;
+/** One origin's data as its agent sent it, written as parts under the capture's id. */
+interface OriginRead {
+  origin: OriginCapture;
+  collected: Collected;
+  page: CapturedPage;
+}
+
+function completeHeader(started: IdentityCapture, reads: OriginRead[], jar: Jar): IdentityCapture {
   return {
     ...started,
     status: "complete",
     endedAt: Date.now(),
     adapters: ADAPTERS.map((adapter) => ({ adapter, status: "captured" as const })),
-    valueTypes: collected.valueTypes,
+    valueTypes: [...new Set(reads.flatMap(({ collected }) => collected.valueTypes))],
     cookies: jar,
-    unsupported: collected.unsupported,
-    origins: origin ? [{ ...origin, ...storage, indexedDB: collected.databases }] : [],
+    unsupported: reads.flatMap(({ collected }) => collected.unsupported),
+    origins: reads.map(({ origin }) => origin),
   };
 }
 
-/** Every cookie of the tab's store, checked against the names the page showed. */
-function cookieJar(deps: CaptureDeps, target: Target, seen: string[]) {
+/** Every cookie of the tab's store, checked against the names each origin's page showed. */
+function cookieJar(deps: CaptureDeps, target: Target, reads: OriginRead[]) {
+  const seen = reads.map(({ origin, page }) => ({
+    host: new URL(origin.origin).hostname,
+    names: page.cookieNames,
+  }));
   return captureCookies(deps.cookies, target.storeId, new URL(target.origin).hostname, seen);
 }
 
-/** Reads the page through its link and publishes it as `identityId`'s capture, or discards it. */
+/** Reads one origin's page through its agent; every part is written before the counts are checked. */
+async function readOrigin(
+  port: OriginPort,
+  { operation, captureId }: { operation: BarrierOperation; captureId: string },
+  origin: string,
+  deps: CaptureDeps,
+): Promise<OriginRead> {
+  const { receiver, written } = collector(captureId, origin, deps.captures);
+  const boundMs = deps.boundMs ?? CAPTURE_BOUND_MS;
+  const page = await captureThroughAgent(port, operation, receiver, boundMs);
+  const collected = await written();
+  const storage = checkWhole(collected, page.counts);
+  const read = { origin, ...storage, indexedDB: collected.databases, caches: [] };
+  return { origin: read, collected, page };
+}
+
+/** The target's page first, then every other origin the window visited, each in the helper tab. */
+async function readOrigins(
+  port: OriginPort,
+  reading: { operation: BarrierOperation; captureId: string; windowId: number },
+  target: Target,
+  deps: CaptureDeps,
+): Promise<OriginRead[]> {
+  const first = await readOrigin(port, reading, target.origin, deps);
+  const visited = await deps.origins.visits.visited(reading.operation.generation);
+  const others = visited.filter((origin) => origin !== target.origin).map((origin) => ({ origin }));
+  const visiting = {
+    windowId: reading.windowId,
+    operation: reading.operation,
+    work: "save" as const,
+  };
+  const rest = await visitOrigins(others, visiting, deps.origins.helper, (agent, { origin }) =>
+    readOrigin(agent, reading, origin, deps),
+  );
+  return [first, ...rest];
+}
+
+const COUNTED = [
+  "localStorage",
+  "sessionStorage",
+  "databases",
+  "records",
+  "caches",
+  "cacheEntries",
+] as const;
+
+function totals(reads: OriginRead[]): CapturedCounts {
+  const sum = (key: (typeof COUNTED)[number]) =>
+    reads.reduce((total, { page }) => total + page.counts[key], 0);
+  return Object.fromEntries(COUNTED.map((key) => [key, sum(key)])) as CapturedCounts;
+}
+
+/** Reads every origin and the cookies, then publishes them as `identityId`'s capture, or discards it. */
 async function captureThrough(
-  { port, operation }: { port: OriginPort; operation: BarrierOperation },
+  { port, ...reading }: { port: OriginPort; operation: BarrierOperation; windowId: number },
   target: Target,
   started: IdentityCapture,
   deps: CaptureDeps,
 ) {
-  const { captures, boundMs = CAPTURE_BOUND_MS } = deps;
+  const { captures } = deps;
   try {
     await captures.begin(started);
-    const { receiver, written } = collector(started.id, started.origins[0]?.origin ?? "", captures);
-    const { counts, cookieNames } = await captureThroughAgent(port, operation, receiver, boundMs);
-    const collected = await written();
-    const storage = checkWhole(collected, counts);
-    const jar = await cookieJar(deps, target, cookieNames);
-    const header = completeHeader(started, storage, collected, jar);
+    const reads = await readOrigins(port, { ...reading, captureId: started.id }, target, deps);
+    const jar = await cookieJar(deps, target, reads);
+    const header = completeHeader(started, reads, jar);
     await captures.publish(header);
-    const kept = [storage.localStorage, storage.sessionStorage, header.cookies];
-    const bytes = collected.bytes + approximateBytes(kept);
+    const kept = [
+      ...reads.flatMap(({ origin }) => [origin.localStorage, origin.sessionStorage]),
+      jar,
+    ];
+    const written = reads.reduce((total, { collected }) => total + collected.bytes, 0);
     return {
-      ...counts,
+      ...totals(reads),
       cookies: jar.length,
       unsupported: header.unsupported.length,
-      bytes,
+      bytes: written + approximateBytes(kept),
     };
   } catch (error) {
     await captures.discard(started.id).catch(() => undefined);
@@ -177,23 +240,37 @@ async function captureThrough(
   }
 }
 
-/** Captures the managed tab's top document and its cookies as `identityId`'s saved data. */
+/**
+ * Captures the managed tab's top document, every other origin the window visited, and the cookies
+ * as `identityId`'s saved data; `operationId` names the helper tab's barriers, so a restart's
+ * recovery removes them.
+ */
 export async function captureIdentity(
   identityId: string,
   managed: ManagedWindowState,
   deps: CaptureDeps,
+  operationId: string = crypto.randomUUID(),
 ): Promise<CaptureSummary> {
   const began = performance.now();
   const target = await targetOf(deps, managed.tabId);
   const port = await connectAgent(deps.api, target, deps.boundMs ?? CAPTURE_BOUND_MS);
   const started = startedHeader(identityId, target);
-  const operation = { id: crypto.randomUUID(), generation: managed.generation };
+  const operation = { id: operationId, generation: managed.generation };
   try {
-    const counts = await captureThrough({ port, operation }, target, started, deps);
+    const link = { port, operation, windowId: managed.windowId };
+    const counts = await captureThrough(link, target, started, deps);
     return { captureId: started.id, ...counts, ms: Math.round(performance.now() - began) };
   } finally {
     port.disconnect();
   }
+}
+
+/** Where a capture finds the visited origins and the helper tab: the bootstrap's own ports. */
+export function captureOrigins(
+  ports: Pick<BootstrapPorts, "visits" | "helperTabs" | "barrier" | "navigation">,
+): CaptureDeps["origins"] {
+  const { visits, helperTabs: tabs, barrier, navigation } = ports;
+  return { visits, helper: { tabs, barrier, navigation } };
 }
 
 /** Chrome's APIs; the getter reaches `runtime.onConnect` only when a capture runs. */

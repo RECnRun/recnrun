@@ -1,5 +1,5 @@
 import * as v from "valibot";
-import { OriginDataSchema } from "./origin-data.ts";
+import { OriginCaptureSchema, OriginDataSchema } from "./origin-data.ts";
 
 /** A host name as Chrome writes a cookie's host: letters, digits, dots, and hyphens. */
 const HostSchema = v.pipe(v.string(), v.regex(/^[a-z0-9.-]+$/i));
@@ -38,10 +38,15 @@ export const SiteCookieSchema = v.pipe(
 
 export type SiteCookie = v.InferOutput<typeof SiteCookieSchema>;
 
-/** What a start with an identity restores: its cookies, then one origin's site data. */
+/**
+ * What a start with an identity restores: its cookies, the target origin's site data, and the
+ * other origins the session visited, each restored in a helper tab before the app runs.
+ */
 export const IdentityDataSchema = v.object({
   cookies: v.array(SiteCookieSchema),
   site: OriginDataSchema,
+  // Data captured before visited origins were kept named only the target's.
+  origins: v.optional(v.array(OriginCaptureSchema), []),
 });
 
 export type IdentityData = v.InferOutput<typeof IdentityDataSchema>;

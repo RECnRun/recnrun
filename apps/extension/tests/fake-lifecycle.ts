@@ -33,6 +33,7 @@ export function memoryIdentities(initial: Identity[] = []) {
 const NOTHING = {
   cookies: [],
   site: { localStorage: {}, sessionStorage: {}, indexedDB: [], caches: [] },
+  origins: [],
 };
 
 const SUMMARY: CaptureSummary = {

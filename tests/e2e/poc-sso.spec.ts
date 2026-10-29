@@ -33,7 +33,10 @@ test("each identity comes back signed in at its provider through A → B → A �
   expect(again.state).toMatchObject({ first: { token: "A" }, signedIn: "A" });
   expect(await silentChecks(run)).toEqual(["none", "none", "session", "none", "session"]);
 
-  // Another site contributes its cookies only: the provider's own localStorage starts empty.
-  expect(await idpStorage(again.page)).toEqual({});
+  // The provider's origin was visited, so its own storage comes back with A too.
+  expect(await idpStorage(again.page)).toEqual({
+    localStorage: { idp_user: "A" },
+    indexedDB: "A",
+  });
   expect(await incognitoWindows(serviceWorker)).toBe(1);
 });

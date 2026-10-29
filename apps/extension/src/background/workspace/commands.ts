@@ -22,6 +22,7 @@ import type { IdentityDeps } from "@/background/workspace/identity-commands";
 import { createLifecycle } from "@/background/workspace/lifecycle";
 import type { LifecycleCommands } from "@/background/workspace/lifecycle-types";
 import { chromeLifecycleEffects } from "@/background/workspace/lifecycle-effects";
+import { chromeHelperTabApi } from "@/background/workspace/helper-tab";
 import { chromeNavigationApi } from "@/background/workspace/navigation";
 import { recoverInterrupted } from "@/background/workspace/recovery";
 import type { RecoveryDeps } from "@/background/workspace/recovery";
@@ -32,6 +33,7 @@ import type { RecordingStore } from "@/ports/recording-store";
 import type { OperationJournal } from "@/ports/operation-journal";
 import { managedWindowRepository } from "@/storage/managed-window-repository";
 import { operationJournal } from "@/storage/operation-journal";
+import { visitedOrigins } from "@/storage/visited-origins";
 
 /** What the dashboard can ask of the Incognito workspace and its saved identities. */
 export interface WorkspaceCommands extends LifecycleCommands {
@@ -135,6 +137,8 @@ export function chromeBootstrapPorts(
     stores: incognitoStoreMemory,
     navigation: chromeNavigationApi,
     barrier: chromeBarrierApi,
+    helperTabs: chromeHelperTabApi,
+    visits: visitedOrigins,
     hooks,
   };
 }
@@ -274,7 +278,7 @@ export function createWorkspaceCommands(
     captureIdentity: (identityId) =>
       exclusive(async () => {
         await requireAccess();
-        return captureManaged(identityId, identities);
+        return captureManaged(identityId, identities, ports);
       }),
     startFromCapture: (identityId) => startRestoring(() => savedStart(identityId, identities)),
   };

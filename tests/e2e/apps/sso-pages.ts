@@ -52,10 +52,35 @@ export const ssoAppHtml = (run: string) =>
   `<script>(${ssoApp.toString()})(${literal(run)}, ${literal(IDP)});</script>` +
   `</head><body></body></html>`;
 
-/** The provider's sign-in page: it remembers the user in its own storage, then returns. */
+/** The provider's sign-in page: it remembers the user in its localStorage and IndexedDB, then returns. */
 function idpSignedIn(user: string, back: string): void {
   localStorage.setItem("idp_user", user);
-  location.replace(back);
+  const open = indexedDB.open("idp", 1);
+  open.onupgradeneeded = () => open.result.createObjectStore("session");
+  open.onsuccess = () => {
+    const transaction = open.result.transaction("session", "readwrite");
+    transaction.objectStore("session").put(user, "user");
+    transaction.oncomplete = () => location.replace(back);
+  };
+}
+
+/** Reads what the provider's origin holds, without creating its database when it is absent. */
+async function idpHeld(): Promise<void> {
+  const held = {
+    localStorage: Object.fromEntries(Object.entries(localStorage)),
+    indexedDB: null as unknown,
+  };
+  const names = (await indexedDB.databases()).map(({ name }) => name);
+  if (names.includes("idp")) {
+    held.indexedDB = await new Promise((resolve) => {
+      const open = indexedDB.open("idp");
+      open.onsuccess = () => {
+        const read = open.result.transaction("session").objectStore("session").get("user");
+        read.onsuccess = () => resolve(read.result);
+      };
+    });
+  }
+  (window as unknown as { __idp: typeof held }).__idp = held;
 }
 
 export const idpLoginHtml = (user: string, back: string) =>
@@ -79,10 +104,10 @@ export function idpSignInHtml(url: URL): string {
   );
 }
 
-/** The provider's page for a spec to read what its origin holds: its localStorage. */
+/** The provider's page for a spec to read what its origin holds: localStorage and IndexedDB. */
 export const idpStorageHtml =
   `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Provider storage</title>` +
-  `<script>window.__idp = { localStorage: { ...localStorage } };</script>` +
+  `<script>(${idpHeld.toString()})();</script>` +
   `</head><body></body></html>`;
 
 /** The server client's page: the session decided who is signed in; it keeps the user as a token. */

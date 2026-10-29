@@ -4,6 +4,7 @@ import { createRoutes } from "@/background/routes";
 import { installTestHandles } from "@/background/test-handles";
 import { chromeBootstrapPorts, createWorkspaceCommands } from "@/background/workspace/commands";
 import { chromeCookieApi, trackIncognitoStores } from "@/background/workspace/cookie-stores";
+import { trackVisitedOrigins } from "@/background/workspace/visited-origins";
 import { trackManagedWindow } from "@/background/workspace/windows";
 import { incognitoStoreMemory } from "@/storage/incognito-stores";
 import { recordingSessionRepository } from "@/storage/recording-session-repository";
@@ -26,5 +27,6 @@ export function startBackground(): void {
   const identity = { extensionId: browser.runtime.id, extensionUrl: browser.runtime.getURL("/") };
   browser.runtime.onMessage.addListener(createBackgroundListener(routes, identity));
   trackManagedWindow();
+  trackVisitedOrigins();
   trackIncognitoStores(chromeCookieApi, incognitoStoreMemory);
 }

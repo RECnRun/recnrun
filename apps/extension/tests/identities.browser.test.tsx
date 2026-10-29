@@ -93,6 +93,18 @@ test("a second tab in the managed window is a conflict too, with no window to cl
   expect(inPanel(root, "Close these windows")).toBeUndefined();
 });
 
+test("while an operation runs, the managed window's other tab is its helper, not a conflict", async () => {
+  const helper = { ...PRIVATE, id: 31, windowId: 3, title: "" };
+  const busy = { ...SAVED, managed: managedBy("admin"), busy: true };
+  const { root, setStatus, incognito } = mount(busy, undefined, [SHOP, helper]);
+  await expect.poll(() => inRow(root, "Admin", "Close")).toBeDefined();
+  expect(panelText(root)).not.toContain(CONFLICT);
+  // A tab still there once the operation ended is the user's.
+  setStatus({ ...busy, busy: false });
+  incognito.windowsChanged();
+  await expect.poll(() => panelText(root)).toContain(CONFLICT);
+});
+
 test("without access, identities can still be deleted but none opens", async () => {
   const { root } = mount({ ...SAVED, access: false });
   await expect.poll(() => inRow(root, "Admin", "Delete")).toBeDefined();

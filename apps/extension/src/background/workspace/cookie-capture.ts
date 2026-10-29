@@ -56,18 +56,25 @@ async function list(api: Pick<CookieApi, "all">, storeId: string): Promise<Store
   }
 }
 
+/** The cookie names one origin's page showed, and its host. */
+export interface SeenCookies {
+  host: string;
+  names: readonly string[];
+}
+
 /**
- * Reads every cookie of `storeId`, the identity's whole Incognito store. `seen` holds the cookie names the page itself showed: one Chrome did
- * not list, as for a site the user withheld from RECnRun (`cookies_helpers.cc:51-56`), fails it.
+ * Reads every cookie of `storeId`, the identity's whole Incognito store. `seen` holds the cookie
+ * names each captured page showed: one Chrome did not list, as for a site the user withheld from
+ * RECnRun (`cookies_helpers.cc:51-56`), fails it.
  */
 export async function captureCookies(
   api: Pick<CookieApi, "all">,
   storeId: string,
   target: string,
-  seen: readonly string[],
+  seen: readonly SeenCookies[],
 ): Promise<SiteCookie[]> {
   const listed = await list(api, storeId);
-  const missing = unlisted(listed, target, seen);
+  const missing = [...new Set(seen.flatMap(({ host, names }) => unlisted(listed, host, names)))];
   if (missing.length > 0) {
     const names = missing.map((name) => `"${name}"`).join(", ");
     throw new WorkspaceError(

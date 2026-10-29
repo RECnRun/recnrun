@@ -2,7 +2,7 @@ import { classifyIncognitoWindows } from "@recnrun/domain";
 import type { Identity, IdentityCapture, IdentityData } from "@recnrun/domain";
 import { bootstrapIdentity } from "@/background/workspace/bootstrap";
 import type { BootstrapPorts } from "@/background/workspace/bootstrap";
-import { captureIdentity } from "@/background/workspace/capture";
+import { captureIdentity, captureOrigins } from "@/background/workspace/capture";
 import { closeRemembering } from "@/background/workspace/fresh-window";
 import { savedStart } from "@/background/workspace/identity-commands";
 import type { IdentityDeps } from "@/background/workspace/identity-commands";
@@ -15,6 +15,7 @@ import { managedWindowRepository } from "@/storage/managed-window-repository";
 const NOTHING: IdentityData = {
   cookies: [],
   site: { localStorage: {}, sessionStorage: {}, indexedDB: [], caches: [] },
+  origins: [],
 };
 
 async function load(identity: Identity, from: Opening["from"], deps: IdentityDeps) {
@@ -38,13 +39,14 @@ export function chromeLifecycleEffects(
       const otherTabs = (managed?.tabs ?? []).filter(({ id }) => id !== stored?.tabId).length;
       return { ...open, foreign: foreign.map(({ id }) => id), otherTabs };
     },
-    capture: async (identity, managed) => {
+    capture: async (identity, managed, operationId) => {
       await deps.captures.settle(identity.id, identity.lastCapture?.id);
       // Tentative until the identity names it: the lifecycle settles it after its persist step.
       const publish = (header: IdentityCapture) =>
         deps.captures.publish(header, { tentative: true });
       const captures = { ...deps.captures, publish };
-      return captureIdentity(identity.id, managed, { ...deps, captures });
+      const capturing = { ...deps, captures, origins: captureOrigins(ports) };
+      return captureIdentity(identity.id, managed, capturing, operationId);
     },
     close,
     load: (identity, from) => load(identity, from, deps),

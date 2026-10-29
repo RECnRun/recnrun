@@ -66,7 +66,7 @@ export async function closeWindows(
  * Resolves once `tabId` finished loading, or after `boundMs`, or when Chrome no longer knows it;
  * whatever navigates the tab next finds out about a tab that never loaded.
  */
-async function loaded(tabId: number, boundMs: number): Promise<void> {
+export async function loaded(tabId: number, boundMs: number): Promise<void> {
   let settle = () => {};
   const done = new Promise<void>((resolve) => {
     settle = resolve;
