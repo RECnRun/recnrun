@@ -46,6 +46,14 @@ The session page in a PiP window is such a frame too. A pre-push `vp run verify`
 
 **Solution.** `watchFocus` and `shownTabId` in `tests/e2e/fixtures/tabs.ts` read the active tab of the browsing window Chrome focused last (`windows.onFocusChanged` order, always-on-top windows skipped). The test then passed 40 of 40 and the spec 90 of 90.
 
+## The PiP window opens with "No tab in focus."
+
+**Symptom.** `incognito.spec.ts` "records the managed tab, and the PiP window follows the current tab" failed now and then: the PiP's Current tab region read "No tab in focus." for the whole 5-second wait, instead of the recorded Incognito tab.
+
+**Cause.** Chrome focuses a Document PiP window that a user gesture opened (`ShouldFocusPictureInPictureWindow`, `chrome/browser/picture_in_picture/picture_in_picture_window_manager.cc`), and Record posts `open-panel` while `start-session` focuses the recorded tab, so the PiP can take the focus after that tab got it. When the session page's first read came after that, no browsing window was focused (the tab model leaves the always-on-top PiP out), no tab had been shown to keep, and no event followed. Delaying `requestPanelWindow` by 500 ms in a scratch copy failed the test every run.
+
+**Solution.** Until it has shown a tab, the PiP window keeps the recorded one as the last tab shown (`session/SessionTabs.tsx`), marked "Not in focus". With the same delay the test passed 5 of 5.
+
 ## A new Incognito window can inherit the previous one's data
 
 **Symptom.** None in the tests: 50 resets in a row came back empty. But RECnRun waited only until `cookies.getAllCookieStores()` no longer listed the Incognito store, and the next `windows.create` came 0.4–1.4 ms after that.

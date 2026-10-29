@@ -120,6 +120,21 @@ test("with the focus outside the browser, the last tab shown stays until it clos
   await expect.poll(() => region(root, "Current tab")).toBe("Current tabNo tab in focus.");
 });
 
+test("opened with the focus already on the PiP window, it shows the recorded tab until a tab gets the focus", async () => {
+  // Chrome focuses the PiP window as it opens, possibly after the recorded tab got the focus.
+  const tabs = fakeTabs({ tabs: [SHOP, DOCS] });
+  const root = mount(await runningStore(), [location.origin], tabs.source);
+  await expect.poll(() => region(root, "Current tab")).toContain("Shop");
+  expect(region(root, "Current tab")).toContain("Recorded");
+  expect(region(root, "Current tab")).toContain("Not in focus");
+  expect(region(root, "Recorded tab")).toBeUndefined();
+
+  tabs.change({ tabs: [SHOP, DOCS], currentId: DOCS.id });
+  await expect.poll(() => region(root, "Current tab")).toContain("Docs");
+  expect(region(root, "Current tab")).not.toContain("Not in focus");
+  expect(region(root, "Recorded tab")).toContain("Shop");
+});
+
 test("a burst of tab events reads the tabs once more, not once per event", async () => {
   const tabs = fakeTabs({ tabs: [SHOP], currentId: SHOP.id });
   const root = mount(await runningStore(), [location.origin], tabs.source);

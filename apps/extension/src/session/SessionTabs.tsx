@@ -10,7 +10,8 @@ import { useBrowserTabs } from "@/views/use-browser-tabs";
  */
 export function SessionTabs({ source, recordedId }: { source: TabSource; recordedId?: number }) {
   const state = useBrowserTabs(source);
-  const lastId = useRef<number | undefined>(undefined);
+  // Chrome focuses the PiP window as it opens, so before any tab is shown the recorded one stands in.
+  const lastId = useRef(recordedId);
   if (!state) return null;
   const { tab, focused } = currentTab(state, lastId.current);
   lastId.current = tab?.id;
