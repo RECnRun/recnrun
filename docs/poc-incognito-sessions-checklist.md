@@ -8,7 +8,7 @@ Plan: [poc-incognito-sessions-plan.md](poc-incognito-sessions-plan.md). Assignme
 | Branch               | `poc/incognito-sessions`                                         |
 | Planned base         | `44c154da29860c7a8df829e902b177df5ce2ba2a` (2026-10-28)          |
 | Actual base (P0.1)   | `44c154d` (re-resolved 2026-10-28, unchanged)                    |
-| Last recorded commit | `15d3550`                                                        |
+| Last recorded commit | `cff664a`                                                        |
 | Decisions OD-1…OD-4  | defaults of plan §3, accepted by the user ("Avance", 2026-10-28) |
 
 ## Status legend
@@ -497,7 +497,11 @@ Source facts (orchestrator, Chromium checkout): `tabs.discard` (`tabs_api.cc:429
   green: `vp run test:e2e -- tests/e2e/poc-panel-session.spec.ts tests/e2e/poc-transparent-switch.spec.ts tests/e2e/poc-beforeunload.spec.ts`: 6 passed (run `2026-10-29T16-11-27.052Z-ec469cfe`)
   commit: `15d3550`
   notes: Panel-only spec: New identity A, main tab writes on app then moves to other.localhost and writes there, a background tab with a `beforeunload` handler, a second Incognito window; New identity B has one empty tab, no dialog; Switch to A restores both windows, every tab and active tab, each tab's storage on both origins, no dialog. Panel helpers moved to `tests/e2e/fixtures/panel.ts` (transparent-switch and beforeunload specs import them). Screens viewed in `.artifacts/screens/S7.4/` (`1-a-open`, `2-b-open`, `3-back-on-a`). Window focus is not compared: Switch is clicked in the dashboard, so no Incognito window is focused at save time, and on restore the start's own window takes the focus rather than the last-used Incognito window (reported, not fixed)
-- [ ] S7.5 Durable docs updated; production build rebuilt; Stage 7 `vp run verify` exits 0
+- [i] S7.5 Durable docs updated; production build rebuilt; Stage 7 `vp run verify` exits 0
+  red: n/a (documentation, agent rule, and build only)
+  green: `vp run verify` → exit 0, 22/22 tasks (run `2026-10-29T16-14-46.808Z-3cccd6b9`): unit and components 93 files, 580 passed; e2e 107 passed; coverage 98.84/95.91/97.62/99.69; jscpd 0.08%; Knip clean; builds and manifest guard pass
+  commit: `cff664a`
+  notes: POCS gains a Stage 7 bullet (every tab and window, per-tab sessionStorage on every origin, discard before close, about 290 ms of steps to switch back to three tabs in two windows) and the "Leave site?" finding; PRODUCT_BRIEF, ARCHITECTURE, and TROUBLESHOOTING were already current from S7.1-S7.3. `.claude/rules/extension.md` names the Incognito URLs the workspace keeps (identity address, each tab's URL in the capture, last path per origin while open); `codex exec --ephemeral -s read-only` quoted the new text verbatim. `vp run extension#build` copied to `/Users/dannyelcf/src/recnrun-manual-build/chrome-mv3` (the directory did not exist and was created); `diff -rq` identical, manifest 0.1.0, `incognito: spanning`, permissions cookies, declarativeNetRequest, history, scripting, storage, tabs, unlimitedStorage, webNavigation; hosts `http://*/*`, `https://*/*`; content script `https://recnrun.com/*` only
 
 ## Stage 5 — Delivery
 
