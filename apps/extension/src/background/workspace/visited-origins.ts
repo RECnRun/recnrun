@@ -19,7 +19,7 @@ export interface VisitTracking {
   /** Whether the tab is a capture's or a start's own helper tab, whose pages are not the user's. */
   helperTab: (tabId: number) => boolean;
   managed: () => Promise<ManagedWindowState | null>;
-  visits: Pick<VisitedOrigins, "note">;
+  visits: Pick<VisitedOrigins, "note" | "noteTab">;
 }
 
 /** The page's origin and path; the query and fragment are dropped, since they can carry tokens. */
@@ -35,6 +35,8 @@ async function record(tracking: VisitTracking, tabId: number, visit: Visit): Pro
   if (managed?.status !== "active") return;
   if (!(await tracking.incognitoTab(tabId))) return;
   await tracking.visits.note(managed.generation, [visit]);
+  // The tab's own list too: its sessionStorage on each origin belongs to it alone.
+  await tracking.visits.noteTab(managed.generation, tabId, [visit]);
 }
 
 /**

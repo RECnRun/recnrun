@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vite-plus/tes
 import { fakeBrowser } from "wxt/testing/fake-browser";
 import { chromeLayoutApi, restoreLayout } from "@/background/workspace/layout-restore";
 import { fakeBarrierApi } from "./fake-barrier";
+import { memoryVisits } from "./fake-helper";
 import { fakeLayoutApi } from "./fake-layout";
 import { fakeNavigationApi } from "./fake-navigation";
 import type { FakeNavigationApi } from "./fake-navigation";
@@ -79,6 +80,7 @@ function restoring(
     layout: fakeLayoutApi(),
     barrier: fakeBarrierApi(),
     navigation: fakeNavigationApi(),
+    visits: memoryVisits(OPERATION.generation),
   };
   const restores = agentsAnswer(deps.navigation, reply);
   const opened: number[] = [];
@@ -119,22 +121,36 @@ describe("restoreLayout", () => {
     ]);
     expect(run.deps.barrier.rules.size).toBe(0);
     expect(run.deps.barrier.scripts.size).toBe(0);
+    // Each reopened tab's origins are its own visits, from its place in the layout.
+    expect(await run.deps.visits.tabVisits(OPERATION.generation)).toEqual([
+      { tabId: 200, from: { window: 0, tab: 1 }, visits: [{ origin: APP }] },
+      { tabId: 201, from: { window: 1, tab: 1 }, visits: [{ origin: OTHER }] },
+    ]);
   });
 
-  test("a tab whose page does not take its sessionStorage still opens, and is named", async () => {
-    const failing = (tabId: number) =>
-      tabId === 201
-        ? { type: "failed", error: "QuotaExceededError" }
-        : { type: "restored", counts: COUNTS };
-    const run = restoring(failing);
+  test("a tab whose sessionStorage of another origin is not taken still opens, and is named", async () => {
+    const run = restoring(() => ({ type: "failed", error: "QuotaExceededError" }));
+    const failed = { work: "restore", step: "restore" };
     await expect(run.running).resolves.toEqual([
+      // The page's own origin is not carried: the page shows its sessionStorage as it is then.
+      {
+        origin: APP,
+        ...failed,
+        reason: "The page could not restore its data (QuotaExceededError).",
+        kept: false,
+      },
       {
         origin: OTHER,
         work: "restore",
         step: "restore",
         reason: "The page could not restore its data (QuotaExceededError).",
-        kept: false,
+        kept: true,
       },
+    ]);
+    // Another origin than the page's is carried, so the next capture keeps its last saved copy.
+    const tabs = await run.deps.visits.tabVisits(OPERATION.generation);
+    expect(tabs.find(({ tabId }) => tabId === 201)?.visits).toEqual([
+      { origin: OTHER, carry: true },
     ]);
     expect(run.deps.layout.calls).toContain(`navigate 201 ${APP}/app/?tab=4`);
     expect(run.deps.barrier.rules.size).toBe(0);

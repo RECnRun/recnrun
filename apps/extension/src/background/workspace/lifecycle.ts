@@ -33,6 +33,8 @@ interface Run {
   captured?: CaptureSummary;
   /** Set once the open identity names the new capture as its last one. */
   persisted?: boolean;
+  /** Set once the session's windows closed, with every tab the capture moved. */
+  closed?: boolean;
   timings: StepTiming[];
 }
 
@@ -64,6 +66,13 @@ async function closeOpen(run: Run): Promise<void> {
     throw new WorkspaceError("TabsChanged", message);
   }
   if (session.length > 0) await run.deps.effects.close(session);
+  run.closed = true;
+}
+
+/** The tabs the capture left off their page get it back when the windows stay open. */
+async function bringBack(run: Run): Promise<void> {
+  const away = run.closed === true ? [] : (run.captured?.away ?? []);
+  if (away.length > 0) await run.deps.effects.returnTabs(away);
 }
 
 async function persist(run: Run): Promise<void> {
@@ -153,6 +162,7 @@ async function runSteps(run: Run, steps: readonly LifecycleStep[]): Promise<void
       await run.deps.effects.beforeStep?.(step);
       await STEP_RUNS[step](run);
     } catch (error) {
+      await bringBack(run);
       await takeBack(run);
       await recordFailure(run, error);
       throw error;

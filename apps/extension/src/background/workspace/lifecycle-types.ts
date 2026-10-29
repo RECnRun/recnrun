@@ -8,6 +8,7 @@ import type {
 } from "@recnrun/domain";
 import type { StepTiming } from "@/background/workspace/bootstrap";
 import type { CaptureSummary } from "@/background/workspace/capture";
+import type { MovedTab } from "@/background/workspace/tab-origins";
 import type { IdentityDraft } from "@/background/workspace/identity-draft";
 import type { IdentityRepository } from "@/ports/identities";
 import type { OperationJournal } from "@/ports/operation-journal";
@@ -48,6 +49,8 @@ export interface LifecycleEffects {
     operationId: string,
   ) => Promise<CaptureSummary>;
   close: (windowIds: readonly number[]) => Promise<void>;
+  /** Brings tabs a closing capture moved back to their page, when the windows stay open after all. */
+  returnTabs: (away: readonly MovedTab[]) => Promise<void>;
   /** Reads and validates what a start of `identity` restores, before any step runs. */
   load: (identity: Identity, from: Opening["from"]) => Promise<Opening>;
   /** Opens a fresh session for `identity`, journaling its steps under `operation`. */

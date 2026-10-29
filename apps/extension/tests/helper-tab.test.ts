@@ -1,10 +1,16 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vite-plus/test";
 import { fakeBrowser } from "wxt/testing/fake-browser";
-import { chromeHelperTabApi, isHelperTab, visitOrigins } from "@/background/workspace/helper-tab";
+import {
+  chromeHelperTabApi,
+  isHelperTab,
+  visitInTab,
+  visitOrigins,
+} from "@/background/workspace/helper-tab";
 import { fakeBarrierApi } from "./fake-barrier";
 import type { FakeBarrierApi } from "./fake-barrier";
 import { fakeHelperTabs, helperNavigation } from "./fake-helper";
 import { fakeNavigationApi, listenerCount } from "./fake-navigation";
+import { echoProbes, fakePort } from "./fake-port";
 import type { FakeNavigationApi } from "./fake-navigation";
 
 const SSO = "http://sso.localhost:5192";
@@ -171,6 +177,28 @@ describe("visitOrigins", () => {
       `of ${SSO} at its unbarrier step: Chrome still lists the barrier after removing it.`,
     );
     expect(tabs.closed).toEqual([100, 101]);
+  });
+});
+
+describe("visitInTab", () => {
+  test("leaves the borrowed tab's barrier pages out of the visits, and a helper tab stays one", async () => {
+    navigation.update = async (tabId, url) => {
+      navigation.updates.push({ tabId, url });
+      const documentId = `doc-${navigation.updates.length}`;
+      const sender = { tab: { id: tabId }, frameId: 0, documentId, origin: SSO };
+      navigation.onCommitted.emit({ tabId, frameId: 0, url, documentId });
+      navigation.onConnect.emit(echoProbes(fakePort(sender)));
+    };
+    const visiting = { operation: VISITING.operation, work: "save" as const };
+    const during = (tabId: number) => async () => isHelperTab(tabId);
+    const borrowed = await visitInTab({ tabId: 42, origin: SSO }, visiting, deps(), during(42));
+    expect(borrowed).toEqual({ ok: true, value: true });
+    expect(isHelperTab(42)).toBe(false);
+    const windowId = (await fakeBrowser.windows.create({}))?.id ?? -1;
+    const helper = await chromeHelperTabApi.open(windowId);
+    await visitInTab({ tabId: helper, origin: SSO }, visiting, deps(), during(helper));
+    expect(isHelperTab(helper)).toBe(true);
+    await chromeHelperTabApi.close(helper);
   });
 });
 

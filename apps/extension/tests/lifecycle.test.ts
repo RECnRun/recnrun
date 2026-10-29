@@ -141,6 +141,27 @@ test("an Incognito tab opened during the capture stops the close, so nothing it 
   expect(journal.written.at(-1)).toMatchObject({ step: "close", status: "failed" });
 });
 
+test("a close that does not happen brings back each tab the capture left off its page", async () => {
+  const { lifecycle, chrome } = setUp({ open: "a" });
+  const away = [{ tabId: 50, url: "http://app.localhost:5192/app/" }];
+  vi.mocked(chrome.effects.capture).mockImplementationOnce(async () => {
+    chrome.state.foreign = [8];
+    return { ...SUMMARY, captureId: "cap-a-3", away };
+  });
+  await expect(lifecycle.switchTo("b")).rejects.toThrow(
+    "The capture is saved; close the other Incognito windows first.",
+  );
+  expect(chrome.calls).toEqual(["return 50"]);
+});
+
+test("a step that fails once the windows closed brings no tab back", async () => {
+  const { lifecycle, chrome } = setUp({ open: "a" });
+  chrome.state.away = [{ tabId: 50, url: "http://app.localhost:5192/app/" }];
+  chrome.state.failAt = "start";
+  await expect(lifecycle.switchTo("b")).rejects.toThrow("Injected at start.");
+  expect(chrome.effects.returnTabs).not.toHaveBeenCalled();
+});
+
 test("a failed start leaves the previous identity's capture saved", async () => {
   const { lifecycle, chrome, journal, saved } = setUp({ open: "a" });
   chrome.state.failAt = "start";

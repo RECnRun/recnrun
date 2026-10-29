@@ -26,11 +26,18 @@ export interface CaptureApi {
   topFrame: (tabId: number) => Promise<{ url: string; documentId: string } | null>;
   inject: (tabId: number, documentId: string) => Promise<void>;
   onConnect: ConnectEvent;
+  /** Unloads the tab without its page's `beforeunload` and resolves with the id it has then. */
+  discard: (tabId: number) => Promise<number>;
+  /** Loads `url` in the tab, as a capture brings a moved tab back to its page. */
+  navigate: (tabId: number, url: string) => Promise<void>;
 }
+
+/** What reading the session's tabs needs: the windows, each top document, and its agent. */
+export type TabReadApi = Pick<CaptureApi, "windows" | "topFrame" | "inject" | "onConnect">;
 
 /** Injects the agent into the expected document only and waits for its link; nothing stays registered. */
 export function connectAgent(
-  api: CaptureApi,
+  api: Pick<CaptureApi, "inject" | "onConnect">,
   expected: AgentExpectation,
   boundMs: number,
 ): Promise<OriginPort> {
@@ -76,6 +83,15 @@ export const chromeCaptureApi: CaptureApi = {
       target: { tabId, documentIds: [documentId] },
       files: [`/${AGENT_SCRIPT}` as const],
     });
+  },
+  discard: async (tabId) => {
+    // Chrome may swap the contents, and the tab's id with them (`tab_lifecycle_unit.cc:290-320`).
+    const tab = await browser.tabs.discard(tabId);
+    if (tab?.id === undefined) throw new Error("Chrome did not unload the tab.");
+    return tab.id;
+  },
+  navigate: async (tabId, url) => {
+    await browser.tabs.update(tabId, { url });
   },
   get onConnect() {
     return browser.runtime.onConnect;

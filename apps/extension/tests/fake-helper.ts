@@ -1,6 +1,6 @@
 import { vi } from "vite-plus/test";
 import type { HelperTabApi } from "@/background/workspace/helper-tab";
-import type { Visit, VisitedOrigins } from "@/ports/visited-origins";
+import type { LayoutPlace, TabVisits, Visit, VisitedOrigins } from "@/ports/visited-origins";
 import { fakeBarrierApi } from "./fake-barrier";
 import { fakeNavigationApi } from "./fake-navigation";
 import type { FakeNavigationApi } from "./fake-navigation";
@@ -23,20 +23,46 @@ export function fakeHelperTabs(firstId = 100) {
   return tabs satisfies HelperTabApi;
 }
 
-/** The session list of visited origins, in memory: one generation's list at a time. */
-export function memoryVisits(generation = 0, initial: Visit[] = []) {
+/** `list` with `added` merged in by origin, as the stored list merges them. */
+function mergedInto(list: readonly Visit[], added: readonly Visit[]): Visit[] {
+  const merging = [...list];
+  for (const visit of added) {
+    const index = merging.findIndex(({ origin }) => origin === visit.origin);
+    merging.splice(index === -1 ? merging.length : index, index === -1 ? 0 : 1, visit);
+  }
+  return merging;
+}
+
+/** The session list of visited origins, in memory: one generation's lists at a time. */
+export function memoryVisits(generation = 0, initial: Visit[] = [], tabs: TabVisits[] = []) {
   const visits = {
     list: { generation, visits: [...initial] },
+    tabs: { generation, tabs: [...tabs] },
     note: vi.fn(async (noted: number, added: readonly Visit[]) => {
-      const list = visits.list.generation === noted ? [...visits.list.visits] : [];
-      for (const visit of added) {
-        const index = list.findIndex(({ origin }) => origin === visit.origin);
-        list.splice(index === -1 ? list.length : index, index === -1 ? 0 : 1, visit);
-      }
-      visits.list = { generation: noted, visits: list };
+      const list = visits.list.generation === noted ? visits.list.visits : [];
+      visits.list = { generation: noted, visits: mergedInto(list, added) };
     }),
     visited: vi.fn(async (asked: number) =>
       visits.list.generation === asked ? [...visits.list.visits] : [],
+    ),
+    noteTab: vi.fn(
+      async (noted: number, tabId: number, added: readonly Visit[], from?: LayoutPlace) => {
+        const kept = visits.tabs.generation === noted ? visits.tabs.tabs : [];
+        const tab = kept.find((each) => each.tabId === tabId);
+        const place = from ?? tab?.from;
+        const updated = {
+          tabId,
+          ...(place && { from: place }),
+          visits: mergedInto(tab?.visits ?? [], added),
+        };
+        visits.tabs = {
+          generation: noted,
+          tabs: [...kept.filter((each) => each !== tab), updated],
+        };
+      },
+    ),
+    tabVisits: vi.fn(async (asked: number) =>
+      visits.tabs.generation === asked ? [...visits.tabs.tabs] : [],
     ),
   };
   return visits satisfies VisitedOrigins;

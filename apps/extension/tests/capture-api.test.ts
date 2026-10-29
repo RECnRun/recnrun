@@ -71,3 +71,14 @@ test("reads the tab's top frame and injects the agent into that document only", 
   });
   expect(chromeCaptureApi.onConnect).toBe(fakeBrowser.runtime.onConnect);
 });
+
+test("discards a tab under the id Chrome returns, refuses one without, and navigates a tab", async () => {
+  const discard = vi.spyOn(fakeBrowser.tabs, "discard").mockResolvedValueOnce({ id: 8 } as never);
+  await expect(chromeCaptureApi.discard(7)).resolves.toBe(8);
+  expect(discard).toHaveBeenCalledWith(7);
+  discard.mockResolvedValueOnce(undefined as never);
+  await expect(chromeCaptureApi.discard(7)).rejects.toThrow("Chrome did not unload the tab.");
+  const update = vi.spyOn(fakeBrowser.tabs, "update").mockResolvedValue({} as never);
+  await chromeCaptureApi.navigate(8, URL_);
+  expect(update).toHaveBeenCalledWith(8, { url: URL_ });
+});

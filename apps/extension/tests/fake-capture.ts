@@ -28,6 +28,9 @@ export function chrome(
     ]),
     topFrame: vi.fn(async (_tabId: number) => frame),
     inject: vi.fn(async () => onConnect.emit(agent)),
+    // A discard keeps the tab's id, as Chrome's in-place discard does.
+    discard: vi.fn(async (tabId: number) => tabId),
+    navigate: vi.fn(async (_tabId: number, _url: string) => undefined),
   };
   const cookies = fakeCookieApi(
     [

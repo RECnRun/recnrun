@@ -3,6 +3,7 @@ import type {
   IdentityData,
   LifecycleStep,
   ManagedWindowState,
+  SkippedOrigin,
   WorkspaceOperation,
 } from "@recnrun/domain";
 import { restoreThroughAgent } from "@/background/workspace/agent-link";
@@ -18,7 +19,7 @@ import type { CookieApi } from "@/background/workspace/cookie-stores";
 import { collectFailures } from "@/background/workspace/errors";
 import { visitOrigins } from "@/background/workspace/helper-tab";
 import type { HelperTabApi } from "@/background/workspace/helper-tab";
-import { restoreLayout } from "@/background/workspace/layout-restore";
+import { restoreLayout, restoreTabSessions } from "@/background/workspace/layout-restore";
 import type { LayoutApi } from "@/background/workspace/layout-restore";
 import { openBehindBarrier, reloadAndCommit } from "@/background/workspace/navigation";
 import type { NavigationApi } from "@/background/workspace/navigation";
@@ -156,6 +157,21 @@ async function restoreOthers(run: Run): Promise<void> {
   run.operation = { ...run.operation, skipped };
 }
 
+const skippedAlso = (run: Run, skipped: readonly SkippedOrigin[]) => {
+  if (skipped.length > 0) {
+    run.operation = { ...run.operation, skipped: [...(run.operation.skipped ?? []), ...skipped] };
+  }
+};
+
+/** Writes the primary tab's sessionStorage of the other origins it visited, which is its own. */
+async function restorePrimarySessions(run: Run): Promise<void> {
+  const { layout } = run.data;
+  const laid = layout?.windows[layout.primary.window]?.tabs[layout.primary.tab];
+  if (layout === undefined || laid === undefined) return;
+  const tab = { tabId: tabOf(run), laid, from: layout.primary };
+  skippedAlso(run, await restoreTabSessions(tab, barrierOperation(run), run.deps));
+}
+
 /** Reopens the identity's other tabs and windows; one whose sessionStorage is not taken is named. */
 async function reopenLayout(run: Run): Promise<void> {
   const { layout } = run.data;
@@ -163,9 +179,7 @@ async function reopenLayout(run: Run): Promise<void> {
   const { windowId, tabId } = known(run.window, "window");
   const opened = (id: number) => run.opened.push(id);
   const reopening = { primary: { windowId, tabId }, operation: barrierOperation(run), opened };
-  const skipped = await restoreLayout(layout, reopening, run.deps);
-  if (skipped.length === 0) return;
-  run.operation = { ...run.operation, skipped: [...(run.operation.skipped ?? []), ...skipped] };
+  skippedAlso(run, await restoreLayout(layout, reopening, run.deps));
 }
 
 const STEP_RUNS: Record<BootstrapStep, (run: Run) => Promise<unknown>> = {
@@ -189,7 +203,10 @@ const STEP_RUNS: Record<BootstrapStep, (run: Run) => Promise<unknown>> = {
       run.origin,
       run.data.cookies,
     ),
-  origins: restoreOthers,
+  origins: async (run) => {
+    await restoreOthers(run);
+    await restorePrimarySessions(run);
+  },
   barrier: async (run) => {
     const operation = barrierOperation(run);
     run.barrier = await installBarrier(tabOf(run), run.origin, operation, run.deps.barrier);

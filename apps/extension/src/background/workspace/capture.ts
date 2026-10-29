@@ -12,6 +12,8 @@ import { CAPTURE_BOUND_MS, readOrigin, readOthers } from "@/background/workspace
 import type { OriginRead, OthersRead } from "@/background/workspace/origin-reads";
 import { findSessionTabs, readLayout } from "@/background/workspace/session-tabs";
 import type { LayoutRead, SessionTab, SessionTabs } from "@/background/workspace/session-tabs";
+import { readTabOrigins, returnTabs } from "@/background/workspace/tab-origins";
+import type { MovedTab } from "@/background/workspace/tab-origins";
 import type { CapturedCounts, OriginPort } from "@/messaging/origin-protocol";
 import type { VisitedOrigins } from "@/ports/visited-origins";
 import type { IdentityCaptures } from "@/storage/identity-captures";
@@ -23,9 +25,11 @@ export interface CaptureDeps {
     "begin" | "append" | "dropParts" | "publish" | "discard" | "read"
   >;
   cookies: Pick<CookieApi, "stores" | "normalTabIds" | "all">;
-  /** The other origins the window visited, and the helper tab each one loads in. */
-  origins: { visits: Pick<VisitedOrigins, "visited">; helper: HelperDeps };
+  /** The other origins the session visited, each tab's own, and the helper tab they load in. */
+  origins: { visits: Pick<VisitedOrigins, "visited" | "tabVisits">; helper: HelperDeps };
   boundMs?: number;
+  /** Set when the session's windows close after the capture, so the tabs it moved stay as they are. */
+  closing?: boolean;
 }
 
 /** A published capture's size and duration, never its values. */
@@ -46,6 +50,8 @@ export interface CaptureSummary {
   ms: number;
   /** Every tab of the session the capture saw, so the close can refuse one opened since. */
   tabs: number[];
+  /** The tabs a closing capture left off their page; whatever stops the close brings them back. */
+  away: MovedTab[];
 }
 
 interface Target {
@@ -179,6 +185,28 @@ interface Link {
   operation: BarrierOperation;
   windowId: number;
   found: SessionTabs;
+  /** Where reading each tab's other origins notes the tabs it moved. */
+  moved: MovedTab[];
+}
+
+/** Each tab's sessionStorage on the other origins it visited, read in that tab. */
+async function readTabsOrigins(
+  link: Link,
+  laid: LayoutRead,
+  identityId: string,
+  deps: CaptureDeps,
+) {
+  let previous: Promise<IdentityCapture | null> | undefined;
+  const run = {
+    operation: link.operation,
+    boundMs: boundOf(deps),
+    live: deps.closing === true,
+    moved: link.moved,
+    previous: async () => (await (previous ??= deps.captures.read(identityId)))?.layout,
+  };
+  const { visits, helper } = deps.origins;
+  const reading = { api: deps.api, barrier: helper.barrier, navigation: helper.navigation, visits };
+  await readTabOrigins(link.found, laid, run, reading);
 }
 
 /**
@@ -186,23 +214,20 @@ interface Link {
  * `identityId`'s capture, or discards it.
  */
 async function captureThrough(
-  { port, found, ...reading }: Link,
+  link: Link,
   target: Target,
   started: IdentityCapture,
   deps: CaptureDeps,
 ) {
+  const { port, found, operation, windowId } = link;
   const { captures } = deps;
   try {
     await captures.begin(started);
     const identityId = started.identityId;
-    const all = await readOrigins(
-      port,
-      { ...reading, captureId: started.id, identityId },
-      target,
-      deps,
-    );
-    const reader = { api: deps.api, operation: reading.operation, boundMs: boundOf(deps) };
-    const laid = await readLayout(found, reader);
+    const reading = { operation, windowId, captureId: started.id, identityId };
+    const all = await readOrigins(port, reading, target, deps);
+    const laid = await readLayout(found, { api: deps.api, operation, boundMs: boundOf(deps) });
+    await readTabsOrigins(link, laid, identityId, deps);
     const jar = await cookieJar(deps, target, all.reads);
     const header = completeHeader(started, all, laid, jar);
     await captures.publish(header);
@@ -214,6 +239,7 @@ async function captureThrough(
 }
 
 const boundOf = (deps: CaptureDeps) => deps.boundMs ?? CAPTURE_BOUND_MS;
+const since = (began: number) => Math.round(performance.now() - began);
 
 /**
  * Captures the session's primary tab in full, every other origin it visited, every other tab's
@@ -232,12 +258,17 @@ export async function captureIdentity(
   const port = await connectAgent(deps.api, target, boundOf(deps));
   const started = startedHeader(identityId, target);
   const operation = { id: operationId, generation: managed.generation };
+  const moved: MovedTab[] = [];
+  let away = false;
   try {
-    const link = { port, operation, windowId: found.primary.windowId, found };
+    const link = { port, operation, windowId: found.primary.windowId, found, moved };
     const counts = await captureThrough(link, target, started, deps);
-    return { captureId: started.id, ...counts, ms: Math.round(performance.now() - began) };
+    away = deps.closing === true;
+    return { captureId: started.id, ...counts, ms: since(began), away: away ? moved : [] };
   } finally {
     port.disconnect();
+    // Brought back unless the windows close next: reloading a page could rotate what was saved.
+    if (!away) await returnTabs(deps.api, moved);
   }
 }
 

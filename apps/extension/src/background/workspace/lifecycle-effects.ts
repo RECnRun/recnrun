@@ -14,6 +14,7 @@ import { isHelperTab } from "@/background/workspace/helper-tab";
 import { savedStart } from "@/background/workspace/identity-commands";
 import type { IdentityDeps } from "@/background/workspace/identity-commands";
 import type { LifecycleEffects, Opening } from "@/background/workspace/lifecycle-types";
+import { returnTabs } from "@/background/workspace/tab-origins";
 import { createNeutralWindow, inventory } from "@/background/workspace/windows";
 import type { IncognitoWindow } from "@/background/workspace/windows";
 import type { OperationJournal } from "@/ports/operation-journal";
@@ -58,10 +59,11 @@ export function chromeLifecycleEffects(
       const publish = (header: IdentityCapture) =>
         deps.captures.publish(header, { tentative: true });
       const captures = { ...deps.captures, publish };
-      const capturing = { ...deps, captures, origins: captureOrigins(ports) };
+      const capturing = { ...deps, captures, origins: captureOrigins(ports), closing: true };
       return captureIdentity(identity.id, managed, capturing, operationId);
     },
     close,
+    returnTabs: (away) => returnTabs(deps.api, away),
     load: (identity, from) => load(identity, from, deps),
     start: async (identity, { url, data }, operation) => {
       const windows = { create: () => createNeutralWindow(identity.id), close };

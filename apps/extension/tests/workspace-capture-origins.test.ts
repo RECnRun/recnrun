@@ -16,7 +16,7 @@ import { fakeBarrierApi } from "./fake-barrier";
 import { chrome, memoryCaptures } from "./fake-capture";
 import { fakeHelperTabs, helperNavigation, memoryVisits } from "./fake-helper";
 import { fakeNavigationApi } from "./fake-navigation";
-import type { Visit } from "@/ports/visited-origins";
+import type { TabVisits, Visit } from "@/ports/visited-origins";
 
 const ORIGIN = "http://app.localhost:5192";
 const SSO = "http://sso.localhost:5192";
@@ -56,6 +56,7 @@ function capturing(
   visited: (string | Visit)[],
   answer = (_origin: string) => ssoReplies(),
   down: string[] = [],
+  session: { tabs?: TabVisits[]; closing?: boolean } = {},
 ) {
   const setup = chrome();
   const tabs = fakeHelperTabs();
@@ -77,9 +78,10 @@ function capturing(
   const visits = memoryVisits(
     4,
     visited.map((each) => (typeof each === "string" ? { origin: each } : each)),
+    session.tabs,
   );
   const origins = { visits, helper: { tabs, barrier, navigation } };
-  const deps = { ...setup, captures, origins, boundMs: 5_000 };
+  const deps = { ...setup, captures, origins, boundMs: 5_000, closing: session.closing };
   const running = captureIdentity("identity-a", MANAGED, deps, "op-7");
   const answerTarget = async () => {
     await vi.waitFor(() => expect(setup.agent.posted).toHaveLength(1));
@@ -256,4 +258,33 @@ test("a window that visited only its target opens no helper tab", async () => {
   await expect(run.running).resolves.toMatchObject(COUNTS);
   expect(run.tabs.open).not.toHaveBeenCalled();
   expect(run.captures.headers.at(-1)?.origins.map(({ origin }) => origin)).toEqual([ORIGIN]);
+});
+
+test("a tab a closing capture moved comes back to its page when the capture fails", async () => {
+  const run = capturing([ORIGIN], undefined, [], {
+    tabs: [{ tabId: 7, visits: [{ origin: SSO }] }],
+    closing: true,
+  });
+  run.navigation.failUpdate = new Error("No tab with id: 7.");
+  run.captures.publish.mockRejectedValueOnce(new Error("QuotaExceededError"));
+  await run.answerTarget();
+  await expect(run.running).rejects.toThrow("QuotaExceededError");
+  expect(run.setup.api.navigate.mock.calls).toEqual([[7, `${ORIGIN}/app/`]]);
+});
+
+test("a closing capture leaves the moved tabs to the close, and another moves none", async () => {
+  const tabVisits = [{ tabId: 7, visits: [{ origin: SSO }] }];
+  for (const closing of [false, true]) {
+    const run = capturing([ORIGIN], undefined, [], { tabs: tabVisits, closing });
+    run.navigation.failUpdate = new Error("No tab with id: 7.");
+    await run.answerTarget();
+    const summary = await run.running;
+    expect(summary.away).toEqual(closing ? [{ tabId: 7, url: `${ORIGIN}/app/` }] : []);
+    expect(run.setup.api.discard).toHaveBeenCalledTimes(closing ? 1 : 0);
+    expect(run.setup.api.navigate).not.toHaveBeenCalled();
+    const unsupported = run.captures.headers.at(-1)?.unsupported ?? [];
+    expect(unsupported.filter(({ adapter }) => adapter === "tabs")).toMatchObject([
+      { item: `window 1, tab 1, ${SSO}` },
+    ]);
+  }
 });

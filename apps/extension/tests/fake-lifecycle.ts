@@ -2,6 +2,7 @@ import type { Identity, ManagedWindowState, SkippedOrigin } from "@recnrun/domai
 import { vi } from "vite-plus/test";
 import { WorkspaceError } from "@/background/workspace/errors";
 import type { CaptureSummary } from "@/background/workspace/capture";
+import type { MovedTab } from "@/background/workspace/tab-origins";
 import type { LifecycleEffects } from "@/background/workspace/lifecycle-types";
 import type { IdentityRepository } from "@/ports/identities";
 
@@ -50,6 +51,7 @@ export const SUMMARY: CaptureSummary = {
   ms: 1,
   skipped: [],
   tabs: [],
+  away: [],
 };
 
 /** Chrome's side of each step, recorded; `failAt` makes that step throw. */
@@ -69,6 +71,8 @@ export function fakeEffects(open?: { identityId?: string }) {
     beside: [] as number[],
     /** The session's tabs, as the close reads them again. */
     tabs: [] as number[],
+    /** The tabs the capture leaves off their page. */
+    away: [] as MovedTab[],
     failAt: undefined as string | undefined,
   };
   const fail = (step: string) => {
@@ -84,7 +88,7 @@ export function fakeEffects(open?: { identityId?: string }) {
     capture: vi.fn(async (saved: Identity) => {
       calls.push(`capture ${saved.id}`);
       fail("capture");
-      return { ...SUMMARY, captureId: `cap-${saved.id}-2` };
+      return { ...SUMMARY, captureId: `cap-${saved.id}-2`, away: state.away };
     }),
     close: vi.fn(async (ids: readonly number[]) => {
       calls.push(`close ${ids.join(",")}`);
@@ -92,6 +96,9 @@ export function fakeEffects(open?: { identityId?: string }) {
       if (state.managed && ids.includes(state.managed.windowId)) state.managed = undefined;
       state.foreign = state.foreign.filter((id) => !ids.includes(id));
       state.beside = state.beside.filter((id) => !ids.includes(id));
+    }),
+    returnTabs: vi.fn(async (away: readonly MovedTab[]) => {
+      calls.push(`return ${away.map(({ tabId }) => tabId).join(",")}`);
     }),
     load: vi.fn(async (target: Identity, from: "capture" | "empty") => {
       fail("load");

@@ -60,7 +60,8 @@ test("a domain cookie comes back as a domain cookie and reaches the sibling host
   const shared = before.filter(({ domain }) => domain === ".app.localhost");
   expect(shared.every(({ hostOnly }) => !hostOnly)).toBe(true);
   // The whole Incognito store is the identity's, the sibling's host-only cookie too.
-  expect(summary).toMatchObject({ cookies: KEPT.length, unsupported: 0 });
+  // The one item left out: the tab's sessionStorage on the sign-in host, read only at a close.
+  expect(summary).toMatchObject({ cookies: KEPT.length, unsupported: 1 });
   expect(after).toEqual(before);
   expect(ssoRequests).toHaveLength(1);
   const sent = ssoRequests[0]?.cookies ?? [];

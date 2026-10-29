@@ -143,21 +143,28 @@ export async function visitOrigins<I extends { origin: string; url?: string }, T
   return outcomes;
 }
 
+/** The helper tabs open now, and the tabs a visit borrows, so the visit tracker leaves their pages out. */
+const helperTabs = new Set<number>();
+
 /**
- * Visits one origin behind an anonymous barrier in a tab the caller opened, as the helper tab
- * does, so a reopened tab gets its own sessionStorage before its page runs.
+ * Visits one origin behind an anonymous barrier in a tab the caller opened or unloaded, as the
+ * helper tab does, so a tab's own sessionStorage there is written or read without its page running.
+ * The caller notes what the tab holds after: the barrier's pages are not the user's visits.
  */
-export function visitInTab<T>(
+export async function visitInTab<T>(
   { tabId, ...item }: { tabId: number; origin: string; url?: string },
   visiting: Pick<Visit, "operation" | "work">,
   deps: BarrierDeps,
   use: (agent: OriginPort) => Promise<T>,
 ): Promise<VisitOutcome<T>> {
-  return visit({ tabId, origin: item.origin, pages: pagesOf(item) }, visiting, deps, use);
+  const borrowed = !helperTabs.has(tabId);
+  helperTabs.add(tabId);
+  try {
+    return await visit({ tabId, origin: item.origin, pages: pagesOf(item) }, visiting, deps, use);
+  } finally {
+    if (borrowed) helperTabs.delete(tabId);
+  }
 }
-
-/** The helper tabs open now, so the visit tracker leaves their pages out. */
-const helperTabs = new Set<number>();
 
 export const isHelperTab = (tabId: number): boolean => helperTabs.has(tabId);
 

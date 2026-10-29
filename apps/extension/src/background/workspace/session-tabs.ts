@@ -3,8 +3,9 @@ import type { IdentityCapture, SessionLayout } from "@recnrun/domain";
 import { captureThroughAgent } from "@/background/workspace/agent-link";
 import type { BarrierOperation } from "@/background/workspace/barrier";
 import { connectAgent } from "@/background/workspace/capture-api";
-import type { CaptureApi, SessionWindow } from "@/background/workspace/capture-api";
+import type { SessionWindow, TabReadApi } from "@/background/workspace/capture-api";
 import { WorkspaceError } from "@/background/workspace/errors";
+import type { OriginPort } from "@/messaging/origin-protocol";
 
 type Unsupported = IdentityCapture["unsupported"][number];
 type Entries = Record<string, string>;
@@ -35,7 +36,7 @@ const LEFT_OUT = "RECnRun reopens only http and https pages.";
 /** A tab's place, never its URL, which stays out of what a capture names. */
 const placeOf = (window: number, tab: number) => `window ${window + 1}, tab ${tab + 1}`;
 
-async function webTabsOf(api: CaptureApi, window: SessionWindow, at: number, left: Unsupported[]) {
+async function webTabsOf(api: TabReadApi, window: SessionWindow, at: number, left: Unsupported[]) {
   const tabs: SessionTab[] = [];
   for (const [index, { id: tabId, active }] of window.tabs.entries()) {
     const frame = await api.topFrame(tabId);
@@ -53,7 +54,7 @@ async function webTabsOf(api: CaptureApi, window: SessionWindow, at: number, lef
  * Every web tab of the session in order, and the one a capture reads in full: the managed tab while
  * it is open, else the focused window's active tab, else the first.
  */
-export async function findSessionTabs(api: CaptureApi, managedTabId: number): Promise<SessionTabs> {
+export async function findSessionTabs(api: TabReadApi, managedTabId: number): Promise<SessionTabs> {
   const unsupported: Unsupported[] = [];
   const windows: SessionTabs["windows"] = [];
   const all = await api.windows();
@@ -73,26 +74,35 @@ export async function findSessionTabs(api: CaptureApi, managedTabId: number): Pr
 
 const ignore = () => undefined;
 
+/** Reads the sessionStorage of the document behind `port`, checked against the agent's count. */
+export async function sessionThrough(
+  port: OriginPort,
+  operation: BarrierOperation,
+  boundMs: number,
+): Promise<Entries> {
+  let entries: Entries = {};
+  const storage = ({ sessionStorage }: { sessionStorage: Entries }) => {
+    entries = sessionStorage;
+  };
+  const receiver = { storage, database: ignore, records: ignore, cache: ignore };
+  const scope = { idleMs: boundMs, scope: "session" as const };
+  const { counts } = await captureThroughAgent(port, operation, receiver, scope);
+  if (Object.keys(entries).length !== counts.sessionStorage) {
+    throw new Error("The tab's sessionStorage arrived incomplete.");
+  }
+  return entries;
+}
+
 /** Reads one tab's own sessionStorage through an agent injected into its document. */
 async function readTabSession(
-  api: CaptureApi,
+  api: TabReadApi,
   tab: SessionTab,
   operation: BarrierOperation,
   boundMs: number,
 ): Promise<Entries> {
   const port = await connectAgent(api, tab, boundMs);
   try {
-    let entries: Entries = {};
-    const storage = ({ sessionStorage }: { sessionStorage: Entries }) => {
-      entries = sessionStorage;
-    };
-    const receiver = { storage, database: ignore, records: ignore, cache: ignore };
-    const scope = { idleMs: boundMs, scope: "session" as const };
-    const { counts } = await captureThroughAgent(port, operation, receiver, scope);
-    if (Object.keys(entries).length !== counts.sessionStorage) {
-      throw new Error("The tab's sessionStorage arrived incomplete.");
-    }
-    return entries;
+    return await sessionThrough(port, operation, boundMs);
   } finally {
     port.disconnect();
   }
@@ -109,7 +119,7 @@ export interface LayoutRead {
 type TabSessions = SessionLayout["windows"][number]["tabs"][number]["sessionStorage"];
 
 interface Reader {
-  api: CaptureApi;
+  api: TabReadApi;
   operation: BarrierOperation;
   boundMs: number;
 }

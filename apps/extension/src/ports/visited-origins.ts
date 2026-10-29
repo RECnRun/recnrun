@@ -7,6 +7,20 @@ export interface Visit {
   carry?: boolean;
 }
 
+/** A tab's place in the capture a start reopened it from: its window and its index there. */
+export interface LayoutPlace {
+  window: number;
+  tab: number;
+}
+
+/** The origins one tab visited, whose sessionStorage belongs to that tab alone. */
+export interface TabVisits {
+  tabId: number;
+  /** Set when a start reopened the tab: a carried origin's entries come from that place. */
+  from?: LayoutPlace;
+  visits: Visit[];
+}
+
 /**
  * The origins the managed window's identity visited, per window generation: a capture saves each
  * one's site data, since all Incognito tabs share one profile's storage.
@@ -19,4 +33,13 @@ export interface VisitedOrigins {
   note: (generation: number, visits: readonly Visit[]) => Promise<void>;
   /** The visits of `generation`; none when the list belongs to another generation. */
   visited: (generation: number) => Promise<Visit[]>;
+  /** Notes `visits` for one tab as `note` does for the list, and where a start reopened it from. */
+  noteTab: (
+    generation: number,
+    tabId: number,
+    visits: readonly Visit[],
+    from?: LayoutPlace,
+  ) => Promise<void>;
+  /** Each tab's visits in `generation`; none when the lists belong to another generation. */
+  tabVisits: (generation: number) => Promise<TabVisits[]>;
 }

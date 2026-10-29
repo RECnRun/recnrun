@@ -5,6 +5,7 @@ import type { BarrierApi, BarrierOperation } from "@/background/workspace/barrie
 import { visitInTab } from "@/background/workspace/helper-tab";
 import type { NavigationApi } from "@/background/workspace/navigation";
 import { BLANK_BOUND_MS, loaded } from "@/background/workspace/windows";
+import type { LayoutPlace, Visit, VisitedOrigins } from "@/ports/visited-origins";
 
 /** The windows and tabs a start reopens beside the one it restored, each on a blank page first. */
 export interface LayoutApi {
@@ -17,10 +18,15 @@ export interface LayoutApi {
   focus: (windowId: number) => Promise<void>;
 }
 
-export interface LayoutDeps {
-  layout: LayoutApi;
+/** What writing a tab's own sessionStorage needs: the barrier, and where the tab's visits are noted. */
+export interface TabSessionDeps {
   barrier: BarrierApi;
   navigation: NavigationApi;
+  visits: Pick<VisitedOrigins, "noteTab">;
+}
+
+export interface LayoutDeps extends TabSessionDeps {
+  layout: LayoutApi;
 }
 
 /** Where the start already restored the primary tab, and what it learns about the windows. */
@@ -35,24 +41,45 @@ type LaidTab = SessionLayout["windows"][number]["tabs"][number];
 
 const RESTORE_BOUND_MS = 15_000;
 
-/** Writes a tab's own sessionStorage behind the anonymous barrier, then opens its page. */
-async function reopenTab(tabId: number, tab: LaidTab, run: LayoutRun, deps: LayoutDeps) {
+/** Writes one origin's entries into the tab's sessionStorage behind the anonymous barrier. */
+function restoreSession(
+  { tabId, laid }: { tabId: number; laid: LaidTab },
+  { origin, entries }: LaidTab["sessionStorage"][number],
+  operation: BarrierOperation,
+  deps: TabSessionDeps,
+) {
+  const page = new URL(laid.url).origin === origin ? laid.url : undefined;
+  const payload = { localStorage: {}, sessionStorage: entries, indexedDB: [], caches: [] };
+  const scope = { boundMs: RESTORE_BOUND_MS, scope: "session" as const };
+  const visiting = { operation, work: "restore" as const };
+  return visitInTab({ tabId, origin, url: page }, visiting, deps, (agent) =>
+    restoreThroughAgent(agent, operation, payload, scope),
+  );
+}
+
+/**
+ * Writes the tab's sessionStorage of each origin, then notes the origins it holds as the tab's
+ * visits, from its place in the layout: one that was not taken is carried, so the next capture
+ * keeps its last saved entries, unless it is the page's own origin, which the page shows as it is.
+ */
+export async function restoreTabSessions(
+  tab: { tabId: number; laid: LaidTab; from: LayoutPlace },
+  operation: BarrierOperation,
+  deps: TabSessionDeps,
+): Promise<SkippedOrigin[]> {
   const skipped: SkippedOrigin[] = [];
-  const visiting = { operation: run.operation, work: "restore" as const };
-  for (const { origin, entries } of tab.sessionStorage) {
-    if (Object.keys(entries).length === 0) continue;
-    const page = new URL(tab.url).origin === origin ? tab.url : undefined;
-    const payload = { localStorage: {}, sessionStorage: entries, indexedDB: [], caches: [] };
-    const scope = { boundMs: RESTORE_BOUND_MS, scope: "session" as const };
-    const outcome = await visitInTab({ tabId, origin, url: page }, visiting, deps, (agent) =>
-      restoreThroughAgent(agent, run.operation, payload, scope),
-    );
-    if (!outcome.ok) {
-      const { step, reason } = outcome;
-      skipped.push({ origin, work: "restore", step, reason, kept: false });
-    }
+  const visits: Visit[] = [];
+  for (const session of tab.laid.sessionStorage) {
+    if (Object.keys(session.entries).length === 0) continue;
+    const { origin } = session;
+    const outcome = await restoreSession(tab, session, operation, deps);
+    const kept = !outcome.ok && origin !== new URL(tab.laid.url).origin;
+    visits.push(kept ? { origin, carry: true } : { origin });
+    if (!outcome.ok)
+      skipped.push({ origin, work: "restore", step: outcome.step, reason: outcome.reason, kept });
   }
-  await deps.layout.navigate(tabId, tab.url);
+  if (visits.length > 0)
+    await deps.visits.noteTab(operation.generation, tab.tabId, visits, tab.from);
   return skipped;
 }
 
@@ -79,10 +106,14 @@ async function reopenWindow(at: number, layout: SessionLayout, run: LayoutRun, d
   const held = { tabId: opened.tabId, index: own ? layout.primary.tab : 0 };
   const ids = await openTabs(opened.windowId, held, tabs.length, deps);
   const skipped: SkippedOrigin[] = [];
-  for (const [index, tab] of tabs.entries()) {
+  for (const [index, laid] of tabs.entries()) {
     const tabId = ids[index] ?? -1;
-    if (!(own && index === held.index)) skipped.push(...(await reopenTab(tabId, tab, run, deps)));
-    if (tab.active) await deps.layout.activate(tabId);
+    if (!(own && index === held.index)) {
+      const from = { window: at, tab: index };
+      skipped.push(...(await restoreTabSessions({ tabId, laid, from }, run.operation, deps)));
+      await deps.layout.navigate(tabId, laid.url);
+    }
+    if (laid.active) await deps.layout.activate(tabId);
   }
   return { windowId: opened.windowId, skipped };
 }

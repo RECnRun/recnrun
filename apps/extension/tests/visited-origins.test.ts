@@ -49,6 +49,13 @@ test("notes each top document's origin and page in any Incognito tab while the w
       ],
     }),
   );
+  // Each tab keeps its own list, since its sessionStorage on each origin is its own.
+  await vi.waitFor(() =>
+    expect(visits.tabs.tabs).toEqual([
+      { tabId: 10, visits: [{ origin: SSO, url: `${SSO}/authorize` }] },
+      { tabId: 9, visits: [{ origin: APP, url: `${APP}/other` }] },
+    ]),
+  );
 });
 
 test("leaves out frames, normal and helper tabs, pages off the web, and a closed window", async () => {
@@ -75,7 +82,7 @@ test("keeps each origin once per generation, in order, and starts again with a n
   expect(await visitedOrigins.visited(3)).toEqual([at(APP, "/a"), { origin: SSO }]);
   expect(await visitedOrigins.visited(4)).toEqual([]);
   expect(await fakeBrowser.storage.session.get(KEY)).toEqual({
-    [KEY]: { generation: 3, visits: [at(APP, "/a"), { origin: SSO }] },
+    [KEY]: { generation: 3, visits: [at(APP, "/a"), { origin: SSO }], tabs: [] },
   });
   await visitedOrigins.note(4, [at(SSO)]);
   expect(await visitedOrigins.visited(3)).toEqual([]);
@@ -83,7 +90,7 @@ test("keeps each origin once per generation, in order, and starts again with a n
   // A new generation is stored even when it starts with nothing.
   await visitedOrigins.note(5, []);
   expect(await fakeBrowser.storage.session.get(KEY)).toEqual({
-    [KEY]: { generation: 5, visits: [] },
+    [KEY]: { generation: 5, visits: [], tabs: [] },
   });
 });
 
@@ -93,6 +100,25 @@ test("an origin a start could not restore carries until the identity's own tab l
   expect(await visitedOrigins.visited(1)).toEqual([{ origin: APP }, { origin: SSO, carry: true }]);
   await visitedOrigins.note(1, [at(SSO, "/home")]);
   expect(await visitedOrigins.visited(1)).toEqual([{ origin: APP }, at(SSO, "/home")]);
+});
+
+test("keeps each tab's visits apart, with the place a start reopened it from", async () => {
+  expect(await visitedOrigins.tabVisits(2)).toEqual([]);
+  await visitedOrigins.noteTab(2, 9, [at(APP)], { window: 0, tab: 1 });
+  await visitedOrigins.noteTab(2, 10, [at(SSO)]);
+  await visitedOrigins.noteTab(2, 9, [{ origin: SSO, carry: true }, at(APP, "/a")]);
+  expect(await visitedOrigins.tabVisits(2)).toEqual([
+    { tabId: 10, visits: [at(SSO)] },
+    {
+      tabId: 9,
+      from: { window: 0, tab: 1 },
+      visits: [at(APP, "/a"), { origin: SSO, carry: true }],
+    },
+  ]);
+  // The lists belong to their generation, as the session list does.
+  expect(await visitedOrigins.tabVisits(3)).toEqual([]);
+  await visitedOrigins.note(3, []);
+  expect(await visitedOrigins.tabVisits(2)).toEqual([]);
 });
 
 test("two notes at once keep both origins", async () => {
