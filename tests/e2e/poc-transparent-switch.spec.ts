@@ -2,7 +2,8 @@ import type { Page, Worker } from "@playwright/test";
 import { IDP } from "./apps/sso-pages.ts";
 import { expect, test } from "./fixtures/extension.ts";
 import { failNext, incognitoWindows, normalCookies, setNormalCookie } from "./fixtures/identity.ts";
-import { clickInDashboard, dashboardOf, openSite } from "./fixtures/session.ts";
+import { newIdentity, opened, switchTo, identity } from "./fixtures/panel.ts";
+import { clickInDashboard, openSite } from "./fixtures/session.ts";
 import {
   expireServerSessions,
   ssoAppUrl,
@@ -21,29 +22,6 @@ test.use({ incognitoAccess: true, viewport: { width: 1280, height: 1400 } });
 /** Saves what the dashboard shows next to the test's results, for a person to look at. */
 const screen = (site: Page, name: string) =>
   site.screenshot({ path: test.info().outputPath(`${name}.png`) });
-
-const identity = (site: Page, label: string) =>
-  dashboardOf(site)
-    .getByRole("list", { name: "Saved identities" })
-    .getByRole("listitem", { name: label, exact: true });
-
-/** `label` is Open and its command returned: Close waits while the command, and the barrier, run. */
-async function opened(site: Page, label: string) {
-  await expect(identity(site, label).getByText("Open", { exact: true })).toBeVisible();
-  await expect(
-    identity(site, label).getByRole("button", { name: "Close", exact: true }),
-  ).toBeEnabled();
-}
-
-/** Types `url` in the panel's Address and clicks New identity, as the user would. */
-async function newIdentity(site: Page, url: string) {
-  const panel = workspacePanel(site);
-  await panel.getByRole("combobox", { name: "Address" }).fill(url);
-  await clickInDashboard(panel.getByRole("button", { name: "New identity", exact: true }));
-}
-
-const switchTo = (site: Page, label: string) =>
-  clickInDashboard(identity(site, label).getByRole("button", { name: "Switch to", exact: true }));
 
 /** Cookies the normal profile holds for the app and its provider, which no switch may touch. */
 async function normalProfile(serviceWorker: Worker) {

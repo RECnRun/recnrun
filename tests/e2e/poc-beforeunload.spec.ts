@@ -1,30 +1,9 @@
-import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures/extension.ts";
 import { incognitoWindows } from "./fixtures/identity.ts";
 import { lifecycleSetUp } from "./fixtures/lifecycle.ts";
+import { askBeforeLeaving } from "./fixtures/panel.ts";
 
 test.use({ incognitoAccess: true });
-
-/**
- * Makes the page ask before it unloads, as Gmail does with a draft; Chrome shows the dialog only
- * after a user activation, so the click gives it one.
- */
-async function askBeforeLeaving(page: Page): Promise<string[]> {
-  const dialogs: string[] = [];
-  page.on("dialog", (dialog) => {
-    dialogs.push(dialog.type());
-    // Dismissing keeps the page, which cancels the close, as "Stay" would.
-    void dialog.dismiss();
-  });
-  await page.evaluate(() => {
-    addEventListener("beforeunload", (event) => {
-      event.preventDefault();
-    });
-  });
-  await page.locator("body").click();
-  expect(await page.evaluate(() => navigator.userActivation.hasBeenActive)).toBe(true);
-  return dialogs;
-}
 
 test("a page that asks before it unloads neither blocks nor shows a dialog on New identity and Close", async ({
   context,
