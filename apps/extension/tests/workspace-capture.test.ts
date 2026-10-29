@@ -38,12 +38,12 @@ async function commandOf(agent: ReturnType<typeof fakePort>) {
 
 /** Starts a capture and answers its command with `replies`, each tagged with the operation. */
 async function captureAnswering(replies: object[], setup = chrome(), captures = memoryCaptures()) {
-  const capturing = captureIdentity(
-    "identity-a",
-    MANAGED,
-    { api: setup.api, captures, cookies: setup.cookies, boundMs: BOUND },
-    { cookieHosts: ["sso.localhost"] },
-  );
+  const capturing = captureIdentity("identity-a", MANAGED, {
+    api: setup.api,
+    captures,
+    cookies: setup.cookies,
+    boundMs: BOUND,
+  });
   const { operation } = await commandOf(setup.agent);
   for (const reply of replies) setup.agent.onMessage.emit({ ...reply, ...operation });
   return { capturing, captures, ...setup };
@@ -95,15 +95,13 @@ describe("captureIdentity", () => {
           caches: [],
         },
       ],
-      capabilities: { cookieHosts: ["sso.localhost"] },
+      // The whole Incognito store is the identity's: another site's cookies are kept too.
       cookies: [
-        { name: "sid", value: "abc", path: "/", secure: false, httpOnly: true, sameSite: "lax" },
+        { ...COOKIE, name: "sid" },
         { ...SITE_SSO, host: "sso.localhost" },
+        { ...COOKIE, name: "ads", host: "other.localhost" },
       ],
-      unsupported: [
-        { adapter: "cookies", item: "ads on other.localhost/" },
-        { adapter: "cacheStorage", ...OPAQUE },
-      ],
+      unsupported: [{ adapter: "cacheStorage", ...OPAQUE }],
     });
     expect(complete?.adapters).toEqual([
       { adapter: "localStorage", status: "captured" },
@@ -119,8 +117,8 @@ describe("captureIdentity", () => {
     expect(summary).toMatchObject({
       captureId: started?.id,
       ...COUNTS,
-      cookies: 2,
-      unsupported: 2,
+      cookies: 3,
+      unsupported: 1,
       bytes,
     });
     expect(bytes).toBeGreaterThan(0);

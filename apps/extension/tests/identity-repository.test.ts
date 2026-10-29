@@ -8,7 +8,6 @@ const alice: Identity = {
   id: "a",
   label: "Alice",
   url: "https://app.example/",
-  capabilities: { cookieHosts: [] },
   created: 1,
 };
 

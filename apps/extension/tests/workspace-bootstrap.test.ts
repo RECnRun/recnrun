@@ -13,7 +13,7 @@ import { echoProbes, fakePort } from "./fake-port";
 
 const ORIGIN = "http://app.localhost:5192";
 const URL_ = `${ORIGIN}/app/redirect?run=1`;
-const START = { url: URL_, cookieHosts: [] };
+const START = URL_;
 const WINDOW = { generation: 2, windowId: 5, tabId: 9, status: "active" as const };
 const DATA: IdentityData = {
   cookies: [{ name: "sid", value: "s", path: "/", secure: false, httpOnly: true, sameSite: "lax" }],
@@ -127,7 +127,7 @@ describe("bootstrapIdentity", () => {
 
     expect(cookies.written).toEqual([{ ...DATA.cookies[0], storeId: "1", url: `${ORIGIN}/` }]);
     expect(seen.cookiesAtNavigation).toBe(1);
-    expect(seen.rulesAtNavigation).toBe(4);
+    expect(seen.rulesAtNavigation).toBe(5);
     expect(seen.restorePayload).toEqual(DATA.site);
     expect(seen.rulesAtReload).toBe(0);
     expect(seen.scriptsAtReload).toBe(0);
@@ -277,15 +277,14 @@ describe("bootstrapIdentity", () => {
   });
 });
 
-describe("bootstrapIdentity with declared hosts", () => {
-  test("hands over to a declared host: its redirect is stripped behind the barrier, then followed", async () => {
+describe("bootstrapIdentity on a redirect off the target", () => {
+  test("hands over to another site: its redirect is stripped behind the barrier, then followed", async () => {
     navigation.reload = async (tabId, documentId) => {
       navigation.reloads.push({ tabId, documentId });
       const url = "http://sso.localhost:5192/sso/authorize?run=1";
       navigation.onCommitted.emit({ tabId, frameId: 0, url, documentId: "doc-2" });
     };
-    const start = { url: URL_, cookieHosts: ["sso.localhost"] };
-    await expect(bootstrapIdentity(start, DATA, deps, "op-1")).resolves.toHaveLength(
+    await expect(bootstrapIdentity(START, DATA, deps, "op-1")).resolves.toHaveLength(
       BOOTSTRAP_STEPS.length,
     );
     expect(seen.rulesAtNavigation).toBe(5);

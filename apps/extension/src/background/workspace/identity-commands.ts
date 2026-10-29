@@ -1,5 +1,5 @@
 import { restorableData } from "@recnrun/domain";
-import type { CaptureCapabilities, IdentityData } from "@recnrun/domain";
+import type { IdentityData } from "@recnrun/domain";
 import { captureIdentity, chromeCaptureApi } from "@/background/workspace/capture";
 import type { CaptureDeps, CaptureSummary } from "@/background/workspace/capture";
 import { chromeCookieApi } from "@/background/workspace/cookie-stores";
@@ -26,17 +26,16 @@ export function chromeIdentityDeps(): IdentityDeps {
   };
 }
 
-/** Captures the managed tab's page as `identityId`'s saved data, widened by `capabilities`. */
+/** Captures the managed tab's page and the Incognito cookie store as `identityId`'s saved data. */
 export async function captureManaged(
   identityId: string,
   deps: IdentityDeps,
-  capabilities: CaptureCapabilities,
 ): Promise<CaptureSummary> {
   const managed = await managedWindowRepository.read();
   if (managed?.status !== "active") {
     throw new WorkspaceError("NoManagedWindow", "No Incognito workspace is open to capture.");
   }
-  return captureIdentity(identityId, managed, deps, capabilities);
+  return captureIdentity(identityId, managed, deps);
 }
 
 /**
@@ -46,13 +45,12 @@ export async function captureManaged(
 export async function savedStart(
   identityId: string,
   { captures, identities }: Pick<IdentityDeps, "captures" | "identities">,
-): Promise<{ url: string; cookieHosts: readonly string[]; data: IdentityData }> {
+): Promise<{ url: string; data: IdentityData }> {
   const saved = (await identities.list()).find(({ id }) => id === identityId);
   await captures.settle(identityId, saved?.lastCapture?.id);
   const capture = await captures.read(identityId);
   if (!capture) {
     throw new WorkspaceError("CaptureMissing", "RECnRun has no saved data for this identity.");
   }
-  const { cookieHosts } = capture.capabilities;
-  return { url: capture.url, cookieHosts, data: restorableData(capture) };
+  return { url: capture.url, data: restorableData(capture) };
 }

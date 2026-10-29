@@ -2,7 +2,7 @@ import * as v from "valibot";
 import { OriginDataSchema } from "./origin-data.ts";
 
 /** A host name as Chrome writes a cookie's host: letters, digits, dots, and hyphens. */
-export const HostSchema = v.pipe(v.string(), v.regex(/^[a-z0-9.-]+$/i));
+const HostSchema = v.pipe(v.string(), v.regex(/^[a-z0-9.-]+$/i));
 
 /**
  * One cookie to restore; no `domain` means a host-only cookie, of `host` or else of the target's

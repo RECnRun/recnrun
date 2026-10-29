@@ -57,6 +57,11 @@ const sameOrigin = (url: string, origin: string) => URL.parse(url)?.origin === o
 const offOrigin = () =>
   new WorkspaceError("OffOriginNavigation", "The page left the target site before it loaded.");
 
+const isWeb = (url: string) => /^https?:$/.test(URL.parse(url)?.protocol ?? "");
+
+const offWeb = () =>
+  new WorkspaceError("OffOriginNavigation", "The page left the web before it loaded.");
+
 /**
  * Follows one tab's top-frame navigation from listeners registered before `start`, so no event goes
  * unseen, until the listeners settle it, the navigation fails, the tab closes, or the bound passes.
@@ -161,30 +166,20 @@ export function openBehindBarrier(
 
 interface Released {
   tabId: number;
-  origin: string;
-  /** Hosts the identity declares: the released app may hand over to them, as to its sign-in. */
-  declaredHosts: readonly string[];
   /** The barrier's document, which the reload replaces. */
   documentId: string;
 }
 
-/** Whether `url` is a web page on one of `hosts`, on any port. */
-function onDeclaredHost(url: string, hosts: readonly string[]): boolean {
-  const parsed = URL.parse(url);
-  const web = parsed?.protocol === "http:" || parsed?.protocol === "https:";
-  return web && hosts.includes(parsed.hostname);
-}
-
 /**
- * Reloads the tab and resolves with the id of the new document it committed on the target origin,
- * or on a declared host.
+ * Reloads the tab and resolves with the id of the new document it committed on any http(s) host:
+ * the barrier hands a cross-origin redirect, such as the app's sign-in, over to this reload.
  */
 export function reloadAndCommit(
   api: NavigationApi,
   released: Released,
   boundMs: number,
 ): Promise<string> {
-  const { tabId, origin } = released;
+  const { tabId } = released;
   const late = () => new WorkspaceError("NavigationTimedOut", "The page did not reload in time.");
   return watchTab<string>(
     api,
@@ -192,9 +187,7 @@ export function reloadAndCommit(
     (settle) => ({
       onCommit: (commit) => {
         if (commit.documentId === released.documentId) return;
-        const allowed =
-          sameOrigin(commit.url, origin) || onDeclaredHost(commit.url, released.declaredHosts);
-        if (!allowed) settle.reject(offOrigin());
+        if (!isWeb(commit.url)) settle.reject(offWeb());
         else settle.resolve(commit.documentId ?? "");
       },
     }),

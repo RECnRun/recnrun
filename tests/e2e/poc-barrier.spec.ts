@@ -109,19 +109,29 @@ for (const delay of [0, 2_000]) {
   });
 }
 
-test("a redirect off the target origin fails the start, closes the window, and releases nothing", async ({
+test("a redirect off the target origin commits script-free on the target, and the release follows it", async ({
+  context,
   serviceWorker,
 }) => {
   const run = `barrier-off-${Date.now()}`;
-  const target = `${APP}/app/redirect?to=other&run=${run}`;
-  const failure = await startWithIdentity(serviceWorker, target, identityFor(run)).then(
-    () => "started",
-    (error: unknown) => String(error),
+  const query = `to=other&run=${run}`;
+  const timings = await startWithIdentity(
+    serviceWorker,
+    `${APP}/app/redirect?${query}`,
+    identityFor(run),
   );
-  expect(failure).toMatch(/did not load \(net::ERR_BLOCKED_BY_CLIENT\)|left the target site/);
-  expect(await incognitoWindows(serviceWorker)).toBe(0);
+  expect(timings.map(({ step }) => step)).toEqual(STEPS);
+  await pageAt(context, `http://other.localhost:5192/app/?${query}`);
+  expect(await incognitoWindows(serviceWorker)).toBe(1);
   expect(await barrierLeft(serviceWorker)).toEqual({ rules: 0, scripts: 0 });
   const entries = await appLog(run);
-  expect(requestsOf(entries)).toEqual(["/app/redirect document"]);
-  expect(entries.some(({ kind }) => kind === "report")).toBe(false);
+  // The barrier's request lost its Location; the release reload repeats it and follows it.
+  const released = entries.findLastIndex(({ path }) => path === "/app/redirect");
+  const held = entries.slice(0, released);
+  expect(requestsOf(held)).toEqual(["/app/redirect document"]);
+  expect(held.some(({ kind }) => kind === "report")).toBe(false);
+  expect(requestsOf(entries.slice(released)).slice(0, 2)).toEqual([
+    "/app/redirect document",
+    "/app/ document",
+  ]);
 });

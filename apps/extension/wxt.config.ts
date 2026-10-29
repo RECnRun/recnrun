@@ -34,7 +34,7 @@ export default defineConfig({
     description: "Records and replays browser sessions for developers.",
     // tabs lets the dashboard list every tab, with its title and address, to record one; test and
     // development builds add the Incognito workspace POC's permissions (src/config/permissions.ts).
-    ...buildAccess(mode, process.env.RECNRUN_POC_HOSTS),
+    ...buildAccess(mode),
     // One extension context spans normal and incognito windows, so the dashboard and the PiP
     // window see incognito tabs once the user turns on "Allow in Incognito".
     incognito: "spanning",

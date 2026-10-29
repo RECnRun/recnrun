@@ -18,8 +18,6 @@ export type LifecycleKind = LifecycleCommand["kind"];
 export interface Opening {
   from: "capture" | "empty";
   url: string;
-  /** The hosts the identity declares; the start may hand over to them. */
-  cookieHosts: readonly string[];
   data: IdentityData;
 }
 
@@ -53,11 +51,10 @@ export interface LifecycleDeps {
   identities: IdentityRepository;
   journal: OperationJournal;
   effects: LifecycleEffects;
-  /** The workspace's one-operation lock, the Incognito access check, and the cookie hosts check. */
+  /** The workspace's one-operation lock and the Incognito access check. */
   guard: {
     exclusive: <T>(run: () => Promise<T>) => Promise<T>;
     access: () => Promise<void>;
-    hosts: (cookieHosts: readonly string[]) => Promise<void>;
   };
   now?: () => number;
 }

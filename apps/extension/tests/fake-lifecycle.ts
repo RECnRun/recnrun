@@ -9,7 +9,6 @@ export const identity = (id: string, captured = true): Identity => ({
   id,
   label: id.toUpperCase(),
   url: `https://${id}.example/`,
-  capabilities: { cookieHosts: [] },
   created: 1,
   ...(captured && { lastCapture: { id: `cap-${id}`, at: 1, bytes: 10 } }),
 });
@@ -88,7 +87,7 @@ export function fakeEffects(open?: { identityId?: string }) {
     }),
     load: vi.fn(async (target: Identity, from: "capture" | "empty") => {
       fail("load");
-      return { from, url: target.url, cookieHosts: target.capabilities.cookieHosts, data: NOTHING };
+      return { from, url: target.url, data: NOTHING };
     }),
     start: vi.fn(async (target: Identity, { from }: { from: "capture" | "empty" }) => {
       calls.push(`start ${target.id} ${from}`);

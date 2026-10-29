@@ -7,7 +7,6 @@ import {
   expireProviderSessions,
   expireServerSessions,
   SIGNED_OUT,
-  SSO_HOSTS,
   ssoFormSignIn,
   ssoInteractiveUrl,
   ssoPage,
@@ -24,12 +23,12 @@ const reportedTokens = async (run: string) =>
     .filter(({ kind }) => kind === "report")
     .map(({ body }) => (body as { token: unknown }).token);
 
-test("a server session that expired by the restore hands over to the declared provider and back", async ({
+test("a server session that expired by the restore hands over to the provider and back, with nothing declared", async ({
   context,
   serviceWorker,
 }) => {
   const run = `sso-server-${Date.now()}`;
-  const { open } = await ssoSetUp(context, serviceWorker, ssoServerUrl(run), SSO_HOSTS);
+  const { open } = await ssoSetUp(context, serviceWorker, ssoServerUrl(run));
   // A new identity has no session either: the start meets the provider's redirect at once.
   const a = await open("A");
   expect(a.state).toMatchObject({ first: { token: null }, ...SIGNED_OUT });
@@ -47,25 +46,12 @@ test("a server session that expired by the restore hands over to the declared pr
   expect(await incognitoWindows(serviceWorker)).toBe(1);
 });
 
-test("a server redirect to an undeclared host still stops the start", async ({
-  context,
-  serviceWorker,
-}) => {
-  const run = `sso-server-undeclared-${Date.now()}`;
-  const { identities } = await ssoSetUp(context, serviceWorker, ssoServerUrl(run));
-  await expect(identities.open("A")).rejects.toThrow(
-    "The page did not load (net::ERR_BLOCKED_BY_CLIENT).",
-  );
-  expect(await journalOf(serviceWorker)).toMatchObject({ step: "navigate", status: "failed" });
-  expect(await incognitoWindows(serviceWorker)).toBe(0);
-});
-
 test("a start whose app and provider sessions both expired releases on the provider's sign-in page", async ({
   context,
   serviceWorker,
 }) => {
   const run = `sso-release-${Date.now()}`;
-  const { identities } = await ssoSetUp(context, serviceWorker, ssoInteractiveUrl(run), SSO_HOSTS);
+  const { identities } = await ssoSetUp(context, serviceWorker, ssoInteractiveUrl(run));
   const tab: { page?: Page } = {};
   /** Opens `label` and returns the managed tab, released on the provider's sign-in page. */
   const signInPage = async (label: string) => {

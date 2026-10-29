@@ -1,7 +1,7 @@
 // The cookie jar of the cookies POC spec: one response per Set-Cookie case, attributes as Chrome reads them.
 
-/** Hosts whose frames the jar page embeds; `other` is the one a capture declares. */
-export const FRAME_HOSTS = { declared: "other.localhost", undeclared: "ads.localhost" };
+/** Hosts whose frames the jar page embeds; a capture keeps their cookies as the app's own. */
+export const FRAME_HOSTS = { other: "other.localhost", ads: "ads.localhost" };
 
 /** Every Set-Cookie of the jar page; the last ones are those Chrome must refuse. */
 export const jarCookies = (run: string) => [

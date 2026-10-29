@@ -102,12 +102,10 @@ describe("openBehindBarrier", () => {
 });
 
 describe("reloadAndCommit", () => {
+  const RELEASED = { tabId: TAB, documentId: "doc-1" };
+
   test("reloads the tab and resolves with the new document of the target origin", async () => {
-    const reloading = reloadAndCommit(
-      api,
-      { tabId: TAB, origin: ORIGIN, declaredHosts: [], documentId: "doc-1" },
-      1_000,
-    );
+    const reloading = reloadAndCommit(api, RELEASED, 1_000);
     expect(api.reloads).toEqual([{ tabId: TAB, documentId: "doc-1" }]);
     commit(api, "doc-1");
     api.onCommitted.emit({ tabId: 3, frameId: 0, url: `${ORIGIN}/`, documentId: "doc-x" });
@@ -116,30 +114,24 @@ describe("reloadAndCommit", () => {
     expect(listenerCount(api)).toBe(0);
   });
 
-  test("fails when the released document is not the target origin's", async () => {
-    const reloading = reloadAndCommit(
-      api,
-      { tabId: TAB, origin: ORIGIN, declaredHosts: [], documentId: "doc-1" },
-      1_000,
-    );
-    commit(api, "doc-2", "chrome-error://chromewebdata/");
-    await expect(reloading).rejects.toMatchObject({ name: "OffOriginNavigation" });
+  test("fails when the released document is no web page", async () => {
+    for (const url of [
+      "chrome-error://chromewebdata/",
+      "data:text/html,x",
+      "ftp://sso.localhost/",
+    ]) {
+      const reloading = reloadAndCommit(api, RELEASED, 1_000);
+      commit(api, "doc-2", url);
+      await expect(reloading, url).rejects.toMatchObject({ name: "OffOriginNavigation" });
+    }
   });
 
-  test("accepts a document on a declared host, on any port, as the app handing over to it", async () => {
-    const released = { tabId: TAB, origin: ORIGIN, declaredHosts: ["sso.localhost"] };
-    const signIn = reloadAndCommit(api, { ...released, documentId: "doc-1" }, 1_000);
-    commit(api, "doc-2", "http://sso.localhost:5192/sso/login?run=1");
-    await expect(signIn).resolves.toBe("doc-2");
-    for (const url of [
-      "http://other.localhost:5192/",
-      "http://evil.sso.localhost/",
-      "ftp://sso.localhost/",
-      "http://sso.localhost:x@evil.localhost/",
-    ]) {
-      const elsewhere = reloadAndCommit(api, { ...released, documentId: "doc-1" }, 1_000);
-      commit(api, "doc-3", url);
-      await expect(elsewhere, url).rejects.toMatchObject({ name: "OffOriginNavigation" });
+  test("accepts a document on any http(s) host, as the app handing over to its sign-in", async () => {
+    // The restore is done and the barrier gone: where the app's own redirect leads is its business.
+    for (const url of ["http://sso.localhost:5192/sso/login?run=1", "https://login.example/"]) {
+      const signIn = reloadAndCommit(api, RELEASED, 1_000);
+      commit(api, "doc-2", url);
+      await expect(signIn, url).resolves.toBe("doc-2");
     }
   });
 });

@@ -89,7 +89,7 @@ test("the managed tab's cookies come back attribute for attribute, HttpOnly ones
   );
   await source.goto(BLANK);
   const before = await incognitoJar(serviceWorker);
-  const summary = await captureIdentity(serviceWorker, "identity-a", [FRAME_HOSTS.declared]);
+  const summary = await captureIdentity(serviceWorker, "identity-a");
   await closeWorkspace(serviceWorker, source);
 
   const logged = (await appLog(run)).length;
@@ -103,10 +103,11 @@ test("the managed tab's cookies come back attribute for attribute, HttpOnly ones
 
   expect(named(before)).toEqual(KEPT);
   expect(outcomes).toEqual(PREDICTED);
-  const undeclared = before.filter(({ domain }) => domain === FRAME_HOSTS.undeclared);
-  expect(undeclared.map(({ name }) => name)).toEqual(["frame_part"]);
-  expect(summary).toMatchObject({ cookies: before.length - 1, unsupported: 1 });
-  expect(after).toEqual(before.filter(({ domain }) => domain !== FRAME_HOSTS.undeclared));
+  // The whole Incognito store is the identity's: the ads frame's cookie comes back too.
+  const ads = before.filter(({ domain }) => domain === FRAME_HOSTS.ads);
+  expect(ads.map(({ name }) => name)).toEqual(["frame_part"]);
+  expect(summary).toMatchObject({ cookies: before.length, unsupported: 0 });
+  expect(after).toEqual(before);
   expect(first).toMatchObject({ path: "/blank", dest: "document" });
   expect(first?.cookies).toEqual(expect.arrayContaining(["h_session", "run"]));
   // The barrier's navigation has the extension as initiator, so it lacks the SameSite=Strict

@@ -15,17 +15,16 @@ function setUp(options: { open?: string; saved?: Identity[]; recording?: boolean
   const chrome = fakeEffects(options.open === undefined ? undefined : { identityId: options.open });
   const journal = memoryOperationJournal();
   const access = vi.fn(async () => {});
-  const hosts = vi.fn(async (_hosts: readonly string[]) => {});
   const lifecycle = createLifecycle({
     recordings: memoryRecordingStore(options.recording ? RECORDING : null),
     identities: repository,
     journal,
     effects: chrome.effects,
-    guard: { exclusive: (run) => run(), access, hosts },
+    guard: { exclusive: (run) => run(), access },
     now: () => NOW,
   });
   const saved = (id: string) => memory.saved.find((each) => each.id === id);
-  return { lifecycle, chrome, journal, memory, saved, access, hosts };
+  return { lifecycle, chrome, journal, memory, saved, access };
 }
 
 const steps = (journal: ReturnType<typeof memoryOperationJournal>) =>
@@ -146,7 +145,7 @@ test("another tab in the workspace's window refuses before the capture and stops
   chrome.state.otherTabs = 1;
   await expect(lifecycle.switchTo("b")).rejects.toThrow("RECnRun saves only its own tab.");
   chrome.state.foreign = [9];
-  const draft = { label: "D", url: "https://d.example/", capabilities: { cookieHosts: [] } };
+  const draft = { label: "D", url: "https://d.example/" };
   await expect(lifecycle.newIdentity(draft, [9])).rejects.toThrow(
     "RECnRun saves only its own tab.",
   );
@@ -227,7 +226,6 @@ test("new identity saves the open one, then opens the new one empty and keeps it
   const draft = {
     label: " Admin ",
     url: "https://app.example/",
-    capabilities: { cookieHosts: [] },
   };
   const created = await lifecycle.newIdentity(draft);
   expect(created).toMatchObject({ label: "Admin", url: draft.url, created: NOW });
@@ -239,7 +237,7 @@ test("new identity saves the open one, then opens the new one empty and keeps it
 test("new identity is not kept when saving the open one fails, nor made from a bad draft", async () => {
   const { lifecycle, chrome, memory } = setUp({ open: "a" });
   chrome.state.failAt = "capture";
-  const draft = { label: "Admin", url: "https://app.example/", capabilities: { cookieHosts: [] } };
+  const draft = { label: "Admin", url: "https://app.example/" };
   await expect(lifecycle.newIdentity(draft)).rejects.toThrow("Injected at capture.");
   await expect(lifecycle.newIdentity({ ...draft, label: " " })).rejects.toMatchObject({
     name: "IdentityNotValid",
@@ -253,7 +251,7 @@ test("new identity is not kept when saving the open one fails, nor made from a b
 test("new identity closes only the other windows the user saw, without saving them", async () => {
   const { lifecycle, chrome } = setUp();
   chrome.state.foreign = [7, 8];
-  const draft = { label: "Admin", url: "https://app.example/", capabilities: { cookieHosts: [] } };
+  const draft = { label: "Admin", url: "https://app.example/" };
   await expect(lifecycle.newIdentity(draft, [7])).rejects.toMatchObject({
     name: "WindowsChanged",
   });
@@ -265,7 +263,7 @@ test("new identity closes only the other windows the user saw, without saving th
 test("new identity closes no window while recording", async () => {
   const { lifecycle, chrome } = setUp({ recording: true });
   chrome.state.foreign = [7];
-  const draft = { label: "Admin", url: "https://app.example/", capabilities: { cookieHosts: [] } };
+  const draft = { label: "Admin", url: "https://app.example/" };
   await expect(lifecycle.newIdentity(draft, [7])).rejects.toMatchObject({
     name: "RecordingInProgress",
   });

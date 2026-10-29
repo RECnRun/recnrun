@@ -1,14 +1,6 @@
-import type { IdentityCapture, SiteCookie } from "@recnrun/domain";
+import type { SiteCookie } from "@recnrun/domain";
 import type { CookieApi, StoredCookie } from "@/background/workspace/cookie-stores";
 import { WorkspaceError } from "@/background/workspace/errors";
-
-type Unsupported = IdentityCapture["unsupported"][number];
-
-/** The hosts whose cookies a capture keeps: the target's, and those its capabilities declare. */
-export interface CookieHosts {
-  target: string;
-  extra: readonly string[];
-}
 
 /** A host-only cookie belongs to its host; a domain cookie to every host within its domain. */
 function belongs({ domain, hostOnly }: StoredCookie, hosts: readonly string[]): boolean {
@@ -65,37 +57,23 @@ async function list(api: Pick<CookieApi, "all">, storeId: string): Promise<Store
 }
 
 /**
- * Reads `storeId`'s cookies and keeps those of the given hosts; it names the others, never their
- * values. `seen` holds the cookie names the page itself showed: one Chrome did not list, as when
- * the host permissions miss its domain (`cookies_helpers.cc:51-56`), fails the capture.
+ * Reads every cookie of `storeId`, the identity's whole Incognito store. `seen` holds the cookie names the page itself showed: one Chrome did
+ * not list, as for a site the user withheld from RECnRun (`cookies_helpers.cc:51-56`), fails it.
  */
 export async function captureCookies(
   api: Pick<CookieApi, "all">,
   storeId: string,
-  hosts: CookieHosts,
+  target: string,
   seen: readonly string[],
-): Promise<{ cookies: SiteCookie[]; unsupported: Unsupported[] }> {
+): Promise<SiteCookie[]> {
   const listed = await list(api, storeId);
-  const missing = unlisted(listed, hosts.target, seen);
+  const missing = unlisted(listed, target, seen);
   if (missing.length > 0) {
     const names = missing.map((name) => `"${name}"`).join(", ");
     throw new WorkspaceError(
       "CookiesNotReadable",
-      `Chrome did not list the page's cookies ${names}; RECnRun needs host access to their domain.`,
+      `Chrome did not list the page's cookies ${names}; give RECnRun access to all sites in chrome://extensions.`,
     );
   }
-  const kept = [hosts.target, ...hosts.extra];
-  const cookies: SiteCookie[] = [];
-  const unsupported: Unsupported[] = [];
-  for (const stored of listed) {
-    if (belongs(stored, kept)) cookies.push(siteCookie(stored, hosts.target));
-    else {
-      unsupported.push({
-        adapter: "cookies",
-        item: `${stored.name} on ${stored.domain}${stored.path}`,
-        reason: "Its host is neither the target's nor a declared cookie host.",
-      });
-    }
-  }
-  return { cookies, unsupported };
+  return listed.map((stored) => siteCookie(stored, target));
 }

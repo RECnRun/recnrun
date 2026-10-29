@@ -5,8 +5,6 @@ import { expect } from "./extension.ts";
 import { identitiesAt, lifecycleDriver } from "./lifecycle.ts";
 import { APP } from "./workspace.ts";
 
-/** The capability every SSO identity declares when its provider's session must come back. */
-export const SSO_HOSTS = { cookieHosts: ["sso.localhost"] };
 /** What the app settles on when the provider has no session for it. */
 export const SIGNED_OUT = { signedIn: null, error: "login_required" };
 
@@ -89,15 +87,10 @@ export async function idpStorage(page: Page): Promise<Record<string, string>> {
   );
 }
 
-/** Identities by label at `url`, each declaring `capabilities`. */
-export async function ssoSetUp(
-  context: BrowserContext,
-  serviceWorker: Worker,
-  url: string,
-  capabilities?: { cookieHosts: string[] },
-) {
+/** Identities by label at `url`. */
+export async function ssoSetUp(context: BrowserContext, serviceWorker: Worker, url: string) {
   const driver = await lifecycleDriver(context, serviceWorker);
-  const identities = identitiesAt(driver.command, url, new Map(), capabilities);
+  const identities = identitiesAt(driver.command, url);
   const tab: { page?: Page } = {};
   /** Opens `label` and waits until the app settled on who is signed in. */
   const open = async (label: string) => {

@@ -1,5 +1,4 @@
 import * as v from "valibot";
-import { CaptureCapabilitiesSchema } from "./identity-capture.ts";
 import { IdSchema } from "./ids.ts";
 import { TargetUrlSchema } from "./managed-window.ts";
 
@@ -7,13 +6,12 @@ const CountSchema = v.pipe(v.number(), v.integer(), v.minValue(0));
 
 /**
  * One saved session of the target app, kept after Incognito closes: its label, where it opens,
- * what it may capture, and its last published capture's id, time, and approximate size.
+ * and its last published capture's id, time, and approximate size.
  */
 export const IdentitySchema = v.object({
   id: IdSchema,
   label: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(80)),
   url: TargetUrlSchema,
-  capabilities: CaptureCapabilitiesSchema,
   created: CountSchema,
   lastCapture: v.optional(v.object({ id: IdSchema, at: CountSchema, bytes: CountSchema })),
 });

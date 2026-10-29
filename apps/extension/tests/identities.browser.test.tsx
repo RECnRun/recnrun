@@ -11,7 +11,6 @@ const ADMIN: Identity = {
   id: "admin",
   label: "Admin",
   url: "https://app.example/",
-  capabilities: { cookieHosts: [] },
   created: 1,
   lastCapture: { id: "cap-1", at: AT, bytes: 1536 },
 };
@@ -99,7 +98,7 @@ test("a second tab in the managed window is a conflict too", async () => {
   expect(inRow(root, "Guest", "Switch to")?.disabled).toBe(true);
 });
 
-test("new identity sends its label and the address, with no extra cookie hosts", async () => {
+test("new identity sends its label and the address", async () => {
   const { root, sent } = mount(SAVED);
   await expect.poll(() => inPanel(root, "New identity")).toBeDefined();
   await typeAddress(root, "https://app.example/login");
@@ -116,56 +115,8 @@ test("new identity sends its label and the address, with no extra cookie hosts",
         type: "workspace-new-identity",
         label: "Reviewer",
         url: "https://app.example/login",
-        capabilities: { cookieHosts: [] },
       },
     ]);
-});
-
-/** Types into the panel field labelled `name` and waits until it holds the value. */
-async function fill(root: HTMLElement, name: string, value: string) {
-  const field = [...(panel(root)?.querySelectorAll("label") ?? [])]
-    .find((label) => label.textContent.startsWith(name))
-    ?.querySelector("input");
-  if (!field) throw new Error(`No ${name} field`);
-  field.value = value;
-  field.dispatchEvent(new Event("input", { bubbles: true }));
-  await expect.poll(() => field.value).toBe(value);
-}
-
-test("new identity sends the cookie hosts it declares, lowercased, once each", async () => {
-  const { root, sent } = mount(SAVED);
-  await expect.poll(() => inPanel(root, "New identity")).toBeDefined();
-  await typeAddress(root, "https://app.example/");
-  await fill(root, "Label", "Reviewer");
-  await fill(root, "Cookie hosts", " SSO.example.com,  login.example.com sso.example.com ");
-  inPanel(root, "New identity")?.click();
-  await expect.poll(() => sent).toHaveLength(1);
-  expect(sent[0]).toMatchObject({
-    capabilities: { cookieHosts: ["sso.example.com", "login.example.com"] },
-  });
-});
-
-test("a cookie host that is no host name is named, and New identity waits for a fix", async () => {
-  const { root, sent } = mount(SAVED);
-  await expect.poll(() => inPanel(root, "New identity")).toBeDefined();
-  await fill(root, "Cookie hosts", "https://sso.example.com/");
-  await expect
-    .poll(() => panelText(root))
-    .toContain("Cookie hosts are host names, such as sso.example.com.");
-  expect(inPanel(root, "New identity")?.disabled).toBe(true);
-  await fill(root, "Cookie hosts", "sso.example.com");
-  await expect.poll(() => inPanel(root, "New identity")?.disabled).toBe(false);
-  expect(sent).toEqual([]);
-});
-
-test("a saved identity names the cookie hosts it keeps besides its address", async () => {
-  const sso = { ...GUEST, capabilities: { cookieHosts: ["sso.example.com", "login.example.com"] } };
-  const { root } = mount({ ...SAVED, identities: [ADMIN, sso] });
-  await expect.poll(() => identityRow(root, "Guest")).toBeDefined();
-  expect(identityRow(root, "Guest")?.textContent).toContain(
-    "Also keeps cookies of sso.example.com, login.example.com",
-  );
-  expect(identityRow(root, "Admin")?.textContent).not.toContain("Also keeps cookies");
 });
 
 test("without access, identities can still be deleted but no new one opens", async () => {

@@ -1,5 +1,5 @@
 import { approximateBytes } from "@recnrun/domain";
-import type { CaptureCapabilities, IdentityCapture, ManagedWindowState } from "@recnrun/domain";
+import type { IdentityCapture, ManagedWindowState } from "@recnrun/domain";
 import { browser } from "wxt/browser";
 import { captureThroughAgent, isExpectedAgent } from "@/background/workspace/agent-link";
 import { AGENT_SCRIPT } from "@/background/workspace/barrier";
@@ -61,7 +61,7 @@ interface Target {
   storeId: string;
 }
 
-type Jar = Pick<IdentityCapture, "cookies" | "unsupported">;
+type Jar = IdentityCapture["cookies"];
 
 async function targetOf(deps: CaptureDeps, tabId: number): Promise<Target> {
   const frame = await deps.api.topFrame(tabId);
@@ -96,17 +96,12 @@ function connectAgent(api: CaptureApi, target: Target, boundMs: number): Promise
   });
 }
 
-function startedHeader(
-  identityId: string,
-  target: Target,
-  capabilities: CaptureCapabilities,
-): IdentityCapture {
+function startedHeader(identityId: string, target: Target): IdentityCapture {
   return {
     formatVersion: 1,
     id: crypto.randomUUID(),
     identityId,
     url: target.url,
-    capabilities,
     status: "in-progress",
     startedAt: Date.now(),
     adapters: [],
@@ -140,19 +135,15 @@ function completeHeader(
     endedAt: Date.now(),
     adapters: ADAPTERS.map((adapter) => ({ adapter, status: "captured" as const })),
     valueTypes: collected.valueTypes,
-    cookies: jar.cookies,
-    unsupported: [...jar.unsupported, ...collected.unsupported],
+    cookies: jar,
+    unsupported: collected.unsupported,
     origins: origin ? [{ ...origin, ...storage, indexedDB: collected.databases }] : [],
   };
 }
 
-/** The store's cookies of the target's host and the declared ones, checked against the page's. */
-function cookieJar(deps: CaptureDeps, target: Target, started: IdentityCapture, seen: string[]) {
-  const hosts = {
-    target: new URL(target.origin).hostname,
-    extra: started.capabilities.cookieHosts,
-  };
-  return captureCookies(deps.cookies, target.storeId, hosts, seen);
+/** Every cookie of the tab's store, checked against the names the page showed. */
+function cookieJar(deps: CaptureDeps, target: Target, seen: string[]) {
+  return captureCookies(deps.cookies, target.storeId, new URL(target.origin).hostname, seen);
 }
 
 /** Reads the page through its link and publishes it as `identityId`'s capture, or discards it. */
@@ -169,14 +160,14 @@ async function captureThrough(
     const { counts, cookieNames } = await captureThroughAgent(port, operation, receiver, boundMs);
     const collected = await written();
     const storage = checkWhole(collected, counts);
-    const jar = await cookieJar(deps, target, started, cookieNames);
+    const jar = await cookieJar(deps, target, cookieNames);
     const header = completeHeader(started, storage, collected, jar);
     await captures.publish(header);
     const kept = [storage.localStorage, storage.sessionStorage, header.cookies];
     const bytes = collected.bytes + approximateBytes(kept);
     return {
       ...counts,
-      cookies: jar.cookies.length,
+      cookies: jar.length,
       unsupported: header.unsupported.length,
       bytes,
     };
@@ -191,12 +182,11 @@ export async function captureIdentity(
   identityId: string,
   managed: ManagedWindowState,
   deps: CaptureDeps,
-  capabilities: CaptureCapabilities = { cookieHosts: [] },
 ): Promise<CaptureSummary> {
   const began = performance.now();
   const target = await targetOf(deps, managed.tabId);
   const port = await connectAgent(deps.api, target, deps.boundMs ?? CAPTURE_BOUND_MS);
-  const started = startedHeader(identityId, target, capabilities);
+  const started = startedHeader(identityId, target);
   const operation = { id: crypto.randomUUID(), generation: managed.generation };
   try {
     const counts = await captureThrough({ port, operation }, target, started, deps);

@@ -19,7 +19,7 @@ const NOTHING: IdentityData = {
 
 async function load(identity: Identity, from: Opening["from"], deps: IdentityDeps) {
   if (from === "capture") return { from, ...(await savedStart(identity.id, deps)) };
-  return { from, url: identity.url, cookieHosts: identity.capabilities.cookieHosts, data: NOTHING };
+  return { from, url: identity.url, data: NOTHING };
 }
 
 /** The lifecycle's steps on Chrome: the window inventory, capture, close, bootstrap, and delete. */
@@ -44,17 +44,16 @@ export function chromeLifecycleEffects(
       const publish = (header: IdentityCapture) =>
         deps.captures.publish(header, { tentative: true });
       const captures = { ...deps.captures, publish };
-      return captureIdentity(identity.id, managed, { ...deps, captures }, identity.capabilities);
+      return captureIdentity(identity.id, managed, { ...deps, captures });
     },
     close,
     load: (identity, from) => load(identity, from, deps),
-    start: async (identity, { url, cookieHosts, data }, operation) => {
+    start: async (identity, { url, data }, operation) => {
       const windows = { create: () => createNeutralWindow(identity.id), close };
       // The bootstrap's journal entries carry the command that started it.
       const record = (written: Parameters<OperationJournal["write"]>[0]) =>
         journal.write({ ...written, kind: operation.kind });
-      const target = { url, cookieHosts };
-      return bootstrapIdentity(target, data, { ...ports, windows, record }, operation.id);
+      return bootstrapIdentity(url, data, { ...ports, windows, record }, operation.id);
     },
     removeCaptures: (identityId) => deps.captures.remove(identityId),
     settle: (identityId, committedId) => deps.captures.settle(identityId, committedId),

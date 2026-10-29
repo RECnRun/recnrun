@@ -69,15 +69,9 @@ type Command = (message: object) => Promise<unknown>;
 
 /**
  * Lifecycle commands by label; the first `open` of a label creates it at `url`, later ones switch.
- * `ids` carries the labels over to another driver, after a restart; `capabilities` go with each
- * new identity.
+ * `ids` carries the labels over to another driver, after a restart.
  */
-export function identitiesAt(
-  command: Command,
-  url: string,
-  ids = new Map<string, string>(),
-  capabilities?: { cookieHosts: string[] },
-) {
+export function identitiesAt(command: Command, url: string, ids = new Map<string, string>()) {
   const idOf = (label: string) => {
     const id = ids.get(label);
     if (id === undefined) throw new Error(`No identity ${label}.`);
@@ -89,7 +83,7 @@ export function identitiesAt(
     open: async (label: string) => {
       const id = ids.get(label);
       if (id !== undefined) return command({ type: "workspace-switch", identityId: id });
-      const message = { type: "workspace-new-identity", label, url, capabilities };
+      const message = { type: "workspace-new-identity", label, url };
       const created = (await command(message)) as { id: string };
       ids.set(label, created.id);
       return created;

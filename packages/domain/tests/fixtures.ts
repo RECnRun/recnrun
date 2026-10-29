@@ -34,7 +34,6 @@ export function sampleCapture(): IdentityCapture {
     id: "capture-1",
     identityId: "identity-a",
     url: `${origin}/app/`,
-    capabilities: { cookieHosts: [] },
     status: "complete",
     startedAt: 1_000,
     endedAt: 1_250,

@@ -73,17 +73,10 @@ export interface BootstrapDeps extends BootstrapPorts {
 const NAVIGATION_BOUND_MS = 15_000;
 const RESTORE_BOUND_MS = 15_000;
 
-/** Where a start opens, and the hosts its identity declares beside the target origin. */
-export interface StartTarget {
-  url: string;
-  cookieHosts: readonly string[];
-}
-
 /** What the steps learn as they run. */
 interface Run {
   url: string;
   origin: string;
-  cookieHosts: readonly string[];
   data: IdentityData;
   deps: BootstrapDeps;
   operation: WorkspaceOperation;
@@ -126,8 +119,8 @@ const STEP_RUNS: Record<BootstrapStep, (run: Run) => Promise<unknown>> = {
       run.data.cookies,
     ),
   barrier: async (run) => {
-    const target = { origin: run.origin, declaredHosts: run.cookieHosts };
-    run.barrier = await installBarrier(tabOf(run), target, barrierOperation(run), run.deps.barrier);
+    const operation = barrierOperation(run);
+    run.barrier = await installBarrier(tabOf(run), run.origin, operation, run.deps.barrier);
   },
   navigate: async (run) => {
     const target = { tabId: tabOf(run), url: run.url, origin: run.origin };
@@ -144,12 +137,7 @@ const STEP_RUNS: Record<BootstrapStep, (run: Run) => Promise<unknown>> = {
   },
   reload: (run) => {
     const documentId = known(run.agent?.sender?.documentId, "document");
-    const released = {
-      tabId: tabOf(run),
-      origin: run.origin,
-      declaredHosts: run.cookieHosts,
-      documentId,
-    };
+    const released = { tabId: tabOf(run), documentId };
     return reloadAndCommit(run.deps.navigation, released, NAVIGATION_BOUND_MS);
   },
 };
@@ -188,7 +176,7 @@ async function fail(run: Run, error: unknown): Promise<never> {
  * releases the app. Any failure closes the window, so no partly restored app is ever released.
  */
 export async function bootstrapIdentity(
-  { url, cookieHosts }: StartTarget,
+  url: string,
   data: IdentityData,
   deps: BootstrapDeps,
   operationId: string,
@@ -200,7 +188,7 @@ export async function bootstrapIdentity(
     status: "running",
     started: Date.now(),
   };
-  const run: Run = { url, origin: new URL(url).origin, cookieHosts, data, deps, operation };
+  const run: Run = { url, origin: new URL(url).origin, data, deps, operation };
   const timings: StepTiming[] = [];
   try {
     for (const step of BOOTSTRAP_STEPS) {

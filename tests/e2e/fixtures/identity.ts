@@ -16,7 +16,7 @@ interface PocGlobal {
     failNext: (step: string) => void;
     replayStale: (on: boolean) => void;
     staleDelivered: () => number;
-    captureIdentity: (identityId: string, capabilities?: unknown) => Promise<CaptureSummary>;
+    captureIdentity: (identityId: string) => Promise<CaptureSummary>;
     startFromCapture: (identityId: string) => Promise<StepTiming[]>;
   };
 }
@@ -35,16 +35,11 @@ interface CaptureSummary {
   ms: number;
 }
 
-/** Captures the managed tab's page as `identityId`, keeping the cookies of `cookieHosts` too. */
-export const captureIdentity = (
-  serviceWorker: Worker,
-  identityId: string,
-  cookieHosts: string[] = [],
-) =>
+/** Captures the managed tab's page and the whole Incognito cookie store as `identityId`. */
+export const captureIdentity = (serviceWorker: Worker, identityId: string) =>
   serviceWorker.evaluate(
-    ([id, hosts]) =>
-      (globalThis as unknown as PocGlobal).recnrunPoc.captureIdentity(id, { cookieHosts: hosts }),
-    [identityId, cookieHosts] as const,
+    (id) => (globalThis as unknown as PocGlobal).recnrunPoc.captureIdentity(id),
+    identityId,
   );
 
 /** Starts a fresh managed window from `identityId`'s published capture. */

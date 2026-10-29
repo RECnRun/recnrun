@@ -1,4 +1,4 @@
-// Opens a development build with host access to Zephyr's hosts in headed Chromium on a fresh
+// Opens a development build, with access to every http(s) site, in headed Chromium on a fresh
 // profile, for the manual run in docs/poc-zephyr-runbook.md. It never opens a Zephyr page itself.
 // Closing Chromium, or Ctrl+C, deletes the profile and with it every capture.
 import { spawn, spawnSync } from "node:child_process";
@@ -9,8 +9,6 @@ import { chromium } from "@playwright/test";
 import { prepareDevChrome } from "../apps/extension/scripts/dev-chrome.ts";
 
 const root = new URL("..", import.meta.url).pathname;
-const ZEPHYR_HOSTS = "https://zephyr-tq.one.be,https://login-acc.one.be";
-const hosts = process.env.RECNRUN_POC_HOSTS ?? ZEPHYR_HOSTS;
 const work = join(root, ".artifacts/poc-zephyr");
 const extension = join(work, "extension");
 const profile = join(work, "profile");
@@ -23,12 +21,11 @@ function run(command, args, options) {
     throw new Error(`${command} ${args.join(" ")} exited ${status}; see build.log.`);
 }
 
-/** Builds the extension in development mode with access to `hosts`, into the run's folder. */
+/** Builds the extension in development mode into the run's folder. */
 function build() {
   const app = join(root, "apps/extension");
   run(join(app, "node_modules/.bin/wxt"), ["build", "--mode", "development"], {
     cwd: app,
-    env: { ...process.env, RECNRUN_POC_HOSTS: hosts },
   });
   cpSync(join(app, ".output/chrome-mv3-dev"), extension, { recursive: true });
   const manifest = JSON.parse(readFileSync(join(extension, "manifest.json"), "utf8"));

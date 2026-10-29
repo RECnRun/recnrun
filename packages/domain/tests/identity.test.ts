@@ -7,7 +7,6 @@ const identity: Identity = {
   id: "id-1",
   label: "Alice",
   url: "https://app.example/",
-  capabilities: { cookieHosts: ["login.example"] },
   created: 1,
 };
 

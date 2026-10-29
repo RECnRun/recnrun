@@ -16,7 +16,7 @@ const stored = (cookie: Partial<StoredCookie>): StoredCookie => ({
   ...cookie,
 });
 
-const HOSTS = { target: "app.localhost", extra: ["sso.localhost"] };
+const TARGET = "app.localhost";
 const jarOf = (cookies: StoredCookie[]) => ({ all: vi.fn(async () => cookies) });
 
 describe("captureCookies", () => {
@@ -39,10 +39,9 @@ describe("captureCookies", () => {
         partitionKey: { topLevelSite: "http://app.localhost", hasCrossSiteAncestor: false },
       }),
     ]);
-    const jar = await captureCookies(api, "1", HOSTS, []);
+    const cookies = await captureCookies(api, "1", TARGET, []);
     expect(api.all).toHaveBeenCalledExactlyOnceWith("1");
-    expect(jar.unsupported).toEqual([]);
-    expect(jar.cookies).toEqual([
+    expect(cookies).toEqual([
       // Host-only on the target: no domain, so a restore sets it on the target's host.
       { name: "sid", value: "abc", path: "/", secure: false, httpOnly: true, sameSite: "lax" },
       {
@@ -68,71 +67,52 @@ describe("captureCookies", () => {
   });
 
   test("keeps cookies that shadow each other by path, each with its own path", async () => {
-    const jar = await captureCookies(
+    const cookies = await captureCookies(
       jarOf([stored({ name: "shadow", path: "/deep" }), stored({ name: "shadow" })]),
       "1",
-      HOSTS,
+      TARGET,
       [],
     );
-    expect(jar.cookies.map(({ name, path }) => `${name}@${path}`)).toEqual([
+    expect(cookies.map(({ name, path }) => `${name}@${path}`)).toEqual([
       "shadow@/deep",
       "shadow@/",
     ]);
   });
 
-  test("keeps a declared host's cookies, host-only ones with their host", async () => {
-    const jar = await captureCookies(
+  test("keeps every cookie of the store, whatever its host, host-only ones with their host", async () => {
+    // The managed Incognito store holds only the open identity, so another site's cookies, such as
+    // its sign-in provider's, are its data too.
+    const cookies = await captureCookies(
       jarOf([
         stored({ name: "sso", domain: "sso.localhost" }),
         stored({ name: "wide", domain: ".localhost", hostOnly: false }),
         stored({ name: "parent", domain: ".sso.localhost", hostOnly: false }),
-      ]),
-      "1",
-      HOSTS,
-      [],
-    );
-    expect(jar.cookies.map(({ name, domain, host }) => ({ name, domain, host }))).toEqual([
-      { name: "sso", domain: undefined, host: "sso.localhost" },
-      { name: "wide", domain: ".localhost", host: undefined },
-      { name: "parent", domain: ".sso.localhost", host: undefined },
-    ]);
-  });
-
-  test("lists every other host's cookie as unsupported, by name and host, never its value", async () => {
-    const jar = await captureCookies(
-      jarOf([
-        stored({ name: "ads", value: "secret-1", domain: "other.localhost" }),
-        stored({ name: "sub", value: "secret-2", domain: ".deep.app.localhost", hostOnly: false }),
+        stored({ name: "ads", domain: "other.localhost" }),
+        stored({ name: "sub", domain: ".deep.app.localhost", hostOnly: false }),
         stored({ name: "kept" }),
       ]),
       "1",
-      { target: "app.localhost", extra: [] },
+      TARGET,
       [],
     );
-    expect(jar.cookies.map(({ name }) => name)).toEqual(["kept"]);
-    expect(jar.unsupported).toEqual([
-      {
-        adapter: "cookies",
-        item: "ads on other.localhost/",
-        reason: "Its host is neither the target's nor a declared cookie host.",
-      },
-      {
-        adapter: "cookies",
-        item: "sub on .deep.app.localhost/",
-        reason: "Its host is neither the target's nor a declared cookie host.",
-      },
+    expect(cookies.map(({ name, domain, host }) => ({ name, domain, host }))).toEqual([
+      { name: "sso", domain: undefined, host: "sso.localhost" },
+      { name: "wide", domain: ".localhost", host: undefined },
+      { name: "parent", domain: ".sso.localhost", host: undefined },
+      { name: "ads", domain: undefined, host: "other.localhost" },
+      { name: "sub", domain: ".deep.app.localhost", host: undefined },
+      { name: "kept", domain: undefined, host: undefined },
     ]);
-    expect(JSON.stringify(jar.unsupported)).not.toMatch(/secret/);
   });
 
   test("fails when the page shows a cookie Chrome did not list, naming it, never its value", async () => {
-    // getAll leaves out a cookie whose domain the host permissions miss (cookies_helpers.cc:51-56).
+    // getAll leaves out a cookie of a site the user withheld from RECnRun (cookies_helpers.cc:51-56).
     const api = jarOf([stored({ name: "theme", httpOnly: false })]);
-    const capturing = captureCookies(api, "1", HOSTS, ["theme", "d_lax", "d_lax", "sid"]);
+    const capturing = captureCookies(api, "1", TARGET, ["theme", "d_lax", "d_lax", "sid"]);
     await expect(capturing).rejects.toMatchObject({
       name: "CookiesNotReadable",
       message:
-        'Chrome did not list the page\'s cookies "d_lax", "sid"; RECnRun needs host access to their domain.',
+        'Chrome did not list the page\'s cookies "d_lax", "sid"; give RECnRun access to all sites in chrome://extensions.',
     });
   });
 
@@ -146,12 +126,10 @@ describe("captureCookies", () => {
       stored({ name: "secret" }),
     ]);
     await expect(
-      captureCookies(api, "1", HOSTS, ["dup", "dup", "wide", ""]),
-    ).resolves.toMatchObject({
-      cookies: expect.any(Array),
-    });
+      captureCookies(api, "1", TARGET, ["dup", "dup", "wide", ""]),
+    ).resolves.toHaveLength(6);
     for (const seen of [["dup", "dup", "dup"], ["sso"], ["secret"]]) {
-      await expect(captureCookies(api, "1", HOSTS, seen), seen.join()).rejects.toMatchObject({
+      await expect(captureCookies(api, "1", TARGET, seen), seen.join()).rejects.toMatchObject({
         name: "CookiesNotReadable",
       });
     }

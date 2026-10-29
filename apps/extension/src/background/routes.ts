@@ -53,8 +53,8 @@ function lifecycleRoute(message: LifecycleRequest, workspace: WorkspaceCommands)
     case "workspace-resume":
       return { from: OWN_PAGE, run: () => workspace.resume(message.identityId) };
     case "workspace-new-identity": {
-      const { label, url, capabilities, closeWindowIds } = message;
-      const draft = { label, url, capabilities };
+      const { label, url, closeWindowIds } = message;
+      const draft = { label, url };
       return { from: OWN_PAGE, run: () => workspace.newIdentity(draft, closeWindowIds) };
     }
     case "workspace-delete-identity":

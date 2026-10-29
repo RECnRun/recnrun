@@ -1,5 +1,4 @@
 import {
-  CaptureCapabilitiesSchema,
   IdentitySchema,
   ManagedWindowStateSchema,
   WorkspaceOperationSchema,
@@ -55,7 +54,6 @@ const WorkspaceNewIdentityMessageSchema = v.object({
   type: v.literal("workspace-new-identity"),
   label: v.string(),
   url: v.string(),
-  capabilities: v.optional(CaptureCapabilitiesSchema, { cookieHosts: [] }),
   closeWindowIds: v.optional(v.array(BrowserIdSchema)),
 });
 

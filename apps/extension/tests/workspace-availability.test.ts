@@ -68,7 +68,7 @@ test("without the cookies API every command that opens a window is refused befor
   withoutCookies();
   const { workspace, captures, memory } = commands();
   const update = vi.spyOn(fakeBrowser.tabs, "update");
-  const draft = { label: "Admin", url: TARGET, capabilities: { cookieHosts: [] } };
+  const draft = { label: "Admin", url: TARGET };
   // One at a time: the workspace refuses a second operation while one runs.
   const attempts = [
     () => workspace.start(TARGET),
@@ -76,7 +76,7 @@ test("without the cookies API every command that opens a window is refused befor
     () => workspace.restart(TARGET),
     () => workspace.startWithIdentity(TARGET, EMPTY),
     () => workspace.startFromCapture("a"),
-    () => workspace.captureIdentity("a", { cookieHosts: [] }),
+    () => workspace.captureIdentity("a"),
     () => workspace.switchTo("a"),
     () => workspace.resume("a"),
     () => workspace.suspend(),

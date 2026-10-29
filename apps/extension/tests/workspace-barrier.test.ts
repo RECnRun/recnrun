@@ -4,7 +4,6 @@ import {
   AGENT_SCRIPT,
   BARRIER_CSP,
   chromeBarrierApi,
-  declaredLocations,
   installBarrier,
   removeBarrier,
 } from "@/background/workspace/barrier";
@@ -13,11 +12,31 @@ import type { FakeBarrierApi } from "./fake-barrier";
 
 const TAB = 7;
 const ORIGIN = "http://app.localhost:5192";
-const TARGET = { origin: ORIGIN, declaredHosts: [] };
-const SSO_TARGET = { origin: ORIGIN, declaredHosts: ["SSO.localhost"] };
+const TARGET = ORIGIN;
 const OPERATION = { id: "op-1", generation: 3 };
 
 let api: FakeBarrierApi;
+
+const literal = (char: string) => char.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&");
+
+/** Chrome's header value pattern: `*` any run, `?` one optional character, `\\` escapes the next. */
+function matches(pattern: string, value: string): boolean {
+  let source = "";
+  for (let index = 0; index < pattern.length; index += 1) {
+    const char = pattern[index] ?? "";
+    if (char === "\\") source += literal(pattern[++index] ?? "");
+    else if (char === "*") source += ".*";
+    else if (char === "?") source += ".?";
+    else source += literal(char);
+  }
+  return new RegExp(`^${source}$`, "s").test(value.toLowerCase());
+}
+
+/** Whether Chrome would apply the rule's header condition to `location` (request_params.cc). */
+function strips(header: { values?: string[]; excludedValues?: string[] }, location: string) {
+  const any = (patterns: string[] = []) => patterns.some((each) => matches(each, location));
+  return any(header.values) && !any(header.excludedValues);
+}
 
 beforeEach(() => {
   fakeBrowser.reset();
@@ -34,7 +53,9 @@ describe("installBarrier", () => {
     expect(BARRIER_CSP).toBe(
       "script-src 'none'; worker-src 'none'; object-src 'none'; frame-src 'none'",
     );
-    const csp = [...api.rules.values()].find(({ action }) => action.type === "modifyHeaders");
+    const csp = [...api.rules.values()].find(
+      ({ condition }) => condition.resourceTypes?.length === 2,
+    );
     expect(csp?.action.responseHeaders).toEqual([
       { header: "Content-Security-Policy", operation: "append", value: BARRIER_CSP },
     ]);
@@ -61,7 +82,7 @@ describe("installBarrier", () => {
       urlFilter: `|${ORIGIN}/`,
     });
     // The allow beats the main-frame block, and stays under the CSP rule so the header still applies.
-    const csp = rules.find(({ action }) => action.type === "modifyHeaders");
+    const csp = rules.find(({ condition }) => condition.resourceTypes?.length === 2);
     const priorities = blocks.map(({ priority }) => priority);
     expect(Math.max(...priorities)).toBeLessThan(allow?.priority ?? 0);
     expect(allow?.priority ?? 0).toBeLessThan(csp?.priority ?? 0);
@@ -84,13 +105,12 @@ describe("installBarrier", () => {
   });
 
   test("derives rule ids from the generation, so two operations never share one", async () => {
-    const first = await installBarrier(TAB, SSO_TARGET, OPERATION, api);
+    const first = await installBarrier(TAB, TARGET, OPERATION, api);
     const second = await installBarrier(8, TARGET, { id: "op-2", generation: 4 }, api);
     expect(first.ruleIds).toHaveLength(5);
     expect(new Set([...first.ruleIds, ...second.ruleIds]).size).toBe(10);
-    // Without declared hosts the last id stays free: there is no hand-over rule.
     expect([...api.rules.keys()].toSorted((a, b) => a - b)).toEqual(
-      [...first.ruleIds, ...second.ruleIds.slice(0, 4)].toSorted((a, b) => a - b),
+      [...first.ruleIds, ...second.ruleIds].toSorted((a, b) => a - b),
     );
   });
 
@@ -106,7 +126,7 @@ describe("installBarrier", () => {
     ).rejects.toMatchObject({
       name: "BarrierCollision",
     });
-    expect([...api.rules.keys()]).toEqual(existing.ruleIds.slice(0, 4));
+    expect([...api.rules.keys()]).toEqual(existing.ruleIds);
     expect([...api.scripts.keys()]).toEqual([existing.scriptId]);
   });
 
@@ -118,8 +138,8 @@ describe("installBarrier", () => {
     expect(api.rules.size).toBe(0);
   });
 
-  test("strips a redirect to a declared host, above the allow rule, so the document commits on the origin", async () => {
-    await installBarrier(TAB, SSO_TARGET, OPERATION, api);
+  test("strips a redirect off the target origin, above the allow rule, so the document commits on the origin", async () => {
+    await installBarrier(TAB, TARGET, OPERATION, api);
     const rules = [...api.rules.values()];
     const handOver = rules.find(({ condition }) => condition.responseHeaders !== undefined);
     expect(handOver?.action).toEqual({
@@ -127,35 +147,44 @@ describe("installBarrier", () => {
       responseHeaders: [{ header: "location", operation: "remove" }],
     });
     expect(handOver?.condition).toMatchObject({ tabIds: [TAB], resourceTypes: ["main_frame"] });
-    expect(handOver?.condition.responseHeaders).toEqual([
-      { header: "location", values: declaredLocations(["sso.localhost"]) },
-    ]);
     const allow = rules.find(({ action }) => action.type === "allow");
     expect(handOver?.priority ?? 0).toBeGreaterThan(allow?.priority ?? 0);
   });
 
-  test("matches a declared host's Location values by scheme, path, and port only", () => {
-    const values = declaredLocations(["SSO.localhost"]);
-    expect(values).toEqual([
-      "http://sso.localhost",
-      "http://sso.localhost/*",
-      "http://sso.localhost:*",
-      "https://sso.localhost",
-      "https://sso.localhost/*",
-      "https://sso.localhost:*",
-      "//sso.localhost",
-      "//sso.localhost/*",
-      "//sso.localhost:*",
-    ]);
-    // `?` matches one optional character in Chrome, so a pattern must not carry it.
-    expect(values.some((value) => value.includes("?"))).toBe(false);
-  });
-
-  test("adds no hand-over rule when the identity declares no host", async () => {
+  test("removes every Location that leaves the target origin, and keeps those that stay on it", async () => {
     await installBarrier(TAB, TARGET, OPERATION, api);
-    const rules = [...api.rules.values()];
-    expect(rules).toHaveLength(4);
-    expect(rules.some(({ condition }) => condition.responseHeaders !== undefined)).toBe(false);
+    const handOver = [...api.rules.values()].find(({ condition }) => condition.responseHeaders);
+    const [header] = handOver?.condition.responseHeaders ?? [];
+    const removes = (location: string) => header !== undefined && strips(header, location);
+    const stays = [
+      "/app/?run=1",
+      "callback?run=1",
+      "?page=2",
+      "#top",
+      `${ORIGIN}`,
+      `${ORIGIN}/sso-app/`,
+      `${ORIGIN}?x=1`,
+      `${ORIGIN}#top`,
+      "HTTP://APP.localhost:5192/app/",
+    ];
+    for (const location of stays) expect(removes(location), location).toBe(false);
+    const leaves = [
+      "http://sso.localhost:5192/sso/authorize?prompt=none",
+      "HTTPS://SSO.LOCALHOST/",
+      "https://app.localhost:5192/",
+      "http://app.localhost:5193/",
+      "http://app.localhost:5192.evil.example/",
+      "http://app.localhost:5192@evil.example/",
+      "//sso.localhost/",
+      "/\\evil.example/",
+      "\\\\evil.example/",
+      "\\/evil.example/",
+      "/\t/evil.example/",
+      "\u0001//evil.example/",
+      "https:evil.example",
+      "data:text/html,x",
+    ];
+    for (const location of leaves) expect(removes(location), location).toBe(true);
   });
 
   test("refuses a target that is not an http(s) origin", async () => {
@@ -165,10 +194,7 @@ describe("installBarrier", () => {
       "not a url",
       "https://app.example:443",
     ]) {
-      await expect(
-        installBarrier(TAB, { origin: target, declaredHosts: [] }, OPERATION, api),
-        target,
-      ).rejects.toMatchObject({
+      await expect(installBarrier(TAB, target, OPERATION, api), target).rejects.toMatchObject({
         name: "TargetNotAllowed",
       });
     }
@@ -180,13 +206,13 @@ describe("removeBarrier", () => {
   test("removes only its own rules and script, and checks that they are gone", async () => {
     const other = await installBarrier(
       8,
-      { origin: "http://other.localhost:5192", declaredHosts: [] },
+      "http://other.localhost:5192",
       { id: "op-0", generation: 2 },
       api,
     );
     const barrier = await installBarrier(TAB, TARGET, OPERATION, api);
     await removeBarrier(barrier, api);
-    expect([...api.rules.keys()]).toEqual(other.ruleIds.slice(0, 4));
+    expect([...api.rules.keys()]).toEqual(other.ruleIds);
     expect([...api.scripts.keys()]).toEqual([other.scriptId]);
     // Removing twice is harmless: the second finds nothing left.
     await expect(removeBarrier(barrier, api)).resolves.toBeUndefined();

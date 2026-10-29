@@ -241,7 +241,6 @@ export function createLifecycle(deps: LifecycleDeps): LifecycleCommands {
       exclusive(async () => {
         const identity = validIdentity(draft, (deps.now ?? Date.now)());
         await access();
-        await deps.guard.hosts(identity.capabilities.cookieHosts);
         if (closeWindowIds !== undefined) await closeShown(deps, closeWindowIds);
         await execute(deps, { kind: "new-identity", identityId: identity.id }, identity);
         return identity;

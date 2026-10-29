@@ -127,13 +127,6 @@ test("rejects an unsupported item without its adapter, or a reason long enough t
   expect(valid({ ...capture, unsupported: [{ ...item, reason: "x".repeat(201) }] })).toBe(false);
 });
 
-test("rejects a declared cookie host that is not a bare host name", () => {
-  const capture = sampleCapture();
-  for (const host of ["", "https://sso.localhost", "sso.localhost/path"]) {
-    expect(valid({ ...capture, capabilities: { cookieHosts: [host] } }), host).toBe(false);
-  }
-});
-
 test("restores a capture's cookies and its target origin's site data, caches included", () => {
   const capture = sampleCapture();
   const other = { ...partsOf(capture).origin, origin: "http://other.localhost:5192" };

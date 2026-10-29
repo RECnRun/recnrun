@@ -25,8 +25,8 @@ const KEPT = [
   "www_only on www.app.localhost/",
 ];
 
-/** Every cookie scoped to the shared domain, which the sibling host must receive. */
-const DOMAIN_COOKIES = ["d_dot", "d_lax", "d_persist", "d_secure", "sso_domain"];
+/** Every cookie the sibling host must receive: the shared domain's, and its own host-only one. */
+const SIBLING_COOKIES = ["d_dot", "d_lax", "d_persist", "d_secure", "sso_domain", "sso_only"];
 
 test("a domain cookie comes back as a domain cookie and reaches the sibling host", async ({
   context,
@@ -59,11 +59,12 @@ test("a domain cookie comes back as a domain cookie and reaches the sibling host
   expect(named(before)).toEqual(KEPT);
   const shared = before.filter(({ domain }) => domain === ".app.localhost");
   expect(shared.every(({ hostOnly }) => !hostOnly)).toBe(true);
-  // The domain cookies belong to the target without a declared host; the sibling's host-only one does not.
-  expect(summary).toMatchObject({ cookies: KEPT.length - 1, unsupported: 1 });
-  expect(after).toEqual(before.filter(({ name }) => name !== "sso_only"));
+  // The whole Incognito store is the identity's, the sibling's host-only cookie too.
+  expect(summary).toMatchObject({ cookies: KEPT.length, unsupported: 0 });
+  expect(after).toEqual(before);
   expect(ssoRequests).toHaveLength(1);
-  expect(ssoRequests[0]?.cookies).toEqual(DOMAIN_COOKIES);
+  const sent = ssoRequests[0]?.cookies ?? [];
+  expect(sent.toSorted((a, b) => a.localeCompare(b))).toEqual(SIBLING_COOKIES);
   expect(ssoScript.toSorted((a, b) => a.localeCompare(b))).toEqual([
     "d_lax",
     "d_persist",

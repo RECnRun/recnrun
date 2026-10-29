@@ -1,18 +1,12 @@
 import { classifyIncognitoWindows, isAllowedTarget } from "@recnrun/domain";
-import type { CaptureCapabilities, IdentityData } from "@recnrun/domain";
+import type { IdentityData } from "@recnrun/domain";
 import { browser } from "wxt/browser";
 import { workspaceAvailable, workspaceUnavailable } from "@/background/workspace/availability";
 import { chromeBarrierApi } from "@/background/workspace/barrier";
 import { bootstrapIdentity } from "@/background/workspace/bootstrap";
-import type {
-  BootstrapHooks,
-  BootstrapPorts,
-  StartTarget,
-  StepTiming,
-} from "@/background/workspace/bootstrap";
+import type { BootstrapHooks, BootstrapPorts, StepTiming } from "@/background/workspace/bootstrap";
 import type { CaptureSummary } from "@/background/workspace/capture";
 import { chromeCookieApi } from "@/background/workspace/cookie-stores";
-import { requireCookieHosts } from "@/background/workspace/cookie-host-access";
 import { WorkspaceError } from "@/background/workspace/errors";
 import {
   closeManagedRemembering,
@@ -46,11 +40,8 @@ export interface WorkspaceCommands extends LifecycleCommands {
   closeAndStart: (url: string, windowIds: readonly number[]) => Promise<void>;
   restart: (url: string) => Promise<void>;
   startWithIdentity: (url: string, data: IdentityData) => Promise<StepTiming[]>;
-  /** Saves the managed tab's page and cookies as `identityId`'s data, widened by `capabilities`. */
-  captureIdentity: (
-    identityId: string,
-    capabilities: CaptureCapabilities,
-  ) => Promise<CaptureSummary>;
+  /** Saves the managed tab's page and the Incognito cookie store as `identityId`'s data. */
+  captureIdentity: (identityId: string) => Promise<CaptureSummary>;
   /** Starts a fresh managed window from `identityId`'s published capture. */
   startFromCapture: (identityId: string) => Promise<StepTiming[]>;
   recover: () => Promise<void>;
@@ -228,13 +219,13 @@ function restoringStart(
     create: createNeutralWindow,
     close: (ids: readonly number[]) => closeRemembering(ids, ports),
   };
-  return (load: () => Promise<StartTarget & { data: IdentityData }>) =>
+  return (load: () => Promise<{ url: string; data: IdentityData }>) =>
     exclusive(async () => {
       await requireNoRecording(recordings);
       await requireAccess();
-      const { url, cookieHosts, data } = await load();
+      const { url, data } = await load();
       const deps = { ...ports, windows, record: journal.write };
-      return bootstrapIdentity({ url, cookieHosts }, data, deps, crypto.randomUUID());
+      return bootstrapIdentity(url, data, deps, crypto.randomUUID());
     });
 }
 
@@ -253,7 +244,7 @@ export function createWorkspaceCommands(
       identities: identities.identities,
       journal,
       effects: chromeLifecycleEffects(ports, identities, journal),
-      guard: { exclusive, access: requireAccess, hosts: requireCookieHosts },
+      guard: { exclusive, access: requireAccess },
     }),
     recover: () => recoverInto(lock, { journal, barrier: ports.barrier }, ports),
     status: () => statusOf(lock, journal, identities.identities),
@@ -278,12 +269,12 @@ export function createWorkspaceCommands(
     },
     startWithIdentity: async (url, data) => {
       requireTarget(url);
-      return startRestoring(async () => ({ url, cookieHosts: [], data }));
+      return startRestoring(async () => ({ url, data }));
     },
-    captureIdentity: (identityId, capabilities) =>
+    captureIdentity: (identityId) =>
       exclusive(async () => {
         await requireAccess();
-        return captureManaged(identityId, identities, capabilities);
+        return captureManaged(identityId, identities);
       }),
     startFromCapture: (identityId) => startRestoring(() => savedStart(identityId, identities)),
   };

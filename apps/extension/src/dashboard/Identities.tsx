@@ -1,7 +1,5 @@
-import { CaptureCapabilitiesSchema } from "@recnrun/domain";
 import type { Identity } from "@recnrun/domain";
 import { useState } from "preact/hooks";
-import * as v from "valibot";
 import type { WorkspaceRequest, WorkspaceStatus } from "@/messaging/workspace-protocol";
 import type { OpenTab, TabSource } from "@/ports/tabs";
 import { useBrowserTabs } from "@/views/use-browser-tabs";
@@ -17,15 +15,6 @@ export function approximateSize(bytes: number): string {
     unit += 1;
   }
   return `about ${unit === 0 ? value : value.toFixed(1)} ${UNITS[unit]}`;
-}
-
-/** The hosts typed into the field, split on commas and spaces, lowercased, once each. */
-function cookieHostsOf(text: string): string[] {
-  const hosts = text
-    .split(/[\s,]+/)
-    .filter(Boolean)
-    .map((host) => host.toLowerCase());
-  return [...new Set(hosts)];
 }
 
 function lastSaved({ lastCapture }: Identity): string {
@@ -115,11 +104,6 @@ function IdentityRow(props: RowProps) {
       <strong>{identity.label}</strong>
       {open && <span class="identity-open">Open</span>}
       <span class="workspace-hint">{lastSaved(identity)}</span>
-      {identity.capabilities.cookieHosts.length > 0 && (
-        <span class="workspace-hint">
-          Also keeps cookies of {identity.capabilities.cookieHosts.join(", ")}
-        </span>
-      )}
       <span class="identity-actions">
         <OpenAction {...props} />
         {!open && <DeleteAction {...props} />}
@@ -134,27 +118,14 @@ function NewIdentity({
   run,
 }: Pick<IdentitiesProps, "target" | "disabled" | "run">) {
   const [label, setLabel] = useState("");
-  const [hosts, setHosts] = useState("");
-  const capabilities = { cookieHosts: cookieHostsOf(hosts) };
-  const valid = v.is(CaptureCapabilitiesSchema, capabilities);
-  const create = () =>
-    run({ type: "workspace-new-identity", label, url: target.trim(), capabilities });
+  const create = () => run({ type: "workspace-new-identity", label, url: target.trim() });
   return (
     <div class="new-identity">
       <label class="workspace-address">
         Label
         <input value={label} onInput={(event) => setLabel(event.currentTarget.value)} />
       </label>
-      <label class="workspace-address">
-        Cookie hosts
-        <input value={hosts} onInput={(event) => setHosts(event.currentTarget.value)} />
-      </label>
-      <p class={valid ? "workspace-hint" : "workspace-conflict"} role={valid ? undefined : "alert"}>
-        {valid
-          ? "Other hosts whose cookies the identity keeps, such as its sign-in provider."
-          : "Cookie hosts are host names, such as sso.example.com."}
-      </p>
-      <button type="button" disabled={disabled || !valid} onClick={create}>
+      <button type="button" disabled={disabled} onClick={create}>
         New identity
       </button>
       <p class="workspace-hint">Saves the open identity first, then opens the address empty.</p>
