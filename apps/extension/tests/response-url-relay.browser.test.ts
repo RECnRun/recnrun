@@ -3,7 +3,10 @@ import { PORT_OFFER_EVENT, RELAY_READY_EVENT } from "@/messaging/response-url-pr
 import { receiveUrls } from "@/origin/response-url-page";
 import { acceptPort, relayUrls, startResponseUrlRelay } from "@/origin/response-url-relay";
 
-const browser = vi.hoisted(() => ({ runtime: { sendMessage: vi.fn() } }));
+const browser = vi.hoisted(() => ({
+  runtime: { sendMessage: vi.fn() },
+  extension: { inIncognitoContext: true },
+}));
 
 vi.mock("wxt/browser", () => ({ browser }));
 
@@ -12,6 +15,7 @@ const PAIRS = [["https://app.example/a", "https://app.example/a?via=redirect"]];
 afterEach(() => {
   vi.restoreAllMocks();
   browser.runtime.sendMessage.mockReset();
+  browser.extension.inIncognitoContext = true;
 });
 
 /** The data the relay posts on a port it was handed, as the page script receives it. */
@@ -76,4 +80,13 @@ test("asks the background for its frame's URLs on the document", async () => {
   startResponseUrlRelay();
   expect([...(await urls)]).toEqual(PAIRS);
   expect(browser.runtime.sendMessage).toHaveBeenCalledExactlyOnceWith({ type: "response-urls" });
+});
+
+test("in a normal window, hands none at once without asking the background", async () => {
+  browser.extension.inIncognitoContext = false;
+  browser.runtime.sendMessage.mockResolvedValue({ ok: true, result: PAIRS });
+  const urls = receiveUrls(document, 1_000);
+  startResponseUrlRelay();
+  expect([...(await urls)]).toEqual([]);
+  expect(browser.runtime.sendMessage).not.toHaveBeenCalled();
 });

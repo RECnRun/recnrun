@@ -38,6 +38,11 @@ export async function relayUrls(port: MessagePort, ask: () => Promise<unknown>):
 }
 
 export function startResponseUrlRelay(): void {
+  // Only Incognito pages are restored, so a normal window's page reads every response natively.
+  if (!browser.extension.inIncognitoContext) {
+    acceptPort(document, (port) => port.postMessage([]));
+    return;
+  }
   const ask = () => browser.runtime.sendMessage({ type: "response-urls" });
   acceptPort(document, (port) => void relayUrls(port, ask));
 }
