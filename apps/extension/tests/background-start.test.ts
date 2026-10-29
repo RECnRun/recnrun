@@ -5,6 +5,7 @@ import { startBackground } from "@/background/start";
 import { incognitoStoreMemory } from "@/storage/incognito-stores";
 import { managedWindowRepository } from "@/storage/managed-window-repository";
 import { recordingSessionRepository } from "@/storage/recording-session-repository";
+import { responseUrlStore } from "@/storage/response-urls";
 import { manageTab } from "./workspace-harness";
 
 const manifest = { manifest_version: 3 as const, name: "RECnRun", version: "0.1.0" };
@@ -12,7 +13,7 @@ const ownPage = { id: fakeBrowser.runtime.id, url: fakeBrowser.runtime.getURL("/
 const contentScript = { id: fakeBrowser.runtime.id, url: "https://recnrun.com/" };
 
 /** Delivers a message as Chrome would and collects the one reply. */
-async function deliver(message: unknown, sender: { id: string; url: string }) {
+async function deliver(message: unknown, sender: { id: string; url: string; origin?: string }) {
   const replies: unknown[] = [];
   // The listener answers through sendResponse; what it returns is Chrome's channel flag.
   void fakeBrowser.runtime.onMessage.trigger(message, sender, (reply: unknown) =>
@@ -43,6 +44,17 @@ test("registers one listener that answers every message family", async () => {
   });
   expect(await deliver({ type: "start-session", tabId: shop.id }, ownPage)).toEqual({ ok: true });
   expect(await recordingSessionRepository.read()).toMatchObject({ tabId: shop.id });
+});
+
+test("answers a relay with the URLs kept for its frame's origin in the open session", async () => {
+  startBackground();
+  const origin = "https://app.example";
+  const pairs = [[`${origin}/a`, `${origin}/a?via=redirect`]] satisfies [string, string][];
+  const managed = { generation: 3, windowId: 4, tabId: 40, status: "active" as const };
+  await managedWindowRepository.update(() => managed);
+  await responseUrlStore.write(3, { [origin]: pairs });
+  const relay = { ...contentScript, url: `${origin}/`, origin, tab: { id: 40, incognito: true } };
+  expect(await deliver({ type: "response-urls" }, relay)).toEqual({ ok: true, result: pairs });
 });
 
 test("tracks the managed Incognito window from the start", async () => {
