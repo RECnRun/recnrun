@@ -159,7 +159,6 @@
 }
 
 .address-combobox {
-  position: relative;
   justify-self: stretch;
 }
 
@@ -289,10 +288,13 @@
 .new-identity {
   display: grid;
   justify-items: start;
+  justify-self: stretch;
   gap: 0.5rem;
 }
 
+/* The suggestions open under the whole row, so no text below peeks out beside them. */
 .address-row {
+  position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: end;

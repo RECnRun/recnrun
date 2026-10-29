@@ -136,6 +136,17 @@ test.describe("with incognito access", () => {
     await expect(options.filter({ hasText: open })).toContainText("Open tab");
     await expect(options.filter({ hasText: visited })).toContainText("History");
     await expect(panel).toContainText("never cookies or storage");
+    // The open list spans the field's row, so no hint text below it peeks out beside it.
+    const listbox = panel.getByRole("listbox", { name: "Address suggestions" });
+    const spans = await listbox.evaluate((list) => {
+      const box = list.getBoundingClientRect();
+      const under = [...document.querySelectorAll(".workspace-hint")]
+        .map((hint) => hint.getBoundingClientRect())
+        .filter((hint) => hint.top < box.bottom && hint.bottom > box.top);
+      return under.map((hint) => box.left <= hint.left && box.right >= hint.right);
+    });
+    expect(spans.length).toBeGreaterThan(0);
+    expect(spans).not.toContain(false);
     await screen(site, "address-suggestions");
 
     await clickInDashboard(options.filter({ hasText: visited }));
