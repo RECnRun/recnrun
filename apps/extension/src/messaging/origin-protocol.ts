@@ -4,6 +4,13 @@ import * as v from "valibot";
 /** The name of the port the origin agent opens to the background. */
 export const ORIGIN_AGENT_PORT = "recnrun-origin-agent";
 
+/**
+ * The type a barrier document commits as: a `text/*` type Chrome renders as plain text
+ * (mime_util.cc `IsSupportedNonImageMimeType`, document_init.cc:209-211), which no site serves, so
+ * the agent tells its barrier document from a page of the origin in another tab.
+ */
+export const BARRIER_DOCUMENT_TYPE = "text/x-recnrun-barrier";
+
 const CountSchema = v.pipe(v.number(), v.integer(), v.minValue(0));
 
 /** Every command and reply names its operation, so a late one from an older operation is dropped. */

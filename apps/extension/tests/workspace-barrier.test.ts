@@ -3,12 +3,12 @@ import { fakeBrowser } from "wxt/testing/fake-browser";
 import {
   AGENT_SCRIPT,
   BARRIER_CSP,
-  BARRIER_STYLE,
   chromeBarrierApi,
   installAnonymousBarrier,
   installBarrier,
   removeBarrier,
 } from "@/background/workspace/barrier";
+import { BARRIER_DOCUMENT_TYPE } from "@/messaging/origin-protocol";
 import { fakeBarrierApi } from "./fake-barrier";
 import type { FakeBarrierApi } from "./fake-barrier";
 
@@ -60,7 +60,7 @@ describe("installBarrier", () => {
     );
     expect(csp?.action.responseHeaders).toEqual([
       { header: "Content-Security-Policy", operation: "append", value: BARRIER_CSP },
-      { header: "content-type", operation: "set", value: "text/plain" },
+      { header: "content-type", operation: "set", value: BARRIER_DOCUMENT_TYPE },
       { header: "x-content-type-options", operation: "set", value: "nosniff" },
       { header: "content-disposition", operation: "remove" },
     ]);
@@ -93,13 +93,12 @@ describe("installBarrier", () => {
     expect(allow?.priority ?? 0).toBeLessThan(csp?.priority ?? 0);
   });
 
-  test("registers the origin agent and the style that hides its document for the target origin only, at document_start, for this session", async () => {
+  test("registers the origin agent, and no style, which would hide every tab of the origin, for the target origin only, at document_start, for this session", async () => {
     const barrier = await installBarrier(TAB, TARGET, OPERATION, api);
     expect([...api.scripts.values()]).toEqual([
       {
         id: barrier.scriptId,
         js: [AGENT_SCRIPT],
-        css: [BARRIER_STYLE],
         matches: [`${ORIGIN}/*`],
         runAt: "document_start",
         allFrames: false,
@@ -107,7 +106,6 @@ describe("installBarrier", () => {
       },
     ]);
     expect(AGENT_SCRIPT).toBe("content-scripts/origin-agent.js");
-    expect(BARRIER_STYLE).toBe("barrier.css");
     expect(barrier.scriptId).toContain(OPERATION.id);
   });
 

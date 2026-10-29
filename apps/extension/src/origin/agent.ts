@@ -1,6 +1,7 @@
 import * as v from "valibot";
 import { browser } from "wxt/browser";
 import {
+  BARRIER_DOCUMENT_TYPE,
   ORIGIN_AGENT_PORT,
   OriginCommandSchema,
   OriginProbeSchema,
@@ -113,8 +114,18 @@ export function runOriginAgent(
   });
 }
 
+/**
+ * Keeps a barrier document unpainted; a page of the origin in another tab, which the registered
+ * agent also enters, is left alone. Chrome runs the agent when the document element is created.
+ */
+export function hideBarrierDocument(page: Pick<Document, "contentType" | "documentElement">): void {
+  if (page.contentType !== BARRIER_DOCUMENT_TYPE) return;
+  page.documentElement.style.setProperty("display", "none", "important");
+}
+
 /** The origin agent's content script: registered behind the barrier, or injected for a capture. */
 export function startOriginAgent(): void {
+  hideBarrierDocument(document);
   const port = browser.runtime.connect({ name: ORIGIN_AGENT_PORT });
   // `caches` exists only in a secure context; elsewhere naming it throws.
   const cacheStorage = isSecureContext ? caches : undefined;

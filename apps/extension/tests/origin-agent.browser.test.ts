@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, test, vi } from "vite-plus/test";
-import { ORIGIN_AGENT_PORT } from "@/messaging/origin-protocol";
-import { runOriginAgent, startOriginAgent } from "@/origin/agent";
+import { BARRIER_DOCUMENT_TYPE, ORIGIN_AGENT_PORT } from "@/messaging/origin-protocol";
+import { hideBarrierDocument, runOriginAgent, startOriginAgent } from "@/origin/agent";
 import type { OriginStores } from "@/origin/restore";
 import { fakePort } from "./fake-port";
 import { clearCaches, clearDatabases, entriesOf, memoryStorage, settled } from "./origin-storage";
@@ -64,8 +64,21 @@ afterEach(() => {
 test("connects to the background and waits, touching nothing, until it gets a command", () => {
   const agent = started();
   expect(browser.runtime.connect).toHaveBeenCalledExactlyOnceWith({ name: ORIGIN_AGENT_PORT });
+  // A page of the origin, as in another tab while a barrier is up, stays painted.
+  expect(document.documentElement.style.getPropertyValue("display")).toBe("");
   expect(agent.posted).toEqual([]);
   expect(agent.onMessage.listeners.size).toBe(1);
+});
+
+test("hides a barrier document only, by the type the barrier gives it", () => {
+  expect(BARRIER_DOCUMENT_TYPE).toBe("text/x-recnrun-barrier");
+  const root = document.createElement("html");
+  hideBarrierDocument({ contentType: BARRIER_DOCUMENT_TYPE, documentElement: root });
+  expect(root.style.getPropertyValue("display")).toBe("none");
+  expect(root.style.getPropertyPriority("display")).toBe("important");
+  const page = document.createElement("html");
+  hideBarrierDocument({ contentType: "text/plain", documentElement: page });
+  expect(page.style.getPropertyValue("display")).toBe("");
 });
 
 test("disconnects, restoring nothing, when the first message is not a valid probe", () => {
