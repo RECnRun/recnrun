@@ -23,9 +23,13 @@ async function fillNew(site: Page, run: string) {
   return panel.getByRole("button", { name: "New identity", exact: true });
 }
 
-/** The workspace holds `label`: its row says Open. */
-const opened = (site: Page, label: string) =>
-  expect(identity(site, label).getByText("Open", { exact: true })).toBeVisible();
+/** `label` is Open and its command returned: Close waits while the command, and the barrier, run. */
+async function opened(site: Page, label: string) {
+  await expect(identity(site, label).getByText("Open", { exact: true })).toBeVisible();
+  await expect(
+    identity(site, label).getByRole("button", { name: "Close", exact: true }),
+  ).toBeEnabled();
+}
 
 test("an identity made in the dashboard comes back signed in at its provider", async ({
   context,

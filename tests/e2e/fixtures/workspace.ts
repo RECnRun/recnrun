@@ -46,7 +46,10 @@ export async function startWorkspace(site: Page, serviceWorker: Worker, url: str
       return managed?.status === "active" && managed.generation > before;
     })
     .toBe(true);
-  await expect(workspacePanel(site).getByText("Open", { exact: true })).toBeVisible();
+  // Close waits while the command, and the barrier, run.
+  await expect(
+    workspacePanel(site).getByRole("button", { name: "Close", exact: true }),
+  ).toBeEnabled();
   const managed = await managedWindow(serviceWorker);
   if (managed?.status !== "active") throw new Error("No managed window opened.");
   return managed.tabId;
