@@ -48,3 +48,44 @@ export const writeTabSession = (page: Page, value: string) =>
 
 /** What the page's tab holds in its sessionStorage, or null. */
 export const tabSession = (page: Page) => page.evaluate(() => sessionStorage.getItem("tab"));
+
+/** A tab Chrome created, or a top-frame page it committed, timed by the service worker's clock. */
+export interface TabEvent {
+  kind: "created" | "committed";
+  tabId: number;
+  url?: string;
+  at: number;
+}
+
+interface TabEventGlobal {
+  chrome: {
+    tabs: { onCreated: { addListener(listener: (tab: { id?: number }) => void): void } };
+    webNavigation: {
+      onCommitted: {
+        addListener(
+          listener: (details: { tabId: number; frameId: number; url: string }) => void,
+        ): void;
+      };
+    };
+  };
+  __tabEvents?: TabEvent[];
+}
+
+/** Starts timing tab creations and top-frame commits inside the service worker, once. */
+export const watchTabEvents = (serviceWorker: Worker) =>
+  serviceWorker.evaluate(() => {
+    const scope = globalThis as unknown as TabEventGlobal;
+    if (scope.__tabEvents) return;
+    const events: TabEvent[] = [];
+    scope.__tabEvents = events;
+    scope.chrome.tabs.onCreated.addListener(({ id = -1 }) => {
+      events.push({ kind: "created", tabId: id, at: Date.now() });
+    });
+    scope.chrome.webNavigation.onCommitted.addListener(({ tabId, frameId, url }) => {
+      if (frameId === 0) events.push({ kind: "committed", tabId, url, at: Date.now() });
+    });
+  });
+
+/** The tab events seen since `watchTabEvents`, in order. */
+export const tabEvents = (serviceWorker: Worker): Promise<TabEvent[]> =>
+  serviceWorker.evaluate(() => (globalThis as unknown as TabEventGlobal).__tabEvents ?? []);

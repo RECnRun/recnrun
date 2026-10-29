@@ -115,3 +115,12 @@ test("a link of another name is never wrapped", () => {
   onConnect.fire(port);
   expect(received[0]).toBe(port);
 });
+
+test("while on, every listener of one connection gets the same link, as Chrome hands them one port", () => {
+  const { onConnect, stale, received } = setUp();
+  const second: OriginPort[] = [];
+  onConnect.addListener((port) => second.push(port));
+  stale.setActive(true);
+  onConnect.fire(fakePort());
+  expect(second[0]).toBe(received[0]);
+});

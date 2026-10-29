@@ -85,7 +85,13 @@ function restoring(
   };
   const restores = agentsAnswer(deps.navigation, reply);
   const opened: number[] = [];
-  const run = { primary: PRIMARY, operation: OPERATION, opened: (id: number) => opened.push(id) };
+  const run = {
+    primary: PRIMARY,
+    origin: APP,
+    released: Promise.resolve(),
+    operation: OPERATION,
+    opened: (id: number) => opened.push(id),
+  };
   return { deps, restores, opened, running: restoreLayout(layout, run, deps) };
 }
 

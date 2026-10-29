@@ -3,6 +3,7 @@ import type { SessionLayout, SkippedOrigin } from "@recnrun/domain";
 import { browser } from "wxt/browser";
 import { restoreThroughAgent } from "@/background/workspace/agent-link";
 import type { BarrierApi, BarrierOperation } from "@/background/workspace/barrier";
+import { handledLater } from "@/background/workspace/gate";
 import { visitInTab } from "@/background/workspace/helper-tab";
 import type { NavigationApi } from "@/background/workspace/navigation";
 import { BLANK_BOUND_MS, loaded } from "@/background/workspace/windows";
@@ -33,9 +34,13 @@ export interface LayoutDeps extends TabSessionDeps {
   layout: LayoutApi;
 }
 
-/** Where the start already restored the primary tab, and what it learns about the windows. */
+/** Where the start restores the primary tab, and what it learns about the windows. */
 export interface LayoutRun {
   primary: { windowId: number; tabId: number };
+  /** The primary tab's origin, whose storage the start restores while the layout reopens. */
+  origin: string;
+  /** Resolves once the primary's storage is back; rejects when the start fails first. */
+  released: Promise<void>;
   operation: BarrierOperation;
   /** Called for each window opened, so a failed start closes it too. */
   opened: (windowId: number) => void;
@@ -105,15 +110,23 @@ async function openTabs(
   return ids;
 }
 
-/** Loads one reopened tab's page, its own sessionStorage written first; what was not taken. */
+/**
+ * Loads one reopened tab's page, its own sessionStorage written first, and names what was not
+ * taken; a page of the primary's origin loads only once the primary's storage is back, since it
+ * would otherwise run on that origin's empty storage, so its load is handed back to wait for.
+ */
 async function loadTab(
   tab: { tabId: number; laid: LaidTab; from: LayoutPlace },
   run: LayoutRun,
   deps: LayoutDeps,
 ) {
   const skipped = await restoreTabSessions(tab, run.operation, deps);
-  await deps.layout.navigate(tab.tabId, tab.laid.url);
-  return skipped;
+  const load = () => deps.layout.navigate(tab.tabId, tab.laid.url);
+  if (URL.parse(tab.laid.url)?.origin === run.origin) {
+    return { skipped, pending: [handledLater(run.released.then(load))] };
+  }
+  await load();
+  return { skipped, pending: [] };
 }
 
 /** The start's own window with the primary tab at its place, or a saved window opened anew. */
@@ -131,22 +144,25 @@ async function reopenWindow(at: number, layout: SessionLayout, run: LayoutRun, d
   const held = { tabId: opened.tabId, index: Math.max(opened.primaryIndex, 0) };
   const ids = await openTabs(opened.windowId, held, tabs, deps);
   const skipped: SkippedOrigin[] = [];
+  const pending: Promise<void>[] = [];
   for (const [index, laid] of tabs.entries()) {
     const tabId = ids[index] ?? -1;
     // A blank or New Tab page without sessionStorage opened as saved; the primary is restored.
     const plain = isPlainPage(laid.url) && laid.sessionStorage.length === 0;
-    const loads = !plain && index !== opened.primaryIndex;
-    const from = { window: at, tab: index };
-    if (loads) skipped.push(...(await loadTab({ tabId, laid, from }, run, deps)));
+    if (!plain && index !== opened.primaryIndex) {
+      const loaded = await loadTab({ tabId, laid, from: { window: at, tab: index } }, run, deps);
+      skipped.push(...loaded.skipped);
+      pending.push(...loaded.pending);
+    }
     if (laid.active) await deps.layout.activate(tabId);
   }
-  return { windowId: opened.windowId, skipped };
+  return { windowId: opened.windowId, skipped, pending };
 }
 
 /**
  * Reopens every saved window and tab beside the primary tab, in their order, each tab with its
- * own sessionStorage before its page runs, then activates and focuses them as they were. A tab
- * whose sessionStorage is not taken still opens, and is named.
+ * own sessionStorage before its page runs, then activates and focuses them as they were, once
+ * every page loads. A tab whose sessionStorage is not taken still opens, and is named.
  */
 export async function restoreLayout(
   layout: SessionLayout,
@@ -154,12 +170,15 @@ export async function restoreLayout(
   deps: LayoutDeps,
 ): Promise<SkippedOrigin[]> {
   const skipped: SkippedOrigin[] = [];
+  const pending: Promise<void>[] = [];
   let focused: number | undefined;
   for (const [at, window] of layout.windows.entries()) {
     const reopened = await reopenWindow(at, layout, run, deps);
     skipped.push(...reopened.skipped);
+    pending.push(...reopened.pending);
     if (window.focused) focused = reopened.windowId;
   }
+  await Promise.all(pending);
   if (focused !== undefined) await deps.layout.focus(focused);
   return skipped;
 }

@@ -61,6 +61,42 @@ describe("openBehindBarrier", () => {
     expect(site.disconnected).toBe(false);
   });
 
+  test("two tabs opened at once each keep their own agent, and a second agent of one document ends", async () => {
+    const other = { ...TARGET, tabId: 4 };
+    const opening = openBehindBarrier(api, TARGET, 1_000);
+    const openingOther = openBehindBarrier(api, other, 1_000);
+    const agent = agentOf("doc-1");
+    const twin = agentOf("doc-1");
+    const otherAgent = agentOf("doc-4", 4);
+    for (const port of [agent, twin, otherAgent]) api.onConnect.emit(port);
+    commit(api, "doc-1");
+    api.onCommitted.emit({ tabId: 4, frameId: 0, url: `${ORIGIN}/`, documentId: "doc-4" });
+    await expect(opening).resolves.toBe(agent);
+    await expect(openingOther).resolves.toBe(otherAgent);
+    expect([agent, twin, otherAgent].map(({ disconnected }) => disconnected)).toEqual([
+      false,
+      true,
+      false,
+    ]);
+    expect(listenerCount(api)).toBe(0);
+  });
+
+  test("a link another tab's watch takes as it connects stays open, and a later twin of it ends", async () => {
+    const other = { ...TARGET, tabId: 4 };
+    const opening = openBehindBarrier(api, TARGET, 1_000);
+    const openingOther = openBehindBarrier(api, other, 1_000);
+    commit(api, "doc-1");
+    const agent = agentOf("doc-1");
+    api.onConnect.emit(agent);
+    await expect(opening).resolves.toBe(agent);
+    const twin = agentOf("doc-1");
+    api.onConnect.emit(twin);
+    api.onCommitted.emit({ tabId: 4, frameId: 0, url: `${ORIGIN}/`, documentId: "doc-4" });
+    api.onConnect.emit(agentOf("doc-4", 4));
+    await openingOther;
+    expect([agent.disconnected, twin.disconnected]).toEqual([false, true]);
+  });
+
   test("fails explicitly when the tab commits a document of another origin", async () => {
     const opening = openBehindBarrier(api, TARGET, 1_000);
     const early = agentOf("doc-1");

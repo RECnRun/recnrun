@@ -121,46 +121,75 @@ interface Target {
   origin: string;
 }
 
+/** How many links each tab's open watches follow: a link from a tab none follows is stray. */
+const followed = new Map<number, number>();
+
+/** Links a watch took: Chrome hands one connection to every watch, the taker ending first. */
+const claimed = new WeakSet<OriginPort>();
+
+const follow = (tabId: number, by: number) => {
+  const count = (followed.get(tabId) ?? 0) + by;
+  if (count > 0) followed.set(tabId, count);
+  else followed.delete(tabId);
+};
+
+/**
+ * Hands `settle` the first expected agent of the tab's committed document, once the commit names
+ * it, and ends the tab's other links; another followed tab's links are left to its own watch.
+ */
+function agentLinks(target: Target, settle: Settle<OriginPort>): TabListeners {
+  const { tabId, origin } = target;
+  let documentId: string | undefined;
+  let taken = false;
+  const waiting = new Set<OriginPort>();
+  const offer = (port: OriginPort) => {
+    if (documentId === undefined) return void waiting.add(port);
+    // Two barriers on one origin each inject an agent, so one document can open two links.
+    if (taken || !isExpectedAgent(port, { tabId, documentId, origin })) return port.disconnect();
+    taken = true;
+    claimed.add(port);
+    settle.resolve(port);
+  };
+  follow(tabId, 1);
+  return {
+    onCommit: (commit) => {
+      if (!sameOrigin(commit.url, origin)) return settle.reject(offOrigin());
+      documentId = commit.documentId;
+      const early = [...waiting];
+      waiting.clear();
+      for (const port of early) offer(port);
+    },
+    onConnect: (port) => {
+      if (port.name !== ORIGIN_AGENT_PORT) return;
+      const from = port.sender?.tab?.id;
+      if (from === tabId) offer(port);
+      else if (!claimed.has(port) && (from === undefined || !followed.has(from))) port.disconnect();
+    },
+    onEnd: () => {
+      follow(tabId, -1);
+      for (const port of waiting) port.disconnect();
+    },
+  };
+}
+
 /**
  * Navigates the barrier's tab to `url` and resolves with the origin agent of the document it
- * committed. Ports can arrive before the commit names the document, so they wait for it; every
- * other agent link is ended, and other extension ports are left to their own listeners.
+ * committed. Ports can arrive before the commit names the document, so they wait for it; the
+ * tab's other agent links and those of tabs no watch follows are ended, and other extension ports
+ * are left to their own listeners.
  */
 export function openBehindBarrier(
   api: NavigationApi,
   target: Target,
   boundMs: number,
 ): Promise<OriginPort> {
-  const { tabId, url, origin } = target;
+  const { tabId, url } = target;
   const late = () =>
     new WorkspaceError("AgentNotConnected", "The page did not open its link in time.");
   return watchTab<OriginPort>(
     api,
     { tabId, boundMs, late, start: () => api.update(tabId, url) },
-    (settle) => {
-      let documentId: string | undefined;
-      const waiting = new Set<OriginPort>();
-      const offer = (port: OriginPort) => {
-        if (documentId === undefined) waiting.add(port);
-        else if (isExpectedAgent(port, { tabId, documentId, origin })) settle.resolve(port);
-        else port.disconnect();
-      };
-      return {
-        onCommit: (commit) => {
-          if (!sameOrigin(commit.url, origin)) return settle.reject(offOrigin());
-          documentId = commit.documentId;
-          const early = [...waiting];
-          waiting.clear();
-          for (const port of early) offer(port);
-        },
-        onConnect: (port) => {
-          if (port.name === ORIGIN_AGENT_PORT) offer(port);
-        },
-        onEnd: () => {
-          for (const port of waiting) port.disconnect();
-        },
-      };
-    },
+    (settle) => agentLinks(target, settle),
   );
 }
 

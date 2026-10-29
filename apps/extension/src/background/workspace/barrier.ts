@@ -48,6 +48,8 @@ export interface BarrierApi {
 export interface BarrierOperation {
   id: string;
   generation: number;
+  /** Which of the operation's barriers this is, so two can stand at once; 0 when left out. */
+  lane?: number;
 }
 
 export interface Barrier {
@@ -73,8 +75,10 @@ const PLAIN_TEXT: NonNullable<BarrierRule["action"]["responseHeaders"]> = [
   { header: "content-disposition", operation: "remove" },
 ];
 
-const RULES_PER_GENERATION = 10;
 const RULES_PER_BARRIER = 6;
+/** A start's primary tab and its reopened tabs each hold a barrier while the other loads. */
+const BARRIER_LANES = 2;
+const RULES_PER_GENERATION = 20;
 
 function requireOrigin(target: string): void {
   const url = URL.parse(target);
@@ -138,8 +142,8 @@ function anonymousRule(id: number, tabIds: number[]): BarrierRule {
 }
 
 /** Blocks everything in the tab, then lets only the target origin's documents through, script-free. */
-function barrierRules(tabId: number, origin: string, generation: number): BarrierRule[] {
-  const base = generation * RULES_PER_GENERATION;
+function barrierRules(tabId: number, origin: string, operation: BarrierOperation): BarrierRule[] {
+  const base = baseOf(operation);
   const tabIds = [tabId];
   return [
     {
@@ -177,22 +181,26 @@ function barrierRules(tabId: number, origin: string, generation: number): Barrie
   ];
 }
 
-const agentScriptId = (operationId: string) => `recnrun-origin-agent-${operationId}`;
+const baseOf = ({ generation, lane = 0 }: BarrierOperation) =>
+  generation * RULES_PER_GENERATION + lane * RULES_PER_BARRIER;
+
+const agentScriptId = ({ id, lane = 0 }: BarrierOperation) =>
+  lane === 0 ? `recnrun-origin-agent-${id}` : `recnrun-origin-agent-${id}-${lane}`;
 
 /**
- * The rule and script ids an operation's barrier uses, known without the tab or the origin; the
- * anonymous rule's id is always among them, and Chrome ignores removing an id it lacks
+ * The rule and script ids one of an operation's barriers uses, known without the tab or the
+ * origin; the anonymous rule's id is always among them, and Chrome ignores removing an id it lacks
  * (rules_monitor_service.cc:817-819).
  */
-export function barrierOf({ id, generation }: BarrierOperation): Barrier {
-  const base = generation * RULES_PER_GENERATION;
+export function barrierOf(operation: BarrierOperation): Barrier {
+  const base = baseOf(operation);
   const ruleIds = Array.from({ length: RULES_PER_BARRIER }, (_, index) => base + index + 1);
-  return { ruleIds, scriptId: agentScriptId(id) };
+  return { ruleIds, scriptId: agentScriptId(operation) };
 }
 
-function agentScript(origin: string, operationId: string): AgentScript {
+function agentScript(origin: string, operation: BarrierOperation): AgentScript {
   return {
-    id: agentScriptId(operationId),
+    id: agentScriptId(operation),
     js: [AGENT_SCRIPT],
     matches: [`${origin}/*`],
     runAt: "document_start",
@@ -238,8 +246,8 @@ export async function installBarrier(
   api: BarrierApi,
 ): Promise<Barrier> {
   requireOrigin(origin);
-  const rules = barrierRules(tabId, origin, operation.generation);
-  return await install(rules, agentScript(origin, operation.id), barrierOf(operation), api);
+  const rules = barrierRules(tabId, origin, operation);
+  return await install(rules, agentScript(origin, operation), barrierOf(operation), api);
 }
 
 /** The barrier for a helper tab, which also keeps the identity's cookies out of its document's exchange. */
@@ -251,9 +259,9 @@ export async function installAnonymousBarrier(
 ): Promise<Barrier> {
   requireOrigin(origin);
   const barrier = barrierOf(operation);
-  const rules = barrierRules(tabId, origin, operation.generation);
+  const rules = barrierRules(tabId, origin, operation);
   rules.push(anonymousRule(barrier.ruleIds[RULES_PER_BARRIER - 1] ?? 0, [tabId]));
-  return await install(rules, agentScript(origin, operation.id), barrier, api);
+  return await install(rules, agentScript(origin, operation), barrier, api);
 }
 
 /** Removes this barrier only, then asks Chrome again to prove it is gone. */
@@ -271,6 +279,20 @@ export async function removeBarrier(barrier: Barrier, api: BarrierApi): Promise<
       "Chrome still lists the barrier after removing it.",
     );
   }
+}
+
+/** Removes the barrier of each of the operation's lanes, trying every one even after a failure. */
+export async function removeBarriersOf(
+  operation: Omit<BarrierOperation, "lane">,
+  api: BarrierApi,
+): Promise<void> {
+  const failures: unknown[] = [];
+  for (let lane = 0; lane < BARRIER_LANES; lane += 1) {
+    await removeBarrier(barrierOf({ ...operation, lane }), api).catch((error: unknown) => {
+      failures.push(error);
+    });
+  }
+  if (failures.length > 0) throw failures[0];
 }
 
 /** The barrier's Chrome APIs; the rule and script shapes above are Chrome's, minus its enum types. */

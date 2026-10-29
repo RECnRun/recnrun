@@ -137,6 +137,17 @@ describe("installBarrier", () => {
     expect([...api.scripts.keys()]).toEqual([existing.scriptId]);
   });
 
+  test("a second lane of one operation installs beside the first, and each removes only its own", async () => {
+    const primary = await installBarrier(TAB, TARGET, OPERATION, api);
+    const other = "http://other.localhost:5192";
+    const layout = await installAnonymousBarrier(8, other, { ...OPERATION, lane: 1 }, api);
+    expect(new Set([...primary.ruleIds, ...layout.ruleIds]).size).toBe(12);
+    expect(layout.scriptId).not.toBe(primary.scriptId);
+    await removeBarrier(layout, api);
+    expect([...api.rules.keys()]).toEqual(primary.ruleIds.slice(0, 5));
+    expect([...api.scripts.keys()]).toEqual([primary.scriptId]);
+  });
+
   test("removes its rules again when the agent cannot be registered", async () => {
     api.registerError = new Error("Chrome refused.");
     await expect(installBarrier(TAB, TARGET, OPERATION, api)).rejects.toMatchObject({

@@ -92,9 +92,16 @@ export function replayStaleReplies(onConnect: ConnectEvent): StaleReplies {
   const add = onConnect.addListener.bind(onConnect);
   const remove = onConnect.removeListener.bind(onConnect);
   const wrapped = new Map<ConnectListener, ConnectListener>();
+  // One link per port, since the watches tell a link they took by its identity.
+  const links = new WeakMap<OriginPort, OriginPort>();
+  const linkOf = (port: OriginPort) => {
+    const link = links.get(port) ?? replaying(port, memory);
+    links.set(port, link);
+    return link;
+  };
   onConnect.addListener = (listener) => {
     const own: ConnectListener = (port) =>
-      listener(active && port.name === ORIGIN_AGENT_PORT ? replaying(port, memory) : port);
+      listener(active && port.name === ORIGIN_AGENT_PORT ? linkOf(port) : port);
     wrapped.set(listener, own);
     add(own);
   };

@@ -64,8 +64,8 @@ describe("visitOrigins", () => {
     ]);
     // Generation 2's six rules, the anonymous one among them, guard each visit in turn.
     expect(seen.map(({ rules }) => rules)).toEqual([
-      [21, 22, 23, 24, 25, 26],
-      [21, 22, 23, 24, 25, 26],
+      [41, 42, 43, 44, 45, 46],
+      [41, 42, 43, 44, 45, 46],
     ]);
     expect(seen[1]?.sender).toMatchObject({ tab: { id: 100 }, origin: CDN });
     expect(agents.every(({ disconnected }) => disconnected)).toBe(true);

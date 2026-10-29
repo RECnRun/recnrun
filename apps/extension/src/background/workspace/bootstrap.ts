@@ -17,6 +17,8 @@ import {
 } from "@/background/workspace/cookie-stores";
 import type { CookieApi } from "@/background/workspace/cookie-stores";
 import { collectFailures } from "@/background/workspace/errors";
+import { gate, handledLater } from "@/background/workspace/gate";
+import type { Gate } from "@/background/workspace/gate";
 import { visitOrigins } from "@/background/workspace/helper-tab";
 import type { HelperTabApi } from "@/background/workspace/helper-tab";
 import { restoreLayout, restoreTabSessions } from "@/background/workspace/layout-restore";
@@ -107,8 +109,12 @@ interface Run {
   agent?: OriginPort;
   /** Set once the page script that shows restored responses' URLs may be registered. */
   exposed?: boolean;
-  /** The windows the layout step opened beside the start's own. */
+  /** The windows the layout opened beside the start's own. */
   opened: number[];
+  /** The identity's other tabs and windows, reopening while the primary tab restores. */
+  layout?: Promise<void>;
+  /** Settles once the primary's storage is back, or the start failed first. */
+  released: Gate;
 }
 
 function known<T>(value: T | undefined, what: string): T {
@@ -188,7 +194,15 @@ async function reopenLayout(run: Run): Promise<void> {
   if (layout === undefined) return;
   const { windowId, tabId } = known(run.window, "window");
   const opened = (id: number) => run.opened.push(id);
-  const reopening = { primary: { windowId, tabId }, operation: barrierOperation(run), opened };
+  // Its own barrier lane, so its tabs' barriers stand beside the primary tab's.
+  const operation = { ...barrierOperation(run), lane: 1 };
+  const reopening = {
+    primary: { windowId, tabId },
+    origin: run.origin,
+    released: run.released.promise,
+    operation,
+    opened,
+  };
   skippedAlso(run, await restoreLayout(layout, reopening, run.deps));
 }
 
@@ -218,8 +232,13 @@ const STEP_RUNS: Record<BootstrapStep, (run: Run) => Promise<unknown>> = {
     await restorePrimarySessions(run);
   },
   barrier: async (run) => {
+    // Registered before the layout's tabs and the reloaded page run, since they read them.
+    run.exposed = true;
+    const urls = responseUrlsOf(run.origin, run.data);
+    await exposeResponseUrls(known(run.window, "window").generation, urls, run.deps);
     const operation = barrierOperation(run);
     run.barrier = await installBarrier(tabOf(run), run.origin, operation, run.deps.barrier);
+    run.layout = handledLater(reopenLayout(run));
   },
   navigate: async (run) => {
     const target = { tabId: tabOf(run), url: run.url, origin: run.origin };
@@ -233,25 +252,24 @@ const STEP_RUNS: Record<BootstrapStep, (run: Run) => Promise<unknown>> = {
     agent.disconnect();
   },
   unbarrier: async (run) => {
-    // Registered before the release, so the reloaded page and the layout's tabs read them.
-    run.exposed = true;
-    const urls = responseUrlsOf(run.origin, run.data);
-    await exposeResponseUrls(known(run.window, "window").generation, urls, run.deps);
     await removeBarrier(known(run.barrier, "barrier"), run.deps.barrier);
     run.barrier = undefined;
+    run.released.open();
   },
   reload: (run) => {
     const documentId = known(run.agent?.sender?.documentId, "document");
     const released = { tabId: tabOf(run), documentId };
     return reloadAndCommit(run.deps.navigation, released, NAVIGATION_BOUND_MS);
   },
-  layout: reopenLayout,
+  layout: (run) => run.layout ?? Promise.resolve(),
 };
 
 /** Undoes what the failed start left: the page link, the windows, then the barrier. */
 async function cleanUp(run: Run): Promise<string[]> {
   const { failures, attempt } = collectFailures();
   run.agent?.disconnect();
+  // The layout settles first, so every window it opened is known to close.
+  await run.layout?.catch(() => undefined);
   const { window, barrier } = run;
   if (window) await attempt(() => run.deps.windows.close([window.windowId, ...run.opened]));
   if (barrier) await attempt(() => removeBarrier(barrier, run.deps.barrier));
@@ -266,6 +284,7 @@ async function fail(run: Run, error: unknown): Promise<never> {
   const record = () => run.deps.record(run.operation).catch(() => undefined);
   run.operation = { ...run.operation, status: "failed", error: message };
   await record();
+  run.released.shut(error);
   const failures = await cleanUp(run);
   if (failures.length > 0) {
     run.operation = {
@@ -280,8 +299,8 @@ async function fail(run: Run, error: unknown): Promise<never> {
 /**
  * Opens a fresh managed window and restores `data` into it before the app at `url` runs: cookies
  * into the tab's own store, the other visited origins' site data in a helper tab, then the target's
- * behind the barrier, then a reload of the same tab releases the app; the identity's other tabs
- * and windows reopen last. Any failure closes every window the start opened, so no partly
+ * behind the barrier, then a reload of the same tab releases the app. The identity's other tabs
+ * and windows reopen meanwhile, a page of the target's origin only once its storage is back. Any failure closes every window the start opened, so no partly
  * restored app is ever released.
  */
 export async function bootstrapIdentity(
@@ -297,7 +316,15 @@ export async function bootstrapIdentity(
     status: "running",
     started: Date.now(),
   };
-  const run: Run = { url, origin: new URL(url).origin, data, deps, operation, opened: [] };
+  const run: Run = {
+    url,
+    origin: new URL(url).origin,
+    data,
+    deps,
+    operation,
+    opened: [],
+    released: gate(),
+  };
   const timings: StepTiming[] = [];
   try {
     for (const step of BOOTSTRAP_STEPS) {

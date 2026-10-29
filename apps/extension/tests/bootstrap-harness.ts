@@ -1,6 +1,6 @@
 import type { IdentityData, WorkspaceOperation } from "@recnrun/domain";
 import { vi } from "vite-plus/test";
-import type { BootstrapDeps } from "@/background/workspace/bootstrap";
+import type { BootstrapDeps, HookStep } from "@/background/workspace/bootstrap";
 import { fakeBarrierApi } from "./fake-barrier";
 import { fakeCookieApi, memoryStoreMemory } from "./fake-cookies";
 import { fakeHelperTabs, memoryResponseUrls, memoryVisits } from "./fake-helper";
@@ -111,7 +111,7 @@ export function bootstrapHarness(agentReply: Reply = "restored") {
     visits: memoryVisits(),
     responseUrls: memoryResponseUrls(),
     windows: { create: vi.fn(async () => WINDOW), close: vi.fn(async () => {}) },
-    hooks: { beforeStep: vi.fn(async () => {}) },
+    hooks: { beforeStep: vi.fn(async (_step: HookStep) => {}) },
     record: vi.fn(async (operation: WorkspaceOperation) => {
       records.push(operation);
     }),

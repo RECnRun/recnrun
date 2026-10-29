@@ -165,3 +165,11 @@ The session page in a PiP window is such a frame too. A pre-push `vp run verify`
 **Cause.** `tabs.update` resolves once the navigation starts, not once it commits, and `tabs.query` already reports the new address as `pendingUrl`. The capture then found the previous page still committed in that tab, took it as the loaded primary tab, and its agent's link closed when `about:blank` committed. A `beforeunload` handler that keeps the page busy for one second reproduces it on any machine.
 
 **Solution.** The `navigateTab` fixture (`tests/e2e/fixtures/tabs.ts`) resolves only once `tabs.onUpdated` reports the tab complete at the new address with no `pendingUrl`, so the session is settled before the test saves it. A user who saves while a tab still loads met the same failure, so a capture now first waits, at most 3 s, until no Incognito tab is loading, and reads a primary tab whose page left during the read behind the barrier instead of failing (`poc-loading-tab.spec.ts`).
+
+## A start that reopens tabs meanwhile fails with "The page closed before its data was restored."
+
+**Symptom.** Once a start reopened the identity's other tabs while the managed tab still restored, `poc-session-layout.spec.ts` failed on Switch back: the restore step lost its agent at once, though its page stayed loaded.
+
+**Cause.** Each navigation that waits for an agent listens on `runtime.onConnect`, and Chrome hands one connection to every listener in turn. The managed tab's wait took its agent and stopped following that tab before the reopened tab's wait heard the same connection, which then found a link from a tab no wait followed and ended it as stray.
+
+**Solution.** A wait remembers each link it took (`navigation.ts`), and another wait leaves a remembered link open; a second agent of the same document, which two barriers on one origin inject, is still ended. The test build's stale-reply wrapper hands every listener the same link for one port, as Chrome does (`stale-replies.ts`).
