@@ -3,6 +3,7 @@ import { fakeBrowser } from "wxt/testing/fake-browser";
 import {
   AGENT_SCRIPT,
   BARRIER_CSP,
+  BARRIER_STYLE,
   chromeBarrierApi,
   installAnonymousBarrier,
   installBarrier,
@@ -49,7 +50,7 @@ afterEach(() => {
 });
 
 describe("installBarrier", () => {
-  test("appends the script-blocking CSP to the tab's documents and frames", async () => {
+  test("serves the tab's documents and frames script-free, as plain text Chrome never downloads", async () => {
     await installBarrier(TAB, TARGET, OPERATION, api);
     expect(BARRIER_CSP).toBe(
       "script-src 'none'; worker-src 'none'; object-src 'none'; frame-src 'none'",
@@ -59,6 +60,9 @@ describe("installBarrier", () => {
     );
     expect(csp?.action.responseHeaders).toEqual([
       { header: "Content-Security-Policy", operation: "append", value: BARRIER_CSP },
+      { header: "content-type", operation: "set", value: "text/plain" },
+      { header: "x-content-type-options", operation: "set", value: "nosniff" },
+      { header: "content-disposition", operation: "remove" },
     ]);
     expect(csp?.condition).toEqual({ tabIds: [TAB], resourceTypes: ["main_frame", "sub_frame"] });
   });
@@ -89,12 +93,13 @@ describe("installBarrier", () => {
     expect(allow?.priority ?? 0).toBeLessThan(csp?.priority ?? 0);
   });
 
-  test("registers the origin agent for the target origin only, at document_start, for this session", async () => {
+  test("registers the origin agent and the style that hides its document for the target origin only, at document_start, for this session", async () => {
     const barrier = await installBarrier(TAB, TARGET, OPERATION, api);
     expect([...api.scripts.values()]).toEqual([
       {
         id: barrier.scriptId,
         js: [AGENT_SCRIPT],
+        css: [BARRIER_STYLE],
         matches: [`${ORIGIN}/*`],
         runAt: "document_start",
         allFrames: false,
@@ -102,6 +107,7 @@ describe("installBarrier", () => {
       },
     ]);
     expect(AGENT_SCRIPT).toBe("content-scripts/origin-agent.js");
+    expect(BARRIER_STYLE).toBe("barrier.css");
     expect(barrier.scriptId).toContain(OPERATION.id);
   });
 
@@ -140,19 +146,16 @@ describe("installBarrier", () => {
     });
     expect(api.rules.size).toBe(0);
   });
+});
 
-  test("strips a redirect off the target origin, above the allow rule, so a plain-text document commits on the origin", async () => {
+describe("installBarrier's redirect hand-over", () => {
+  test("strips a redirect off the target origin, above the allow rule, so the document commits on the origin", async () => {
     await installBarrier(TAB, TARGET, OPERATION, api);
     const rules = [...api.rules.values()];
     const handOver = rules.find(({ condition }) => condition.responseHeaders !== undefined);
-    // A type Chrome cannot render, or an attachment, would make the 302 a failed download.
     expect(handOver?.action).toEqual({
       type: "modifyHeaders",
-      responseHeaders: [
-        { header: "location", operation: "remove" },
-        { header: "content-type", operation: "set", value: "text/plain" },
-        { header: "content-disposition", operation: "remove" },
-      ],
+      responseHeaders: [{ header: "location", operation: "remove" }],
     });
     expect(handOver?.condition).toMatchObject({ tabIds: [TAB], resourceTypes: ["main_frame"] });
     const allow = rules.find(({ action }) => action.type === "allow");

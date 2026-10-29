@@ -27,6 +27,7 @@ export interface BarrierRule {
 export interface AgentScript {
   id: string;
   js: string[];
+  css: string[];
   matches: string[];
   runAt: "document_start";
   allFrames: false;
@@ -57,6 +58,19 @@ export const BARRIER_CSP =
   "script-src 'none'; worker-src 'none'; object-src 'none'; frame-src 'none'";
 /** Where WXT emits the runtime-registered origin agent. */
 export const AGENT_SCRIPT = "content-scripts/origin-agent.js";
+/** The style, copied from `public/`, that keeps a barrier document unpainted. */
+export const BARRIER_STYLE = "barrier.css";
+
+/**
+ * A barrier document commits as plain text, unsniffed: it shows no title and runs no meta refresh,
+ * and a type Chrome cannot render, or an attachment, would make it a download, which fails a
+ * non-2xx response (navigation_url_loader_impl.cc:1516-1532, navigation_request.cc:988-991).
+ */
+const PLAIN_TEXT: NonNullable<BarrierRule["action"]["responseHeaders"]> = [
+  { header: "content-type", operation: "set", value: "text/plain" },
+  { header: "x-content-type-options", operation: "set", value: "nosniff" },
+  { header: "content-disposition", operation: "remove" },
+];
 
 const RULES_PER_GENERATION = 10;
 const RULES_PER_BARRIER = 6;
@@ -81,10 +95,7 @@ const LEAVING = ["*:*", "*//*", "*/\\\\*", "*\\\\/*", "*\\\\\\\\*", "*\t*"];
 
 /**
  * Strips a cross-origin redirect behind the barrier, so the document commits on the origin and the
- * reload, once the barrier is gone, follows it; same-origin redirects are followed at once. The
- * body commits as plain text: a type Chrome cannot render, or an attachment, makes a non-2xx
- * response a failed download (navigation_url_loader_impl.cc, navigation_request.cc), and plain
- * text never runs a meta refresh.
+ * reload, once the barrier is gone, follows it; same-origin redirects are followed at once.
  */
 function handOverRule(id: number, tabIds: number[], origin: string): BarrierRule {
   return {
@@ -92,11 +103,7 @@ function handOverRule(id: number, tabIds: number[], origin: string): BarrierRule
     priority: 3,
     action: {
       type: "modifyHeaders",
-      responseHeaders: [
-        { header: "location", operation: "remove" },
-        { header: "content-type", operation: "set", value: "text/plain" },
-        { header: "content-disposition", operation: "remove" },
-      ],
+      responseHeaders: [{ header: "location", operation: "remove" }],
     },
     condition: {
       tabIds,
@@ -160,6 +167,7 @@ function barrierRules(tabId: number, origin: string, generation: number): Barrie
         type: "modifyHeaders",
         responseHeaders: [
           { header: "Content-Security-Policy", operation: "append", value: BARRIER_CSP },
+          ...PLAIN_TEXT,
         ],
       },
       condition: { tabIds, resourceTypes: ["main_frame", "sub_frame"] },
@@ -185,6 +193,8 @@ function agentScript(origin: string, operationId: string): AgentScript {
   return {
     id: agentScriptId(operationId),
     js: [AGENT_SCRIPT],
+    // Injected when the document element is created, before any paint; a capture's agent has none.
+    css: [BARRIER_STYLE],
     matches: [`${origin}/*`],
     runAt: "document_start",
     allFrames: false,

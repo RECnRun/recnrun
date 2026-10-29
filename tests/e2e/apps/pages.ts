@@ -112,6 +112,9 @@ const page = (title: string, script: string) =>
 /** A page with no script, so only what a test writes ends up in its origin's storage. */
 export const blankPage = page("Blank", "");
 
+/** A provider's sign-in page, as an origin's root answers a visit without its session. */
+export const signInPage = page("Sign in to Fixture", "");
+
 export const sentinelPage = (tag: string) =>
   page("Sentinel", `(${writeSentinels.toString()})(${literal(tag)});`);
 

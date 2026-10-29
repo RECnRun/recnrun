@@ -9,7 +9,7 @@ import type { Exchange } from "./http.ts";
 import { domainJarCookies, frameCookies, framePage, jarCookies, jarPage } from "./cookie-pages.ts";
 import { pwaRoutes } from "./pwa-routes.ts";
 import { ssoRoutes } from "./sso-routes.ts";
-import { blankPage, inspectPage, sentinelPage, serviceWorker } from "./pages.ts";
+import { blankPage, inspectPage, sentinelPage, serviceWorker, signInPage } from "./pages.ts";
 import { writersHtml, writersServiceWorker, writersWorker } from "./writer-pages.ts";
 
 const PORT = 5192;
@@ -105,7 +105,15 @@ async function setDown({ request, response }: Exchange): Promise<void> {
   send(response, "application/json", JSON.stringify({ down: [...downHosts] }));
 }
 
+/** The root of signin.localhost is a sign-in page; every other host has none. */
+function root({ response, host }: Exchange): void {
+  if (host.startsWith("signin.")) return send(response, HTML, signInPage);
+  response.writeHead(404, { "content-type": "text/plain" });
+  response.end("not found");
+}
+
 const routes: Record<string, (exchange: Exchange) => void | Promise<void>> = {
+  "GET /": root,
   "GET /health": ({ response }) => send(response, "text/plain", "ok"),
   "GET /sentinel": sentinel,
   "GET /blank": ({ response }) => send(response, HTML, blankPage),
