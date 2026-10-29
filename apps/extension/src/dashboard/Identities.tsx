@@ -21,19 +21,25 @@ function lastSaved({ lastCapture }: Identity): string {
   return `Saved ${new Date(lastCapture.at).toLocaleString()}, ${approximateSize(lastCapture.bytes)}`;
 }
 
-/** Why an origin was left out, in the row's words; the journal keeps the page's own reason. */
-const STEP_PHRASES: Record<SkippedOrigin["step"], string> = {
-  navigate: "the site did not answer",
+/** Why an origin was left out, in the row's words, where the step alone tells it. */
+const STEP_PHRASES: Record<Exclude<SkippedOrigin["step"], "navigate">, string> = {
   save: "its page did not hand over its data",
   restore: "its page did not take its data",
   "not-restored": "the last start could not restore it",
 };
 
+/** A page that did not load fails in many ways, so its own reason says which, as a phrase. */
+function whyOf({ step, reason }: SkippedOrigin): string {
+  if (step !== "navigate") return STEP_PHRASES[step];
+  return reason.replace(/^[A-Z](?=[a-z])/, (letter) => letter.toLowerCase()).replace(/\.$/, "");
+}
+
 /** One left-out origin as the row names it: what was not done, where, why, and what stays. */
-function skippedNote({ origin, work, step, kept }: SkippedOrigin): string {
+function skippedNote(skipped: SkippedOrigin): string {
+  const { origin, work, kept } = skipped;
   const done = work === "save" ? "Not saved" : "Not restored";
   const rest = work === "save" && kept ? "; its last saved storage is kept" : "";
-  return `${done}: storage of ${origin} (${STEP_PHRASES[step]})${rest}.`;
+  return `${done}: storage of ${origin} (${whyOf(skipped)})${rest}.`;
 }
 
 interface RowProps {

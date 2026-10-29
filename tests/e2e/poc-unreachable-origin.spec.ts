@@ -71,7 +71,7 @@ test("an origin that does not answer is skipped, named on its row, and kept unti
       skipped: [restored],
     });
     await expect(notesOf(site, "A")).toHaveText([
-      `Not restored: storage of ${down} (the site did not answer).`,
+      `Not restored: storage of ${down} (the page did not load (net::ERR_EMPTY_RESPONSE)).`,
     ]);
     await site.screenshot({ path: test.info().outputPath("not-restored-row.png") });
 
@@ -105,7 +105,7 @@ test("an origin first saved while it does not answer is named as not saved", asy
     await next();
     expect(await incognitoWindows(serviceWorker)).toBe(1);
     await expect(notesOf(site, "A")).toHaveText([
-      `Not saved: storage of ${down} (the site did not answer).`,
+      `Not saved: storage of ${down} (the page did not load (net::ERR_EMPTY_RESPONSE)).`,
     ]);
     await site.screenshot({ path: test.info().outputPath("not-saved-row.png") });
   } finally {
