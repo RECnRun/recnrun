@@ -8,7 +8,7 @@ Plan: [poc-incognito-sessions-plan.md](poc-incognito-sessions-plan.md). Assignme
 | Branch               | `poc/incognito-sessions`                                         |
 | Planned base         | `44c154da29860c7a8df829e902b177df5ce2ba2a` (2026-10-28)          |
 | Actual base (P0.1)   | `44c154d` (re-resolved 2026-10-28, unchanged)                    |
-| Last recorded commit | `4ea872c`                                                        |
+| Last recorded commit | `c018eec`                                                        |
 | Decisions OD-1…OD-4  | defaults of plan §3, accepted by the user ("Avance", 2026-10-28) |
 
 ## Status legend
@@ -531,6 +531,12 @@ Source facts (orchestrator, Chromium checkout): `tabs.discard` (`tabs_api.cc:429
       commit: ede0d07 Wait for loading tabs before a capture reads the session; 4ea872c Keep the single-origin read private to the origin reads
       notes: `settledTabs` (`windows.ts`) re-reads the Incognito tabs on each `tabs.onUpdated`/`onRemoved` until none has `status: "loading"` or a `pendingUrl`, bounded by `SETTLE_BOUND_MS` (3 s). A loaded primary tab whose document changed (checked with `webNavigation.getFrame`) after a failed connect or read is read behind the barrier, as an unloaded tab is, after `originReader` drops the parts already written; a closed tab or the same document still fails as before. Other tabs whose read fails stay named as unsupported, as before. Timing: the wait cost 0.3 to 22 ms per capture when no tab was loading (`poc-session-layout.spec.ts`, 5 repeats); the captures there took 7 to 64 ms.
       verify: `vp run verify` → exit 0, 22/22 tasks (run `2026-10-29T18-36-21.033Z-08e7c118`)
+- [x] S7.10 New identity opens when a cross-origin redirect's response is one Chrome would download
+      red: `vp run test:e2e -- tests/e2e/poc-binary-redirect.spec.ts` (the app answers a 302 to `other.localhost` typed `application/binary`, and again with `Content-Disposition: attachment`; New identity through the panel) on the unfixed code → 2 failed, panel alert "New identity failed at the navigate step. The page did not load (net::ERR_INVALID_RESPONSE)." (run `2026-10-29T21-08-29.984Z-7d1b0ee0`); `vp run test:unit` → 1 failed, the hand-over rule lacked the `content-type` set and `content-disposition` remove
+      green: the same e2e command → 2 passed, A opens and the release lands on `other.localhost/app/`; `--repeat-each 10` → 20 passed; unit 455 passed
+      commit: c018eec Commit a handed-over redirect as plain text behind the barrier
+      notes: Removing `Location` makes the 302 an ordinary response; Chrome downloads one it must download or whose type it cannot render (`navigation_url_loader_impl.cc:1516-1532`) and fails a non-2xx download with `ERR_INVALID_RESPONSE` (`navigation_request.cc:988-991, 5546-5551`). The hand-over rule now also sets `Content-Type: text/plain` and removes `Content-Disposition`; a DNR header rule goes through the network service's header client (`extension_web_request_event_router.cc:2764-2785`), so the type is derived from the modified headers, as the green run shows. TROUBLESHOOTING and ARCHITECTURE updated
+      verify: `vp run verify` → exit 0 (run `2026-10-29T21-11-49.030Z-94354906`)
 
 ## Stage 5 — Delivery
 
