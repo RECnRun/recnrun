@@ -8,7 +8,7 @@ Plan: [poc-incognito-sessions-plan.md](poc-incognito-sessions-plan.md). Assignme
 | Branch               | `poc/incognito-sessions`                                         |
 | Planned base         | `44c154da29860c7a8df829e902b177df5ce2ba2a` (2026-10-28)          |
 | Actual base (P0.1)   | `44c154d` (re-resolved 2026-10-28, unchanged)                    |
-| Last recorded commit | `c018eec`                                                        |
+| Last recorded commit | `60aa2fb`                                                        |
 | Decisions OD-1…OD-4  | defaults of plan §3, accepted by the user ("Avance", 2026-10-28) |
 
 ## Status legend
@@ -537,6 +537,12 @@ Source facts (orchestrator, Chromium checkout): `tabs.discard` (`tabs_api.cc:429
       commit: c018eec Commit a handed-over redirect as plain text behind the barrier
       notes: Removing `Location` makes the 302 an ordinary response; Chrome downloads one it must download or whose type it cannot render (`navigation_url_loader_impl.cc:1516-1532`) and fails a non-2xx download with `ERR_INVALID_RESPONSE` (`navigation_request.cc:988-991, 5546-5551`). The hand-over rule now also sets `Content-Type: text/plain` and removes `Content-Disposition`; a DNR header rule goes through the network service's header client (`extension_web_request_event_router.cc:2764-2785`), so the type is derived from the modified headers, as the green run shows. TROUBLESHOOTING and ARCHITECTURE updated
       verify: `vp run verify` → exit 0 (run `2026-10-29T21-11-49.030Z-94354906`)
+- [x] S7.11 A barrier document paints nothing of the site and shows no title
+      red: `vp run test:e2e -- tests/e2e/poc-barrier-hidden.spec.ts` (A's main tab keeps sessionStorage on `signin.localhost`, whose root is a "Sign in to Fixture" page; Switch to A held 2.5 s before `barrier` and `restore`; the managed tab sampled through `scripting.executeScript` and `tabs.query`) on the unfixed code → 1 failed, `{ display: "block", title: "Sign in to Fixture" }` at the sign-in root (run `2026-10-29T21-23-15.505Z-25ac9fa0`, scratch worktree); scratch controls: fix without the style → `display: "block"`, fix without plain text → `title: "Sign in to Fixture"`; `vp run test:unit` → 3 failed
+      green: the same e2e command → 1 passed (run `2026-10-29T21-22-52.040Z-346a0a07`); with `poc-binary-redirect.spec.ts`, `--repeat-each 10` → 30 passed (run `2026-10-29T21-24-03.613Z-1bb68b5c`); unit 455 passed; screenshots in `.artifacts/screens/S7.11/` (red sign-in page; green blank at the sign-in root and the target, released app shown)
+      commit: 60aa2fb Show nothing of a document behind the barrier, nor its title
+      notes: The barrier's document rule now sets `Content-Type: text/plain` and `X-Content-Type-Options: nosniff` and removes `Content-Disposition` (moved there from S7.10's hand-over rule), so the document has no title (Chrome shows the address); the registered origin agent carries `barrier.css` (`:root { display: none !important; }`), inserted at `document_start` only (`user_script_injector.cc`, `ShouldInjectOrRemoveCss`), which Blink runs synchronously when the document element is created (`render_frame_impl.cc`, `RunScriptsAtDocumentElementAvailable`). A capture's agent (`executeScript`) gets no style, and the release reload runs after the barrier is gone, as the spec's final `{ display: "block", title: "Blank" }` shows. The tab title is recorded on every `tabs.onUpdated` from before New identity B through the Switch and never shows the sign-in title. TROUBLESHOOTING and ARCHITECTURE updated
+      verify: `vp run verify` → exit 0, 22/22 tasks, e2e 115 passed (run `2026-10-29T21-26-43.077Z-aeb498ce`)
 
 ## Stage 5 — Delivery
 
