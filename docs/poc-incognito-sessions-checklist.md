@@ -453,6 +453,33 @@ User request (2026-10-29): the user must not declare cookie hosts; starting A, s
   commit: c337729 Describe transparent identity switching in the durable docs
   notes: PRODUCT_BRIEF: the Incognito workspace paragraph now describes Address with suggestions, auto-named New identity, Switch to/Close/Delete, the whole cookie store and every visited site's storage with nothing declared, the skip policy and row notes, alerts, Close these windows, Site access withheld, the workspace in every build with all-sites and history warnings, and what incognito addresses are kept (identity address, last page path without query/fragment, session only). TROUBLESHOOTING: the domain-cookie entry's solution and the redirect entry (now "to a sign-in provider", the any-off-origin Location rule) replace the declared-host design; new entries: withheld Site access, history limited to a day, a visited site that does not answer. POCS: Method updated for OD-1, a Stage 6 bullet, findings list, non-claims (other origins' sessionStorage, third-party frames, DBSC, blocked sites). ARCHITECTURE: security model names the helper tab and the anonymous barrier. MILESTONES not touched (not in S6.4's list; its POC line still reads "suspend, resume")
 
+- [ ] S6.G Stage 6 gate: Knip's unused exported type `Started` (`lifecycle-types.ts:26`) fixed, then `vp run verify` exits 0; every S6.x marked `[x]` with that run
+
+## Stage 7 — The identity is the whole Incognito session
+
+User's manual run (2026-10-29): Gmail and Zephyr switched, with three defects. (1) A second tab in the managed window, or another Incognito window, refuses every command; the user works in several tabs. (2) Gmail's "Leave site?" dialog blocked a Switch: closing the window runs `beforeunload`. (3) With only one Incognito tab open the panel still showed the conflict: that tab was not the stored `tabId` (no Record button), so the window counted as having another tab. The user also refuses "other sites' sessionStorage is not kept" as a limit.
+
+Every Incognito tab and window shares one profile, so while an identity is open all of them are its session, not foreign windows. Windows found when no identity is open stay foreign (Close these windows, S6.2).
+
+Source facts (orchestrator, Chromium checkout): `tabs.discard` (`tabs_api.cc:4295-4360`) → `TabLifecycleUnit::Discard` (`tab_lifecycle_unit.cc:380-415`) checks only the tab strip and an earlier discard, then replaces or preserves the contents without `ClosePage`, so no `beforeunload` runs; `FinishDiscard` copies the controller state, session storage namespaces included (`tab_lifecycle_unit.cc:300-308`, `CopyStateFrom`). The returned tab may carry a new id on the non-preserving path.
+
+- [ ] S7.1 Close without `beforeunload` dialogs: after a tab's capture read it, RECnRun discards it before any window closes (use the id `tabs.discard` returns). Red: an e2e fixture page that registers `beforeunload` and gets a user activation (a click), then Switch to / New identity / Close fails or shows a dialog (Playwright dismisses it, so the close is cancelled); green: no dialog, command succeeds. Applies to every Incognito tab, helper tabs excluded.
+- [ ] S7.2 Every Incognito tab and window belongs to the open identity
+  - Remove the `IncognitoTabsOpen` refusal and the `IncognitoWindowsOpen` refusal while an identity's session is live; the session is live while any Incognito window is open after RECnRun opened it (generation), not while one stored tab exists. Fixes defect (3): no `tabId`-based conflict.
+  - Capture every Incognito tab: the agent reads each tab's current document (localStorage, IndexedDB, Cache Storage once per origin; sessionStorage per tab); the cookie store as today; visited origins as today.
+  - Save the layout: windows in order, each window's tabs in order with full URL, the active tab per window, the focused window. Stored in the capture only (extension IndexedDB), never logged and never sent to the website bridge.
+  - Restore: the first tab through the existing bootstrap (barrier, restore, release); then the other tabs and windows at their URLs, same layout and active tabs, before the command returns. A tab URL that is not http(s) is skipped and noted.
+  - Panel copy: the conflict notice only for Incognito windows while no identity is open; a hint that switching saves and closes every Incognito tab and window and reopens the target's.
+  - Red/green in unit (lifecycle plan, effects) and e2e (two tabs plus a second Incognito window opened during A; stored managed tab closed while another tab stays: Switch works).
+- [ ] S7.3 sessionStorage of every origin, per tab
+  - Track visited origins per tab (tab → origin → last `origin + pathname`), per generation.
+  - Capture: after S7.1's discard, for each other origin that tab visited, navigate that same tab behind the anonymous barrier (S6.7 rules) to its last page and read its sessionStorage; the tab keeps its namespace across the discard. Unreachable: S6.7a retry, skip, carry rules.
+  - Restore: each restored tab first visits, behind the barrier, every origin with saved sessionStorage for that tab and writes it, then navigates to its URL and releases.
+  - Red: a two-origin fixture where tab 1 writes sessionStorage on origin X, navigates to Y; A → new B → A, then tab 1 navigates to X and reads it (old code: null). Green: X's value back in that tab only; another tab's X sessionStorage stays its own.
+  - Remove the non-claim from PRODUCT_BRIEF, POCS, ARCHITECTURE, TROUBLESHOOTING where present. If a source fact proves part of it impossible, stop and report before writing a non-claim.
+- [ ] S7.4 End to end through the panel only: A with two tabs and a second Incognito window, a `beforeunload` page, sessionStorage on two origins; New identity B shows none of it; Switch to A brings every tab, window, active tab and storage back, no dialog; screenshots viewed
+- [ ] S7.5 Durable docs updated; production build rebuilt; Stage 7 `vp run verify` exits 0
+
 ## Stage 5 — Delivery
 
 - [i] D.1 Timings aggregated (capture, transport, persistence, teardown, bootstrap, restore, PWA readiness, total; 10,000-record size)
