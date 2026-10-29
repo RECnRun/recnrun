@@ -1,5 +1,6 @@
 import { vi } from "vite-plus/test";
 import type { HelperTabApi } from "@/background/workspace/helper-tab";
+import type { ResponseUrls, ResponseUrlStore } from "@/ports/response-urls";
 import type { LayoutPlace, TabVisits, Visit, VisitedOrigins } from "@/ports/visited-origins";
 import { fakeBarrierApi } from "./fake-barrier";
 import { fakeNavigationApi } from "./fake-navigation";
@@ -122,4 +123,16 @@ export function noVisits() {
     visits: memoryVisits(),
     helper: { tabs: fakeHelperTabs(), barrier: fakeBarrierApi(), navigation: fakeNavigationApi() },
   };
+}
+
+/** The restored responses' URLs, in memory: one generation's at a time. */
+export function memoryResponseUrls(generation = 0, initial: ResponseUrls = {}) {
+  const store = {
+    kept: { generation, urls: initial },
+    read: vi.fn(async (asked: number) => (store.kept.generation === asked ? store.kept.urls : {})),
+    write: vi.fn(async (written: number, urls: ResponseUrls) => {
+      store.kept = { generation: written, urls };
+    }),
+  };
+  return store satisfies ResponseUrlStore;
 }

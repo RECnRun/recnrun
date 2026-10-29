@@ -23,8 +23,14 @@ import { restoreLayout, restoreTabSessions } from "@/background/workspace/layout
 import type { LayoutApi } from "@/background/workspace/layout-restore";
 import { openBehindBarrier, reloadAndCommit } from "@/background/workspace/navigation";
 import type { NavigationApi } from "@/background/workspace/navigation";
-import type { OriginPort, UnsupportedEntry } from "@/messaging/origin-protocol";
+import {
+  exposeResponseUrls,
+  responseUrlsOf,
+  withdrawResponseUrls,
+} from "@/background/workspace/response-urls";
+import type { OriginPort } from "@/messaging/origin-protocol";
 import type { IncognitoStoreMemory } from "@/ports/incognito-stores";
+import type { ResponseUrlStore } from "@/ports/response-urls";
 import type { VisitedOrigins } from "@/ports/visited-origins";
 
 /** The steps of a start with an identity, in order; the journal and the timings name them. */
@@ -70,6 +76,8 @@ export interface BootstrapPorts {
   /** The session's other windows and tabs, reopened as the identity left them. */
   layout: LayoutApi;
   visits: VisitedOrigins;
+  /** The URLs the restored cache entries were fetched from, which their pages show. */
+  responseUrls: ResponseUrlStore;
   hooks: BootstrapHooks;
 }
 
@@ -97,6 +105,8 @@ interface Run {
   storeId?: string;
   barrier?: Barrier;
   agent?: OriginPort;
+  /** Set once the page script that shows restored responses' URLs may be registered. */
+  exposed?: boolean;
   /** The windows the layout step opened beside the start's own. */
   opened: number[];
 }
@@ -131,12 +141,9 @@ async function restoreOthers(run: Run): Promise<void> {
     others,
     visiting,
     { tabs, barrier, navigation },
-    async (agent, other) => {
-      const { origin, ...site } = other;
-      const restored = await restoreThroughAgent(agent, operation, site, {
-        boundMs: RESTORE_BOUND_MS,
-      });
-      rebuiltAlso(run, origin, restored.rebuilt);
+    (agent, other) => {
+      const { origin: _origin, ...site } = other;
+      return restoreThroughAgent(agent, operation, site, { boundMs: RESTORE_BOUND_MS });
     },
   );
   const skipped = outcomes.flatMap((outcome) =>
@@ -159,13 +166,6 @@ async function restoreOthers(run: Run): Promise<void> {
   );
   run.operation = { ...run.operation, skipped };
 }
-
-/** Names each cache entry of `origin` the agent could write only as captured, without its URL. */
-const rebuiltAlso = (run: Run, origin: string, rebuilt: readonly UnsupportedEntry[]) => {
-  if (rebuilt.length === 0) return;
-  const named = rebuilt.map((entry) => ({ origin, ...entry }));
-  run.operation = { ...run.operation, rebuilt: [...(run.operation.rebuilt ?? []), ...named] };
-};
 
 const skippedAlso = (run: Run, skipped: readonly SkippedOrigin[]) => {
   if (skipped.length > 0) {
@@ -227,13 +227,16 @@ const STEP_RUNS: Record<BootstrapStep, (run: Run) => Promise<unknown>> = {
   },
   restore: async (run) => {
     const agent = known(run.agent, "page link");
-    const restored = await restoreThroughAgent(agent, barrierOperation(run), run.data.site, {
+    await restoreThroughAgent(agent, barrierOperation(run), run.data.site, {
       boundMs: RESTORE_BOUND_MS,
     });
-    rebuiltAlso(run, run.origin, restored.rebuilt);
     agent.disconnect();
   },
   unbarrier: async (run) => {
+    // Registered before the release, so the reloaded page and the layout's tabs read them.
+    run.exposed = true;
+    const urls = responseUrlsOf(run.origin, run.data);
+    await exposeResponseUrls(known(run.window, "window").generation, urls, run.deps);
     await removeBarrier(known(run.barrier, "barrier"), run.deps.barrier);
     run.barrier = undefined;
   },
@@ -252,6 +255,7 @@ async function cleanUp(run: Run): Promise<string[]> {
   const { window, barrier } = run;
   if (window) await attempt(() => run.deps.windows.close([window.windowId, ...run.opened]));
   if (barrier) await attempt(() => removeBarrier(barrier, run.deps.barrier));
+  if (run.exposed === true) await attempt(() => withdrawResponseUrls(run.deps.barrier));
   return failures;
 }
 

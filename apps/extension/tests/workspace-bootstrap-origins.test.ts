@@ -28,7 +28,7 @@ test("restores each other visited origin in a helper tab before the target, and 
   const timings = await run.running;
   expect(timings.map(({ step }) => step)).toEqual(BOOTSTRAP_STEPS);
   // The origin is the place, not part of what its page restores.
-  expect(run.restores).toEqual([{ payload: SSO_SITE, rules: 7 }]);
+  expect(run.restores).toEqual([{ payload: SSO_SITE, rules: 6 }]);
   expect(run.deps.helperTabs.opened).toEqual([{ tabId: 100, windowId: 5 }]);
   expect(run.deps.helperTabs.closed).toEqual([100]);
   expect(run.navigation.updates).toEqual([
@@ -82,15 +82,5 @@ test("a visited origin that does not answer is skipped at the navigate step", as
   expect(run.records.at(-1)).toMatchObject({
     status: "done",
     skipped: [{ origin: SSO, step: "navigate", kept: true }],
-  });
-});
-
-test("a cache entry the agent writes only as captured is named with its origin in the journal", async () => {
-  const rebuilt = [{ item: "pages-v1 GET http://sso.localhost:5192/p", reason: "Another body." }];
-  const run = restoring({ type: "restored", counts: COUNTS, rebuilt });
-  await run.running;
-  expect(run.records.at(-1)).toMatchObject({
-    status: "done",
-    rebuilt: [{ origin: SSO, ...rebuilt[0] }],
   });
 });

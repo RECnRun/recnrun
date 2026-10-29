@@ -6,7 +6,7 @@ import {
   OriginCommandSchema,
   OriginProbeSchema,
 } from "@/messaging/origin-protocol";
-import type { OriginCommand, OriginPort, UnsupportedEntry } from "@/messaging/origin-protocol";
+import type { OriginCommand, OriginPort } from "@/messaging/origin-protocol";
 import { captureOrigin } from "@/origin/capture";
 import { OriginFailure } from "@/origin/failure";
 import { restoreOrigin } from "@/origin/restore";
@@ -47,11 +47,10 @@ function run(
 ): Promise<void> {
   const { operationId, generation } = command;
   if (command.type === "restore") {
-    return replyAfter(port, command, async () => {
-      const rebuilt: UnsupportedEntry[] = [];
-      const counts = await restoreOrigin(stores, command.payload, command.scope, rebuilt);
-      return { type: "restored", counts, rebuilt };
-    });
+    return replyAfter(port, command, async () => ({
+      type: "restored",
+      counts: await restoreOrigin(stores, command.payload, command.scope),
+    }));
   }
   // Each message goes out while the read transaction is live; the port keeps their order.
   const sink = {

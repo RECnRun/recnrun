@@ -67,6 +67,7 @@ async function closeOpen(run: Run): Promise<void> {
   }
   if (session.length > 0) await run.deps.effects.close(session);
   run.closed = true;
+  await run.deps.effects.endSession();
 }
 
 /** The tabs the capture left off their page get it back when the windows stay open. */

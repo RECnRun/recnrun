@@ -111,7 +111,7 @@ test("without Cache Storage nothing is read, and only an empty list can be writt
     counts: { caches: 0, cacheEntries: 0 },
     sent: [],
   });
-  await expect(writeCaches(undefined, [])).resolves.toEqual({ entries: 0, rebuilt: [] });
+  await expect(writeCaches(undefined, [])).resolves.toBe(0);
   await expect(writeCaches(undefined, [{ name: "v1", entries: [] }])).rejects.toMatchObject({
     name: "SecurityError",
   });

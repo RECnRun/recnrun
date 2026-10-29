@@ -16,7 +16,7 @@ import { fakeCookieApi, memoryStoreMemory } from "./fake-cookies";
 import { memoryRecordingStore } from "./fake-extension";
 import { memoryOperationJournal } from "./fake-journal";
 import { memoryIdentities } from "./fake-lifecycle";
-import { fakeHelperTabs, memoryVisits } from "./fake-helper";
+import { fakeHelperTabs, memoryResponseUrls, memoryVisits } from "./fake-helper";
 import { fakeLayoutApi } from "./fake-layout";
 import { fakeNavigationApi } from "./fake-navigation";
 import { openWindowsWithTabs } from "./fake-windows";
@@ -38,6 +38,7 @@ function ports(beforeStep: (step: string) => Promise<void> = async () => {}) {
     helperTabs: fakeHelperTabs(),
     layout: fakeLayoutApi(),
     visits: memoryVisits(),
+    responseUrls: memoryResponseUrls(),
     hooks: { beforeStep },
   };
 }

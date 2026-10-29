@@ -97,6 +97,9 @@ export function fakeEffects(open?: { identityId?: string }) {
       state.foreign = state.foreign.filter((id) => !ids.includes(id));
       state.beside = state.beside.filter((id) => !ids.includes(id));
     }),
+    endSession: vi.fn(async () => {
+      calls.push("end session");
+    }),
     returnTabs: vi.fn(async (away: readonly MovedTab[]) => {
       calls.push(`return ${away.map(({ tabId }) => tabId).join(",")}`);
     }),

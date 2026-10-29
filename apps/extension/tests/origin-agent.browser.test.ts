@@ -127,7 +127,6 @@ test("restores the first valid command, replies restored, and ignores any later 
         type: "restored",
         ...operation,
         counts: { ...NONE, localStorage: 1 },
-        rebuilt: [],
       },
     ]);
   expect(entriesOf(stores.localStorage)).toEqual(payload.localStorage);

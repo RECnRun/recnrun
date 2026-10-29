@@ -25,12 +25,14 @@ export interface BarrierRule {
   };
 }
 
+/** A content script registered at run time; the origin agent's runs in the top frame only. */
 export interface AgentScript {
   id: string;
   js: string[];
   matches: string[];
   runAt: "document_start";
-  allFrames: false;
+  allFrames: boolean;
+  world?: "ISOLATED" | "MAIN";
   persistAcrossSessions: false;
 }
 
@@ -72,7 +74,7 @@ const PLAIN_TEXT: NonNullable<BarrierRule["action"]["responseHeaders"]> = [
 ];
 
 const RULES_PER_GENERATION = 10;
-const RULES_PER_BARRIER = 7;
+const RULES_PER_BARRIER = 6;
 
 function requireOrigin(target: string): void {
   const url = URL.parse(target);
@@ -172,13 +174,6 @@ function barrierRules(tabId: number, origin: string, generation: number): Barrie
       condition: { tabIds, resourceTypes: ["main_frame", "sub_frame"] },
     },
     handOverRule(base + 5, tabIds, origin),
-    // The agent fetches the origin's cached responses again; no page script runs to fetch anything.
-    {
-      id: base + 6,
-      priority: 2,
-      action: { type: "allow" },
-      condition: { tabIds, resourceTypes: ["xmlhttprequest"] },
-    },
   ];
 }
 

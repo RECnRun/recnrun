@@ -98,14 +98,4 @@ describe("WorkspaceOperationSchema", () => {
     }
     expect(v.is(WorkspaceOperationSchema, { ...operation, kind: "restart" })).toBe(false);
   });
-
-  test("names each cache entry a restore wrote without its URL, by origin, item, and reason", () => {
-    const operation = { id: "op", kind: "switch", step: "restore", status: "done", started: 1 };
-    const entry = { origin: "http://app.localhost:5192", item: "v1 GET /a", reason: "Changed." };
-    expect(v.is(WorkspaceOperationSchema, { ...operation, rebuilt: [entry] })).toBe(true);
-    const long = { ...entry, reason: "x".repeat(201) };
-    expect(v.is(WorkspaceOperationSchema, { ...operation, rebuilt: [long] })).toBe(false);
-    const path = { ...entry, origin: "http://app.localhost:5192/app" };
-    expect(v.is(WorkspaceOperationSchema, { ...operation, rebuilt: [path] })).toBe(false);
-  });
 });

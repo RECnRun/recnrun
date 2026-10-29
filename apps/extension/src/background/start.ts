@@ -4,10 +4,13 @@ import { createRoutes } from "@/background/routes";
 import { installTestHandles } from "@/background/test-handles";
 import { chromeBootstrapPorts, createWorkspaceCommands } from "@/background/workspace/commands";
 import { chromeCookieApi, trackIncognitoStores } from "@/background/workspace/cookie-stores";
+import { answerResponseUrls } from "@/background/workspace/response-urls";
 import { trackFocusedWindow, trackVisitedOrigins } from "@/background/workspace/visited-origins";
 import { trackManagedWindow } from "@/background/workspace/windows";
 import { incognitoStoreMemory } from "@/storage/incognito-stores";
+import { managedWindowRepository } from "@/storage/managed-window-repository";
 import { recordingSessionRepository } from "@/storage/recording-session-repository";
+import { responseUrlStore } from "@/storage/response-urls";
 
 export function startBackground(): void {
   const ports = chromeBootstrapPorts();
@@ -23,6 +26,11 @@ export function startBackground(): void {
     extensionVersion: browser.runtime.getManifest().version,
     store: recordingSessionRepository,
     workspace,
+    responseUrls: (sender) =>
+      answerResponseUrls(sender, {
+        responseUrls: responseUrlStore,
+        managed: () => managedWindowRepository.read(),
+      }),
   });
   const identity = { extensionId: browser.runtime.id, extensionUrl: browser.runtime.getURL("/") };
   browser.runtime.onMessage.addListener(createBackgroundListener(routes, identity));

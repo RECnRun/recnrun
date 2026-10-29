@@ -49,6 +49,8 @@ export interface LifecycleEffects {
     operationId: string,
   ) => Promise<CaptureSummary>;
   close: (windowIds: readonly number[]) => Promise<void>;
+  /** Unregisters what showed the closed session's restored responses' URLs. */
+  endSession: () => Promise<void>;
   /** Brings tabs a closing capture moved back to their page, when the windows stay open after all. */
   returnTabs: (away: readonly MovedTab[]) => Promise<void>;
   /** Reads and validates what a start of `identity` restores, before any step runs. */

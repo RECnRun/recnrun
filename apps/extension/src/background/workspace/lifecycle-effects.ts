@@ -12,6 +12,7 @@ import { captureIdentity, captureOrigins } from "@/background/workspace/capture"
 import { closeRemembering } from "@/background/workspace/fresh-window";
 import { isHelperTab } from "@/background/workspace/helper-tab";
 import { savedStart } from "@/background/workspace/identity-commands";
+import { withdrawResponseUrls } from "@/background/workspace/response-urls";
 import type { IdentityDeps } from "@/background/workspace/identity-commands";
 import type { LifecycleEffects, Opening } from "@/background/workspace/lifecycle-types";
 import { returnTabs } from "@/background/workspace/tab-origins";
@@ -30,6 +31,24 @@ const NOTHING: IdentityData = {
 /** A window's tabs as a capture sees them, RECnRun's helper tabs left out. */
 const tabIdsOf = ({ tabs = [] }: IncognitoWindow) =>
   tabs.flatMap(({ id }) => (id === undefined || isHelperTab(id) ? [] : [id]));
+
+/** Captures the open identity tentatively: the lifecycle settles it after its persist step. */
+function captureWith(ports: BootstrapPorts, deps: IdentityDeps): LifecycleEffects["capture"] {
+  return async (identity, managed, operationId) => {
+    await deps.captures.settle(identity.id, identity.lastCapture?.id);
+    const publish = (header: IdentityCapture) => deps.captures.publish(header, { tentative: true });
+    const captures = { ...deps.captures, publish };
+    const origins = captureOrigins(ports);
+    const capturing = {
+      ...deps,
+      captures,
+      origins,
+      responseUrls: ports.responseUrls,
+      closing: true,
+    };
+    return captureIdentity(identity.id, managed, capturing, operationId);
+  };
+}
 
 async function load(identity: Identity, from: Opening["from"], deps: IdentityDeps) {
   if (from === "capture") return { from, ...(await savedStart(identity.id, deps)) };
@@ -53,16 +72,9 @@ export function chromeLifecycleEffects(
       const tabs = session.flatMap((window) => tabIdsOf(window));
       return { ...open, session: ids(session), foreign: ids(foreign), tabs };
     },
-    capture: async (identity, managed, operationId) => {
-      await deps.captures.settle(identity.id, identity.lastCapture?.id);
-      // Tentative until the identity names it: the lifecycle settles it after its persist step.
-      const publish = (header: IdentityCapture) =>
-        deps.captures.publish(header, { tentative: true });
-      const captures = { ...deps.captures, publish };
-      const capturing = { ...deps, captures, origins: captureOrigins(ports), closing: true };
-      return captureIdentity(identity.id, managed, capturing, operationId);
-    },
+    capture: captureWith(ports, deps),
     close,
+    endSession: () => withdrawResponseUrls(ports.barrier),
     returnTabs: (away) => returnTabs(deps.api, away),
     load: (identity, from) => load(identity, from, deps),
     start: async (identity, { url, data }, operation) => {

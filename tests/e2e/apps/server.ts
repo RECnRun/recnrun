@@ -95,14 +95,6 @@ function cacheVary({ request, response }: Exchange): void {
   send(response, "text/plain", `variant ${variant}`, { vary: "x-variant", "x-kind": "vary" });
 }
 
-let changes = 0;
-
-/** A page that is never the same twice, as one that changed since the capture. */
-function cacheChanging({ response }: Exchange): void {
-  changes += 1;
-  send(response, "text/plain", `change ${changes}`);
-}
-
 /** Hosts a spec took down: a request to one drops its connection, as an unreachable server. */
 const downHosts = new Set<string>();
 
@@ -152,7 +144,6 @@ const routes: Record<string, (exchange: Exchange) => void | Promise<void>> = {
   "GET /cache/redirect": cacheRedirect,
   "GET /cache/cors": cacheCors,
   "GET /cache/vary": cacheVary,
-  "GET /cache/changing": cacheChanging,
   "GET /cache/none": ({ response }) => {
     response.writeHead(204, { "x-kind": "none" });
     response.end();

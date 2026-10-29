@@ -1,5 +1,6 @@
 import { RequestTypeSchema } from "@recnrun/bridge";
 import * as v from "valibot";
+import { ResponseUrlRequestSchema } from "@/messaging/response-url-protocol";
 import { SessionRequestSchema } from "@/messaging/session-protocol";
 import { WorkspaceRequestSchema } from "@/messaging/workspace-protocol";
 
@@ -11,6 +12,7 @@ export const BackgroundMessageSchema = v.variant("type", [
   BridgeRequestSchema,
   SessionRequestSchema,
   WorkspaceRequestSchema,
+  ResponseUrlRequestSchema,
 ]);
 
 export type BackgroundMessage = v.InferOutput<typeof BackgroundMessageSchema>;

@@ -3,7 +3,7 @@ import { vi } from "vite-plus/test";
 import type { BootstrapDeps } from "@/background/workspace/bootstrap";
 import { fakeBarrierApi } from "./fake-barrier";
 import { fakeCookieApi, memoryStoreMemory } from "./fake-cookies";
-import { fakeHelperTabs, memoryVisits } from "./fake-helper";
+import { fakeHelperTabs, memoryResponseUrls, memoryVisits } from "./fake-helper";
 import { fakeLayoutApi } from "./fake-layout";
 import { fakeNavigationApi } from "./fake-navigation";
 import type { FakeNavigationApi } from "./fake-navigation";
@@ -109,6 +109,7 @@ export function bootstrapHarness(agentReply: Reply = "restored") {
     helperTabs: fakeHelperTabs(),
     layout: fakeLayoutApi(),
     visits: memoryVisits(),
+    responseUrls: memoryResponseUrls(),
     windows: { create: vi.fn(async () => WINDOW), close: vi.fn(async () => {}) },
     hooks: { beforeStep: vi.fn(async () => {}) },
     record: vi.fn(async (operation: WorkspaceOperation) => {

@@ -7,6 +7,7 @@ import type { Collected } from "@/background/workspace/capture-collector";
 import { visitOrigins } from "@/background/workspace/helper-tab";
 import type { HelperDeps } from "@/background/workspace/helper-tab";
 import type { CapturedCounts, CapturedPage, OriginPort } from "@/messaging/origin-protocol";
+import type { ResponseUrls } from "@/ports/response-urls";
 import type { Visit } from "@/ports/visited-origins";
 import type { IdentityCaptures } from "@/storage/identity-captures";
 
@@ -30,6 +31,8 @@ export interface Reading {
 export interface ReadDeps {
   captures: Pick<IdentityCaptures, "append" | "dropParts" | "read">;
   boundMs?: number;
+  /** Per origin, the URLs the managed window's start restored its cache entries with. */
+  shownUrls?: ResponseUrls;
 }
 
 /** Reads one origin's page through its agent; every part is written before the counts are checked. */
@@ -37,9 +40,14 @@ async function readOrigin(
   port: OriginPort,
   { operation, captureId }: Reading,
   origin: string,
-  deps: Pick<ReadDeps, "captures" | "boundMs">,
+  deps: Pick<ReadDeps, "captures" | "boundMs" | "shownUrls">,
 ): Promise<OriginRead> {
-  const { receiver, written } = collector(captureId, origin, deps.captures);
+  const { receiver, written } = collector(
+    captureId,
+    origin,
+    deps.captures,
+    deps.shownUrls?.[origin],
+  );
   const boundMs = deps.boundMs ?? CAPTURE_BOUND_MS;
   const page = await captureThroughAgent(port, operation, receiver, { idleMs: boundMs }).catch(
     async (error: unknown) => {
@@ -113,7 +121,7 @@ const NOT_RESTORED = "The last start could not restore it, so the window never h
 export function originReader(
   reading: Reading,
   origin: string,
-  deps: Pick<ReadDeps, "captures" | "boundMs">,
+  deps: Pick<ReadDeps, "captures" | "boundMs" | "shownUrls">,
 ): (port: OriginPort) => Promise<OriginRead> {
   let tried = false;
   return async (port) => {

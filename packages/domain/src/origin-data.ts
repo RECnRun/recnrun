@@ -48,7 +48,7 @@ const HeadersSchema = v.array(v.tuple([v.string(), v.string()]));
 /**
  * One Cache Storage entry as the page can rebuild it: a GET request and a response a `Response`
  * constructor accepts again, so its status is 200 to 599 and an opaque response never appears,
- * with the type, final URL, and redirect a fetched one had, which only fetching it again restores.
+ * with the type, final URL, and redirect a fetched one had; a restored page shows only the URL.
  */
 const CacheEntrySchema = v.object({
   request: v.object({ url: v.string(), method: v.string(), headers: HeadersSchema }),

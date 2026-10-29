@@ -16,6 +16,7 @@ import type { LayoutRead, SessionTabs } from "@/background/workspace/session-tab
 import { readTabOrigins, returnTabs } from "@/background/workspace/tab-origins";
 import type { MovedTab } from "@/background/workspace/tab-origins";
 import type { CapturedCounts } from "@/messaging/origin-protocol";
+import type { ResponseUrlStore } from "@/ports/response-urls";
 import type { VisitedOrigins } from "@/ports/visited-origins";
 import type { IdentityCaptures } from "@/storage/identity-captures";
 
@@ -32,6 +33,8 @@ export interface CaptureDeps {
     helper: HelperDeps;
   };
   boundMs?: number;
+  /** The URLs the managed window's start restored the cache entries with, which the agent cannot read. */
+  responseUrls?: Pick<ResponseUrlStore, "read">;
   /** Set when the session's windows close after the capture, so the tabs it moved stay as they are. */
   closing?: boolean;
 }
@@ -139,8 +142,10 @@ async function readOrigins(
   primary: PrimaryAccess,
   reading: { operation: BarrierOperation; captureId: string; windowId: number; identityId: string },
   target: Target,
-  deps: CaptureDeps,
+  capturing: CaptureDeps,
 ): Promise<OthersRead> {
+  const shownUrls = await capturing.responseUrls?.read(reading.operation.generation);
+  const deps = { ...capturing, shownUrls };
   const first = await primary.read(originReader(reading, target.origin, deps));
   const visited = await deps.origins.visits.visited(reading.operation.generation);
   const others = visited.filter(({ origin }) => origin !== target.origin);

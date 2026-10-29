@@ -9,7 +9,7 @@ const steps = (journal: ReturnType<typeof memoryOperationJournal>) =>
 test("switch saves the open identity before it closes, then starts the target from its capture", async () => {
   const { lifecycle, chrome, journal, saved, access } = setUp({ open: "a" });
   const timings = await lifecycle.switchTo("b");
-  expect(chrome.calls).toEqual(["capture a", "close 5", "start b capture"]);
+  expect(chrome.calls).toEqual(["capture a", "close 5", "end session", "start b capture"]);
   expect(saved("a")?.lastCapture).toEqual({ id: "cap-a-2", at: NOW, bytes: 64 });
   expect(steps(journal)).toEqual([
     "capture running",
@@ -122,7 +122,7 @@ test("Switch closes every window of the session, one beside the window RECnRun o
   chrome.state.tabs = [50, 60];
   vi.mocked(chrome.effects.capture).mockResolvedValueOnce({ ...SUMMARY, tabs: [50, 60] });
   await lifecycle.switchTo("b");
-  expect(chrome.calls).toEqual(["close 5,6", "start b capture"]);
+  expect(chrome.calls).toEqual(["close 5,6", "end session", "start b capture"]);
 });
 
 test("an Incognito tab opened during the capture stops the close, so nothing it shows is lost", async () => {
@@ -166,7 +166,7 @@ test("a failed start leaves the previous identity's capture saved", async () => 
   const { lifecycle, chrome, journal, saved } = setUp({ open: "a" });
   chrome.state.failAt = "start";
   await expect(lifecycle.switchTo("b")).rejects.toThrow("Injected at start.");
-  expect(chrome.calls).toEqual(["capture a", "close 5", "start b capture"]);
+  expect(chrome.calls).toEqual(["capture a", "close 5", "end session", "start b capture"]);
   expect(saved("a")?.lastCapture?.id).toBe("cap-a-2");
   expect(journal.written.at(-1)).toMatchObject({ step: "start-from-capture", status: "failed" });
 });
@@ -184,7 +184,7 @@ test("a start failure the bootstrap recorded at its own step is left as it recor
 test("suspend saves and closes the open identity, then records the operation done", async () => {
   const { lifecycle, chrome, journal } = setUp({ open: "a" });
   await lifecycle.suspend();
-  expect(chrome.calls).toEqual(["capture a", "close 5"]);
+  expect(chrome.calls).toEqual(["capture a", "close 5", "end session"]);
   expect(chrome.state.managed).toBeUndefined();
   expect(journal.written.at(-1)).toMatchObject({ kind: "suspend", step: "close", status: "done" });
 });
@@ -228,7 +228,12 @@ test("new identity saves the open one, then opens the new one empty and keeps it
   const created = await lifecycle.newIdentity(draft);
   expect(created).toMatchObject({ label: "Admin", url: draft.url, created: NOW });
   expect(created.lastCapture).toBeUndefined();
-  expect(chrome.calls).toEqual(["capture a", "close 5", `start ${created.id} empty`]);
+  expect(chrome.calls).toEqual([
+    "capture a",
+    "close 5",
+    "end session",
+    `start ${created.id} empty`,
+  ]);
   expect(saved(created.id)).toEqual(created);
 });
 

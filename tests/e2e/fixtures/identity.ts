@@ -178,11 +178,7 @@ export const journalOf = (serviceWorker: Worker) =>
   serviceWorker.evaluate(async () => {
     const { chrome } = globalThis as unknown as ChromeGlobal;
     const stored = await chrome.storage.local.get("workspace-operation");
-    return (stored["workspace-operation"] ?? null) as {
-      step: string;
-      status: string;
-      rebuilt?: { origin: string; item: string; reason: string }[];
-    } | null;
+    return (stored["workspace-operation"] ?? null) as { step: string; status: string } | null;
   });
 
 /** Closes a tab as the user would, from outside the start that uses it. */

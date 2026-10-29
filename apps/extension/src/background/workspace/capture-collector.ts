@@ -11,6 +11,7 @@ type ValueType = IdentityCapture["valueTypes"][number];
 type OriginCapture = IdentityCapture["origins"][number];
 type Database = OriginCapture["indexedDB"][number];
 type Unsupported = IdentityCapture["unsupported"][number];
+type Cache = OriginCapture["caches"][number];
 export type WebStorage = Pick<OriginCapture, "localStorage" | "sessionStorage">;
 
 /** What the collector received, checked against the agent's counts before anything is published. */
@@ -48,12 +49,32 @@ function orderedWriter(captureId: string, captures: Pick<IdentityCaptures, "appe
   return { write, settled };
 }
 
-/** Writes each received part in order and keeps what the counts are checked against. */
+/**
+ * `cache` with the URL each restored entry was fetched from: the agent reads it without one, as
+ * Chrome keeps no URL for a constructed response, and only the page script shows it.
+ */
+function withShownUrls(cache: Cache, shown: ReadonlyMap<string, string>): Cache {
+  if (shown.size === 0) return cache;
+  const entries = cache.entries.map((entry) => {
+    const url = entry.response.url === "" ? shown.get(entry.request.url) : undefined;
+    return url === undefined
+      ? entry
+      : { request: entry.request, response: { ...entry.response, url } };
+  });
+  return { name: cache.name, entries };
+}
+
+/**
+ * Writes each received part in order and keeps what the counts are checked against; `shown` names
+ * the URLs the managed window's start restored for `origin`'s cache entries.
+ */
 export function collector(
   captureId: string,
   origin: string,
   captures: Pick<IdentityCaptures, "append">,
+  shown: readonly (readonly [string, string])[] = [],
 ) {
+  const urls = new Map(shown);
   const collected: Collected = {
     databases: [],
     valueTypes: [],
@@ -79,7 +100,8 @@ export function collector(
       );
       write({ origin, database, store, records }, records);
     },
-    cache: ({ cache, unsupported }) => {
+    cache: ({ cache: read, unsupported }) => {
+      const cache = withShownUrls(read, urls);
       collected.caches += 1;
       collected.cacheEntries += cache.entries.length;
       collected.bytes += approximateBytes(cache);

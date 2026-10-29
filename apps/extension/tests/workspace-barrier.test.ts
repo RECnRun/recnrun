@@ -109,30 +109,15 @@ describe("installBarrier", () => {
     expect(barrier.scriptId).toContain(OPERATION.id);
   });
 
-  test("lets the agent's fetches through, which re-fetch the origin's cached responses", async () => {
-    await installBarrier(TAB, TARGET, OPERATION, api);
-    const fetches = [...api.rules.values()].filter(({ condition }) =>
-      condition.resourceTypes?.includes("xmlhttprequest"),
-    );
-    expect(fetches).toEqual([
-      {
-        id: 36,
-        priority: 2,
-        action: { type: "allow" },
-        condition: { tabIds: [TAB], resourceTypes: ["xmlhttprequest"] },
-      },
-    ]);
-  });
-
   test("derives rule ids from the generation, so two operations never share one", async () => {
     const first = await installBarrier(TAB, TARGET, OPERATION, api);
     const second = await installBarrier(8, TARGET, { id: "op-2", generation: 4 }, api);
-    // The seventh id is the anonymous rule's, listed even when it is not installed.
-    expect(first.ruleIds).toHaveLength(7);
-    expect(new Set([...first.ruleIds, ...second.ruleIds]).size).toBe(14);
+    // The sixth id is the anonymous rule's, listed even when it is not installed.
+    expect(first.ruleIds).toHaveLength(6);
+    expect(new Set([...first.ruleIds, ...second.ruleIds]).size).toBe(12);
     expect([...api.rules.keys()].toSorted((a, b) => a - b)).toEqual([
-      ...first.ruleIds.slice(0, 6),
-      ...second.ruleIds.slice(0, 6),
+      ...first.ruleIds.slice(0, 5),
+      ...second.ruleIds.slice(0, 5),
     ]);
   });
 
@@ -148,7 +133,7 @@ describe("installBarrier", () => {
     ).rejects.toMatchObject({
       name: "BarrierCollision",
     });
-    expect([...api.rules.keys()]).toEqual(existing.ruleIds.slice(0, 6));
+    expect([...api.rules.keys()]).toEqual(existing.ruleIds.slice(0, 5));
     expect([...api.scripts.keys()]).toEqual([existing.scriptId]);
   });
 
@@ -230,9 +215,9 @@ describe("installAnonymousBarrier", () => {
   test("an anonymous barrier, for a helper tab, sends no cookie and keeps every Set-Cookie out", async () => {
     const barrier = await installAnonymousBarrier(TAB, TARGET, OPERATION, api);
     expect([...api.rules.keys()]).toEqual(barrier.ruleIds);
-    const anonymous = api.rules.get(barrier.ruleIds[6] ?? 0);
+    const anonymous = api.rules.get(barrier.ruleIds[5] ?? 0);
     expect(anonymous).toEqual({
-      id: barrier.ruleIds[6],
+      id: barrier.ruleIds[5],
       priority: 3,
       action: {
         type: "modifyHeaders",
@@ -259,7 +244,7 @@ describe("removeBarrier", () => {
     );
     const barrier = await installBarrier(TAB, TARGET, OPERATION, api);
     await removeBarrier(barrier, api);
-    expect([...api.rules.keys()]).toEqual(other.ruleIds.slice(0, 6));
+    expect([...api.rules.keys()]).toEqual(other.ruleIds.slice(0, 5));
     expect([...api.scripts.keys()]).toEqual([other.scriptId]);
     // Removing twice is harmless: the second finds nothing left.
     await expect(removeBarrier(barrier, api)).resolves.toBeUndefined();

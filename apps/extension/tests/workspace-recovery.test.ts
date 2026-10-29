@@ -3,10 +3,13 @@ import { afterEach, beforeEach, expect, test, vi } from "vite-plus/test";
 import { fakeBrowser } from "wxt/testing/fake-browser";
 import { installBarrier } from "@/background/workspace/barrier";
 import { recoverInterrupted } from "@/background/workspace/recovery";
+import { exposeResponseUrls } from "@/background/workspace/response-urls";
 import { closeManagedWindow, createNeutralWindow } from "@/background/workspace/windows";
+import type { ResponseUrls } from "@/ports/response-urls";
 import { managedWindowRepository } from "@/storage/managed-window-repository";
 import { fakeBarrierApi } from "./fake-barrier";
 import type { FakeBarrierApi } from "./fake-barrier";
+import { memoryResponseUrls } from "./fake-helper";
 import { memoryOperationJournal } from "./fake-journal";
 import { openIncognitoWindow, openWindowsWithTabs } from "./fake-windows";
 
@@ -51,13 +54,15 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-test("an interrupted start is recorded failed at its step, then its barrier and window go", async () => {
-  const { operation, windowId } = await interruptedAt("restore");
+test("an interrupted start is recorded failed at its step, then its barrier, window, and scripts go", async () => {
+  const { operation, windowId, generation } = await interruptedAt("reload");
+  const urls = { [ORIGIN]: [[`${ORIGIN}/a`, `${ORIGIN}/a`]] } satisfies ResponseUrls;
+  await exposeResponseUrls(generation, urls, { barrier, responseUrls: memoryResponseUrls() });
   const journal = memoryOperationJournal(operation);
   const failed = { ...operation, status: "failed", error: INTERRUPTED };
   await expect(recover(journal)).resolves.toEqual(failed);
   expect(await journal.read()).toEqual(failed);
-  expect([...barrier.rules.keys()]).toEqual([91, 92, 93, 94, 95, 96]);
+  expect([...barrier.rules.keys()]).toEqual([91, 92, 93, 94, 95]);
   expect([...barrier.scripts.keys()]).toEqual(["recnrun-origin-agent-op-other"]);
   expect(await isOpen(windowId)).toBe(false);
 });
@@ -98,7 +103,7 @@ test("a start interrupted before its window existed is recorded failed and remov
   const journal = memoryOperationJournal(operation);
   await recover(journal);
   expect(await journal.read()).toMatchObject({ step: "store-gone", status: "failed" });
-  expect(barrier.rules.size).toBe(6);
+  expect(barrier.rules.size).toBe(5);
 });
 
 test("a finished, failed, or missing operation is left as it is", async () => {
@@ -110,7 +115,7 @@ test("a finished, failed, or missing operation is left as it is", async () => {
   }
   const failed = { ...operation, status: "failed" as const, error: "Earlier." };
   await expect(recover(memoryOperationJournal(failed))).resolves.toBeUndefined();
-  expect(barrier.rules.size).toBe(12);
+  expect(barrier.rules.size).toBe(10);
   expect(await isOpen(windowId)).toBe(true);
 });
 

@@ -1,4 +1,5 @@
 import type { RequestResult } from "@recnrun/bridge";
+import type { Browser } from "wxt/browser";
 import type { Route, Routes, Sender } from "@/background/listener";
 import type { BackgroundMessage } from "@/messaging/background-messages";
 import { focusTab, startSession } from "@/background/session-requests";
@@ -10,11 +11,15 @@ interface RouteDependencies {
   extensionVersion: string;
   store: RecordingStore;
   workspace: WorkspaceCommands;
+  /** The response URLs a frame's page script shows, for the sender's origin only. */
+  responseUrls: (sender: Browser.runtime.MessageSender) => Promise<unknown>;
 }
 
 const ANY: readonly Sender[] = ["contentScript", "ownPage"];
 /** Session and workspace requests come from the framed dashboard, never from the site's content script. */
 const OWN_PAGE: readonly Sender[] = ["ownPage"];
+/** Only the relay, a content script in the page whose responses it shows, asks for their URLs. */
+const CONTENT_SCRIPT: readonly Sender[] = ["contentScript"];
 
 type StartRequest = Extract<
   WorkspaceRequest,
@@ -83,7 +88,12 @@ function workspaceRoute(message: WorkspaceRequest, workspace: WorkspaceCommands)
  * The route table, one case per message type; the exhaustive switch makes a new type fail to
  * compile until it has a route. Bridge requests answer with the result their schema promises.
  */
-export function createRoutes({ extensionVersion, store, workspace }: RouteDependencies): Routes {
+export function createRoutes({
+  extensionVersion,
+  store,
+  workspace,
+  responseUrls,
+}: RouteDependencies): Routes {
   const ping = async (): Promise<RequestResult<"ping">> => ({ extensionVersion });
   return (message): Route => {
     if (isWorkspaceRequest(message)) return workspaceRoute(message, workspace);
@@ -98,6 +108,8 @@ export function createRoutes({ extensionVersion, store, workspace }: RouteDepend
           from: OWN_PAGE,
           run: ({ tab }) => (tab?.id === undefined ? Promise.resolve() : focusTab(tab.id)),
         };
+      case "response-urls":
+        return { from: CONTENT_SCRIPT, run: responseUrls };
     }
   };
 }

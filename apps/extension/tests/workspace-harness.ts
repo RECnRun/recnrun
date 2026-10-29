@@ -14,7 +14,7 @@ import { fakeBarrierApi } from "./fake-barrier";
 import { fakeCookieApi, memoryStoreMemory } from "./fake-cookies";
 import type { FakeCookieApi } from "./fake-cookies";
 import { memoryRecordingStore } from "./fake-extension";
-import { fakeHelperTabs, memoryVisits } from "./fake-helper";
+import { fakeHelperTabs, memoryResponseUrls, memoryVisits } from "./fake-helper";
 import { fakeLayoutApi } from "./fake-layout";
 import { fakeNavigationApi } from "./fake-navigation";
 
@@ -40,6 +40,7 @@ export function fakeWorkspacePorts(
     helperTabs: fakeHelperTabs(),
     layout: fakeLayoutApi(),
     visits: memoryVisits(),
+    responseUrls: memoryResponseUrls(),
     hooks,
   };
 }
@@ -51,7 +52,12 @@ export function workspaceBackground(
   identities?: IdentityDeps,
 ): Send {
   const workspace = createWorkspaceCommands(store, ports, undefined, identities);
-  const routes = createRoutes({ extensionVersion: "0.1.0", store, workspace });
+  const routes = createRoutes({
+    extensionVersion: "0.1.0",
+    store,
+    workspace,
+    responseUrls: async () => [],
+  });
   const listener = createBackgroundListener(routes, identity);
   return (message, sender = ownPage) =>
     new Promise<unknown>((resolve, reject) => {

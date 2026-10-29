@@ -2,6 +2,7 @@ import type { WorkspaceOperation } from "@recnrun/domain";
 import { barrierOf, removeBarrier } from "@/background/workspace/barrier";
 import type { BarrierApi } from "@/background/workspace/barrier";
 import { collectFailures } from "@/background/workspace/errors";
+import { withdrawResponseUrls } from "@/background/workspace/response-urls";
 import type { OperationJournal } from "@/ports/operation-journal";
 
 export interface RecoveryDeps {
@@ -24,13 +25,15 @@ const INTERRUPTED_COMMAND: Record<WorkspaceOperation["kind"], string> = {
 const interrupted = ({ kind }: WorkspaceOperation) =>
   `Interrupted: RECnRun restarted before ${INTERRUPTED_COMMAND[kind]} finished.`;
 
-/** Undoes what the interrupted operation may have left: its session's windows, then its barrier. */
+/** Undoes what the interrupted operation may have left: its session's windows, its barrier, its scripts. */
 async function cleanUp(operation: WorkspaceOperation, deps: RecoveryDeps): Promise<string[]> {
   const { failures, attempt } = collectFailures();
   const { id, generation, windowId } = operation;
   if (generation === undefined) return failures;
   if (windowId !== undefined) await attempt(() => deps.closeWindow(generation));
   await attempt(() => removeBarrier(barrierOf({ id, generation }), deps.barrier));
+  // A start that reached its release left them registered for the window just closed.
+  if (windowId !== undefined) await attempt(() => withdrawResponseUrls(deps.barrier));
   return failures;
 }
 

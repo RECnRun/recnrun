@@ -31,7 +31,7 @@ describe("bootstrapIdentity", () => {
 
     expect(cookies.written).toEqual([{ ...DATA.cookies[0], storeId: "1", url: `${ORIGIN}/` }]);
     expect(seen.cookiesAtNavigation).toBe(1);
-    expect(seen.rulesAtNavigation).toBe(6);
+    expect(seen.rulesAtNavigation).toBe(5);
     expect(seen.restorePayload).toEqual(DATA.site);
     expect(seen.rulesAtReload).toBe(0);
     expect(seen.scriptsAtReload).toBe(0);
@@ -191,7 +191,37 @@ describe("bootstrapIdentity on a redirect off the target", () => {
     await expect(bootstrapIdentity(START, DATA, deps, "op-1")).resolves.toHaveLength(
       BOOTSTRAP_STEPS.length,
     );
-    expect(seen.rulesAtNavigation).toBe(6);
+    expect(seen.rulesAtNavigation).toBe(5);
     expect(records.at(-1)).toMatchObject({ step: "layout", status: "done" });
+  });
+});
+
+describe("bootstrapIdentity with fetched cache entries", () => {
+  test("registers the scripts that show restored responses' URLs before the release", async () => {
+    const entry = {
+      request: { url: `${ORIGIN}/a`, method: "GET", headers: [] },
+      response: { status: 200, statusText: "OK", headers: [], body: null, type: "basic" as const },
+    };
+    const fetched = {
+      ...entry,
+      response: { ...entry.response, url: `${ORIGIN}/b`, redirected: true },
+    };
+    const site = { ...DATA.site, caches: [{ name: "pages", entries: [fetched] }] };
+    const data = { ...DATA, site };
+    await bootstrapIdentity(START, data, deps, "op-1");
+    expect(seen.scriptsAtReload).toBe(2);
+    expect(await deps.responseUrls.read(WINDOW.generation)).toEqual({
+      [ORIGIN]: [[`${ORIGIN}/a`, `${ORIGIN}/b`]],
+    });
+
+    use(bootstrapHarness());
+
+    vi.mocked(deps.hooks.beforeStep).mockImplementation(async (step) => {
+      if (step === "layout") throw new WorkspaceError("InjectedFailure", "Injected at layout.");
+    });
+    await expect(bootstrapIdentity(START, data, deps, "op-2")).rejects.toMatchObject({
+      name: "InjectedFailure",
+    });
+    expect(barrier.scripts.size).toBe(0);
   });
 });

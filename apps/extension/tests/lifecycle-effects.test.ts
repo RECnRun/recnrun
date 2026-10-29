@@ -5,7 +5,9 @@ import { fakeBrowser } from "wxt/testing/fake-browser";
 import { WorkspaceError } from "@/background/workspace/errors";
 import { chromeHelperTabApi } from "@/background/workspace/helper-tab";
 import { chromeLifecycleEffects } from "@/background/workspace/lifecycle-effects";
+import { exposeResponseUrls } from "@/background/workspace/response-urls";
 import { createNeutralWindow } from "@/background/workspace/windows";
+import type { ResponseUrls } from "@/ports/response-urls";
 import { managedWindowRepository } from "@/storage/managed-window-repository";
 import { completeReplies } from "./capture-replies";
 import { chrome, memoryCaptures } from "./fake-capture";
@@ -23,7 +25,8 @@ function effects(failAt?: string, frame?: null) {
   const captures = memoryCaptures();
   const deps = { api, cookies, captures, identities: memoryIdentities([identity("a")]).repository };
   const journal = memoryOperationJournal();
-  return { effects: chromeLifecycleEffects(ports, deps, journal), captures, journal, api, agent };
+  const chromeSide = chromeLifecycleEffects(ports, deps, journal);
+  return { effects: chromeSide, ports, captures, journal, api, agent };
 }
 
 beforeEach(() => {
@@ -67,6 +70,17 @@ test("lists every Incognito window as the session's while it is open, and as for
   });
   await chromeSide.close([beside]);
   expect(await chromeSide.windows()).toEqual({ session: [], foreign: [], tabs: [] });
+});
+
+test("ends the session by unregistering the scripts that showed its responses' URLs", async () => {
+  const { effects: chromeSide, ports } = effects();
+  const urls: ResponseUrls = {
+    "https://app.example": [["https://app.example/a", "https://app.example/a"]],
+  };
+  await exposeResponseUrls(1, urls, ports);
+  expect(ports.barrier.scripts.size).toBe(2);
+  await chromeSide.endSession();
+  expect(ports.barrier.scripts.size).toBe(0);
 });
 
 test("leaves RECnRun's helper tab out of the session's tabs", async () => {

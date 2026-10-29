@@ -35,6 +35,7 @@ import type { OperationJournal } from "@/ports/operation-journal";
 import { managedWindowRepository } from "@/storage/managed-window-repository";
 import { operationJournal } from "@/storage/operation-journal";
 import { visitedOrigins } from "@/storage/visited-origins";
+import { responseUrlStore } from "@/storage/response-urls";
 
 /** What the dashboard can ask of the Incognito workspace and its saved identities. */
 export interface WorkspaceCommands extends LifecycleCommands {
@@ -144,6 +145,7 @@ export function chromeBootstrapPorts(
     helperTabs: chromeHelperTabApi,
     layout: chromeLayoutApi,
     visits: visitedOrigins,
+    responseUrls: responseUrlStore,
     hooks,
   };
 }
