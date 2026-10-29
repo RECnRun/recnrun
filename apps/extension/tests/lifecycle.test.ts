@@ -1,31 +1,6 @@
-import type { Identity } from "@recnrun/domain";
 import { expect, test, vi } from "vite-plus/test";
-import { createLifecycle } from "@/background/workspace/lifecycle";
-import { memoryRecordingStore } from "./fake-extension";
-import { memoryOperationJournal } from "./fake-journal";
-import { fakeEffects, identity, memoryIdentities } from "./fake-lifecycle";
-
-const NOW = 1_700_000_000_000;
-const RECORDING = { tabId: 1, status: "recording" as const, banked: 0, since: 0 };
-
-function setUp(options: { open?: string; saved?: Identity[]; recording?: boolean } = {}) {
-  const { memory, repository } = memoryIdentities(
-    options.saved ?? [identity("a"), identity("b"), identity("c", false)],
-  );
-  const chrome = fakeEffects(options.open === undefined ? undefined : { identityId: options.open });
-  const journal = memoryOperationJournal();
-  const access = vi.fn(async () => {});
-  const lifecycle = createLifecycle({
-    recordings: memoryRecordingStore(options.recording ? RECORDING : null),
-    identities: repository,
-    journal,
-    effects: chrome.effects,
-    guard: { exclusive: (run) => run(), access },
-    now: () => NOW,
-  });
-  const saved = (id: string) => memory.saved.find((each) => each.id === id);
-  return { lifecycle, chrome, journal, memory, saved, access };
-}
+import type { memoryOperationJournal } from "./fake-journal";
+import { NOW, setUp } from "./lifecycle-harness";
 
 const steps = (journal: ReturnType<typeof memoryOperationJournal>) =>
   journal.written.map(({ step, status }) => `${step} ${status}`);
@@ -144,14 +119,7 @@ test("another tab in the workspace's window refuses before the capture and stops
   const { lifecycle, chrome, journal, saved } = setUp({ open: "a" });
   chrome.state.otherTabs = 1;
   await expect(lifecycle.switchTo("b")).rejects.toThrow("RECnRun saves only its own tab.");
-  chrome.state.foreign = [9];
-  const draft = { label: "D", url: "https://d.example/" };
-  await expect(lifecycle.newIdentity(draft, [9])).rejects.toThrow(
-    "RECnRun saves only its own tab.",
-  );
-  expect(chrome.state.foreign).toEqual([9]);
   expect(journal.written).toEqual([]);
-  chrome.state.foreign = [];
   chrome.state.otherTabs = 0;
   vi.mocked(chrome.effects.capture).mockImplementationOnce(async () => {
     chrome.state.otherTabs = 1;
@@ -243,31 +211,9 @@ test("new identity is not kept when saving the open one fails, nor made from a b
     name: "IdentityNotValid",
   });
   await expect(lifecycle.newIdentity({ ...draft, url: "file:///etc" })).rejects.toThrow(
-    "Give the identity a label and an http or https address.",
+    "Only http and https pages can open in the Incognito workspace.",
   );
   expect(memory.saved.map(({ id }) => id)).toEqual(["a", "b", "c"]);
-});
-
-test("new identity closes only the other windows the user saw, without saving them", async () => {
-  const { lifecycle, chrome } = setUp();
-  chrome.state.foreign = [7, 8];
-  const draft = { label: "Admin", url: "https://app.example/" };
-  await expect(lifecycle.newIdentity(draft, [7])).rejects.toMatchObject({
-    name: "WindowsChanged",
-  });
-  expect(chrome.calls).toEqual([]);
-  const created = await lifecycle.newIdentity(draft, [8, 7]);
-  expect(chrome.calls).toEqual(["close 8,7", `start ${created.id} empty`]);
-});
-
-test("new identity closes no window while recording", async () => {
-  const { lifecycle, chrome } = setUp({ recording: true });
-  chrome.state.foreign = [7];
-  const draft = { label: "Admin", url: "https://app.example/" };
-  await expect(lifecycle.newIdentity(draft, [7])).rejects.toMatchObject({
-    name: "RecordingInProgress",
-  });
-  expect(chrome.calls).toEqual([]);
 });
 
 test("delete removes a closed identity and its captures, even while recording", async () => {

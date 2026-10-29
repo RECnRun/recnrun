@@ -1,6 +1,11 @@
 import * as v from "valibot";
 import { describe, expect, test } from "vite-plus/test";
-import { approximateBytes, IdentityListSchema, IdentitySchema } from "../src/index.ts";
+import {
+  approximateBytes,
+  IdentityListSchema,
+  IdentitySchema,
+  nextIdentityName,
+} from "../src/index.ts";
 import type { Identity } from "../src/index.ts";
 
 const identity: Identity = {
@@ -50,5 +55,26 @@ describe("approximateBytes", () => {
     expect(approximateBytes({ ab: "c", when: new Date(0) })).toBe(4 + 2 + 8 + 8);
     expect(approximateBytes(new Map([["k", 1n]]))).toBe(2 + 8);
     expect(approximateBytes(new Set(["xy"]))).toBe(4);
+  });
+});
+
+describe("nextIdentityName", () => {
+  test("names identities A to Z, then AA, AB, and on, taking the first free name", () => {
+    expect(nextIdentityName([])).toBe("A");
+    expect(nextIdentityName(["A", "B"])).toBe("C");
+    expect(nextIdentityName(["B", "Admin"])).toBe("A");
+    const alphabet = Array.from({ length: 26 }, (_, index) => String.fromCharCode(65 + index));
+    expect(nextIdentityName(alphabet)).toBe("AA");
+    expect(nextIdentityName([...alphabet, "AA"])).toBe("AB");
+    expect(
+      nextIdentityName([
+        ...alphabet,
+        ..."ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").map((each) => `A${each}`),
+      ]),
+    ).toBe("BA");
+  });
+
+  test("counts a taken name whatever its case or spaces", () => {
+    expect(nextIdentityName([" a ", "b"])).toBe("C");
   });
 });

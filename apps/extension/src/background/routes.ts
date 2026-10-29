@@ -33,6 +33,7 @@ const LIFECYCLE_TYPES: ReadonlySet<string> = new Set<LifecycleRequest["type"]>([
   "workspace-suspend",
   "workspace-resume",
   "workspace-new-identity",
+  "workspace-close-windows",
   "workspace-delete-identity",
 ]);
 
@@ -43,7 +44,7 @@ const isLifecycleRequest = (message: WorkspaceRequest): message is LifecycleRequ
 const isWorkspaceRequest = (message: BackgroundMessage): message is WorkspaceRequest =>
   message.type.startsWith("workspace-");
 
-/** Switch to, Suspend, Resume, New identity, and Delete. */
+/** Switch to, Suspend, Resume, New identity, Close windows, and Delete. */
 function lifecycleRoute(message: LifecycleRequest, workspace: WorkspaceCommands): Route {
   switch (message.type) {
     case "workspace-switch":
@@ -53,10 +54,12 @@ function lifecycleRoute(message: LifecycleRequest, workspace: WorkspaceCommands)
     case "workspace-resume":
       return { from: OWN_PAGE, run: () => workspace.resume(message.identityId) };
     case "workspace-new-identity": {
-      const { label, url, closeWindowIds } = message;
-      const draft = { label, url };
-      return { from: OWN_PAGE, run: () => workspace.newIdentity(draft, closeWindowIds) };
+      const { label, url } = message;
+      const draft = { url, ...(label !== undefined && { label }) };
+      return { from: OWN_PAGE, run: () => workspace.newIdentity(draft) };
     }
+    case "workspace-close-windows":
+      return { from: OWN_PAGE, run: () => workspace.closeWindows(message.windowIds) };
     case "workspace-delete-identity":
       return { from: OWN_PAGE, run: () => workspace.deleteIdentity(message.identityId) };
   }

@@ -3,8 +3,11 @@ import { useEffect, useRef, useState } from "preact/hooks";
 import * as v from "valibot";
 import { ask } from "@/dashboard/ask";
 import { Identities } from "@/dashboard/Identities";
+import { panelAlert } from "@/dashboard/workspace-alert";
+import type { CommandFailure, PanelRequest } from "@/dashboard/workspace-alert";
+import { WorkspaceConflict, hasConflict } from "@/dashboard/WorkspaceConflict";
 import { WorkspaceStatusSchema } from "@/messaging/workspace-protocol";
-import type { WorkspaceRequest, WorkspaceStatus } from "@/messaging/workspace-protocol";
+import type { WorkspaceStatus } from "@/messaging/workspace-protocol";
 import type { TabSource } from "@/ports/tabs";
 import { coalesceReads } from "@/views/coalesce-reads";
 import type { ExtensionServices, SendRequest } from "@/views/extension-services";
@@ -72,90 +75,19 @@ interface WorkspaceProps {
   onTarget: (url: string) => void;
 }
 
-const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
-
-/** The other Incognito windows; their titles come from the live tab model and are never stored. */
-function ForeignWindows({ status, tabs }: { status: WorkspaceStatus; tabs: TabSource }) {
-  const open = useBrowserTabs(tabs)?.tabs ?? [];
-  const { foreign } = status;
-  const are = foreign.length === 1 ? "is" : "are";
-  return (
-    <>
-      <p>
-        {plural(foreign.length, "Incognito window", "Incognito windows")} {are} open
-      </p>
-      <ul class="incognito-windows">
-        {foreign.map(({ id, tabCount }) => {
-          const titles = open.filter((tab) => tab.windowId === id).map((tab) => tab.title);
-          const count = plural(tabCount, "tab", "tabs");
-          return <li key={id}>{titles.length > 0 ? `${count}: ${titles.join(", ")}` : count}</li>;
-        })}
-      </ul>
-    </>
-  );
-}
-
-interface ActionProps {
-  status: WorkspaceStatus;
-  target: string;
+interface CommandProps {
   disabled: boolean;
-  run: (request: WorkspaceRequest) => void;
+  run: (request: PanelRequest) => void;
 }
 
-/** One action per state: restart the open workspace, close the windows shown, or start; none while both are open. */
-function WorkspaceAction({ status, target, disabled, run }: ActionProps) {
-  const url = target.trim();
-  // Both commands need every other Incognito window gone; RECnRun closes none it did not open here.
-  if (status.managed?.status === "active" && status.foreign.length > 0) {
-    return (
-      <>
-        <p>Incognito workspace open</p>
-        <p class="workspace-hint">
-          Close the other Incognito windows yourself; this list follows them.
-        </p>
-      </>
-    );
-  }
-  if (status.managed?.status === "active") {
-    return (
-      <>
-        <p>Incognito workspace open</p>
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={() => run({ type: "workspace-restart", url })}
-        >
-          Close and start empty
-        </button>
-        <p class="workspace-hint">Its current Incognito data is discarded.</p>
-      </>
-    );
-  }
-  if (status.foreign.length > 0) {
-    const windowIds = status.foreign.map(({ id }) => id);
-    return (
-      <>
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={() => run({ type: "workspace-close-and-start", url, windowIds })}
-        >
-          Close these windows and start
-        </button>
-        <p class="workspace-hint">Or close them yourself; this list follows them.</p>
-      </>
-    );
-  }
+function NewIdentity({
+  target,
+  onTarget,
+  disabled,
+  run,
+}: Pick<WorkspaceProps, "target" | "onTarget"> & CommandProps) {
   return (
-    <button type="button" disabled={disabled} onClick={() => run({ type: "workspace-start", url })}>
-      Start
-    </button>
-  );
-}
-
-function AddressField({ target, onTarget }: Pick<WorkspaceProps, "target" | "onTarget">) {
-  return (
-    <>
+    <div class="new-identity">
       <label class="workspace-address">
         Address
         <input
@@ -168,109 +100,82 @@ function AddressField({ target, onTarget }: Pick<WorkspaceProps, "target" | "onT
       <p class="workspace-hint">
         “Use this tab's address” copies only a normal tab's address, never its cookies or storage.
       </p>
-    </>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => run({ type: "workspace-new-identity", url: target.trim() })}
+      >
+        New identity
+      </button>
+      <p class="workspace-hint">Saves the open identity first, then opens the address empty.</p>
+    </div>
   );
 }
 
-interface BodyProps extends ActionProps {
-  tabs: TabSource;
-  onTarget: (url: string) => void;
-}
-
-/** The saved identity the open managed window holds, if it holds one. */
-function heldIdentity({ managed, identities }: WorkspaceStatus) {
-  if (managed?.status !== "active") return undefined;
-  return identities.find(({ id }) => id === managed.identityId);
-}
+type BodyProps = Pick<WorkspaceProps, "tabs" | "target" | "onTarget"> &
+  CommandProps & { status: WorkspaceStatus };
 
 function WorkspaceBody({ status, tabs, target, onTarget, disabled, run }: BodyProps) {
-  if (!status.access) return <p>The Incognito workspace requires “Allow in Incognito”.</p>;
-  const held = heldIdentity(status);
+  const open = useBrowserTabs(tabs)?.tabs ?? [];
+  // Chrome hides Incognito windows without access, so only Delete stays possible then.
+  const blocked = !status.access || hasConflict(status, open);
   return (
     <>
-      <AddressField target={target} onTarget={onTarget} />
-      {status.foreign.length > 0 && <ForeignWindows status={status} tabs={tabs} />}
-      {held ? (
-        <p>Incognito workspace open: {held.label}</p>
+      {status.access ? (
+        <NewIdentity target={target} onTarget={onTarget} disabled={disabled || blocked} run={run} />
       ) : (
-        <WorkspaceAction status={status} target={target} disabled={disabled} run={run} />
+        <p>The Incognito workspace requires “Allow in Incognito”.</p>
       )}
+      {status.access && blocked && (
+        <WorkspaceConflict status={status} tabs={open} disabled={disabled} run={run} />
+      )}
+      <Identities status={status} blocked={blocked} disabled={disabled} run={run} />
     </>
   );
-}
-
-const OPERATION_NAMES: Record<NonNullable<WorkspaceStatus["operation"]>["kind"], string> = {
-  "start-with-identity": "Start with an identity",
-  switch: "Switch",
-  suspend: "Suspend",
-  resume: "Resume",
-  "new-identity": "New identity",
-  "delete-identity": "Delete",
-};
-
-/** Why the last operation stopped, by its step, kept until another command runs. */
-function failedOperation(status: WorkspaceStatus | undefined): string | undefined {
-  const operation = status?.operation;
-  if (operation?.status !== "failed") return undefined;
-  const name = OPERATION_NAMES[operation.kind];
-  return `${name} failed at the ${operation.step} step. ${operation.error ?? ""}`;
-}
-
-/** The panel's alerts; a command's error that its failed operation already names shows once. */
-function alerts(status: WorkspaceStatus | undefined, shown: string | undefined): string[] {
-  const failed = failedOperation(status);
-  const repeated = shown !== undefined && shown === status?.operation?.error;
-  return [failed, repeated ? undefined : shown].filter((each) => each !== undefined);
 }
 
 /**
- * The one Incognito window RECnRun manages: what blocks it, and the command for each state. Every
+ * The one Incognito window RECnRun manages, its saved identities, and what blocks switching. Every
  * command reads the status again when it ends, refused or not.
  */
 export function IncognitoWorkspace({ workspace, tabs, send, target, onTarget }: WorkspaceProps) {
   const { status, readError, refresh } = workspace;
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string>();
-  const run = (request: WorkspaceRequest) => {
+  const [failure, setFailure] = useState<CommandFailure>();
+  const [dismissed, setDismissed] = useState<string>();
+  const run = (request: PanelRequest) => {
     setPending(true);
-    setError(undefined);
+    setFailure(undefined);
+    setDismissed(status?.operation?.id);
     void ask(send, request)
-      .catch((caught: unknown) => setError(errorMessage(caught)))
+      .catch((caught: unknown) => setFailure({ request, error: errorMessage(caught) }))
       .finally(() => {
         setPending(false);
         refresh();
       });
   };
+  const alert = panelAlert({ status, dismissed, failure, readError });
   return (
     <section class="incognito-workspace" aria-labelledby="incognito-workspace-heading">
       <h3 id="incognito-workspace-heading">Incognito workspace</h3>
+      {alert !== undefined && (
+        <p class="workspace-alert" role="alert">
+          {alert}
+        </p>
+      )}
       {status && !status.available && (
         <p>The Incognito workspace is not available in this build.</p>
       )}
       {status?.available && (
-        <>
-          <WorkspaceBody
-            status={status}
-            tabs={tabs}
-            target={target}
-            onTarget={onTarget}
-            disabled={pending || status.busy}
-            run={run}
-          />
-          <Identities
-            status={status}
-            tabs={tabs}
-            target={target}
-            disabled={pending || status.busy}
-            run={run}
-          />
-        </>
+        <WorkspaceBody
+          status={status}
+          tabs={tabs}
+          target={target}
+          onTarget={onTarget}
+          disabled={pending || status.busy}
+          run={run}
+        />
       )}
-      {alerts(status, error ?? readError).map((message) => (
-        <p key={message} role="alert">
-          {message}
-        </p>
-      ))}
     </section>
   );
 }

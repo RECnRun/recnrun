@@ -2,6 +2,7 @@ import type { Page, Worker } from "@playwright/test";
 import { sampleSnapshot } from "@recnrun/domain/testing";
 import { expect, test } from "./fixtures/extension.ts";
 import { keep } from "./fixtures/keep.ts";
+import { lifecycleDriver } from "./fixtures/lifecycle.ts";
 import { dashboardOf, openSite } from "./fixtures/session.ts";
 import {
   holding,
@@ -58,19 +59,20 @@ const sentinelAt = (run: string, cycle: number) =>
   `${APP}/sentinel?tag=incog-${cycle}&run=${run}-${cycle}`;
 
 interface Stress {
-  site: Page;
   serviceWorker: Worker;
   run: string;
+  /** Sends `workspace-restart`, which the dashboard no longer offers, from an extension page. */
+  restart: (url: string) => Promise<unknown>;
 }
 
-/** One cycle: the managed tab holds `incog-<cycle>`, the dashboard resets, and `/inspect` reads. */
+/** One cycle: the managed tab holds `incog-<cycle>`, RECnRun restarts it, and `/inspect` reads. */
 async function resetCycle(stress: Stress, managed: Page, cycle: number) {
-  const { site, serviceWorker, run } = stress;
+  const { serviceWorker, run, restart } = stress;
   await sentinelsWritten(managed);
   const generation = await managedGeneration(serviceWorker);
   const target = `${APP}/inspect?run=${run}-${cycle}-inspect`;
   // Issued as soon as the writes finished, with no pause, to stress the teardown.
-  await runWorkspace(site, target, "Close and start empty");
+  await restart(target);
   const page = await pageAt(managed.context(), target);
   const fresh = await inspected(page);
   // The HttpOnly cookie shows in serverCookies, the Cookie header the server received.
@@ -83,7 +85,7 @@ async function resetCycle(stress: Stress, managed: Page, cycle: number) {
   return { page, teardown: teardownGaps(await readTeardown(serviceWorker)) };
 }
 
-test("Close and start empty leaves the next managed window with no Incognito data", async ({
+test("a restart leaves the next managed window with no Incognito data", async ({
   context,
   page,
   serviceWorker,
@@ -96,7 +98,9 @@ test("Close and start empty leaves the next managed window with no Incognito dat
   const site = await openSite(context, "/");
   let managed = (await openWorkspaceApp(site, serviceWorker, sentinelAt(run, 1))).page;
   await installTeardownProbe(serviceWorker);
-  const stress = { site, serviceWorker, run };
+  const { command } = await lifecycleDriver(context, serviceWorker);
+  const restart = (url: string) => command({ type: "workspace-restart", url });
+  const stress = { serviceWorker, run, restart };
   const cycles: ReturnType<typeof teardownGaps>[] = [];
   for (let cycle = 1; cycle <= CYCLES; cycle += 1) {
     const { page: next, teardown } = await resetCycle(stress, managed, cycle);
@@ -149,11 +153,11 @@ test("an Incognito window the user opened and closed before any command is waite
   expect(await rememberedStores(serviceWorker)).toEqual(["1"]);
 
   const target = `${APP}/inspect?run=${run}`;
-  await runWorkspace(site, target, "Start");
+  await runWorkspace(site, target, "New identity");
   expect(await inspected(await pageAt(context, target))).toEqual(NOTHING);
 });
 
-test("another Incognito window keeps the workspace's data, so the dashboard offers no reset", async ({
+test("another Incognito window keeps the workspace's data, so the dashboard offers only closing it", async ({
   context,
   serviceWorker,
 }) => {
@@ -164,9 +168,8 @@ test("another Incognito window keeps the workspace's data, so the dashboard offe
   await openIncognitoTab(serviceWorker, "about:blank");
   const panel = workspacePanel(site);
   await expect(panel).toContainText("1 Incognito window is open");
-  await expect(panel).toContainText("Close the other Incognito windows yourself");
-  // New identity stays in view, disabled, beside the conflict that explains why.
-  await expect(panel.getByRole("button", { disabled: false })).toHaveCount(0);
+  // The disabled commands stay in view beside the conflict that explains why.
+  await expect(panel.getByRole("button", { disabled: false })).toHaveText(["Close these windows"]);
   await site.screenshot({ path: test.info().outputPath("blocked.png") });
 
   // What the dashboard refuses to do: close only the managed window while the other one lives.
@@ -183,5 +186,5 @@ test("another Incognito window keeps the workspace's data, so the dashboard offe
     controller: `${APP}/sw.js`,
   });
   await expect(panel).toContainText("2 Incognito windows are open");
-  await expect(panel.getByRole("button", { name: "Start", exact: true })).toHaveCount(0);
+  await expect(panel.getByRole("button", { name: "New identity" })).toBeDisabled();
 });

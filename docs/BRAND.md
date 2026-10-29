@@ -25,20 +25,20 @@ No file has a tile: the three colors read on both light and dark backgrounds, so
 
 ## Palette
 
-| Token               | Hex       | Role                          |
-| ------------------- | --------- | ----------------------------- |
-| `--brand-green`     | `#1f883d` | Button fill in light mode     |
-| `--brand-green-dim` | `#238636` | Button fill in dark mode      |
-| `--brand-red`       | `#c62a21` | Dashboard links in light mode |
-| `--brand-coral`     | `#ff5c5f` | Dashboard links in dark mode  |
-| `--brand-ink`       | `#1c1d21` | Text in light mode            |
-| `--brand-paper`     | `#f6f7f9` | Light page background         |
+| Token               | Hex       | Role                                     |
+| ------------------- | --------- | ---------------------------------------- |
+| `--brand-green`     | `#1f883d` | Button fill in light mode                |
+| `--brand-green-dim` | `#238636` | Button fill in dark mode                 |
+| `--brand-red`       | `#c62a21` | Dashboard links and errors in light mode |
+| `--brand-coral`     | `#ff5c5f` | Dashboard links and errors in dark mode  |
+| `--brand-ink`       | `#1c1d21` | Text in light mode                       |
+| `--brand-paper`     | `#f6f7f9` | Light page background                    |
 
 Grays (`--gray-0` … `--gray-950`) are the neutral surfaces, borders, and secondary text.
 
 ### Where the accent goes
 
-Buttons follow GitHub's primary button: the same greens as [Primer](https://primer.style/) (`#1f883d` light, `#238636` dark) with white text, so a call to action looks like the one developers already click on GitHub. Red is not a button color: it means recording, and a red button reads as stop or delete. Red stays for links in the dashboard and for the logo. Structure stays neutral: surfaces, cards, borders, and dividers use the grays, and buttons have no border.
+Buttons follow GitHub's primary button: the same greens as [Primer](https://primer.style/) (`#1f883d` light, `#238636` dark) with white text, so a call to action looks like the one developers already click on GitHub. Red is not a button color: it means recording, and a red button reads as stop or delete. Red stays for links and error messages in the dashboard and for the logo. Structure stays neutral: surfaces, cards, borders, and dividers use the grays, and buttons have no border.
 
 The logo red `#f3362b` is too light for white text (3.91:1) and too dark for ink text (4.31:1), so links use a deeper red in light mode and the brighter coral in dark mode. Contrast (WCAG 2.2 ratios):
 
@@ -46,6 +46,7 @@ The logo red `#f3362b` is too light for white text (3.91:1) and too dark for ink
 | -------------------- | ------------------------ | ---------------------------- |
 | Button fill and text | green with white: 4.52:1 | dim green with white: 4.63:1 |
 | Link                 | red on the page: 5.22:1  | coral on a card: 5.62:1      |
+| Error text           | red on a card: 5.59:1    | coral on a card: 5.62:1      |
 
 ## Typography
 
@@ -68,6 +69,6 @@ Text follows [GitHub's brand typography](https://brand.github.com/foundations/ty
 `@recnrun/brand/base.css` (`packages/brand/src/base.css`) holds every token, in a `:root` block with two layers, and the base layout. The website and the dashboard import it before their own stylesheets (`apps/website/src/app/app.css`, `apps/extension/src/dashboard/dashboard.css`), which hold only rules.
 
 1. **Palette:** `--brand-*` and `--gray-*`. The only place a hex color is written.
-2. **Semantic:** `--surface`, `--card`, `--border`, `--text`, `--muted`, `--accent`, `--accent-text`, `--link`. Each points to a palette token, and the `prefers-color-scheme: dark` block repoints them.
+2. **Semantic:** `--surface`, `--card`, `--border`, `--text`, `--muted`, `--accent`, `--accent-text`, `--link`, `--danger` (error text). Each points to a palette token, and the `prefers-color-scheme: dark` block repoints them.
 
 Rules use semantic tokens only: never write a hex color in a property, and never reference a palette token outside the `:root` blocks. A new color is a new palette token in `base.css` plus a semantic token for its role; keep the values identical to this table.

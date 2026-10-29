@@ -40,7 +40,7 @@ test.describe("without incognito access", () => {
     const site = await openSite(context, "/");
     await expect(dashboardOf(site).locator("body")).toContainText("Allow in Incognito");
     await expect(
-      workspacePanel(site).getByRole("button", { name: "Start", exact: true }),
+      workspacePanel(site).getByRole("button", { name: "New identity", exact: true }),
     ).toHaveCount(0);
     await expect(tabItem(dashboardOf(site), site.url())).not.toContainText("Incognito");
   });
@@ -106,7 +106,14 @@ test.describe("with incognito access", () => {
     await expect(tabRegion(pip, "Recorded tab")).toContainText("Incognito");
     expect(await recordedTabId(serviceWorker)).toBe(app.id);
 
-    expect(await storedText(serviceWorker)).not.toMatch(/private|elsewhere/);
+    const { local, session } = JSON.parse(await storedText(serviceWorker)) as {
+      local: { identities?: { url: string }[] };
+      session: unknown;
+    };
+    // The identity keeps the address the user typed to open it; nothing keeps what the tab showed.
+    expect(local.identities?.map(({ url }) => url)).toEqual([privateUrl]);
+    const rest = JSON.stringify({ local: { ...local, identities: undefined }, session });
+    expect(rest).not.toMatch(/private|elsewhere/);
   });
 
   test("the PiP window tells the current tab from the recorded one, and drops closed tabs", async ({

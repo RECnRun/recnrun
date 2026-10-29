@@ -8,7 +8,7 @@ const banner = (site: Page) =>
 const startButton = (site: Page) =>
   dashboardOf(site)
     .getByRole("region", { name: "Incognito workspace" })
-    .getByRole("button", { name: "Start", exact: true });
+    .getByRole("button", { name: "New identity", exact: true });
 
 /** Flips "Allow in Incognito" in RECnRun's details as the user would; Chrome reloads RECnRun. */
 async function toggleIncognito(details: Page) {

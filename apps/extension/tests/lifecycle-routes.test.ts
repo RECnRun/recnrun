@@ -70,7 +70,12 @@ test("each lifecycle message answers with the refusal it met", async () => {
   });
   expect(await send({ type: "workspace-new-identity", label: " ", url: TARGET })).toEqual({
     ok: false,
-    error: "Give the identity a label and an http or https address.",
+    error: "Give the identity a label of 1 to 80 characters.",
+  });
+  // Without a label the background names the identity, so only the address is checked.
+  expect(await send({ type: "workspace-new-identity", url: "file:///etc" })).toEqual({
+    ok: false,
+    error: "Only http and https pages can open in the Incognito workspace.",
   });
 });
 
@@ -88,14 +93,9 @@ test("switch is refused while recording, and refused for a window with no identi
   });
 });
 
-test("new identity closes only the windows it was shown", async () => {
+test("close windows closes only the windows it was shown", async () => {
   const { send } = background();
-  const reply = await send({
-    type: "workspace-new-identity",
-    label: "Admin",
-    url: TARGET,
-    closeWindowIds: [99],
-  });
+  const reply = await send({ type: "workspace-close-windows", windowIds: [99] });
   expect(reply).toEqual({
     ok: false,
     error: "The Incognito windows changed; review them again before closing them.",
@@ -109,9 +109,10 @@ test("lifecycle messages answer only the extension's own pages, and only valid o
     "workspace-suspend",
     "workspace-resume",
     "workspace-new-identity",
+    "workspace-close-windows",
     "workspace-delete-identity",
   ]) {
-    const message = { type, identityId: "a", label: "A", url: TARGET };
+    const message = { type, identityId: "a", label: "A", url: TARGET, windowIds: [] };
     await expect(send(message, contentScript)).rejects.toThrow("No answer");
   }
   await expect(send({ type: "workspace-switch", identityId: "" })).rejects.toThrow("No answer");

@@ -75,3 +75,13 @@ export async function typeAddress(root: HTMLElement, url: string) {
   input.dispatchEvent(new Event("input", { bubbles: true }));
   await new Promise((resolve) => setTimeout(resolve, 0));
 }
+
+/** The panel's alerts, in order; the panel keeps at most one. */
+export const alertText = (root: HTMLElement) =>
+  [...(panel(root)?.querySelectorAll('[role="alert"]') ?? [])].map((each) => each.textContent);
+
+/** The names of the panel's buttons a click would reach. */
+export const enabledButtons = (root: HTMLElement) =>
+  [...(panel(root)?.querySelectorAll("button") ?? [])]
+    .filter((each) => !each.disabled)
+    .map((each) => each.textContent);

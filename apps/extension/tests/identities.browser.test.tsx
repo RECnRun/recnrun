@@ -4,7 +4,7 @@ import { approximateSize } from "@/dashboard/Identities";
 import { NO_INCOGNITO_WINDOW } from "./fake-extension";
 import { PRIVATE, SHOP } from "./fake-tabs";
 import { button } from "./queries";
-import { inPanel, mount, panel, panelText, typeAddress } from "./workspace-panel";
+import { alertText, enabledButtons, inPanel, mount, panelText } from "./workspace-panel";
 
 const AT = Date.UTC(2026, 9, 28, 12, 30);
 const ADMIN: Identity = {
@@ -53,77 +53,52 @@ test("lists each saved identity with its last capture's time and size, and where
   );
 });
 
-test("with nothing open, a saved identity resumes and one never saved opens empty", async () => {
+test("with nothing open, Switch to restores a saved identity and opens one never saved empty", async () => {
   const { root, sent } = mount(SAVED);
-  await expect.poll(() => inRow(root, "Admin", "Resume")).toBeDefined();
-  inRow(root, "Admin", "Resume")?.click();
+  await expect.poll(() => inRow(root, "Admin", "Switch to")).toBeDefined();
+  expect(inRow(root, "Admin", "Resume")).toBeUndefined();
+  inRow(root, "Admin", "Switch to")?.click();
   await expect.poll(() => sent).toEqual([{ type: "workspace-resume", identityId: "admin" }]);
   inRow(root, "Guest", "Switch to")?.click();
   await expect.poll(() => sent.at(-1)).toEqual({ type: "workspace-switch", identityId: "guest" });
 });
 
-test("the open identity is named, suspends, and cannot be deleted; others switch", async () => {
+test("the open identity is marked Open and closes, and cannot be deleted; others switch", async () => {
   const { root, sent } = mount({ ...SAVED, managed: managedBy("admin") });
-  await expect.poll(() => panelText(root)).toContain("Incognito workspace open: Admin");
-  expect(identityRow(root, "Admin")?.textContent).toContain("Open");
+  await expect.poll(() => inRow(root, "Admin", "Close")).toBeDefined();
+  expect(identityRow(root, "Admin")?.querySelector(".identity-open")?.textContent).toBe("Open");
   expect(inRow(root, "Admin", "Delete")).toBeUndefined();
-  expect(inPanel(root, "Close and start empty")).toBeUndefined();
-  inRow(root, "Admin", "Suspend")?.click();
+  expect(inRow(root, "Admin", "Suspend")).toBeUndefined();
+  expect(panelText(root)).not.toContain("Incognito workspace open");
+  inRow(root, "Admin", "Close")?.click();
   await expect.poll(() => sent).toEqual([{ type: "workspace-suspend" }]);
   inRow(root, "Guest", "Switch to")?.click();
   await expect.poll(() => sent.at(-1)).toEqual({ type: "workspace-switch", identityId: "guest" });
 });
 
-test("a workspace opened without an identity offers no switch, only Close and start empty", async () => {
-  const { root } = mount({ ...SAVED, managed: managedBy() });
-  await expect.poll(() => inPanel(root, "Close and start empty")).toBeDefined();
-  expect(inRow(root, "Guest", "Switch to")).toBeUndefined();
-  expect(inRow(root, "Admin", "Resume")).toBeUndefined();
-  expect(inRow(root, "Guest", "Delete")).toBeDefined();
-});
-
-test("another Incognito window disables switching until it closes, but not Delete", async () => {
+test("another Incognito window disables every command but Delete and Close these windows", async () => {
   const { root } = mount({ ...SAVED, foreign: [{ id: 2, tabCount: 1 }] });
   await expect.poll(() => panelText(root)).toContain(CONFLICT);
-  expect(inRow(root, "Admin", "Resume")?.disabled).toBe(true);
+  expect(enabledButtons(root)).toEqual(["Close these windows", "Delete", "Delete"]);
+  expect(inRow(root, "Admin", "Switch to")?.disabled).toBe(true);
   expect(inPanel(root, "New identity")?.disabled).toBe(true);
-  expect(inRow(root, "Admin", "Delete")?.disabled).toBe(false);
 });
 
-test("a second tab in the managed window is a conflict too", async () => {
+test("a second tab in the managed window is a conflict too, with no window to close", async () => {
   const stray = { ...PRIVATE, id: 31, windowId: 3, title: "Stray" };
   const { root } = mount({ ...SAVED, managed: managedBy("admin") }, undefined, [SHOP, stray]);
   await expect.poll(() => panelText(root)).toContain(CONFLICT);
-  expect(inRow(root, "Admin", "Suspend")?.disabled).toBe(true);
+  expect(inRow(root, "Admin", "Close")?.disabled).toBe(true);
   expect(inRow(root, "Guest", "Switch to")?.disabled).toBe(true);
+  expect(inPanel(root, "Close these windows")).toBeUndefined();
 });
 
-test("new identity sends its label and the address", async () => {
-  const { root, sent } = mount(SAVED);
-  await expect.poll(() => inPanel(root, "New identity")).toBeDefined();
-  await typeAddress(root, "https://app.example/login");
-  const label = panel(root)?.querySelectorAll("input")[1];
-  if (!label) throw new Error("No label field");
-  label.value = "Reviewer";
-  label.dispatchEvent(new Event("input", { bubbles: true }));
-  await expect.poll(() => label.value).toBe("Reviewer");
-  inPanel(root, "New identity")?.click();
-  await expect
-    .poll(() => sent)
-    .toEqual([
-      {
-        type: "workspace-new-identity",
-        label: "Reviewer",
-        url: "https://app.example/login",
-      },
-    ]);
-});
-
-test("without access, identities can still be deleted but no new one opens", async () => {
+test("without access, identities can still be deleted but none opens", async () => {
   const { root } = mount({ ...SAVED, access: false });
   await expect.poll(() => inRow(root, "Admin", "Delete")).toBeDefined();
   expect(inPanel(root, "New identity")).toBeUndefined();
-  expect(inRow(root, "Admin", "Resume")?.disabled).toBe(true);
+  expect(inRow(root, "Admin", "Switch to")?.disabled).toBe(true);
+  expect(inRow(root, "Admin", "Delete")?.disabled).toBe(false);
 });
 
 test("delete asks once more, and Keep takes it back", async () => {
@@ -153,8 +128,21 @@ test("a failed lifecycle command is an alert naming the command and its step", a
   };
   const { root } = mount({ ...SAVED, operation });
   await expect
-    .poll(() => panel(root)?.querySelector('[role="alert"]')?.textContent)
-    .toBe("Switch failed at the capture step. The page did not open its link in time.");
+    .poll(() => alertText(root))
+    .toEqual(["Switch to failed at the capture step. The page did not open its link in time."]);
+});
+
+test("a suspend that failed is named Close", async () => {
+  const operation = {
+    id: "op-3",
+    kind: "suspend" as const,
+    step: "close",
+    status: "failed" as const,
+    started: 1,
+    error: "Gone.",
+  };
+  const { root } = mount({ ...SAVED, operation });
+  await expect.poll(() => alertText(root)).toEqual(["Close failed at the close step. Gone."]);
 });
 
 test("a command's error that its failed operation already names shows once", async () => {
@@ -172,9 +160,30 @@ test("a command's error that its failed operation already names shows once", asy
     setStatus({ ...SAVED, operation });
     return Promise.resolve({ ok: false, error });
   });
-  await expect.poll(() => inRow(root, "Admin", "Resume")).toBeDefined();
-  inRow(root, "Admin", "Resume")?.click();
-  const alerts = () =>
-    [...(panel(root)?.querySelectorAll('[role="alert"]') ?? [])].map((each) => each.textContent);
-  await expect.poll(alerts).toEqual([`Resume failed at the restore step. ${error}`]);
+  await expect.poll(() => inRow(root, "Admin", "Switch to")).toBeDefined();
+  inRow(root, "Admin", "Switch to")?.click();
+  await expect
+    .poll(() => alertText(root))
+    .toEqual([`Switch to failed at the restore step. ${error}`]);
+});
+
+test("a journaled failure from before stays hidden once the next command starts", async () => {
+  const operation = {
+    id: "op-4",
+    kind: "switch" as const,
+    step: "restore",
+    status: "failed" as const,
+    started: 1,
+    error: "Old.",
+  };
+  let finish = (_reply: unknown) => {};
+  const { root } = mount({ ...SAVED, operation }, (request) =>
+    request.type === "workspace-switch" ? new Promise((resolve) => (finish = resolve)) : undefined,
+  );
+  await expect.poll(() => alertText(root)).toEqual(["Switch to failed at the restore step. Old."]);
+  inRow(root, "Guest", "Switch to")?.click();
+  await expect.poll(() => alertText(root)).toEqual([]);
+  finish({ ok: true });
+  await expect.poll(() => inRow(root, "Guest", "Switch to")?.disabled).toBe(false);
+  expect(alertText(root)).toEqual([]);
 });

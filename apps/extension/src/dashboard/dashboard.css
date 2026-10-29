@@ -220,7 +220,18 @@
 }
 
 .workspace-conflict {
+  display: grid;
+  justify-items: start;
+  gap: 0.5rem;
+}
+
+.workspace-conflict > p:first-child {
   color: var(--link);
+  font-weight: 600;
+}
+
+.workspace-alert {
+  color: var(--danger);
   font-weight: 600;
 }
 

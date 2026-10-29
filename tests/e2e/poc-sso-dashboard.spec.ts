@@ -16,13 +16,16 @@ const identity = (site: Page, label: string) =>
     .getByRole("list", { name: "Saved identities" })
     .getByRole("listitem", { name: label, exact: true });
 
-/** Fills the panel's New identity form for the SSO app of `run`. */
-async function fillNew(site: Page, run: string, label: string) {
+/** Fills the panel's address with the SSO app of `run` and returns New identity. */
+async function fillNew(site: Page, run: string) {
   const panel = workspacePanel(site);
   await panel.getByRole("textbox", { name: "Address" }).fill(ssoAppUrl(run));
-  await panel.getByRole("textbox", { name: "Label" }).fill(label);
   return panel.getByRole("button", { name: "New identity", exact: true });
 }
+
+/** The workspace holds `label`: its row says Open. */
+const opened = (site: Page, label: string) =>
+  expect(identity(site, label).getByText("Open", { exact: true })).toBeVisible();
 
 test("an identity made in the dashboard comes back signed in at its provider", async ({
   context,
@@ -30,22 +33,22 @@ test("an identity made in the dashboard comes back signed in at its provider", a
 }) => {
   const run = `sso-dashboard-${Date.now()}`;
   const site = await openSite(context, "/");
-  await clickInDashboard(await fillNew(site, run, "A"));
-  await expect(workspacePanel(site)).toContainText("Incognito workspace open: A");
+  await clickInDashboard(await fillNew(site, run));
+  await opened(site, "A");
   const a = await ssoPage(context);
   // The new identity's silent check settles signed out before the sign-in navigates away.
   expect(await ssoSettled(a)).toMatchObject({ signedIn: null, error: "login_required" });
   expect(await ssoSignIn(a, run, "A")).toMatchObject({ signedIn: "A" });
 
-  await clickInDashboard(await fillNew(site, run, "B"));
-  await expect(workspacePanel(site)).toContainText("Incognito workspace open: B");
+  await clickInDashboard(await fillNew(site, run));
+  await opened(site, "B");
   const b = await ssoPage(context, a);
   expect(await ssoSettled(b)).toMatchObject({ first: { token: null }, signedIn: null });
   expect(await ssoSignIn(b, run, "B")).toMatchObject({ signedIn: "B" });
   await screen(site, "b-signed-in");
 
   await clickInDashboard(identity(site, "A").getByRole("button", { name: "Switch to" }));
-  await expect(workspacePanel(site)).toContainText("Incognito workspace open: A");
+  await opened(site, "A");
   const back = await ssoPage(context, b);
   expect(await ssoSettled(back)).toMatchObject({ first: { token: "A" }, signedIn: "A" });
   expect(await incognitoWindows(serviceWorker)).toBe(1);

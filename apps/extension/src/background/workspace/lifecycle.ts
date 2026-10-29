@@ -1,4 +1,4 @@
-import { errorMessage, planLifecycle } from "@recnrun/domain";
+import { errorMessage, nextIdentityName, planLifecycle } from "@recnrun/domain";
 import type {
   Identity,
   LifecycleCommand,
@@ -203,19 +203,18 @@ function operationFor(command: LifecycleCommand, deps: LifecycleDeps): Workspace
   };
 }
 
+/** The next free letter among the saved identities' labels. */
+async function nextName(deps: LifecycleDeps): Promise<string> {
+  return nextIdentityName((await deps.identities.list()).map(({ label }) => label));
+}
+
 /** The user decided on the windows they saw; any other set needs a fresh decision. */
 async function closeShown(deps: LifecycleDeps, windowIds: readonly number[]): Promise<void> {
-  const { foreign, otherTabs } = await deps.effects.windows();
+  const { foreign } = await deps.effects.windows();
   const shown = new Set(windowIds);
   if (shown.size !== foreign.length || !foreign.every((id) => shown.has(id))) {
     const message = "The Incognito windows changed; review them again before closing them.";
     throw new WorkspaceError("WindowsChanged", message);
-  }
-  // The plan would refuse these tabs after the close; refusing first closes nothing.
-  if (otherTabs > 0) {
-    const message =
-      "Close the other tabs in the Incognito workspace first; RECnRun saves only its own tab.";
-    throw new WorkspaceError("IncognitoTabsOpen", message);
   }
   if ((await deps.recordings.read()) !== null) {
     throw new WorkspaceError("RecordingInProgress", "Stop the recording first.");
@@ -237,13 +236,18 @@ export function createLifecycle(deps: LifecycleDeps): LifecycleCommands {
     suspend: async () => {
       await opening({ kind: "suspend" });
     },
-    newIdentity: (draft, closeWindowIds) =>
+    newIdentity: (draft) =>
       exclusive(async () => {
-        const identity = validIdentity(draft, (deps.now ?? Date.now)());
+        const label = draft.label ?? (await nextName(deps));
+        const identity = validIdentity({ label, url: draft.url }, (deps.now ?? Date.now)());
         await access();
-        if (closeWindowIds !== undefined) await closeShown(deps, closeWindowIds);
         await execute(deps, { kind: "new-identity", identityId: identity.id }, identity);
         return identity;
+      }),
+    closeWindows: (windowIds) =>
+      exclusive(async () => {
+        await access();
+        await closeShown(deps, windowIds);
       }),
     deleteIdentity: (identityId) =>
       exclusive(async () => {

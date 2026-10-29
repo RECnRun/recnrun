@@ -59,12 +59,13 @@ export interface LifecycleDeps {
   now?: () => number;
 }
 
-/** Switch to, Suspend, Resume, New identity, and Delete, each one operation under the lock. */
+/** Switch to, Suspend, Resume, New identity, Close windows, and Delete, each under the lock. */
 export interface LifecycleCommands {
   switchTo: (identityId: string) => Promise<StepTiming[]>;
   suspend: () => Promise<void>;
   resume: (identityId: string) => Promise<StepTiming[]>;
-  /** Closes `closeWindowIds` without saving them first when given; they must be every other window. */
-  newIdentity: (draft: IdentityDraft, closeWindowIds?: readonly number[]) => Promise<Identity>;
+  newIdentity: (draft: IdentityDraft) => Promise<Identity>;
+  /** Closes the other Incognito windows the user saw, without saving them; they must be all of them. */
+  closeWindows: (windowIds: readonly number[]) => Promise<void>;
   deleteIdentity: (identityId: string) => Promise<void>;
 }

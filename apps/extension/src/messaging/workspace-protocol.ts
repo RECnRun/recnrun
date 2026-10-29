@@ -47,14 +47,19 @@ const WorkspaceResumeMessageSchema = v.object({
 });
 
 /**
- * The dashboard asks to save the open identity, if any, and open a new one empty; `closeWindowIds`
- * are the other Incognito windows it showed the user, closed without being saved.
+ * The dashboard asks to save the open identity, if any, and open a new one empty; without a
+ * `label`, the background names it with the next free letter.
  */
 const WorkspaceNewIdentityMessageSchema = v.object({
   type: v.literal("workspace-new-identity"),
-  label: v.string(),
+  label: v.optional(v.string()),
   url: v.string(),
-  closeWindowIds: v.optional(v.array(BrowserIdSchema)),
+});
+
+/** The dashboard asks to close the other Incognito windows it showed the user, unsaved. */
+const WorkspaceCloseWindowsMessageSchema = v.object({
+  type: v.literal("workspace-close-windows"),
+  windowIds: v.array(BrowserIdSchema),
 });
 
 /** The dashboard asks to delete a saved identity that is not open, and its captures. */
@@ -72,6 +77,7 @@ export const WorkspaceRequestSchema = v.variant("type", [
   WorkspaceSuspendMessageSchema,
   WorkspaceResumeMessageSchema,
   WorkspaceNewIdentityMessageSchema,
+  WorkspaceCloseWindowsMessageSchema,
   WorkspaceDeleteIdentityMessageSchema,
 ]);
 

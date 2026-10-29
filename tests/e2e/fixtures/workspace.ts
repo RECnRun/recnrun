@@ -35,10 +35,18 @@ export async function runWorkspace(site: Page, url: string, action: string): Pro
   await clickInDashboard(panel.getByRole("button", { name: action, exact: true }));
 }
 
-/** Starts the managed Incognito window at `url` from the dashboard; resolves with its tab id. */
+/** Opens a new identity at `url` from the dashboard; resolves with the managed tab's id. */
 export async function startWorkspace(site: Page, serviceWorker: Worker, url: string) {
-  await runWorkspace(site, url, "Start");
-  await expect(workspacePanel(site)).toContainText("Incognito workspace open");
+  const before = (await managedWindow(serviceWorker))?.generation ?? 0;
+  await runWorkspace(site, url, "New identity");
+  // A later generation is this command's window, not the one an earlier identity held.
+  await expect
+    .poll(async () => {
+      const managed = await managedWindow(serviceWorker);
+      return managed?.status === "active" && managed.generation > before;
+    })
+    .toBe(true);
+  await expect(workspacePanel(site).getByText("Open", { exact: true })).toBeVisible();
   const managed = await managedWindow(serviceWorker);
   if (managed?.status !== "active") throw new Error("No managed window opened.");
   return managed.tabId;

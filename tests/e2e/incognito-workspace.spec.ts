@@ -19,7 +19,7 @@ const incognitoUrls = async (serviceWorker: Parameters<typeof chromeTabs>[0]) =>
   (await chromeTabs(serviceWorker)).filter((tab) => tab.incognito).map((tab) => tab.url);
 
 test.describe("without incognito access", () => {
-  test("the workspace states its requirement and offers no Start", async ({ context }) => {
+  test("the workspace states its requirement and offers no command", async ({ context }) => {
     const site = await openSite(context, "/");
     const panel = workspacePanel(site);
     await expect(panel).toContainText("The Incognito workspace requires “Allow in Incognito”.");
@@ -34,13 +34,13 @@ test.describe("without incognito access", () => {
 test.describe("with incognito access", () => {
   test.use({ incognitoAccess: true });
 
-  test("Start opens the managed window at the address from a normal tab", async ({
+  test("New identity opens the managed window at the address, named A", async ({
     context,
     serviceWorker,
   }) => {
     const site = await openSite(context, "/");
     const panel = workspacePanel(site);
-    await expect(panel.getByRole("button", { name: "Start", exact: true })).toBeVisible();
+    await expect(panel.getByRole("button", { disabled: false })).toHaveText(["New identity"]);
     await expect(
       dashboardOf(site).getByRole("button", { name: "New incognito window" }),
     ).toHaveCount(0);
@@ -50,12 +50,13 @@ test.describe("with incognito access", () => {
     await expect.poll(() => incognitoUrls(serviceWorker)).toEqual([`${APP}/inspect?run=start`]);
     const tabs = await chromeTabs(serviceWorker);
     expect(tabs.find((tab) => tab.incognito)?.id).toBe(tabId);
-    await expect(panel.getByRole("button", { name: "Close and start empty" })).toBeVisible();
-    await expect(panel).toContainText("Its current Incognito data is discarded.");
+    const a = panel.getByRole("listitem").filter({ hasText: "A" });
+    await expect(a.getByText("Open", { exact: true })).toBeVisible();
+    await expect(a.getByRole("button", { name: "Close", exact: true })).toBeEnabled();
     await screen(site, "open");
   });
 
-  test("open Incognito windows block Start until the user closes them through the panel", async ({
+  test("open Incognito windows block New identity until Close these windows closes them", async ({
     context,
     serviceWorker,
   }) => {
@@ -64,13 +65,17 @@ test.describe("with incognito access", () => {
     const site = await openSite(context, "/");
     const panel = workspacePanel(site);
     await expect(panel).toContainText("2 Incognito windows are open");
-    await expect(panel.getByRole("listitem")).toHaveCount(2);
-    await expect(panel.getByRole("button", { name: "Start", exact: true })).toHaveCount(0);
-    await expect(panel).toContainText("Or close them yourself");
+    await expect(panel.locator("ul.incognito-windows").getByRole("listitem")).toHaveCount(2);
+    await expect(panel.getByRole("button", { name: "New identity" })).toBeDisabled();
+    await expect(panel.getByRole("button", { disabled: false })).toHaveText([
+      "Close these windows",
+    ]);
     await screen(site, "blocked");
 
-    await runWorkspace(site, `${APP}/inspect?run=closed`, "Close these windows and start");
-    await expect(panel).toContainText("Incognito workspace open");
+    await clickInDashboard(panel.getByRole("button", { name: "Close these windows" }));
+    await expect.poll(() => incognitoUrls(serviceWorker)).toEqual([]);
+    await expect(panel.getByRole("button", { name: "New identity" })).toBeEnabled();
+    await startWorkspace(site, serviceWorker, `${APP}/inspect?run=closed`);
     await expect.poll(() => incognitoUrls(serviceWorker)).toEqual([`${APP}/inspect?run=closed`]);
   });
 
@@ -86,25 +91,7 @@ test.describe("with incognito access", () => {
     await expect(panel).toContainText("2 Incognito windows are open");
   });
 
-  test("Close and start empty replaces the managed window with a fresh one", async ({
-    context,
-    serviceWorker,
-  }) => {
-    const site = await openSite(context, "/");
-    const first = await startWorkspace(site, serviceWorker, `${APP}/inspect?run=one`);
-    const before = await managedWindow(serviceWorker);
-    await runWorkspace(site, `${APP}/inspect?run=two`, "Close and start empty");
-    await expect
-      .poll(async () => (await managedWindow(serviceWorker))?.generation)
-      .toBe((before?.generation ?? 0) + 1);
-    const after = await managedWindow(serviceWorker);
-    expect(after?.tabId).not.toBe(first);
-    expect(after?.windowId).not.toBe(before?.windowId);
-    await expect.poll(() => incognitoUrls(serviceWorker)).toEqual([`${APP}/inspect?run=two`]);
-    await expect(workspacePanel(site)).toContainText("Incognito workspace open");
-  });
-
-  test("another Incognito window beside the workspace leaves no command until the user closes it", async ({
+  test("another Incognito window beside the workspace leaves only Close these windows", async ({
     context,
     serviceWorker,
   }) => {
@@ -113,21 +100,23 @@ test.describe("with incognito access", () => {
     await openIncognitoTab(serviceWorker, `${APP}/inspect?run=beside`);
     const panel = workspacePanel(site);
     await expect(panel).toContainText("1 Incognito window is open");
-    await expect(panel).toContainText("Close the other Incognito windows yourself");
-    // New identity stays in view, disabled, beside the conflict that explains why.
-    await expect(panel.getByRole("button", { disabled: false })).toHaveCount(0);
+    // The disabled commands stay in view beside the conflict that explains why.
+    await expect(panel.getByRole("button", { disabled: false })).toHaveText([
+      "Close these windows",
+    ]);
     await expect(panel.getByRole("button", { name: "New identity" })).toBeDisabled();
     await screen(site, "open-and-foreign");
 
     await (await pageAt(context, `${APP}/inspect?run=beside`)).close();
-    await expect(panel.getByRole("button", { name: "Close and start empty" })).toBeVisible();
+    await expect(panel.getByRole("button", { name: "New identity" })).toBeEnabled();
+    expect((await managedWindow(serviceWorker))?.status).toBe("active");
   });
 
   test("an internal address is refused with the background's reason", async ({ context }) => {
     const site = await openSite(context, "/");
-    await runWorkspace(site, "chrome://settings/", "Start");
+    await runWorkspace(site, "chrome://settings/", "New identity");
     await expect(workspacePanel(site).getByRole("alert")).toHaveText(
-      "Only http and https pages can open in the Incognito workspace.",
+      "New identity failed. Only http and https pages can open in the Incognito workspace.",
     );
     await screen(site, "refused");
   });

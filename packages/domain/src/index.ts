@@ -30,6 +30,7 @@ export {
   type IdentityCapture,
 } from "./identity-capture.ts";
 export { approximateBytes, IdentityListSchema, IdentitySchema, type Identity } from "./identity.ts";
+export { nextIdentityName } from "./identity-name.ts";
 export {
   planLifecycle,
   type LifecycleCommand,
