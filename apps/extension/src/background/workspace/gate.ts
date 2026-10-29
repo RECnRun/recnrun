@@ -12,7 +12,8 @@ export interface Gate {
 }
 
 export function gate(): Gate {
-  const settle: Pick<Gate, "open" | "shut"> = { open: () => {}, shut: () => {} };
-  const promise = new Promise<void>((open, shut) => Object.assign(settle, { open, shut }));
-  return { promise: handledLater(promise), ...settle };
+  // The executor runs at once, so both ends are set before the gate is handed out.
+  const ends = {} as Pick<Gate, "open" | "shut">;
+  const promise = new Promise<void>((open, shut) => Object.assign(ends, { open, shut }));
+  return { promise: handledLater(promise), ...ends };
 }
