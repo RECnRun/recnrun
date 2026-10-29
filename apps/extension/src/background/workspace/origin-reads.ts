@@ -33,7 +33,7 @@ export interface ReadDeps {
 }
 
 /** Reads one origin's page through its agent; every part is written before the counts are checked. */
-export async function readOrigin(
+async function readOrigin(
   port: OriginPort,
   { operation, captureId }: Reading,
   origin: string,
