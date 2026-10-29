@@ -30,7 +30,33 @@ function within(promise: Promise<void>, timeoutMs: number, error: () => Error): 
   return Promise.race([promise, expired]).finally(() => clearTimeout(timer));
 }
 
-/** Resolves once Chrome reported every window removed and a fresh inventory no longer lists them. */
+/**
+ * Unloads every tab of the windows without running their pages' `beforeunload`, so closing them
+ * never waits on a "Leave site?" dialog: a discard skips `ClosePage` (`tab_lifecycle_unit.cc:380-415`).
+ */
+async function discardTabs(windowIds: readonly number[]): Promise<void> {
+  const listed = await Promise.all(
+    windowIds.map((windowId) => browser.tabs.query({ windowId }).catch(() => [])),
+  );
+  const ids = listed
+    .flat()
+    .flatMap(({ id, discarded }) => (id === undefined || discarded ? [] : [id]));
+  // A tab Chrome cannot discard is closed as before; the close timeout names a close it blocks.
+  const discard = async (id: number) => {
+    // Chrome throws synchronously for an argument it refuses, so the call sits inside the try.
+    try {
+      await browser.tabs.discard(id);
+    } catch {
+      return;
+    }
+  };
+  await Promise.all(ids.map(discard));
+}
+
+/**
+ * Resolves once Chrome reported every window removed and a fresh inventory no longer lists them;
+ * their tabs are discarded first.
+ */
 export async function closeWindows(
   ids: readonly number[],
   timeoutMs = CLOSE_TIMEOUT_MS,
@@ -48,6 +74,7 @@ export async function closeWindows(
   browser.windows.onRemoved.addListener(onRemoved);
   try {
     if (pending.size === 0) settle();
+    await discardTabs(ids);
     // Chrome rejects an id it no longer knows; the inventory below decides whether it is gone.
     await Promise.all(ids.map((id) => browser.windows.remove(id).catch(() => onRemoved(id))));
     const late = () =>

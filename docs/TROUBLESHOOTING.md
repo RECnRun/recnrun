@@ -107,3 +107,11 @@ Ruled out on the way: a lock request that never settles (the click never reached
 **Cause.** A save reads each site the window showed by loading it in a helper tab; a start restores each one the same way. Any failure ended the command, so one unreachable site held the whole identity hostage.
 
 **Solution.** A save tries the site's root, then once the last page's path the window showed there, and when neither answers keeps the identity's last saved storage of that site, or names it as unsupported when there is none; a start skips the site and the next save keeps its saved storage without visiting it (`background/workspace/origin-reads.ts`, `bootstrap.ts`). The identity's row and the operation journal name each site left out and the step (`tests/e2e/poc-unreachable-origin.spec.ts`).
+
+## A "Leave site?" dialog cancels a Switch
+
+**Symptom.** In the user's run, Gmail asked "Leave site?" when a Switch closed the managed window, and the Switch failed with "Chrome did not close the Incognito windows in time." In tests the dialog is dismissed, which keeps the page, so the close is cancelled the same way (`poc-beforeunload.spec.ts` before the fix: both tests failed after 10 s).
+
+**Cause.** `windows.remove` closes each tab through `ClosePage`, which runs the page's `beforeunload` handler; Chrome shows the dialog once the page has had a user activation.
+
+**Solution.** Before it removes the windows, `closeWindows` (`background/workspace/windows.ts`) discards every tab with `tabs.discard`, which replaces the page without `ClosePage` (`chrome/browser/resource_coordinator/tab_lifecycle_unit.cc:380-415`), so no handler runs. Chrome discards the active tab of the focused window too and answers with a new tab id (`kWebContentsDiscard` is off on desktop, `content/public/common/content_features.cc:381-387`, so the contents are replaced); the tab keeps its session storage, copied by `CopyStateFrom` (`navigation_controller_impl.cc:3032-3049`). RECnRun discards only after the capture read the tab. The page's own `beforeunload` is never patched.

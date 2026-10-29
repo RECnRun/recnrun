@@ -111,6 +111,37 @@ describe("closeWindows", () => {
     });
   });
 
+  test("discards each tab of the windows before it removes them, so no page asks to stay", async () => {
+    const id = await openIncognitoWindow();
+    const [tab] = await fakeBrowser.tabs.query({ windowId: id });
+    // The fake browser throws "not implemented" synchronously, as Chrome does for a refused argument.
+    const discard = vi.spyOn(fakeBrowser.tabs, "discard");
+    const removed = vi.spyOn(fakeBrowser.windows, "remove");
+    await closeWindows([id]);
+    expect(discard).toHaveBeenCalledWith(tab?.id);
+    expect(discard.mock.invocationCallOrder[0]).toBeLessThan(
+      removed.mock.invocationCallOrder[0] ?? 0,
+    );
+    expect(await inventory()).toEqual([]);
+  });
+
+  test("discards only tabs Chrome has not discarded yet, and goes on when a discard fails", async () => {
+    const id = await openIncognitoWindow();
+    // The callback overload of `query` returns void, so the spy is typed by its promise form.
+    const query = vi.spyOn(fakeBrowser.tabs, "query") as unknown as MockInstance<
+      () => Promise<Browser.tabs.Tab[]>
+    >;
+    query.mockResolvedValueOnce([
+      { id: 1, discarded: true },
+      { id: 2, discarded: false },
+      { discarded: false },
+    ] as Browser.tabs.Tab[]);
+    const discard = vi.spyOn(fakeBrowser.tabs, "discard").mockRejectedValue(new Error("No tab."));
+    await closeWindows([id]);
+    expect(discard.mock.calls).toEqual([[2]]);
+    expect(await inventory()).toEqual([]);
+  });
+
   test("accepts a window that closed before RECnRun could remove it", async () => {
     vi.spyOn(fakeBrowser.windows, "remove").mockRejectedValue(new Error("No window with id: 9."));
     await expect(closeWindows([9])).resolves.toBeUndefined();
