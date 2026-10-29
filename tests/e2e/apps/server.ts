@@ -54,10 +54,21 @@ function app({ response, url, run }: Exchange): void {
   send(response, HTML, appPage(run ?? "", nonce), csp);
 }
 
-/** One hop before the app, as sign-in and locale redirects do; `?to=other` leaves the origin. */
+/**
+ * One hop before the app, as sign-in and locale redirects do; `?to=other` leaves the origin, and
+ * `?type=binary` and `?attachment=1` give it a body Chrome would download, as Gmail's does.
+ */
 function redirect({ response, url }: Exchange): void {
   const away = url.searchParams.get("to") === "other" ? "http://other.localhost:5192" : "";
-  redirectTo(response, `${away}/app/${url.search}`);
+  const binary = url.searchParams.get("type") === "binary";
+  const attachment = url.searchParams.get("attachment") === "1";
+  response.writeHead(302, {
+    location: `${away}/app/${url.search}`,
+    "cache-control": "no-store",
+    ...(binary ? { "content-type": "application/binary" } : {}),
+    ...(attachment ? { "content-disposition": "attachment" } : {}),
+  });
+  response.end();
 }
 
 const APP_ORIGIN = "http://app.localhost:5192";

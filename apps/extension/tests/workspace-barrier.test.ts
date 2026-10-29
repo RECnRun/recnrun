@@ -141,13 +141,18 @@ describe("installBarrier", () => {
     expect(api.rules.size).toBe(0);
   });
 
-  test("strips a redirect off the target origin, above the allow rule, so the document commits on the origin", async () => {
+  test("strips a redirect off the target origin, above the allow rule, so a plain-text document commits on the origin", async () => {
     await installBarrier(TAB, TARGET, OPERATION, api);
     const rules = [...api.rules.values()];
     const handOver = rules.find(({ condition }) => condition.responseHeaders !== undefined);
+    // A type Chrome cannot render, or an attachment, would make the 302 a failed download.
     expect(handOver?.action).toEqual({
       type: "modifyHeaders",
-      responseHeaders: [{ header: "location", operation: "remove" }],
+      responseHeaders: [
+        { header: "location", operation: "remove" },
+        { header: "content-type", operation: "set", value: "text/plain" },
+        { header: "content-disposition", operation: "remove" },
+      ],
     });
     expect(handOver?.condition).toMatchObject({ tabIds: [TAB], resourceTypes: ["main_frame"] });
     const allow = rules.find(({ action }) => action.type === "allow");

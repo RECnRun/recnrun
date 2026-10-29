@@ -86,6 +86,14 @@ The session page in a PiP window is such a frame too. A pre-push `vp run verify`
 
 **Solution.** A fifth tab-scoped rule removes a main-frame `Location` that may leave the target origin, during the barrier only (`background/workspace/barrier.ts`): it matches any value with a colon, `//`, a backslash, or a tab, and excludes the origin itself and its paths, queries, and fragments. Chrome applies header changes before it checks for a redirect (`url_request_http_job.cc:1242-1246`), and a response without `Location` is none (`http_response_headers.cc:1099-1112`), so the response commits as the target origin's script-free document and the restore runs. The release reload then follows the app's redirect, now with the provider's cookies. Chrome matches the whole lowercased value with `*` and `?` wildcards (`request_params.cc:70-86`, `base/strings/pattern.cc`); a redirect the patterns miss stays blocked, never followed.
 
+## New identity fails at the navigate step with `net::ERR_INVALID_RESPONSE`
+
+**Symptom.** New identity at a signed-out Gmail address failed with "New identity failed at the navigate step. The page did not load (net::ERR_INVALID_RESPONSE)." The fixture's sign-in redirects, served as `text/html`, never did.
+
+**Cause.** The barrier's hand-over rule removes the `Location` of the 302 to the sign-in origin, so the redirect commits as an ordinary response, and Gmail's carries a type Chrome cannot render. Chrome downloads a response it must download (`Content-Disposition: attachment`) or whose type it does not support (`content/browser/loader/navigation_url_loader_impl.cc:1516-1532`), and a download with a non-2xx status fails the navigation with `ERR_INVALID_RESPONSE` (`IsFailedDownload`, `content/browser/renderer_host/navigation_request.cc:988-991, 5546-5551`).
+
+**Solution.** The same rule also sets `Content-Type` to `text/plain` and removes `Content-Disposition` (`background/workspace/barrier.ts`), so the placeholder commits as a plain-text document, which never runs a meta refresh either. A DNR rule that modifies headers counts as an extra-headers listener (`extensions/browser/api/web_request/extension_web_request_event_router.cc:2764-2785`), so the network service applies the change before it derives the response's type. `poc-binary-redirect.spec.ts` covers `application/binary` with and without an attachment.
+
 ## A start fails with `net::ERR_ABORTED` in headed Chromium
 
 **Symptom.** Run through `vp run poc:zephyr`, 5 of 10 starts failed at the `navigate` step with "The page did not load (net::ERR_ABORTED)." Docker's end-to-end runs never hit it.

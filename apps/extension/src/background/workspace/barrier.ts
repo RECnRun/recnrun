@@ -11,7 +11,7 @@ export interface BarrierRule {
     type: "allow" | "block" | "modifyHeaders";
     requestHeaders?: { header: string; operation: "remove" }[];
     responseHeaders?: (
-      | { header: string; operation: "append"; value: string }
+      | { header: string; operation: "append" | "set"; value: string }
       | { header: string; operation: "remove" }
     )[];
   };
@@ -81,7 +81,10 @@ const LEAVING = ["*:*", "*//*", "*/\\\\*", "*\\\\/*", "*\\\\\\\\*", "*\t*"];
 
 /**
  * Strips a cross-origin redirect behind the barrier, so the document commits on the origin and the
- * reload, once the barrier is gone, follows it; same-origin redirects are followed at once.
+ * reload, once the barrier is gone, follows it; same-origin redirects are followed at once. The
+ * body commits as plain text: a type Chrome cannot render, or an attachment, makes a non-2xx
+ * response a failed download (navigation_url_loader_impl.cc, navigation_request.cc), and plain
+ * text never runs a meta refresh.
  */
 function handOverRule(id: number, tabIds: number[], origin: string): BarrierRule {
   return {
@@ -89,7 +92,11 @@ function handOverRule(id: number, tabIds: number[], origin: string): BarrierRule
     priority: 3,
     action: {
       type: "modifyHeaders",
-      responseHeaders: [{ header: "location", operation: "remove" }],
+      responseHeaders: [
+        { header: "location", operation: "remove" },
+        { header: "content-type", operation: "set", value: "text/plain" },
+        { header: "content-disposition", operation: "remove" },
+      ],
     },
     condition: {
       tabIds,
