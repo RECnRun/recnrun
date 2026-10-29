@@ -10,7 +10,9 @@ Problems we hit, what caused them, and how we solved them. Add an entry when a p
 
 Ruled out on the way: a lock request that never settles (the click never reached the dashboard's handler), layout shift from the incognito banner (the failure stayed after the tab list waited for the banner), and `dev-chrome.spec.ts` launching extra browsers (replacing it with a sleep still failed).
 
-**Solution.** `clickInDashboard(locator)` in `tests/e2e/fixtures/session.ts` moves the mouse over the element until a `mousemove` reaches it inside the frame, then clicks. That waits for the condition Chromium needs, as Chromium's own tests do with `WaitForHitTestData`; it retries no click and weakens no assertion. Every click in a dashboard frame goes through it, `clickToOpenPanel` included. With it, 18 full suites in a row lost no click, and the traces show some clicks waiting a few seconds, each a click that would have failed before.
+**Solution.** `clickInFrame(locator)` in `tests/e2e/fixtures/session.ts` moves the mouse over the element until a `mousemove` reaches it inside the frame, then clicks. That waits for the condition Chromium needs, as Chromium's own tests do with `WaitForHitTestData`; it retries no click and weakens no assertion. Every click in a dashboard frame goes through it, `clickToOpenPanel` included. With it, 18 full suites in a row lost no click, and the traces show some clicks waiting a few seconds, each a click that would have failed before.
+
+The session page in a PiP window is such a frame too. A pre-push `vp run verify` lost the Pause click in `session-control.spec.ts`: the trace held every page's frames for about 400 ms, and the PiP window presented its first frame 7 ms after Playwright reported "click action done", so Chromium had no hit-test data for the session frame yet. Clicks in the PiP window now go through `clickInFrame` as well.
 
 ## After two Back steps, a reload shows the wrong route
 

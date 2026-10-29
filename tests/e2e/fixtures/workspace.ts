@@ -1,6 +1,6 @@
 import type { BrowserContext, Page, Worker } from "@playwright/test";
 import { expect } from "./extension.ts";
-import { clickInDashboard, dashboardOf } from "./session.ts";
+import { clickInFrame, dashboardOf } from "./session.ts";
 
 /** The POC fixture application, served by `tests/e2e/apps/server.ts`. */
 export const APP = "http://app.localhost:5192";
@@ -32,7 +32,7 @@ export function managedWindow(serviceWorker: Worker): Promise<ManagedWindow | nu
 export async function runWorkspace(site: Page, url: string, action: string): Promise<void> {
   const panel = workspacePanel(site);
   await panel.getByRole("combobox", { name: "Address" }).fill(url);
-  await clickInDashboard(panel.getByRole("button", { name: action, exact: true }));
+  await clickInFrame(panel.getByRole("button", { name: action, exact: true }));
 }
 
 /** Opens a new identity at `url` from the dashboard; resolves with the managed tab's id. */

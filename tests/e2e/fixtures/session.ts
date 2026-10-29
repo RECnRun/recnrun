@@ -27,11 +27,11 @@ export async function openSite(context: BrowserContext, path: string): Promise<P
 }
 
 /**
- * Clicks inside the dashboard frame. Until Chromium publishes that out-of-process frame's hit-test
- * data, it routes a click there to the site; a real pointer moves first, so this waits until a
- * mouse move reaches the element.
+ * Clicks inside an out-of-process frame: the dashboard in a site, or the session in a PiP window.
+ * Until Chromium publishes that frame's hit-test data, it routes a click there to the parent
+ * document; a real pointer moves first, so this waits until a mouse move reaches the element.
  */
-export async function clickInDashboard(target: Locator): Promise<void> {
+export async function clickInFrame(target: Locator): Promise<void> {
   await target.scrollIntoViewIfNeeded();
   const box = await target.boundingBox();
   if (!box) throw new Error("The element to click has no box.");
@@ -56,7 +56,7 @@ export async function clickInDashboard(target: Locator): Promise<void> {
 
 /** The PiP window is a page of its own in Playwright; this waits for the one a click opens. */
 export async function clickToOpenPanel(context: BrowserContext, button: Locator): Promise<Page> {
-  const [pip] = await Promise.all([context.waitForEvent("page"), clickInDashboard(button)]);
+  const [pip] = await Promise.all([context.waitForEvent("page"), clickInFrame(button)]);
   return pip;
 }
 

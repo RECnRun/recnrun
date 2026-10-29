@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures/extension.ts";
-import { clickInDashboard, dashboardOf, openSite } from "./fixtures/session.ts";
+import { clickInFrame, dashboardOf, openSite } from "./fixtures/session.ts";
 import { chromeTabs, openIncognitoTab } from "./fixtures/tabs.ts";
 import {
   APP,
@@ -69,7 +69,7 @@ test.describe("with incognito access", () => {
     ]);
     await screen(site, "blocked");
 
-    await clickInDashboard(panel.getByRole("button", { name: "Close these windows" }));
+    await clickInFrame(panel.getByRole("button", { name: "Close these windows" }));
     await expect.poll(() => incognitoUrls(serviceWorker)).toEqual([]);
     await expect(panel.getByRole("button", { name: "New identity" })).toBeEnabled();
     await startWorkspace(site, serviceWorker, `${APP}/inspect?run=closed`);
@@ -143,10 +143,10 @@ test.describe("with incognito access", () => {
     expect(spans).not.toContain(false);
     await screen(site, "address-suggestions");
 
-    await clickInDashboard(options.filter({ hasText: visited }));
+    await clickInFrame(options.filter({ hasText: visited }));
     await expect(address).toHaveValue(visited);
     await expect(options).toHaveCount(0);
-    await clickInDashboard(panel.getByRole("button", { name: "New identity", exact: true }));
+    await clickInFrame(panel.getByRole("button", { name: "New identity", exact: true }));
     await expect.poll(() => incognitoUrls(serviceWorker)).toEqual([visited]);
   });
 });

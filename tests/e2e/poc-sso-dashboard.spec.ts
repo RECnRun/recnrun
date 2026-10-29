@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures/extension.ts";
 import { incognitoWindows } from "./fixtures/identity.ts";
-import { clickInDashboard, dashboardOf, openSite } from "./fixtures/session.ts";
+import { clickInFrame, dashboardOf, openSite } from "./fixtures/session.ts";
 import { ssoAppUrl, ssoPage, ssoSettled, ssoSignIn } from "./fixtures/sso.ts";
 import { workspacePanel } from "./fixtures/workspace.ts";
 
@@ -37,21 +37,21 @@ test("an identity made in the dashboard comes back signed in at its provider", a
 }) => {
   const run = `sso-dashboard-${Date.now()}`;
   const site = await openSite(context, "/");
-  await clickInDashboard(await fillNew(site, run));
+  await clickInFrame(await fillNew(site, run));
   await opened(site, "A");
   const a = await ssoPage(context);
   // The new identity's silent check settles signed out before the sign-in navigates away.
   expect(await ssoSettled(a)).toMatchObject({ signedIn: null, error: "login_required" });
   expect(await ssoSignIn(a, run, "A")).toMatchObject({ signedIn: "A" });
 
-  await clickInDashboard(await fillNew(site, run));
+  await clickInFrame(await fillNew(site, run));
   await opened(site, "B");
   const b = await ssoPage(context, a);
   expect(await ssoSettled(b)).toMatchObject({ first: { token: null }, signedIn: null });
   expect(await ssoSignIn(b, run, "B")).toMatchObject({ signedIn: "B" });
   await screen(site, "b-signed-in");
 
-  await clickInDashboard(identity(site, "A").getByRole("button", { name: "Switch to" }));
+  await clickInFrame(identity(site, "A").getByRole("button", { name: "Switch to" }));
   await opened(site, "A");
   const back = await ssoPage(context, b);
   expect(await ssoSettled(back)).toMatchObject({ first: { token: "A" }, signedIn: "A" });

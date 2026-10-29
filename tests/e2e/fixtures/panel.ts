@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 import { expect } from "./extension.ts";
-import { clickInDashboard, dashboardOf } from "./session.ts";
+import { clickInFrame, dashboardOf } from "./session.ts";
 import { workspacePanel } from "./workspace.ts";
 
 /** One saved identity's row in the panel. */
@@ -21,11 +21,11 @@ export async function opened(site: Page, label: string) {
 export async function newIdentity(site: Page, url: string) {
   const panel = workspacePanel(site);
   await panel.getByRole("combobox", { name: "Address" }).fill(url);
-  await clickInDashboard(panel.getByRole("button", { name: "New identity", exact: true }));
+  await clickInFrame(panel.getByRole("button", { name: "New identity", exact: true }));
 }
 
 export const switchTo = (site: Page, label: string) =>
-  clickInDashboard(identity(site, label).getByRole("button", { name: "Switch to", exact: true }));
+  clickInFrame(identity(site, label).getByRole("button", { name: "Switch to", exact: true }));
 
 /**
  * Makes the page ask before it unloads, as Gmail does with a draft; Chrome shows the dialog only

@@ -3,7 +3,7 @@ import { IDP } from "./apps/sso-pages.ts";
 import { expect, test } from "./fixtures/extension.ts";
 import { failNext, incognitoWindows, normalCookies, setNormalCookie } from "./fixtures/identity.ts";
 import { newIdentity, opened, switchTo, identity } from "./fixtures/panel.ts";
-import { clickInDashboard, openSite } from "./fixtures/session.ts";
+import { clickInFrame, openSite } from "./fixtures/session.ts";
 import {
   expireServerSessions,
   ssoAppUrl,
@@ -133,7 +133,7 @@ test("a failed switch and another Incognito window show in the panel, and the pa
   await expect(identity(site, "A").getByRole("button", { name: "Switch to" })).toBeDisabled();
   await screen(site, "6-conflict");
 
-  await clickInDashboard(panel.getByRole("button", { name: "Close these windows" }));
+  await clickInFrame(panel.getByRole("button", { name: "Close these windows" }));
   await expect(alert).toHaveCount(0);
   await expect.poll(() => incognitoWindows(serviceWorker)).toBe(0);
   await switchTo(site, "A");

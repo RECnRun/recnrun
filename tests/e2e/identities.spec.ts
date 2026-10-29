@@ -3,7 +3,7 @@ import { BLANK } from "./fixtures/captures.ts";
 import { expect, test } from "./fixtures/extension.ts";
 import { keep } from "./fixtures/keep.ts";
 import { closeTab, failNext, incognitoWindows } from "./fixtures/identity.ts";
-import { clickInDashboard, dashboardOf, openSite } from "./fixtures/session.ts";
+import { clickInFrame, dashboardOf, openSite } from "./fixtures/session.ts";
 import { openIncognitoTab } from "./fixtures/tabs.ts";
 import { pageAt, workspacePanel } from "./fixtures/workspace.ts";
 
@@ -19,7 +19,7 @@ const identity = (site: Page, label: string) =>
     .getByRole("listitem", { name: label, exact: true });
 
 const click = (site: Page, label: string, action: string) =>
-  clickInDashboard(identity(site, label).getByRole("button", { name: action, exact: true }));
+  clickInFrame(identity(site, label).getByRole("button", { name: action, exact: true }));
 
 /** The marker the identity's page keeps in its localStorage, read from the managed tab. */
 const marker = async (site: Page) =>
@@ -43,7 +43,7 @@ async function opened(site: Page, label: string) {
 async function newIdentity(site: Page, label: string) {
   const panel = workspacePanel(site);
   await panel.getByRole("combobox", { name: "Address" }).fill(BLANK);
-  await clickInDashboard(panel.getByRole("button", { name: "New identity", exact: true }));
+  await clickInFrame(panel.getByRole("button", { name: "New identity", exact: true }));
   await opened(site, label);
 }
 

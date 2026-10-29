@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures/extension.ts";
-import { clickInDashboard, dashboardOf, FRAME, openSite, tabItem } from "./fixtures/session.ts";
+import { clickInFrame, dashboardOf, FRAME, openSite, tabItem } from "./fixtures/session.ts";
 import { chromeTabs } from "./fixtures/tabs.ts";
 
 const banner = (site: Page) =>
@@ -46,7 +46,7 @@ test("without incognito access, the banner opens RECnRun's details, and every si
 
   const [details] = await Promise.all([
     context.waitForEvent("page"),
-    clickInDashboard(banner(first).getByRole("button", { name: "Open Extension Config" })),
+    clickInFrame(banner(first).getByRole("button", { name: "Open Extension Config" })),
   ]);
   await expect(details).toHaveURL(`chrome://extensions/?id=${id}`);
   const tabs = await chromeTabs(serviceWorker);

@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures/extension.ts";
-import { clickInDashboard, openSite } from "./fixtures/session.ts";
+import { clickInFrame, openSite } from "./fixtures/session.ts";
 import { workspacePanel } from "./fixtures/workspace.ts";
 
 test.use({ incognitoAccess: true });
@@ -36,7 +36,7 @@ test("withheld Site access hides New identity and leads to RECnRun's details, un
 
   const [opened] = await Promise.all([
     context.waitForEvent("page"),
-    clickInDashboard(panel.getByRole("button", { name: "Open RECnRun's details" })),
+    clickInFrame(panel.getByRole("button", { name: "Open RECnRun's details" })),
   ]);
   await expect(opened).toHaveURL(`chrome://extensions/?id=${id}`);
 
