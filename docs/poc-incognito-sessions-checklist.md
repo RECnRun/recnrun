@@ -8,7 +8,7 @@ Plan: [poc-incognito-sessions-plan.md](poc-incognito-sessions-plan.md). Assignme
 | Branch               | `poc/incognito-sessions`                                         |
 | Planned base         | `44c154da29860c7a8df829e902b177df5ce2ba2a` (2026-10-28)          |
 | Actual base (P0.1)   | `44c154d` (re-resolved 2026-10-28, unchanged)                    |
-| Last recorded commit | `b5d2570`                                                        |
+| Last recorded commit | `dede7fc`                                                        |
 | Decisions OD-1…OD-4  | defaults of plan §3, accepted by the user ("Avance", 2026-10-28) |
 
 ## Status legend
@@ -519,6 +519,12 @@ Source facts (orchestrator, Chromium checkout): `tabs.discard` (`tabs_api.cc:429
       commit: 7ef5162 Wait for the PiP session frame to take the pointer before clicking; c2e0790 Name one window Close this window in the conflict banner; b5d2570 Save unloaded tabs and what blank tabs showed before
       notes: The PiP clicks went through the frame's hit-test wait (`clickInDashboard` renamed `clickInFrame`), the same Chromium input routing as the dashboard frame. A tab Chrome unloaded is kept by its `tabs.query` address and read in place behind the barrier (`primary-read.ts` when it is the primary); a blank or New Tab page keeps the sessionStorage of the sites it showed and returns to its page after the start writes it; `tabs.onReplaced` re-keys a tab's visits. Memory Saver itself was not exercised; `tabs.discard` stands in for it. Screenshots in `.artifacts/screens/S7.7/`.
       verify: `vp run verify` → exit 0 (run `2026-10-29T17-48-12.126Z-da0d8f6c`)
+- [x] S7.8 CI failure in `poc-unloaded-tabs.spec.ts:97` ("The page closed before its data was captured.")
+      red: GitHub Actions run 40925811885 failed on both attempts in about 1.4 s; its trace shows the Switch failing 48 ms after `navigateTab` to `about:blank` resolved. In scratch `s63neg` at b50fa00, a `beforeunload` handler keeping the main page busy for 1 s → `vp run test:e2e -- tests/e2e/poc-unloaded-tabs.spec.ts -g "only web page"` failed with the same error, the capture taking the old app page as the loaded primary tab (run `2026-10-29T18-07-33.611Z-db552283`)
+      green: the same command with the fixed fixture passes under that handler (run `2026-10-29T18-08-11.068Z-44a7618f`); `--repeat-each 10` → 30 passed (run `2026-10-29T18-08-25.034Z-9bfd7d38`); full `vp run test:e2e` twice → 111 passed each (runs `2026-10-29T18-09-38.531Z-baa7e749`, `2026-10-29T18-12-04.459Z-efee54a1`)
+      commit: dede7fc Wait for a test navigation to commit before saving the session
+      notes: `tabs.update` resolves when the navigation starts and `tabs.query` already reports the new address as `pendingUrl`, so the test's layout check passed while the previous page was still committed. `navigateTab` now waits for `tabs.onUpdated` to report the tab complete at the address with no `pendingUrl`. TROUBLESHOOTING gains the entry.
+      verify: `vp run verify` → exit 0 (run `2026-10-29T18-14-37.287Z-1a078946`)
 
 ## Stage 5 — Delivery
 
