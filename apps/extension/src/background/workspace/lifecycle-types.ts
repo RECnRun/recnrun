@@ -23,7 +23,7 @@ export interface Opening {
 }
 
 /** What a start did: how long each step took, and the visited origins it could not restore. */
-export interface Started {
+interface Started {
   timings: StepTiming[];
   skipped: SkippedOrigin[];
 }
