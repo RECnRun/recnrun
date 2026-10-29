@@ -104,6 +104,20 @@ test("another Incognito window disables every command but Delete and Close these
   expect(inPanel(root, "New identity")?.disabled).toBe(true);
 });
 
+test("two other Incognito windows are named in the plural", async () => {
+  const foreign = [
+    { id: 2, tabCount: 1 },
+    { id: 3, tabCount: 2 },
+  ];
+  const { root } = mount({ ...SAVED, foreign });
+  await expect
+    .poll(() => panelText(root))
+    .toContain(
+      "Incognito windows are open while no identity is, so no identity owns them. Close them to switch identities.",
+    );
+  expect(panelText(root)).toContain("2 Incognito windows are open");
+});
+
 test("while an identity is open, its other Incognito tabs are its session, not a conflict", async () => {
   const second = { ...PRIVATE, id: 31, windowId: 3, title: "Second" };
   const beside = { ...PRIVATE, id: 40, windowId: 4, title: "Beside" };

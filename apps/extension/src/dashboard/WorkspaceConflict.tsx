@@ -42,12 +42,13 @@ interface ConflictProps {
 /** What blocks switching, and the windows RECnRun may close: exactly the ones listed. */
 export function WorkspaceConflict({ status, tabs, disabled, run }: ConflictProps) {
   const windowIds = status.foreign.map(({ id }) => id);
+  const notice =
+    windowIds.length === 1
+      ? "An Incognito window is open while no identity is, so no identity owns it. Close it to switch identities."
+      : "Incognito windows are open while no identity is, so no identity owns them. Close them to switch identities.";
   return (
     <div class="workspace-conflict" role="status">
-      <p>
-        An Incognito window is open while no identity is, so no identity owns it. Close it to switch
-        identities.
-      </p>
+      <p>{notice}</p>
       <ForeignWindows status={status} tabs={tabs} />
       <button
         type="button"
