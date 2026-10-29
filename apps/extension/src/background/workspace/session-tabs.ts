@@ -23,7 +23,7 @@ export interface SessionTab {
 }
 
 /** A blank tab or the New Tab page: a start reopens it empty at its place. */
-export interface PlainTab {
+interface PlainTab {
   tabId: number;
   windowId: number;
   active: boolean;
