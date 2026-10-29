@@ -17,7 +17,8 @@ interface ConnectEvent {
 export interface SessionWindow {
   id: number;
   focused: boolean;
-  tabs: { id: number; active: boolean }[];
+  /** A tab Chrome unloaded runs no document, so its address comes from the tab itself. */
+  tabs: { id: number; active: boolean; discarded?: boolean; url?: string }[];
 }
 
 /** What a capture needs from Chrome: the windows, a tab's top document, the agent's injection, its port. */
@@ -70,8 +71,8 @@ export const chromeCaptureApi: CaptureApi = {
       focused,
       tabs: [...tabs]
         .sort((one, other) => one.index - other.index)
-        .flatMap(({ id: tabId, active }) =>
-          tabId === undefined || isHelperTab(tabId) ? [] : [{ id: tabId, active }],
+        .flatMap(({ id: tabId, active, discarded, url }) =>
+          tabId === undefined || isHelperTab(tabId) ? [] : [{ id: tabId, active, discarded, url }],
         ),
     })),
   topFrame: async (tabId) => {

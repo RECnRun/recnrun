@@ -54,14 +54,15 @@ test("rejects a missing primary tab, an empty window, two focused windows, or tw
   expect(() => primaryTab({ ...layout, primary: { window: 3, tab: 0 } })).toThrow(/no primary/);
 });
 
-test("accepts a blank tab and a New Tab page beside the target, without sessionStorage", () => {
+test("accepts a blank tab and a New Tab page beside the target, with what the tab showed before", () => {
   const plain = (url: string, sessionStorage: unknown[] = []) => ({
     ...layout,
     windows: [{ ...first, tabs: [...(first?.tabs ?? []), { url, active: false, sessionStorage }] }],
   });
   expect(valid(plain("about:blank"))).toBe(true);
   expect(valid(plain("chrome://newtab/"))).toBe(true);
-  expect(valid(plain("about:blank", [{ origin: APP, entries: {} }]))).toBe(false);
+  // A tab keeps its sessionStorage on each origin it showed, whatever page it shows now.
+  expect(valid(plain("about:blank", [{ origin: APP, entries: { a: "1" } }]))).toBe(true);
   // The primary tab is the start's target, so it is always a web page.
   const blankFirst = { url: "about:blank", active: true, sessionStorage: [] };
   expect(valid({ ...layout, windows: [{ ...first, tabs: [blankFirst] }, second] })).toBe(false);

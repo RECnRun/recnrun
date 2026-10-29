@@ -40,6 +40,8 @@ export interface VisitedOrigins {
     visits: readonly Visit[],
     from?: LayoutPlace,
   ) => Promise<void>;
+  /** Moves `removed`'s visits and place to `added`, the id Chrome gave the tab when it swapped its contents. */
+  replaceTab: (generation: number, removed: number, added: number) => Promise<void>;
   /** Each tab's visits in `generation`; none when the lists belong to another generation. */
   tabVisits: (generation: number) => Promise<TabVisits[]>;
   /** Keeps `windowId` as the Incognito window of `generation` that had the focus last. */

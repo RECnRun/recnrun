@@ -3,8 +3,8 @@ import type { BarrierApi, BarrierOperation } from "@/background/workspace/barrie
 import type { CaptureApi } from "@/background/workspace/capture-api";
 import { visitInTab } from "@/background/workspace/helper-tab";
 import type { NavigationApi } from "@/background/workspace/navigation";
-import { isWebTab, sessionThrough } from "@/background/workspace/session-tabs";
-import type { LayoutRead, SessionTab, SessionTabs } from "@/background/workspace/session-tabs";
+import { isLoadedTab, isWebTab, sessionThrough } from "@/background/workspace/session-tabs";
+import type { FoundTab, LayoutRead, SessionTabs } from "@/background/workspace/session-tabs";
 import type { LayoutPlace, Visit, VisitedOrigins } from "@/ports/visited-origins";
 
 type Unsupported = IdentityCapture["unsupported"][number];
@@ -53,13 +53,22 @@ async function previousEntries(run: TabOriginRun, from: LayoutPlace | undefined,
   return tab?.sessionStorage.find((each) => each.origin === origin)?.entries;
 }
 
-/** Unloads the tab without its page's `beforeunload`, under the id Chrome gives it then. */
-async function moveOff(tab: SessionTab, reading: Reading): Promise<number | undefined> {
+/**
+ * Unloads the tab without its page's `beforeunload`, under the id Chrome gives it then; a tab
+ * Chrome unloaded, or on a blank or New Tab page, runs no page that could ask to stay.
+ */
+async function moveOff(tab: FoundTab, reading: Reading): Promise<number | undefined> {
+  const { moved } = reading.run;
+  if (!isLoadedTab(tab)) {
+    if (!moved.some(({ tabId }) => tabId === tab.tabId))
+      moved.push({ tabId: tab.tabId, url: tab.url });
+    return tab.tabId;
+  }
   const tabId = await reading.deps.api.discard(tab.tabId).catch(() => undefined);
   if (tabId === undefined) return undefined;
   const { seen } = reading.found;
   seen.splice(seen.indexOf(tab.tabId), 1, tabId);
-  reading.run.moved.push({ tabId, url: tab.url });
+  moved.push({ tabId, url: tab.url });
   return tabId;
 }
 
@@ -76,7 +85,7 @@ async function readIn(tabId: number | undefined, visit: Visit, reading: Reading)
 }
 
 /** One origin the tab did not hand over, by place and origin, never by address. */
-function unread(tab: SessionTab, origin: string, reason: string, kept: boolean): Unsupported {
+function unread(tab: FoundTab, origin: string, reason: string, kept: boolean): Unsupported {
   const suffix = kept ? " The last saved copy is kept." : "";
   return {
     adapter: "tabs",
@@ -99,7 +108,7 @@ async function liveOf(visits: readonly Visit[], keep: (origin: string) => Promis
  * it, each other one read in the tab, and one that is not read kept as last saved, and named.
  */
 async function tabOrigins(
-  tab: SessionTab,
+  tab: FoundTab,
   others: { from?: LayoutPlace; visits: Visit[] },
   reading: Reading,
 ): Promise<TabSessions> {
@@ -126,10 +135,21 @@ async function tabOrigins(
 }
 
 /**
- * Adds to the layout, for each web tab, the sessionStorage of every other origin it visited, which
- * belongs to that tab alone: the tab is unloaded first, so no page can ask to stay, then loads
- * each origin behind the anonymous barrier and hands its entries over. The caller brings back
- * every tab in `run.moved` unless its window closes.
+ * The origins whose entries only the tab's own visits read: every one for a blank or New Tab page,
+ * and the page's own too for a tab Chrome unloaded, unless the capture reads it in full.
+ */
+function toRead(tab: FoundTab, visits: readonly Visit[], primary: FoundTab): Visit[] {
+  if (!isWebTab(tab)) return [...visits];
+  const others = visits.filter(({ origin }) => origin !== tab.origin);
+  if (isLoadedTab(tab) || tab === primary) return others;
+  return [visits.find(({ origin }) => origin === tab.origin) ?? { origin: tab.origin }, ...others];
+}
+
+/**
+ * Adds to the layout, for each tab, the sessionStorage of every origin it visited that its page
+ * does not hand over, which belongs to that tab alone: a loaded tab is unloaded first, so no page
+ * can ask to stay, then loads each origin behind the anonymous barrier and hands its entries
+ * over. The caller brings back every tab in `run.moved` unless its window closes.
  */
 export async function readTabOrigins(
   found: SessionTabs,
@@ -141,10 +161,8 @@ export async function readTabOrigins(
   const reading = { run, deps, found, read };
   for (const [at, window] of found.windows.entries()) {
     for (const [index, tab] of window.tabs.entries()) {
-      // A blank or New Tab page reopens empty, so what it visited before is not read.
-      if (!isWebTab(tab)) continue;
       const list = lists.find(({ tabId }) => tabId === tab.tabId);
-      const visits = (list?.visits ?? []).filter(({ origin }) => origin !== tab.origin);
+      const visits = toRead(tab, list?.visits ?? [], found.primary);
       const laid = read.layout.windows[at]?.tabs[index];
       if (visits.length === 0 || laid === undefined) continue;
       laid.sessionStorage.push(...(await tabOrigins(tab, { from: list?.from, visits }, reading)));

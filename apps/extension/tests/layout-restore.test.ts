@@ -151,6 +151,33 @@ describe("restoreLayout", () => {
     expect(run.deps.navigation.updates).toEqual([]);
   });
 
+  test("a blank or New Tab page that holds sessionStorage takes it, then shows its page again", async () => {
+    const held = (url: string) => ({
+      url,
+      active: false,
+      sessionStorage: [{ origin: OTHER, entries: { step: "2" } }],
+    });
+    const main = { url: `${APP}/app/`, active: true, sessionStorage: [] };
+    const layout: SessionLayout = {
+      windows: [{ focused: true, tabs: [main, held("about:blank"), held("chrome://newtab/")] }],
+      primary: { window: 0, tab: 0 },
+    };
+    const run = restoring(undefined, layout);
+    await expect(run.running).resolves.toEqual([]);
+    expect(run.deps.navigation.updates).toEqual([
+      { tabId: 200, url: `${OTHER}/` },
+      { tabId: 201, url: `${OTHER}/` },
+    ]);
+    expect(run.deps.layout.calls).toEqual([
+      "tab 200 in 5 at 1",
+      "new tab 201 in 5 at 2",
+      "activate 9",
+      "navigate 200 about:blank",
+      "navigate 201 chrome://newtab/",
+      "focus 5",
+    ]);
+  });
+
   test("a tab whose sessionStorage of another origin is not taken still opens, and is named", async () => {
     const run = restoring(() => ({ type: "failed", error: "QuotaExceededError" }));
     const failed = { work: "restore", step: "restore" };

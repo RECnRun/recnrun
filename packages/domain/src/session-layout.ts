@@ -10,10 +10,10 @@ const TabSessionSchema = v.object({
   entries: OriginDataSchema.entries.sessionStorage,
 });
 
-/** Pages a start reopens as Chrome opens them, empty: a blank tab and the New Tab page. */
+/** Pages a start reopens as Chrome opens them: a blank tab and the New Tab page. */
 export const PLAIN_PAGES = ["about:blank", "chrome://newtab/"] as const;
 
-/** Whether `url` is a page a start reopens empty rather than loads. */
+/** Whether `url` is a page a start opens as Chrome does rather than loads from a server. */
 export const isPlainPage = (url: string): url is (typeof PLAIN_PAGES)[number] =>
   (PLAIN_PAGES as readonly string[]).includes(url);
 
@@ -23,10 +23,6 @@ const LayoutTabSchema = v.pipe(
     active: v.boolean(),
     sessionStorage: v.array(TabSessionSchema),
   }),
-  v.check(
-    ({ url, sessionStorage }) => !isPlainPage(url) || sessionStorage.length === 0,
-    "A blank or New Tab page holds no sessionStorage.",
-  ),
   v.check(
     ({ sessionStorage }) =>
       new Set(sessionStorage.map(({ origin }) => origin)).size === sessionStorage.length,
@@ -41,7 +37,7 @@ const LayoutWindowSchema = v.pipe(
 
 /**
  * Every Incognito window a capture saved, in order, each with its tabs in order (a web page, a blank
- * tab, or the New Tab page), and where the
+ * tab, or the New Tab page, each with the sessionStorage of the origins it showed), and where the
  * capture's own target sits: its window and its place there. The URLs stay in the capture; they
  * are never logged or sent over the website bridge.
  */

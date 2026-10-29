@@ -1,7 +1,13 @@
 import type { SessionLayout } from "@recnrun/domain";
 import { expect, test, vi } from "vite-plus/test";
-import type { LayoutRead, SessionTab, SessionTabs } from "@/background/workspace/session-tabs";
+import type {
+  LayoutRead,
+  SessionTab,
+  SessionTabs,
+  UnloadedTab,
+} from "@/background/workspace/session-tabs";
 import { readTabOrigins, returnTabs } from "@/background/workspace/tab-origins";
+import type { MovedTab } from "@/background/workspace/tab-origins";
 import type { TabVisits } from "@/ports/visited-origins";
 import { fakeBarrierApi } from "./fake-barrier";
 import { memoryVisits } from "./fake-helper";
@@ -93,7 +99,13 @@ function reading(tabs: TabVisits[], held: Parameters<typeof agentsHold>[0]) {
     visits: memoryVisits(OPERATION.generation, [], tabs),
   };
   const previous = vi.fn(async () => PREVIOUS);
-  const run = { operation: OPERATION, boundMs: 5_000, live: true, previous, moved: [] };
+  const run = {
+    operation: OPERATION,
+    boundMs: 5_000,
+    live: true,
+    previous,
+    moved: [] as MovedTab[],
+  };
   return { deps, run, ...session() };
 }
 
@@ -178,23 +190,74 @@ test("a capture the windows outlast leaves every tab on its page and keeps the l
   ]);
 });
 
-test("leaves a blank or New Tab page where it is, whatever it visited before", async () => {
+/** Adds `tab` as the third tab of the window, as the capture found and laid it. */
+function third(
+  found: SessionTabs,
+  read: LayoutRead,
+  tab: SessionTabs["windows"][number]["tabs"][number],
+) {
+  found.windows[0]?.tabs.push(tab);
+  read.layout.windows[0]?.tabs.push({ url: tab.url, active: false, sessionStorage: [] });
+}
+
+const unloaded = (tabId: number): UnloadedTab => ({
+  tabId,
+  windowId: 1,
+  active: false,
+  url: `${APP}/app/?tab=2`,
+  origin: APP,
+  place: "window 1, tab 3",
+});
+
+test("reads what a blank or New Tab page showed before in that tab, which runs no page to unload", async () => {
   const { deps, run, found, read } = reading([{ tabId: 12, visits: [{ origin: OTHER }] }], {
     [OTHER]: { step: "2" },
   });
-  const blank = {
-    tabId: 12,
-    windowId: 1,
-    active: false,
-    url: "about:blank" as const,
-    place: "window 1, tab 3",
-  };
-  found.windows[0]?.tabs.push(blank);
-  read.layout.windows[0]?.tabs.push({ url: "about:blank", active: false, sessionStorage: [] });
+  const place = "window 1, tab 3";
+  third(found, read, { tabId: 12, windowId: 1, active: false, url: "about:blank", place });
   await readTabOrigins(found, read, run, deps);
   expect(deps.api.discard).not.toHaveBeenCalled();
-  expect(read.layout.windows[0]?.tabs[2]?.sessionStorage).toEqual([]);
+  expect(read.layout.windows[0]?.tabs[2]?.sessionStorage).toEqual([
+    { origin: OTHER, entries: { step: "2" } },
+  ]);
+  expect(run.moved).toEqual([{ tabId: 12, url: "about:blank" }]);
+  expect(deps.navigation.updates).toEqual([{ tabId: 12, url: `${OTHER}/` }]);
   expect(read.unsupported).toEqual([]);
+});
+
+test("reads a tab Chrome unloaded on its own origin too, in that tab, without unloading it again", async () => {
+  const { deps, run, found, read } = reading([{ tabId: 13, visits: [{ origin: OTHER }] }], {
+    [APP]: { own: "1" },
+    [OTHER]: { step: "2" },
+  });
+  third(found, read, unloaded(13));
+  await readTabOrigins(found, read, run, deps);
+  expect(deps.api.discard).not.toHaveBeenCalled();
+  expect(read.layout.windows[0]?.tabs[2]?.sessionStorage).toEqual([
+    { origin: APP, entries: { own: "1" } },
+    { origin: OTHER, entries: { step: "2" } },
+  ]);
+  expect(run.moved).toEqual([{ tabId: 13, url: `${APP}/app/?tab=2` }]);
+  expect(read.entries).toBe(2);
+});
+
+test("leaves an unloaded primary tab's own origin to the full read, and moves it once", async () => {
+  const { deps, run, found, read } = reading(
+    [{ tabId: 13, visits: [{ origin: APP }, { origin: OTHER }] }],
+    {
+      [OTHER]: { step: "2" },
+    },
+  );
+  const primary = unloaded(13);
+  third(found, read, primary);
+  found.primary = primary;
+  run.moved.push({ tabId: 13, url: primary.url });
+  await readTabOrigins(found, read, run, deps);
+  expect(read.layout.windows[0]?.tabs[2]?.sessionStorage).toEqual([
+    { origin: OTHER, entries: { step: "2" } },
+  ]);
+  expect(run.moved).toEqual([{ tabId: 13, url: primary.url }]);
+  expect(deps.navigation.updates).toEqual([{ tabId: 13, url: `${OTHER}/` }]);
 });
 
 test("brings each moved tab back to its page, past one that cannot load it", async () => {

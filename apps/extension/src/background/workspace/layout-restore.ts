@@ -105,7 +105,7 @@ async function openTabs(
   return ids;
 }
 
-/** Loads one reopened web tab's page, its own sessionStorage written first; what was not taken. */
+/** Loads one reopened tab's page, its own sessionStorage written first; what was not taken. */
 async function loadTab(
   tab: { tabId: number; laid: LaidTab; from: LayoutPlace },
   run: LayoutRun,
@@ -133,8 +133,9 @@ async function reopenWindow(at: number, layout: SessionLayout, run: LayoutRun, d
   const skipped: SkippedOrigin[] = [];
   for (const [index, laid] of tabs.entries()) {
     const tabId = ids[index] ?? -1;
-    // A blank or New Tab page opened as it was saved; the primary tab is already restored.
-    const loads = !isPlainPage(laid.url) && index !== opened.primaryIndex;
+    // A blank or New Tab page without sessionStorage opened as saved; the primary is restored.
+    const plain = isPlainPage(laid.url) && laid.sessionStorage.length === 0;
+    const loads = !plain && index !== opened.primaryIndex;
     const from = { window: at, tab: index };
     if (loads) skipped.push(...(await loadTab({ tabId, laid, from }, run, deps)));
     if (laid.active) await deps.layout.activate(tabId);

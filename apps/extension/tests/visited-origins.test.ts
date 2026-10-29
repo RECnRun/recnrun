@@ -19,10 +19,12 @@ beforeEach(() => {
 /** The tracker over fakes: tabs 9 and 10 are Incognito ones, tab 11 a helper, tab 1 a normal one. */
 function tracked(managed: ManagedWindowState | null = MANAGED) {
   const onCommitted = fakeEvent<[{ tabId: number; frameId: number; url: string }]>();
+  const onReplaced = fakeEvent<[number, number]>();
   const visits = memoryVisits();
   const state = { managed };
   trackVisitedOrigins({
     onCommitted,
+    onReplaced,
     incognitoTab: async (tabId) => [9, 10, 11].includes(tabId),
     helperTab: (tabId) => tabId === 11,
     managed: async () => state.managed,
@@ -30,7 +32,12 @@ function tracked(managed: ManagedWindowState | null = MANAGED) {
   });
   const commit = (tabId: number, url: string, frameId = 0) =>
     onCommitted.emit({ tabId, frameId, url });
-  return { visits, state, commit };
+  return {
+    visits,
+    state,
+    commit,
+    replace: (added: number, removed: number) => onReplaced.emit(added, removed),
+  };
 }
 
 test("notes each top document's origin and page in any Incognito tab while the window is open", async () => {
@@ -121,6 +128,31 @@ test("keeps each tab's visits apart, with the place a start reopened it from", a
   expect(await visitedOrigins.tabVisits(2)).toEqual([]);
 });
 
+test("a tab Chrome swaps keeps its visits under its new id while the window is open", async () => {
+  const { visits, state, commit, replace } = tracked();
+  commit(9, `${APP}/`);
+  await vi.waitFor(() => expect(visits.tabs.tabs).toEqual([{ tabId: 9, visits: [at(APP)] }]));
+  // Unloading a tab can swap its contents, and its id with them; its sessionStorage stays.
+  replace(12, 9);
+  await vi.waitFor(() => expect(visits.tabs.tabs).toEqual([{ tabId: 12, visits: [at(APP)] }]));
+  state.managed = null;
+  replace(13, 12);
+  await Promise.resolve();
+  expect(visits.replaceTab).toHaveBeenCalledTimes(1);
+});
+
+test("moves a swapped tab's visits and place to its new id, in its generation", async () => {
+  await visitedOrigins.noteTab(2, 9, [at(APP)], { window: 0, tab: 1 });
+  await visitedOrigins.noteTab(2, 10, [at(SSO)]);
+  await visitedOrigins.replaceTab(2, 9, 12);
+  expect(await visitedOrigins.tabVisits(2)).toEqual([
+    { tabId: 12, from: { window: 0, tab: 1 }, visits: [at(APP)] },
+    { tabId: 10, visits: [at(SSO)] },
+  ]);
+  await visitedOrigins.replaceTab(2, 99, 100);
+  expect((await visitedOrigins.tabVisits(2)).map(({ tabId }) => tabId)).toEqual([12, 10]);
+});
+
 test("two notes at once keep both origins", async () => {
   await Promise.all([visitedOrigins.note(1, [at(APP)]), visitedOrigins.note(1, [at(SSO)])]);
   expect(await visitedOrigins.visited(1)).toEqual([at(APP), at(SSO)]);
@@ -146,6 +178,11 @@ test("Chrome's tracking reads the managed window and the tab's Incognito flag", 
     if (tabId === 9) return { id: 9, incognito: true };
     throw new Error("No tab with id.");
   }) as never);
+  // fakeBrowser implements no in-memory onReplaced.
+  const replaced = fakeEvent<[number, number]>();
+  vi.spyOn(fakeBrowser.tabs.onReplaced, "addListener").mockImplementation(
+    replaced.addListener as never,
+  );
   trackVisitedOrigins();
   await fakeBrowser.webNavigation.onCommitted.trigger({
     tabId: 2,
@@ -159,6 +196,10 @@ test("Chrome's tracking reads the managed window and the tab's Incognito flag", 
   } as never);
   await vi.waitFor(async () => expect(await visitedOrigins.visited(3)).toEqual([at(APP)]));
   expect(get).toHaveBeenCalledWith(2);
+  replaced.emit(12, 9);
+  await vi.waitFor(async () =>
+    expect(await visitedOrigins.tabVisits(3)).toEqual([{ tabId: 12, visits: [at(APP)] }]),
+  );
 });
 
 /** The focus tracker over fakes: windows 5 and 6 are Incognito ones, window 1 a normal one. */

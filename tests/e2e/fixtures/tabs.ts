@@ -23,6 +23,7 @@ interface ChromeGlobal {
       query(filter: object): Promise<ChromeTab[]>;
       create(properties: object): Promise<ChromeTab>;
       update(tabId: number, properties: object): Promise<ChromeTab>;
+      discard(tabId: number): Promise<ChromeTab | undefined>;
     };
     windows: {
       create(data: object): Promise<{ id?: number; tabs?: ChromeTab[] }>;
@@ -149,6 +150,27 @@ export function focusTab(serviceWorker: Worker, tabId: number): Promise<void> {
     const tab = await chrome.tabs.update(id, { active: true });
     await chrome.windows.update(tab.windowId, { focused: true });
   }, tabId);
+}
+
+/** Unloads the tab as Chrome's Memory Saver does, and returns the id the tab has then. */
+export function discardTab(serviceWorker: Worker, tabId: number): Promise<number> {
+  return serviceWorker.evaluate(async (id) => {
+    const { chrome } = globalThis as unknown as ChromeGlobal;
+    const discarded = await chrome.tabs.discard(id);
+    if (discarded?.id === undefined) throw new Error("Chrome did not discard the tab.");
+    return discarded.id;
+  }, tabId);
+}
+
+/** Loads `url` in the tab, as typing it in the address bar would. */
+export function navigateTab(serviceWorker: Worker, tabId: number, url: string): Promise<void> {
+  return serviceWorker.evaluate(
+    async ([id, address]) => {
+      const { chrome } = globalThis as unknown as ChromeGlobal;
+      await chrome.tabs.update(id, { url: address });
+    },
+    [tabId, url] as const,
+  );
 }
 
 /** Everything the extension stores, local and session storage alike, as one string. */

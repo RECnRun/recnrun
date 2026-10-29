@@ -26,6 +26,8 @@ beforeEach(() => {
   fakeBrowser.reset();
   vi.restoreAllMocks();
   vi.spyOn(fakeBrowser.runtime, "getManifest").mockReturnValue(manifest);
+  // fakeBrowser implements no in-memory onReplaced.
+  vi.spyOn(fakeBrowser.tabs.onReplaced, "addListener").mockImplementation(() => undefined);
 });
 
 test("registers one listener that answers every message family", async () => {

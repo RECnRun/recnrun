@@ -61,6 +61,11 @@ export function memoryVisits(generation = 0, initial: Visit[] = [], tabs: TabVis
         };
       },
     ),
+    replaceTab: vi.fn(async (noted: number, removed: number, added: number) => {
+      const kept = visits.tabs.generation === noted ? visits.tabs.tabs : [];
+      const tabs = kept.map((each) => (each.tabId === removed ? { ...each, tabId: added } : each));
+      visits.tabs = { generation: noted, tabs };
+    }),
     tabVisits: vi.fn(async (asked: number) =>
       visits.tabs.generation === asked ? [...visits.tabs.tabs] : [],
     ),

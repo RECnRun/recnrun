@@ -211,3 +211,57 @@ test("a tab whose page does not hand its sessionStorage over reopens without it,
     { adapter: "tabs", item: "window 1, tab 1", reason: "The page stopped sending its data." },
   ]);
 });
+
+const UNLOADED: SessionWindow[] = [
+  {
+    id: 1,
+    focused: true,
+    tabs: [
+      { id: 10, active: true, discarded: true, url: `${APP}/app/` },
+      { id: 11, active: false, discarded: true, url: "about:blank" },
+      { id: 12, active: false, discarded: true },
+      { id: 13, active: false, discarded: true, url: "chrome://settings/" },
+      { id: 14, active: false },
+    ],
+  },
+];
+
+test("keeps a tab Chrome unloaded by the address it shows, without reading its page", async () => {
+  const api = sessionChrome(UNLOADED, { 14: page(`${OTHER}/blank`, "doc-14") });
+  const found = await findSessionTabs(api, 10);
+  expect(found.windows[0]?.tabs).toEqual([
+    {
+      tabId: 10,
+      windowId: 1,
+      active: true,
+      url: `${APP}/app/`,
+      origin: APP,
+      place: "window 1, tab 1",
+    },
+    { tabId: 11, windowId: 1, active: false, url: "about:blank", place: "window 1, tab 2" },
+    expect.objectContaining({ tabId: 14, documentId: "doc-14" }),
+  ]);
+  expect(found.unsupported.map(({ item }) => item)).toEqual(["window 1, tab 3", "window 1, tab 4"]);
+  expect(api.topFrame.mock.calls).toEqual([[14]]);
+  // A loaded web tab is read in full over the managed one Chrome unloaded.
+  expect(found.primary.tabId).toBe(14);
+  const read = await readLayout(found, { api, operation: OPERATION, boundMs: BOUND });
+  expect(read.layout.primary).toEqual({ window: 0, tab: 2 });
+  // An unloaded tab's own sessionStorage comes with its other origins, never through an agent.
+  expect(api.inject).not.toHaveBeenCalled();
+});
+
+test("reads a tab Chrome unloaded in full when no web tab of the session runs a page", async () => {
+  const windows = [
+    { ...UNLOADED[0], tabs: UNLOADED[0]?.tabs.slice(0, 2) ?? [] },
+  ] as SessionWindow[];
+  const found = await findSessionTabs(sessionChrome(windows, {}), 99);
+  expect(found.primary).toEqual({
+    tabId: 10,
+    windowId: 1,
+    active: true,
+    url: `${APP}/app/`,
+    origin: APP,
+    place: "window 1, tab 1",
+  });
+});

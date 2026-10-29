@@ -22,7 +22,17 @@ export interface SessionTab {
   place: string;
 }
 
-/** A blank tab or the New Tab page: a start reopens it empty at its place. */
+/** A web tab Chrome unloaded: no document runs in it, so a capture reads it behind the barrier. */
+export interface UnloadedTab {
+  tabId: number;
+  windowId: number;
+  active: boolean;
+  url: string;
+  origin: string;
+  place: string;
+}
+
+/** A blank tab or the New Tab page: a start reopens it at its place. */
 interface PlainTab {
   tabId: number;
   windowId: number;
@@ -31,15 +41,18 @@ interface PlainTab {
   place: string;
 }
 
-export type FoundTab = SessionTab | PlainTab;
+export type FoundTab = SessionTab | UnloadedTab | PlainTab;
 
-/** Whether the tab shows a web page, which a capture reads. */
-export const isWebTab = (tab: FoundTab): tab is SessionTab => "origin" in tab;
+/** Whether the tab holds a web page, loaded or not, which a capture reads. */
+export const isWebTab = (tab: FoundTab): tab is SessionTab | UnloadedTab => "origin" in tab;
+
+/** Whether the tab's page runs, so its own agent can hand its sessionStorage over. */
+export const isLoadedTab = (tab: FoundTab): tab is SessionTab => "documentId" in tab;
 
 /** The session's tabs by window, the tab a capture reads in full, and the tabs left out. */
 export interface SessionTabs {
   windows: { focused: boolean; tabs: FoundTab[] }[];
-  primary: SessionTab;
+  primary: SessionTab | UnloadedTab;
   unsupported: Unsupported[];
   /** Every tab of the session, web or not, so the close can tell one opened since. */
   seen: number[];
@@ -54,23 +67,31 @@ const leftOut = (url: string) =>
 /** A tab's place, never its URL, which stays out of what a capture names. */
 const placeOf = (window: number, tab: number) => `window ${window + 1}, tab ${tab + 1}`;
 
-/** The tab as a capture keeps it, or why it stays out. */
+/** The tab as a capture keeps it, or why it stays out; a page without a document is unloaded. */
 function foundTab(
-  frame: { url: string; documentId: string } | null,
+  page: { url: string; documentId?: string } | null,
   at: { tabId: number; windowId: number; active: boolean; place: string },
 ): FoundTab | string {
-  if (frame === null) return UNREAD;
-  const { url, documentId } = frame;
+  if (page === null) return UNREAD;
+  const { url, documentId } = page;
   if (isPlainPage(url)) return { ...at, url };
   if (!isAllowedTarget(url)) return leftOut(url);
-  return { ...at, url, origin: new URL(url).origin, documentId };
+  const origin = new URL(url).origin;
+  return documentId === undefined ? { ...at, url, origin } : { ...at, url, origin, documentId };
+}
+
+/** The tab's top document, or for a tab Chrome unloaded only the address it shows. */
+async function pageOf(api: TabReadApi, tab: SessionWindow["tabs"][number]) {
+  if (tab.discarded !== true) return api.topFrame(tab.id);
+  return tab.url === undefined ? null : { url: tab.url };
 }
 
 async function tabsOf(api: TabReadApi, window: SessionWindow, at: number, left: Unsupported[]) {
   const tabs: FoundTab[] = [];
-  for (const [index, { id: tabId, active }] of window.tabs.entries()) {
+  for (const [index, each] of window.tabs.entries()) {
     const place = placeOf(at, index);
-    const tab = foundTab(await api.topFrame(tabId), { tabId, windowId: window.id, active, place });
+    const { id: tabId, active } = each;
+    const tab = foundTab(await pageOf(api, each), { tabId, windowId: window.id, active, place });
     if (typeof tab === "string") left.push({ adapter: "tabs", item: place, reason: tab });
     else tabs.push(tab);
   }
@@ -82,10 +103,25 @@ function focusedOf(all: readonly SessionWindow[], lastFocused: number | undefine
   return all.find(({ focused }) => focused)?.id ?? lastFocused;
 }
 
+/** The tab to read in full among `tabs`: the managed one, else the focused window's active one, else the first. */
+function primaryOf(
+  windows: SessionTabs["windows"],
+  accepts: (tab: FoundTab) => boolean,
+  managed: number,
+) {
+  const web = windows.flatMap((window) => window.tabs.filter(isWebTab).filter(accepts));
+  const focused = windows
+    .find(({ focused: has }) => has)
+    ?.tabs.filter(isWebTab)
+    .find((tab) => tab.active && accepts(tab));
+  return web.find(({ tabId }) => tabId === managed) ?? focused ?? web[0];
+}
+
 /**
- * Every web, blank, and New Tab page of the session in order, and the one a capture reads in full: the managed tab while
- * it is open, else the focused window's active tab, else the first. `lastFocused` is the Incognito
- * window that had the focus last, since the dashboard holds it when the user asks to save.
+ * Every web, blank, and New Tab page of the session in order, and the one a capture reads in full:
+ * among the loaded web tabs, else among those Chrome unloaded, the managed tab while it is open,
+ * else the focused window's active tab, else the first. `lastFocused` is the Incognito window that
+ * had the focus last, since the dashboard holds it when the user asks to save.
  */
 export async function findSessionTabs(
   api: TabReadApi,
@@ -100,12 +136,8 @@ export async function findSessionTabs(
     const tabs = await tabsOf(api, window, at, unsupported);
     if (tabs.length > 0) windows.push({ focused: window.id === focusedId, tabs });
   }
-  const web = windows.flatMap(({ tabs }) => tabs.filter(isWebTab));
-  const focused = windows
-    .find(({ focused: has }) => has)
-    ?.tabs.filter(isWebTab)
-    .find(({ active }) => active);
-  const primary = web.find(({ tabId }) => tabId === managedTabId) ?? focused ?? web[0];
+  const primary =
+    primaryOf(windows, isLoadedTab, managedTabId) ?? primaryOf(windows, isWebTab, managedTabId);
   if (primary === undefined) {
     throw new WorkspaceError("TargetNotAllowed", "Only http and https pages can be captured.");
   }
@@ -179,9 +211,9 @@ async function sessionOf(tab: SessionTab, read: LayoutRead, reader: Reader) {
 }
 
 /**
- * Lays the session out as it is: each tab's address and, for every web tab but the primary one,
- * whose origin the capture reads in full, its own sessionStorage. A tab whose read fails reopens
- * without it, and is named.
+ * Lays the session out as it is: each tab's address and, for every loaded web tab but the primary
+ * one, whose origin the capture reads in full, its own sessionStorage. A tab whose read fails
+ * reopens without it, and is named; an unloaded tab's comes with its other origins.
  */
 export async function readLayout(found: SessionTabs, reader: Reader): Promise<LayoutRead> {
   const layout: SessionLayout = { windows: [], primary: { window: 0, tab: 0 } };
@@ -191,7 +223,7 @@ export async function readLayout(found: SessionTabs, reader: Reader): Promise<La
     for (const [index, tab] of tabs.entries()) {
       const primary = tab === found.primary;
       if (primary) layout.primary = { window: at, tab: index };
-      const own = !primary && isWebTab(tab);
+      const own = !primary && isLoadedTab(tab);
       const sessionStorage = own ? await sessionOf(tab, read, reader) : [];
       laid.push({ url: tab.url, active: tab.active, sessionStorage });
     }

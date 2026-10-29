@@ -99,6 +99,12 @@ const noteTab: VisitedOrigins["noteTab"] = (generation, tabId, visits, from) =>
     return { ...current, tabs: [...others, tab] };
   });
 
+const replaceTab: VisitedOrigins["replaceTab"] = (generation, removed, added) =>
+  change(generation, (current) => ({
+    ...current,
+    tabs: current.tabs.map((tab) => (tab.tabId === removed ? { ...tab, tabId: added } : tab)),
+  }));
+
 async function visited(generation: number): Promise<Visit[]> {
   const current = await read();
   return current?.generation === generation ? current.visits : [];
@@ -122,6 +128,7 @@ export const visitedOrigins: VisitedOrigins = {
   note,
   visited,
   noteTab,
+  replaceTab,
   tabVisits,
   noteFocus,
   focusedWindow,

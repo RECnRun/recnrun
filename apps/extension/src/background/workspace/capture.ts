@@ -2,7 +2,6 @@ import { approximateBytes } from "@recnrun/domain";
 import type { IdentityCapture, ManagedWindowState, SkippedOrigin } from "@recnrun/domain";
 import type { BarrierOperation } from "@/background/workspace/barrier";
 import type { BootstrapPorts } from "@/background/workspace/bootstrap";
-import { connectAgent } from "@/background/workspace/capture-api";
 import type { CaptureApi } from "@/background/workspace/capture-api";
 import { captureCookies } from "@/background/workspace/cookie-capture";
 import { resolveTabStore } from "@/background/workspace/cookie-stores";
@@ -10,11 +9,13 @@ import type { CookieApi } from "@/background/workspace/cookie-stores";
 import type { HelperDeps } from "@/background/workspace/helper-tab";
 import { CAPTURE_BOUND_MS, readOrigin, readOthers } from "@/background/workspace/origin-reads";
 import type { OriginRead, OthersRead } from "@/background/workspace/origin-reads";
+import { openPrimary } from "@/background/workspace/primary-read";
+import type { PrimaryAccess } from "@/background/workspace/primary-read";
 import { findSessionTabs, readLayout } from "@/background/workspace/session-tabs";
-import type { LayoutRead, SessionTab, SessionTabs } from "@/background/workspace/session-tabs";
+import type { LayoutRead, SessionTabs } from "@/background/workspace/session-tabs";
 import { readTabOrigins, returnTabs } from "@/background/workspace/tab-origins";
 import type { MovedTab } from "@/background/workspace/tab-origins";
-import type { CapturedCounts, OriginPort } from "@/messaging/origin-protocol";
+import type { CapturedCounts } from "@/messaging/origin-protocol";
 import type { VisitedOrigins } from "@/ports/visited-origins";
 import type { IdentityCaptures } from "@/storage/identity-captures";
 
@@ -59,7 +60,6 @@ export interface CaptureSummary {
 
 interface Target {
   tabId: number;
-  documentId: string;
   origin: string;
   url: string;
   /** The tab's Incognito cookie store. */
@@ -68,10 +68,10 @@ interface Target {
 
 type Jar = IdentityCapture["cookies"];
 
-async function targetOf(deps: CaptureDeps, tab: SessionTab): Promise<Target> {
-  const { tabId, documentId, origin, url } = tab;
+async function targetOf(deps: CaptureDeps, tab: SessionTabs["primary"]): Promise<Target> {
+  const { tabId, origin, url } = tab;
   const storeId = await resolveTabStore(deps.cookies, tabId);
-  return { tabId, documentId, origin, url, storeId };
+  return { tabId, origin, url, storeId };
 }
 
 function startedHeader(identityId: string, target: Target): IdentityCapture {
@@ -136,12 +136,12 @@ function cookieJar(deps: CaptureDeps, target: Target, reads: OriginRead[]) {
 
 /** The target's page first, then every other origin the window visited, each in the helper tab. */
 async function readOrigins(
-  port: OriginPort,
+  primary: PrimaryAccess,
   reading: { operation: BarrierOperation; captureId: string; windowId: number; identityId: string },
   target: Target,
   deps: CaptureDeps,
 ): Promise<OthersRead> {
-  const first = await readOrigin(port, reading, target.origin, deps);
+  const first = await primary.read((port) => readOrigin(port, reading, target.origin, deps));
   const visited = await deps.origins.visits.visited(reading.operation.generation);
   const others = visited.filter(({ origin }) => origin !== target.origin);
   const helper = { ...deps, helper: deps.origins.helper };
@@ -184,7 +184,7 @@ function summaryOf(all: OthersRead, laid: LayoutRead, jar: Jar, header: Identity
 }
 
 interface Link {
-  port: OriginPort;
+  primary: PrimaryAccess;
   operation: BarrierOperation;
   windowId: number;
   found: SessionTabs;
@@ -222,13 +222,13 @@ async function captureThrough(
   started: IdentityCapture,
   deps: CaptureDeps,
 ) {
-  const { port, found, operation, windowId } = link;
+  const { primary, found, operation, windowId } = link;
   const { captures } = deps;
   try {
     await captures.begin(started);
     const identityId = started.identityId;
     const reading = { operation, windowId, captureId: started.id, identityId };
-    const all = await readOrigins(port, reading, target, deps);
+    const all = await readOrigins(primary, reading, target, deps);
     const laid = await readLayout(found, { api: deps.api, operation, boundMs: boundOf(deps) });
     await readTabsOrigins(link, laid, identityId, deps);
     const jar = await cookieJar(deps, target, all.reads);
@@ -252,8 +252,8 @@ async function sessionTabsOf(deps: CaptureDeps, managed: ManagedWindowState) {
 
 /**
  * Captures the session's primary tab in full, every other origin it visited, every other tab's
- * sessionStorage and place, and the cookies as `identityId`'s saved data; `operationId` names the helper tab's barriers, so a restart's
- * recovery removes them.
+ * sessionStorage and place, and the cookies as `identityId`'s saved data; `operationId` names the
+ * helper tab's barriers, so a restart's recovery removes them.
  */
 export async function captureIdentity(
   identityId: string,
@@ -264,18 +264,22 @@ export async function captureIdentity(
   const began = performance.now();
   const found = await sessionTabsOf(deps, managed);
   const target = await targetOf(deps, found.primary);
-  const port = await connectAgent(deps.api, target, boundOf(deps));
-  const started = startedHeader(identityId, target);
   const operation = { id: operationId, generation: managed.generation };
   const moved: MovedTab[] = [];
+  const primary = await openPrimary(
+    found.primary,
+    { operation, boundMs: boundOf(deps), moved },
+    { api: deps.api, ...deps.origins },
+  );
+  const started = startedHeader(identityId, target);
   let away = false;
   try {
-    const link = { port, operation, windowId: found.primary.windowId, found, moved };
+    const link = { primary, operation, windowId: found.primary.windowId, found, moved };
     const counts = await captureThrough(link, target, started, deps);
     away = deps.closing === true;
     return { captureId: started.id, ...counts, ms: since(began), away: away ? moved : [] };
   } finally {
-    port.disconnect();
+    primary.release();
     // Brought back unless the windows close next: reloading a page could rotate what was saved.
     if (!away) await returnTabs(deps.api, moved);
   }

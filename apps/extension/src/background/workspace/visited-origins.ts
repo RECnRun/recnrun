@@ -14,12 +14,13 @@ interface Commit {
 /** What the tracking needs from Chrome and storage; tests replace each. */
 export interface VisitTracking {
   onCommitted: { addListener: (listener: (commit: Commit) => void) => void };
+  onReplaced: { addListener: (listener: (added: number, removed: number) => void) => void };
   /** Whether the tab is an Incognito one; false for a tab Chrome no longer knows. */
   incognitoTab: (tabId: number) => Promise<boolean>;
   /** Whether the tab is a capture's or a start's own helper tab, whose pages are not the user's. */
   helperTab: (tabId: number) => boolean;
   managed: () => Promise<ManagedWindowState | null>;
-  visits: Pick<VisitedOrigins, "note" | "noteTab">;
+  visits: Pick<VisitedOrigins, "note" | "noteTab" | "replaceTab">;
 }
 
 /** The page's origin and path; the query and fragment are dropped, since they can carry tokens. */
@@ -39,9 +40,17 @@ async function record(tracking: VisitTracking, tabId: number, visit: Visit): Pro
   await tracking.visits.noteTab(managed.generation, tabId, [visit]);
 }
 
+/** Keeps a swapped tab's visits under the id Chrome gave it, as its sessionStorage stays with it. */
+async function replace(tracking: VisitTracking, added: number, removed: number): Promise<void> {
+  const managed = await tracking.managed();
+  if (managed?.status !== "active") return;
+  await tracking.visits.replaceTab(managed.generation, removed, added);
+}
+
 /**
  * Notes the origin and page of each top document an Incognito tab commits while the managed window
- * is open, so the next capture saves that origin's site data too; a failure is logged as unhandled.
+ * is open, so the next capture saves that origin's site data too, and follows a tab whose contents
+ * Chrome swaps; a failure is logged as unhandled.
  */
 export function trackVisitedOrigins(tracking: VisitTracking = chromeVisitTracking()): void {
   tracking.onCommitted.addListener(({ tabId, frameId, url }) => {
@@ -51,12 +60,14 @@ export function trackVisitedOrigins(tracking: VisitTracking = chromeVisitTrackin
       void record(tracking, tabId, visit);
     }
   });
+  tracking.onReplaced.addListener((added, removed) => void replace(tracking, added, removed));
 }
 
 /** Chrome's navigation events and tabs, the managed window's state, and the session list. */
 function chromeVisitTracking(): VisitTracking {
   return {
     onCommitted: browser.webNavigation.onCommitted,
+    onReplaced: browser.tabs.onReplaced,
     incognitoTab: async (tabId) => {
       const tab = await browser.tabs.get(tabId).catch(() => undefined);
       return tab?.incognito === true;
