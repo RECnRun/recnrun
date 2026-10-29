@@ -99,7 +99,13 @@ export type RestoredCounts = v.InferOutput<typeof CountsSchema>;
  */
 export const OriginReplySchema = v.variant("type", [
   v.object({ type: v.literal("probe-echo"), ...OPERATION, probe: v.unknown() }),
-  v.object({ type: v.literal("restored"), ...OPERATION, counts: CountsSchema }),
+  // `rebuilt`: the fetched cache entries the restore could only write as captured.
+  v.object({
+    type: v.literal("restored"),
+    ...OPERATION,
+    counts: CountsSchema,
+    rebuilt: v.optional(v.array(UnsupportedEntrySchema), []),
+  }),
   // Web Storage comes first; a database's schema comes before its records, which travel apart.
   v.object({
     type: v.literal("capture-storage"),

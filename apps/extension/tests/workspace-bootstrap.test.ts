@@ -31,7 +31,7 @@ describe("bootstrapIdentity", () => {
 
     expect(cookies.written).toEqual([{ ...DATA.cookies[0], storeId: "1", url: `${ORIGIN}/` }]);
     expect(seen.cookiesAtNavigation).toBe(1);
-    expect(seen.rulesAtNavigation).toBe(5);
+    expect(seen.rulesAtNavigation).toBe(6);
     expect(seen.restorePayload).toEqual(DATA.site);
     expect(seen.rulesAtReload).toBe(0);
     expect(seen.scriptsAtReload).toBe(0);
@@ -191,7 +191,7 @@ describe("bootstrapIdentity on a redirect off the target", () => {
     await expect(bootstrapIdentity(START, DATA, deps, "op-1")).resolves.toHaveLength(
       BOOTSTRAP_STEPS.length,
     );
-    expect(seen.rulesAtNavigation).toBe(5);
+    expect(seen.rulesAtNavigation).toBe(6);
     expect(records.at(-1)).toMatchObject({ step: "layout", status: "done" });
   });
 });

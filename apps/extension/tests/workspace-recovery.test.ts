@@ -57,7 +57,7 @@ test("an interrupted start is recorded failed at its step, then its barrier and 
   const failed = { ...operation, status: "failed", error: INTERRUPTED };
   await expect(recover(journal)).resolves.toEqual(failed);
   expect(await journal.read()).toEqual(failed);
-  expect([...barrier.rules.keys()]).toEqual([91, 92, 93, 94, 95]);
+  expect([...barrier.rules.keys()]).toEqual([91, 92, 93, 94, 95, 96]);
   expect([...barrier.scripts.keys()]).toEqual(["recnrun-origin-agent-op-other"]);
   expect(await isOpen(windowId)).toBe(false);
 });
@@ -98,7 +98,7 @@ test("a start interrupted before its window existed is recorded failed and remov
   const journal = memoryOperationJournal(operation);
   await recover(journal);
   expect(await journal.read()).toMatchObject({ step: "store-gone", status: "failed" });
-  expect(barrier.rules.size).toBe(5);
+  expect(barrier.rules.size).toBe(6);
 });
 
 test("a finished, failed, or missing operation is left as it is", async () => {
@@ -110,7 +110,7 @@ test("a finished, failed, or missing operation is left as it is", async () => {
   }
   const failed = { ...operation, status: "failed" as const, error: "Earlier." };
   await expect(recover(memoryOperationJournal(failed))).resolves.toBeUndefined();
-  expect(barrier.rules.size).toBe(10);
+  expect(barrier.rules.size).toBe(12);
   expect(await isOpen(windowId)).toBe(true);
 });
 

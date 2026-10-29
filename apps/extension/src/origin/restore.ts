@@ -1,5 +1,5 @@
 import type { OriginData } from "@recnrun/domain";
-import type { RestoredCounts, StorageScope } from "@/messaging/origin-protocol";
+import type { RestoredCounts, StorageScope, UnsupportedEntry } from "@/messaging/origin-protocol";
 import { cacheCount, writeCaches } from "@/origin/cache-storage";
 import { OriginFailure, step } from "@/origin/failure";
 import { writeEntries } from "@/origin/web-storage";
@@ -112,13 +112,15 @@ async function restoreSession(stores: OriginStores, data: OriginData): Promise<R
 }
 
 /**
- * Writes one origin's data into its empty storage and counts what it wrote; a session scope
- * writes the tab's sessionStorage alone.
+ * Writes one origin's data into its empty storage and counts what it wrote, adding to `rebuilt`
+ * each fetched cache entry it wrote as captured; a session scope writes the tab's sessionStorage
+ * alone.
  */
 export async function restoreOrigin(
   stores: OriginStores,
   data: OriginData,
   scope: StorageScope = "origin",
+  rebuilt: UnsupportedEntry[] = [],
 ): Promise<RestoredCounts> {
   if (scope === "session") return restoreSession(stores, data);
   await step("check", () => requireEmpty(stores));
@@ -133,13 +135,14 @@ export async function restoreOrigin(
     // One database at a time, so a failure names no later database as half written.
     records += await step("indexedDB", () => restoreDatabase(stores.indexedDB, database));
   }
-  const cacheEntries = await step("cacheStorage", () => writeCaches(stores.caches, data.caches));
+  const written = await step("cacheStorage", () => writeCaches(stores.caches, data.caches));
+  rebuilt.push(...written.rebuilt);
   return {
     localStorage,
     sessionStorage,
     databases: data.indexedDB.length,
     records,
     caches: data.caches.length,
-    cacheEntries,
+    cacheEntries: written.entries,
   };
 }

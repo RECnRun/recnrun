@@ -36,7 +36,11 @@ export {
   type SessionLayout,
 } from "./session-layout.ts";
 export { SKIP_STEPS, SkippedOriginSchema, type SkippedOrigin } from "./skipped-origin.ts";
-export { WorkspaceOperationSchema, type WorkspaceOperation } from "./workspace-operation.ts";
+export {
+  WorkspaceOperationSchema,
+  type RebuiltEntry,
+  type WorkspaceOperation,
+} from "./workspace-operation.ts";
 export {
   IDENTITY_CAPTURE_VERSION,
   IdentityCaptureSchema,

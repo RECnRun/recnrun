@@ -59,7 +59,7 @@ describe("restoreThroughAgent", () => {
       payload: PAYLOAD,
     });
     port.onMessage.emit({ type: "restored", ...reply, counts: COUNTS });
-    await expect(restored).resolves.toEqual(COUNTS);
+    await expect(restored).resolves.toEqual({ counts: COUNTS, rebuilt: [] });
   });
 
   test("fails as structured clone unavailable, and never sends the payload, when the probe loses its type", async () => {
@@ -85,7 +85,7 @@ describe("restoreThroughAgent", () => {
     port.onMessage.emit({ type: "restored", ...reply });
     port.onMessage.emit("restored");
     port.onMessage.emit({ type: "restored", ...reply, counts: COUNTS });
-    await expect(restored).resolves.toEqual(COUNTS);
+    await expect(restored).resolves.toEqual({ counts: COUNTS, rebuilt: [] });
     expect(port.onMessage.listeners.size).toBe(0);
     expect(port.onDisconnect.listeners.size).toBe(0);
   });
@@ -148,7 +148,7 @@ describe("the session scope", () => {
     await vi.waitFor(() => expect(writing.posted).toHaveLength(1));
     expect(writing.posted[0]).toMatchObject({ type: "restore", scope: "session" });
     writing.onMessage.emit({ type: "restored", ...reply, counts: COUNTS });
-    await expect(restored).resolves.toEqual(COUNTS);
+    await expect(restored).resolves.toEqual({ counts: COUNTS, rebuilt: [] });
 
     const reading = echoProbes(fakePort(SENDER));
     const storage = vi.fn();

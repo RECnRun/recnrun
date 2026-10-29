@@ -47,7 +47,8 @@ const HeadersSchema = v.array(v.tuple([v.string(), v.string()]));
 
 /**
  * One Cache Storage entry as the page can rebuild it: a GET request and a response a `Response`
- * constructor accepts again, so its status is 200 to 599 and an opaque response never appears.
+ * constructor accepts again, so its status is 200 to 599 and an opaque response never appears,
+ * with the type, final URL, and redirect a fetched one had, which only fetching it again restores.
  */
 const CacheEntrySchema = v.object({
   request: v.object({ url: v.string(), method: v.string(), headers: HeadersSchema }),
@@ -57,6 +58,10 @@ const CacheEntrySchema = v.object({
     headers: HeadersSchema,
     // Null for a status that has no body, such as 204.
     body: v.nullable(v.instance(ArrayBuffer)),
+    // What a fetched response carried; earlier captures kept none, as a constructed one has none.
+    type: v.optional(v.picklist(["basic", "cors", "default"]), "default"),
+    url: v.optional(v.string(), ""),
+    redirected: v.optional(v.boolean(), false),
   }),
 });
 

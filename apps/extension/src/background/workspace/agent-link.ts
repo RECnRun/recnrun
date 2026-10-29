@@ -9,6 +9,7 @@ import type {
   OriginReply,
   RestoredCounts,
   StorageScope,
+  UnsupportedEntry,
 } from "@/messaging/origin-protocol";
 
 /** The one document an operation restores into: the barrier's tab, as Chrome committed it. */
@@ -153,6 +154,12 @@ const RESTORE_ENDING: Ending = {
     new WorkspaceError("AgentDisconnected", "The page closed before its data was restored."),
 };
 
+/** What a restore wrote, and the fetched cache entries it could only write as captured. */
+export interface Restored {
+  counts: RestoredCounts;
+  rebuilt: UnsupportedEntry[];
+}
+
 /**
  * Probes a validated agent, sends it the payload, and waits, at most `boundMs`, for its answer;
  * a session scope has the agent write its tab's sessionStorage alone.
@@ -162,14 +169,15 @@ export async function restoreThroughAgent(
   operation: BarrierOperation,
   payload: OriginData,
   { boundMs, scope = "origin" }: { boundMs: number; scope?: StorageScope },
-): Promise<RestoredCounts> {
+): Promise<Restored> {
   await probeLink(port, operation, boundMs, RESTORE_ENDING);
-  return exchange<RestoredCounts>(port, operation, {
+  return exchange<Restored>(port, operation, {
     command: { type: "restore", scope, payload },
     boundMs,
     idle: false,
     onReply: (reply, settle) => {
-      if (reply.type === "restored") settle.resolve(reply.counts);
+      if (reply.type === "restored")
+        settle.resolve({ counts: reply.counts, rebuilt: reply.rebuilt });
       else failedWith(reply, settle, "restore");
     },
     late: RESTORE_ENDING.late,

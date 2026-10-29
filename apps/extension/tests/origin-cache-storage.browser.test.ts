@@ -111,7 +111,7 @@ test("without Cache Storage nothing is read, and only an empty list can be writt
     counts: { caches: 0, cacheEntries: 0 },
     sent: [],
   });
-  await expect(writeCaches(undefined, [])).resolves.toBe(0);
+  await expect(writeCaches(undefined, [])).resolves.toEqual({ entries: 0, rebuilt: [] });
   await expect(writeCaches(undefined, [{ name: "v1", entries: [] }])).rejects.toMatchObject({
     name: "SecurityError",
   });
@@ -131,7 +131,15 @@ test("a restore refuses an origin that already holds a cache", async () => {
 test("an entry the cache refuses fails the restore at its step", async () => {
   const entry = {
     request: { url: "/vary", method: "GET", headers: [] },
-    response: { status: 200, statusText: "", headers: [["vary", "*"]], body: null },
+    response: {
+      status: 200,
+      statusText: "",
+      headers: [["vary", "*"]] as [string, string][],
+      body: null,
+      type: "default" as const,
+      url: "",
+      redirected: false,
+    },
   } satisfies Cache["entries"][number];
   await expect(writeCaches(caches, [{ name: "v1", entries: [entry] }])).rejects.toMatchObject({
     name: "TypeError",

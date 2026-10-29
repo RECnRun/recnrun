@@ -23,7 +23,7 @@ import { restoreLayout, restoreTabSessions } from "@/background/workspace/layout
 import type { LayoutApi } from "@/background/workspace/layout-restore";
 import { openBehindBarrier, reloadAndCommit } from "@/background/workspace/navigation";
 import type { NavigationApi } from "@/background/workspace/navigation";
-import type { OriginPort } from "@/messaging/origin-protocol";
+import type { OriginPort, UnsupportedEntry } from "@/messaging/origin-protocol";
 import type { IncognitoStoreMemory } from "@/ports/incognito-stores";
 import type { VisitedOrigins } from "@/ports/visited-origins";
 
@@ -131,9 +131,12 @@ async function restoreOthers(run: Run): Promise<void> {
     others,
     visiting,
     { tabs, barrier, navigation },
-    (agent, other) => {
-      const { origin: _origin, ...site } = other;
-      return restoreThroughAgent(agent, operation, site, { boundMs: RESTORE_BOUND_MS });
+    async (agent, other) => {
+      const { origin, ...site } = other;
+      const restored = await restoreThroughAgent(agent, operation, site, {
+        boundMs: RESTORE_BOUND_MS,
+      });
+      rebuiltAlso(run, origin, restored.rebuilt);
     },
   );
   const skipped = outcomes.flatMap((outcome) =>
@@ -156,6 +159,13 @@ async function restoreOthers(run: Run): Promise<void> {
   );
   run.operation = { ...run.operation, skipped };
 }
+
+/** Names each cache entry of `origin` the agent could write only as captured, without its URL. */
+const rebuiltAlso = (run: Run, origin: string, rebuilt: readonly UnsupportedEntry[]) => {
+  if (rebuilt.length === 0) return;
+  const named = rebuilt.map((entry) => ({ origin, ...entry }));
+  run.operation = { ...run.operation, rebuilt: [...(run.operation.rebuilt ?? []), ...named] };
+};
 
 const skippedAlso = (run: Run, skipped: readonly SkippedOrigin[]) => {
   if (skipped.length > 0) {
@@ -217,9 +227,10 @@ const STEP_RUNS: Record<BootstrapStep, (run: Run) => Promise<unknown>> = {
   },
   restore: async (run) => {
     const agent = known(run.agent, "page link");
-    await restoreThroughAgent(agent, barrierOperation(run), run.data.site, {
+    const restored = await restoreThroughAgent(agent, barrierOperation(run), run.data.site, {
       boundMs: RESTORE_BOUND_MS,
     });
+    rebuiltAlso(run, run.origin, restored.rebuilt);
     agent.disconnect();
   },
   unbarrier: async (run) => {

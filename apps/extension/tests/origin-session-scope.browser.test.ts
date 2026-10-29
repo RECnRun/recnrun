@@ -77,7 +77,10 @@ test("a session restore writes the tab's sessionStorage beside the data the orig
   agent.onMessage.emit(sessionRestore);
   await expect
     .poll(() => agent.posted)
-    .toEqual([echo, { type: "restored", ...operation, counts: { ...NONE, sessionStorage: 1 } }]);
+    .toEqual([
+      echo,
+      { type: "restored", ...operation, counts: { ...NONE, sessionStorage: 1 }, rebuilt: [] },
+    ]);
   expect(entriesOf(stores.sessionStorage)).toEqual({ tab: "second" });
   expect(entriesOf(stores.localStorage)).toEqual({ theme: "dark" });
 });

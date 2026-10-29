@@ -4,6 +4,7 @@ import {
   IDENTITY_CAPTURE_VERSION,
   IdentityCaptureSchema,
   IdentityDataSchema,
+  OriginDataSchema,
   restorableData,
 } from "../src/index.ts";
 import type { IdentityCapture } from "../src/index.ts";
@@ -118,8 +119,26 @@ test("rejects an origin with a path, an index without a key path, and a malforme
   expect(valid(withOrigin({ caches: [{ name: "v1", entries: [opaque] }] }))).toBe(false);
   const typed = { ...entry, response: { ...entry?.response, body: new Uint8Array([1]) } };
   expect(valid(withOrigin({ caches: [{ name: "v1", entries: [typed] }] }))).toBe(false);
+  const opaqueType = { ...entry, response: { ...entry?.response, type: "opaque" } };
+  expect(valid(withOrigin({ caches: [{ name: "v1", entries: [opaqueType] }] }))).toBe(false);
 });
 
+test("reads a cache entry captured before responses kept their type, URL, and redirect as constructed", () => {
+  const { origin: _origin, ...data } = partsOf(sampleCapture()).origin;
+  const [entry] = data.caches[0]?.entries ?? [];
+  expect(entry?.response).toMatchObject({ type: "basic", redirected: false });
+  const { type: _type, url: _url, redirected: _redirected, ...earlier } = entry?.response ?? {};
+  const legacy = { ...entry, response: earlier };
+  const parsed = v.parse(OriginDataSchema, {
+    ...data,
+    caches: [{ name: "v1", entries: [legacy] }],
+  });
+  expect(parsed.caches[0]?.entries[0]?.response).toMatchObject({
+    type: "default",
+    url: "",
+    redirected: false,
+  });
+});
 test("rejects an unsupported item without its adapter, or a reason long enough to carry a value", () => {
   const capture = sampleCapture();
   const item = { adapter: "cacheStorage", item: "v1 /opaque", reason: "Opaque response" };

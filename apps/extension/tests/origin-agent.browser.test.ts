@@ -127,6 +127,7 @@ test("restores the first valid command, replies restored, and ignores any later 
         type: "restored",
         ...operation,
         counts: { ...NONE, localStorage: 1 },
+        rebuilt: [],
       },
     ]);
   expect(entriesOf(stores.localStorage)).toEqual(payload.localStorage);
@@ -225,6 +226,9 @@ test("captures each cache after IndexedDB, one message per cache", async () => {
       statusText: "Made",
       headers: [["content-type", "text/plain;charset=UTF-8"]],
       body: new TextEncoder().encode("a").buffer,
+      type: "default",
+      url: "",
+      redirected: false,
     },
   };
   await expect

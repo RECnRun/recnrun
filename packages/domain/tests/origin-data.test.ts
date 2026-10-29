@@ -42,11 +42,27 @@ const data: OriginData = {
       entries: [
         {
           request: { url: "http://app.localhost/a", method: "GET", headers: [["accept", "*/*"]] },
-          response: { status: 200, statusText: "OK", headers: [], body: bytes.buffer },
+          response: {
+            status: 200,
+            statusText: "OK",
+            headers: [],
+            body: bytes.buffer,
+            type: "basic",
+            url: "http://app.localhost/a",
+            redirected: false,
+          },
         },
         {
           request: { url: "http://app.localhost/b", method: "GET", headers: [] },
-          response: { status: 204, statusText: "", headers: [], body: null },
+          response: {
+            status: 204,
+            statusText: "",
+            headers: [],
+            body: null,
+            type: "default",
+            url: "",
+            redirected: false,
+          },
         },
       ],
     },

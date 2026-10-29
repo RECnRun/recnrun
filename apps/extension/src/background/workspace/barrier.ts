@@ -72,7 +72,7 @@ const PLAIN_TEXT: NonNullable<BarrierRule["action"]["responseHeaders"]> = [
 ];
 
 const RULES_PER_GENERATION = 10;
-const RULES_PER_BARRIER = 6;
+const RULES_PER_BARRIER = 7;
 
 function requireOrigin(target: string): void {
   const url = URL.parse(target);
@@ -172,6 +172,13 @@ function barrierRules(tabId: number, origin: string, generation: number): Barrie
       condition: { tabIds, resourceTypes: ["main_frame", "sub_frame"] },
     },
     handOverRule(base + 5, tabIds, origin),
+    // The agent fetches the origin's cached responses again; no page script runs to fetch anything.
+    {
+      id: base + 6,
+      priority: 2,
+      action: { type: "allow" },
+      condition: { tabIds, resourceTypes: ["xmlhttprequest"] },
+    },
   ];
 }
 

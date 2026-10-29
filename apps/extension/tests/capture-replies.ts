@@ -14,7 +14,15 @@ export const SCHEMA = { type: "capture-database", database: DATABASE };
 export const PART = { type: "capture-records", database: "app", store: "kv", records: RECORDS };
 const ENTRY = {
   request: { url: `${ORIGIN}/a`, method: "GET", headers: [] },
-  response: { status: 200, statusText: "OK", headers: [], body: new ArrayBuffer(2) },
+  response: {
+    status: 200,
+    statusText: "OK",
+    headers: [],
+    body: new ArrayBuffer(2),
+    type: "basic",
+    url: `${ORIGIN}/a`,
+    redirected: false,
+  },
 };
 export const OPAQUE = { item: "v1 GET http://cdn.localhost/lib.js", reason: "Opaque." };
 export const CACHE = {

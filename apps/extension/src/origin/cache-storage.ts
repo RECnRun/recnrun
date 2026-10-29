@@ -1,5 +1,6 @@
 import type { OriginData } from "@recnrun/domain";
 import type { UnsupportedEntry } from "@/messaging/origin-protocol";
+import { refetch } from "@/origin/cache-refetch";
 
 type Cache = OriginData["caches"][number];
 type Entry = Cache["entries"][number];
@@ -14,18 +15,22 @@ const NULL_BODY = new Set([101, 103, 204, 205, 304]);
 const OPAQUE_REASON =
   "An opaque response hides its status, headers, and body, so no Response can rebuild it.";
 
+/** How many entries a restore fetches again at once. */
+const REFETCHES_AT_ONCE = 6;
+
 /** Names an entry by cache, method, and URL without its query, which may hold a token. */
-function itemOf(cache: string, request: Request): string {
-  const { origin, pathname } = new URL(request.url);
-  return `${cache} ${request.method} ${origin}${pathname}`;
+function itemOf(cache: string, { url, method }: Pick<Request, "url" | "method">): string {
+  const { origin, pathname } = new URL(url);
+  return `${cache} ${method} ${origin}${pathname}`;
 }
 
 async function entryOf(request: Request, response: Response): Promise<Entry> {
-  const { status, statusText } = response;
+  const { status, statusText, url, redirected } = response;
   const body = NULL_BODY.has(status) ? null : await response.arrayBuffer();
+  const type = response.type === "basic" || response.type === "cors" ? response.type : "default";
   return {
     request: { url: request.url, method: request.method, headers: [...request.headers] },
-    response: { status, statusText, headers: [...response.headers], body },
+    response: { status, statusText, headers: [...response.headers], body, type, url, redirected },
   };
 }
 
@@ -60,23 +65,55 @@ export async function cacheCount(storage: CacheStorage | undefined): Promise<num
   return storage ? (await storage.keys()).length : 0;
 }
 
+/** What a restore wrote, and the fetched entries it could only write as captured. */
+export interface CachesWritten {
+  entries: number;
+  rebuilt: UnsupportedEntry[];
+}
+
+/** A fetched entry's fresh response, or, for a constructed one, nothing to fetch. */
+const answerOf = (entry: Entry) =>
+  entry.response.url === "" ? Promise.resolve(undefined) : refetch(entry);
+
+/** The response an entry goes back with: its fresh one, or one built from the capture. */
+function responseOf({ response }: Entry, answer: Response | string | undefined): Response {
+  if (answer instanceof Response) return answer;
+  const { body, status, statusText, headers } = response;
+  return new Response(body, { status, statusText, headers });
+}
+
+/** Writes the entries in order: each fetched again, a few at a time, or as captured. */
+async function writeCache(
+  cache: globalThis.Cache,
+  name: string,
+  entries: Entry[],
+  written: CachesWritten,
+): Promise<void> {
+  for (let start = 0; start < entries.length; start += REFETCHES_AT_ONCE) {
+    const batch = entries.slice(start, start + REFETCHES_AT_ONCE);
+    const answers = await Promise.all(batch.map(answerOf));
+    for (const [at, entry] of batch.entries()) {
+      const { url, method, headers } = entry.request;
+      // The guards drop forbidden headers, such as Set-Cookie, silently.
+      await cache.put(new Request(url, { method, headers }), responseOf(entry, answers[at]));
+      const reason = answers[at];
+      if (typeof reason === "string")
+        written.rebuilt.push({ item: itemOf(name, entry.request), reason });
+      written.entries += 1;
+    }
+  }
+}
+
 /** Puts every entry back in its cache, in the captured order, and counts them. */
 export async function writeCaches(
   storage: CacheStorage | undefined,
   caches: OriginData["caches"],
-): Promise<number> {
-  if (caches.length === 0) return 0;
+): Promise<CachesWritten> {
+  const written: CachesWritten = { entries: 0, rebuilt: [] };
+  if (caches.length === 0) return written;
   if (!storage) throw new DOMException("This context has no Cache Storage.", "SecurityError");
-  let count = 0;
   for (const { name, entries } of caches) {
-    const cache = await storage.open(name);
-    for (const { request, response } of entries) {
-      const { url, method, headers } = request;
-      const { body, ...init } = response;
-      // The guards drop forbidden headers, such as Set-Cookie, silently.
-      await cache.put(new Request(url, { method, headers }), new Response(body, init));
-      count += 1;
-    }
+    await writeCache(await storage.open(name), name, entries, written);
   }
-  return count;
+  return written;
 }
