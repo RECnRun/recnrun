@@ -264,3 +264,18 @@ test("holds ten thousand records written in parts of a thousand", async () => {
   expect(orders?.records).toHaveLength(10_000);
   expect(orders?.records.at(-1)?.key).toBe(10_000);
 });
+
+test("dropping an origin's parts leaves the other origins' parts, and only while in progress", async () => {
+  const repository = createIdentityCaptures(indexedDB);
+  const { capture, complete, started, parts } = split("capture-1");
+  await repository.begin(started);
+  for (const part of parts) await repository.append("capture-1", part);
+  const other = { ...(parts[0] as CapturePart), origin: "http://other.localhost:5192" };
+  await repository.append("capture-1", other);
+  await repository.dropParts("capture-1", other.origin);
+  expect((await rowCounts()).parts).toBe(parts.length);
+
+  await repository.publish(complete);
+  expect(await repository.read("identity-a")).toEqual(capture);
+  await expect(repository.dropParts("capture-1", ORIGIN)).rejects.toThrow(/not in progress/);
+});

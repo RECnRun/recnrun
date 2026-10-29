@@ -1,4 +1,4 @@
-import type { Identity } from "@recnrun/domain";
+import type { Identity, SkippedOrigin } from "@recnrun/domain";
 import { useState } from "preact/hooks";
 import type { PanelRequest } from "@/dashboard/workspace-alert";
 import type { WorkspaceStatus } from "@/messaging/workspace-protocol";
@@ -19,6 +19,21 @@ export function approximateSize(bytes: number): string {
 function lastSaved({ lastCapture }: Identity): string {
   if (lastCapture === undefined) return "Not saved yet";
   return `Saved ${new Date(lastCapture.at).toLocaleString()}, ${approximateSize(lastCapture.bytes)}`;
+}
+
+/** Why an origin was left out, in the row's words; the journal keeps the page's own reason. */
+const STEP_PHRASES: Record<SkippedOrigin["step"], string> = {
+  navigate: "the site did not answer",
+  save: "its page did not hand over its data",
+  restore: "its page did not take its data",
+  "not-restored": "the last start could not restore it",
+};
+
+/** One left-out origin as the row names it: what was not done, where, why, and what stays. */
+function skippedNote({ origin, work, step, kept }: SkippedOrigin): string {
+  const done = work === "save" ? "Not saved" : "Not restored";
+  const rest = work === "save" && kept ? "; its last saved storage is kept" : "";
+  return `${done}: storage of ${origin} (${STEP_PHRASES[step]})${rest}.`;
 }
 
 interface RowProps {
@@ -96,6 +111,11 @@ function IdentityRow(props: RowProps) {
         <OpenAction {...props} />
         {!open && <DeleteAction {...props} />}
       </span>
+      {identity.skipped?.map((skipped) => (
+        <span key={`${skipped.work} ${skipped.origin}`} class="workspace-hint identity-skipped">
+          {skippedNote(skipped)}
+        </span>
+      ))}
     </li>
   );
 }

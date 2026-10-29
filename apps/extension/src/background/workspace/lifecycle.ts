@@ -5,6 +5,7 @@ import type {
   LifecycleState,
   LifecycleStep,
   ManagedWindowState,
+  SkippedOrigin,
   WorkspaceOperation,
 } from "@recnrun/domain";
 import type { StepTiming } from "@/background/workspace/bootstrap";
@@ -67,8 +68,9 @@ async function persist(run: Run): Promise<void> {
     at: (deps.now ?? Date.now)(),
     bytes: captured.bytes,
   };
+  const id = open.identity.id;
   await deps.identities.update((list) =>
-    list.map((each) => (each.id === open.identity.id ? { ...each, lastCapture } : each)),
+    list.map((each) => (each.id === id ? noted({ ...each, lastCapture }, captured.skipped) : each)),
   );
   run.persisted = true;
   // Reads settle first, so a failure here only leaves the replaced capture until then.
@@ -84,21 +86,35 @@ async function takeBack(run: Run): Promise<void> {
   await deps.effects.settle(open.identity.id, previous).catch(() => undefined);
 }
 
+/** The identity with `skipped` as the origins its last save or restore left out, or none. */
+function noted(identity: Identity, skipped: readonly SkippedOrigin[]): Identity {
+  const { skipped: _previous, ...rest } = identity;
+  return skipped.length === 0 ? rest : { ...rest, skipped: [...skipped] };
+}
+
 async function start(run: Run): Promise<void> {
   const { target, adding, opening, deps, kind } = run;
   if (target === undefined || opening === undefined) return;
   if (adding) await deps.identities.update((current) => [...current, adding]);
-  run.timings = await deps.effects.start(target, opening, { id: run.operation.id, kind });
+  const started = await deps.effects.start(target, opening, { id: run.operation.id, kind });
+  run.timings = started.timings;
+  // The last save's notes stay; this start's replace the last start's.
+  const saved = (target.skipped ?? []).filter(({ work }) => work === "save");
+  const skipped = [...saved, ...started.skipped];
+  if (skipped.length === 0 && target.skipped === undefined) return;
+  await deps.identities.update((list) =>
+    list.map((each) => (each.id === target.id ? noted(each, skipped) : each)),
+  );
 }
 
 const STEP_RUNS: Record<LifecycleStep, (run: Run) => Promise<void>> = {
   capture: async (run) => {
-    if (run.open)
-      run.captured = await run.deps.effects.capture(
-        run.open.identity,
-        run.open.managed,
-        run.operation.id,
-      );
+    if (run.open === undefined) return;
+    const { identity, managed } = run.open;
+    run.captured = await run.deps.effects.capture(identity, managed, run.operation.id);
+    const { skipped } = run.captured;
+    // Journaled with the next step, so the operation names each origin the save left out.
+    if (skipped.length > 0) run.operation = { ...run.operation, skipped };
   },
   persist,
   close: closeOpen,

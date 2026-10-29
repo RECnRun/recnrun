@@ -259,6 +259,11 @@
   font-weight: 600;
 }
 
+/* Each left-out origin takes a line of its own under the row's label and actions. */
+.identity-skipped {
+  flex-basis: 100%;
+}
+
 .identity-actions {
   display: flex;
   flex-wrap: wrap;

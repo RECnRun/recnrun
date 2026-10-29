@@ -246,6 +246,18 @@ export function createIdentityCaptures(factory: IDBFactory) {
         await openHeader(tx, captureId);
         await request(tx.objectStore(PARTS).add({ ...part, captureId }));
       }),
+    /** Drops the parts one origin wrote to a capture in progress, so a failed read leaves none. */
+    dropParts: (captureId: string, origin: string): Promise<void> =>
+      run("readwrite", async (tx) => {
+        await openHeader(tx, captureId);
+        const parts = tx.objectStore(PARTS);
+        const keys = await request(parts.index(BY_CAPTURE).getAllKeys(captureId));
+        const rows = await partsOf(tx, captureId);
+        const dropped = keys.filter(
+          (_, index) => parsed(PartRowSchema, rows[index]).origin === origin,
+        );
+        await Promise.all(dropped.map((key) => request(parts.delete(key))));
+      }),
     /** Completes a capture and makes it the identity's published one, or changes nothing. */
     publish: async (header: IdentityCapture, { tentative = false } = {}): Promise<void> => {
       const valid = validHeader(header, "complete");

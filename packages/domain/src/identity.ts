@@ -1,12 +1,14 @@
 import * as v from "valibot";
 import { IdSchema } from "./ids.ts";
 import { TargetUrlSchema } from "./managed-window.ts";
+import { SkippedOriginSchema } from "./skipped-origin.ts";
 
 const CountSchema = v.pipe(v.number(), v.integer(), v.minValue(0));
 
 /**
  * One saved session of the target app, kept after Incognito closes: its label, where it opens,
- * and its last published capture's id, time, and approximate size.
+ * its last published capture's id, time, and approximate size, and the visited origins its last
+ * save or restore left out.
  */
 export const IdentitySchema = v.object({
   id: IdSchema,
@@ -14,6 +16,7 @@ export const IdentitySchema = v.object({
   url: TargetUrlSchema,
   created: CountSchema,
   lastCapture: v.optional(v.object({ id: IdSchema, at: CountSchema, bytes: CountSchema })),
+  skipped: v.optional(v.array(SkippedOriginSchema)),
 });
 
 export type Identity = v.InferOutput<typeof IdentitySchema>;

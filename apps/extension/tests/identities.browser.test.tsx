@@ -53,6 +53,26 @@ test("lists each saved identity with its last capture's time and size, and where
   );
 });
 
+test("names each visited origin a save or restore left out on its identity's row", async () => {
+  const note = { reason: "The page did not load (net::ERR_EMPTY_RESPONSE).", kept: false };
+  const skipped = [
+    { ...note, origin: "https://sso.example", work: "save", step: "navigate" },
+    { ...note, origin: "https://cdn.example", work: "save", step: "not-restored", kept: true },
+    { ...note, origin: "https://api.example", work: "restore", step: "restore" },
+    { ...note, origin: "https://img.example", work: "save", step: "save" },
+  ] as const;
+  const { root } = mount({ ...SAVED, identities: [{ ...ADMIN, skipped: [...skipped] }, GUEST] });
+  await expect.poll(() => identityRow(root, "Admin")).toBeDefined();
+  const notes = [...(identityRow(root, "Admin")?.querySelectorAll(".identity-skipped") ?? [])];
+  expect(notes.map((each) => each.textContent)).toEqual([
+    "Not saved: storage of https://sso.example (the site did not answer).",
+    "Not saved: storage of https://cdn.example (the last start could not restore it); its last saved storage is kept.",
+    "Not restored: storage of https://api.example (its page did not take its data).",
+    "Not saved: storage of https://img.example (its page did not hand over its data).",
+  ]);
+  expect(identityRow(root, "Guest")?.querySelector(".identity-skipped")).toBeNull();
+});
+
 test("with nothing open, Switch to restores a saved identity and opens one never saved empty", async () => {
   const { root, sent } = mount(SAVED);
   await expect.poll(() => inRow(root, "Admin", "Switch to")).toBeDefined();

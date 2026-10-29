@@ -37,22 +37,50 @@ test("restores each other visited origin in a helper tab before the target, and 
   ]);
   expect(run.seen.restorePayload).toEqual(DATA.site);
   // The next capture of this window keeps every origin, even one the app never loads again.
-  expect(run.deps.visits.list).toEqual({ generation: 2, origins: [ORIGIN, SSO] });
+  expect(run.deps.visits.list).toEqual({
+    generation: 2,
+    visits: [{ origin: ORIGIN }, { origin: SSO }],
+  });
+  expect(run.records.at(-1)).not.toHaveProperty("skipped");
   expect(run.barrier.rules.size).toBe(0);
 });
 
-test("a visited origin that cannot be restored fails the start before the app loads", async () => {
+test("a visited origin that cannot be restored is skipped, and the app still opens", async () => {
   const run = restoring({ type: "failed", error: "QuotaExceededError" });
-  await expect(run.running).rejects.toMatchObject({
-    name: "VisitedOriginFailed",
-    message: expect.stringContaining(
-      `Could not restore the site data of ${SSO} at its restore step`,
-    ),
-  });
-  expect(run.records.at(-1)).toMatchObject({ step: "origins", status: "failed" });
-  expect(run.deps.windows.close).toHaveBeenCalledWith([5]);
-  expect(run.navigation.updates.map(({ tabId }) => tabId)).toEqual([100]);
+  const timings = await run.running;
+  expect(timings.map(({ step }) => step)).toEqual(BOOTSTRAP_STEPS);
+  const skipped = [
+    {
+      origin: SSO,
+      work: "restore",
+      step: "restore",
+      reason: "The page could not restore its data (QuotaExceededError).",
+      kept: true,
+    },
+  ];
+  // The journal names the origin and its step from then on, through the start's end.
+  expect(run.records.find(({ step }) => step === "barrier")).toMatchObject({ skipped });
+  expect(run.records.at(-1)).toMatchObject({ status: "done", skipped });
+  expect(run.deps.windows.close).not.toHaveBeenCalled();
+  expect(run.navigation.updates.map(({ tabId }) => tabId)).toEqual([100, 9]);
   expect(run.deps.helperTabs.closed).toEqual([100]);
+  // The window never held the origin's saved storage, so the next capture keeps it as saved.
+  expect(run.deps.visits.list.visits).toEqual([{ origin: ORIGIN }, { origin: SSO, carry: true }]);
   expect(run.barrier.rules.size).toBe(0);
   expect(run.barrier.scripts.size).toBe(0);
+});
+
+test("a visited origin that does not answer is skipped at the navigate step", async () => {
+  const run = bootstrapHarness();
+  const { deps } = run;
+  const managed = deps.navigation.update;
+  deps.navigation.update = async (tabId, url) => {
+    if (tabId !== 100) return managed(tabId, url);
+    deps.navigation.onErrorOccurred.emit({ tabId, frameId: 0, error: "net::ERR_EMPTY_RESPONSE" });
+  };
+  await bootstrapIdentity(START, { ...DATA, origins: [SSO_DATA] }, deps, "op-1");
+  expect(run.records.at(-1)).toMatchObject({
+    status: "done",
+    skipped: [{ origin: SSO, step: "navigate", kept: true }],
+  });
 });

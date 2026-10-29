@@ -1,4 +1,4 @@
-import type { Identity, ManagedWindowState } from "@recnrun/domain";
+import type { Identity, ManagedWindowState, SkippedOrigin } from "@recnrun/domain";
 import { vi } from "vite-plus/test";
 import { WorkspaceError } from "@/background/workspace/errors";
 import type { CaptureSummary } from "@/background/workspace/capture";
@@ -36,7 +36,7 @@ const NOTHING = {
   origins: [],
 };
 
-const SUMMARY: CaptureSummary = {
+export const SUMMARY: CaptureSummary = {
   captureId: "",
   localStorage: 1,
   sessionStorage: 0,
@@ -48,6 +48,7 @@ const SUMMARY: CaptureSummary = {
   unsupported: 0,
   bytes: 64,
   ms: 1,
+  skipped: [],
 };
 
 /** Chrome's side of each step, recorded; `failAt` makes that step throw. */
@@ -94,7 +95,7 @@ export function fakeEffects(open?: { identityId?: string }) {
       calls.push(`start ${target.id} ${from}`);
       fail("start");
       state.managed = window({ identityId: target.id });
-      return [{ step: "reload" as const, ms: 1 }];
+      return { timings: [{ step: "reload" as const, ms: 1 }], skipped: [] as SkippedOrigin[] };
     }),
     removeCaptures: vi.fn(async (identityId: string) => {
       calls.push(`remove ${identityId}`);

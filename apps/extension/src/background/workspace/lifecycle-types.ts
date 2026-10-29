@@ -4,6 +4,7 @@ import type {
   LifecycleCommand,
   LifecycleStep,
   ManagedWindowState,
+  SkippedOrigin,
 } from "@recnrun/domain";
 import type { StepTiming } from "@/background/workspace/bootstrap";
 import type { CaptureSummary } from "@/background/workspace/capture";
@@ -19,6 +20,12 @@ export interface Opening {
   from: "capture" | "empty";
   url: string;
   data: IdentityData;
+}
+
+/** What a start did: how long each step took, and the visited origins it could not restore. */
+export interface Started {
+  timings: StepTiming[];
+  skipped: SkippedOrigin[];
 }
 
 /** Chrome's side of each lifecycle step; tests replace it with fakes. */
@@ -43,7 +50,7 @@ export interface LifecycleEffects {
     identity: Identity,
     opening: Opening,
     operation: { id: string; kind: LifecycleKind },
-  ) => Promise<StepTiming[]>;
+  ) => Promise<Started>;
   removeCaptures: (identityId: string) => Promise<void>;
   /** Ends a tentative capture: kept when it is `committedId`, else the one before comes back. */
   settle: (identityId: string, committedId: string | undefined) => Promise<void>;

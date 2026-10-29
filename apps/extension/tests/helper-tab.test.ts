@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vite-plus/test";
 import { fakeBrowser } from "wxt/testing/fake-browser";
-import { chromeHelperTabApi, visitOrigins } from "@/background/workspace/helper-tab";
+import { chromeHelperTabApi, isHelperTab, visitOrigins } from "@/background/workspace/helper-tab";
 import { fakeBarrierApi } from "./fake-barrier";
 import type { FakeBarrierApi } from "./fake-barrier";
 import { fakeHelperTabs, helperNavigation } from "./fake-helper";
@@ -47,7 +47,10 @@ describe("visitOrigins", () => {
         return origin.length;
       },
     );
-    expect(results).toEqual([SSO.length, CDN.length]);
+    expect(results).toEqual([
+      { ok: true, value: SSO.length },
+      { ok: true, value: CDN.length },
+    ]);
     expect(tabs.opened).toEqual([{ tabId: 100, windowId: 5 }]);
     expect(navigation.updates).toEqual([
       { tabId: 100, url: `${SSO}/` },
@@ -66,39 +69,87 @@ describe("visitOrigins", () => {
     expect(listenerCount(navigation)).toBe(0);
   });
 
-  test("names the origin and the step that failed, and leaves no barrier or tab behind", async () => {
+  test("skips an origin whose work fails, by origin and step, and goes on to the next", async () => {
     helperNavigation(navigation, tabs, () => []);
-    const failing = visitOrigins(
-      [{ origin: SSO }, { origin: CDN }],
+    const outcomes = await visitOrigins(
+      [{ origin: CDN }, { origin: SSO }],
       VISITING,
       deps(),
       async (_, { origin }) => {
         if (origin === CDN)
           throw new Error("The page could not capture its data (QuotaExceededError).");
+        return 1;
       },
     );
-    await expect(failing).rejects.toMatchObject({
-      name: "VisitedOriginFailed",
-      message: `Could not save the site data of ${CDN} at its save step: The page could not capture its data (QuotaExceededError).`,
-    });
+    expect(outcomes).toEqual([
+      {
+        ok: false,
+        origin: CDN,
+        step: "save",
+        reason: "The page could not capture its data (QuotaExceededError).",
+      },
+      { ok: true, value: 1 },
+    ]);
     expect(tabs.closed).toEqual([100]);
     expect(barrier.rules.size).toBe(0);
     expect(barrier.scripts.size).toBe(0);
   });
 
-  test("a page that does not load fails at the navigate step", async () => {
-    navigation.update = async (tabId) => {
-      navigation.onErrorOccurred.emit({ tabId, frameId: 0, error: "net::ERR_CONNECTION_REFUSED" });
+  test("an origin whose pages do not load is skipped at the navigate step", async () => {
+    navigation.update = async (tabId, url) => {
+      navigation.updates.push({ tabId, url });
+      navigation.onErrorOccurred.emit({ tabId, frameId: 0, error: "net::ERR_CONNECTION_RESET" });
     };
     const visiting = { ...VISITING, work: "restore" as const };
-    await expect(
-      visitOrigins([{ origin: SSO }], visiting, deps(), async () => 0),
-    ).rejects.toMatchObject({
-      name: "VisitedOriginFailed",
-      message: `Could not restore the site data of ${SSO} at its navigate step: The page did not load (net::ERR_CONNECTION_REFUSED).`,
-    });
+    const use = vi.fn(async () => 0);
+    const outcomes = await visitOrigins([{ origin: SSO, url: `${SSO}/` }], visiting, deps(), use);
+    expect(outcomes).toEqual([
+      {
+        ok: false,
+        origin: SSO,
+        step: "navigate",
+        reason: "The page did not load (net::ERR_CONNECTION_RESET).",
+      },
+    ]);
+    // The last page is the root itself, so it is not loaded twice.
+    expect(navigation.updates).toEqual([{ tabId: 100, url: `${SSO}/` }]);
+    expect(use).not.toHaveBeenCalled();
     expect(barrier.rules.size).toBe(0);
     expect(tabs.closed).toEqual([100]);
+    expect(listenerCount(navigation)).toBe(0);
+  });
+
+  test("tries the last page the window showed when the root does not load", async () => {
+    helperNavigation(navigation, tabs, () => []);
+    const commit = navigation.update;
+    navigation.update = async (tabId, url) => {
+      if (url !== `${SSO}/`) return commit(tabId, url);
+      navigation.updates.push({ tabId, url });
+      navigation.onErrorOccurred.emit({ tabId, frameId: 0, error: "net::ERR_EMPTY_RESPONSE" });
+    };
+    const register = vi.spyOn(barrier, "registerScript");
+    const item = { origin: SSO, url: `${SSO}/account` };
+    const outcomes = await visitOrigins([item], VISITING, deps(), async (agent) => agent.sender);
+    expect(outcomes).toEqual([{ ok: true, value: expect.objectContaining({ origin: SSO }) }]);
+    expect(navigation.updates).toEqual([
+      { tabId: 100, url: `${SSO}/` },
+      { tabId: 100, url: `${SSO}/account` },
+    ]);
+    // One barrier guards both pages, and it is gone after.
+    expect(register).toHaveBeenCalledTimes(1);
+    expect(barrier.rules.size).toBe(0);
+  });
+
+  test("a work that fails on the root is tried again on the last page", async () => {
+    helperNavigation(navigation, tabs, () => []);
+    const item = { origin: SSO, url: `${SSO}/account` };
+    const use = vi.fn(async () => {
+      if (use.mock.calls.length === 1) throw new Error("The page stopped sending its data.");
+      return 2;
+    });
+    const outcomes = await visitOrigins([item], VISITING, deps(), use);
+    expect(outcomes).toEqual([{ ok: true, value: 2 }]);
+    expect(navigation.updates.map(({ url }) => url)).toEqual([`${SSO}/`, `${SSO}/account`]);
   });
 
   test("fails at the tab, barrier, and unbarrier steps by name", async () => {
@@ -130,9 +181,12 @@ describe("chromeHelperTabApi", () => {
     const tabId = await chromeHelperTabApi.open(windowId);
     expect(create).toHaveBeenCalledWith({ windowId, url: "about:blank", active: false });
     expect((await fakeBrowser.tabs.get(tabId)).windowId).toBe(windowId);
+    // The visit tracker leaves the helper tab's pages out while it is open.
+    expect(isHelperTab(tabId)).toBe(true);
     const remove = vi.spyOn(fakeBrowser.tabs, "remove");
     await chromeHelperTabApi.close(tabId);
     expect(remove).toHaveBeenCalledWith(tabId);
+    expect(isHelperTab(tabId)).toBe(false);
   });
 
   test("refuses a tab Chrome returned without an id", async () => {

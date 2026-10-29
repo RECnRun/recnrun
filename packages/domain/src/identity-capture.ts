@@ -14,6 +14,7 @@ const ADAPTERS = [
   "sessionStorage",
   "cookies",
   "cacheStorage",
+  "origins",
 ] as const;
 
 /** The structured-clone types a capture may carry in its `unknown` values. */

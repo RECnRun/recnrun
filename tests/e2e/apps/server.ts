@@ -83,6 +83,17 @@ function cacheVary({ request, response }: Exchange): void {
   send(response, "text/plain", `variant ${variant}`, { vary: "x-variant", "x-kind": "vary" });
 }
 
+/** Hosts a spec took down: a request to one drops its connection, as an unreachable server. */
+const downHosts = new Set<string>();
+
+/** The spec's switch: `{ host, down }`. */
+async function setDown({ request, response }: Exchange): Promise<void> {
+  const { host, down } = (await bodyOf(request)) as { host: string; down: boolean };
+  if (down) downHosts.add(host);
+  else downHosts.delete(host);
+  send(response, "application/json", JSON.stringify({ down: [...downHosts] }));
+}
+
 const routes: Record<string, (exchange: Exchange) => void | Promise<void>> = {
   "GET /health": ({ response }) => send(response, "text/plain", "ok"),
   "GET /sentinel": sentinel,
@@ -118,6 +129,7 @@ const routes: Record<string, (exchange: Exchange) => void | Promise<void>> = {
   ...pwaRoutes,
   ...ssoRoutes,
   "POST /__log": report,
+  "POST /__down": setDown,
   "GET /__log": ({ response, run }) =>
     send(response, "application/json", JSON.stringify({ entries: logs.get(run ?? "") ?? [] })),
 };
@@ -135,6 +147,7 @@ async function route(request: IncomingMessage, response: ServerResponse): Promis
     const path = url.pathname;
     record(run, { kind: "request", method, path, host, dest, cookies, time: Date.now() });
   }
+  if (downHosts.has(host)) return void request.socket.destroy();
   const handler = routes[key];
   if (handler) return handler({ request, response, url, host, run });
   response.writeHead(404, { "content-type": "text/plain" });

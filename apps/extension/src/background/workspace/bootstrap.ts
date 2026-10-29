@@ -104,6 +104,51 @@ const barrierOperation = (run: Run) => ({
   generation: known(run.window, "window").generation,
 });
 
+/**
+ * Restores the other visited origins in the helper tab. One that does not answer or whose page
+ * fails is skipped, and the next capture keeps its last saved storage, since the window lacks it.
+ */
+async function restoreOthers(run: Run): Promise<void> {
+  const { generation, windowId } = known(run.window, "window");
+  const others = run.data.origins;
+  // Noted first, so the next capture keeps them even when the app never loads them again.
+  await run.deps.visits.note(
+    generation,
+    [run, ...others].map(({ origin }) => ({ origin })),
+  );
+  const operation = barrierOperation(run);
+  const { helperTabs: tabs, barrier, navigation } = run.deps;
+  const visiting = { windowId, operation, work: "restore" as const };
+  const outcomes = await visitOrigins(
+    others,
+    visiting,
+    { tabs, barrier, navigation },
+    (agent, other) => {
+      const { origin: _origin, ...site } = other;
+      return restoreThroughAgent(agent, operation, site, RESTORE_BOUND_MS);
+    },
+  );
+  const skipped = outcomes.flatMap((outcome) =>
+    outcome.ok
+      ? []
+      : [
+          {
+            origin: outcome.origin,
+            work: "restore" as const,
+            step: outcome.step,
+            reason: outcome.reason,
+            kept: true,
+          },
+        ],
+  );
+  if (skipped.length === 0) return;
+  await run.deps.visits.note(
+    generation,
+    skipped.map(({ origin }) => ({ origin, carry: true })),
+  );
+  run.operation = { ...run.operation, skipped };
+}
+
 const STEP_RUNS: Record<BootstrapStep, (run: Run) => Promise<unknown>> = {
   "store-gone": (run) =>
     waitForIncognitoGone(run.deps.cookies, run.deps.stores, run.deps.storeBoundMs),
@@ -125,19 +170,7 @@ const STEP_RUNS: Record<BootstrapStep, (run: Run) => Promise<unknown>> = {
       run.origin,
       run.data.cookies,
     ),
-  origins: async (run) => {
-    const { generation, windowId } = known(run.window, "window");
-    const others = run.data.origins;
-    // Noted first, so the next capture keeps them even when the app never loads them again.
-    await run.deps.visits.note(generation, [run.origin, ...others.map(({ origin }) => origin)]);
-    const operation = barrierOperation(run);
-    const { helperTabs: tabs, barrier, navigation } = run.deps;
-    const visiting = { windowId, operation, work: "restore" as const };
-    await visitOrigins(others, visiting, { tabs, barrier, navigation }, (agent, other) => {
-      const { origin: _origin, ...site } = other;
-      return restoreThroughAgent(agent, operation, site, RESTORE_BOUND_MS);
-    });
-  },
+  origins: restoreOthers,
   barrier: async (run) => {
     const operation = barrierOperation(run);
     run.barrier = await installBarrier(tabOf(run), run.origin, operation, run.deps.barrier);

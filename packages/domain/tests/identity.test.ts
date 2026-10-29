@@ -22,6 +22,25 @@ describe("IdentitySchema", () => {
     expect(v.is(IdentitySchema, captured)).toBe(true);
   });
 
+  test("keeps the visited origins a save or restore left out, by origin and step, never values", () => {
+    const skipped = {
+      origin: "https://sso.example",
+      work: "save",
+      step: "navigate",
+      reason: "The page did not load (net::ERR_CONNECTION_RESET).",
+      kept: true,
+    };
+    expect(v.is(IdentitySchema, { ...identity, skipped: [skipped] })).toBe(true);
+    expect(v.is(IdentitySchema, { ...identity, skipped: [{ ...skipped, step: "tab" }] })).toBe(
+      false,
+    );
+    expect(v.is(IdentitySchema, { ...identity, skipped: [{ ...skipped, origin: "sso" }] })).toBe(
+      false,
+    );
+    const long = { ...skipped, reason: "x".repeat(201) };
+    expect(v.is(IdentitySchema, { ...identity, skipped: [long] })).toBe(false);
+  });
+
   test("trims the label and refuses an empty or long one", () => {
     expect(v.parse(IdentitySchema, { ...identity, label: "  Bob " }).label).toBe("Bob");
     expect(v.is(IdentitySchema, { ...identity, label: "   " })).toBe(false);

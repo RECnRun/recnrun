@@ -1,4 +1,5 @@
 import * as v from "valibot";
+import { SkippedOriginSchema } from "./skipped-origin.ts";
 
 /** A workspace operation as RECnRun records it while it runs and after it ends. */
 export const WorkspaceOperationSchema = v.object({
@@ -17,6 +18,8 @@ export const WorkspaceOperationSchema = v.object({
   generation: v.optional(v.pipe(v.number(), v.integer(), v.minValue(0))),
   windowId: v.optional(v.number()),
   error: v.optional(v.string()),
+  /** The visited origins the operation left out, each with its step. */
+  skipped: v.optional(v.array(SkippedOriginSchema)),
 });
 
 export type WorkspaceOperation = v.InferOutput<typeof WorkspaceOperationSchema>;

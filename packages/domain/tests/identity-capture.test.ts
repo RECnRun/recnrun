@@ -127,6 +127,16 @@ test("rejects an unsupported item without its adapter, or a reason long enough t
   expect(valid({ ...capture, unsupported: [{ ...item, reason: "x".repeat(201) }] })).toBe(false);
 });
 
+test("names an origin a capture could not reach under the origins adapter, by origin only", () => {
+  const capture = sampleCapture();
+  const item = {
+    adapter: "origins",
+    item: "https://sso.example",
+    reason: "The site did not answer",
+  };
+  expect(valid({ ...capture, unsupported: [item] })).toBe(true);
+});
+
 test("restores a capture's cookies, its target origin's site data, and every other origin", () => {
   const capture = sampleCapture();
   const other = { ...partsOf(capture).origin, origin: "http://other.localhost:5192" };

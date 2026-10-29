@@ -16,14 +16,15 @@ beforeEach(() => {
   fakeBrowser.reset();
 });
 
-/** The tracker over fakes: tabs 9 and 10 are Incognito ones, tab 1 a normal one. */
+/** The tracker over fakes: tabs 9 and 10 are Incognito ones, tab 11 a helper, tab 1 a normal one. */
 function tracked(managed: ManagedWindowState | null = MANAGED) {
   const onCommitted = fakeEvent<[{ tabId: number; frameId: number; url: string }]>();
   const visits = memoryVisits();
   const state = { managed };
   trackVisitedOrigins({
     onCommitted,
-    incognitoTab: async (tabId) => tabId === 9 || tabId === 10,
+    incognitoTab: async (tabId) => [9, 10, 11].includes(tabId),
+    helperTab: (tabId) => tabId === 11,
     managed: async () => state.managed,
     visits,
   });
@@ -32,19 +33,29 @@ function tracked(managed: ManagedWindowState | null = MANAGED) {
   return { visits, state, commit };
 }
 
-test("notes each top document's origin in any Incognito tab while the managed window is open", async () => {
+test("notes each top document's origin and page in any Incognito tab while the window is open", async () => {
   const { visits, commit } = tracked();
   commit(9, `${APP}/app/?run=1`);
   // A popup or second tab shares the identity's Incognito profile, so its origin counts too.
-  commit(10, `${SSO}/authorize?client=app`);
+  commit(10, `${SSO}/authorize?client=app#state`);
   commit(9, `${APP}/other`);
-  await vi.waitFor(() => expect(visits.list).toEqual({ generation: 3, origins: [APP, SSO] }));
+  // The query and fragment can carry tokens, so only the path is kept.
+  await vi.waitFor(() =>
+    expect(visits.list).toEqual({
+      generation: 3,
+      visits: [
+        { origin: APP, url: `${APP}/other` },
+        { origin: SSO, url: `${SSO}/authorize` },
+      ],
+    }),
+  );
 });
 
-test("leaves out frames, normal tabs, pages off the web, and a closed managed window", async () => {
+test("leaves out frames, normal and helper tabs, pages off the web, and a closed window", async () => {
   const { visits, state, commit } = tracked();
   commit(9, `${SSO}/frame`, 4);
   commit(1, `${SSO}/`);
+  commit(11, `${SSO}/`);
   for (const url of ["about:blank", "chrome://newtab/", "data:text/html,x"]) commit(9, url);
   state.managed = { ...MANAGED, status: "closed" };
   commit(9, `${SSO}/`);
@@ -54,41 +65,52 @@ test("leaves out frames, normal tabs, pages off the web, and a closed managed wi
   expect(visits.note).not.toHaveBeenCalled();
 });
 
+const at = (origin: string, path = "/") => ({ origin, url: `${origin}${path}` });
+
 test("keeps each origin once per generation, in order, and starts again with a new one", async () => {
   expect(await visitedOrigins.visited(3)).toEqual([]);
-  await visitedOrigins.note(3, [APP, APP]);
-  await visitedOrigins.note(3, [SSO, APP]);
-  expect(await visitedOrigins.visited(3)).toEqual([APP, SSO]);
+  await visitedOrigins.note(3, [at(APP), at(APP, "/a")]);
+  await visitedOrigins.note(3, [{ origin: SSO }, { origin: APP }]);
+  // A visit without a page keeps the last one.
+  expect(await visitedOrigins.visited(3)).toEqual([at(APP, "/a"), { origin: SSO }]);
   expect(await visitedOrigins.visited(4)).toEqual([]);
   expect(await fakeBrowser.storage.session.get(KEY)).toEqual({
-    [KEY]: { generation: 3, origins: [APP, SSO] },
+    [KEY]: { generation: 3, visits: [at(APP, "/a"), { origin: SSO }] },
   });
-  await visitedOrigins.note(4, [SSO]);
+  await visitedOrigins.note(4, [at(SSO)]);
   expect(await visitedOrigins.visited(3)).toEqual([]);
-  expect(await visitedOrigins.visited(4)).toEqual([SSO]);
+  expect(await visitedOrigins.visited(4)).toEqual([at(SSO)]);
   // A new generation is stored even when it starts with nothing.
   await visitedOrigins.note(5, []);
   expect(await fakeBrowser.storage.session.get(KEY)).toEqual({
-    [KEY]: { generation: 5, origins: [] },
+    [KEY]: { generation: 5, visits: [] },
   });
+});
+
+test("an origin a start could not restore carries until the identity's own tab loads it", async () => {
+  await visitedOrigins.note(1, [{ origin: APP }, { origin: SSO }]);
+  await visitedOrigins.note(1, [{ origin: SSO, carry: true }]);
+  expect(await visitedOrigins.visited(1)).toEqual([{ origin: APP }, { origin: SSO, carry: true }]);
+  await visitedOrigins.note(1, [at(SSO, "/home")]);
+  expect(await visitedOrigins.visited(1)).toEqual([{ origin: APP }, at(SSO, "/home")]);
 });
 
 test("two notes at once keep both origins", async () => {
-  await Promise.all([visitedOrigins.note(1, [APP]), visitedOrigins.note(1, [SSO])]);
-  expect(await visitedOrigins.visited(1)).toEqual([APP, SSO]);
+  await Promise.all([visitedOrigins.note(1, [at(APP)]), visitedOrigins.note(1, [at(SSO)])]);
+  expect(await visitedOrigins.visited(1)).toEqual([at(APP), at(SSO)]);
 });
 
-test("refuses a stored list that does not match the schema, such as a page off the web", async () => {
-  await fakeBrowser.storage.session.set({
-    [KEY]: { generation: 1, origins: ["chrome://settings"] },
-  });
-  await expect(visitedOrigins.visited(1)).rejects.toThrow(
-    "The stored visited origins do not match the current schema.",
-  );
-  await expect(visitedOrigins.note(1, [APP])).rejects.toThrow("current schema");
+test("refuses a stored list that does not match the schema, such as a page off its origin", async () => {
+  for (const visits of [[{ origin: "chrome://settings" }], [{ origin: APP, url: `${SSO}/` }]]) {
+    await fakeBrowser.storage.session.set({ [KEY]: { generation: 1, visits } });
+    await expect(visitedOrigins.visited(1)).rejects.toThrow(
+      "The stored visited origins do not match the current schema.",
+    );
+  }
+  await expect(visitedOrigins.note(1, [at(APP)])).rejects.toThrow("current schema");
   await fakeBrowser.storage.session.remove(KEY);
-  await visitedOrigins.note(1, [APP]);
-  expect(await visitedOrigins.visited(1)).toEqual([APP]);
+  await visitedOrigins.note(1, [at(APP)]);
+  expect(await visitedOrigins.visited(1)).toEqual([at(APP)]);
 });
 
 test("Chrome's tracking reads the managed window and the tab's Incognito flag", async () => {
@@ -109,6 +131,6 @@ test("Chrome's tracking reads the managed window and the tab's Incognito flag", 
     frameId: 0,
     url: `${APP}/`,
   } as never);
-  await vi.waitFor(async () => expect(await visitedOrigins.visited(3)).toEqual([APP]));
+  await vi.waitFor(async () => expect(await visitedOrigins.visited(3)).toEqual([at(APP)]));
   expect(get).toHaveBeenCalledWith(2);
 });

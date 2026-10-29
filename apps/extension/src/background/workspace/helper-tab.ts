@@ -43,19 +43,37 @@ interface Place {
   origin: string;
 }
 
-/** Loads the origin's root behind the barrier and hands its agent to `use`, then ends the link. */
-async function withAgent<T>(
-  place: Place,
-  step: { name: string; work: Work },
+/** What one origin's visit came to: the work's result, or the step and reason it gave up at. */
+export type VisitOutcome<T> =
+  | { ok: true; value: T }
+  | { ok: false; origin: string; step: "navigate" | Work; reason: string };
+
+/** A page's reason as a skipped origin keeps it: short, and never empty. */
+const reasonOf = (error: unknown) => errorMessage(error).slice(0, 200) || "Unknown failure.";
+
+/** The origin's root first, then the last page the window showed there, when it is another one. */
+function pagesOf({ origin, url }: { origin: string; url?: string }): [string, ...string[]] {
+  const root = `${origin}/`;
+  return url === undefined || url === root ? [root] : [root, url];
+}
+
+/** Loads one page behind the barrier and hands its agent to `use`, then ends the link. */
+async function attempt<T>(
+  place: Place & { url: string },
+  work: Work,
   deps: HelperDeps,
   use: (agent: OriginPort) => Promise<T>,
-): Promise<T> {
-  step.name = "navigate";
-  const target = { ...place, url: `${place.origin}/` };
-  const agent = await openBehindBarrier(deps.navigation, target, NAVIGATION_BOUND_MS);
-  step.name = step.work;
+): Promise<VisitOutcome<T>> {
+  let agent: OriginPort;
   try {
-    return await use(agent);
+    agent = await openBehindBarrier(deps.navigation, place, NAVIGATION_BOUND_MS);
+  } catch (error) {
+    return { ok: false, origin: place.origin, step: "navigate", reason: reasonOf(error) };
+  }
+  try {
+    return { ok: true, value: await use(agent) };
+  } catch (error) {
+    return { ok: false, origin: place.origin, step: work, reason: reasonOf(error) };
   } finally {
     agent.disconnect();
   }
@@ -63,54 +81,55 @@ async function withAgent<T>(
 
 /**
  * Visits one origin behind an anonymous barrier, so neither its scripts nor its server touch the
- * identity; the barrier is gone again when this resolves.
+ * identity, trying each of its pages until one works; the barrier is gone again when this resolves.
+ * A page that does not load or whose work fails is an outcome; a barrier that fails is fatal.
  */
 async function visit<T>(
-  place: Place,
+  { pages: [root, ...others], ...place }: Place & { pages: readonly [string, ...string[]] },
   { operation, work }: Visit,
   deps: HelperDeps,
   use: (agent: OriginPort) => Promise<T>,
-): Promise<T> {
-  const step = { name: "barrier", work };
-  try {
-    const barrier = await installAnonymousBarrier(
-      place.tabId,
-      place.origin,
-      operation,
-      deps.barrier,
-    );
-    const result = await withAgent(place, step, deps, use).catch(async (error: unknown) => {
-      await removeBarrier(barrier, deps.barrier).catch(() => undefined);
-      throw error;
-    });
-    step.name = "unbarrier";
-    await removeBarrier(barrier, deps.barrier);
-    return result;
-  } catch (error) {
-    throw failed(place.origin, work, step.name, error);
+): Promise<VisitOutcome<T>> {
+  const barrier = await installAnonymousBarrier(
+    place.tabId,
+    place.origin,
+    operation,
+    deps.barrier,
+  ).catch((error: unknown) => {
+    throw failed(place.origin, work, "barrier", error);
+  });
+  let outcome = await attempt({ ...place, url: root }, work, deps, use);
+  for (const url of others) {
+    if (outcome.ok) break;
+    outcome = await attempt({ ...place, url }, work, deps, use);
   }
+  await removeBarrier(barrier, deps.barrier).catch((error: unknown) => {
+    throw failed(place.origin, work, "unbarrier", error);
+  });
+  return outcome;
 }
 
 /**
  * Runs `use` with the agent of each origin in turn, in one helper tab opened in the managed window
- * and closed after; the first failure ends the visits and names its origin and step.
+ * and closed after, and returns each origin's outcome: an origin that does not answer or whose
+ * work fails is skipped, while a tab or barrier failure ends the visits and names its origin.
  */
-export async function visitOrigins<I extends { origin: string }, T>(
+export async function visitOrigins<I extends { origin: string; url?: string }, T>(
   items: readonly I[],
   visiting: Visit,
   deps: HelperDeps,
   use: (agent: OriginPort, item: I) => Promise<T>,
-): Promise<T[]> {
+): Promise<VisitOutcome<T>[]> {
   const [first] = items;
   if (first === undefined) return [];
   const tabId = await deps.tabs.open(visiting.windowId).catch((error: unknown) => {
     throw failed(first.origin, visiting.work, "tab", error);
   });
-  const results: T[] = [];
+  const outcomes: VisitOutcome<T>[] = [];
   try {
     for (const item of items) {
-      const place = { tabId, origin: item.origin };
-      results.push(await visit(place, visiting, deps, (agent) => use(agent, item)));
+      const place = { tabId, origin: item.origin, pages: pagesOf(item) };
+      outcomes.push(await visit(place, visiting, deps, (agent) => use(agent, item)));
     }
   } catch (error) {
     // The window's own cleanup, or the next status read, finds a tab this could not close.
@@ -118,17 +137,29 @@ export async function visitOrigins<I extends { origin: string }, T>(
     throw error;
   }
   await deps.tabs.close(tabId);
-  return results;
+  return outcomes;
 }
+
+/** The helper tabs open now, so the visit tracker leaves their pages out. */
+const helperTabs = new Set<number>();
+
+export const isHelperTab = (tabId: number): boolean => helperTabs.has(tabId);
 
 /** Chrome's tabs; `tabs.remove` replies once the tab is destroyed (tabs_api.cc:3236-3345). */
 export const chromeHelperTabApi: HelperTabApi = {
   open: async (windowId) => {
     const tab = await browser.tabs.create({ windowId, url: "about:blank", active: false });
     if (tab.id === undefined) throw new Error("Chrome did not open the helper tab.");
+    helperTabs.add(tab.id);
     // A navigation started before the blank page commits can fail with net::ERR_ABORTED.
     await loaded(tab.id, BLANK_BOUND_MS);
     return tab.id;
   },
-  close: (tabId) => browser.tabs.remove(tabId),
+  close: async (tabId) => {
+    try {
+      await browser.tabs.remove(tabId);
+    } finally {
+      helperTabs.delete(tabId);
+    }
+  },
 };

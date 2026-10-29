@@ -53,6 +53,10 @@ export function memoryCaptures() {
       calls.push("append");
       parts.push(part);
     }),
+    dropParts: vi.fn(async (_id: string, origin: string) => {
+      calls.push("drop");
+      parts.splice(0, parts.length, ...parts.filter((part) => part.origin !== origin));
+    }),
     publish: vi.fn(async (header: IdentityCapture) => {
       calls.push("publish");
       headers.push(header);

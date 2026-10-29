@@ -28,6 +28,7 @@ export {
   type IdentityData,
   type SiteCookie,
 } from "./identity-data.ts";
+export { SKIP_STEPS, SkippedOriginSchema, type SkippedOrigin } from "./skipped-origin.ts";
 export { WorkspaceOperationSchema, type WorkspaceOperation } from "./workspace-operation.ts";
 export {
   IDENTITY_CAPTURE_VERSION,

@@ -1,5 +1,11 @@
 import { classifyIncognitoWindows } from "@recnrun/domain";
-import type { Identity, IdentityCapture, IdentityData } from "@recnrun/domain";
+import type {
+  Identity,
+  IdentityCapture,
+  IdentityData,
+  SkippedOrigin,
+  WorkspaceOperation,
+} from "@recnrun/domain";
 import { bootstrapIdentity } from "@/background/workspace/bootstrap";
 import type { BootstrapPorts } from "@/background/workspace/bootstrap";
 import { captureIdentity, captureOrigins } from "@/background/workspace/capture";
@@ -53,9 +59,18 @@ export function chromeLifecycleEffects(
     start: async (identity, { url, data }, operation) => {
       const windows = { create: () => createNeutralWindow(identity.id), close };
       // The bootstrap's journal entries carry the command that started it.
-      const record = (written: Parameters<OperationJournal["write"]>[0]) =>
-        journal.write({ ...written, kind: operation.kind });
-      return bootstrapIdentity(url, data, { ...ports, windows, record }, operation.id);
+      let skipped: SkippedOrigin[] = [];
+      const record = (written: WorkspaceOperation) => {
+        skipped = written.skipped ?? skipped;
+        return journal.write({ ...written, kind: operation.kind });
+      };
+      const timings = await bootstrapIdentity(
+        url,
+        data,
+        { ...ports, windows, record },
+        operation.id,
+      );
+      return { timings, skipped };
     },
     removeCaptures: (identityId) => deps.captures.remove(identityId),
     settle: (identityId, committedId) => deps.captures.settle(identityId, committedId),

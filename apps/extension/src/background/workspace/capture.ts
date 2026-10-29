@@ -1,20 +1,19 @@
 import { approximateBytes } from "@recnrun/domain";
-import type { IdentityCapture, ManagedWindowState, OriginCapture } from "@recnrun/domain";
+import type { IdentityCapture, ManagedWindowState, SkippedOrigin } from "@recnrun/domain";
 import { browser } from "wxt/browser";
-import { captureThroughAgent, isExpectedAgent } from "@/background/workspace/agent-link";
+import { isExpectedAgent } from "@/background/workspace/agent-link";
 import { AGENT_SCRIPT } from "@/background/workspace/barrier";
 import type { BarrierOperation } from "@/background/workspace/barrier";
 import type { BootstrapPorts } from "@/background/workspace/bootstrap";
-import { checkWhole, collector } from "@/background/workspace/capture-collector";
-import type { Collected } from "@/background/workspace/capture-collector";
 import { captureCookies } from "@/background/workspace/cookie-capture";
 import { resolveTabStore } from "@/background/workspace/cookie-stores";
 import type { CookieApi } from "@/background/workspace/cookie-stores";
 import { WorkspaceError } from "@/background/workspace/errors";
-import { visitOrigins } from "@/background/workspace/helper-tab";
 import type { HelperDeps } from "@/background/workspace/helper-tab";
+import { CAPTURE_BOUND_MS, readOrigin, readOthers } from "@/background/workspace/origin-reads";
+import type { OriginRead, OthersRead } from "@/background/workspace/origin-reads";
 import { ORIGIN_AGENT_PORT } from "@/messaging/origin-protocol";
-import type { CapturedCounts, CapturedPage, OriginPort } from "@/messaging/origin-protocol";
+import type { CapturedCounts, OriginPort } from "@/messaging/origin-protocol";
 import type { VisitedOrigins } from "@/ports/visited-origins";
 import type { IdentityCaptures } from "@/storage/identity-captures";
 
@@ -32,7 +31,10 @@ export interface CaptureApi {
 
 export interface CaptureDeps {
   api: CaptureApi;
-  captures: Pick<IdentityCaptures, "begin" | "append" | "publish" | "discard">;
+  captures: Pick<
+    IdentityCaptures,
+    "begin" | "append" | "dropParts" | "publish" | "discard" | "read"
+  >;
   cookies: Pick<CookieApi, "stores" | "normalTabIds" | "all">;
   /** The other origins the window visited, and the helper tab each one loads in. */
   origins: { visits: Pick<VisitedOrigins, "visited">; helper: HelperDeps };
@@ -50,13 +52,12 @@ export interface CaptureSummary {
   cacheEntries: number;
   cookies: number;
   unsupported: number;
+  /** The visited origins this capture left out or kept from the last one, by origin and step. */
+  skipped: SkippedOrigin[];
   /** The approximate size of what was kept, as the dashboard shows it. */
   bytes: number;
   ms: number;
 }
-
-/** How long the agent may take to connect, and to send its next message. */
-const CAPTURE_BOUND_MS = 15_000;
 
 interface Target {
   tabId: number;
@@ -128,14 +129,8 @@ const ADAPTERS = [
   "cacheStorage",
 ] as const;
 
-/** One origin's data as its agent sent it, written as parts under the capture's id. */
-interface OriginRead {
-  origin: OriginCapture;
-  collected: Collected;
-  page: CapturedPage;
-}
-
-function completeHeader(started: IdentityCapture, reads: OriginRead[], jar: Jar): IdentityCapture {
+function completeHeader(started: IdentityCapture, all: OthersRead, jar: Jar): IdentityCapture {
+  const { reads } = all;
   return {
     ...started,
     status: "complete",
@@ -143,7 +138,7 @@ function completeHeader(started: IdentityCapture, reads: OriginRead[], jar: Jar)
     adapters: ADAPTERS.map((adapter) => ({ adapter, status: "captured" as const })),
     valueTypes: [...new Set(reads.flatMap(({ collected }) => collected.valueTypes))],
     cookies: jar,
-    unsupported: reads.flatMap(({ collected }) => collected.unsupported),
+    unsupported: [...reads.flatMap(({ collected }) => collected.unsupported), ...all.unsupported],
     origins: reads.map(({ origin }) => origin),
   };
 }
@@ -157,41 +152,19 @@ function cookieJar(deps: CaptureDeps, target: Target, reads: OriginRead[]) {
   return captureCookies(deps.cookies, target.storeId, new URL(target.origin).hostname, seen);
 }
 
-/** Reads one origin's page through its agent; every part is written before the counts are checked. */
-async function readOrigin(
-  port: OriginPort,
-  { operation, captureId }: { operation: BarrierOperation; captureId: string },
-  origin: string,
-  deps: CaptureDeps,
-): Promise<OriginRead> {
-  const { receiver, written } = collector(captureId, origin, deps.captures);
-  const boundMs = deps.boundMs ?? CAPTURE_BOUND_MS;
-  const page = await captureThroughAgent(port, operation, receiver, boundMs);
-  const collected = await written();
-  const storage = checkWhole(collected, page.counts);
-  const read = { origin, ...storage, indexedDB: collected.databases, caches: [] };
-  return { origin: read, collected, page };
-}
-
 /** The target's page first, then every other origin the window visited, each in the helper tab. */
 async function readOrigins(
   port: OriginPort,
-  reading: { operation: BarrierOperation; captureId: string; windowId: number },
+  reading: { operation: BarrierOperation; captureId: string; windowId: number; identityId: string },
   target: Target,
   deps: CaptureDeps,
-): Promise<OriginRead[]> {
+): Promise<OthersRead> {
   const first = await readOrigin(port, reading, target.origin, deps);
   const visited = await deps.origins.visits.visited(reading.operation.generation);
-  const others = visited.filter((origin) => origin !== target.origin).map((origin) => ({ origin }));
-  const visiting = {
-    windowId: reading.windowId,
-    operation: reading.operation,
-    work: "save" as const,
-  };
-  const rest = await visitOrigins(others, visiting, deps.origins.helper, (agent, { origin }) =>
-    readOrigin(agent, reading, origin, deps),
-  );
-  return [first, ...rest];
+  const others = visited.filter(({ origin }) => origin !== target.origin);
+  const helper = { ...deps, helper: deps.origins.helper };
+  const rest = await readOthers(others, reading, helper);
+  return { ...rest, reads: [first, ...rest.reads] };
 }
 
 const COUNTED = [
@@ -219,9 +192,16 @@ async function captureThrough(
   const { captures } = deps;
   try {
     await captures.begin(started);
-    const reads = await readOrigins(port, { ...reading, captureId: started.id }, target, deps);
+    const identityId = started.identityId;
+    const all = await readOrigins(
+      port,
+      { ...reading, captureId: started.id, identityId },
+      target,
+      deps,
+    );
+    const { reads } = all;
     const jar = await cookieJar(deps, target, reads);
-    const header = completeHeader(started, reads, jar);
+    const header = completeHeader(started, all, jar);
     await captures.publish(header);
     const kept = [
       ...reads.flatMap(({ origin }) => [origin.localStorage, origin.sessionStorage]),
@@ -232,6 +212,7 @@ async function captureThrough(
       ...totals(reads),
       cookies: jar.length,
       unsupported: header.unsupported.length,
+      skipped: all.skipped,
       bytes: written + approximateBytes(kept),
     };
   } catch (error) {

@@ -1,6 +1,6 @@
 import { vi } from "vite-plus/test";
 import type { HelperTabApi } from "@/background/workspace/helper-tab";
-import type { VisitedOrigins } from "@/ports/visited-origins";
+import type { Visit, VisitedOrigins } from "@/ports/visited-origins";
 import { fakeBarrierApi } from "./fake-barrier";
 import { fakeNavigationApi } from "./fake-navigation";
 import type { FakeNavigationApi } from "./fake-navigation";
@@ -24,15 +24,19 @@ export function fakeHelperTabs(firstId = 100) {
 }
 
 /** The session list of visited origins, in memory: one generation's list at a time. */
-export function memoryVisits(generation = 0, origins: string[] = []) {
+export function memoryVisits(generation = 0, initial: Visit[] = []) {
   const visits = {
-    list: { generation, origins: [...origins] },
-    note: vi.fn(async (noted: number, added: readonly string[]) => {
-      const kept = visits.list.generation === noted ? visits.list.origins : [];
-      visits.list = { generation: noted, origins: [...new Set([...kept, ...added])] };
+    list: { generation, visits: [...initial] },
+    note: vi.fn(async (noted: number, added: readonly Visit[]) => {
+      const list = visits.list.generation === noted ? [...visits.list.visits] : [];
+      for (const visit of added) {
+        const index = list.findIndex(({ origin }) => origin === visit.origin);
+        list.splice(index === -1 ? list.length : index, index === -1 ? 0 : 1, visit);
+      }
+      visits.list = { generation: noted, visits: list };
     }),
     visited: vi.fn(async (asked: number) =>
-      visits.list.generation === asked ? [...visits.list.origins] : [],
+      visits.list.generation === asked ? [...visits.list.visits] : [],
     ),
   };
   return visits satisfies VisitedOrigins;

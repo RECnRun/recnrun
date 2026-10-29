@@ -1,5 +1,5 @@
 import { approximateBytes } from "@recnrun/domain";
-import type { ManagedWindowState } from "@recnrun/domain";
+import type { IdentityCapture, ManagedWindowState, OriginCapture } from "@recnrun/domain";
 import { beforeEach, expect, test, vi } from "vite-plus/test";
 import { fakeBrowser } from "wxt/testing/fake-browser";
 import { captureIdentity } from "@/background/workspace/capture";
@@ -16,6 +16,7 @@ import { fakeBarrierApi } from "./fake-barrier";
 import { chrome, memoryCaptures } from "./fake-capture";
 import { fakeHelperTabs, helperNavigation, memoryVisits } from "./fake-helper";
 import { fakeNavigationApi } from "./fake-navigation";
+import type { Visit } from "@/ports/visited-origins";
 
 const ORIGIN = "http://app.localhost:5192";
 const SSO = "http://sso.localhost:5192";
@@ -47,8 +48,15 @@ beforeEach(() => {
   fakeBrowser.reset();
 });
 
-/** A capture whose window also visited `visited`, each answering in the helper tab with `answer`. */
-function capturing(visited: string[], answer = (_origin: string) => ssoReplies()) {
+/**
+ * A capture whose window also visited `visited`, each answering in the helper tab with `answer`;
+ * the helper's navigations to a page in `down` fail as a server that drops the connection.
+ */
+function capturing(
+  visited: (string | Visit)[],
+  answer = (_origin: string) => ssoReplies(),
+  down: string[] = [],
+) {
   const setup = chrome();
   const tabs = fakeHelperTabs();
   const barrier = fakeBarrierApi();
@@ -59,8 +67,18 @@ function capturing(visited: string[], answer = (_origin: string) => ssoReplies()
     commands.push({ origin, command });
     return command.type === "capture" ? answer(origin) : [];
   });
+  const commit = navigation.update;
+  navigation.update = async (tabId, url) => {
+    if (!down.includes(url)) return commit(tabId, url);
+    navigation.updates.push({ tabId, url });
+    navigation.onErrorOccurred.emit({ tabId, frameId: 0, error: "net::ERR_EMPTY_RESPONSE" });
+  };
   const captures = memoryCaptures();
-  const origins = { visits: memoryVisits(4, visited), helper: { tabs, barrier, navigation } };
+  const visits = memoryVisits(
+    4,
+    visited.map((each) => (typeof each === "string" ? { origin: each } : each)),
+  );
+  const origins = { visits, helper: { tabs, barrier, navigation } };
   const deps = { ...setup, captures, origins, boundMs: 5_000 };
   const running = captureIdentity("identity-a", MANAGED, deps, "op-7");
   const answerTarget = async () => {
@@ -68,7 +86,7 @@ function capturing(visited: string[], answer = (_origin: string) => ssoReplies()
     const operation = { operationId: "op-7", generation: 4 };
     for (const reply of completeReplies) setup.agent.onMessage.emit({ ...reply, ...operation });
   };
-  return { running, answerTarget, setup, tabs, barrier, captures, commands, agents };
+  return { running, answerTarget, setup, tabs, barrier, navigation, captures, commands, agents };
 }
 
 test("saves every other visited origin through the helper tab, the target first", async () => {
@@ -126,19 +144,110 @@ test("checks the cookies each visited origin's page showed against its own host"
   expect(run.captures.calls.at(-1)).toBe("discard");
 });
 
-test("a visited origin that cannot be saved fails the capture, naming it, and publishes nothing", async () => {
-  const run = capturing([SSO, CDN], (origin) =>
-    origin === CDN ? [capturedWith({ records: 9 })] : ssoReplies(),
+/** The unsupported items that name a left-out origin, beside the target's own cache entries. */
+const left = ({ adapter }: { adapter: string }) => adapter === "origins";
+
+test("a visited origin whose page fails is left out and named, and the rest is published", async () => {
+  const run = capturing([CDN, SSO], (origin) =>
+    origin === CDN ? [...ssoReplies().slice(0, 3), capturedWith({ records: 9 })] : ssoReplies(),
   );
+  run.setup.cookies.jar = [];
   await run.answerTarget();
-  await expect(run.running).rejects.toMatchObject({
-    name: "VisitedOriginFailed",
-    message: `Could not save the site data of ${CDN} at its save step: The page's data did not all arrive.`,
-  });
-  expect(run.captures.publish).not.toHaveBeenCalled();
-  expect(run.captures.calls.at(-1)).toBe("discard");
+  const summary = await run.running;
+  const reason = "The page's data did not all arrive.";
+  expect(summary.skipped).toEqual([
+    { origin: CDN, work: "save", step: "save", reason, kept: false },
+  ]);
+  const complete = run.captures.headers.at(-1);
+  expect(complete?.origins.map(({ origin }) => origin)).toEqual([ORIGIN, SSO]);
+  expect(complete?.unsupported.filter(left)).toEqual([{ adapter: "origins", item: CDN, reason }]);
+  // The records the failed page did send are dropped, so the capture holds none of the origin.
+  expect(run.captures.dropParts).toHaveBeenCalledWith(complete?.id, CDN);
+  expect(run.captures.parts.some(({ origin }) => origin === CDN)).toBe(false);
+  expect(run.captures.publish).toHaveBeenCalled();
   expect(run.tabs.closed).toEqual([100]);
   expect(run.barrier.rules.size).toBe(0);
+});
+
+const CDN_SAVED: OriginCapture = {
+  origin: CDN,
+  localStorage: { cdn: "A" },
+  sessionStorage: {},
+  indexedDB: [
+    {
+      ...SSO_DATABASE,
+      stores: [
+        { name: "session", keyPath: null, autoIncrement: false, indexes: [], records: SSO_RECORDS },
+      ],
+    },
+  ],
+  caches: [{ name: "v1", entries: [] }],
+};
+
+/** The identity's last published capture, which held `CDN_SAVED`. */
+const previous = (): IdentityCapture => ({
+  formatVersion: 1,
+  id: "capture-old",
+  identityId: "identity-a",
+  url: `${ORIGIN}/app/`,
+  status: "complete",
+  startedAt: 1,
+  endedAt: 2,
+  adapters: [],
+  valueTypes: [],
+  cookies: [],
+  origins: [CDN_SAVED],
+  unsupported: [],
+});
+
+test("keeps an unreachable origin's last saved storage after trying its root and its last page", async () => {
+  const down = [`${CDN}/`, `${CDN}/assets`];
+  const run = capturing([{ origin: CDN, url: `${CDN}/assets` }], () => ssoReplies(), down);
+  run.captures.read.mockResolvedValue(previous());
+  run.setup.cookies.jar = [];
+  await run.answerTarget();
+  const summary = await run.running;
+  expect(run.navigation.updates.map(({ url }) => url)).toEqual(down);
+  const reason = "The page did not load (net::ERR_EMPTY_RESPONSE).";
+  expect(summary.skipped).toEqual([
+    { origin: CDN, work: "save", step: "navigate", reason, kept: true },
+  ]);
+  const complete = run.captures.headers.at(-1);
+  expect(complete?.origins.at(-1)).toEqual({
+    ...CDN_SAVED,
+    indexedDB: [SSO_DATABASE],
+    caches: [],
+  });
+  expect(complete?.unsupported.filter(left)).toEqual([]);
+  expect(run.captures.parts.filter(({ origin }) => origin === CDN)).toEqual([
+    { origin: CDN, database: "idp", store: "session", records: SSO_RECORDS },
+    { origin: CDN, cache: { name: "v1", entries: [] } },
+  ]);
+  expect(run.captures.read).toHaveBeenCalledWith("identity-a");
+  expect(summary).toMatchObject({
+    localStorage: COUNTS.localStorage + 1,
+    caches: COUNTS.caches + 1,
+  });
+  expect(run.barrier.rules.size).toBe(0);
+});
+
+test("an origin the last start could not restore keeps its saved storage without a visit", async () => {
+  const run = capturing([
+    { origin: CDN, carry: true },
+    { origin: SSO, carry: true },
+  ]);
+  run.captures.read.mockResolvedValue(previous());
+  run.setup.cookies.jar = [];
+  await run.answerTarget();
+  const summary = await run.running;
+  expect(run.tabs.open).not.toHaveBeenCalled();
+  expect(summary.skipped).toMatchObject([
+    { origin: CDN, step: "not-restored", kept: true },
+    { origin: SSO, step: "not-restored", kept: false },
+  ]);
+  const complete = run.captures.headers.at(-1);
+  expect(complete?.origins.map(({ origin }) => origin)).toEqual([ORIGIN, CDN]);
+  expect(complete?.unsupported.filter(left)).toMatchObject([{ adapter: "origins", item: SSO }]);
 });
 
 test("a window that visited only its target opens no helper tab", async () => {

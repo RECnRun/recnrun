@@ -237,6 +237,7 @@ const SUMMARY = {
   cacheEntries: 0,
   cookies: 0,
   unsupported: 0,
+  skipped: [],
   bytes: 64,
   ms: 1,
 };
