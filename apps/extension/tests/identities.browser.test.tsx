@@ -96,10 +96,10 @@ test("the open identity is marked Open and closes, and cannot be deleted; others
   await expect.poll(() => sent.at(-1)).toEqual({ type: "workspace-switch", identityId: "guest" });
 });
 
-test("another Incognito window disables every command but Delete and Close these windows", async () => {
+test("another Incognito window disables every command but Delete and Close this window", async () => {
   const { root } = mount({ ...SAVED, foreign: [{ id: 2, tabCount: 1 }] });
   await expect.poll(() => panelText(root)).toContain(CONFLICT);
-  expect(enabledButtons(root)).toEqual(["Close these windows", "Delete", "Delete"]);
+  expect(enabledButtons(root)).toEqual(["Close this window", "Delete", "Delete"]);
   expect(inRow(root, "Admin", "Switch to")?.disabled).toBe(true);
   expect(inPanel(root, "New identity")?.disabled).toBe(true);
 });
@@ -116,6 +116,7 @@ test("two other Incognito windows are named in the plural", async () => {
       "Incognito windows are open while no identity is, so no identity owns them. Close them to switch identities.",
     );
   expect(panelText(root)).toContain("2 Incognito windows are open");
+  expect(enabledButtons(root)).toEqual(["Close these windows", "Delete", "Delete"]);
 });
 
 test("while an identity is open, its other Incognito tabs are its session, not a conflict", async () => {

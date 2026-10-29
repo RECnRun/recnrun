@@ -133,7 +133,7 @@ test("a failed switch and another Incognito window show in the panel, and the pa
   await expect(identity(site, "A").getByRole("button", { name: "Switch to" })).toBeDisabled();
   await screen(site, "6-conflict");
 
-  await clickInFrame(panel.getByRole("button", { name: "Close these windows" }));
+  await clickInFrame(panel.getByRole("button", { name: "Close this window" }));
   await expect(alert).toHaveCount(0);
   await expect.poll(() => incognitoWindows(serviceWorker)).toBe(0);
   await switchTo(site, "A");

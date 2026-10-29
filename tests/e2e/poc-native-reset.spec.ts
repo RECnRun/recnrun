@@ -168,7 +168,9 @@ test("another Incognito window keeps the workspace's data, so the dashboard coun
   await openIncognitoTab(serviceWorker, "about:blank");
   const panel = workspacePanel(site);
   await expect(panel.getByRole("button", { name: "New identity" })).toBeEnabled();
-  await expect(panel.getByRole("button", { name: "Close these windows" })).toHaveCount(0);
+  await expect(
+    panel.getByRole("button", { name: /^Close th(is window|ese windows)$/ }),
+  ).toHaveCount(0);
   await site.screenshot({ path: test.info().outputPath("beside.png") });
 
   // Why the dashboard never closes only the managed window while another one lives.

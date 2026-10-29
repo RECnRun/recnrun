@@ -99,7 +99,9 @@ test.describe("with incognito access", () => {
     await expect.poll(() => incognitoUrls(serviceWorker)).toHaveLength(2);
     await expect(panel.getByRole("button", { name: "New identity" })).toBeEnabled();
     await expect(panel).not.toContainText("Incognito window is open");
-    await expect(panel.getByRole("button", { name: "Close these windows" })).toHaveCount(0);
+    await expect(
+      panel.getByRole("button", { name: /^Close th(is window|ese windows)$/ }),
+    ).toHaveCount(0);
     await screen(site, "open-and-beside");
     expect((await managedWindow(serviceWorker))?.status).toBe("active");
   });

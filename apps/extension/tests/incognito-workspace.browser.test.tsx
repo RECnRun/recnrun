@@ -110,9 +110,9 @@ test("a windows-changed refusal shows the error and the new list, which the next
     setStatus({ ...NO_INCOGNITO_WINDOW, foreign: foreign(2, 6) });
     return Promise.resolve({ ok: false, error: CHANGED });
   });
-  await expect.poll(() => inPanel(root, "Close these windows")).toBeDefined();
-  inPanel(root, "Close these windows")?.click();
-  await expect.poll(() => alertText(root)).toEqual([`Close these windows failed. ${CHANGED}`]);
+  await expect.poll(() => inPanel(root, "Close this window")).toBeDefined();
+  inPanel(root, "Close this window")?.click();
+  await expect.poll(() => alertText(root)).toEqual([`Close this window failed. ${CHANGED}`]);
   await expect.poll(() => panelText(root)).toContain("2 Incognito windows are open");
   inPanel(root, "Close these windows")?.click();
   await expect

@@ -1,3 +1,4 @@
+import { closeWindowsName } from "@/dashboard/workspace-alert";
 import type { PanelRequest } from "@/dashboard/workspace-alert";
 import type { WorkspaceStatus } from "@/messaging/workspace-protocol";
 import type { OpenTab } from "@/ports/tabs";
@@ -55,7 +56,7 @@ export function WorkspaceConflict({ status, tabs, disabled, run }: ConflictProps
         disabled={disabled}
         onClick={() => run({ type: "workspace-close-windows", windowIds })}
       >
-        Close these windows
+        {closeWindowsName(windowIds.length)}
       </button>
     </div>
   );

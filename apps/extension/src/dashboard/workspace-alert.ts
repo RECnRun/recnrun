@@ -11,15 +11,23 @@ type PanelCommand =
 /** The requests the workspace panel sends; the others are for tests and recovery. */
 export type PanelRequest = Extract<WorkspaceRequest, { type: PanelCommand }>;
 
+/** The label of the button that closes the listed windows, which names one or several. */
+export const closeWindowsName = (count: number) =>
+  count === 1 ? "Close this window" : "Close these windows";
+
 /** Each request by the button that sends it. */
-const COMMAND_NAMES: Record<PanelCommand, string> = {
+const COMMAND_NAMES: Record<Exclude<PanelCommand, "workspace-close-windows">, string> = {
   "workspace-new-identity": "New identity",
   "workspace-switch": "Switch to",
   "workspace-resume": "Switch to",
   "workspace-suspend": "Close",
   "workspace-delete-identity": "Delete",
-  "workspace-close-windows": "Close these windows",
 };
+
+const commandName = (request: PanelRequest) =>
+  request.type === "workspace-close-windows"
+    ? closeWindowsName(request.windowIds.length)
+    : COMMAND_NAMES[request.type];
 
 const OPERATION_NAMES: Record<NonNullable<WorkspaceStatus["operation"]>["kind"], string> = {
   "start-with-identity": "Start with an identity",
@@ -54,6 +62,6 @@ export function panelAlert({ status, dismissed, failure, readError }: AlertSourc
     const name = OPERATION_NAMES[operation.kind];
     return `${name} failed at the ${operation.step} step. ${operation.error ?? ""}`.trimEnd();
   }
-  if (failure) return `${COMMAND_NAMES[failure.request.type]} failed. ${failure.error}`;
+  if (failure) return `${commandName(failure.request)} failed. ${failure.error}`;
   return readError;
 }
