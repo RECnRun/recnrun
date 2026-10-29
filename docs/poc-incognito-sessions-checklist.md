@@ -8,7 +8,7 @@ Plan: [poc-incognito-sessions-plan.md](poc-incognito-sessions-plan.md). Assignme
 | Branch               | `poc/incognito-sessions`                                         |
 | Planned base         | `44c154da29860c7a8df829e902b177df5ce2ba2a` (2026-10-28)          |
 | Actual base (P0.1)   | `44c154d` (re-resolved 2026-10-28, unchanged)                    |
-| Last recorded commit | `dede7fc`                                                        |
+| Last recorded commit | `4ea872c`                                                        |
 | Decisions OD-1…OD-4  | defaults of plan §3, accepted by the user ("Avance", 2026-10-28) |
 
 ## Status legend
@@ -525,6 +525,12 @@ Source facts (orchestrator, Chromium checkout): `tabs.discard` (`tabs_api.cc:429
       commit: dede7fc Wait for a test navigation to commit before saving the session
       notes: `tabs.update` resolves when the navigation starts and `tabs.query` already reports the new address as `pendingUrl`, so the test's layout check passed while the previous page was still committed. `navigateTab` now waits for `tabs.onUpdated` to report the tab complete at the address with no `pendingUrl`. TROUBLESHOOTING gains the entry.
       verify: `vp run verify` → exit 0 (run `2026-10-29T18-14-37.287Z-1a078946`)
+- [x] S7.9 A capture waits for loading tabs; a primary page that leaves during the read is read behind the barrier
+      red: `vp run test:e2e -- tests/e2e/poc-loading-tab.spec.ts` (main page busy 1 s in `beforeunload`, navigation started without waiting, New identity clicked at once) on the unfixed code → the panel showed "New identity failed at the capture step. The page closed before its data was captured." (run `2026-10-29T18-20-08.871Z-dfce8e2e`); unit negative controls in scratch `s63neg` (no settle call, `pendingUrl` ignored, listener left registered, no document check) → 5 failed across settled-tabs, session-tabs, primary-read; without the part drop → capture-left-page failed ("expected [ 'begin', 'append', 'append', …(3) ] to deeply equal [ … (4) ]")
+      green: the same e2e command passes, A back at its new address with its sessionStorage (run `2026-10-29T18-21-28.640Z-24f03e43`); `--repeat-each 10` → 10 passed (run `2026-10-29T18-26-37.161Z-faa33073`); unit 455 passed; full `vp run test:e2e` twice → 112 passed each (runs `2026-10-29T18-28-32.384Z-a9d087b2`, `2026-10-29T18-30-41.767Z-6919ef46`); a throwaway scratch run with the page busy 5 s, past the 3 s bound, saved A through the barrier fallback (`AgentDisconnected` caught) and brought it back at the address found, with its sessionStorage (run `2026-10-29T18-25-50.308Z-9d0ad9ad`)
+      commit: ede0d07 Wait for loading tabs before a capture reads the session; 4ea872c Keep the single-origin read private to the origin reads
+      notes: `settledTabs` (`windows.ts`) re-reads the Incognito tabs on each `tabs.onUpdated`/`onRemoved` until none has `status: "loading"` or a `pendingUrl`, bounded by `SETTLE_BOUND_MS` (3 s). A loaded primary tab whose document changed (checked with `webNavigation.getFrame`) after a failed connect or read is read behind the barrier, as an unloaded tab is, after `originReader` drops the parts already written; a closed tab or the same document still fails as before. Other tabs whose read fails stay named as unsupported, as before. Timing: the wait cost 0.3 to 22 ms per capture when no tab was loading (`poc-session-layout.spec.ts`, 5 repeats); the captures there took 7 to 64 ms.
+      verify: `vp run verify` → exit 0, 22/22 tasks (run `2026-10-29T18-36-21.033Z-08e7c118`)
 
 ## Stage 5 — Delivery
 
