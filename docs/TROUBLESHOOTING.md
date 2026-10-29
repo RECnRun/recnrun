@@ -117,3 +117,11 @@ The session page in a PiP window is such a frame too. A pre-push `vp run verify`
 **Cause.** `windows.remove` closes each tab through `ClosePage`, which runs the page's `beforeunload` handler; Chrome shows the dialog once the page has had a user activation.
 
 **Solution.** Before it removes the windows, `closeWindows` (`background/workspace/windows.ts`) discards every tab with `tabs.discard`, which replaces the page without `ClosePage` (`chrome/browser/resource_coordinator/tab_lifecycle_unit.cc:380-415`), so no handler runs. Chrome discards the active tab of the focused window too and answers with a new tab id (`kWebContentsDiscard` is off on desktop, `content/public/common/content_features.cc:381-387`, so the contents are replaced); the tab keeps its session storage, copied by `CopyStateFrom` (`navigation_controller_impl.cc:3032-3049`). RECnRun discards only after the capture read the tab. The page's own `beforeunload` is never patched.
+
+## A save in CI fails with "The page closed before its data was captured."
+
+**Symptom.** On GitHub's runner, `poc-unloaded-tabs.spec.ts` failed in about 50 ms on the Switch right after the test moved the main tab to `about:blank`; local runs passed.
+
+**Cause.** `tabs.update` resolves once the navigation starts, not once it commits, and `tabs.query` already reports the new address as `pendingUrl`. The capture then found the previous page still committed in that tab, took it as the loaded primary tab, and its agent's link closed when `about:blank` committed. A `beforeunload` handler that keeps the page busy for one second reproduces it on any machine.
+
+**Solution.** The `navigateTab` fixture (`tests/e2e/fixtures/tabs.ts`) resolves only once `tabs.onUpdated` reports the tab complete at the new address with no `pendingUrl`, so the session is settled before the test saves it.

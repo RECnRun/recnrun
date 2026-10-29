@@ -3,6 +3,8 @@ import type { Worker } from "@playwright/test";
 interface ChromeTab {
   id?: number;
   url?: string;
+  pendingUrl?: string;
+  status?: string;
   active: boolean;
   incognito: boolean;
   windowId: number;
@@ -24,6 +26,10 @@ interface ChromeGlobal {
       create(properties: object): Promise<ChromeTab>;
       update(tabId: number, properties: object): Promise<ChromeTab>;
       discard(tabId: number): Promise<ChromeTab | undefined>;
+      onUpdated: Record<
+        "addListener" | "removeListener",
+        (listener: (tabId: number, change: object, tab: ChromeTab) => void) => void
+      >;
     };
     windows: {
       create(data: object): Promise<{ id?: number; tabs?: ChromeTab[] }>;
@@ -162,12 +168,25 @@ export function discardTab(serviceWorker: Worker, tabId: number): Promise<number
   }, tabId);
 }
 
-/** Loads `url` in the tab, as typing it in the address bar would. */
+/**
+ * Loads `url` in the tab, as typing it in the address bar would, and resolves once the tab shows
+ * it: `tabs.update` resolves while the previous page may still be the one committed.
+ */
 export function navigateTab(serviceWorker: Worker, tabId: number, url: string): Promise<void> {
   return serviceWorker.evaluate(
     async ([id, address]) => {
       const { chrome } = globalThis as unknown as ChromeGlobal;
+      const shown = new Promise<void>((resolve) => {
+        const listener = (updated: number, _change: object, tab: ChromeTab) => {
+          const done = tab.status === "complete" && tab.pendingUrl === undefined;
+          if (updated !== id || !done || tab.url !== address) return;
+          chrome.tabs.onUpdated.removeListener(listener);
+          resolve();
+        };
+        chrome.tabs.onUpdated.addListener(listener);
+      });
       await chrome.tabs.update(id, { url: address });
+      await shown;
     },
     [tabId, url] as const,
   );
