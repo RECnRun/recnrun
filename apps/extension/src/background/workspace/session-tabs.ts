@@ -59,6 +59,8 @@ export interface SessionTabs {
 }
 
 const UNREAD = "RECnRun could not read the tab's page.";
+/** How long a capture waits for the session's tabs to finish loading before it reads them as they are. */
+export const SETTLE_BOUND_MS = 3_000;
 
 /** Why a tab of another scheme stays out, by its scheme alone, never its address. */
 const leftOut = (url: string) =>
@@ -118,9 +120,9 @@ function primaryOf(
 }
 
 /**
- * Every web, blank, and New Tab page of the session in order, and the one a capture reads in full:
- * among the loaded web tabs, else among those Chrome unloaded, the managed tab while it is open,
- * else the focused window's active tab, else the first. `lastFocused` is the Incognito window that
+ * Every web, blank, and New Tab page of the session in order, once none is loading, and the one a
+ * capture reads in full: among the loaded web tabs, else among those Chrome unloaded, the managed
+ * tab while it is open, else the focused window's active tab, else the first. `lastFocused` is the Incognito window that
  * had the focus last, since the dashboard holds it when the user asks to save.
  */
 export async function findSessionTabs(
@@ -130,6 +132,7 @@ export async function findSessionTabs(
 ): Promise<SessionTabs> {
   const unsupported: Unsupported[] = [];
   const windows: SessionTabs["windows"] = [];
+  await api.settle(SETTLE_BOUND_MS);
   const all = await api.windows();
   const focusedId = focusedOf(all, lastFocused);
   for (const [at, window] of all.entries()) {

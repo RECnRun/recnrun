@@ -114,6 +114,38 @@ export async function loaded(tabId: number, boundMs: number): Promise<void> {
   }
 }
 
+/** Whether the tab is between a navigation's start and the end of its load. */
+const isLoading = (tab: Browser.tabs.Tab) =>
+  tab.status === "loading" || tab.pendingUrl !== undefined;
+
+const anyLoading = async () => (await inventory()).some(({ tabs = [] }) => tabs.some(isLoading));
+
+/**
+ * Resolves once no Incognito tab is loading, or after `boundMs`: until a navigation commits, Chrome
+ * still runs the page it replaces. Each tab event reads the tabs again.
+ */
+export async function settledTabs(boundMs: number): Promise<void> {
+  let wake = () => {};
+  const changed = () => wake();
+  const next = () => new Promise<"changed">((resolve) => (wake = () => resolve("changed")));
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const expired = new Promise<"late">((resolve) => (timer = setTimeout(resolve, boundMs, "late")));
+  browser.tabs.onUpdated.addListener(changed);
+  browser.tabs.onRemoved.addListener(changed);
+  try {
+    // Each wait is set up before the read, so a load that ends in between is not missed.
+    let woken = next();
+    while (await anyLoading()) {
+      if ((await Promise.race([woken, expired])) === "late") return;
+      woken = next();
+    }
+  } finally {
+    clearTimeout(timer);
+    browser.tabs.onUpdated.removeListener(changed);
+    browser.tabs.onRemoved.removeListener(changed);
+  }
+}
+
 /**
  * Opens RECnRun's Incognito window on a blank page, only when no other Incognito window exists,
  * holding `identityId` when it is given. It returns once the blank page loaded: windows.create

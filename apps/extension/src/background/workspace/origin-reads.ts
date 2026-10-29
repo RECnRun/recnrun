@@ -109,6 +109,20 @@ export interface OthersRead {
 
 const NOT_RESTORED = "The last start could not restore it, so the window never held it.";
 
+/** Reads one origin's page at each call, first dropping whatever parts an earlier call wrote. */
+export function originReader(
+  reading: Reading,
+  origin: string,
+  deps: Pick<ReadDeps, "captures" | "boundMs">,
+): (port: OriginPort) => Promise<OriginRead> {
+  let tried = false;
+  return async (port) => {
+    if (tried) await deps.captures.dropParts(reading.captureId, origin);
+    tried = true;
+    return readOrigin(port, reading, origin, deps);
+  };
+}
+
 /**
  * Reads each other visited origin in the helper tab. One that does not answer, whose page fails,
  * or that the last start could not restore keeps the identity's last saved storage of it, or is

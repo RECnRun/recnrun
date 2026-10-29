@@ -16,7 +16,7 @@ export interface PrimaryAccess {
 }
 
 interface PrimaryDeps {
-  api: Pick<CaptureApi, "inject" | "onConnect">;
+  api: Pick<CaptureApi, "inject" | "onConnect" | "topFrame">;
   helper: Pick<HelperDeps, "barrier" | "navigation">;
 }
 
@@ -43,6 +43,43 @@ function unloadedAccess(tab: UnloadedTab, run: PrimaryRun, deps: PrimaryDeps): P
   };
 }
 
+/** Whether another document than the one found now runs in the tab, which is still open. */
+async function left(tab: SessionTab, deps: PrimaryDeps) {
+  const now = await deps.api.topFrame(tab.tabId).catch(() => null);
+  return now !== null && now.documentId !== tab.documentId;
+}
+
+/**
+ * Reads through the page's own agent; a page that left before or during the read, as one still
+ * loading at the settle bound does, is read behind the barrier instead, as an unloaded tab is.
+ */
+async function loadedAccess(
+  tab: SessionTab,
+  run: PrimaryRun,
+  deps: PrimaryDeps,
+): Promise<PrimaryAccess> {
+  const behind = async (error: unknown) => {
+    if (await left(tab, deps)) return unloadedAccess(tab, run, deps);
+    throw error;
+  };
+  let port: OriginPort;
+  try {
+    port = await connectAgent(deps.api, tab, run.boundMs);
+  } catch (error) {
+    return behind(error);
+  }
+  return {
+    read: async (use) => {
+      try {
+        return await use(port);
+      } catch (error) {
+        return (await behind(error)).read(use);
+      }
+    },
+    release: () => port.disconnect(),
+  };
+}
+
 /** The primary tab's page agent, or for a tab Chrome unloaded, its origin read behind the barrier. */
 export async function openPrimary(
   tab: SessionTab | UnloadedTab,
@@ -50,6 +87,5 @@ export async function openPrimary(
   deps: PrimaryDeps,
 ): Promise<PrimaryAccess> {
   if (!isLoadedTab(tab)) return unloadedAccess(tab, run, deps);
-  const port = await connectAgent(deps.api, tab, run.boundMs);
-  return { read: (use) => use(port), release: () => port.disconnect() };
+  return loadedAccess(tab, run, deps);
 }

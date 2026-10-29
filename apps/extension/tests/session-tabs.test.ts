@@ -1,6 +1,6 @@
 import { afterEach, expect, test, vi } from "vite-plus/test";
 import type { SessionWindow } from "@/background/workspace/capture-api";
-import { findSessionTabs, readLayout } from "@/background/workspace/session-tabs";
+import { SETTLE_BOUND_MS, findSessionTabs, readLayout } from "@/background/workspace/session-tabs";
 import { echoProbes, fakeEvent, fakePort } from "./fake-port";
 
 const APP = "http://app.localhost:5192";
@@ -50,6 +50,7 @@ function sessionChrome(
     onConnect.emit(agent);
   });
   return {
+    settle: vi.fn(async (_boundMs: number) => undefined),
     windows: vi.fn(async () => windows),
     topFrame: vi.fn(async (tabId: number) => frames[tabId] ?? null),
     inject,
@@ -85,7 +86,12 @@ const FRAMES: Record<number, Frame> = {
 };
 
 test("finds each web, blank, and New Tab page in order and names the others by place and scheme", async () => {
-  const found = await findSessionTabs(sessionChrome(TWO_WINDOWS, FRAMES), 10);
+  const api = sessionChrome(TWO_WINDOWS, FRAMES);
+  const found = await findSessionTabs(api, 10);
+  // The tabs are read once none is loading, so no page found is one a navigation replaces.
+  expect(api.settle).toHaveBeenCalledWith(SETTLE_BOUND_MS);
+  const [settled] = api.settle.mock.invocationCallOrder;
+  expect(settled).toBeLessThan(api.windows.mock.invocationCallOrder[0] ?? 0);
   expect(
     found.windows.map(({ focused, tabs }) => [focused, tabs.map(({ tabId }) => tabId)]),
   ).toEqual([

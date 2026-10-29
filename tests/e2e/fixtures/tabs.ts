@@ -168,6 +168,17 @@ export function discardTab(serviceWorker: Worker, tabId: number): Promise<number
   }, tabId);
 }
 
+/** Starts loading `url` in the tab and returns at once, while the previous page may still show. */
+export function startLoading(serviceWorker: Worker, tabId: number, url: string): Promise<void> {
+  return serviceWorker.evaluate(
+    async ([id, address]) => {
+      const { chrome } = globalThis as unknown as ChromeGlobal;
+      await chrome.tabs.update(id, { url: address });
+    },
+    [tabId, url] as const,
+  );
+}
+
 /**
  * Loads `url` in the tab, as typing it in the address bar would, and resolves once the tab shows
  * it: `tabs.update` resolves while the previous page may still be the one committed.

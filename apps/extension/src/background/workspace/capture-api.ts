@@ -4,7 +4,7 @@ import type { AgentExpectation } from "@/background/workspace/agent-link";
 import { AGENT_SCRIPT } from "@/background/workspace/barrier";
 import { WorkspaceError } from "@/background/workspace/errors";
 import { isHelperTab } from "@/background/workspace/helper-tab";
-import { inventory } from "@/background/workspace/windows";
+import { inventory, settledTabs } from "@/background/workspace/windows";
 import { ORIGIN_AGENT_PORT } from "@/messaging/origin-protocol";
 import type { OriginPort } from "@/messaging/origin-protocol";
 
@@ -23,6 +23,8 @@ export interface SessionWindow {
 
 /** What a capture needs from Chrome: the windows, a tab's top document, the agent's injection, its port. */
 export interface CaptureApi {
+  /** Resolves once no tab of the session is loading a page, or after `boundMs`. */
+  settle: (boundMs: number) => Promise<void>;
   windows: () => Promise<SessionWindow[]>;
   topFrame: (tabId: number) => Promise<{ url: string; documentId: string } | null>;
   inject: (tabId: number, documentId: string) => Promise<void>;
@@ -34,7 +36,10 @@ export interface CaptureApi {
 }
 
 /** What reading the session's tabs needs: the windows, each top document, and its agent. */
-export type TabReadApi = Pick<CaptureApi, "windows" | "topFrame" | "inject" | "onConnect">;
+export type TabReadApi = Pick<
+  CaptureApi,
+  "settle" | "windows" | "topFrame" | "inject" | "onConnect"
+>;
 
 /** Injects the agent into the expected document only and waits for its link; nothing stays registered. */
 export function connectAgent(
@@ -65,6 +70,7 @@ export function connectAgent(
 
 /** Chrome's APIs; the getter reaches `runtime.onConnect` only when a capture runs. */
 export const chromeCaptureApi: CaptureApi = {
+  settle: settledTabs,
   windows: async () =>
     (await inventory()).map(({ id, focused, tabs = [] }) => ({
       id,

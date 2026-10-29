@@ -22,6 +22,7 @@ export function chrome(
   const agent = echoProbes(fakePort(SENDER), carry);
   const api = {
     onConnect,
+    settle: vi.fn(async (_boundMs: number) => undefined),
     // One window, its one tab the managed tab 7, unless a test lays out more.
     windows: vi.fn(async (): Promise<SessionWindow[]> => [
       { id: 9, focused: true, tabs: [{ id: 7, active: true }] },

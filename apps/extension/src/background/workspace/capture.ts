@@ -7,7 +7,7 @@ import { captureCookies } from "@/background/workspace/cookie-capture";
 import { resolveTabStore } from "@/background/workspace/cookie-stores";
 import type { CookieApi } from "@/background/workspace/cookie-stores";
 import type { HelperDeps } from "@/background/workspace/helper-tab";
-import { CAPTURE_BOUND_MS, readOrigin, readOthers } from "@/background/workspace/origin-reads";
+import { CAPTURE_BOUND_MS, originReader, readOthers } from "@/background/workspace/origin-reads";
 import type { OriginRead, OthersRead } from "@/background/workspace/origin-reads";
 import { openPrimary } from "@/background/workspace/primary-read";
 import type { PrimaryAccess } from "@/background/workspace/primary-read";
@@ -141,7 +141,7 @@ async function readOrigins(
   target: Target,
   deps: CaptureDeps,
 ): Promise<OthersRead> {
-  const first = await primary.read((port) => readOrigin(port, reading, target.origin, deps));
+  const first = await primary.read(originReader(reading, target.origin, deps));
   const visited = await deps.origins.visits.visited(reading.operation.generation);
   const others = visited.filter(({ origin }) => origin !== target.origin);
   const helper = { ...deps, helper: deps.origins.helper };
