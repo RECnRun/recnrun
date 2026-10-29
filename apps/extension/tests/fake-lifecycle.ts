@@ -49,6 +49,7 @@ export const SUMMARY: CaptureSummary = {
   bytes: 64,
   ms: 1,
   skipped: [],
+  tabs: [],
 };
 
 /** Chrome's side of each step, recorded; `failAt` makes that step throw. */
@@ -64,7 +65,10 @@ export function fakeEffects(open?: { identityId?: string }) {
   const state = {
     managed: open ? window(open) : undefined,
     foreign: [] as number[],
-    otherTabs: 0,
+    /** The session's windows besides the one RECnRun opened first. */
+    beside: [] as number[],
+    /** The session's tabs, as the close reads them again. */
+    tabs: [] as number[],
     failAt: undefined as string | undefined,
   };
   const fail = (step: string) => {
@@ -73,8 +77,9 @@ export function fakeEffects(open?: { identityId?: string }) {
   const effects: LifecycleEffects = {
     windows: vi.fn(async () => ({
       managed: state.managed,
+      session: state.managed ? [state.managed.windowId, ...state.beside] : [],
       foreign: state.foreign,
-      otherTabs: state.otherTabs,
+      tabs: state.managed ? state.tabs : [],
     })),
     capture: vi.fn(async (saved: Identity) => {
       calls.push(`capture ${saved.id}`);
@@ -86,6 +91,7 @@ export function fakeEffects(open?: { identityId?: string }) {
       fail("close");
       if (state.managed && ids.includes(state.managed.windowId)) state.managed = undefined;
       state.foreign = state.foreign.filter((id) => !ids.includes(id));
+      state.beside = state.beside.filter((id) => !ids.includes(id));
     }),
     load: vi.fn(async (target: Identity, from: "capture" | "empty") => {
       fail("load");

@@ -49,7 +49,7 @@ test.describe("without incognito access", () => {
 test.describe("with incognito access", () => {
   test.use({ incognitoAccess: true });
 
-  test("only the Incognito workspace's tab offers Record, never a normal or another Incognito tab", async ({
+  test("every Incognito tab of the open identity offers Record, never a normal tab", async ({
     context,
     serviceWorker,
   }) => {
@@ -68,12 +68,13 @@ test.describe("with incognito access", () => {
     const normal = tabItem(dashboardOf(site), site.url());
     await expect(normal).toBeVisible();
     await expect(normal.getByRole("button")).toHaveCount(0);
-    const foreignUrl = `${APP}/inspect?run=foreign`;
-    await openIncognitoTab(serviceWorker, foreignUrl);
-    const foreign = tabItem(dashboardOf(site), foreignUrl);
-    await expect(foreign).toContainText("Incognito");
-    await expect(foreign.getByRole("button")).toHaveCount(0);
-    await site.screenshot({ path: test.info().outputPath("record-managed-only.png") });
+    // A window opened while the identity is open is its session too, so its tab records.
+    const besideUrl = `${APP}/inspect?run=beside`;
+    await openIncognitoTab(serviceWorker, besideUrl);
+    const beside = tabItem(dashboardOf(site), besideUrl);
+    await expect(beside).toContainText("Incognito");
+    await expect(beside.getByRole("button")).toHaveText(["Record"]);
+    await site.screenshot({ path: test.info().outputPath("record-session-tabs.png") });
   });
 
   test("records the managed tab, and the PiP window follows the current tab", async ({

@@ -4,6 +4,7 @@ import { fakeBrowser } from "wxt/testing/fake-browser";
 import { installBarrier } from "@/background/workspace/barrier";
 import { recoverInterrupted } from "@/background/workspace/recovery";
 import { closeManagedWindow, createNeutralWindow } from "@/background/workspace/windows";
+import { managedWindowRepository } from "@/storage/managed-window-repository";
 import { fakeBarrierApi } from "./fake-barrier";
 import type { FakeBarrierApi } from "./fake-barrier";
 import { memoryOperationJournal } from "./fake-journal";
@@ -113,12 +114,23 @@ test("a finished, failed, or missing operation is left as it is", async () => {
   expect(await isOpen(windowId)).toBe(true);
 });
 
-test("a window that is no longer the operation's managed window stays open", async () => {
+test("an interrupted start closes every window of its session, the journaled one or not", async () => {
+  const { operation, windowId } = await interruptedAt("restore");
+  const beside = await openIncognitoWindow();
+  await recover(memoryOperationJournal(operation));
+  expect(await isOpen(windowId)).toBe(false);
+  expect(await isOpen(beside)).toBe(false);
+});
+
+test("windows stay open once the operation's session is no longer the open one", async () => {
   const { operation, windowId, generation } = await interruptedAt("restore");
-  const foreign = await openIncognitoWindow();
-  await recover(memoryOperationJournal({ ...operation, windowId: foreign }));
+  const other = await openIncognitoWindow();
   await recover(memoryOperationJournal({ ...operation, generation: generation + 1 }));
-  expect(await isOpen(foreign)).toBe(true);
+  await managedWindowRepository.update(
+    async (current) => current && { ...current, status: "closed" },
+  );
+  await recover(memoryOperationJournal(operation));
+  expect(await isOpen(other)).toBe(true);
   expect(await isOpen(windowId)).toBe(true);
 });
 

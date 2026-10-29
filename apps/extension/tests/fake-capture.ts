@@ -1,5 +1,6 @@
 import type { IdentityCapture } from "@recnrun/domain";
 import { vi } from "vite-plus/test";
+import type { SessionWindow } from "@/background/workspace/capture-api";
 import type { CapturePart } from "@/storage/identity-captures";
 import { fakeCookieApi } from "./fake-cookies";
 import { noVisits } from "./fake-helper";
@@ -10,7 +11,7 @@ const SENDER = { tab: { id: 7 }, frameId: 0, documentId: "doc-1", origin: ORIGIN
 const URL_ = `${ORIGIN}/app/`;
 
 /**
- * Chrome as a capture sees it: a tab's top document, an agent that connects when injected and
+ * Chrome as a capture sees it: one window holding tab 7, a tab's top document, an agent that connects when injected and
  * echoes the link probe as `carry` delivers it, and the Incognito cookie store holding tab 7.
  */
 export function chrome(
@@ -21,7 +22,11 @@ export function chrome(
   const agent = echoProbes(fakePort(SENDER), carry);
   const api = {
     onConnect,
-    topFrame: vi.fn(async () => frame),
+    // One window, its one tab the managed tab 7, unless a test lays out more.
+    windows: vi.fn(async (): Promise<SessionWindow[]> => [
+      { id: 9, focused: true, tabs: [{ id: 7, active: true }] },
+    ]),
+    topFrame: vi.fn(async (_tabId: number) => frame),
     inject: vi.fn(async () => onConnect.emit(agent)),
   };
   const cookies = fakeCookieApi(

@@ -157,7 +157,7 @@ test("an Incognito window the user opened and closed before any command is waite
   expect(await inspected(await pageAt(context, target))).toEqual(NOTHING);
 });
 
-test("another Incognito window keeps the workspace's data, so the dashboard offers only closing it", async ({
+test("another Incognito window keeps the workspace's data, so the dashboard counts it as the session's", async ({
   context,
   serviceWorker,
 }) => {
@@ -167,12 +167,11 @@ test("another Incognito window keeps the workspace's data, so the dashboard offe
   await sentinelsWritten(app.page);
   await openIncognitoTab(serviceWorker, "about:blank");
   const panel = workspacePanel(site);
-  await expect(panel).toContainText("1 Incognito window is open");
-  // The disabled commands stay in view beside the conflict that explains why.
-  await expect(panel.getByRole("button", { disabled: false })).toHaveText(["Close these windows"]);
-  await site.screenshot({ path: test.info().outputPath("blocked.png") });
+  await expect(panel.getByRole("button", { name: "New identity" })).toBeEnabled();
+  await expect(panel.getByRole("button", { name: "Close these windows" })).toHaveCount(0);
+  await site.screenshot({ path: test.info().outputPath("beside.png") });
 
-  // What the dashboard refuses to do: close only the managed window while the other one lives.
+  // Why the dashboard never closes only the managed window while another one lives.
   const managed = await managedWindow(serviceWorker);
   await closeWindow(serviceWorker, managed?.windowId ?? -1);
   const target = `${APP}/inspect?run=${run}`;
@@ -185,6 +184,7 @@ test("another Incognito window keeps the workspace's data, so the dashboard offe
     sessionStorage: {},
     controller: `${APP}/sw.js`,
   });
-  await expect(panel).toContainText("2 Incognito windows are open");
-  await expect(panel.getByRole("button", { name: "New identity" })).toBeDisabled();
+  // Both windows still hold the open identity's data, so they stay its session.
+  await expect(panel).not.toContainText("Incognito windows are open");
+  await expect(panel.getByRole("button", { name: "New identity" })).toBeEnabled();
 });

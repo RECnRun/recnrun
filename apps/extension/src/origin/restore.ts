@@ -1,5 +1,5 @@
 import type { OriginData } from "@recnrun/domain";
-import type { RestoredCounts } from "@/messaging/origin-protocol";
+import type { RestoredCounts, StorageScope } from "@/messaging/origin-protocol";
 import { cacheCount, writeCaches } from "@/origin/cache-storage";
 import { OriginFailure, step } from "@/origin/failure";
 import { writeEntries } from "@/origin/web-storage";
@@ -95,11 +95,32 @@ async function restoreDatabase(factory: IDBFactory, database: Database): Promise
   }
 }
 
-/** Writes one origin's data into its empty storage and counts what it wrote. */
+/** Writes a tab's own sessionStorage into it, beside the origin's data another tab restored. */
+async function restoreSession(stores: OriginStores, data: OriginData): Promise<RestoredCounts> {
+  if (stores.sessionStorage.length > 0) throw new OriginFailure("check", "OriginNotEmpty");
+  const sessionStorage = await step("sessionStorage", () =>
+    writeEntries(stores.sessionStorage, data.sessionStorage),
+  );
+  return {
+    localStorage: 0,
+    sessionStorage,
+    databases: 0,
+    records: 0,
+    caches: 0,
+    cacheEntries: 0,
+  };
+}
+
+/**
+ * Writes one origin's data into its empty storage and counts what it wrote; a session scope
+ * writes the tab's sessionStorage alone.
+ */
 export async function restoreOrigin(
   stores: OriginStores,
   data: OriginData,
+  scope: StorageScope = "origin",
 ): Promise<RestoredCounts> {
+  if (scope === "session") return restoreSession(stores, data);
   await step("check", () => requireEmpty(stores));
   const localStorage = await step("localStorage", () =>
     writeEntries(stores.localStorage, data.localStorage),

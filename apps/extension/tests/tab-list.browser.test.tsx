@@ -12,11 +12,15 @@ import {
   fakeExtension,
   memoryRecordingStore,
 } from "./fake-extension";
-import { DOCS, PRIVATE, SHOP, fakeIncognito, fakeTabs } from "./fake-tabs";
+import type { OpenTab } from "@/ports/tabs";
+import { DOCS, PRIVATE, SHOP as NORMAL_SHOP, fakeIncognito, fakeTabs } from "./fake-tabs";
 import { closePanel, framedPage } from "./framed-page";
 import { button } from "./queries";
 
-/** The workspace status with `tabId` as the managed window's tab, the only one RECnRun records. */
+// A session starts only on an Incognito tab of the open identity.
+const SHOP: OpenTab = { ...NORMAL_SHOP, incognito: true };
+
+/** The workspace status with an identity open, `tabId` the tab its window opened with. */
 const managing = (tabId: number, status: "active" | "closed" = "active"): WorkspaceStatus => ({
   ...NO_INCOGNITO_WINDOW,
   managed: { generation: 1, windowId: 1, tabId, status },
@@ -64,7 +68,7 @@ afterEach(() => {
   document.body.replaceChildren();
 });
 
-test("lists the browser's tabs as they change; only the workspace's tab can start a session", async () => {
+test("lists the browser's tabs as they change; only an Incognito tab of the open identity can start a session", async () => {
   const { root, tabs } = mount();
   await expect.poll(() => buttons(item(root, "Shop"))).toEqual(["Record"]);
   expect(buttons(item(root, "Docs"))).toEqual([]);
@@ -76,12 +80,14 @@ test("lists the browser's tabs as they change; only the workspace's tab can star
   expect(buttons(item(root, "Docs"))).toEqual([]);
 });
 
-test("Record follows the managed tab while its window is open, and no other tab offers it", async () => {
+test("Record shows on every Incognito tab while an identity is open, and on no normal tab", async () => {
   let status = managing(PRIVATE.id);
   const incognito = fakeIncognito(true);
-  const tabs = fakeTabs({ tabs: [SHOP, PRIVATE] }).source;
+  const second = { ...PRIVATE, id: 10, windowId: 3, title: "Second" };
+  const tabs = fakeTabs({ tabs: [NORMAL_SHOP, PRIVATE, second] }).source;
   const { root } = mount({ tabs, incognito: incognito.access }, () => status);
   await expect.poll(() => buttons(item(root, "Private"))).toEqual(["Record"]);
+  expect(buttons(item(root, "Second"))).toEqual(["Record"]);
   expect(buttons(item(root, "Shop"))).toEqual([]);
 
   status = managing(PRIVATE.id, "closed");
@@ -203,7 +209,7 @@ test("of two dashboards starting at once, only one takes the control", async () 
 });
 
 test("marks incognito tabs, shows only the icons it may load, and records the managed one", async () => {
-  const shop = { ...SHOP, favicon: "data:image/png;base64,AA==" };
+  const shop = { ...NORMAL_SHOP, favicon: "data:image/png;base64,AA==" };
   const tabs = fakeTabs({ tabs: [shop, PRIVATE] }).source;
   const { root, sent, page } = mount({ tabs }, () => managing(PRIVATE.id));
   await expect.poll(() => buttons(item(root, "Private"))).toEqual(["Record"]);

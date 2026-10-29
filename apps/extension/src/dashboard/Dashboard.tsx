@@ -4,7 +4,7 @@ import { useEffect, useState } from "preact/hooks";
 import { IncognitoControl } from "@/dashboard/IncognitoControl";
 import {
   IncognitoWorkspace,
-  managedTabId,
+  sessionOpen,
   useWorkspaceStatus,
 } from "@/dashboard/IncognitoWorkspace";
 import { RecordingDetail } from "@/dashboard/RecordingDetail";
@@ -92,7 +92,7 @@ export function Dashboard({ services, router, take }: DashboardProps) {
                   tabs={services.tabs}
                   store={services.recordings}
                   take={take}
-                  recordable={managedTabId(workspace.status)}
+                  recordable={sessionOpen(workspace.status)}
                 />
               </>
             )}

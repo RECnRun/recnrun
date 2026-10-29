@@ -1,5 +1,6 @@
 import { expect, test, vi } from "vite-plus/test";
 import type { memoryOperationJournal } from "./fake-journal";
+import { SUMMARY } from "./fake-lifecycle";
 import { NOW, setUp } from "./lifecycle-harness";
 
 const steps = (journal: ReturnType<typeof memoryOperationJournal>) =>
@@ -115,21 +116,29 @@ test("an Incognito window opened during the capture stops the close, with the ca
   expect(journal.written.at(-1)).toMatchObject({ step: "close", status: "failed" });
 });
 
-test("another tab in the workspace's window refuses before the capture and stops the close after it", async () => {
+test("Switch closes every window of the session, one beside the window RECnRun opened too", async () => {
+  const { lifecycle, chrome } = setUp({ open: "a" });
+  chrome.state.beside = [6];
+  chrome.state.tabs = [50, 60];
+  vi.mocked(chrome.effects.capture).mockResolvedValueOnce({ ...SUMMARY, tabs: [50, 60] });
+  await lifecycle.switchTo("b");
+  expect(chrome.calls).toEqual(["close 5,6", "start b capture"]);
+});
+
+test("an Incognito tab opened during the capture stops the close, so nothing it shows is lost", async () => {
   const { lifecycle, chrome, journal, saved } = setUp({ open: "a" });
-  chrome.state.otherTabs = 1;
-  await expect(lifecycle.switchTo("b")).rejects.toThrow("RECnRun saves only its own tab.");
-  expect(journal.written).toEqual([]);
-  chrome.state.otherTabs = 0;
+  chrome.state.tabs = [50];
   vi.mocked(chrome.effects.capture).mockImplementationOnce(async () => {
-    chrome.state.otherTabs = 1;
-    return { ...SUMMARY, captureId: "cap-a-3" };
+    chrome.state.beside = [9];
+    chrome.state.tabs = [50, 90];
+    return { ...SUMMARY, captureId: "cap-a-3", tabs: [50] };
   });
   await expect(lifecycle.switchTo("b")).rejects.toThrow(
-    "The capture is saved; close the other tabs in the Incognito workspace first.",
+    "The capture is saved; an Incognito tab opened while it ran, so run the command again to save it too.",
   );
   expect(chrome.calls).toEqual([]);
   expect(saved("a")?.lastCapture?.id).toBe("cap-a-3");
+  expect(journal.written.at(-1)).toMatchObject({ step: "close", status: "failed" });
 });
 
 test("a failed start leaves the previous identity's capture saved", async () => {
@@ -226,18 +235,3 @@ test("delete removes a closed identity and its captures, even while recording", 
   await expect(lifecycle.deleteIdentity("b")).rejects.toMatchObject({ name: "IdentityNotFound" });
   expect(access).not.toHaveBeenCalled();
 });
-
-const SUMMARY = {
-  captureId: "",
-  localStorage: 0,
-  sessionStorage: 0,
-  databases: 0,
-  records: 0,
-  caches: 0,
-  cacheEntries: 0,
-  cookies: 0,
-  unsupported: 0,
-  skipped: [],
-  bytes: 64,
-  ms: 1,
-};

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test, vi } from "vite-plus/test";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vite-plus/test";
 import { fakeBrowser } from "wxt/testing/fake-browser";
 import { createBackgroundListener } from "@/background/listener";
 import { createRoutes } from "@/background/routes";
@@ -38,6 +38,11 @@ async function activeTabId() {
 
 beforeEach(() => {
   fakeBrowser.reset();
+});
+
+// The Node projects share a worker, so a spy left on the fake browser would reach other files.
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 describe("bridge requests", () => {

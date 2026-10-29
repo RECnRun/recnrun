@@ -141,30 +141,37 @@ export async function createNeutralWindow(identityId?: string): Promise<ManagedW
   return state;
 }
 
-function markClosed(windowId?: number): void {
-  // An unreadable state stays as it is; the next status read reports it.
-  void managedWindowRepository
-    .update((current) => {
-      const gone = windowId === undefined || current?.windowId === windowId;
-      return current?.status === "active" && gone ? { ...current, status: "closed" } : current;
-    })
-    .catch(() => {});
+/** Marks the session closed while it is still the one of `generation`, and nothing else. */
+async function close(generation?: number): Promise<void> {
+  await managedWindowRepository.update((current) => {
+    const same = generation === undefined || current?.generation === generation;
+    return current?.status === "active" && same ? { ...current, status: "closed" } : current;
+  });
 }
 
-/** Keeps the stored state true when the window goes, by RECnRun, the user, or a browser restart. */
+/** The session ends with its last Incognito window; one that closes beside others leaves it open. */
+async function closeIfLast(): Promise<void> {
+  const before = await managedWindowRepository.read();
+  if (before?.status !== "active" || (await inventory()).length > 0) return;
+  // A new session opened meanwhile has another generation, so it stays active.
+  await close(before.generation);
+}
+
+/** Keeps the stored state true when the last window goes, by RECnRun, the user, or a restart. */
 export function trackManagedWindow(): void {
-  browser.windows.onRemoved.addListener((windowId) => markClosed(windowId));
+  // An unreadable state stays as it is; the next status read reports it.
+  browser.windows.onRemoved.addListener(() => void closeIfLast().catch(() => {}));
   // Incognito windows never survive a restart, and Chrome reuses window ids after one.
-  browser.runtime.onStartup.addListener(() => markClosed());
+  browser.runtime.onStartup.addListener(() => void close().catch(() => {}));
 }
 
 /**
- * Closes `windowId` only while it is still the open managed window of `generation`; Chrome reuses
- * window ids after a restart, so an id alone could name a window the user opened.
+ * Closes every Incognito window while the session of `generation` is still active: each one is the
+ * session's then. Chrome reuses window ids after a restart, so an id alone could name another.
  */
-export async function closeManagedWindow(windowId: number, generation: number): Promise<void> {
+export async function closeManagedWindow(generation: number): Promise<void> {
   const managed = await managedWindowRepository.read();
-  const ours = managed?.status === "active" && managed.windowId === windowId;
-  if (!ours || managed.generation !== generation) return;
-  if ((await inventory()).some(({ id }) => id === windowId)) await closeWindows([windowId]);
+  if (managed?.status !== "active" || managed.generation !== generation) return;
+  const open = (await inventory()).map(({ id }) => id);
+  if (open.length > 0) await closeWindows(open);
 }

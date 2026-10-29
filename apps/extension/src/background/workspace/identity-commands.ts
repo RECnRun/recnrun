@@ -1,6 +1,7 @@
 import { restorableData } from "@recnrun/domain";
 import type { IdentityData } from "@recnrun/domain";
-import { captureIdentity, captureOrigins, chromeCaptureApi } from "@/background/workspace/capture";
+import { chromeCaptureApi } from "@/background/workspace/capture-api";
+import { captureIdentity, captureOrigins } from "@/background/workspace/capture";
 import type { CaptureDeps, CaptureSummary } from "@/background/workspace/capture";
 import { chromeCookieApi } from "@/background/workspace/cookie-stores";
 import { WorkspaceError } from "@/background/workspace/errors";

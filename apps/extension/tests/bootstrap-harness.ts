@@ -4,6 +4,7 @@ import type { BootstrapDeps } from "@/background/workspace/bootstrap";
 import { fakeBarrierApi } from "./fake-barrier";
 import { fakeCookieApi, memoryStoreMemory } from "./fake-cookies";
 import { fakeHelperTabs, memoryVisits } from "./fake-helper";
+import { fakeLayoutApi } from "./fake-layout";
 import { fakeNavigationApi } from "./fake-navigation";
 import type { FakeNavigationApi } from "./fake-navigation";
 import { echoProbes, fakePort } from "./fake-port";
@@ -106,6 +107,7 @@ export function bootstrapHarness(agentReply: Reply = "restored") {
     navigation,
     barrier,
     helperTabs: fakeHelperTabs(),
+    layout: fakeLayoutApi(),
     visits: memoryVisits(),
     windows: { create: vi.fn(async () => WINDOW), close: vi.fn(async () => {}) },
     hooks: { beforeStep: vi.fn(async () => {}) },

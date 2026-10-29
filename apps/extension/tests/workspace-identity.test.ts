@@ -17,6 +17,7 @@ import { memoryRecordingStore } from "./fake-extension";
 import { memoryOperationJournal } from "./fake-journal";
 import { memoryIdentities } from "./fake-lifecycle";
 import { fakeHelperTabs, memoryVisits } from "./fake-helper";
+import { fakeLayoutApi } from "./fake-layout";
 import { fakeNavigationApi } from "./fake-navigation";
 import { openWindowsWithTabs } from "./fake-windows";
 import { allowIncognito, manageTab } from "./workspace-harness";
@@ -35,6 +36,7 @@ function ports(beforeStep: (step: string) => Promise<void> = async () => {}) {
     navigation: fakeNavigationApi(),
     barrier: fakeBarrierApi(),
     helperTabs: fakeHelperTabs(),
+    layout: fakeLayoutApi(),
     visits: memoryVisits(),
     hooks: { beforeStep },
   };

@@ -12,10 +12,19 @@ const OPERATION = {
   generation: CountSchema,
 };
 
+/**
+ * What a command reads or writes: all of the origin's storage, or only the sessionStorage of the
+ * agent's own tab, which no other tab shares.
+ */
+const ScopeSchema = v.optional(v.picklist(["origin", "session"]), "origin");
+
+export type StorageScope = v.InferOutput<typeof ScopeSchema>;
+
 /** The background asks the agent to restore one origin's data into its page. */
 const OriginRestoreCommandSchema = v.object({
   type: v.literal("restore"),
   ...OPERATION,
+  scope: ScopeSchema,
   payload: OriginDataSchema,
 });
 
@@ -23,6 +32,7 @@ const OriginRestoreCommandSchema = v.object({
 const OriginCaptureCommandSchema = v.object({
   type: v.literal("capture"),
   ...OPERATION,
+  scope: ScopeSchema,
   chunk: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(10_000)), 500),
 });
 

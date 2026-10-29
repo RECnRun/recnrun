@@ -43,12 +43,11 @@ export async function closeRemembering(
   await closeWindows(ids);
 }
 
-/** Closes the managed window of `generation`, as recovery does, once its store is remembered. */
+/** Closes the session of `generation`, as recovery does, once its store is remembered. */
 export async function closeManagedRemembering(
-  windowId: number,
   generation: number,
   deps: FreshWindowDeps,
 ): Promise<void> {
   await rememberBeforeClosing(deps);
-  await closeManagedWindow(windowId, generation);
+  await closeManagedWindow(generation);
 }

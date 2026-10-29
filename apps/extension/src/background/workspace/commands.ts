@@ -23,6 +23,7 @@ import { createLifecycle } from "@/background/workspace/lifecycle";
 import type { LifecycleCommands } from "@/background/workspace/lifecycle-types";
 import { chromeLifecycleEffects } from "@/background/workspace/lifecycle-effects";
 import { chromeHelperTabApi } from "@/background/workspace/helper-tab";
+import { chromeLayoutApi } from "@/background/workspace/layout-restore";
 import { chromeNavigationApi } from "@/background/workspace/navigation";
 import { recoverInterrupted } from "@/background/workspace/recovery";
 import type { RecoveryDeps } from "@/background/workspace/recovery";
@@ -88,9 +89,9 @@ async function closeShownAndStart(
   ports: BootstrapPorts,
 ): Promise<void> {
   await requireAccess();
-  const { managed, foreign } = await classifiedWindows();
+  const { session, foreign } = await classifiedWindows();
   // Starting needs every Incognito window gone, so closing the shown ones first would be in vain.
-  if (managed !== undefined) {
+  if (session.length > 0) {
     throw new WorkspaceError(
       "WorkspaceOpen",
       "Close and start empty replaces the open workspace; close the other Incognito windows first.",
@@ -107,17 +108,20 @@ async function closeShownAndStart(
   await startAt(url, ports);
 }
 
-/** Discards the managed window's Incognito data by replacing the window; other windows would keep it. */
+/** Discards the session's Incognito data by closing every window of it, then starts anew. */
 async function replaceManaged(url: string, ports: BootstrapPorts): Promise<void> {
   await requireAccess();
-  const { managed, foreign } = await classifiedWindows();
+  const { session, foreign } = await classifiedWindows();
   if (foreign.length > 0) {
     throw new WorkspaceError("IncognitoWindowsOpen", "Close the other Incognito windows first.");
   }
-  if (managed === undefined) {
+  if (session.length === 0) {
     throw new WorkspaceError("NoManagedWindow", "No Incognito workspace is open; start one first.");
   }
-  await closeRemembering([managed.id], ports);
+  await closeRemembering(
+    session.map(({ id }) => id),
+    ports,
+  );
   await startAt(url, ports);
 }
 
@@ -138,6 +142,7 @@ export function chromeBootstrapPorts(
     navigation: chromeNavigationApi,
     barrier: chromeBarrierApi,
     helperTabs: chromeHelperTabApi,
+    layout: chromeLayoutApi,
     visits: visitedOrigins,
     hooks,
   };
@@ -178,8 +183,7 @@ function recoverInto(
   deps: Omit<RecoveryDeps, "closeWindow">,
   ports: BootstrapPorts,
 ): Promise<void> {
-  const closeWindow = (windowId: number, generation: number) =>
-    closeManagedRemembering(windowId, generation, ports);
+  const closeWindow = (generation: number) => closeManagedRemembering(generation, ports);
   const recovering = recoverInterrupted({ ...deps, closeWindow });
   // A failed recovery leaves the journal as it was; the status then shows it as it is.
   lock.ready = recovering.catch(() => undefined);

@@ -16,7 +16,7 @@ const ADMIN: Identity = {
 };
 const GUEST: Identity = { ...ADMIN, id: "guest", label: "Guest", lastCapture: undefined };
 const SAVED = { ...NO_INCOGNITO_WINDOW, identities: [ADMIN, GUEST] };
-const CONFLICT = "Another Incognito window or tab is open. Close it to switch identities";
+const CONFLICT = "An Incognito window is open while no identity is, so no identity owns it.";
 const managedBy = (identityId?: string) => ({
   generation: 1,
   windowId: 3,
@@ -104,25 +104,21 @@ test("another Incognito window disables every command but Delete and Close these
   expect(inPanel(root, "New identity")?.disabled).toBe(true);
 });
 
-test("a second tab in the managed window is a conflict too, with no window to close", async () => {
-  const stray = { ...PRIVATE, id: 31, windowId: 3, title: "Stray" };
-  const { root } = mount({ ...SAVED, managed: managedBy("admin") }, undefined, [SHOP, stray]);
-  await expect.poll(() => panelText(root)).toContain(CONFLICT);
-  expect(inRow(root, "Admin", "Close")?.disabled).toBe(true);
-  expect(inRow(root, "Guest", "Switch to")?.disabled).toBe(true);
-  expect(inPanel(root, "Close these windows")).toBeUndefined();
-});
-
-test("while an operation runs, the managed window's other tab is its helper, not a conflict", async () => {
-  const helper = { ...PRIVATE, id: 31, windowId: 3, title: "" };
-  const busy = { ...SAVED, managed: managedBy("admin"), busy: true };
-  const { root, setStatus, incognito } = mount(busy, undefined, [SHOP, helper]);
+test("while an identity is open, its other Incognito tabs are its session, not a conflict", async () => {
+  const second = { ...PRIVATE, id: 31, windowId: 3, title: "Second" };
+  const beside = { ...PRIVATE, id: 40, windowId: 4, title: "Beside" };
+  const { root } = mount({ ...SAVED, managed: managedBy("admin") }, undefined, [
+    SHOP,
+    second,
+    beside,
+  ]);
   await expect.poll(() => inRow(root, "Admin", "Close")).toBeDefined();
   expect(panelText(root)).not.toContain(CONFLICT);
-  // A tab still there once the operation ended is the user's.
-  setStatus({ ...busy, busy: false });
-  incognito.windowsChanged();
-  await expect.poll(() => panelText(root)).toContain(CONFLICT);
+  expect(inRow(root, "Admin", "Close")?.disabled).toBe(false);
+  expect(inRow(root, "Guest", "Switch to")?.disabled).toBe(false);
+  expect(panelText(root)).toContain(
+    "Switch to saves every Incognito tab and window of the open identity, closes them, and reopens the other identity's as they were.",
+  );
 });
 
 test("without access, identities can still be deleted but none opens", async () => {

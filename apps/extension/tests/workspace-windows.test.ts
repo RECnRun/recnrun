@@ -225,17 +225,30 @@ describe("createNeutralWindow", () => {
 });
 
 describe("trackManagedWindow", () => {
-  test("marks the managed window closed when it goes, and ignores other windows", async () => {
+  test("marks the session closed when its last Incognito window goes, not while another stays", async () => {
     trackManagedWindow();
     const managed = await createNeutralWindow();
-    const other = await fakeBrowser.windows.create({ incognito: true });
-    await fakeBrowser.windows.remove(other?.id ?? -1);
-    await expect.poll(() => managedWindowRepository.read()).toEqual(managed);
-
+    const other = await openIncognitoWindow();
+    const normal = await fakeBrowser.windows.create({ url: "https://shop.example/" });
     await fakeBrowser.windows.remove(managed.windowId);
+    await fakeBrowser.windows.remove(normal?.id ?? -1);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(await managedWindowRepository.read()).toEqual(managed);
+
+    await fakeBrowser.windows.remove(other);
     await expect
       .poll(() => managedWindowRepository.read())
       .toEqual({ ...managed, status: "closed" });
+  });
+
+  test("leaves a newer session open when an older one's last window goes", async () => {
+    trackManagedWindow();
+    const older = await createNeutralWindow();
+    await managedWindowRepository.update(async () => ({ ...older, generation: 5 }));
+    vi.spyOn(managedWindowRepository, "read").mockResolvedValueOnce(older);
+    await fakeBrowser.windows.remove(older.windowId);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(await managedWindowRepository.read()).toEqual({ ...older, generation: 5 });
   });
 
   test("marks it closed when the browser starts, since Incognito windows never survive a restart", async () => {

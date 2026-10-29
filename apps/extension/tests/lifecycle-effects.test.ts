@@ -3,6 +3,7 @@ import { sampleCapture } from "@recnrun/domain/testing";
 import { afterEach, beforeEach, expect, test, vi } from "vite-plus/test";
 import { fakeBrowser } from "wxt/testing/fake-browser";
 import { WorkspaceError } from "@/background/workspace/errors";
+import { chromeHelperTabApi } from "@/background/workspace/helper-tab";
 import { chromeLifecycleEffects } from "@/background/workspace/lifecycle-effects";
 import { createNeutralWindow } from "@/background/workspace/windows";
 import { managedWindowRepository } from "@/storage/managed-window-repository";
@@ -34,18 +35,47 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-test("lists the managed window, with its identity, only while its window is open", async () => {
+/** The tab ids of `windowIds`, in window order, as Chrome lists them. */
+async function tabsIn(...windowIds: number[]): Promise<number[]> {
+  const tabs = await Promise.all(windowIds.map((windowId) => fakeBrowser.tabs.query({ windowId })));
+  return tabs.flat().flatMap(({ id }) => (id === undefined ? [] : [id]));
+}
+
+test("lists every Incognito window as the session's while it is open, and as foreign otherwise", async () => {
   const { effects: chromeSide } = effects();
-  expect(await chromeSide.windows()).toEqual({ foreign: [], otherTabs: 0 });
+  const before = await openIncognitoWindow();
+  expect(await chromeSide.windows()).toEqual({ session: [], foreign: [before], tabs: [] });
+  await chromeSide.close([before]);
   const managed = await createNeutralWindow("a");
   expect(managed.identityId).toBe("a");
-  const foreign = await openIncognitoWindow();
-  expect(await chromeSide.windows()).toEqual({ managed, foreign: [foreign], otherTabs: 0 });
-  // A tab the user opened beside the managed one is counted, the managed one never.
-  await fakeBrowser.tabs.create({ windowId: managed.windowId, url: "about:blank" });
-  expect(await chromeSide.windows()).toMatchObject({ otherTabs: 1 });
-  await chromeSide.close([managed.windowId, foreign]);
-  expect(await chromeSide.windows()).toEqual({ foreign: [], otherTabs: 0 });
+  const beside = await openIncognitoWindow();
+  const both = await tabsIn(managed.windowId, beside);
+  expect(both).toHaveLength(2);
+  expect(await chromeSide.windows()).toEqual({
+    managed,
+    session: [managed.windowId, beside],
+    foreign: [],
+    tabs: both,
+  });
+  // The window RECnRun opened first may go; the session lives on in the other one.
+  await chromeSide.close([managed.windowId]);
+  expect(await chromeSide.windows()).toEqual({
+    managed,
+    session: [beside],
+    foreign: [],
+    tabs: await tabsIn(beside),
+  });
+  await chromeSide.close([beside]);
+  expect(await chromeSide.windows()).toEqual({ session: [], foreign: [], tabs: [] });
+});
+
+test("leaves RECnRun's helper tab out of the session's tabs", async () => {
+  const { effects: chromeSide } = effects();
+  const managed = await createNeutralWindow("a");
+  const helper = await chromeHelperTabApi.open(managed.windowId);
+  expect((await chromeSide.windows()).tabs).toEqual([managed.tabId]);
+  // The fake browser cannot remove a tab of a window it created through the spy; the set is cleared.
+  await chromeHelperTabApi.close(helper).catch(() => undefined);
 });
 
 test("a start journals the bootstrap's steps under the command's kind, in a window of the identity", async () => {
@@ -82,6 +112,8 @@ test("loading a start from a capture RECnRun does not have refuses and opens no 
 test("captures the managed tab, and deletes its captures", async () => {
   const { effects: chromeSide, captures, api } = effects(undefined, null);
   const managed = await createNeutralWindow("a");
+  const tabs = [{ id: managed.tabId, active: true }];
+  api.windows.mockResolvedValue([{ id: managed.windowId, focused: true, tabs }]);
   await expect(chromeSide.capture(identity("a"), managed, "op-7")).rejects.toMatchObject({
     name: "TargetNotAllowed",
   });

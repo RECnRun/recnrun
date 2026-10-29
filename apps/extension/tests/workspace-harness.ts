@@ -1,5 +1,6 @@
 import * as v from "valibot";
 import { vi } from "vite-plus/test";
+import type { Browser } from "wxt/browser";
 import { fakeBrowser } from "wxt/testing/fake-browser";
 import { createBackgroundListener } from "@/background/listener";
 import { createRoutes } from "@/background/routes";
@@ -14,6 +15,7 @@ import { fakeCookieApi, memoryStoreMemory } from "./fake-cookies";
 import type { FakeCookieApi } from "./fake-cookies";
 import { memoryRecordingStore } from "./fake-extension";
 import { fakeHelperTabs, memoryVisits } from "./fake-helper";
+import { fakeLayoutApi } from "./fake-layout";
 import { fakeNavigationApi } from "./fake-navigation";
 
 const EXTENSION_URL = "chrome-extension://own-id/";
@@ -36,6 +38,7 @@ export function fakeWorkspacePorts(
     navigation: fakeNavigationApi(),
     barrier: fakeBarrierApi(),
     helperTabs: fakeHelperTabs(),
+    layout: fakeLayoutApi(),
     visits: memoryVisits(),
     hooks,
   };
@@ -59,8 +62,26 @@ export function workspaceBackground(
     });
 }
 
-/** Stores `tabId` as the active managed Incognito window's tab, the only one RECnRun records. */
+const incognitoTabs = new Set<number>();
+
+/** Has Chrome report `tabId` as an Incognito tab, which the fake browser never does. */
+function markIncognito(tabId: number) {
+  // One spy serves every marked tab; a second spy over the first would call itself.
+  if (!vi.isMockFunction(fakeBrowser.tabs.get)) {
+    incognitoTabs.clear();
+    const get = fakeBrowser.tabs.get.bind(fakeBrowser.tabs);
+    vi.spyOn(fakeBrowser.tabs, "get").mockImplementation((async (id: number) => {
+      // The fake browser resolves nothing for an unknown id, though the type says otherwise.
+      const tab = (await get(id)) as Browser.tabs.Tab | undefined;
+      return tab && incognitoTabs.has(id) ? { ...tab, incognito: true } : tab;
+    }) as never);
+  }
+  incognitoTabs.add(tabId);
+}
+
+/** Stores `tabId` as the open session's first tab, an Incognito one; `vi.restoreAllMocks()` ends that. */
 export function manageTab(tabId: number, windowId = 1) {
+  markIncognito(tabId);
   return managedWindowRepository.update(() => ({
     generation: 1,
     windowId,

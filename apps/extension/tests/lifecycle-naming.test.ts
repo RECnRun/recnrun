@@ -23,7 +23,6 @@ test("a deleted identity's letter is taken again, and a given label is kept", as
 test("close windows closes the other Incognito windows the user saw, without saving them", async () => {
   const { lifecycle, chrome, journal } = setUp({ open: "a" });
   chrome.state.foreign = [7, 8];
-  chrome.state.otherTabs = 1;
   await expect(lifecycle.closeWindows([7])).rejects.toMatchObject({ name: "WindowsChanged" });
   expect(chrome.calls).toEqual([]);
   await lifecycle.closeWindows([8, 7]);

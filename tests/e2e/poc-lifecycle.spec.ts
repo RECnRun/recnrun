@@ -115,7 +115,7 @@ test("two dashboards issuing commands at once: one runs, the other is refused as
   expect(await incognitoWindows(serviceWorker)).toBe(1);
 });
 
-test("an Incognito window the user opens stops a switch before it starts and after it captured", async ({
+test("an Incognito window opened beside the identity is its session, one opened after the capture stops the close", async ({
   context,
   serviceWorker,
 }) => {
@@ -125,31 +125,31 @@ test("an Incognito window the user opens stops a switch before it starts and aft
   await identities.open("B");
   await writeMarker(await next(), "B:1");
 
-  const before = await openIncognitoTab(serviceWorker, "about:blank");
-  await expect(identities.open("A")).rejects.toThrow("Close the other Incognito windows first.");
-  if (before === undefined) throw new Error("No stray Incognito tab opened.");
-  await closeTab(serviceWorker, before);
-  await expect.poll(() => incognitoWindows(serviceWorker)).toBe(1);
-
-  await delayStep(serviceWorker, "capture", 1_500);
-  const switching = identities.open("A");
-  await expect
-    .poll(() => journalOf(serviceWorker))
-    .toMatchObject({ step: "capture", status: "running" });
-  const during = await openIncognitoTab(serviceWorker, "about:blank");
-  await expect(switching).rejects.toThrow(
-    "The capture is saved; close the other Incognito windows first.",
-  );
-  expect(await journalOf(serviceWorker)).toMatchObject({ step: "close", status: "failed" });
-  // B's window stayed open and holds what it held; nothing of the user's window was touched.
-  expect(tab.page?.isClosed()).toBe(false);
+  await openIncognitoTab(serviceWorker, "about:blank");
   expect(await incognitoWindows(serviceWorker)).toBe(2);
-  if (tab.page) expect(await readMarker(tab.page)).toEqual(marked("B:1"));
-  if (during === undefined) throw new Error("No stray Incognito tab opened.");
-  await closeTab(serviceWorker, during);
-  await delayStep(serviceWorker, "capture", 0);
   await identities.open("A");
   expect(await readMarker(await next())).toEqual(marked("A:1"));
+  expect(await incognitoWindows(serviceWorker)).toBe(1);
+
+  await delayStep(serviceWorker, "persist", 1_500);
+  const switching = identities.open("B");
+  await expect
+    .poll(() => journalOf(serviceWorker))
+    .toMatchObject({ step: "persist", status: "running" });
+  const during = await openIncognitoTab(serviceWorker, "about:blank");
+  await expect(switching).rejects.toThrow(
+    "The capture is saved; an Incognito tab opened while it ran, so run the command again to save it too.",
+  );
+  expect(await journalOf(serviceWorker)).toMatchObject({ step: "close", status: "failed" });
+  // A's windows stayed open and hold what they held, the one opened after the capture too.
+  expect(tab.page?.isClosed()).toBe(false);
+  expect(await incognitoWindows(serviceWorker)).toBe(2);
+  if (tab.page) expect(await readMarker(tab.page)).toEqual(marked("A:1"));
+  if (during === undefined) throw new Error("No Incognito tab opened after the capture.");
+  await closeTab(serviceWorker, during);
+  await delayStep(serviceWorker, "persist", 0);
+  await identities.open("B");
+  expect(await readMarker(await next())).toEqual(marked("B:1"));
 });
 
 const RECORDS = 10_000;

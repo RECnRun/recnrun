@@ -31,6 +31,7 @@ type WorkspaceErrorName =
   | "SiteAccessWithheld"
   | "StructuredCloneUnavailable"
   | "TabClosed"
+  | "TabsChanged"
   | "TargetNotAllowed"
   | "VisitedOriginFailed"
   | "WindowNotCreated"

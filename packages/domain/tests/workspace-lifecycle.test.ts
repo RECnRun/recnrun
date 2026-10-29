@@ -6,7 +6,6 @@ import type { LifecycleCommand, LifecycleState } from "../src/index.ts";
 const idle: LifecycleState = {
   recording: false,
   foreignWindows: 0,
-  otherTabs: 0,
   open: undefined,
   identities: [
     { id: "a", captured: true },
@@ -55,13 +54,13 @@ describe("planLifecycle", () => {
   });
 
   test("delete removes any identity but the open one, whatever else holds", () => {
-    const busy = { ...openA, recording: true, foreignWindows: 2, otherTabs: 1 };
+    const busy = { ...openA, recording: true, foreignWindows: 2 };
     expect(steps({ kind: "delete-identity", identityId: "b" }, busy)).toEqual(["remove"]);
     expect(refusal({ kind: "delete-identity", identityId: "a" }, openA)).toBe("IdentityOpen");
     expect(steps({ kind: "delete-identity", identityId: "a" }, idle)).toEqual(["remove"]);
   });
 
-  test("refuses every window command while recording, or with another Incognito window or tab", () => {
+  test("refuses every window command while recording, or beside an Incognito window of no session", () => {
     const commands: LifecycleCommand[] = [
       { kind: "switch", identityId: "b" },
       { kind: "suspend" },
@@ -70,8 +69,7 @@ describe("planLifecycle", () => {
     ];
     for (const command of commands) {
       expect(refusal(command, { ...openA, recording: true })).toBe("RecordingInProgress");
-      expect(refusal(command, { ...openA, foreignWindows: 1 })).toBe("IncognitoWindowsOpen");
-      expect(refusal(command, { ...openA, otherTabs: 1 })).toBe("IncognitoTabsOpen");
+      expect(refusal(command, { ...idle, foreignWindows: 1 })).toBe("IncognitoWindowsOpen");
     }
   });
 

@@ -77,7 +77,7 @@ test("the panel offers only the address and New identity, which sends no label",
   expect(enabledButtons(root)).toEqual(["New identity"]);
   expect(panel(root)?.querySelectorAll("input")).toHaveLength(1);
   expect(panelText(root)).toContain(
-    "New identity saves the open identity first, then opens the address empty.",
+    "New identity saves the open identity first, every Incognito tab and window of it, then opens the address empty.",
   );
   await typeAddress(root, TARGET);
   const before = reads();

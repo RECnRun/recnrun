@@ -135,36 +135,34 @@ test("a failed capture, persistence, or restore leaves a state the next command 
   expect(await readMarker(await next())).toEqual(marked("A:2"));
 });
 
-test("another tab in the workspace's window refuses the window commands, before or during the capture", async ({
+test("another tab in the workspace's window is saved with it, and one opened after the capture stops the close", async ({
   context,
   serviceWorker,
 }) => {
   const { identities, next, tab } = await bothSaved(context, serviceWorker);
   const managed = await managedWindow(serviceWorker);
   if (!managed) throw new Error("No managed window");
-  let extra = await openTabIn(serviceWorker, managed.windowId, "about:blank");
-  for (const command of [() => identities.open("B"), () => identities.suspend()]) {
-    await expect(command()).rejects.toThrow("RECnRun saves only its own tab.");
-  }
-  // Refused before any step: nothing journaled or captured, A's window and data as they were.
-  expect(await journalOf(serviceWorker)).toBeNull();
-  expect(await storedCaptures(serviceWorker, identities.idOf("A"))).toMatchObject({ count: 1 });
-  if (tab.page) expect(await readMarker(tab.page)).toEqual(marked("A:2"));
-  await closeTab(serviceWorker, extra);
+  await openTabIn(serviceWorker, managed.windowId, "about:blank");
+  await identities.open("B");
+  expect(await readMarker(await next())).toEqual(marked("B:1"));
+  await identities.open("A");
+  expect(await readMarker(await next())).toEqual(marked("A:2"));
 
-  await delayStep(serviceWorker, "capture", 1_500);
+  await delayStep(serviceWorker, "persist", 1_500);
   const capturing = identities.open("B").then(
     () => "switched",
     (error: unknown) => String(error),
   );
-  await atStep(serviceWorker, "capture");
-  extra = await openTabIn(serviceWorker, managed.windowId, "about:blank");
+  await atStep(serviceWorker, "persist");
+  const opened = await managedWindow(serviceWorker);
+  const extra = await openTabIn(serviceWorker, opened?.windowId ?? -1, "about:blank");
   expect(await capturing).toContain(
-    "The capture is saved; close the other tabs in the Incognito workspace first.",
+    "The capture is saved; an Incognito tab opened while it ran, so run the command again to save it too.",
   );
   expect(await journalOf(serviceWorker)).toMatchObject({ step: "close", status: "failed" });
+  if (tab.page) expect(await readMarker(tab.page)).toEqual(marked("A:2"));
   await closeTab(serviceWorker, extra);
-  await delayStep(serviceWorker, "capture", 0);
+  await delayStep(serviceWorker, "persist", 0);
   await identities.open("B");
   expect(await readMarker(await next())).toEqual(marked("B:1"));
   await identities.open("A");

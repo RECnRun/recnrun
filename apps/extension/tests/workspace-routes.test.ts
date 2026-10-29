@@ -34,21 +34,24 @@ afterEach(() => {
 
 describe("workspace-status", () => {
   test("reports access, the managed window, and foreign windows by id and tab count", async () => {
+    const foreign = await openIncognitoWindow();
     expect(await status()).toEqual({
       siteAccess: true,
       access: true,
-      foreign: [],
+      foreign: [{ id: foreign, tabCount: 1 }],
       busy: false,
       identities: [],
     });
+    await fakeBrowser.windows.remove(foreign);
     await send({ type: "workspace-start", url: TARGET });
-    const foreign = await openIncognitoWindow();
+    // A window opened while the session is open is the session's, never foreign.
+    await openIncognitoWindow();
     const { managed, ...rest } = await status();
     expect(managed).toEqual(await managedWindowRepository.read());
     expect(rest).toEqual({
       siteAccess: true,
       access: true,
-      foreign: [{ id: foreign, tabCount: 1 }],
+      foreign: [],
       busy: false,
       identities: [],
     });
@@ -200,7 +203,7 @@ describe("workspace-close-and-start", () => {
       },
       removed: [],
     });
-    expect((await status()).foreign.map((each) => each.id)).toEqual([shown]);
+    expect((await status()).foreign).toEqual([]);
   });
 
   test("refuses an internal target before closing anything", async () => {

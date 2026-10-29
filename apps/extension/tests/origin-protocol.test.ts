@@ -31,6 +31,13 @@ test("a restore command names its operation and carries the origin's data", () =
   }
 });
 
+test("a command reads or writes the whole origin unless it names its tab's sessionStorage", () => {
+  expect(v.parse(OriginCommandSchema, restore)).toMatchObject({ scope: "origin" });
+  const session = { ...restore, scope: "session" };
+  expect(v.parse(OriginCommandSchema, session)).toMatchObject({ scope: "session" });
+  expect(v.is(OriginCommandSchema, { ...restore, scope: "local" })).toBe(false);
+});
+
 test("the agent answers restored with counts, or failed with a short reason", () => {
   const restored = { type: "restored", operationId: "op-1", generation: 2, counts };
   const failed = {
@@ -54,8 +61,9 @@ test("the agent answers restored with counts, or failed with a short reason", ()
 
 test("a capture command names its operation and a chunk size, 500 records unless it says", () => {
   const capture = { type: "capture", operationId: "op-1", generation: 2 };
-  expect(v.parse(OriginCommandSchema, capture)).toEqual({ ...capture, chunk: 500 });
-  expect(v.parse(OriginCommandSchema, { ...capture, chunk: 2 })).toEqual({ ...capture, chunk: 2 });
+  const parsed = { ...capture, scope: "origin" };
+  expect(v.parse(OriginCommandSchema, capture)).toEqual({ ...parsed, chunk: 500 });
+  expect(v.parse(OriginCommandSchema, { ...capture, chunk: 2 })).toEqual({ ...parsed, chunk: 2 });
   for (const chunk of [0, 1.5, 10_001]) {
     expect(v.is(OriginCommandSchema, { ...capture, chunk }), String(chunk)).toBe(false);
   }

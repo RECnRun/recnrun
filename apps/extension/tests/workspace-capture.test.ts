@@ -2,7 +2,7 @@ import { approximateBytes } from "@recnrun/domain";
 import type { ManagedWindowState } from "@recnrun/domain";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vite-plus/test";
 import { fakeBrowser } from "wxt/testing/fake-browser";
-import { captureIdentity, chromeCaptureApi } from "@/background/workspace/capture";
+import { captureIdentity } from "@/background/workspace/capture";
 import {
   CACHE,
   COUNTS,
@@ -110,17 +110,27 @@ describe("captureIdentity", () => {
       { adapter: "indexedDB", status: "captured" },
       { adapter: "cookies", status: "captured" },
       { adapter: "cacheStorage", status: "captured" },
+      { adapter: "tabs", status: "captured" },
     ]);
+    // The session's one tab is the primary one, whose sessionStorage its origin holds.
+    const layout = {
+      windows: [{ focused: true, tabs: [{ url: URL_, active: true, sessionStorage: [] }] }],
+      primary: { window: 0, tab: 0 },
+    };
+    expect(complete?.layout).toEqual(layout);
     expect(complete?.valueTypes.toSorted()).toEqual(["Date", "Object", "Set", "primitive"]);
     expect(complete?.endedAt).toBeGreaterThanOrEqual(complete?.startedAt ?? Infinity);
-    // The size counts what was kept: Web Storage, each store's records and cache, and cookies.
-    const bytes = approximateBytes([LOCAL, SESSION, RECORDS, CACHE.cache, complete?.cookies]);
+    // The size counts what was kept: Web Storage, each store's records and cache, cookies, and tabs.
+    const kept = [LOCAL, SESSION, RECORDS, CACHE.cache, complete?.cookies, layout];
+    const bytes = approximateBytes(kept);
     expect(summary).toMatchObject({
       captureId: started?.id,
       ...COUNTS,
       cookies: 3,
       unsupported: 1,
       bytes,
+      // Each tab it saw, so the close refuses one opened since.
+      tabs: [7],
     });
     expect(bytes).toBeGreaterThan(0);
     expect(agent.disconnected).toBe(true);
@@ -299,28 +309,5 @@ describe("a failed capture", () => {
     await expect(captureIdentity("", MANAGED, deps)).rejects.toThrow(/does not match/);
     expect(captures.publish).not.toHaveBeenCalled();
     expect(setup.agent.disconnected).toBe(true);
-  });
-});
-
-describe("chromeCaptureApi", () => {
-  test("reads the tab's top frame and injects the agent into that document only", async () => {
-    const frame = { url: URL_, documentId: "doc-1", frameId: 0, parentFrameId: -1 };
-    const getFrame = vi
-      .spyOn(fakeBrowser.webNavigation, "getFrame")
-      .mockResolvedValue(frame as never);
-    await expect(chromeCaptureApi.topFrame(7)).resolves.toEqual({ url: URL_, documentId: "doc-1" });
-    expect(getFrame).toHaveBeenCalledWith({ tabId: 7, frameId: 0 });
-    getFrame.mockResolvedValue(null as never);
-    await expect(chromeCaptureApi.topFrame(7)).resolves.toBeNull();
-
-    const executeScript = vi
-      .spyOn(fakeBrowser.scripting, "executeScript")
-      .mockResolvedValue([] as never);
-    await chromeCaptureApi.inject(7, "doc-1");
-    expect(executeScript).toHaveBeenCalledWith({
-      target: { tabId: 7, documentIds: ["doc-1"] },
-      files: ["/content-scripts/origin-agent.js"],
-    });
-    expect(chromeCaptureApi.onConnect).toBe(fakeBrowser.runtime.onConnect);
   });
 });

@@ -3,15 +3,11 @@ import type { WorkspaceStatus } from "@/messaging/workspace-protocol";
 import type { OpenTab } from "@/ports/tabs";
 
 /**
- * An Incognito window, or a tab in the managed window, that RECnRun did not open. While an
- * operation runs, the managed window's other tab is RECnRun's helper; one the user opened then
- * shows once it ends.
+ * An Incognito window open while no identity is: no identity owns its tabs. While one is open,
+ * every Incognito tab and window is its session, which a switch saves, so none conflicts.
  */
-export function hasConflict(status: WorkspaceStatus, tabs: readonly OpenTab[]): boolean {
-  if (status.foreign.length > 0) return true;
-  const { managed } = status;
-  if (managed?.status !== "active" || status.busy) return false;
-  return tabs.some(({ windowId, id }) => windowId === managed.windowId && id !== managed.tabId);
+export function hasConflict(status: WorkspaceStatus): boolean {
+  return status.foreign.length > 0;
 }
 
 const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
@@ -49,21 +45,17 @@ export function WorkspaceConflict({ status, tabs, disabled, run }: ConflictProps
   return (
     <div class="workspace-conflict" role="status">
       <p>
-        Another Incognito window or tab is open. Close it to switch identities; RECnRun saves only
-        its own tab.
+        An Incognito window is open while no identity is, so no identity owns it. Close it to switch
+        identities.
       </p>
-      {windowIds.length > 0 && (
-        <>
-          <ForeignWindows status={status} tabs={tabs} />
-          <button
-            type="button"
-            disabled={disabled}
-            onClick={() => run({ type: "workspace-close-windows", windowIds })}
-          >
-            Close these windows
-          </button>
-        </>
-      )}
+      <ForeignWindows status={status} tabs={tabs} />
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => run({ type: "workspace-close-windows", windowIds })}
+      >
+        Close these windows
+      </button>
     </div>
   );
 }

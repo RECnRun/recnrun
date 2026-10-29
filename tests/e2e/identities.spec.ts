@@ -102,14 +102,25 @@ test("New identity, Switch to, Close, and Delete from the dashboard", async ({
   await keep("identity-commands-ms", timings);
 });
 
-test("another Incognito window disables switching until it closes", async ({
+test("an Incognito window opened while no identity is disables switching until it closes", async ({
   context,
   serviceWorker,
 }) => {
   const site = await setUp(context, serviceWorker);
-  const stray = await openIncognitoTab(serviceWorker, "about:blank");
   const switchTo = identity(site, "A").getByRole("button", { name: "Switch to" });
-  await expect(workspacePanel(site)).toContainText("Another Incognito window or tab is open.");
+  // While B is open, another Incognito window is B's session, not a conflict.
+  const beside = await openIncognitoTab(serviceWorker, "about:blank");
+  await expect.poll(() => incognitoWindows(serviceWorker)).toBe(2);
+  await expect(switchTo).toBeEnabled();
+  if (beside === undefined) throw new Error("No Incognito tab opened beside B.");
+  await closeTab(serviceWorker, beside);
+  await click(site, "B", "Close");
+  await expect.poll(() => incognitoWindows(serviceWorker)).toBe(0);
+
+  const stray = await openIncognitoTab(serviceWorker, "about:blank");
+  await expect(workspacePanel(site)).toContainText(
+    "An Incognito window is open while no identity is, so no identity owns it.",
+  );
   await expect(switchTo).toBeDisabled();
   await expect(identity(site, "A").getByRole("button", { name: "Delete" })).toBeEnabled();
   await screen(site, "conflict");

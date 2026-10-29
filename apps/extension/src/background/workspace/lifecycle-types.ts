@@ -30,11 +30,16 @@ interface Started {
 
 /** Chrome's side of each lifecycle step; tests replace it with fakes. */
 export interface LifecycleEffects {
-  /** The managed window while still open, every other Incognito window, and its other tabs. */
+  /**
+   * The session while one of its windows is open, with every Incognito window, or else the
+   * Incognito windows opened without one.
+   */
   windows: () => Promise<{
     managed?: ManagedWindowState;
+    session: readonly number[];
     foreign: readonly number[];
-    otherTabs: number;
+    /** The session's tabs, RECnRun's helper tabs left out. */
+    tabs: readonly number[];
   }>;
   /** Saves the open identity; `operationId` names the barriers its helper tab installs. */
   capture: (
@@ -45,7 +50,7 @@ export interface LifecycleEffects {
   close: (windowIds: readonly number[]) => Promise<void>;
   /** Reads and validates what a start of `identity` restores, before any step runs. */
   load: (identity: Identity, from: Opening["from"]) => Promise<Opening>;
-  /** Opens a fresh managed window for `identity`, journaling its steps under `operation`. */
+  /** Opens a fresh session for `identity`, journaling its steps under `operation`. */
   start: (
     identity: Identity,
     opening: Opening,

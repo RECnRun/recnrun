@@ -1,5 +1,5 @@
 import type { OriginData } from "@recnrun/domain";
-import type { CapturedCounts } from "@/messaging/origin-protocol";
+import type { CapturedCounts, StorageScope } from "@/messaging/origin-protocol";
 import { readCaches } from "@/origin/cache-storage";
 import type { CacheSink } from "@/origin/cache-storage";
 import { step } from "@/origin/failure";
@@ -114,14 +114,24 @@ async function captureDatabases(factory: IDBFactory, sink: CaptureSink, chunk: n
   return { databases: listed.length, records };
 }
 
-/** Reads the page's Web Storage, IndexedDB, then Cache Storage into `sink` and counts what it sent. */
+const NOTHING = { databases: 0, records: 0, caches: 0, cacheEntries: 0 };
+
+/**
+ * Reads the page's Web Storage, IndexedDB, then Cache Storage into `sink` and counts what it sent;
+ * a session scope reads the tab's sessionStorage alone.
+ */
 export async function captureOrigin(
   stores: OriginStores,
   sink: CaptureSink,
   chunk: number,
+  scope: StorageScope = "origin",
 ): Promise<CapturedCounts> {
-  const localStorage = await step("localStorage", () => readEntries(stores.localStorage));
   const sessionStorage = await step("sessionStorage", () => readEntries(stores.sessionStorage));
+  if (scope === "session") {
+    sink.storage({ localStorage: {}, sessionStorage });
+    return { localStorage: 0, sessionStorage: Object.keys(sessionStorage).length, ...NOTHING };
+  }
+  const localStorage = await step("localStorage", () => readEntries(stores.localStorage));
   sink.storage({ localStorage, sessionStorage });
   const counts = await captureDatabases(stores.indexedDB, sink, chunk);
   const caches = await step("cacheStorage", () => readCaches(stores.caches, sink.cache));

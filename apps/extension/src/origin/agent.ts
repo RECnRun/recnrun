@@ -48,7 +48,7 @@ function run(
   if (command.type === "restore") {
     return replyAfter(port, command, async () => ({
       type: "restored",
-      counts: await restoreOrigin(stores, command.payload),
+      counts: await restoreOrigin(stores, command.payload, command.scope),
     }));
   }
   // Each message goes out while the read transaction is live; the port keeps their order.
@@ -71,8 +71,9 @@ function run(
   };
   return replyAfter(port, command, async () => ({
     type: "captured",
-    counts: await captureOrigin(stores, sink, command.chunk),
-    cookieNames: cookieNames(documentCookie()),
+    counts: await captureOrigin(stores, sink, command.chunk, command.scope),
+    // A tab's sessionStorage says nothing of the origin's cookies, which its full capture names.
+    cookieNames: command.scope === "session" ? [] : cookieNames(documentCookie()),
   }));
 }
 

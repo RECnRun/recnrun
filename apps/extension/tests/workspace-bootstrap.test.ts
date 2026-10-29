@@ -80,7 +80,7 @@ describe("bootstrapIdentity", () => {
       "store-gone running",
       ...window,
       ...BOOTSTRAP_STEPS.slice(2).map((step) => `${step} running 5`),
-      "reload done 5",
+      "layout done 5",
     ]);
     expect(records.at(-1)).toMatchObject({
       id: "op-1",
@@ -192,6 +192,6 @@ describe("bootstrapIdentity on a redirect off the target", () => {
       BOOTSTRAP_STEPS.length,
     );
     expect(seen.rulesAtNavigation).toBe(5);
-    expect(records.at(-1)).toMatchObject({ step: "reload", status: "done" });
+    expect(records.at(-1)).toMatchObject({ step: "layout", status: "done" });
   });
 });

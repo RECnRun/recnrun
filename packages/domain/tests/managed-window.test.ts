@@ -36,38 +36,45 @@ describe("ManagedWindowStateSchema", () => {
 describe("classifyIncognitoWindows", () => {
   const normal = { id: 1, incognito: false, type: "normal" };
   const managedWindow = { id: 7, incognito: true, type: "normal" };
-  const foreignWindow = { id: 8, incognito: true, type: "normal" };
-  const foreignPopup = { id: 9, incognito: true, type: "popup" };
+  const otherWindow = { id: 8, incognito: true, type: "normal" };
+  const popup = { id: 9, incognito: true, type: "popup" };
 
-  test("splits Incognito windows into the managed one and the foreign ones", () => {
-    const windows = [normal, managedWindow, foreignWindow, foreignPopup];
+  test("counts every Incognito window as the session's while the session is active", () => {
+    const windows = [normal, managedWindow, otherWindow, popup];
     expect(classifyIncognitoWindows(windows, active)).toEqual({
-      managed: managedWindow,
-      foreign: [foreignWindow, foreignPopup],
+      session: [managedWindow, otherWindow, popup],
+      foreign: [],
     });
   });
 
-  test("counts every Incognito window as foreign without an active managed window", () => {
-    const windows = [managedWindow, foreignWindow];
-    const none = { managed: undefined, foreign: windows };
+  test("keeps the session after the window RECnRun opened first is gone", () => {
+    expect(classifyIncognitoWindows([otherWindow], active)).toEqual({
+      session: [otherWindow],
+      foreign: [],
+    });
+  });
+
+  test("counts every Incognito window as foreign without an active session", () => {
+    const windows = [managedWindow, otherWindow];
+    const none = { session: [], foreign: windows };
     expect(classifyIncognitoWindows(windows, undefined)).toEqual(none);
     expect(classifyIncognitoWindows(windows, { ...active, status: "closed" })).toEqual(none);
   });
 
   test("leaves out normal and DevTools windows", () => {
     const windows = [normal, { id: 2, incognito: true, type: "devtools" }];
-    expect(classifyIncognitoWindows(windows, active)).toEqual({ managed: undefined, foreign: [] });
+    expect(classifyIncognitoWindows(windows, active)).toEqual({ session: [], foreign: [] });
   });
 
-  test("counts an Incognito always-on-top window, such as a Document PiP, as foreign", () => {
+  test("counts an Incognito always-on-top window, such as a Document PiP, as a window", () => {
     const pip = { id: 3, incognito: true, type: "normal", alwaysOnTop: true };
-    expect(classifyIncognitoWindows([pip], active)).toEqual({ managed: undefined, foreign: [pip] });
+    expect(classifyIncognitoWindows([pip], undefined)).toEqual({ session: [], foreign: [pip] });
   });
 
   test("keeps an Incognito window of an unreported type, since it would still block a reset", () => {
     const untyped = { id: 4, incognito: true };
     expect(classifyIncognitoWindows([untyped], undefined)).toEqual({
-      managed: undefined,
+      session: [],
       foreign: [untyped],
     });
   });

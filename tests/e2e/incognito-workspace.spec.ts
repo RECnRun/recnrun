@@ -5,7 +5,6 @@ import { chromeTabs, openIncognitoTab } from "./fixtures/tabs.ts";
 import {
   APP,
   managedWindow,
-  pageAt,
   runWorkspace,
   startWorkspace,
   workspacePanel,
@@ -89,7 +88,7 @@ test.describe("with incognito access", () => {
     await expect(panel).toContainText("2 Incognito windows are open");
   });
 
-  test("another Incognito window beside the workspace leaves only Close these windows", async ({
+  test("another Incognito window beside the workspace is its session, not a conflict", async ({
     context,
     serviceWorker,
   }) => {
@@ -97,16 +96,11 @@ test.describe("with incognito access", () => {
     await startWorkspace(site, serviceWorker, `${APP}/inspect?run=managed`);
     await openIncognitoTab(serviceWorker, `${APP}/inspect?run=beside`);
     const panel = workspacePanel(site);
-    await expect(panel).toContainText("1 Incognito window is open");
-    // The disabled commands stay in view beside the conflict that explains why.
-    await expect(panel.getByRole("button", { disabled: false })).toHaveText([
-      "Close these windows",
-    ]);
-    await expect(panel.getByRole("button", { name: "New identity" })).toBeDisabled();
-    await screen(site, "open-and-foreign");
-
-    await (await pageAt(context, `${APP}/inspect?run=beside`)).close();
+    await expect.poll(() => incognitoUrls(serviceWorker)).toHaveLength(2);
     await expect(panel.getByRole("button", { name: "New identity" })).toBeEnabled();
+    await expect(panel).not.toContainText("Incognito window is open");
+    await expect(panel.getByRole("button", { name: "Close these windows" })).toHaveCount(0);
+    await screen(site, "open-and-beside");
     expect((await managedWindow(serviceWorker))?.status).toBe("active");
   });
 

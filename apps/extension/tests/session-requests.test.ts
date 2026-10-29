@@ -6,7 +6,7 @@ import { managedWindowRepository } from "@/storage/managed-window-repository";
 import { memoryRecordingStore } from "./fake-extension";
 import { manageTab } from "./workspace-harness";
 
-const NOT_MANAGED = "Only the Incognito workspace's tab can be recorded.";
+const NOT_MANAGED = "Only a tab of the Incognito workspace can be recorded.";
 
 const running = (tabId: number): RecordingSession => ({
   tabId,
@@ -67,6 +67,16 @@ test("starts no session on a tab the Incognito workspace does not manage", async
   await expect(startSession(docs.id ?? -1, store)).rejects.toThrow(NOT_MANAGED);
   expect(await store.read()).toBeNull();
   expect(await activeTabId()).toBe(docs.id);
+});
+
+test("records any Incognito tab while the session is open, not only the one it opened with", async () => {
+  const first = await fakeBrowser.tabs.create({ url: "https://shop.example/" });
+  const other = await fakeBrowser.tabs.create({ url: "https://docs.example/" });
+  await manageTab(first.id ?? -1);
+  vi.spyOn(fakeBrowser.tabs, "get").mockResolvedValue({ ...other, incognito: true } as never);
+  const store = memoryRecordingStore();
+  await startSession(other.id ?? -1, store, 5);
+  expect(await store.read()).toMatchObject({ tabId: other.id, status: "recording" });
 });
 
 test("starts no session on a tab that is gone", async () => {

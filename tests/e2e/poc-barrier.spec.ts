@@ -32,6 +32,7 @@ const STEPS = [
   "restore",
   "unbarrier",
   "reload",
+  "layout",
 ];
 
 const isFirstReport = ({ kind, body }: AppLogEntry) =>

@@ -126,6 +126,10 @@ export function Identities({ status, blocked, disabled, run }: Omit<RowProps, "i
     <div class="identities">
       <h4>Saved identities</h4>
       <p class="workspace-hint">Saved on this computer in RECnRun, kept after Incognito closes.</p>
+      <p class="workspace-hint">
+        Switch to saves every Incognito tab and window of the open identity, closes them, and
+        reopens the other identity's as they were.
+      </p>
       <ul aria-label="Saved identities">
         {status.identities.map((identity) => (
           <IdentityRow

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vite-plus/test";
 import { fakeBrowser } from "wxt/testing/fake-browser";
+import { inventory } from "@/background/workspace/windows";
 import { managedWindowRepository } from "@/storage/managed-window-repository";
 import { fakeCookieApi, memoryStoreMemory } from "./fake-cookies";
 import { memoryRecordingStore } from "./fake-extension";
@@ -93,8 +94,19 @@ describe("workspace-restart", () => {
     expect(fakeBrowser.windows.create).not.toHaveBeenCalled();
   });
 
-  test("refuses while another Incognito window is open, and closes nothing", async () => {
-    await startManaged();
+  test("closes every window of the session, one opened beside the managed window too", async () => {
+    const previous = await startManaged();
+    const beside = await openIncognitoWindow();
+    const remove = vi.spyOn(fakeBrowser.windows, "remove");
+    expect(await send(restart)).toEqual({ ok: true });
+    expect(remove.mock.calls.map(([id]) => id)).toEqual([previous.windowId, beside]);
+    const replaced = await managedWindowRepository.read();
+    expect((await inventory()).map(({ id }) => id)).toEqual([replaced?.windowId]);
+  });
+
+  test("refuses while an Incognito window no identity owns is open, and closes nothing", async () => {
+    const previous = await startManaged();
+    await managedWindowRepository.update(async () => ({ ...previous, status: "closed" }));
     await openIncognitoWindow();
     const remove = vi.spyOn(fakeBrowser.windows, "remove");
     expect(await send(restart)).toEqual({

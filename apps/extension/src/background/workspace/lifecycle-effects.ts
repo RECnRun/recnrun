@@ -10,10 +10,12 @@ import { bootstrapIdentity } from "@/background/workspace/bootstrap";
 import type { BootstrapPorts } from "@/background/workspace/bootstrap";
 import { captureIdentity, captureOrigins } from "@/background/workspace/capture";
 import { closeRemembering } from "@/background/workspace/fresh-window";
+import { isHelperTab } from "@/background/workspace/helper-tab";
 import { savedStart } from "@/background/workspace/identity-commands";
 import type { IdentityDeps } from "@/background/workspace/identity-commands";
 import type { LifecycleEffects, Opening } from "@/background/workspace/lifecycle-types";
 import { createNeutralWindow, inventory } from "@/background/workspace/windows";
+import type { IncognitoWindow } from "@/background/workspace/windows";
 import type { OperationJournal } from "@/ports/operation-journal";
 import { managedWindowRepository } from "@/storage/managed-window-repository";
 
@@ -23,6 +25,10 @@ const NOTHING: IdentityData = {
   site: { localStorage: {}, sessionStorage: {}, indexedDB: [], caches: [] },
   origins: [],
 };
+
+/** A window's tabs as a capture sees them, RECnRun's helper tabs left out. */
+const tabIdsOf = ({ tabs = [] }: IncognitoWindow) =>
+  tabs.flatMap(({ id }) => (id === undefined || isHelperTab(id) ? [] : [id]));
 
 async function load(identity: Identity, from: Opening["from"], deps: IdentityDeps) {
   if (from === "capture") return { from, ...(await savedStart(identity.id, deps)) };
@@ -39,11 +45,12 @@ export function chromeLifecycleEffects(
   return {
     windows: async () => {
       const stored = (await managedWindowRepository.read()) ?? undefined;
-      const { managed, foreign } = classifyIncognitoWindows(await inventory(), stored);
-      // The stored state counts only while its window is still open.
-      const open = managed === undefined || stored === undefined ? {} : { managed: stored };
-      const otherTabs = (managed?.tabs ?? []).filter(({ id }) => id !== stored?.tabId).length;
-      return { ...open, foreign: foreign.map(({ id }) => id), otherTabs };
+      const { session, foreign } = classifyIncognitoWindows(await inventory(), stored);
+      // The stored state counts only while one of its windows is still open.
+      const open = session.length === 0 || stored === undefined ? {} : { managed: stored };
+      const ids = (windows: readonly { id: number }[]) => windows.map(({ id }) => id);
+      const tabs = session.flatMap((window) => tabIdsOf(window));
+      return { ...open, session: ids(session), foreign: ids(foreign), tabs };
     },
     capture: async (identity, managed, operationId) => {
       await deps.captures.settle(identity.id, identity.lastCapture?.id);

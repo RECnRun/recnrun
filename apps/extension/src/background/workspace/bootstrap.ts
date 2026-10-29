@@ -18,6 +18,8 @@ import type { CookieApi } from "@/background/workspace/cookie-stores";
 import { collectFailures } from "@/background/workspace/errors";
 import { visitOrigins } from "@/background/workspace/helper-tab";
 import type { HelperTabApi } from "@/background/workspace/helper-tab";
+import { restoreLayout } from "@/background/workspace/layout-restore";
+import type { LayoutApi } from "@/background/workspace/layout-restore";
 import { openBehindBarrier, reloadAndCommit } from "@/background/workspace/navigation";
 import type { NavigationApi } from "@/background/workspace/navigation";
 import type { OriginPort } from "@/messaging/origin-protocol";
@@ -36,6 +38,7 @@ export const BOOTSTRAP_STEPS = [
   "restore",
   "unbarrier",
   "reload",
+  "layout",
 ] as const;
 
 type BootstrapStep = (typeof BOOTSTRAP_STEPS)[number];
@@ -63,6 +66,8 @@ export interface BootstrapPorts {
   barrier: BarrierApi;
   /** The hidden tab the other visited origins are restored in. */
   helperTabs: HelperTabApi;
+  /** The session's other windows and tabs, reopened as the identity left them. */
+  layout: LayoutApi;
   visits: VisitedOrigins;
   hooks: BootstrapHooks;
 }
@@ -91,6 +96,8 @@ interface Run {
   storeId?: string;
   barrier?: Barrier;
   agent?: OriginPort;
+  /** The windows the layout step opened beside the start's own. */
+  opened: number[];
 }
 
 function known<T>(value: T | undefined, what: string): T {
@@ -125,7 +132,7 @@ async function restoreOthers(run: Run): Promise<void> {
     { tabs, barrier, navigation },
     (agent, other) => {
       const { origin: _origin, ...site } = other;
-      return restoreThroughAgent(agent, operation, site, RESTORE_BOUND_MS);
+      return restoreThroughAgent(agent, operation, site, { boundMs: RESTORE_BOUND_MS });
     },
   );
   const skipped = outcomes.flatMap((outcome) =>
@@ -147,6 +154,18 @@ async function restoreOthers(run: Run): Promise<void> {
     skipped.map(({ origin }) => ({ origin, carry: true })),
   );
   run.operation = { ...run.operation, skipped };
+}
+
+/** Reopens the identity's other tabs and windows; one whose sessionStorage is not taken is named. */
+async function reopenLayout(run: Run): Promise<void> {
+  const { layout } = run.data;
+  if (layout === undefined) return;
+  const { windowId, tabId } = known(run.window, "window");
+  const opened = (id: number) => run.opened.push(id);
+  const reopening = { primary: { windowId, tabId }, operation: barrierOperation(run), opened };
+  const skipped = await restoreLayout(layout, reopening, run.deps);
+  if (skipped.length === 0) return;
+  run.operation = { ...run.operation, skipped: [...(run.operation.skipped ?? []), ...skipped] };
 }
 
 const STEP_RUNS: Record<BootstrapStep, (run: Run) => Promise<unknown>> = {
@@ -181,7 +200,9 @@ const STEP_RUNS: Record<BootstrapStep, (run: Run) => Promise<unknown>> = {
   },
   restore: async (run) => {
     const agent = known(run.agent, "page link");
-    await restoreThroughAgent(agent, barrierOperation(run), run.data.site, RESTORE_BOUND_MS);
+    await restoreThroughAgent(agent, barrierOperation(run), run.data.site, {
+      boundMs: RESTORE_BOUND_MS,
+    });
     agent.disconnect();
   },
   unbarrier: async (run) => {
@@ -193,14 +214,15 @@ const STEP_RUNS: Record<BootstrapStep, (run: Run) => Promise<unknown>> = {
     const released = { tabId: tabOf(run), documentId };
     return reloadAndCommit(run.deps.navigation, released, NAVIGATION_BOUND_MS);
   },
+  layout: reopenLayout,
 };
 
-/** Undoes what the failed start left: the page link, the window, then the barrier. */
+/** Undoes what the failed start left: the page link, the windows, then the barrier. */
 async function cleanUp(run: Run): Promise<string[]> {
   const { failures, attempt } = collectFailures();
   run.agent?.disconnect();
   const { window, barrier } = run;
-  if (window) await attempt(() => run.deps.windows.close([window.windowId]));
+  if (window) await attempt(() => run.deps.windows.close([window.windowId, ...run.opened]));
   if (barrier) await attempt(() => removeBarrier(barrier, run.deps.barrier));
   return failures;
 }
@@ -226,8 +248,9 @@ async function fail(run: Run, error: unknown): Promise<never> {
 /**
  * Opens a fresh managed window and restores `data` into it before the app at `url` runs: cookies
  * into the tab's own store, the other visited origins' site data in a helper tab, then the target's
- * behind the barrier, then a reload of the same tab releases the app. Any failure closes the
- * window, so no partly restored app is ever released.
+ * behind the barrier, then a reload of the same tab releases the app; the identity's other tabs
+ * and windows reopen last. Any failure closes every window the start opened, so no partly
+ * restored app is ever released.
  */
 export async function bootstrapIdentity(
   url: string,
@@ -242,7 +265,7 @@ export async function bootstrapIdentity(
     status: "running",
     started: Date.now(),
   };
-  const run: Run = { url, origin: new URL(url).origin, data, deps, operation };
+  const run: Run = { url, origin: new URL(url).origin, data, deps, operation, opened: [] };
   const timings: StepTiming[] = [];
   try {
     for (const step of BOOTSTRAP_STEPS) {

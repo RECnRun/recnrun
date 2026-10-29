@@ -8,6 +8,7 @@ import type {
   OriginPort,
   OriginReply,
   RestoredCounts,
+  StorageScope,
 } from "@/messaging/origin-protocol";
 
 /** The one document an operation restores into: the barrier's tab, as Chrome committed it. */
@@ -152,16 +153,19 @@ const RESTORE_ENDING: Ending = {
     new WorkspaceError("AgentDisconnected", "The page closed before its data was restored."),
 };
 
-/** Probes a validated agent, sends it the payload, and waits, at most `boundMs`, for its answer. */
+/**
+ * Probes a validated agent, sends it the payload, and waits, at most `boundMs`, for its answer;
+ * a session scope has the agent write its tab's sessionStorage alone.
+ */
 export async function restoreThroughAgent(
   port: OriginPort,
   operation: BarrierOperation,
   payload: OriginData,
-  boundMs: number,
+  { boundMs, scope = "origin" }: { boundMs: number; scope?: StorageScope },
 ): Promise<RestoredCounts> {
   await probeLink(port, operation, boundMs, RESTORE_ENDING);
   return exchange<RestoredCounts>(port, operation, {
-    command: { type: "restore", payload },
+    command: { type: "restore", scope, payload },
     boundMs,
     idle: false,
     onReply: (reply, settle) => {
@@ -188,16 +192,19 @@ const CAPTURE_ENDING: Ending = {
     new WorkspaceError("AgentDisconnected", "The page closed before its data was captured."),
 };
 
-/** Probes a validated agent and asks it for its page's data; each message restarts `idleMs`. */
+/**
+ * Probes a validated agent and asks it for its page's data; each message restarts `idleMs`. A
+ * session scope asks for its tab's sessionStorage alone.
+ */
 export async function captureThroughAgent(
   port: OriginPort,
   operation: BarrierOperation,
   receiver: CaptureReceiver,
-  idleMs: number,
+  { idleMs, scope = "origin" }: { idleMs: number; scope?: StorageScope },
 ): Promise<CapturedPage> {
   await probeLink(port, operation, idleMs, CAPTURE_ENDING);
   return exchange<CapturedPage>(port, operation, {
-    command: { type: "capture" },
+    command: { type: "capture", scope },
     boundMs: idleMs,
     idle: true,
     onReply: (reply, settle) => {

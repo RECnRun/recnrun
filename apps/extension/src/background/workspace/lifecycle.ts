@@ -46,18 +46,24 @@ function journaled(run: Run, step: LifecycleStep): WorkspaceOperation {
   return { ...run.operation, generation: managed.generation, windowId: managed.windowId };
 }
 
-/** The window reads again: another Incognito window may have opened during the capture. */
+/**
+ * Closes every window of the session, read again, once the capture saw each of its tabs: a tab
+ * opened while it ran would close unsaved, and a window found after the session ended holds no
+ * identity.
+ */
 async function closeOpen(run: Run): Promise<void> {
-  const { managed, foreign, otherTabs } = await run.deps.effects.windows();
+  const { session, foreign, tabs } = await run.deps.effects.windows();
   if (foreign.length > 0) {
     const message = "The capture is saved; close the other Incognito windows first.";
     throw new WorkspaceError("IncognitoWindowsOpen", message);
   }
-  if (otherTabs > 0) {
-    const message = "The capture is saved; close the other tabs in the Incognito workspace first.";
-    throw new WorkspaceError("IncognitoTabsOpen", message);
+  const seen = new Set(run.captured?.tabs);
+  if (run.captured && tabs.some((tabId) => !seen.has(tabId))) {
+    const message =
+      "The capture is saved; an Incognito tab opened while it ran, so run the command again to save it too.";
+    throw new WorkspaceError("TabsChanged", message);
   }
-  if (managed !== undefined) await run.deps.effects.close([managed.windowId]);
+  if (session.length > 0) await run.deps.effects.close(session);
 }
 
 async function persist(run: Run): Promise<void> {
@@ -161,11 +167,10 @@ async function runSteps(run: Run, steps: readonly LifecycleStep[]): Promise<void
 /** What the plan decides on, read fresh under the lock. */
 async function readState(deps: LifecycleDeps, adding: Identity | undefined) {
   const list = [...(await deps.identities.list()), ...(adding ? [adding] : [])];
-  const { managed, foreign, otherTabs } = await deps.effects.windows();
+  const { managed, foreign } = await deps.effects.windows();
   const state: LifecycleState = {
     recording: (await deps.recordings.read()) !== null,
     foreignWindows: foreign.length,
-    otherTabs,
     open: managed && (managed.identityId === undefined ? {} : { identityId: managed.identityId }),
     identities: list.map(({ id, lastCapture }) => ({ id, captured: lastCapture !== undefined })),
   };

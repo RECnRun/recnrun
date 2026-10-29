@@ -4,6 +4,7 @@ import { SiteCookieSchema } from "./identity-data.ts";
 import type { IdentityData } from "./identity-data.ts";
 import { TargetUrlSchema } from "./managed-window.ts";
 import { OriginCaptureSchema } from "./origin-data.ts";
+import { primaryTab, SessionLayoutSchema } from "./session-layout.ts";
 
 /** The capture format's own version, apart from `Snapshot`'s; a breaking change bumps it. */
 export const IDENTITY_CAPTURE_VERSION = 1;
@@ -15,6 +16,7 @@ const ADAPTERS = [
   "cookies",
   "cacheStorage",
   "origins",
+  "tabs",
 ] as const;
 
 /** The structured-clone types a capture may carry in its `unknown` values. */
@@ -67,6 +69,8 @@ const CaptureFieldsSchema = v.object({
   unsupported: v.array(
     v.object({ adapter: AdapterSchema, item: v.string(), reason: ReasonSchema }),
   ),
+  /** Every Incognito tab and window the capture saved; absent from captures of one tab only. */
+  layout: v.optional(SessionLayoutSchema),
 });
 
 type CaptureFields = v.InferOutput<typeof CaptureFieldsSchema>;
@@ -107,15 +111,23 @@ export const IdentityCaptureSchema = v.pipe(
   v.check(({ adapters }) => distinct(adapters.map(({ adapter }) => adapter)), "Repeated adapter."),
   v.check(({ valueTypes }) => distinct(valueTypes), "Repeated value type."),
   v.check(hasConsistentStatus, "The capture's status does not match its contents."),
+  v.check(
+    ({ layout, url }) => layout === undefined || primaryTab(layout).url === url,
+    "The layout's primary tab is not the capture's target.",
+  ),
 );
 
 export type IdentityCapture = v.InferOutput<typeof IdentityCaptureSchema>;
 
-/** What a start from `capture` restores: its cookies, its target origin's site data, then the rest. */
+/**
+ * What a start from `capture` restores: its cookies, its target origin's site data, the rest, and
+ * the other tabs and windows.
+ */
 export function restorableData(capture: IdentityCapture): IdentityData {
   const target = capture.origins.find(({ origin }) => isPageOf(capture.url, origin));
   if (!target) throw new Error("The capture holds no data for its target's origin.");
   const { origin: _origin, ...site } = target;
   const origins = capture.origins.filter((each) => each !== target);
-  return { cookies: capture.cookies, site, origins };
+  const { cookies, layout } = capture;
+  return { cookies, site, origins, ...(layout && { layout }) };
 }

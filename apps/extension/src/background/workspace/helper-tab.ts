@@ -22,6 +22,9 @@ export interface HelperDeps {
   navigation: NavigationApi;
 }
 
+/** What a visit needs besides a tab: the barrier and the navigation behind it. */
+type BarrierDeps = Pick<HelperDeps, "barrier" | "navigation">;
+
 /** What the helper does with each origin's agent; it names the step in the errors. */
 type Work = "save" | "restore";
 
@@ -61,7 +64,7 @@ function pagesOf({ origin, url }: { origin: string; url?: string }): [string, ..
 async function attempt<T>(
   place: Place & { url: string },
   work: Work,
-  deps: HelperDeps,
+  deps: BarrierDeps,
   use: (agent: OriginPort) => Promise<T>,
 ): Promise<VisitOutcome<T>> {
   let agent: OriginPort;
@@ -86,8 +89,8 @@ async function attempt<T>(
  */
 async function visit<T>(
   { pages: [root, ...others], ...place }: Place & { pages: readonly [string, ...string[]] },
-  { operation, work }: Visit,
-  deps: HelperDeps,
+  { operation, work }: Pick<Visit, "operation" | "work">,
+  deps: BarrierDeps,
   use: (agent: OriginPort) => Promise<T>,
 ): Promise<VisitOutcome<T>> {
   const barrier = await installAnonymousBarrier(
@@ -138,6 +141,19 @@ export async function visitOrigins<I extends { origin: string; url?: string }, T
   }
   await deps.tabs.close(tabId);
   return outcomes;
+}
+
+/**
+ * Visits one origin behind an anonymous barrier in a tab the caller opened, as the helper tab
+ * does, so a reopened tab gets its own sessionStorage before its page runs.
+ */
+export function visitInTab<T>(
+  { tabId, ...item }: { tabId: number; origin: string; url?: string },
+  visiting: Pick<Visit, "operation" | "work">,
+  deps: BarrierDeps,
+  use: (agent: OriginPort) => Promise<T>,
+): Promise<VisitOutcome<T>> {
+  return visit({ tabId, origin: item.origin, pages: pagesOf(item) }, visiting, deps, use);
 }
 
 /** The helper tabs open now, so the visit tracker leaves their pages out. */

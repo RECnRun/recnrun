@@ -22,8 +22,8 @@ interface TabListProps {
   tabs: TabSource;
   store: RecordingStore;
   take: TakeControl;
-  /** The managed Incognito tab, the only one a session may start on; absent while none is open. */
-  recordable?: number;
+  /** Whether an identity's session is open; a session may start on any of its Incognito tabs. */
+  recordable: boolean;
 }
 
 interface TabProps {
@@ -31,7 +31,7 @@ interface TabProps {
   recording: Recording;
   /** Whether a dashboard has the control, so the session floats in its PiP window. */
   controlled: boolean;
-  /** Whether this tab is the managed one, so it may start a session. */
+  /** Whether this tab is one of the open session's, so it may start a session. */
   recordable: boolean;
   take: () => void;
 }
@@ -99,7 +99,7 @@ function ClosedTabItem({ recording, controlled }: Omit<TabProps, "tab" | "take" 
   );
 }
 
-/** Every open tab; with no session the managed one can start one, and the recorded tab shows it. */
+/** Every open tab; with no session a tab of the open identity can start one, and the recorded tab shows it. */
 export function TabList({ tabs, store, take, recordable }: TabListProps) {
   const openTabs = useBrowserTabs(tabs)?.tabs;
   const recording = useRecording(store);
@@ -123,7 +123,7 @@ export function TabList({ tabs, store, take, recordable }: TabListProps) {
             tab={tab}
             recording={recording}
             controlled={controlled}
-            recordable={tab.id === recordable}
+            recordable={recordable && tab.incognito}
             take={takeOn(tab.id)}
           />
         ))}

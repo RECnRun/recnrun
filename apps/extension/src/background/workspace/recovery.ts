@@ -7,8 +7,8 @@ import type { OperationJournal } from "@/ports/operation-journal";
 export interface RecoveryDeps {
   journal: OperationJournal;
   barrier: BarrierApi;
-  /** Closes the window only while it is still the managed window of that generation. */
-  closeWindow: (windowId: number, generation: number) => Promise<void>;
+  /** Closes the session's windows only while that generation's session is still open. */
+  closeWindow: (generation: number) => Promise<void>;
 }
 
 /** What each command is called in the error a restart leaves, so it names the one interrupted. */
@@ -24,12 +24,12 @@ const INTERRUPTED_COMMAND: Record<WorkspaceOperation["kind"], string> = {
 const interrupted = ({ kind }: WorkspaceOperation) =>
   `Interrupted: RECnRun restarted before ${INTERRUPTED_COMMAND[kind]} finished.`;
 
-/** Undoes what the interrupted operation may have left: its journaled window, then its barrier. */
+/** Undoes what the interrupted operation may have left: its session's windows, then its barrier. */
 async function cleanUp(operation: WorkspaceOperation, deps: RecoveryDeps): Promise<string[]> {
   const { failures, attempt } = collectFailures();
   const { id, generation, windowId } = operation;
   if (generation === undefined) return failures;
-  if (windowId !== undefined) await attempt(() => deps.closeWindow(windowId, generation));
+  if (windowId !== undefined) await attempt(() => deps.closeWindow(generation));
   await attempt(() => removeBarrier(barrierOf({ id, generation }), deps.barrier));
   return failures;
 }

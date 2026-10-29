@@ -41,7 +41,7 @@ export async function readOrigin(
 ): Promise<OriginRead> {
   const { receiver, written } = collector(captureId, origin, deps.captures);
   const boundMs = deps.boundMs ?? CAPTURE_BOUND_MS;
-  const page = await captureThroughAgent(port, operation, receiver, boundMs).catch(
+  const page = await captureThroughAgent(port, operation, receiver, { idleMs: boundMs }).catch(
     async (error: unknown) => {
       // Parts already on their way land first, so a caller that drops them drops them all.
       await written().catch(() => undefined);

@@ -67,10 +67,9 @@ export function useWorkspaceStatus({
   };
 }
 
-/** The tab RECnRun may record: the managed window's, while that window is open. */
-export function managedTabId(status: WorkspaceStatus | undefined): number | undefined {
-  const managed = status?.managed;
-  return managed?.status === "active" ? managed.tabId : undefined;
+/** Whether an identity's Incognito session is open, so any of its tabs may be recorded. */
+export function sessionOpen(status: WorkspaceStatus | undefined): boolean {
+  return status?.managed?.status === "active";
 }
 
 interface WorkspaceProps {
@@ -119,7 +118,8 @@ function NewIdentity({ history, tabs, status, disabled, run }: NewIdentityProps)
         copied, never cookies or storage.
       </p>
       <p class="workspace-hint">
-        New identity saves the open identity first, then opens the address empty.
+        New identity saves the open identity first, every Incognito tab and window of it, then opens
+        the address empty.
       </p>
     </div>
   );
@@ -164,7 +164,7 @@ function WorkspaceBody(props: BodyProps) {
   const open = useBrowserTabs(tabs)?.tabs ?? [];
   const granted = status.access && status.siteAccess;
   // Chrome hides Incognito windows without access, so only Delete stays possible then.
-  const blocked = !granted || hasConflict(status, open);
+  const blocked = !granted || hasConflict(status);
   return (
     <>
       <Requirements status={status} openDetails={openDetails} />
