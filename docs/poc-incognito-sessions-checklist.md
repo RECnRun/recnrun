@@ -398,6 +398,15 @@ Stage 3 verify: exit 0 on `8f2647e`, 485 unit/component, 86/86 e2e, coverage 98.
 
 Stage 4 verify: exit 0 on `f0ffb45`, 503 unit/component, 97/97 e2e, coverage 99.01% statements / 96.38% branches / 98.05% functions / 99.86% lines (`.artifacts/docker/2026-10-28T22-32-58.740Z-1bf5988f-205d-4024-84b8-429ae4447dde`). S4.4 stays `[~]` until the user's Zephyr run; S4.5 waits for it.
 
+## Stage 6 — Transparent switching
+
+User request (2026-10-29): the user must not declare cookie hosts; starting A, switching to a new B, and switching back to A must need no other input, through a simple panel. The managed Incognito session is exclusive to one identity (every command waits for the previous store to go away, S2.5a, and refuses while a foreign Incognito tab exists, S3.12f), so its whole cookie store is the identity's.
+
+- [ ] S6.1 Capture and restore the whole Incognito cookie store; drop declared cookie hosts
+- [ ] S6.2 One-action panel: Address, New identity (auto-named), Switch to, Close, Delete; failures as alerts
+- [ ] S6.3 End to end through the panel only: A → new B → A on the SSO fixture with nothing declared, screenshots viewed
+- [ ] S6.4 Docs: report, runbook, ARCHITECTURE, PRODUCT_BRIEF, TROUBLESHOOTING, POCS
+
 ## Stage 5 — Delivery
 
 - [i] D.1 Timings aggregated (capture, transport, persistence, teardown, bootstrap, restore, PWA readiness, total; 10,000-record size)
