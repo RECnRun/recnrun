@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, test, vi } from "vite-plus/test";
 import type { Browser } from "wxt/browser";
 import { fakeBrowser } from "wxt/testing/fake-browser";
 import { chromeCaptureApi } from "@/background/workspace/capture-api";
+import { chromeAgentPorts } from "@/background/workspace/agent-ports";
 import { chromeHelperTabApi } from "@/background/workspace/helper-tab";
 
 const URL_ = "http://app.localhost:5192/app/";
@@ -69,7 +70,7 @@ test("reads the tab's top frame and injects the agent into that document only", 
     target: { tabId: 7, documentIds: ["doc-1"] },
     files: ["/content-scripts/origin-agent.js"],
   });
-  expect(chromeCaptureApi.onConnect).toBe(fakeBrowser.runtime.onConnect);
+  expect(chromeCaptureApi.onConnect).toBe(chromeAgentPorts);
 });
 
 test("discards a tab under the id Chrome returns, refuses one without, and navigates a tab", async () => {

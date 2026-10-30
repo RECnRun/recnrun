@@ -1,3 +1,4 @@
+import { agentPorts } from "@/background/workspace/agent-ports";
 import { ORIGIN_AGENT_PORT } from "@/messaging/origin-protocol";
 import type { OriginPort, OriginSender } from "@/messaging/origin-protocol";
 
@@ -14,6 +15,12 @@ export function fakeEvent<A extends unknown[]>() {
       for (const listener of Array.from(listeners)) listener(...args);
     },
   };
+}
+
+/** Agent links routed as the background routes Chrome's; a test emits each link a page opens. */
+export function fakeAgentPorts() {
+  const { event, dispatch, listeners } = agentPorts();
+  return { ...event, listeners, emit: dispatch };
 }
 
 /** A runtime port between the origin agent and the background; `posted` holds what this end sent. */

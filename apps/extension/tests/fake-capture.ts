@@ -4,7 +4,7 @@ import type { SessionWindow } from "@/background/workspace/capture-api";
 import type { CapturePart } from "@/storage/identity-captures";
 import { fakeCookieApi } from "./fake-cookies";
 import { noVisits } from "./fake-helper";
-import { echoProbes, fakeEvent, fakePort } from "./fake-port";
+import { echoProbes, fakeAgentPorts, fakePort } from "./fake-port";
 
 const ORIGIN = "http://app.localhost:5192";
 const SENDER = { tab: { id: 7 }, frameId: 0, documentId: "doc-1", origin: ORIGIN };
@@ -18,7 +18,7 @@ export function chrome(
   frame: { url: string; documentId: string } | null = { url: URL_, documentId: "doc-1" },
   carry?: (probe: unknown) => unknown,
 ) {
-  const onConnect = fakeEvent<[ReturnType<typeof fakePort>]>();
+  const onConnect = fakeAgentPorts();
   const agent = echoProbes(fakePort(SENDER), carry);
   const api = {
     onConnect,

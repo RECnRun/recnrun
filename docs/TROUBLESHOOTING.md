@@ -172,4 +172,12 @@ The session page in a PiP window is such a frame too. A pre-push `vp run verify`
 
 **Cause.** Each navigation that waits for an agent listens on `runtime.onConnect`, and Chrome hands one connection to every listener in turn. The managed tab's wait took its agent and stopped following that tab before the reopened tab's wait heard the same connection, which then found a link from a tab no wait followed and ended it as stray.
 
-**Solution.** A wait remembers each link it took (`navigation.ts`), and another wait leaves a remembered link open; a second agent of the same document, which two barriers on one origin inject, is still ended. The test build's stale-reply wrapper hands every listener the same link for one port, as Chrome does (`stale-replies.ts`).
+**Solution.** The background listens on `runtime.onConnect` once for agent links (`agent-ports.ts`), hands each link to every wait, and ends it only when none keeps it, so a wait no longer ends a link another wait took. A second agent of the same document, which two barriers on one origin inject, is still ended. The test build's stale-reply wrapper hands every listener the same link for one port, as Chrome does (`stale-replies.ts`).
+
+## A reopened page keeps an idle agent link after the Switch
+
+**Symptom.** After a start removed the barrier, a page of the primary's origin that loaded while the layout's agent script was still registered opened a link to the background that stayed open until the page navigated.
+
+**Cause.** Each wait ended only the stray links of its own tab while it listened, so a link from a tab no wait followed, or one that connected once every wait had ended, was left open.
+
+**Solution.** The routed listener (`agent-ports.ts`) ends at once every agent link no wait keeps, for every tab and after the waits end; the agent then holds nothing, since its only listener is on the closed port. `poc-stray-agent-links.spec.ts` opens a second tab during a held restore and checks that no agent link stays open, then or after the Switch.

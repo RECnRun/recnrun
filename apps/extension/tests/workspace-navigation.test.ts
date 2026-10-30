@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vite-plus/test";
 import { fakeBrowser } from "wxt/testing/fake-browser";
+import { chromeAgentPorts } from "@/background/workspace/agent-ports";
 import {
   chromeNavigationApi,
   openBehindBarrier,
@@ -97,6 +98,17 @@ describe("openBehindBarrier", () => {
     expect([agent.disconnected, twin.disconnected]).toEqual([false, true]);
   });
 
+  test("a link that arrives once every wait ended is ended at once", async () => {
+    const opening = openBehindBarrier(api, TARGET, 1_000);
+    commit(api, "doc-1");
+    const agent = agentOf("doc-1");
+    api.onConnect.emit(agent);
+    await expect(opening).resolves.toBe(agent);
+    const late = agentOf("doc-5", 5);
+    api.onConnect.emit(late);
+    expect([agent.disconnected, late.disconnected]).toEqual([false, true]);
+  });
+
   test("fails explicitly when the tab commits a document of another origin", async () => {
     const opening = openBehindBarrier(api, TARGET, 1_000);
     const early = agentOf("doc-1");
@@ -188,7 +200,7 @@ describe("chromeNavigationApi", () => {
     expect(chromeNavigationApi.onCommitted).toBe(fakeBrowser.webNavigation.onCommitted);
     expect(chromeNavigationApi.onErrorOccurred).toBe(fakeBrowser.webNavigation.onErrorOccurred);
     expect(chromeNavigationApi.onTabRemoved).toBe(fakeBrowser.tabs.onRemoved);
-    expect(chromeNavigationApi.onConnect).toBe(fakeBrowser.runtime.onConnect);
+    expect(chromeNavigationApi.onConnect).toBe(chromeAgentPorts);
   });
 
   test("the injected function reloads the document it runs in", async () => {

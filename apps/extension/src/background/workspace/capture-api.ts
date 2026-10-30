@@ -1,17 +1,13 @@
 import { browser } from "wxt/browser";
 import { isExpectedAgent } from "@/background/workspace/agent-link";
 import type { AgentExpectation } from "@/background/workspace/agent-link";
+import { chromeAgentPorts } from "@/background/workspace/agent-ports";
+import type { AgentPortEvent } from "@/background/workspace/agent-ports";
 import { AGENT_SCRIPT } from "@/background/workspace/barrier";
 import { WorkspaceError } from "@/background/workspace/errors";
 import { isHelperTab } from "@/background/workspace/helper-tab";
 import { inventory, settledTabs } from "@/background/workspace/windows";
-import { ORIGIN_AGENT_PORT } from "@/messaging/origin-protocol";
 import type { OriginPort } from "@/messaging/origin-protocol";
-
-interface ConnectEvent {
-  addListener: (listener: (port: OriginPort) => void) => void;
-  removeListener: (listener: (port: OriginPort) => void) => void;
-}
 
 /** One Incognito window of the session, its tabs in order, RECnRun's helper tabs left out. */
 export interface SessionWindow {
@@ -28,7 +24,7 @@ export interface CaptureApi {
   windows: () => Promise<SessionWindow[]>;
   topFrame: (tabId: number) => Promise<{ url: string; documentId: string } | null>;
   inject: (tabId: number, documentId: string) => Promise<void>;
-  onConnect: ConnectEvent;
+  onConnect: AgentPortEvent;
   /** Unloads the tab without its page's `beforeunload` and resolves with the id it has then. */
   discard: (tabId: number) => Promise<number>;
   /** Loads `url` in the tab, as a capture brings a moved tab back to its page. */
@@ -57,10 +53,11 @@ export function connectAgent(
       end(() =>
         reject(new WorkspaceError("AgentNotConnected", "The page did not open its link in time.")),
       );
+    // Any other link is left to the routing, which ends the ones no wait keeps.
     const onConnect = (port: OriginPort) => {
-      if (port.name !== ORIGIN_AGENT_PORT) return;
-      if (isExpectedAgent(port, expected)) end(() => resolve(port));
-      else port.disconnect();
+      if (!isExpectedAgent(port, expected)) return false;
+      end(() => resolve(port));
+      return true;
     };
     const timer = setTimeout(fail, boundMs);
     api.onConnect.addListener(onConnect);
@@ -68,7 +65,7 @@ export function connectAgent(
   });
 }
 
-/** Chrome's APIs; the getter reaches `runtime.onConnect` only when a capture runs. */
+/** Chrome's APIs; agent links come through the background's routing of `runtime.onConnect`. */
 export const chromeCaptureApi: CaptureApi = {
   settle: settledTabs,
   windows: async () =>
@@ -100,7 +97,5 @@ export const chromeCaptureApi: CaptureApi = {
   navigate: async (tabId, url) => {
     await browser.tabs.update(tabId, { url });
   },
-  get onConnect() {
-    return browser.runtime.onConnect;
-  },
+  onConnect: chromeAgentPorts,
 };

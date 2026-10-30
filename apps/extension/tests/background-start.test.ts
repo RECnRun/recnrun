@@ -6,6 +6,7 @@ import { incognitoStoreMemory } from "@/storage/incognito-stores";
 import { managedWindowRepository } from "@/storage/managed-window-repository";
 import { recordingSessionRepository } from "@/storage/recording-session-repository";
 import { responseUrlStore } from "@/storage/response-urls";
+import { fakePort } from "./fake-port";
 import { manageTab } from "./workspace-harness";
 
 const manifest = { manifest_version: 3 as const, name: "RECnRun", version: "0.1.0" };
@@ -29,6 +30,8 @@ beforeEach(() => {
   vi.spyOn(fakeBrowser.runtime, "getManifest").mockReturnValue(manifest);
   // fakeBrowser implements no in-memory onReplaced.
   vi.spyOn(fakeBrowser.tabs.onReplaced, "addListener").mockImplementation(() => undefined);
+  // Nor an in-memory runtime.onConnect.
+  vi.spyOn(fakeBrowser.runtime.onConnect, "addListener").mockImplementation(() => undefined);
 });
 
 test("registers one listener that answers every message family", async () => {
@@ -44,6 +47,23 @@ test("registers one listener that answers every message family", async () => {
   });
   expect(await deliver({ type: "start-session", tabId: shop.id }, ownPage)).toEqual({ ok: true });
   expect(await recordingSessionRepository.read()).toMatchObject({ tabId: shop.id });
+});
+
+test("ends at once an agent link that no wait asked for, and leaves other ports alone", () => {
+  const added = vi.spyOn(fakeBrowser.runtime.onConnect, "addListener");
+  startBackground();
+  const stray = fakePort({
+    tab: { id: 7 },
+    frameId: 0,
+    documentId: "doc-7",
+    origin: "https://app.example",
+  });
+  const other = { ...fakePort(), name: "another-port" };
+  for (const [listener] of added.mock.calls) {
+    listener(stray as unknown as Browser.runtime.Port);
+    listener(other as unknown as Browser.runtime.Port);
+  }
+  expect([stray.disconnected, other.disconnected]).toEqual([true, false]);
 });
 
 test("answers a relay with the URLs kept for its frame's origin in the open session", async () => {

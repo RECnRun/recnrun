@@ -2,6 +2,7 @@ import { browser } from "wxt/browser";
 import { createBackgroundListener } from "@/background/listener";
 import { createRoutes } from "@/background/routes";
 import { installTestHandles } from "@/background/test-handles";
+import { routeAgentPorts } from "@/background/workspace/agent-ports";
 import { chromeBootstrapPorts, createWorkspaceCommands } from "@/background/workspace/commands";
 import { chromeCookieApi, trackIncognitoStores } from "@/background/workspace/cookie-stores";
 import { answerResponseUrls } from "@/background/workspace/response-urls";
@@ -21,6 +22,8 @@ export function startBackground(): void {
   if (import.meta.env.MODE === "test") {
     installTestHandles(globalThis, workspace, ports.hooks, browser.runtime.onConnect);
   }
+  // Routed after the test handles wrap `onConnect`, so the stale replay reaches the waits.
+  routeAgentPorts(browser.runtime.onConnect);
   // Closing a tab never ends the session; only Stop, in a dashboard or the PiP window, does.
   const routes = createRoutes({
     extensionVersion: browser.runtime.getManifest().version,

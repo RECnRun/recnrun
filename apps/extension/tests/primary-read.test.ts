@@ -5,7 +5,7 @@ import type { MovedTab } from "@/background/workspace/tab-origins";
 import { fakeBarrierApi } from "./fake-barrier";
 import { fakeNavigationApi, listenerCount } from "./fake-navigation";
 import type { FakeNavigationApi } from "./fake-navigation";
-import { echoProbes, fakeEvent, fakePort } from "./fake-port";
+import { echoProbes, fakeAgentPorts, fakePort } from "./fake-port";
 
 const APP = "http://app.localhost:5192";
 const OPERATION = { id: "op-1", generation: 3 };
@@ -32,7 +32,7 @@ beforeEach(() => {
 function pageApi(
   now: { url: string; documentId: string } | null = { url: AT.url, documentId: "doc-7" },
 ) {
-  const onConnect = fakeEvent<[ReturnType<typeof fakePort>]>();
+  const onConnect = fakeAgentPorts();
   const agents: ReturnType<typeof fakePort>[] = [];
   const inject = vi.fn(async (tabId: number, documentId: string) => {
     const agent = echoProbes(fakePort({ tab: { id: tabId }, frameId: 0, documentId, origin: APP }));

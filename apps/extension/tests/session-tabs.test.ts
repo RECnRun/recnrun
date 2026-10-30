@@ -1,7 +1,7 @@
 import { afterEach, expect, test, vi } from "vite-plus/test";
 import type { SessionWindow } from "@/background/workspace/capture-api";
 import { SETTLE_BOUND_MS, findSessionTabs, readLayout } from "@/background/workspace/session-tabs";
-import { echoProbes, fakeEvent, fakePort } from "./fake-port";
+import { echoProbes, fakeAgentPorts, fakePort } from "./fake-port";
 
 const APP = "http://app.localhost:5192";
 const OTHER = "http://other.localhost:5192";
@@ -19,7 +19,7 @@ function sessionChrome(
   frames: Record<number, Frame>,
   held: Record<number, Record<string, string>> = {},
 ) {
-  const onConnect = fakeEvent<[ReturnType<typeof fakePort>]>();
+  const onConnect = fakeAgentPorts();
   const inject = vi.fn(async (tabId: number, documentId: string) => {
     const origin = new URL(frames[tabId]?.url ?? "").origin;
     const agent = echoProbes(fakePort({ tab: { id: tabId }, frameId: 0, documentId, origin }));
