@@ -45,6 +45,20 @@ export default defineConfig({
         },
       },
       {
+        // The content script runs inside web pages; it reaches stored data only through the background.
+        files: ["apps/extension/src/content/**"],
+        rules: {
+          "no-restricted-properties": [
+            "error",
+            {
+              object: "browser",
+              property: "storage",
+              message: "The content script never touches storage; ask the background.",
+            },
+          ],
+        },
+      },
+      {
         // describe/test callbacks group many cases; production code keeps the stricter caps.
         files: testFiles,
         rules: {

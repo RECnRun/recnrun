@@ -137,7 +137,7 @@ module.exports = {
       comment:
         "Content scripts run inside web pages; they reach data only by messaging the background.",
       from: { path: "^apps/extension/src/content/" },
-      to: { path: "^apps/extension/src/storage/" },
+      to: { path: ["^apps/extension/src/storage/", "node_modules/wxt/.*storage"] },
     },
     {
       name: "extension-popup-isolated",
@@ -155,8 +155,10 @@ module.exports = {
   ],
   options: {
     parser: "swc",
+    // npm packages stay in the graph as leaves, so rules can name them; only the workspaces' build
+    // output is left out (a package's own dist/ must stay in).
     doNotFollow: { path: "node_modules" },
-    exclude: { path: "(^|/)(node_modules|\\.output|\\.wxt|dist)/" },
+    exclude: { path: "^(apps|packages)/[^/]+/(\\.output|\\.wxt|dist)/" },
     enhancedResolveOptions: {
       exportsFields: ["exports"],
       conditionNames: ["import", "require", "node", "default", "types"],
