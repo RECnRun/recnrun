@@ -1,29 +1,30 @@
+import { useRoute, workflowHref } from "@/app/route";
+import type { Route } from "@/app/route";
 import { useExtensionState } from "@/features/extension-status/extension-state";
-import type { ExtensionState } from "@/features/extension-status/extension-state";
-import { Explorer } from "@/features/explorer/Explorer";
+import { RecordingStatus } from "@/features/recording-status/RecordingStatus";
+import { Timeline } from "@/features/timeline/Timeline";
+import { WorkflowList } from "@/features/workflows/WorkflowList";
 import type { ExtensionGateway } from "@/services/extension";
-import { EmptyState } from "@/ui/EmptyState";
 import { InstallBanner } from "@/ui/InstallBanner";
 
-function Content({ state }: { state: ExtensionState }) {
-  switch (state.status) {
-    case "detecting":
-      return <p role="status">Looking for the RECnRun extension…</p>;
-    case "missing":
-      return <InstallBanner />;
-    case "failed":
-      return <EmptyState title="Could not read your data" message={state.message} />;
-    case "ready":
-      return <Explorer snapshot={state.snapshot} />;
+function Page({ route, gateway }: { route: Route; gateway: ExtensionGateway }) {
+  switch (route.name) {
+    case "workflows":
+      return <WorkflowList gateway={gateway} hrefFor={workflowHref} />;
+    case "workflow":
+      return <Timeline gateway={gateway} id={route.id} backHref="#/" />;
   }
 }
 
 export function App({ gateway }: { gateway: ExtensionGateway }) {
   const state = useExtensionState(gateway);
+  const route = useRoute();
   return (
     <>
       <header class="site-header">
-        <h1>RECnRun</h1>
+        <h1>
+          <a href="#/">RECnRun</a>
+        </h1>
         {state.status === "ready" && (
           <p class="muted" data-testid="extension-version">
             Extension {state.extensionVersion}
@@ -31,7 +32,14 @@ export function App({ gateway }: { gateway: ExtensionGateway }) {
         )}
       </header>
       <main>
-        <Content state={state} />
+        {state.status === "detecting" && <p role="status">Looking for the RECnRun extension…</p>}
+        {state.status === "missing" && <InstallBanner />}
+        {state.status === "ready" && (
+          <>
+            <RecordingStatus gateway={gateway} />
+            <Page route={route} gateway={gateway} />
+          </>
+        )}
       </main>
     </>
   );
