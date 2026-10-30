@@ -140,6 +140,20 @@ module.exports = {
       to: { path: ["^apps/extension/src/storage/", "node_modules/wxt/.*storage"] },
     },
     {
+      name: "extension-recorder-isolated",
+      severity: "error",
+      comment:
+        "The recorder runs inside the user's applications; it only reports steps to the background.",
+      from: { path: "^apps/extension/src/recorder/" },
+      to: {
+        path: [
+          "^apps/extension/src/(content|background|storage|messaging|popup)/",
+          "^packages/bridge/",
+          "node_modules/wxt/.*storage",
+        ],
+      },
+    },
+    {
       name: "extension-popup-isolated",
       severity: "error",
       from: { path: "^apps/extension/src/popup/" },
