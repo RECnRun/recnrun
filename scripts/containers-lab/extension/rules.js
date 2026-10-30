@@ -13,7 +13,8 @@ import { isBlockRule } from "./sessions-block.js";
 import { setRealCookies } from "./real-jar.js";
 import { containerOf } from "./registry.js";
 
-const URLS = ["http://app.localhost/*", "http://idp.localhost/*"];
+// Every host the manifest permits: the lab's, and a real site's when a run patches them in.
+const URLS = ["<all_urls>"];
 let mode = "off";
 let current = new Map();
 let classified = [];

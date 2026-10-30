@@ -113,6 +113,24 @@ async function pendingCases(t) {
   );
 }
 
+/** A navigation Chrome cannot even start fails the switch at once, with the network error. */
+async function navigationFailureCase(t) {
+  await t.test("a navigation that fails ends the switch with the network error", async () => {
+    await lab.activate(handle, "A", { url: HOME });
+    const started = Date.now();
+    await assert.rejects(
+      handle.lab.activate(handle.tabId, "B", { url: "http://127.0.0.1:9/" }),
+      /ERR_CONNECTION_REFUSED/,
+    );
+    const ms = Date.now() - started;
+    const failed = (await handle.lab.sessions()).tabs[0];
+    evidence.navigationFailed = { ms, phase: failed.phase };
+    assert.equal(failed.phase, "failed");
+    // The error ends the switch at once; the commit timeout is the fallback.
+    assert.ok(ms < 5000, `took ${ms} ms`);
+  });
+}
+
 await test("switch transitions", async (t) => {
   t.after(async () => {
     lab.writeEvidence(`single-tab-transitions-${lab.MODE}`, {
@@ -181,6 +199,8 @@ await test("switch transitions", async (t) => {
       );
     },
   );
+
+  await navigationFailureCase(t);
 
   await t.test(
     "a failure while the store is emptied keeps the jar saved just before it",

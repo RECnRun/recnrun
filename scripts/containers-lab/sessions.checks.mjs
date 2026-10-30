@@ -2,7 +2,7 @@
 // which identity a paused request gets.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { decide, setPhaseSource } from "./extension/documents.js";
+import { decide, setPhaseSource, startDocuments } from "./extension/documents.js";
 import { containerIdOf } from "./extension/sessions.js";
 
 await test("the first generation keeps the id; a reset appends the generation", () => {
@@ -10,6 +10,18 @@ await test("the first generation keeps the id; a reset appends the generation", 
   assert.equal(containerIdOf("A", 2), "a.2");
   assert.equal(containerIdOf("b", 3), "b.3");
 });
+
+const listeners = {};
+const listener = (name) => ({ addListener: (fn) => (listeners[name] = fn) });
+globalThis.chrome = {
+  debugger: { onEvent: listener("debugger.onEvent") },
+  webNavigation: {
+    onCommitted: listener("onCommitted"),
+    onErrorOccurred: listener("onErrorOccurred"),
+  },
+  tabs: { onRemoved: listener("onRemoved") },
+};
+startDocuments();
 
 const main = { tabId: 7 };
 const child = { tabId: 7, sessionId: "s1" };
@@ -47,4 +59,31 @@ await test("a subresource of an unknown document is blocked after the wait", asy
     block: "unknown-document",
   });
   assert.ok(Date.now() - started >= 150);
+});
+
+await test("a request Chrome never announced belongs to its frame's current document", async () => {
+  setPhaseSource(() => ({ managed: true, container: "a" }));
+  listeners["debugger.onEvent"](main, "Page.frameNavigated", {
+    frame: { id: "F1", loaderId: "L1", url: "http://app.localhost/home" },
+  });
+  const inFrame = { ...paused("Script", "never-sent-2"), frameId: "F1" };
+  assert.deepEqual(await decide(main, state, inFrame), { container: "a" });
+  // Only the frame's own document counts: a frame that never navigated is still unknown.
+  const elsewhere = { ...paused("Script", "never-sent-3"), frameId: "F2" };
+  assert.deepEqual(await decide(main, state, elsewhere), { block: "unknown-document" });
+});
+
+await test("a CORS preflight, announced with an empty loader, belongs to its frame's document", async () => {
+  setPhaseSource(() => ({ managed: true, container: "a" }));
+  listeners["debugger.onEvent"](main, "Page.frameNavigated", {
+    frame: { id: "F3", loaderId: "L3", url: "http://app.localhost/home" },
+  });
+  listeners["debugger.onEvent"](main, "Network.requestWillBeSent", {
+    requestId: "preflight-1",
+    loaderId: "",
+    type: "Preflight",
+    request: { url: "http://idp.localhost/account" },
+  });
+  const preflight = { ...paused("Preflight", "preflight-1"), frameId: "F3" };
+  assert.deepEqual(await decide(main, state, preflight), { container: "a" });
 });

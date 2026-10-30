@@ -15,6 +15,7 @@ function stateOf(tabId) {
   if (!tabs.has(tabId)) {
     tabs.set(tabId, {
       loaders: new Map(),
+      frames: new Map(),
       documents: new Map(),
       requests: new Map(),
       commitWaiters: new Set(),
@@ -33,7 +34,10 @@ function remember(map, key, value) {
 /** `phase(tabId)` tells whether a tab is managed and which container is active, or null. */
 export const setPhaseSource = (phase) => (phaseOf = phase);
 
-/** Resolves the neutral document's commit: `{ documentId, url }` from webNavigation. */
+/**
+ * Resolves a document's commit (`{ documentId, url }` from webNavigation) or rejects when the
+ * main frame's navigation fails with a network error; an abort is another navigation taking over.
+ */
 export function waitForCommit(tabId, matches, timeoutMs = 5000) {
   const state = stateOf(tabId);
   return new Promise((resolve, reject) => {
@@ -41,14 +45,27 @@ export function waitForCommit(tabId, matches, timeoutMs = 5000) {
       state.commitWaiters.delete(waiter);
       reject(new Error(`No document committed in tab ${tabId} within ${timeoutMs} ms`));
     }, timeoutMs);
-    const waiter = (details) => {
-      if (!matches(details)) return;
+    const settle = (details, outcome) => {
       clearTimeout(timer);
       state.commitWaiters.delete(waiter);
-      resolve(details);
+      outcome(details);
+    };
+    const waiter = (details) => {
+      if (details.error !== undefined) {
+        if (details.frameId !== 0 || details.error === "net::ERR_ABORTED") return;
+        settle(new Error(`Navigation to ${details.url} failed: ${details.error}`), reject);
+      } else if (matches(details)) settle(details, resolve);
     };
     state.commitWaiters.add(waiter);
   });
+}
+
+/** A failed navigation of a tab a switch waits on: its waiters learn the error. */
+function onNavigationError(details) {
+  const state = tabs.get(details.tabId);
+  if (!state) return;
+  record("navigation-failed", { tabId: details.tabId, url: details.url, error: details.error });
+  for (const waiter of state.commitWaiters) waiter(details);
 }
 
 /** Commits of every tab a switch waits on (managed or swap): documents, evidence, and waiters. */
@@ -74,6 +91,7 @@ function onRequestWillBeSent(state, tabId, params) {
 }
 
 function onFrameNavigated(state, tabId, { frame }) {
+  remember(state.frames, frame.id, frame.loaderId);
   if (state.loaders.has(frame.loaderId)) return;
   remember(state.loaders, frame.loaderId, phaseOf(tabId).container);
   record("frame-navigated", { tabId, loaderId: frame.loaderId, url: frame.url });
@@ -128,9 +146,10 @@ export async function decide(source, state, params) {
       ? { block: "navigation-while-switching" }
       : { container: phase.container };
   }
-  const loaderId = await loaderOf(stateOf(source.tabId), params.networkId);
-  const container =
-    loaderId === undefined ? undefined : stateOf(source.tabId).loaders.get(loaderId);
+  const docs = stateOf(source.tabId);
+  // A CORS preflight is announced with an empty loader: its frame's document made it.
+  const loaderId = (await loaderOf(docs, params.networkId)) || docs.frames.get(params.frameId);
+  const container = loaderId === undefined ? undefined : docs.loaders.get(loaderId);
   if (container === undefined) return { block: "unknown-document" };
   if (container === null) return { block: "document-of-no-identity" };
   return { container };
@@ -150,6 +169,7 @@ export const commitsOf = (tabId) => [...stateOf(tabId).committed];
 
 export function startDocuments() {
   chrome.webNavigation.onCommitted.addListener(onCommitted);
+  chrome.webNavigation.onErrorOccurred.addListener(onNavigationError);
   chrome.debugger.onEvent.addListener((source, method, params) => {
     if (source.tabId !== undefined) onNetworkEvent(source, method, params);
   });
