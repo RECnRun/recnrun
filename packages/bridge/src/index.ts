@@ -2,6 +2,7 @@ export { BridgeError, createBridgeClient, type BridgeClient, type Detection } fr
 export { createBridgeHost, type BridgeHost, type RequestHandler } from "./host.ts";
 export {
   isRequestType,
+  REQUESTS,
   type EventData,
   type EventName,
   type RequestPayload,
