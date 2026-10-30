@@ -1,5 +1,6 @@
 import { emptySnapshot } from "@recnrun/domain";
-import { describe, expect, test } from "vite-plus/test";
+import { sampleStep, sampleSteps, sampleWorkflow } from "@recnrun/domain/testing";
+import { describe, expect, test, vi } from "vite-plus/test";
 import { BridgeError, createBridgeClient } from "../src/index.ts";
 import { messages } from "../src/protocol.ts";
 import { memoryTransport } from "./memory-transport.ts";
@@ -70,5 +71,50 @@ describe("request", () => {
     const { client, replyWith } = setup();
     replyWith(messages.success("req-1", { schemaVersion: 1 }));
     await expect(client.request("getSnapshot")).rejects.toThrow(/invalid getSnapshot result/);
+  });
+
+  test("sends the payload with the request", async () => {
+    const { client, transport, replyWith } = setup();
+    replyWith(messages.success("req-1", sampleSteps()));
+    await expect(client.request("listSteps", { workflowId: "wf-login" })).resolves.toEqual(
+      sampleSteps(),
+    );
+    expect(transport.sent[0]).toEqual(
+      messages.request("req-1", "listSteps", { workflowId: "wf-login" }),
+    );
+  });
+
+  test("lets a request without payload omit it", async () => {
+    const { client, transport, replyWith } = setup();
+    replyWith(messages.success("req-1", sampleWorkflow()));
+    await expect(client.request("stopWorkflow")).resolves.toEqual(sampleWorkflow());
+    expect(transport.sent[0]).toEqual(messages.request("req-1", "stopWorkflow"));
+  });
+});
+
+describe("subscribe", () => {
+  test("delivers validated events by name", () => {
+    const { client, transport } = setup();
+    const step = sampleStep();
+    const onStep = vi.fn();
+    const onStatus = vi.fn();
+    client.subscribe("stepRecorded", onStep);
+    client.subscribe("recordingChanged", onStatus);
+    transport.send(messages.event("stepRecorded", step));
+    expect(onStep).toHaveBeenCalledWith(step);
+    expect(onStatus).not.toHaveBeenCalled();
+  });
+
+  test("ignores malformed event data and stops after unsubscribe", () => {
+    const { client, transport } = setup();
+    const step = sampleStep();
+    const listener = vi.fn();
+    const stop = client.subscribe("stepRecorded", listener);
+    transport.send(messages.event("stepRecorded", { ...step, author: "robot" }));
+    transport.send({ ...messages.event("stepRecorded", step), channel: "other" });
+    expect(listener).not.toHaveBeenCalled();
+    stop();
+    transport.send(messages.event("stepRecorded", step));
+    expect(listener).not.toHaveBeenCalled();
   });
 });

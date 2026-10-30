@@ -48,6 +48,14 @@ export function sampleWorkflows(): Workflow[] {
   ];
 }
 
+export function sampleWorkflow(): Workflow {
+  return sampleWorkflows()[0] as Workflow;
+}
+
+export function sampleStep(): Step {
+  return sampleSteps()[0] as Step;
+}
+
 /** The steps of `wf-login`, oldest first. */
 export function sampleSteps(): Step[] {
   const base = { workflowId: "wf-login", tabId: 12, url: "http://localhost:3000/login" } as const;

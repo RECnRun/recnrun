@@ -16,12 +16,9 @@ export function createRequestHandler({
   readSnapshot,
 }: HandlerDependencies): Handler {
   return async (type) => {
-    switch (type) {
-      case "ping":
-        return { extensionVersion };
-      case "getSnapshot":
-        return readSnapshot();
-    }
+    if (type === "ping") return { extensionVersion };
+    if (type === "getSnapshot") return readSnapshot();
+    throw new Error(`The extension does not answer ${type} yet.`);
   };
 }
 
