@@ -1,6 +1,13 @@
 import type { BrowserContext, Page } from "@playwright/test";
 import { expect, test } from "./fixtures/extension.ts";
-import { APP_HTML, APP_ORIGIN, callApi, groupOf, hasApi } from "./fixtures/public-api.ts";
+import {
+  APP_HTML,
+  APP_ORIGIN,
+  callApi,
+  EXTENSION_ID,
+  groupOf,
+  hasApi,
+} from "./fixtures/public-api.ts";
 
 const SAVE = 'click [data-testid="save"]';
 
@@ -121,7 +128,8 @@ test("starts and stops a recording of the active tab from the popup", async ({
 }) => {
   await serveApp(context);
   const popup = await context.newPage();
-  await popup.goto(`chrome-extension://${serviceWorker.url().split("/")[2]}/popup.html`);
+  // The id the skill hardcodes must be the one the test build runs under.
+  await popup.goto(`chrome-extension://${EXTENSION_ID}/popup.html`);
   await app.goto(`${APP_ORIGIN}/checkout`);
   await app.bringToFront();
 
