@@ -1,12 +1,14 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures/extension.ts";
-import { clickInDashboard, dashboardOf, FRAME, openSite, tabItem } from "./fixtures/session.ts";
+import { clickInFrame, dashboardOf, FRAME, openSite, tabItem } from "./fixtures/session.ts";
 import { chromeTabs } from "./fixtures/tabs.ts";
 
 const banner = (site: Page) =>
   dashboardOf(site).getByRole("region", { name: "Enable Incognito Mode" });
-const newWindow = (site: Page) =>
-  dashboardOf(site).getByRole("button", { name: "New incognito window" });
+const startButton = (site: Page) =>
+  dashboardOf(site)
+    .getByRole("region", { name: "Incognito workspace" })
+    .getByRole("button", { name: "New identity", exact: true });
 
 /** Flips "Allow in Incognito" in RECnRun's details as the user would; Chrome reloads RECnRun. */
 async function toggleIncognito(details: Page) {
@@ -36,15 +38,15 @@ test("without incognito access, the banner opens RECnRun's details, and every si
     await expect(banner(site)).toContainText(
       "Open the extension settings and enable “Allow in Incognito”.",
     );
-    await expect(newWindow(site)).toHaveCount(0);
+    await expect(startButton(site)).toHaveCount(0);
   }
-  await expect(
-    tabItem(dashboardOf(first), second.url()).getByRole("button", { name: "Record" }),
-  ).toBeVisible();
+  const listed = tabItem(dashboardOf(first), second.url());
+  await expect(listed).toBeVisible();
+  await expect(listed.getByRole("button", { name: "Record" })).toHaveCount(0);
 
   const [details] = await Promise.all([
     context.waitForEvent("page"),
-    clickInDashboard(banner(first).getByRole("button", { name: "Open Extension Config" })),
+    clickInFrame(banner(first).getByRole("button", { name: "Open Extension Config" })),
   ]);
   await expect(details).toHaveURL(`chrome://extensions/?id=${id}`);
   const tabs = await chromeTabs(serviceWorker);
@@ -56,7 +58,7 @@ test("without incognito access, the banner opens RECnRun's details, and every si
   await toggleIncognito(details);
   for (const site of sites) {
     await comeBack(site);
-    await expect(newWindow(site)).toBeVisible();
+    await expect(startButton(site)).toBeVisible();
     await expect(banner(site)).toHaveCount(0);
   }
 
@@ -64,7 +66,7 @@ test("without incognito access, the banner opens RECnRun's details, and every si
   for (const site of sites) {
     await comeBack(site);
     await expect(banner(site)).toBeVisible();
-    await expect(newWindow(site)).toHaveCount(0);
+    await expect(startButton(site)).toHaveCount(0);
   }
 });
 
@@ -73,7 +75,7 @@ test.describe("with incognito access", () => {
 
   test("no banner shows", async ({ context }) => {
     const site = await openSite(context, "/");
-    await expect(newWindow(site)).toBeVisible();
+    await expect(startButton(site)).toBeVisible();
     await expect(banner(site)).toHaveCount(0);
   });
 });

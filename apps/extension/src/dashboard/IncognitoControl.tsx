@@ -27,7 +27,10 @@ function IncognitoBanner({ access, onError }: IncognitoProps) {
 }
 
 /** Whether RECnRun may see incognito tabs; `undefined` until Chrome answers. */
-type IncognitoState = boolean | "unknown" | undefined;
+type IncognitoState = IncognitoAnswer | undefined;
+
+/** Chrome's answer, or "unknown" when it failed to give one. */
+type IncognitoAnswer = boolean | "unknown";
 
 function useIncognitoAccess(access: IncognitoAccess): IncognitoState {
   const [allowed, setAllowed] = useState<IncognitoState>();
@@ -40,29 +43,23 @@ function useIncognitoAccess(access: IncognitoAccess): IncognitoState {
 
 interface ControlProps {
   access: IncognitoAccess;
-  children: ComponentChildren;
+  children: (allowed: IncognitoAnswer) => ComponentChildren;
 }
 
 /**
- * Opens an incognito window when RECnRun may see it, or leads to where to allow that, above
- * its children. They wait for Chrome's answer, so the banner never moves a Record button.
+ * Leads to where to allow Incognito when RECnRun may not see it, above its children, which get
+ * Chrome's answer. They wait for it, so the banner never moves a Record button.
  */
 export function IncognitoControl({ access, children }: ControlProps) {
   const allowed = useIncognitoAccess(access);
   const [error, setError] = useState<string>();
   const onError = (caught: unknown) => setError(errorMessage(caught));
   if (allowed === undefined) return null;
-  const open = () => access.openWindow().catch(onError);
   return (
     <>
-      {allowed === true && (
-        <button type="button" class="tab-new-window" onClick={() => void open()}>
-          New incognito window
-        </button>
-      )}
       {allowed === false && <IncognitoBanner access={access} onError={onError} />}
       {error && <p role="alert">{error}</p>}
-      {children}
+      {children(allowed)}
     </>
   );
 }

@@ -17,11 +17,17 @@ function toOpenTab(tab: Browser.tabs.Tab): OpenTab[] {
   return [favicon ? { ...open, favicon } : open];
 }
 
-export function toBrowserTabs(windows: readonly Browser.windows.Window[]): BrowserTabs {
+export function toBrowserTabs(
+  windows: readonly Browser.windows.Window[],
+  lastFocusedId?: number,
+): BrowserTabs {
   // Chrome lists a Document PiP window as an always-on-top normal window; it is no page to record.
   const browsing = windows.filter((each) => !each.alwaysOnTop);
   const tabs = browsing.flatMap((each) => (each.tabs ?? []).flatMap(toOpenTab));
-  const currentId = browsing.find((each) => each.focused)?.tabs?.find((tab) => tab.active)?.id;
+  const focused = browsing.filter((each) => each.focused);
+  // While the focus moves between windows Chrome can report both focused; the last focused one has it.
+  const window = focused.find((each) => each.id === lastFocusedId) ?? focused[0];
+  const currentId = window?.tabs?.find((tab) => tab.active)?.id;
   return currentId === undefined ? { tabs } : { tabs, currentId };
 }
 
@@ -46,8 +52,17 @@ const TAB_EVENTS = [
 export function browserTabs(): TabSource {
   return {
     // With "Allow in Incognito" on, the extension's normal context also gets incognito windows.
-    read: async () =>
-      toBrowserTabs(await browser.windows.getAll({ populate: true, windowTypes: ["normal"] })),
+    read: async () => {
+      const [windows, lastFocusedId] = await Promise.all([
+        browser.windows.getAll({ populate: true, windowTypes: ["normal"] }),
+        // Without a last focused window, the focused flags alone decide.
+        browser.windows
+          .getLastFocused({ windowTypes: ["normal"] })
+          .then((window) => window.id)
+          .catch(() => undefined),
+      ]);
+      return toBrowserTabs(windows, lastFocusedId);
+    },
     watch: (onChange) => {
       const listener = () => onChange();
       for (const event of TAB_EVENTS) browser.tabs[event].addListener(listener);

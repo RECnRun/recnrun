@@ -2,7 +2,7 @@ import type { Page, Worker } from "@playwright/test";
 import type { Snapshot } from "@recnrun/domain";
 import { sampleSnapshot } from "@recnrun/domain/testing";
 import { expect, test } from "./fixtures/extension.ts";
-import { clickInDashboard, FRAME } from "./fixtures/session.ts";
+import { clickInFrame, FRAME } from "./fixtures/session.ts";
 
 const extensionOrigin = (worker: Worker) => `chrome-extension://${new URL(worker.url()).host}`;
 
@@ -69,11 +69,11 @@ test("routes deep links into the dashboard and its navigation to the address bar
   await expect(dashboard.getByRole("article")).toHaveAccessibleName("Log in as admin");
   await expect(page).toHaveTitle("Log in as admin · RECnRun");
 
-  await clickInDashboard(dashboard.getByRole("link", { name: "All recordings" }));
+  await clickInFrame(dashboard.getByRole("link", { name: "All recordings" }));
   await expect(page).toHaveURL(`${baseURL}/`);
   const checkout = dashboard.getByRole("link", { name: "Checkout with saved card" });
   await expect(checkout).toHaveAttribute("href", `${baseURL}/recordings/rec-checkout`);
-  await clickInDashboard(checkout);
+  await clickInFrame(checkout);
   await expect(page).toHaveURL(`${baseURL}/recordings/rec-checkout`);
   await expect(page).toHaveTitle("Checkout with saved card · RECnRun");
 

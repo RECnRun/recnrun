@@ -1,10 +1,16 @@
 import type { Snapshot } from "@recnrun/domain";
 import type { SessionRequest } from "@/messaging/session-protocol";
+import type { WorkspaceRequest } from "@/messaging/workspace-protocol";
+import type { HistorySource } from "@/ports/history";
+import type { OperationJournal } from "@/ports/operation-journal";
 import type { RecordingStore } from "@/ports/recording-store";
 import type { IncognitoAccess, TabSource } from "@/ports/tabs";
 
-/** Sends a session request to the background and resolves with its reply, which the caller validates. */
-export type SendRequest = (request: SessionRequest) => Promise<unknown>;
+/** What an extension page asks the background. */
+export type PageRequest = SessionRequest | WorkspaceRequest;
+
+/** Sends a page request to the background and resolves with its reply, which the caller validates. */
+export type SendRequest = (request: PageRequest) => Promise<unknown>;
 
 /** What the extension's pages read and do, injected so component tests need no extension APIs. */
 export interface ExtensionServices {
@@ -12,6 +18,10 @@ export interface ExtensionServices {
   recordings: RecordingStore;
   tabs: TabSource;
   incognito: IncognitoAccess;
+  /** The normal profile's history, which the Address field suggests from. */
+  history: HistorySource;
+  /** The background's journal of workspace operations, watched so a failure shows when it happens. */
+  operations: Pick<OperationJournal, "watch">;
   /** Keeps the site tabs' ports open, so a site tab learns when RECnRun unloads. */
   holdSitePorts: () => void;
   send: SendRequest;

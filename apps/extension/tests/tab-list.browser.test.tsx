@@ -1,42 +1,38 @@
 import { render } from "preact";
 import { afterEach, expect, test, vi } from "vite-plus/test";
 import { startDashboard } from "@/dashboard/start";
-import { openPanelMessage, panelClosedMessage } from "@/messaging/frame-protocol";
+import { openPanelMessage } from "@/messaging/frame-protocol";
 import { returnToDashboardMessage, startSessionMessage } from "@/messaging/session-protocol";
-import type { SessionRequest } from "@/messaging/session-protocol";
+import type { WorkspaceStatus } from "@/messaging/workspace-protocol";
 import type { ExtensionServices } from "@/views/extension-services";
 import { CONTROL_LOCK, tryHoldLock } from "@/views/view-locks";
-import { fakeExtension, memoryRecordingStore } from "./fake-extension";
-import { DOCS, PRIVATE, SHOP, fakeIncognito, fakeTabs } from "./fake-tabs";
+import {
+  NO_INCOGNITO_WINDOW,
+  fakeBackground,
+  fakeExtension,
+  memoryRecordingStore,
+} from "./fake-extension";
+import type { OpenTab } from "@/ports/tabs";
+import { DOCS, PRIVATE, SHOP as NORMAL_SHOP, fakeIncognito, fakeTabs } from "./fake-tabs";
+import { closePanel, framedPage } from "./framed-page";
 import { button } from "./queries";
 
-/** A dashboard frame stand-in whose parent, the site, is this test page. */
-function framedPage() {
-  return Object.assign(new EventTarget(), {
-    parent: window,
-    document,
-    location: { ancestorOrigins: [location.origin], search: "" },
-  }) as unknown as Window;
-}
+// A session starts only on an Incognito tab of the open identity.
+const SHOP: OpenTab = { ...NORMAL_SHOP, incognito: true };
 
-/** What the site's content script would send the frame once the PiP window closes. */
-const closePanel = (page: Window) =>
-  page.dispatchEvent(
-    new MessageEvent("message", {
-      data: panelClosedMessage(),
-      origin: location.origin,
-      source: window,
-    }),
-  );
+/** The workspace status with an identity open, `tabId` the tab its window opened with. */
+const managing = (tabId: number, status: "active" | "closed" = "active"): WorkspaceStatus => ({
+  ...NO_INCOGNITO_WINDOW,
+  managed: { generation: 1, windowId: 1, tabId, status },
+});
 
-function mount(services: Partial<ExtensionServices> = {}) {
+function mount(
+  services: Partial<ExtensionServices> = {},
+  status: () => WorkspaceStatus = () => managing(SHOP.id),
+) {
   const tabs = fakeTabs({ tabs: [SHOP, DOCS] });
-  const sent: SessionRequest[] = [];
+  const { send, sent } = fakeBackground(status);
   const page = framedPage();
-  const send = async (request: SessionRequest) => {
-    sent.push(request);
-    return { ok: true };
-  };
   const root = document.body.appendChild(document.createElement("div"));
   startDashboard(root, fakeExtension({ tabs: tabs.source, send, ...services }), page);
   return { root, sent, tabs, page };
@@ -47,6 +43,7 @@ const onMessage = (event: MessageEvent) => posted.push(event.data);
 
 const item = (root: HTMLElement, title: string) =>
   root.querySelector<HTMLElement>(`li[aria-label="${title}"]`) ?? undefined;
+/** The session's buttons. */
 const buttons = (scope: HTMLElement | undefined) =>
   [...(scope?.querySelectorAll("button") ?? [])].map((each) => each.textContent);
 const alertText = (root: HTMLElement) => root.querySelector('[role="alert"]')?.textContent;
@@ -71,15 +68,36 @@ afterEach(() => {
   document.body.replaceChildren();
 });
 
-test("lists the browser's tabs as they change, each able to start a session", async () => {
+test("lists the browser's tabs as they change; only an Incognito tab of the open identity can start a session", async () => {
   const { root, tabs } = mount();
   await expect.poll(() => buttons(item(root, "Shop"))).toEqual(["Record"]);
+  expect(buttons(item(root, "Docs"))).toEqual([]);
   expect(root.querySelector("aside h2")?.textContent).toBe("Tabs");
   expect(item(root, "Shop")?.textContent).toContain("https://shop.example/");
 
   tabs.change({ tabs: [DOCS] });
   await expect.poll(() => item(root, "Shop")).toBeUndefined();
-  expect(buttons(item(root, "Docs"))).toEqual(["Record"]);
+  expect(buttons(item(root, "Docs"))).toEqual([]);
+});
+
+test("Record shows on every Incognito tab while an identity is open, and on no normal tab", async () => {
+  let status = managing(PRIVATE.id);
+  const incognito = fakeIncognito(true);
+  const second = { ...PRIVATE, id: 10, windowId: 3, title: "Second" };
+  const tabs = fakeTabs({ tabs: [NORMAL_SHOP, PRIVATE, second] }).source;
+  const { root } = mount({ tabs, incognito: incognito.access }, () => status);
+  await expect.poll(() => buttons(item(root, "Private"))).toEqual(["Record"]);
+  expect(buttons(item(root, "Second"))).toEqual(["Record"]);
+  expect(buttons(item(root, "Shop"))).toEqual([]);
+
+  status = managing(PRIVATE.id, "closed");
+  incognito.windowsChanged();
+  await expect.poll(() => buttons(item(root, "Private"))).toEqual([]);
+  status = NO_INCOGNITO_WINDOW;
+  incognito.windowsChanged();
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  expect(buttons(item(root, "Private"))).toEqual([]);
+  expect(buttons(item(root, "Shop"))).toEqual([]);
 });
 
 test("Record takes the control, asks the site for the PiP window, and records the tab", async () => {
@@ -103,12 +121,15 @@ test("the dashboard listens to the frame channel once for its route and its cont
   const added = vi.spyOn(page, "addEventListener");
   const root = document.body.appendChild(document.createElement("div"));
   startDashboard(root, fakeExtension({ tabs: fakeTabs({ tabs: [SHOP] }).source }), page);
-  await expect.poll(() => button(item(root, "Shop") ?? root, "Record")).toBeDefined();
+  await expect.poll(() => item(root, "Shop")).toBeDefined();
   expect(added.mock.calls.filter(([type]) => type === "message")).toHaveLength(1);
 });
 
 test("a session the background cannot start frees the control and shows the error", async () => {
-  const send = async () => ({ ok: false as const, error: "Quota exceeded" });
+  const send = async (request: { type: string }) =>
+    request.type === "workspace-status"
+      ? { ok: true as const, result: managing(SHOP.id) }
+      : { ok: false as const, error: "Quota exceeded" };
   const { root } = mount({ send });
   await expect.poll(() => button(item(root, "Shop") ?? root, "Record")).toBeDefined();
   button(item(root, "Shop") ?? root, "Record")?.click();
@@ -148,7 +169,8 @@ test("a session left without control can be continued or stopped from any dashbo
   await expect.poll(() => buttons(item(root, "Shop"))).toEqual(["Continue", "Stop"]);
 
   button(item(root, "Shop") ?? root, "Stop")?.click();
-  await expect.poll(() => buttons(item(root, "Docs"))).toEqual(["Record"]);
+  await expect.poll(() => buttons(item(root, "Shop"))).toEqual(["Record"]);
+  expect(buttons(item(root, "Docs"))).toEqual([]);
   expect(await recordings.read()).toBeNull();
 });
 
@@ -175,9 +197,9 @@ test("a session whose tab closed stays until stopped, and only floats while cont
 test("of two dashboards starting at once, only one takes the control", async () => {
   const first = mount();
   const second = mount();
-  await expect.poll(() => button(item(second.root, "Docs") ?? second.root, "Record")).toBeDefined();
+  await expect.poll(() => button(item(second.root, "Shop") ?? second.root, "Record")).toBeDefined();
   button(item(first.root, "Shop") ?? first.root, "Record")?.click();
-  button(item(second.root, "Docs") ?? second.root, "Record")?.click();
+  button(item(second.root, "Shop") ?? second.root, "Record")?.click();
 
   await expect.poll(() => alertText(second.root)).toBe("Another RECnRun tab controls the session.");
   expect(first.sent).toEqual([startSessionMessage(SHOP.id)]);
@@ -186,10 +208,12 @@ test("of two dashboards starting at once, only one takes the control", async () 
   await expectControlFree();
 });
 
-test("marks incognito tabs, shows only the icons it may load, and records them alike", async () => {
-  const shop = { ...SHOP, favicon: "data:image/png;base64,AA==" };
-  const { root, sent, page } = mount({ tabs: fakeTabs({ tabs: [shop, PRIVATE] }).source });
+test("marks incognito tabs, shows only the icons it may load, and records the managed one", async () => {
+  const shop = { ...NORMAL_SHOP, favicon: "data:image/png;base64,AA==" };
+  const tabs = fakeTabs({ tabs: [shop, PRIVATE] }).source;
+  const { root, sent, page } = mount({ tabs }, () => managing(PRIVATE.id));
   await expect.poll(() => buttons(item(root, "Private"))).toEqual(["Record"]);
+  expect(buttons(item(root, "Shop"))).toEqual([]);
   expect(item(root, "Private")?.textContent).toContain("Incognito");
   expect(item(root, "Shop")?.textContent).not.toContain("Incognito");
   expect(item(root, "Shop")?.querySelector("img")?.getAttribute("src")).toBe(shop.favicon);
@@ -205,14 +229,13 @@ test("marks incognito tabs, shows only the icons it may load, and records them a
 const banner = (root: HTMLElement) =>
   root.querySelector<HTMLElement>('section[aria-labelledby="incognito-heading"]') ?? undefined;
 
-test("without incognito access, a banner opens RECnRun's details and no window is offered", async () => {
+test("without incognito access, a banner opens RECnRun's details", async () => {
   const incognito = fakeIncognito(false);
   const { root } = mount({ incognito: incognito.access });
   await expect.poll(() => banner(root)?.textContent).toContain("Enable Incognito Mode");
   expect(banner(root)?.textContent).toContain(
     "Open the extension settings and enable “Allow in Incognito”.",
   );
-  expect(button(root, "New incognito window")).toBeUndefined();
   button(root, "Open Extension Config")?.click();
   await expect.poll(() => incognito.settings).toHaveLength(1);
 });
@@ -249,7 +272,7 @@ test("details Chrome refuses to open are an alert", async () => {
   await expect.poll(() => alertText(root)).toContain("Cannot open chrome://extensions.");
 });
 
-test("an access Chrome fails to report shows neither the banner nor the window", async () => {
+test("an access Chrome fails to report shows no banner", async () => {
   const access = {
     ...fakeIncognito(false).access,
     allowed: async () => Promise.reject(new Error("Extension context invalidated.")),
@@ -257,27 +280,6 @@ test("an access Chrome fails to report shows neither the banner nor the window",
   const { root } = mount({ incognito: access });
   await expect.poll(() => item(root, "Shop")).toBeDefined();
   expect(banner(root)).toBeUndefined();
-  expect(button(root, "New incognito window")).toBeUndefined();
-});
-
-test("with incognito access, a new incognito window opens without starting a session", async () => {
-  const incognito = fakeIncognito(true);
-  const { root, sent } = mount({ incognito: incognito.access });
-  await expect.poll(() => button(root, "New incognito window")).toBeDefined();
-  expect(banner(root)).toBeUndefined();
-  button(root, "New incognito window")?.click();
-  await expect.poll(() => incognito.opened).toHaveLength(1);
-  expect(sent).toEqual([]);
-});
-
-test("a window Chrome refuses to open is an alert", async () => {
-  const refused = fakeIncognito(true, async () => {
-    throw new Error("Incognito mode is disabled.");
-  });
-  const { root } = mount({ incognito: refused.access });
-  await expect.poll(() => button(root, "New incognito window")).toBeDefined();
-  button(root, "New incognito window")?.click();
-  await expect.poll(() => alertText(root)).toContain("Incognito mode is disabled.");
 });
 
 test("only a framed dashboard holds the site tabs' ports", async () => {

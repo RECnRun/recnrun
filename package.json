@@ -10,6 +10,7 @@
     "dev:extension": "vp run extension#dev",
     "clean": "node scripts/clean.mjs && vp run extension#wxt:prepare",
     "logo": "node scripts/favicon.mjs && node scripts/logo-png.mjs",
+    "poc:zephyr": "node scripts/poc-zephyr.mjs",
     "test:unit": "node scripts/test-container.mjs test:unit:local",
     "test:unit:local": "vp test --project=website --project=extension --project=@recnrun/domain --project=@recnrun/bridge",
     "test:components": "node scripts/test-container.mjs test:components:local",

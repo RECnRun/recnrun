@@ -55,15 +55,15 @@ export default defineConfig({
         },
       },
       {
-        // The content script runs inside web pages; it reaches stored data only through the background.
-        files: ["apps/extension/src/content/**"],
+        // Content scripts run inside web pages; they reach stored data only through the background.
+        files: ["apps/extension/src/content/**", "apps/extension/src/origin/**"],
         rules: {
           "no-restricted-properties": [
             "error",
             {
               object: "browser",
               property: "storage",
-              message: "The content script never touches storage; ask the background.",
+              message: "Content scripts never touch extension storage; ask the background.",
             },
           ],
         },

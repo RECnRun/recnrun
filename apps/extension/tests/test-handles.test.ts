@@ -1,0 +1,113 @@
+import type { IdentityData } from "@recnrun/domain";
+import { afterEach, expect, test, vi } from "vite-plus/test";
+import { installTestHandles } from "@/background/test-handles";
+import type { PocHandles } from "@/background/test-handles";
+import type { BootstrapHooks } from "@/background/workspace/bootstrap";
+import type { WorkspaceCommands } from "@/background/workspace/commands";
+import { ORIGIN_AGENT_PORT } from "@/messaging/origin-protocol";
+
+const DATA: IdentityData = {
+  cookies: [],
+  site: { localStorage: {}, sessionStorage: {}, indexedDB: [], caches: [] },
+  origins: [],
+};
+const TIMINGS = [{ step: "window" as const, ms: 2 }];
+const SUMMARY = { captureId: "capture-1", databases: 1, records: 3, ms: 12 };
+
+function install() {
+  const scope: { recnrunPoc?: PocHandles } = {};
+  const startWithIdentity = vi.fn(async () => TIMINGS);
+  const captureIdentity = vi.fn(async () => SUMMARY);
+  const startFromCapture = vi.fn(async () => TIMINGS);
+  const commands = {
+    startWithIdentity,
+    captureIdentity,
+    startFromCapture,
+  } as unknown as WorkspaceCommands;
+  const hooks: BootstrapHooks = { beforeStep: async () => {} };
+  const added = vi.fn();
+  const onConnect = { addListener: added, removeListener: vi.fn() };
+  installTestHandles(scope, commands, hooks, onConnect);
+  if (!scope.recnrunPoc) throw new Error("No handles installed");
+  const { recnrunPoc: handles } = scope;
+  return { handles, hooks, onConnect, added, startWithIdentity, captureIdentity, startFromCapture };
+}
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+test("starts with validated identity data and keeps the step timings", async () => {
+  const { handles, startWithIdentity } = install();
+  await expect(handles.startWithIdentity("http://app.localhost:5192/app/", DATA)).resolves.toEqual(
+    TIMINGS,
+  );
+  expect(startWithIdentity).toHaveBeenCalledWith("http://app.localhost:5192/app/", DATA);
+  expect(handles.timings()).toEqual([TIMINGS]);
+  await expect(handles.startWithIdentity("http://app.localhost:5192/", {})).rejects.toThrow();
+  expect(startWithIdentity).toHaveBeenCalledTimes(1);
+});
+
+test("delays the restore step only, by the set delay", async () => {
+  vi.useFakeTimers();
+  const { handles, hooks } = install();
+  handles.setRestoreDelay(2_000);
+  await expect(hooks.beforeStep("window")).resolves.toBeUndefined();
+  let restored = false;
+  const restore = hooks.beforeStep("restore").then(() => {
+    restored = true;
+  });
+  await vi.advanceTimersByTimeAsync(1_999);
+  expect(restored).toBe(false);
+  await vi.advanceTimersByTimeAsync(1);
+  await restore;
+  expect(restored).toBe(true);
+});
+
+test("delays and fails a lifecycle step as it does a start's step", async () => {
+  vi.useFakeTimers();
+  const { handles, hooks } = install();
+  handles.setStepDelay("capture", 500);
+  let captured = false;
+  const capture = hooks.beforeStep("capture").then(() => {
+    captured = true;
+  });
+  await vi.advanceTimersByTimeAsync(499);
+  expect(captured).toBe(false);
+  await vi.advanceTimersByTimeAsync(1);
+  await capture;
+  expect(captured).toBe(true);
+  handles.failNext("persist");
+  await expect(hooks.beforeStep("persist")).rejects.toMatchObject({ name: "InjectedFailure" });
+});
+
+test("fails the next run of one step once", async () => {
+  const { handles, hooks } = install();
+  handles.failNext("restore");
+  await expect(hooks.beforeStep("navigate")).resolves.toBeUndefined();
+  await expect(hooks.beforeStep("restore")).rejects.toMatchObject({ name: "InjectedFailure" });
+  await expect(hooks.beforeStep("restore")).resolves.toBeUndefined();
+});
+
+test("captures an identity and starts from its capture, keeping that start's timings", async () => {
+  const { handles, captureIdentity, startFromCapture } = install();
+  await expect(handles.captureIdentity("identity-a")).resolves.toEqual(SUMMARY);
+  expect(captureIdentity).toHaveBeenCalledExactlyOnceWith("identity-a");
+  await expect(handles.startFromCapture("identity-a")).resolves.toEqual(TIMINGS);
+  expect(startFromCapture).toHaveBeenCalledWith("identity-a");
+  expect(handles.timings()).toEqual([TIMINGS]);
+});
+
+test("hands the agent links to the stale replay, which stays off until a test turns it on", () => {
+  const { handles, onConnect, added } = install();
+  const listener = vi.fn();
+  onConnect.addListener(listener);
+  const [own] = (added.mock.calls[0] ?? []) as [((port: unknown) => void)?];
+  const port = { name: ORIGIN_AGENT_PORT };
+  own?.(port);
+  expect(listener).toHaveBeenLastCalledWith(port);
+  handles.replayStale(true);
+  own?.(port);
+  expect(listener.mock.lastCall?.[0]).not.toBe(port);
+  expect(handles.staleDelivered()).toBe(0);
+});

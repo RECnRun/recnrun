@@ -1,10 +1,12 @@
-import { beforeEach, describe, expect, test, vi } from "vite-plus/test";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vite-plus/test";
 import { fakeBrowser } from "wxt/testing/fake-browser";
 import { createBackgroundListener } from "@/background/listener";
 import { createRoutes } from "@/background/routes";
+import { createWorkspaceCommands } from "@/background/workspace/commands";
 import type { BackgroundReply } from "@/messaging/background-messages";
 import { returnToDashboardMessage, startSessionMessage } from "@/messaging/session-protocol";
 import { memoryRecordingStore } from "./fake-extension";
+import { manageTab } from "./workspace-harness";
 
 const EXTENSION_URL = "chrome-extension://own-id/";
 const identity = { extensionId: "own-id", extensionUrl: EXTENSION_URL };
@@ -17,8 +19,18 @@ interface Sender {
   tab?: { id?: number };
 }
 
-function listen(message: unknown, sender: Sender, store = memoryRecordingStore()) {
-  const routes = createRoutes({ extensionVersion: "0.1.0", store });
+function listen(
+  message: unknown,
+  sender: Sender,
+  store = memoryRecordingStore(),
+  responseUrls: (sender: object) => Promise<unknown> = async () => [],
+) {
+  const routes = createRoutes({
+    extensionVersion: "0.1.0",
+    store,
+    workspace: createWorkspaceCommands(store),
+    responseUrls,
+  });
   const replies: BackgroundReply[] = [];
   const listener = createBackgroundListener(routes, identity);
   const answered = listener(message, sender as never, (reply) => replies.push(reply));
@@ -32,6 +44,11 @@ async function activeTabId() {
 
 beforeEach(() => {
   fakeBrowser.reset();
+});
+
+// The Node projects share a worker, so a spy left on the fake browser would reach other files.
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 describe("bridge requests", () => {
@@ -59,9 +76,34 @@ describe("bridge requests", () => {
   });
 });
 
+describe("response URL requests", () => {
+  test("answers a content script with the URLs for its own frame, and never a page", async () => {
+    const pairs = [["https://app.example/a", "https://app.example/a?via=redirect"]];
+    const asked: object[] = [];
+    const responseUrls = async (sender: object) => {
+      asked.push(sender);
+      return pairs;
+    };
+    const { answered, replies } = listen(
+      { type: "response-urls" },
+      contentScript,
+      undefined,
+      responseUrls,
+    );
+    expect(answered).toBe(true);
+    await vi.waitFor(() => expect(replies).toEqual([{ ok: true, result: pairs }]));
+    expect(asked).toEqual([contentScript]);
+
+    const refused = listen({ type: "response-urls" }, ownPage, undefined, responseUrls);
+    expect(refused.answered).toBe(false);
+    expect(asked).toHaveLength(1);
+  });
+});
+
 describe("session requests", () => {
   test("starts a session for the extension's own pages and replies once it runs", async () => {
     const shop = await fakeBrowser.tabs.create({ url: "https://shop.example/" });
+    await manageTab(shop.id ?? -1);
     const { store, answered, replies } = listen(startSessionMessage(shop.id ?? -1), ownPage);
     expect(answered).toBe(true);
     await vi.waitFor(() => expect(replies).toEqual([{ ok: true }]));
@@ -98,6 +140,7 @@ describe("session requests", () => {
   });
 
   test("a tab that closed meanwhile is an error reply, and no session", async () => {
+    await manageTab(999);
     const { store, replies } = listen(startSessionMessage(999), ownPage);
     await vi.waitFor(() => expect(replies).toHaveLength(1));
     expect(await store.read()).toBeNull();

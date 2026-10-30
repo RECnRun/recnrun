@@ -1,0 +1,25 @@
+import * as v from "valibot";
+import { SkippedOriginSchema } from "./skipped-origin.ts";
+
+/** A workspace operation as RECnRun records it while it runs and after it ends. */
+export const WorkspaceOperationSchema = v.object({
+  id: v.pipe(v.string(), v.minLength(1)),
+  kind: v.picklist([
+    "start-with-identity",
+    "switch",
+    "suspend",
+    "resume",
+    "new-identity",
+    "delete-identity",
+  ]),
+  step: v.string(),
+  status: v.picklist(["running", "failed", "done"]),
+  started: v.number(),
+  generation: v.optional(v.pipe(v.number(), v.integer(), v.minValue(0))),
+  windowId: v.optional(v.number()),
+  error: v.optional(v.string()),
+  /** The visited origins the operation left out, each with its step. */
+  skipped: v.optional(v.array(SkippedOriginSchema)),
+});
+
+export type WorkspaceOperation = v.InferOutput<typeof WorkspaceOperationSchema>;

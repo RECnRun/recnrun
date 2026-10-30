@@ -1,0 +1,168 @@
+import { afterEach, describe, expect, test, vi } from "vite-plus/test";
+import {
+  captureThroughAgent,
+  isExpectedAgent,
+  restoreThroughAgent,
+} from "@/background/workspace/agent-link";
+import { echoProbes, fakePort } from "./fake-port";
+
+const ORIGIN = "http://app.localhost:5192";
+const EXPECTED = { tabId: 7, documentId: "doc-1", origin: ORIGIN };
+const SENDER = { tab: { id: 7 }, frameId: 0, documentId: "doc-1", origin: ORIGIN };
+const OPERATION = { id: "op-1", generation: 2 };
+const PAYLOAD = { localStorage: { theme: "dark" }, sessionStorage: {}, indexedDB: [], caches: [] };
+const COUNTS = {
+  localStorage: 1,
+  sessionStorage: 0,
+  databases: 0,
+  records: 0,
+  caches: 0,
+  cacheEntries: 0,
+};
+const BOUND = 5000;
+const reply = { operationId: OPERATION.id, generation: OPERATION.generation };
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+describe("isExpectedAgent", () => {
+  test("accepts only the agent in the top frame of the expected document", () => {
+    expect(isExpectedAgent(fakePort(SENDER), EXPECTED)).toBe(true);
+    for (const sender of [
+      { ...SENDER, tab: { id: 8 } },
+      { ...SENDER, tab: undefined },
+      { ...SENDER, frameId: 1 },
+      { ...SENDER, documentId: "doc-2" },
+      { ...SENDER, origin: "http://other.localhost:5192" },
+      undefined,
+    ]) {
+      expect(isExpectedAgent(fakePort(sender), EXPECTED), JSON.stringify(sender)).toBe(false);
+    }
+    expect(isExpectedAgent({ ...fakePort(SENDER), name: "recnrun-site" }, EXPECTED)).toBe(false);
+  });
+});
+
+describe("restoreThroughAgent", () => {
+  test("probes the link with a Date and sends the payload only once the Date comes back", async () => {
+    const port = fakePort(SENDER);
+    const restored = restoreThroughAgent(port, OPERATION, PAYLOAD, { boundMs: BOUND });
+    expect(port.posted).toEqual([{ type: "probe", ...reply, probe: new Date(0) }]);
+    // A probe echo of another operation is dropped like any other reply.
+    port.onMessage.emit({ type: "probe-echo", ...reply, generation: 1, probe: new Date(0) });
+    port.onMessage.emit({ type: "probe-echo", ...reply, probe: new Date(0) });
+    await vi.waitFor(() => expect(port.posted).toHaveLength(2));
+    expect(port.posted[1]).toEqual({
+      type: "restore",
+      ...reply,
+      scope: "origin",
+      payload: PAYLOAD,
+    });
+    port.onMessage.emit({ type: "restored", ...reply, counts: COUNTS });
+    await expect(restored).resolves.toEqual(COUNTS);
+  });
+
+  test("fails as structured clone unavailable, and never sends the payload, when the probe loses its type", async () => {
+    // Chrome's default JSON messaging turns a Date into its ISO string, silently.
+    for (const probe of [new Date(0).toISOString(), {}, undefined]) {
+      const port = fakePort(SENDER);
+      const restored = restoreThroughAgent(port, OPERATION, PAYLOAD, { boundMs: BOUND });
+      port.onMessage.emit({ type: "probe-echo", ...reply, probe });
+      await expect(restored).rejects.toMatchObject({ name: "StructuredCloneUnavailable" });
+      expect(port.posted).toEqual([{ type: "probe", ...reply, probe: new Date(0) }]);
+      expect(port.onMessage.listeners.size).toBe(0);
+    }
+  });
+
+  test("sends the payload and resolves with the counts of its own operation's reply", async () => {
+    const port = echoProbes(fakePort(SENDER));
+    const restored = restoreThroughAgent(port, OPERATION, PAYLOAD, { boundMs: BOUND });
+    await vi.waitFor(() => expect(port.posted).toHaveLength(1));
+    expect(port.posted).toEqual([{ type: "restore", ...reply, scope: "origin", payload: PAYLOAD }]);
+    // Replies of another operation or generation, and anything malformed, are dropped.
+    port.onMessage.emit({ type: "restored", ...reply, operationId: "op-0", counts: COUNTS });
+    port.onMessage.emit({ type: "restored", ...reply, generation: 1, counts: COUNTS });
+    port.onMessage.emit({ type: "restored", ...reply });
+    port.onMessage.emit("restored");
+    port.onMessage.emit({ type: "restored", ...reply, counts: COUNTS });
+    await expect(restored).resolves.toEqual(COUNTS);
+    expect(port.onMessage.listeners.size).toBe(0);
+    expect(port.onDisconnect.listeners.size).toBe(0);
+  });
+
+  test("rejects with the agent's reason when it failed", async () => {
+    const port = fakePort(SENDER);
+    const restored = restoreThroughAgent(port, OPERATION, PAYLOAD, { boundMs: BOUND });
+    port.onMessage.emit({ type: "failed", ...reply, error: "indexedDB: DataError" });
+    await expect(restored).rejects.toMatchObject({
+      name: "RestoreFailed",
+      message: expect.stringContaining("indexedDB: DataError"),
+    });
+    expect(port.onMessage.listeners.size).toBe(0);
+  });
+
+  test("rejects when the page goes away before replying", async () => {
+    const port = fakePort(SENDER);
+    const restored = restoreThroughAgent(port, OPERATION, PAYLOAD, { boundMs: BOUND });
+    port.onDisconnect.emit();
+    await expect(restored).rejects.toMatchObject({ name: "AgentDisconnected" });
+    expect(port.onDisconnect.listeners.size).toBe(0);
+  });
+
+  test("a port whose page went away while the restore waited fails as closed, not with Chrome's error", async () => {
+    // Chrome throws on a port whose context is gone, even when reading its events.
+    const gone = () => {
+      throw new Error("Extension context invalidated.");
+    };
+    const unreadable = Object.defineProperty(fakePort(SENDER), "onMessage", { get: gone });
+    const unwritable = { ...fakePort(SENDER), postMessage: gone };
+    for (const port of [unreadable, unwritable]) {
+      await expect(
+        restoreThroughAgent(port, OPERATION, PAYLOAD, { boundMs: BOUND }),
+      ).rejects.toMatchObject({
+        name: "AgentDisconnected",
+        message: "The page closed before its data was restored.",
+      });
+    }
+    expect(unwritable.onMessage.listeners.size).toBe(0);
+  });
+
+  test("gives up and disconnects when no reply comes within the bound", async () => {
+    vi.useFakeTimers();
+    const port = fakePort(SENDER);
+    const restored = restoreThroughAgent(port, OPERATION, PAYLOAD, { boundMs: BOUND });
+    vi.advanceTimersByTime(BOUND - 1);
+    expect(port.disconnected).toBe(false);
+    vi.advanceTimersByTime(1);
+    await expect(restored).rejects.toMatchObject({ name: "RestoreTimedOut" });
+    expect(port.disconnected).toBe(true);
+    expect(port.onMessage.listeners.size).toBe(0);
+  });
+});
+
+describe("the session scope", () => {
+  test("asks the agent for its tab's sessionStorage alone, to read or to write", async () => {
+    const writing = echoProbes(fakePort(SENDER));
+    const session = { boundMs: BOUND, scope: "session" as const };
+    const restored = restoreThroughAgent(writing, OPERATION, PAYLOAD, session);
+    await vi.waitFor(() => expect(writing.posted).toHaveLength(1));
+    expect(writing.posted[0]).toMatchObject({ type: "restore", scope: "session" });
+    writing.onMessage.emit({ type: "restored", ...reply, counts: COUNTS });
+    await expect(restored).resolves.toEqual(COUNTS);
+
+    const reading = echoProbes(fakePort(SENDER));
+    const storage = vi.fn();
+    const receiver = { storage, database: vi.fn(), records: vi.fn(), cache: vi.fn() };
+    const captured = captureThroughAgent(reading, OPERATION, receiver, {
+      idleMs: BOUND,
+      scope: "session",
+    });
+    await vi.waitFor(() => expect(reading.posted).toHaveLength(1));
+    expect(reading.posted[0]).toEqual({ type: "capture", ...reply, scope: "session" });
+    const entries = { localStorage: {}, sessionStorage: { tab: "2" } };
+    reading.onMessage.emit({ type: "capture-storage", ...reply, ...entries });
+    reading.onMessage.emit({ type: "captured", ...reply, counts: COUNTS, cookieNames: [] });
+    await expect(captured).resolves.toEqual({ counts: COUNTS, cookieNames: [] });
+    expect(storage).toHaveBeenCalledWith(expect.objectContaining(entries));
+  });
+});

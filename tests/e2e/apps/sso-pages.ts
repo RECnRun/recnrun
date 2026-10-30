@@ -1,0 +1,125 @@
+// The SSO fixture: an identity provider on sso.localhost and an app at /sso-app/ on app.localhost
+// that signs in through it, as an OIDC client keeps its tokens. Page scripts are serialized with
+// toString(), so they must not close over imports.
+import { literal } from "./app-pages.ts";
+
+export const IDP = "http://sso.localhost:5192";
+
+/** What the app observed on `window.__sso` once it settled on a sign-in state. */
+export interface SsoState {
+  /** The token the app's first inline script read from its localStorage. */
+  first: { token: string | null; time: number };
+  signedIn: string | null;
+  error: string | null;
+  done: boolean;
+}
+
+/**
+ * The app's first inline script: back from the provider it keeps the user as its token; otherwise
+ * it asks the provider silently (`prompt=none`), as an OIDC client checks its session on load.
+ */
+function ssoApp(run: string, idp: string): void {
+  const state: SsoState = {
+    first: { token: localStorage.getItem("sso_token"), time: Date.now() },
+    signedIn: null,
+    error: null,
+    done: false,
+  };
+  (window as unknown as { __sso: SsoState }).__sso = state;
+  const query = `run=${encodeURIComponent(run)}`;
+  navigator.sendBeacon(`/__log?${query}`, JSON.stringify({ phase: "sso-first", ...state.first }));
+  const answer = new URLSearchParams(location.hash.slice(1));
+  const back = `${location.origin}${location.pathname}${location.search}`;
+  const user = answer.get("user");
+  const error = answer.get("error");
+  if (user === null && error === null) {
+    const silent = `${idp}/sso/authorize?${query}&prompt=none&redirect_uri=${encodeURIComponent(back)}`;
+    location.replace(silent);
+    return;
+  }
+  if (user === null) localStorage.removeItem("sso_token");
+  else localStorage.setItem("sso_token", user);
+  history.replaceState(null, "", back);
+  Object.assign(state, { signedIn: user, error, done: true });
+  document.addEventListener("DOMContentLoaded", () => {
+    document.body.textContent = user === null ? `Not signed in (${error})` : `Signed in as ${user}`;
+  });
+}
+
+/** `/sso-app/?run=`: only the first inline script; it decides the page. */
+export const ssoAppHtml = (run: string) =>
+  `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>SSO app</title>` +
+  `<script>(${ssoApp.toString()})(${literal(run)}, ${literal(IDP)});</script>` +
+  `</head><body></body></html>`;
+
+/** The provider's sign-in page: it remembers the user in its localStorage and IndexedDB, then returns. */
+function idpSignedIn(user: string, back: string): void {
+  localStorage.setItem("idp_user", user);
+  const open = indexedDB.open("idp", 1);
+  open.onupgradeneeded = () => open.result.createObjectStore("session");
+  open.onsuccess = () => {
+    const transaction = open.result.transaction("session", "readwrite");
+    transaction.objectStore("session").put(user, "user");
+    transaction.oncomplete = () => location.replace(back);
+  };
+}
+
+/** Reads what the provider's origin holds, without creating its database when it is absent. */
+async function idpHeld(): Promise<void> {
+  const held = {
+    localStorage: Object.fromEntries(Object.entries(localStorage)),
+    indexedDB: null as unknown,
+  };
+  const names = (await indexedDB.databases()).map(({ name }) => name);
+  if (names.includes("idp")) {
+    held.indexedDB = await new Promise((resolve) => {
+      const open = indexedDB.open("idp");
+      open.onsuccess = () => {
+        const read = open.result.transaction("session").objectStore("session").get("user");
+        read.onsuccess = () => resolve(read.result);
+      };
+    });
+  }
+  (window as unknown as { __idp: typeof held }).__idp = held;
+}
+
+export const idpLoginHtml = (user: string, back: string) =>
+  `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Sign in</title>` +
+  `<script>(${idpSignedIn.toString()})(${literal(user)}, ${literal(back)});</script>` +
+  `</head><body></body></html>`;
+
+const attribute = (value: string) =>
+  value.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;");
+
+/** The provider's interactive sign-in page: a form that signs the typed user in at /sso/login. */
+export function idpSignInHtml(url: URL): string {
+  const hidden = ["run", "redirect_uri", "response_mode"]
+    .map((name) => [name, url.searchParams.get(name)] as const)
+    .filter((pair): pair is readonly [string, string] => pair[1] !== null)
+    .map(([name, value]) => `<input type="hidden" name="${name}" value="${attribute(value)}">`);
+  return (
+    `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Sign in</title></head>` +
+    `<body><form action="/sso/login"><label>User <input name="user"></label>${hidden.join("")}` +
+    `<button>Sign in</button></form></body></html>`
+  );
+}
+
+/** The provider's page for a spec to read what its origin holds: localStorage and IndexedDB. */
+export const idpStorageHtml =
+  `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Provider storage</title>` +
+  `<script>(${idpHeld.toString()})();</script>` +
+  `</head><body></body></html>`;
+
+/** The server client's page: the session decided who is signed in; it keeps the user as a token. */
+function ssoServer(run: string, user: string | null, error: string | null): void {
+  const first = { token: localStorage.getItem("sso_token"), time: Date.now() };
+  const state: SsoState = { first, signedIn: user, error, done: true };
+  (window as unknown as { __sso: SsoState }).__sso = state;
+  navigator.sendBeacon(`/__log?run=${encodeURIComponent(run)}`, JSON.stringify(first));
+  if (user !== null) localStorage.setItem("sso_token", user);
+}
+
+export const ssoServerHtml = (run: string, user: string | null, error: string | null) =>
+  `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>SSO server app</title>` +
+  `<script>(${ssoServer.toString()})(${literal(run)}, ${literal(user)}, ${literal(error)});` +
+  `</script></head><body>${user === null ? "Not signed in" : "Signed in"}</body></html>`;

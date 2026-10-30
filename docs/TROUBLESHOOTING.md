@@ -10,7 +10,9 @@ Problems we hit, what caused them, and how we solved them. Add an entry when a p
 
 Ruled out on the way: a lock request that never settles (the click never reached the dashboard's handler), layout shift from the incognito banner (the failure stayed after the tab list waited for the banner), and `dev-chrome.spec.ts` launching extra browsers (replacing it with a sleep still failed).
 
-**Solution.** `clickInDashboard(locator)` in `tests/e2e/fixtures/session.ts` moves the mouse over the element until a `mousemove` reaches it inside the frame, then clicks. That waits for the condition Chromium needs, as Chromium's own tests do with `WaitForHitTestData`; it retries no click and weakens no assertion. Every click in a dashboard frame goes through it, `clickToOpenPanel` included. With it, 18 full suites in a row lost no click, and the traces show some clicks waiting a few seconds, each a click that would have failed before.
+**Solution.** `clickInFrame(locator)` in `tests/e2e/fixtures/session.ts` moves the mouse over the element until a `mousemove` reaches it inside the frame, then clicks. That waits for the condition Chromium needs, as Chromium's own tests do with `WaitForHitTestData`; it retries no click and weakens no assertion. Every click in a dashboard frame goes through it, `clickToOpenPanel` included. With it, 18 full suites in a row lost no click, and the traces show some clicks waiting a few seconds, each a click that would have failed before.
+
+The session page in a PiP window is such a frame too. A pre-push `vp run verify` lost the Pause click in `session-control.spec.ts`: the trace held every page's frames for about 400 ms, and the PiP window presented its first frame 7 ms after Playwright reported "click action done", so Chromium had no hit-test data for the session frame yet. Clicks in the PiP window now go through `clickInFrame` as well.
 
 ## After two Back steps, a reload shows the wrong route
 
@@ -19,3 +21,163 @@ Ruled out on the way: a lock request that never settles (the click never reached
 **Cause.** Each popstate sends the route to the frame, and the frame published the route it shows back in a `location` message, which the content script applied with `history.pushState` whenever that path differed from the address bar. Preact publishes in an effect, after paint, so the answer to the first Back (`/`) could arrive after the second Back: the content script pushed `/`, then the second route again, and a reload between those two pushes reloaded `/`.
 
 **Solution.** The frame says which routes come from its own navigation: a link click sends a `navigate` message, the only one the content script turns into `history.pushState`. `location` only sets the title, and only while its path is still in the address bar, so a late answer to a Back changes nothing (`frame.browser.test.tsx`, "a location the address bar has moved past…").
+
+## A captured Blob cannot be written to the extension's IndexedDB
+
+**Symptom.** `poc-transport.spec.ts` failed in `captureIdentity` with `DataError: Failed to write blobs (InvalidBlob)`: a Blob that the origin agent read from an Incognito page's IndexedDB and sent to the service worker over its port (structured clone messaging) could not be stored in the extension's own IndexedDB.
+
+**Cause.** The service worker can read such a Blob (`arrayBuffer()` returns its bytes and `type` is kept), but IndexedDB refuses to write it. The Blob still refers to the Incognito page's blob data, which the extension's storage does not accept. The opposite direction, a Blob read from the extension's IndexedDB and sent to the agent, restores into the page without trouble. The Blob registry is per browser context (`storage/browser/blob/blob_storage_context.cc:727-738`).
+
+**Solution.** Before writing each part, the background replaces every Blob in it, at any depth, with a copy made from its bytes, keeping its `type` (and a File's `name` and `lastModified`) (`background/workspace/own-blobs.ts`, `own-blobs.test.ts`).
+
+## The PiP window keeps showing a tab that lost the focus
+
+**Symptom.** After the focus moved from a normal window to an Incognito one, the PiP window's Current tab still showed the normal window's tab (`incognito.spec.ts`, "drops closed tabs", 2 of 2 runs).
+
+**Cause.** While it dispatches `windows.onFocusChanged`, Chrome can report both windows as `focused` in `windows.getAll` (2 of 3 probe runs). The tab model took the first, and no later event corrected it.
+
+**Solution.** The tab model takes the window `windows.getLastFocused` names (`tabs/open-tabs.ts`). `incognito.spec.ts --repeat-each=10` then passed 50 of 50.
+
+## A session-control test reads the PiP window's tab as the active one
+
+**Symptom.** `session-control.spec.ts` "closing the PiP window keeps the session…" failed 2 of 20 runs (6 of 40 under a probe) once the recorded tab moved to the managed Incognito window: the active tab id was the PiP window's, not the recorded tab's.
+
+**Cause.** Record posts `open-panel` and then `start-session` focuses the recorded tab. When the PiP window opens after that focus, it keeps the focus, and the test's helper read the tab of the focused window. The product already allows a focused PiP; only the test was wrong.
+
+**Solution.** `watchFocus` and `shownTabId` in `tests/e2e/fixtures/tabs.ts` read the active tab of the browsing window Chrome focused last (`windows.onFocusChanged` order, always-on-top windows skipped). The test then passed 40 of 40 and the spec 90 of 90.
+
+## The PiP window opens with "No tab in focus."
+
+**Symptom.** `incognito.spec.ts` "records the managed tab, and the PiP window follows the current tab" failed now and then: the PiP's Current tab region read "No tab in focus." for the whole 5-second wait, instead of the recorded Incognito tab.
+
+**Cause.** Chrome focuses a Document PiP window that a user gesture opened (`ShouldFocusPictureInPictureWindow`, `chrome/browser/picture_in_picture/picture_in_picture_window_manager.cc`), and Record posts `open-panel` while `start-session` focuses the recorded tab, so the PiP can take the focus after that tab got it. When the session page's first read came after that, no browsing window was focused (the tab model leaves the always-on-top PiP out), no tab had been shown to keep, and no event followed. Delaying `requestPanelWindow` by 500 ms in a scratch copy failed the test every run.
+
+**Solution.** Until it has shown a tab, the PiP window keeps the recorded one as the last tab shown (`session/SessionTabs.tsx`), marked "Not in focus". With the same delay the test passed 5 of 5.
+
+## A new Incognito window can inherit the previous one's data
+
+**Symptom.** None in the tests: 50 resets in a row came back empty. But RECnRun waited only until `cookies.getAllCookieStores()` no longer listed the Incognito store, and the next `windows.create` came 0.4–1.4 ms after that.
+
+**Cause.** The listing drops a store when its last tab closes (`chrome/browser/extensions/api/cookies/cookies_api.cc:895-904`), not when the profile goes. Chrome destroys the off-the-record profile only after its renderers exit, or after a 1 s timeout (`browser_manager_service.cc:145-161`, `profile_destroyer.cc:335-343, 395-411`), and until then `windows.create({ incognito: true })` reuses it with its data (`tabs_api.cc:1044-1047`, `profile_impl.cc:1063-1066`).
+
+**Solution.** RECnRun remembers every Incognito store id it sees (`local:incognito-store-ids`), and before every window creation waits until no Incognito store is listed and `cookies.getAll({ storeId })` rejects with "Invalid cookie store id" for each remembered id, bounded at 10 s (`background/workspace/fresh-window.ts`, `cookie-stores.ts`). The lookup only finds an existing profile (`cookies_helpers.cc:81-98`, `chrome_extensions_browser_client.cc:322-325`), so the rejection means it was erased.
+
+## SameSite=Strict cookies are missing on the released document
+
+**Symptom.** After a start with an identity, the app's first request lacked the restored `SameSite=Strict` cookies; Lax and None ones arrived (`poc-cookies.spec.ts`).
+
+**Cause.** `tabs.update` makes the extension's origin the initiator of the barrier navigation (`tabs_api.cc:2966-2971`), so it is cross-site, and a `tabs.reload` inherits that initiator (`navigation_entry_impl.cc:984`).
+
+**Solution.** The release reloads from inside the barrier's document: `scripting.executeScript` on its `documentId`, isolated world, `location.reload()`. A reload the page starts names the document's origin as initiator (`location.cc:262-272`, `frame_load_request.cc:97-101`), so the request is same-site and carries every restored cookie (`background/workspace/bootstrap.ts`). Only the origin agent runs in the barrier's document, so its missing Strict cookies do not matter.
+
+## Domain cookies are missing from a capture, without an error
+
+**Symptom.** With host permissions for `zephyr-tq.one.be` and `login-acc.one.be` only, a capture held none of the `.one.be` cookies, and nothing failed.
+
+**Cause.** `cookies.getAll` keeps a cookie only with host access to its bare domain as a URL: no port, and `https` only when the cookie is `Secure` (`chrome/browser/extensions/api/cookies/cookies_helpers.cc:51-56, 201-206`, `net/cookies/cookie_util.cc:664-692`). A missing pattern hides the cookie silently. Chrome also treats an unlisted top-level domain such as `localhost` as a one-label registry (`net/base/registry_controlled_domains/registry_controlled_domain.cc:188-195, 308`), so `Domain=app.localhost` is a real domain cookie.
+
+**Solution.** At first, development builds granted each host the identity declared and its parent domains. Declaring hosts proved unworkable (the user had to know every sign-in provider in advance), so every build now asks for access to all sites (`http://*/*`, `https://*/*`, `config/permissions.ts`) and an identity keeps the whole Incognito cookie store. A capture still compares the page's `document.cookie` names with the listed cookies and fails with `CookiesNotReadable` naming the missing ones, which now only a site the user or a policy blocks can cause (`extensions/common/permissions/permissions_data.cc:391-395, 658-689`). An HttpOnly cookie hidden that way still cannot be detected.
+
+## Withheld Site access hides cookies without an error
+
+**Symptom.** With every build asking for all sites, a capture could still miss cookies, httpOnly ones silently, after the user set RECnRun's Site access to "On click" or "On specific sites" in chrome://extensions.
+
+**Cause.** Withholding Site access removes the hosts from the extension's active permissions (`chrome/browser/extensions/scripting_permissions_modifier.cc:39-58, 183-192`, `permissions_updater.cc:362`), and `cookies.getAll` keeps only cookies of hosts it can access.
+
+**Solution.** The workspace reads `permissions.contains` for both all-sites patterns (`background/workspace/site-access.ts`, `permissions_api.cc:167-188`), refuses every command but Delete with `SiteAccessWithheld` before opening any window, and the panel asks the user to set Site access "On all sites" in RECnRun's details. It reads it again on `permissions.onAdded` and `onRemoved` (`tests/e2e/site-access.spec.ts`).
+
+## The barrier blocks a redirect to a sign-in provider
+
+**Symptom.** A start of a server-rendered app whose own session had expired failed with `ERR_BLOCKED_BY_CLIENT`, although the provider's cookies were restored.
+
+**Cause.** The app answers the barrier navigation with a redirect to its provider, and the barrier blocks every main-frame request off the target origin.
+
+**Solution.** A fifth tab-scoped rule removes a main-frame `Location` that may leave the target origin, during the barrier only (`background/workspace/barrier.ts`): it matches any value with a colon, `//`, a backslash, or a tab, and excludes the origin itself and its paths, queries, and fragments. Chrome applies header changes before it checks for a redirect (`url_request_http_job.cc:1242-1246`), and a response without `Location` is none (`http_response_headers.cc:1099-1112`), so the response commits as the target origin's script-free document and the restore runs. The release reload then follows the app's redirect, now with the provider's cookies. Chrome matches the whole lowercased value with `*` and `?` wildcards (`request_params.cc:70-86`, `base/strings/pattern.cc`); a redirect the patterns miss stays blocked, never followed.
+
+## New identity fails at the navigate step with `net::ERR_INVALID_RESPONSE`
+
+**Symptom.** New identity at a signed-out Gmail address failed with "New identity failed at the navigate step. The page did not load (net::ERR_INVALID_RESPONSE)." The fixture's sign-in redirects, served as `text/html`, never did.
+
+**Cause.** The barrier's hand-over rule removes the `Location` of the 302 to the sign-in origin, so the redirect commits as an ordinary response, and Gmail's carries a type Chrome cannot render. Chrome downloads a response it must download (`Content-Disposition: attachment`) or whose type it does not support (`content/browser/loader/navigation_url_loader_impl.cc:1516-1532`), and a download with a non-2xx status fails the navigation with `ERR_INVALID_RESPONSE` (`IsFailedDownload`, `content/browser/renderer_host/navigation_request.cc:988-991, 5546-5551`).
+
+**Solution.** The barrier's document rule sets `Content-Type` to a plain-text type (`text/x-recnrun-barrier`, next entry) and removes `Content-Disposition` (`background/workspace/barrier.ts`; the hand-over rule did, until the next entry's fix moved it to every barrier document), so the placeholder commits as a plain-text document, which never runs a meta refresh either. A DNR rule that modifies headers counts as an extra-headers listener (`extensions/browser/api/web_request/extension_web_request_event_router.cc:2764-2785`), so the network service applies the change before it derives the response's type. `poc-binary-redirect.spec.ts` covers `application/binary` with and without an attachment.
+
+## A restored cache entry has an empty `url`
+
+**Symptom.** After a Switch, an app that caches its pages read `response.url` from `caches.match()` and got `""` for every entry, though the same entries had their fetched URLs before the capture. Code that resolves relative links or checks where a cached page came from broke.
+
+**Cause.** The start writes each entry back with `cache.put(request, new Response(body, init))`, and a constructed `Response` has no URL list. Chrome stores a cached response's URL list when it is put (`content/browser/cache_storage/cache_storage_cache.cc:1913-1914`) and rebuilds the response from it when read (`:447-450`), so an entry put from a constructed response reads back with an empty `url`, type `default`, and `redirected` false. No `Response` constructor option or Cache API sets the URL. A first fix fetched each entry again into the cache; it took about 321 ms against 108 ms for 200 entries of 100 KB, and it was replaced by the scoped patch below.
+
+**Solution.** A page-world content script shows the URL again, the one page API patch RECnRun makes (security model in [ARCHITECTURE.md](ARCHITECTURE.md#security-model)). The capture keeps each fetched entry's `url`; the start keeps request URL and response URL pairs per origin in `session:response-urls` and registers the relay and the page script on those origins before the release. The page script wraps `Cache.prototype.match`, `matchAll`, `CacheStorage.prototype.match`, the `Response.prototype.url` getter, and `Response.prototype.clone`, so only a response whose native `url` is empty, under a request URL it was given, shows the fetched URL. A capture's agent reads the native empty URL, so the collector fills it in from the same pairs, and the URL survives the next Switch. `poc-cache-response-url.spec.ts` covers `match`, a redirected entry, `matchAll`, `caches.match`, and a clone across three Switches, and a response the app builds after the start keeps its empty URL.
+
+## A Switch shows the site's sign-in page before the identity opens
+
+**Symptom.** On a Switch to a Gmail identity, the managed tab first showed Google's sign-in page, with its title, then Gmail opened signed in. Users read it as a lost session.
+
+**Cause.** To write a tab's own `sessionStorage` on another origin it visited, the start loads that origin's root in the tab behind the anonymous barrier, which sends no cookie, so the site answers as to anyone signed out. The barrier stops the page's scripts, but Chrome still paints its markup and shows its `<title>`. Helper tabs, reopened layout tabs, and the target origin's own barrier document during `navigate` and `restore` paint the same way.
+
+**Solution.** Every barrier document now commits as `text/x-recnrun-barrier` with `X-Content-Type-Options: nosniff` (the barrier's document rule). Chrome renders any `text/*` type outside a short list of downloads as a plain-text document (`third_party/blink/common/mime_util/mime_util.cc`, `IsSupportedNonImageMimeType`; `third_party/blink/renderer/core/dom/document_init.cc:209-211`), so it has no title and Chrome shows the address instead. The origin agent, which the barrier registers for the origin at `document_start`, hides its document's root (`display: none !important`) when `document.contentType` is that type (`hideBarrierDocument` in `origin/agent.ts`). Chrome runs a `document_start` script synchronously when the document element is created (`extensions/renderer/script_injection.cc:286-300`, `content/renderer/render_frame_impl.cc` `RunScriptsAtDocumentElementAvailable`), so before any paint. No site serves that type, so a page of the origin is never hidden: not a capture's agent, which comes through `scripting.executeScript`, not the release reload, which loads after the barrier is gone, and not a page of the origin that loads in another tab while the barrier is up, which the registered agent also enters. The first version of this fix registered `barrier.css` (`:root { display: none !important; }`) with the agent instead, and Chrome inserts a registered script's CSS into every matching document, with no key to remove it (`extensions/renderer/user_script_injector.cc`, `GetCssSources`), so such a page stayed blank for good, as a layout tab of the same origin still loading when the next tab's barrier went up would. `poc-barrier-hidden.spec.ts` covers both: without the hiding the plain text is painted, without the type the sign-in page is painted with its title, and with the style the other tab is hidden.
+
+## A second tab on an SSO app comes back without its storage
+
+**Symptom.** After a Switch back to an identity, its second tab, a single-page app behind single sign-on (Zephyr), reopened late, and without the state the app keeps in its storage. The identity's row named the app's origin as not saved, or not restored.
+
+**Cause.** The start and the save reach that origin in a helper tab behind the anonymous barrier, which sends no cookie, so the app answers as to anyone signed out and sends the tab to its provider. Behind the barrier that went two ways. A `302` typed `application/binary`, once the barrier removed its `Location`, was a response Chrome downloads, which fails a non-2xx navigation with `ERR_INVALID_RESPONSE` (the entry above), so the visit failed at `navigate` and the row read "(the site did not answer)", and none of the four stores was saved. A `200` page with a `<meta http-equiv="refresh">` to the provider left for it while the agent was writing, so the restore failed at `restore` ("its page did not take its data"), with `localStorage` and `sessionStorage` written but IndexedDB and Cache Storage not. The tab's own `sessionStorage`, restored by the layout, was never at fault, and neither was a plain `302` typed `text/html`. The tab is late because the layout reopens it only once the primary tab is released, after its restore and reload.
+
+**Solution.** The two entries above: a barrier document commits as unsniffed plain text, never a download, and runs no meta refresh. `poc-second-tab-spa.spec.ts` serves the three answers on three origins (`tests/e2e/apps/spa-routes.ts`) and checks that a second tab on each comes back after a Switch with its `localStorage`, `sessionStorage`, IndexedDB, and Cache Storage. Before those fixes the binary origin came back with nothing and the meta-refresh origin without IndexedDB and Cache Storage. Locally the second tab finished loading about 90 ms after the primary tab was released. Reopening it alongside the primary tab's restore would need barriers that can run together (each operation owns one barrier's rule ids and agent script id, and `openBehindBarrier` ends every agent link but its own tab's), and the tab could not load its page before the primary restored the origins they share, so the layout still waits for the release.
+
+## A start fails with `net::ERR_ABORTED` in headed Chromium
+
+**Symptom.** Run through `vp run poc:zephyr`, 5 of 10 starts failed at the `navigate` step with "The page did not load (net::ERR_ABORTED)." Docker's end-to-end runs never hit it.
+
+**Cause.** `windows.create` replies while the new tab's `about:blank` navigation is still running (`chrome/browser/extensions/api/tabs/tabs_api.cc:1306-1311`), and the start navigated the tab before that committed. Where Chromium aborts the later navigation was not found in the source.
+
+**Solution.** `createNeutralWindow` (`background/workspace/windows.ts`) returns once the new tab reports `status: "complete"`, within 5 s, with its listener registered before `tabs.get`. The same probe then opened 6 of 6.
+
+## History suggestions miss pages visited before today
+
+**Symptom.** The Address field suggested pages from open tabs and saved identities, but from history only pages visited the same day.
+
+**Cause.** `history.search` searches only the last 24 hours unless the call sets `startTime` (`chrome/browser/extensions/api/history/history_api.cc:309, 317-319`).
+
+**Solution.** `dashboard/browser-history.ts` passes `startTime: 0` with the typed text and `maxResults: 20`.
+
+## A visited site that does not answer blocks every Switch
+
+**Symptom.** Once the managed window had shown a site that later stopped answering (a dropped connection, `net::ERR_EMPTY_RESPONSE`), every Switch and Close of that identity failed at the `navigate` step, and so did the start of an identity that had saved the site.
+
+**Cause.** A save reads each site the window showed by loading it in a helper tab; a start restores each one the same way. Any failure ended the command, so one unreachable site held the whole identity hostage.
+
+**Solution.** A save tries the site's root, then once the last page's path the window showed there, and when neither answers keeps the identity's last saved storage of that site, or names it as unsupported when there is none; a start skips the site and the next save keeps its saved storage without visiting it (`background/workspace/origin-reads.ts`, `bootstrap.ts`). The identity's row and the operation journal name each site left out and the step (`tests/e2e/poc-unreachable-origin.spec.ts`).
+
+## A "Leave site?" dialog cancels a Switch
+
+**Symptom.** In the user's run, Gmail asked "Leave site?" when a Switch closed the managed window, and the Switch failed with "Chrome did not close the Incognito windows in time." In tests the dialog is dismissed, which keeps the page, so the close is cancelled the same way (`poc-beforeunload.spec.ts` before the fix: both tests failed after 10 s).
+
+**Cause.** `windows.remove` closes each tab through `ClosePage`, which runs the page's `beforeunload` handler; Chrome shows the dialog once the page has had a user activation.
+
+**Solution.** Before it removes the windows, `closeWindows` (`background/workspace/windows.ts`) discards every tab with `tabs.discard`, which replaces the page without `ClosePage` (`chrome/browser/resource_coordinator/tab_lifecycle_unit.cc:380-415`), so no handler runs. Chrome discards the active tab of the focused window too and answers with a new tab id (`kWebContentsDiscard` is off on desktop, `content/public/common/content_features.cc:381-387`, so the contents are replaced); the tab keeps its session storage, copied by `CopyStateFrom` (`navigation_controller_impl.cc:3032-3049`). RECnRun discards only after the capture read the tab. The page's own `beforeunload` is never patched.
+
+## A save in CI fails with "The page closed before its data was captured."
+
+**Symptom.** On GitHub's runner, `poc-unloaded-tabs.spec.ts` failed in about 50 ms on the Switch right after the test moved the main tab to `about:blank`; local runs passed.
+
+**Cause.** `tabs.update` resolves once the navigation starts, not once it commits, and `tabs.query` already reports the new address as `pendingUrl`. The capture then found the previous page still committed in that tab, took it as the loaded primary tab, and its agent's link closed when `about:blank` committed. A `beforeunload` handler that keeps the page busy for one second reproduces it on any machine.
+
+**Solution.** The `navigateTab` fixture (`tests/e2e/fixtures/tabs.ts`) resolves only once `tabs.onUpdated` reports the tab complete at the new address with no `pendingUrl`, so the session is settled before the test saves it. A user who saves while a tab still loads met the same failure, so a capture now first waits, at most 3 s, until no Incognito tab is loading, and reads a primary tab whose page left during the read behind the barrier instead of failing (`poc-loading-tab.spec.ts`).
+
+## A start that reopens tabs meanwhile fails with "The page closed before its data was restored."
+
+**Symptom.** Once a start reopened the identity's other tabs while the managed tab still restored, `poc-session-layout.spec.ts` failed on Switch back: the restore step lost its agent at once, though its page stayed loaded.
+
+**Cause.** Each navigation that waits for an agent listens on `runtime.onConnect`, and Chrome hands one connection to every listener in turn. The managed tab's wait took its agent and stopped following that tab before the reopened tab's wait heard the same connection, which then found a link from a tab no wait followed and ended it as stray.
+
+**Solution.** The background listens on `runtime.onConnect` once for agent links (`agent-ports.ts`), hands each link to every wait, and ends it only when none keeps it, so a wait no longer ends a link another wait took. A second agent of the same document, which two barriers on one origin inject, is still ended. The test build's stale-reply wrapper hands every listener the same link for one port, as Chrome does (`stale-replies.ts`).
+
+## A reopened page keeps an idle agent link after the Switch
+
+**Symptom.** After a start removed the barrier, a page of the primary's origin that loaded while the layout's agent script was still registered opened a link to the background that stayed open until the page navigated.
+
+**Cause.** Each wait ended only the stray links of its own tab while it listened, so a link from a tab no wait followed, or one that connected once every wait had ended, was left open.
+
+**Solution.** The routed listener (`agent-ports.ts`) ends at once every agent link no wait keeps, for every tab and after the waits end; the agent then holds nothing, since its only listener is on the closed port. `poc-stray-agent-links.spec.ts` opens a second tab during a held restore and checks that no agent link stays open, then or after the Switch.

@@ -134,6 +134,175 @@
   font-size: 0.875rem;
 }
 
-.tab-new-window {
-  justify-self: start;
+.incognito-workspace {
+  display: grid;
+  justify-items: start;
+  gap: 0.5rem;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space);
+}
+
+.incognito-workspace h3,
+.incognito-workspace p,
+.incognito-workspace ul {
+  margin: 0;
+}
+
+.incognito-workspace h3 {
+  font-size: 1rem;
+}
+
+.incognito-windows {
+  padding-left: 1.25rem;
+}
+
+.address-combobox {
+  justify-self: stretch;
+}
+
+.address-suggestions {
+  position: absolute;
+  z-index: 1;
+  inset: calc(100% + 0.25rem) 0 auto;
+  max-height: 18rem;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0.25rem 0;
+  list-style: none;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.address-suggestions [role="option"] {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0 0.75rem;
+  padding: 0.375rem 0.75rem;
+  cursor: pointer;
+}
+
+.address-suggestions [role="option"]:hover,
+.address-suggestions [aria-selected="true"] {
+  background: var(--surface);
+}
+
+.suggestion-title,
+.suggestion-url {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.suggestion-source,
+.suggestion-url {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.suggestion-url {
+  grid-column: 1 / -1;
+}
+
+.workspace-address {
+  display: grid;
+  gap: 0.25rem;
+  justify-self: stretch;
+}
+
+.workspace-address input {
+  font: inherit;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.25rem 0.75rem;
+}
+
+.workspace-hint {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.identities {
+  display: grid;
+  gap: 0.5rem;
+  justify-self: stretch;
+}
+
+.identities h4 {
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+.identities ul {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0;
+  list-style: none;
+}
+
+.identity {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.75rem;
+  border-top: 1px solid var(--border);
+  padding-top: 0.5rem;
+}
+
+.identity-open {
+  color: var(--accent);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+/* Each left-out origin takes a line of its own under the row's label and actions. */
+.identity-skipped {
+  flex-basis: 100%;
+}
+
+.identity-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+.workspace-conflict,
+.workspace-requirement {
+  display: grid;
+  justify-items: start;
+  gap: 0.5rem;
+}
+
+.workspace-conflict > p:first-child,
+.workspace-requirement > p {
+  color: var(--link);
+  font-weight: 600;
+}
+
+.workspace-alert {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.new-identity {
+  display: grid;
+  justify-items: start;
+  justify-self: stretch;
+  gap: 0.5rem;
+}
+
+/* The suggestions open under the whole row, so no text below peeks out beside them. */
+.address-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 0.5rem;
+  justify-self: stretch;
 }

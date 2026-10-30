@@ -23,7 +23,11 @@ interface ExtensionOptions {
 }
 
 interface ExtensionFixtures {
+  /** The profile directory, kept until the test ends; empty without `incognitoAccess`. */
+  profile: string;
   serviceWorker: Worker;
+  /** Closes Chromium and opens it again on the same profile, as the user restarting it would. */
+  relaunch: () => Promise<{ context: BrowserContext; serviceWorker: Worker }>;
   seedSnapshot: (snapshot: Snapshot) => Promise<void>;
   clickToolbarIcon: (page: Page) => Promise<void>;
 }
@@ -55,29 +59,54 @@ function incognitoProfile(): string {
   return dir;
 }
 
+/** Chromium on `profile` with the test build of the extension loaded. */
+function launch(profile: string, headless: boolean, remoteDebuggingPort: number | undefined) {
+  const port =
+    remoteDebuggingPort === undefined ? [] : [`--remote-debugging-port=${remoteDebuggingPort}`];
+  return chromium.launchPersistentContext(profile, {
+    headless,
+    args: [
+      `--disable-extensions-except=${extensionPath}`,
+      `--load-extension=${extensionPath}`,
+      ...port,
+    ],
+  });
+}
+
+/** The extension's running worker, or the next one Chrome starts. */
+async function workerOf(context: BrowserContext): Promise<Worker> {
+  const [running] = context.serviceWorkers();
+  return running ?? (await context.waitForEvent("serviceworker"));
+}
+
 /** A Chromium profile with the test build of the extension loaded. */
 export const test = base.extend<ExtensionFixtures & ExtensionOptions>({
   remoteDebuggingPort: [undefined, { option: true }],
   incognitoAccess: [false, { option: true }],
-  context: async ({ headless, remoteDebuggingPort, incognitoAccess }, use) => {
-    const port =
-      remoteDebuggingPort === undefined ? [] : [`--remote-debugging-port=${remoteDebuggingPort}`];
+  profile: async ({ incognitoAccess }, use) => {
     const profile = incognitoAccess ? incognitoProfile() : "";
-    const context: BrowserContext = await chromium.launchPersistentContext(profile, {
-      headless,
-      args: [
-        `--disable-extensions-except=${extensionPath}`,
-        `--load-extension=${extensionPath}`,
-        ...port,
-      ],
-    });
-    await use(context);
-    await context.close();
+    await use(profile);
     if (profile) rmSync(profile, { recursive: true, force: true });
   },
+  context: async ({ headless, remoteDebuggingPort, profile }, use) => {
+    const context: BrowserContext = await launch(profile, headless, remoteDebuggingPort);
+    await use(context);
+    await context.close();
+  },
   serviceWorker: async ({ context }, use) => {
-    const [running] = context.serviceWorkers();
-    await use(running ?? (await context.waitForEvent("serviceworker")));
+    await use(await workerOf(context));
+  },
+  relaunch: async ({ context, profile, headless, remoteDebuggingPort }, use) => {
+    const opened: BrowserContext[] = [];
+    await use(async () => {
+      // Without a profile directory of its own, Chromium starts empty again.
+      if (!profile) throw new Error("A relaunch needs incognitoAccess, which keeps the profile.");
+      await (opened.at(-1) ?? context).close();
+      const next = await launch(profile, headless, remoteDebuggingPort);
+      opened.push(next);
+      return { context: next, serviceWorker: await workerOf(next) };
+    });
+    for (const each of opened) await each.close();
   },
   seedSnapshot: async ({ serviceWorker }, use) => {
     await use(async (snapshot) => {

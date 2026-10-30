@@ -24,6 +24,7 @@
   --accent: var(--brand-green);
   --accent-text: var(--gray-0);
   --link: var(--brand-red);
+  --danger: var(--brand-red);
   --radius: 0.75rem;
   --space: 1rem;
 }
@@ -38,6 +39,7 @@
     --accent: var(--brand-green-dim);
     --accent-text: var(--gray-0);
     --link: var(--brand-coral);
+    --danger: var(--brand-coral);
   }
 }
 

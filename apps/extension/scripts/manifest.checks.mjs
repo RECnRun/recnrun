@@ -5,9 +5,21 @@ import { fileURLToPath } from "node:url";
 
 const manifestPath = fileURLToPath(new URL("../.output/chrome-mv3/manifest.json", import.meta.url));
 
+const testManifestPath = fileURLToPath(
+  new URL("../.output/chrome-mv3-test/manifest.json", import.meta.url),
+);
+
 function productionManifest() {
   assert.ok(existsSync(manifestPath), "Build the extension first: vp run extension#build");
   return JSON.parse(readFileSync(manifestPath, "utf8"));
+}
+
+function testManifest() {
+  assert.ok(
+    existsSync(testManifestPath),
+    "Build the test extension first: vp run extension#build:test",
+  );
+  return JSON.parse(readFileSync(testManifestPath, "utf8"));
 }
 
 await test("the production build talks only to the RECnRun domains", () => {
@@ -38,12 +50,25 @@ await test("only the RECnRun site may frame the dashboard and the session page",
   ]);
 });
 
-await test("the production build requests only storage and tabs", () => {
+/** The recorder's permissions, then the Incognito workspace's, in every build. */
+const PERMISSIONS = [
+  "storage",
+  "tabs",
+  "declarativeNetRequest",
+  "scripting",
+  "cookies",
+  "webNavigation",
+  "unlimitedStorage",
+  "history",
+];
+
+await test("the production build requests the recorder's and the Incognito workspace's permissions", () => {
   const manifest = productionManifest();
-  assert.deepEqual(manifest.permissions, ["storage", "tabs"]);
+  assert.deepEqual(manifest.permissions, PERMISSIONS);
+  assert.deepEqual(manifest.host_permissions, ["http://*/*", "https://*/*"]);
+  assert.equal(manifest.message_serialization, "structured_clone");
   assert.equal(manifest.commands, undefined);
   assert.equal(manifest.action?.default_popup, undefined);
-  assert.equal(manifest.host_permissions, undefined);
   assert.equal(manifest.optional_permissions, undefined);
   assert.equal(manifest.optional_host_permissions, undefined);
   assert.equal(manifest.externally_connectable, undefined);
@@ -60,4 +85,46 @@ await test("the production build ships the logo as its icons", () => {
   for (const icon of Object.values(manifest.icons)) {
     assert.ok(existsSync(new URL(`../.output/chrome-mv3/${icon}`, import.meta.url)), icon);
   }
+});
+
+await test("the test build asks for exactly what the production build asks for", () => {
+  const manifest = testManifest();
+  const production = productionManifest();
+  for (const key of [
+    "permissions",
+    "host_permissions",
+    "message_serialization",
+    "optional_permissions",
+    "optional_host_permissions",
+    "externally_connectable",
+    "incognito",
+  ]) {
+    assert.deepEqual(manifest[key], production[key], key);
+  }
+});
+
+await test("every build ships the origin agent, registered at run time", () => {
+  const agent = "content-scripts/origin-agent.js";
+  for (const [dir, manifest] of [
+    ["chrome-mv3", productionManifest()],
+    ["chrome-mv3-test", testManifest()],
+  ]) {
+    assert.ok(
+      existsSync(new URL(`../.output/${dir}/${agent}`, import.meta.url)),
+      `${dir}/${agent}`,
+    );
+    const declared = manifest.content_scripts.flatMap((script) => script.js);
+    assert.ok(!declared.includes(agent), "The origin agent is not a manifest content script.");
+  }
+});
+
+await test("only the test build exposes the POC test handles on the service worker", () => {
+  const background = (dir) =>
+    readFileSync(
+      fileURLToPath(new URL(`../.output/${dir}/background.js`, import.meta.url)),
+      "utf8",
+    );
+  // includes() rather than match(), so a failure does not print the whole bundle.
+  assert.ok(background("chrome-mv3-test").includes("recnrunPoc"), "The test build lacks them.");
+  assert.ok(!background("chrome-mv3").includes("recnrunPoc"), "The production build has them.");
 });

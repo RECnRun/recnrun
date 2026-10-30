@@ -2,6 +2,11 @@ import { errorMessage } from "@recnrun/domain";
 import type { Snapshot } from "@recnrun/domain";
 import { useEffect, useState } from "preact/hooks";
 import { IncognitoControl } from "@/dashboard/IncognitoControl";
+import {
+  IncognitoWorkspace,
+  sessionOpen,
+  useWorkspaceStatus,
+} from "@/dashboard/IncognitoWorkspace";
 import { RecordingDetail } from "@/dashboard/RecordingDetail";
 import { EmptyState, RecordingList } from "@/dashboard/RecordingList";
 import { selectedRecordingId, titleFor } from "@/dashboard/route";
@@ -55,6 +60,7 @@ function Content(props: { load: Load; route: string; nav: Navigation }) {
 export function Dashboard({ services, router, take }: DashboardProps) {
   const load = useSnapshot(services.loadSnapshot);
   const [route, setRoute] = useState(router.initialRoute);
+  const workspace = useWorkspaceStatus(services);
   useEffect(() => router.subscribe(setRoute), [router]);
   const navigate = (path: string) => {
     router.navigate(path);
@@ -73,7 +79,23 @@ export function Dashboard({ services, router, take }: DashboardProps) {
       <main>
         <div class="session-panel">
           <IncognitoControl access={services.incognito}>
-            <TabList tabs={services.tabs} store={services.recordings} take={take} />
+            {() => (
+              <>
+                <IncognitoWorkspace
+                  workspace={workspace}
+                  tabs={services.tabs}
+                  send={services.send}
+                  openDetails={services.incognito.openSettings}
+                  history={services.history}
+                />
+                <TabList
+                  tabs={services.tabs}
+                  store={services.recordings}
+                  take={take}
+                  recordable={sessionOpen(workspace.status)}
+                />
+              </>
+            )}
           </IncognitoControl>
         </div>
         <Content load={load} route={route} nav={{ router, navigate }} />
