@@ -15,6 +15,7 @@ const tasks = new Set([
   "test:components:local",
   "test:e2e:local",
   "test:coverage:local",
+  "test:single-tab:local",
 ]);
 const runId = `${new Date().toISOString().replaceAll(":", "-")}-${randomUUID()}`;
 const artifacts = resolve(

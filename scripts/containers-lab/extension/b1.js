@@ -60,6 +60,16 @@ async function reinstall(key, session, source) {
   }
 }
 
+/** Re-registers the prelude of a tab's main session for another container (sessions.js switches). */
+export async function switchPrelude(tabId, container) {
+  const key = keyOf({ tabId });
+  const session = sessions.get(key);
+  if (!session) throw new Error(`Tab ${tabId} has no prelude session to switch`);
+  session.container = container;
+  await reinstall(key, session, preludeSource(container, await jarOf(container)));
+  if (!sessions.has(key)) throw new Error(`The prelude for tab ${tabId} could not be reinstalled`);
+}
+
 async function jarChanged(container) {
   const source = preludeSource(container, await jarOf(container));
   for (const [key, session] of sessions)

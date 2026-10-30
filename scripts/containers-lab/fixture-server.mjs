@@ -79,6 +79,14 @@ function appRoutes(state) {
       json(response, { user: userOf(request) }, { "cache-control": "private, max-age=600" }),
     "GET /set-pref": (request, response, url) =>
       send(response, 204, { "set-cookie": `theme=${url.searchParams.get("theme")}; Path=/` }),
+    // A late response: it answers after `ms` with a cookie naming whoever asked.
+    "GET /slow": (request, response, url) => {
+      const user = userOf(request);
+      setTimeout(
+        () => json(response, { user }, { "set-cookie": `late=${user}; Path=/` }),
+        Number(url.searchParams.get("ms") ?? 1000),
+      );
+    },
     "GET /logout": (request, response) =>
       send(response, 302, { location: "/home", "set-cookie": "sid=; Path=/; Max-Age=0" }),
     // The identity provider's code is the user name: the lab checks cookies, not OAuth.

@@ -141,3 +141,16 @@ The dashboard header has a Record button (`dashboard/panel/RecordControls.tsx`).
   - A shared worker gets one instance per container and isolated storage, but its requests carry the profile's own cookies: Fetch never pauses them.
   - Service workers are disabled in containers; a registration belongs to an origin, not a container.
   - The debugger session outlives the extension's service worker, and a restarted worker must adopt it. Requests made while the extension reloads carry the profile's cookies.
+
+## Single-tab multi-user sessions (October 2026)
+
+**Problem.** A developer wants several users to take turns in the same tab of their own Chrome profile (A creates an order, B submits it, A checks, C approves, A checks again), each finding their own session and storage when they come back, with no second sign-in.
+
+**Result.** PASS for saving and restoring data; network and worker isolation out of scope. Branch `poc/single-tab-multi-user`; the full report is [poc-single-tab-sessions-results.md](poc-single-tab-sessions-results.md). A session manager binds the tab-group POC's containers to one tab in turns: a switch suspends the active identity, loads `about:blank` so the document dies, rebinds the debugger session, the registry, and the prelude to the next container, and loads the application again. A → B → A → C → A ran three times in one tab with distinct documents on every switch and one sign-in per user, in two modes: `debugger` (the tab-group mechanism) and `swap` (no debugger: `chrome.cookies` moves the store's cookies into and out of the identity's jar, and the prelude is a content script that reads the identity from a cookie). The tab-group POC's leaks (shared workers, the extension-reload window) do not touch saved data. The report recommends the swap mode for a product that only saves and restores data.
+
+- **Findings.**
+  - A request must be attributed to the document that made it, not to the tab's current identity: CDP's `loaderId` and webNavigation's `documentId` map to the container active when the document was created, so a delayed response's `Set-Cookie` lands in the right jar.
+  - While the tab switches, no identity is active, and a request whose document is unknown is blocked; a failed switch blocks the tab with a session DNR rule until a switch succeeds.
+  - The debugger session survives the switch (`rebind`), and a lost one is re-attached before the first application request, so interception never lags the navigation.
+  - Without the debugger, Chrome's own store is the active identity's: saved with `chrome.cookies.getAll` (HttpOnly included) and restored with `chrome.cookies.set` before the navigation. The switch waits, after `about:blank` committed, for the tab's requests to drain (`webRequest`, bounded by a timeout) before it saves the store, so a keepalive request's late `Set-Cookie` is saved into the right jar; a request past the timeout is reported and its cookie lands in the next store. Chrome applies its own cookie rules to what it stores.
+  - The user picks only the next identity; Start and Resume are decided by whether the container exists, and Reset is an explicit new generation (`b.2`) with the old jar cleared.

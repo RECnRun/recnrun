@@ -8,10 +8,13 @@ import { jarOf, settled, storeHeaders } from "./jar-store.js";
 import { cookieHeader, siteOf } from "./jar.js";
 import { isProbeRule } from "./bootstraps.js";
 import { buildRules } from "./dnr-rules.js";
+import { containerForResponse } from "./documents.js";
+import { isBlockRule } from "./sessions-block.js";
 import { setRealCookies } from "./real-jar.js";
 import { containerOf } from "./registry.js";
 
-const URLS = ["http://app.localhost/*", "http://idp.localhost/*"];
+// Every host the manifest permits: the lab's, and a real site's when a run patches them in.
+const URLS = ["<all_urls>"];
 let mode = "off";
 let current = new Map();
 let classified = [];
@@ -39,7 +42,7 @@ async function applyNow() {
   const addRules = mode === "off" ? [] : buildRules(containers, Date.now(), options);
   const removeRuleIds = (await chrome.declarativeNetRequest.getSessionRules())
     .map(({ id }) => id)
-    .filter((id) => !isProbeRule(id));
+    .filter((id) => !isProbeRule(id) && !isBlockRule(id));
   await chrome.declarativeNetRequest.updateSessionRules({ removeRuleIds, addRules });
   const now = Date.now();
   for (const tabId of known) if (!classifiedAt.has(tabId)) classifiedAt.set(tabId, now);
@@ -93,11 +96,21 @@ export async function jarChanged() {
 const setCookiesOf = (headers) =>
   headers.filter(({ name }) => name.toLowerCase() === "set-cookie").map(({ value }) => value ?? "");
 
+/** Whose jar a managed tab's Set-Cookie headers belong to; `null` drops them. */
+function ownerOf(details, values) {
+  const managed = containerForResponse(details);
+  if (managed === null && values.length > 0) {
+    record("set-cookie-dropped", { tabId: details.tabId, url: details.url });
+  }
+  return managed === null ? null : (managed ?? containerOf(details.tabId));
+}
+
 async function observe(details) {
   if (mode === "off") return;
   const { tabId, url, responseHeaders = [], statusCode } = details;
   const values = setCookiesOf(responseHeaders);
-  const container = containerOf(tabId);
+  const container = ownerOf(details, values);
+  if (container === null) return;
   // A tab the rules do not cover yet keeps its Set-Cookie headers until it is known to be the control's.
   if (isEarly(details) && !container) {
     if (values.length > 0) earlyEntry(tabId).cookies.push({ values, url });

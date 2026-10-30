@@ -38,6 +38,13 @@ async function store(container, headers, requestUrl, options) {
   return jar;
 }
 
+/** Replaces `container`'s jar wholesale (the swap mode saves the cookie store into it). */
+export async function replaceJar(container, jar) {
+  jars.set(container, jar);
+  await chrome.storage.local.set({ [key(container)]: jar });
+  for (const listener of listeners) await listener(container);
+}
+
 export async function clearJar(container) {
   jars.set(container, []);
   await chrome.storage.local.remove(key(container));

@@ -70,21 +70,19 @@ export async function labWorker(context, after) {
 
 /**
  * A Chromium with a temporary profile; `close()` removes it unless `keep`. `profile` reopens a
- * kept one, and `args` adds switches such as --restore-last-session.
+ * kept one, `args` adds switches such as --restore-last-session, and `extension` loads another
+ * directory than the lab's (a copy whose manifest names a real site).
  */
 export async function launchLab({
   headless = true,
   profile = mkdtempSync(join(tmpdir(), "recnrun-containers-")),
   args = [],
+  extension = extensionPath,
 } = {}) {
   const context = await chromium.launchPersistentContext(profile, {
     channel: "chromium",
     headless,
-    args: [
-      `--disable-extensions-except=${extensionPath}`,
-      `--load-extension=${extensionPath}`,
-      ...args,
-    ],
+    args: [`--disable-extensions-except=${extension}`, `--load-extension=${extension}`, ...args],
   });
   const { worker, lab } = await labWorker(context);
   const version =

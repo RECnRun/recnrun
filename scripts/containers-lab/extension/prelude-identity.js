@@ -1,9 +1,10 @@
 // The prelude's parts for workers and cookies, a classic script that runs after prelude.js. Each
-// part is self-contained, as in prelude.js.
+// part is self-contained, as in prelude.js. A native namespace (the swap mode) keeps Chrome's own
+// cookies and workers and takes only the storage parts.
 (() => {
   /** One shared worker per container and name; service workers are off in containers (S1). */
   function workersPart(ns) {
-    if (ns.control) return;
+    if (ns.control || ns.native) return;
     if (typeof SharedWorker !== "undefined") {
       const Raw = SharedWorker;
       globalThis.SharedWorker = class SharedWorker extends Raw {
@@ -27,7 +28,7 @@
 
   /** `document.cookie` over a snapshot of the container's script-visible cookies. */
   function cookiesPart(ns) {
-    if (typeof Document === "undefined" || ns.control) return;
+    if (typeof Document === "undefined" || ns.control || ns.native) return;
     const site = (host) => host.split(".").slice(-2).join(".");
     const origins = location.ancestorOrigins;
     const top =
