@@ -6,8 +6,10 @@ import { BackgroundReplySchema } from "@/messaging/background-protocol";
 export function createForwardingHandler(
   sendMessage: (message: unknown) => Promise<unknown>,
 ): RequestHandler {
-  return async (type) => {
-    const reply = v.parse(BackgroundReplySchema, await sendMessage({ type }));
+  return async (type, payload) => {
+    const message =
+      payload === undefined ? { kind: "request", type } : { kind: "request", type, payload };
+    const reply = v.parse(BackgroundReplySchema, await sendMessage(message));
     if (!reply.ok) throw new Error(reply.error);
     return reply.result;
   };

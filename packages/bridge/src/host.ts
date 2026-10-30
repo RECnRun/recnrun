@@ -7,8 +7,8 @@ import type { Transport } from "./transport.ts";
 export type RequestHandler = (type: RequestType, payload: unknown) => Promise<unknown>;
 
 export interface BridgeHost {
-  stop(): void;
-  emit<N extends EventName>(name: N, data: EventData<N>): void;
+  stop: () => void;
+  emit: <N extends EventName>(name: N, data: EventData<N>) => void;
 }
 
 /** Answers page requests from the content script and announces the extension. */
