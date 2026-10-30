@@ -1,3 +1,4 @@
+import { sampleStep } from "@recnrun/domain/testing";
 import { describe, expect, test, vi } from "vite-plus/test";
 import { createBridgeClient, createBridgeHost, isRequestType } from "../src/index.ts";
 import { messages } from "../src/protocol.ts";
@@ -23,7 +24,7 @@ describe("createBridgeHost", () => {
   test("turns handler failures into error responses", async () => {
     const transport = memoryTransport();
     createBridgeHost(transport, () => Promise.reject(new Error("No storage")), "1.0.0");
-    transport.send(messages.request("r1", "getSnapshot"));
+    transport.send(messages.request("r1", "listWorkflows"));
     await settle();
     expect(transport.sent.at(-1)).toEqual(messages.failure("r1", "No storage"));
   });
@@ -42,11 +43,38 @@ describe("createBridgeHost", () => {
   test("stops answering once stopped", async () => {
     const transport = memoryTransport();
     const handle = vi.fn(async () => "pong");
-    const stop = createBridgeHost(transport, handle, "1.0.0");
-    stop();
+    createBridgeHost(transport, handle, "1.0.0").stop();
     transport.send(messages.request("r1", "ping"));
     await settle();
     expect(handle).not.toHaveBeenCalled();
+  });
+
+  test("passes the validated payload to the handler", async () => {
+    const transport = memoryTransport();
+    const handle = vi.fn(async () => []);
+    createBridgeHost(transport, handle, "1.0.0");
+    transport.send(messages.request("r1", "listSteps", { workflowId: "wf-login" }));
+    await settle();
+    expect(handle).toHaveBeenCalledWith("listSteps", { workflowId: "wf-login" });
+    expect(transport.sent.at(-1)).toEqual(messages.success("r1", []));
+  });
+
+  test("answers a malformed payload with an error instead of calling the handler", async () => {
+    const transport = memoryTransport();
+    const handle = vi.fn(async () => []);
+    createBridgeHost(transport, handle, "1.0.0");
+    transport.send(messages.request("r1", "listSteps", { workflowId: 7 }));
+    await settle();
+    expect(handle).not.toHaveBeenCalled();
+    expect(transport.sent.at(-1)).toEqual(messages.failure("r1", "Invalid listSteps payload."));
+  });
+
+  test("emits events to the page", () => {
+    const transport = memoryTransport();
+    const host = createBridgeHost(transport, vi.fn(), "1.0.0");
+    const step = sampleStep();
+    host.emit("stepRecorded", step);
+    expect(transport.sent.at(-1)).toEqual(messages.event("stepRecorded", step));
   });
 
   test("completes a round trip with the client", async () => {
@@ -59,7 +87,7 @@ describe("createBridgeHost", () => {
 
 describe("isRequestType", () => {
   test("accepts only request types the protocol defines", () => {
-    expect(["ping", "getSnapshot"].every(isRequestType)).toBe(true);
+    expect(["ping", "listWorkflows", "startWorkflow", "listSteps"].every(isRequestType)).toBe(true);
     expect([undefined, "", "deleteEverything", 1].some(isRequestType)).toBe(false);
   });
 });

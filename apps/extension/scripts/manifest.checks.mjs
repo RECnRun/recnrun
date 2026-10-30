@@ -14,14 +14,20 @@ test("the production build talks only to the RECnRun domains", () => {
   const manifest = productionManifest();
   const matches = manifest.content_scripts.flatMap((script) => script.matches);
   assert.deepEqual(matches, ["https://recnrun.com/*"]);
+  assert.deepEqual(manifest.externally_connectable, { matches: ["https://recnrun.com/*"] });
   assert.doesNotMatch(JSON.stringify(manifest), /localhost|127\.0\.0\.1/);
 });
 
-test("the production build requests no permission beyond storage", () => {
+test("the production build asks for site access only at run time", () => {
   const manifest = productionManifest();
-  assert.deepEqual(manifest.permissions, ["storage"]);
+  assert.deepEqual(manifest.permissions, ["storage", "scripting", "tabs", "tabGroups"]);
+  assert.deepEqual(manifest.optional_host_permissions, ["http://*/*", "https://*/*"]);
   assert.equal(manifest.host_permissions, undefined);
-  assert.equal(manifest.externally_connectable, undefined);
+});
+
+test("the production build keeps the extension id stable through its key", () => {
+  const manifest = productionManifest();
+  assert.match(manifest.key ?? "", /^MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA/);
 });
 
 test("the production build ships the logo as its icons", () => {

@@ -13,6 +13,7 @@ catalog:
   "@vitest/coverage-v8": 5.0.5
   dependency-cruiser: ^18.7.0
   eslint-plugin-sonarjs: ^4.2.2
+  fake-indexeddb: ^6.2.7
   jscpd: ^5.4.1
   knip: ^6.42.1
   oxfmt: 0.73.0
@@ -37,3 +38,4 @@ allowBuilds:
 minimumReleaseAgeExclude:
   - dependency-cruiser@18.7.0
   - knip@6.42.1
+  - fake-indexeddb@6.2.7
