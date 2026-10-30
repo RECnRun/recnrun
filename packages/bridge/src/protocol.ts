@@ -1,7 +1,6 @@
 import {
   IdSchema,
   RecordingStatusSchema,
-  SnapshotSchema,
   StartResultSchema,
   StepSchema,
   WorkflowDraftSchema,
@@ -22,7 +21,6 @@ const ById = v.object({ id: IdSchema });
 /** Payload and result schema per request type. A new request type starts here. */
 export const REQUESTS = {
   ping: { payload: NoPayload, result: v.object({ extensionVersion: v.string() }) },
-  getSnapshot: { payload: NoPayload, result: SnapshotSchema },
   getRecordingStatus: { payload: NoPayload, result: RecordingStatusSchema },
   startWorkflow: {
     payload: v.object({

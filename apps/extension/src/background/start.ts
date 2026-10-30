@@ -8,7 +8,6 @@ import {
 import { createTimelinePorts } from "@/background/timeline-ports";
 import { createWorkflowController } from "@/background/workflows";
 import { externalMatches } from "@/config/origins";
-import { readSnapshot } from "@/storage/snapshot-repository";
 import { openWorkflowStore } from "@/storage/workflow-store";
 
 function background(work: Promise<unknown>): void {
@@ -29,7 +28,6 @@ export function startBackground(): void {
     extensionVersion: browser.runtime.getManifest().version,
     controller,
     store,
-    readSnapshot,
   });
 
   browser.runtime.onMessage.addListener(

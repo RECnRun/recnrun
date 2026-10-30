@@ -1,4 +1,3 @@
-import { emptySnapshot } from "@recnrun/domain";
 import { sampleStep, sampleSteps, sampleWorkflow } from "@recnrun/domain/testing";
 import { describe, expect, test, vi } from "vite-plus/test";
 import { BridgeError, createBridgeClient } from "../src/index.ts";
@@ -49,20 +48,20 @@ describe("detect", () => {
 describe("request", () => {
   test("resolves with the validated result", async () => {
     const { client, replyWith } = setup();
-    replyWith(messages.success("req-1", emptySnapshot()));
-    await expect(client.request("getSnapshot")).resolves.toEqual(emptySnapshot());
+    replyWith(messages.success("req-1", []));
+    await expect(client.request("listWorkflows")).resolves.toEqual([]);
   });
 
   test("ignores responses to other requests", async () => {
     const { client, replyWith } = setup();
-    replyWith(messages.success("someone-else", emptySnapshot()));
-    await expect(client.request("getSnapshot")).rejects.toThrow(/Timed out/);
+    replyWith(messages.success("someone-else", []));
+    await expect(client.request("listWorkflows")).rejects.toThrow(/Timed out/);
   });
 
   test("rejects with the error the extension reported", async () => {
     const { client, replyWith } = setup();
     replyWith(messages.failure("req-1", "Storage unavailable"));
-    await expect(client.request("getSnapshot")).rejects.toThrow(
+    await expect(client.request("listWorkflows")).rejects.toThrow(
       new BridgeError("Storage unavailable"),
     );
   });
@@ -70,7 +69,7 @@ describe("request", () => {
   test("rejects a result that does not match the schema", async () => {
     const { client, replyWith } = setup();
     replyWith(messages.success("req-1", { schemaVersion: 1 }));
-    await expect(client.request("getSnapshot")).rejects.toThrow(/invalid getSnapshot result/);
+    await expect(client.request("listWorkflows")).rejects.toThrow(/invalid listWorkflows result/);
   });
 
   test("sends the payload with the request", async () => {

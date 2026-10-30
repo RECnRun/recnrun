@@ -24,7 +24,7 @@ describe("createBridgeHost", () => {
   test("turns handler failures into error responses", async () => {
     const transport = memoryTransport();
     createBridgeHost(transport, () => Promise.reject(new Error("No storage")), "1.0.0");
-    transport.send(messages.request("r1", "getSnapshot"));
+    transport.send(messages.request("r1", "listWorkflows"));
     await settle();
     expect(transport.sent.at(-1)).toEqual(messages.failure("r1", "No storage"));
   });
@@ -87,7 +87,7 @@ describe("createBridgeHost", () => {
 
 describe("isRequestType", () => {
   test("accepts only request types the protocol defines", () => {
-    expect(["ping", "getSnapshot", "startWorkflow", "listSteps"].every(isRequestType)).toBe(true);
+    expect(["ping", "listWorkflows", "startWorkflow", "listSteps"].every(isRequestType)).toBe(true);
     expect([undefined, "", "deleteEverything", 1].some(isRequestType)).toBe(false);
   });
 });

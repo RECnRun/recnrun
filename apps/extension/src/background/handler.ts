@@ -1,6 +1,6 @@
 import { REQUESTS } from "@recnrun/bridge";
 import type { RequestPayload, RequestResult, RequestType } from "@recnrun/bridge";
-import type { Snapshot, StepDraft } from "@recnrun/domain";
+import type { StepDraft } from "@recnrun/domain";
 import * as v from "valibot";
 import { BackgroundMessageSchema, ExternalRequestSchema } from "@/messaging/background-protocol";
 import type { BackgroundReply } from "@/messaging/background-protocol";
@@ -14,7 +14,6 @@ export interface HandlerDependencies {
   extensionVersion: string;
   controller: WorkflowController;
   store: WorkflowStore;
-  readSnapshot: () => Promise<Snapshot>;
 }
 
 export type Dispatch = (type: RequestType, payload: unknown, caller: Caller) => Promise<unknown>;
@@ -25,10 +24,9 @@ type Handlers = {
 
 /** One dispatcher for the content script, the popup, and the public API. */
 export function createRequestHandler(deps: HandlerDependencies): Dispatch {
-  const { extensionVersion, controller, store, readSnapshot } = deps;
+  const { extensionVersion, controller, store } = deps;
   const handlers: Handlers = {
     ping: async () => ({ extensionVersion }),
-    getSnapshot: () => readSnapshot(),
     getRecordingStatus: (_, caller) => controller.status(caller),
     startWorkflow: (payload, caller) => controller.start(payload, caller),
     stopWorkflow: (payload, caller) => controller.stop(payload, caller),

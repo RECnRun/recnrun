@@ -1,5 +1,5 @@
 import type { RequestType } from "@recnrun/bridge";
-import { sampleSnapshot, sampleStep, sampleWorkflow } from "@recnrun/domain/testing";
+import { sampleStep, sampleWorkflow } from "@recnrun/domain/testing";
 import { IDBFactory } from "fake-indexeddb";
 import { beforeEach, describe, expect, test, vi } from "vite-plus/test";
 import {
@@ -28,7 +28,6 @@ const dispatch = createRequestHandler({
   extensionVersion: "0.1.0",
   controller,
   store,
-  readSnapshot: async () => sampleSnapshot(),
 });
 
 const pageSender: MessageSender = {
@@ -50,7 +49,6 @@ describe("createRequestHandler", () => {
     await store.putWorkflow(sampleWorkflow());
     await store.appendStep(sampleStep());
     await expect(dispatch("ping", undefined, {})).resolves.toEqual({ extensionVersion: "0.1.0" });
-    await expect(dispatch("getSnapshot", undefined, {})).resolves.toEqual(sampleSnapshot());
     await expect(dispatch("listWorkflows", undefined, {})).resolves.toEqual([sampleWorkflow()]);
     await expect(dispatch("listSteps", { workflowId: "wf-login" }, {})).resolves.toEqual([
       sampleStep(),
