@@ -16,7 +16,7 @@ function background(work: Promise<unknown>): void {
 
 export function startBackground(): void {
   const store = openWorkflowStore();
-  const ports = createTimelinePorts();
+  const ports = createTimelinePorts(async (tabId) => (await browser.tabs.get(tabId)).groupId);
   const controller = createWorkflowController({
     browser: createBrowserAdapter(),
     store,

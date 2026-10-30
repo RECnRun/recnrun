@@ -32,7 +32,7 @@ function useTimeline(gateway: ExtensionGateway, id: string): TimelineState {
       (next) => active && setState(next),
       (error: unknown) => active && setState({ status: "failed", message: errorMessage(error) }),
     );
-    const unsubscribe = gateway.onStep((step) => {
+    const unsubscribeSteps = gateway.onStep((step) => {
       if (step.workflowId !== id) return;
       setState((current) =>
         current.status === "ready"
@@ -40,9 +40,14 @@ function useTimeline(gateway: ExtensionGateway, id: string): TimelineState {
           : current,
       );
     });
+    const unsubscribeWorkflow = gateway.onWorkflowChanged((workflow) => {
+      if (workflow.id !== id) return;
+      setState((current) => (current.status === "ready" ? { ...current, workflow } : current));
+    });
     return () => {
       active = false;
-      unsubscribe();
+      unsubscribeSteps();
+      unsubscribeWorkflow();
     };
   }, [gateway, id]);
   return state;
@@ -106,7 +111,7 @@ function TimelineView({ workflow, steps }: { workflow: Workflow; steps: Step[] }
           message="Interact with a page in the recording tab group and the steps appear here."
         />
       ) : (
-        <ol class="steps">
+        <ol class="steps" aria-label="Steps">
           {steps.map((step) => (
             <StepRow key={step.id} step={step} />
           ))}

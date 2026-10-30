@@ -17,6 +17,9 @@ function deliver(emit: BridgeHost["emit"], message: TimelineMessage): void {
     case "recordingChanged":
       emit("recordingChanged", message.data);
       break;
+    case "workflowChanged":
+      emit("workflowChanged", message.data);
+      break;
   }
 }
 

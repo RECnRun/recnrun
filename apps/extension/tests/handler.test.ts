@@ -110,10 +110,17 @@ describe("createMessageListener", () => {
     expect(controller.status).toHaveBeenCalledWith(caller);
   });
 
-  test("gives the popup no tab, so the controller uses the active one", async () => {
+  test("gives the popup no tab, even when it is open in a tab, so the active tab is used", async () => {
     const popup = { id: "own-id", url: "chrome-extension://own-id/popup.html" };
     listen(listener, { kind: "request", type: "getRecordingStatus" }, popup);
     await vi.waitFor(() => expect(controller.status).toHaveBeenCalledWith({}));
+    listen(
+      listener,
+      { kind: "request", type: "getRecordingStatus" },
+      { ...popup, tab: { id: 4, url: popup.url, groupId: 7, windowId: 1, status: "complete" } },
+    );
+    await vi.waitFor(() => expect(controller.status).toHaveBeenCalledTimes(2));
+    expect(controller.status).toHaveBeenLastCalledWith({});
   });
 
   test("reports failures as error replies", async () => {

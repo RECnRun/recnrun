@@ -59,8 +59,13 @@ type Listener = (
   sendResponse: (reply: BackgroundReply) => void,
 ) => boolean;
 
+/** The popup opened as a tab still asks about the active tab, like the real popup does. */
+function isExtensionPage(url: string | undefined): boolean {
+  return url?.startsWith("chrome-extension://") === true;
+}
+
 function callerOf(sender: MessageSender): Caller {
-  const tab = sender.tab && toTabInfo(sender.tab);
+  const tab = sender.tab && !isExtensionPage(sender.url) ? toTabInfo(sender.tab) : undefined;
   if (!tab) return {};
   const dashboardOrigin = originOf(sender.url);
   return dashboardOrigin === undefined ? { tab } : { tab, dashboardOrigin };

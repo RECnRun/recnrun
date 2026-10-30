@@ -132,3 +132,7 @@ body {
 [role="alert"] {
   color: var(--record);
 }
+
+.recording .button {
+  justify-self: start;
+}

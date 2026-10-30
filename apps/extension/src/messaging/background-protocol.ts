@@ -1,6 +1,11 @@
 import { isRequestType } from "@recnrun/bridge";
 import type { RequestType } from "@recnrun/bridge";
-import { RecordingStatusSchema, StepDraftSchema, StepSchema } from "@recnrun/domain";
+import {
+  RecordingStatusSchema,
+  StepDraftSchema,
+  StepSchema,
+  WorkflowSchema,
+} from "@recnrun/domain";
 import * as v from "valibot";
 
 /** Control requests pages on the allowed origins may send with `chrome.runtime.sendMessage`. */
@@ -46,6 +51,7 @@ export const TIMELINE_PORT = "timeline";
 export const TimelineMessageSchema = v.variant("name", [
   v.object({ name: v.literal("stepRecorded"), data: StepSchema }),
   v.object({ name: v.literal("recordingChanged"), data: RecordingStatusSchema }),
+  v.object({ name: v.literal("workflowChanged"), data: WorkflowSchema }),
 ]);
 
 export type BackgroundReply = v.InferOutput<typeof BackgroundReplySchema>;

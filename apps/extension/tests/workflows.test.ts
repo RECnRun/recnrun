@@ -61,6 +61,7 @@ describe("start", () => {
       { name: "recordingChanged", data: { workflow, missingOrigins: [] } },
       100,
     );
+    expect(notify).toHaveBeenCalledWith({ name: "workflowChanged", data: workflow }, undefined);
   });
 
   test("opens the requested URL inside the group and injects the recorder into loaded tabs", async () => {
@@ -143,10 +144,11 @@ describe("stop and resume", () => {
     expect(stopped).toMatchObject({ id: "id-1", status: "stopped" });
     await expect(readRecordings()).resolves.toEqual(new Map());
     expect(browser.registered).toBeUndefined();
-    expect(notify).toHaveBeenLastCalledWith(
+    expect(notify).toHaveBeenCalledWith(
       { name: "recordingChanged", data: { missingOrigins: [] } },
       100,
     );
+    expect(notify).toHaveBeenLastCalledWith({ name: "workflowChanged", data: stopped }, undefined);
   });
 
   test("stops by id from anywhere, and returns an already stopped workflow unchanged", async () => {

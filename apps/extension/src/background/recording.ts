@@ -86,6 +86,7 @@ export async function begin(
   await bindRecording(groupId, binding);
   await sync(deps);
   notify({ name: "recordingChanged", data: { workflow: recording, missingOrigins: [] } }, groupId);
+  notify({ name: "workflowChanged", data: recording }, undefined);
   return { status: "recording", workflow: recording };
 }
 
@@ -103,6 +104,7 @@ export async function stopGroup(
   const tabs = recordableTabs(await browser.groupTabs(groupId), binding.dashboardOrigin);
   const missing = await missingOrigins(browser, tabs, binding.dashboardOrigin);
   notify({ name: "recordingChanged", data: { missingOrigins: missing } }, groupId);
+  notify({ name: "workflowChanged", data: stopped }, undefined);
   return stopped;
 }
 

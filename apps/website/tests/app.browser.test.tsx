@@ -123,6 +123,26 @@ test("shows a workflow's steps and appends live steps once", async () => {
   expect(root.querySelector("a[href='#/']")).not.toBeNull();
 });
 
+test("updates a workflow's status in the list and on its timeline when the extension reports it", async () => {
+  const [recording, stopped] = sampleWorkflows();
+  if (!recording || !stopped) throw new Error("fixture");
+  const gateway = installedGateway({ workflows: [recording] });
+  const list = mount(gateway);
+  await expect.poll(() => texts(list, "article.workflow .status")).toEqual(["Recording"]);
+  gateway.emitWorkflow({ ...recording, status: "stopped" });
+  gateway.emitWorkflow(stopped);
+  await expect.poll(() => texts(list, "article.workflow .status")).toEqual(["Stopped", "Stopped"]);
+  expect(texts(list, "article.workflow h2")).toEqual([
+    "Checkout with saved card",
+    "Log in as admin",
+  ]);
+
+  const timeline = mount(gateway, "#/workflows/wf-login");
+  await expect.poll(() => timeline.querySelector("main .status")?.textContent).toBe("Recording");
+  gateway.emitWorkflow({ ...recording, status: "stopped" });
+  await expect.poll(() => timeline.querySelector("main .status")?.textContent).toBe("Stopped");
+});
+
 test("explains a workflow without steps and an unknown workflow id", async () => {
   const empty = mount(
     installedGateway({ workflows: sampleWorkflows() }),

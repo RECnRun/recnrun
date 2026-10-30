@@ -1,6 +1,6 @@
 import type { Workflow } from "@recnrun/domain";
 import { useEffect, useState } from "preact/hooks";
-import { filterWorkflows } from "@/features/workflows/workflow-view";
+import { filterWorkflows, upsertWorkflow } from "@/features/workflows/workflow-view";
 import { WorkflowCard } from "@/features/workflows/WorkflowCard";
 import type { ExtensionGateway } from "@/services/extension";
 import { EmptyState } from "@/ui/EmptyState";
@@ -11,7 +11,7 @@ type ListState =
   | { status: "ready"; workflows: Workflow[] }
   | { status: "failed"; message: string };
 
-/** Reloads on every recording change, since starting or stopping updates a workflow. */
+/** Lists once, then applies the workflow changes the extension pushes. */
 function useWorkflows(gateway: ExtensionGateway): [ListState, () => void] {
   const [state, setState] = useState<ListState>({ status: "loading" });
   const [generation, setGeneration] = useState(0);
@@ -22,7 +22,13 @@ function useWorkflows(gateway: ExtensionGateway): [ListState, () => void] {
       (workflows) => active && setState({ status: "ready", workflows }),
       (error: unknown) => active && setState({ status: "failed", message: errorMessage(error) }),
     );
-    const unsubscribe = gateway.onRecordingChanged(reload);
+    const unsubscribe = gateway.onWorkflowChanged((workflow) =>
+      setState((current) =>
+        current.status === "ready"
+          ? { ...current, workflows: upsertWorkflow(current.workflows, workflow) }
+          : current,
+      ),
+    );
     return () => {
       active = false;
       unsubscribe();

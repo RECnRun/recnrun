@@ -46,6 +46,7 @@ export const REQUESTS = {
 /** Data schema per event the extension pushes to the page. */
 export const EVENTS = {
   stepRecorded: StepSchema,
+  workflowChanged: WorkflowSchema,
   recordingChanged: RecordingStatusSchema,
 } as const;
 

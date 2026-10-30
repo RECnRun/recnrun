@@ -1,4 +1,4 @@
-import { sampleStep } from "@recnrun/domain/testing";
+import { sampleStep, sampleWorkflow } from "@recnrun/domain/testing";
 import { afterEach, beforeEach, expect, test, vi } from "vite-plus/test";
 import { createTimelineRelay } from "@/content/timeline";
 
@@ -35,11 +35,13 @@ test("relays validated timeline messages to the page as bridge events", () => {
   createTimelineRelay(() => port, emit, 1000);
   port.receive({ name: "stepRecorded", data: sampleStep() });
   port.receive({ name: "recordingChanged", data: { missingOrigins: ["http://localhost/*"] } });
+  port.receive({ name: "workflowChanged", data: sampleWorkflow() });
   port.receive({ name: "stepRecorded", data: { id: "broken" } });
   port.receive("junk");
   expect(emit.mock.calls).toEqual([
     ["stepRecorded", sampleStep()],
     ["recordingChanged", { missingOrigins: ["http://localhost/*"] }],
+    ["workflowChanged", sampleWorkflow()],
   ]);
 });
 

@@ -18,6 +18,7 @@ export interface ExtensionGateway {
   deleteWorkflow: (id: string) => Promise<void>;
   onStep: (listener: (step: Step) => void) => () => void;
   onRecordingChanged: (listener: (status: RecordingStatus) => void) => () => void;
+  onWorkflowChanged: (listener: (workflow: Workflow) => void) => () => void;
 }
 
 export function createExtensionGateway(options: { timeoutMs?: number } = {}): ExtensionGateway {
@@ -36,5 +37,6 @@ export function createExtensionGateway(options: { timeoutMs?: number } = {}): Ex
     },
     onStep: (listener) => client.subscribe("stepRecorded", listener),
     onRecordingChanged: (listener) => client.subscribe("recordingChanged", listener),
+    onWorkflowChanged: (listener) => client.subscribe("workflowChanged", listener),
   };
 }

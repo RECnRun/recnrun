@@ -11,6 +11,7 @@ export interface FakeGateway extends ExtensionGateway {
   /** Pushes a `stepRecorded` event to every subscriber. */
   emitStep: (step: Step) => void;
   emitStatus: (status: RecordingStatus) => void;
+  emitWorkflow: (workflow: Workflow) => void;
   calls: Array<{ type: string; payload?: unknown }>;
 }
 
@@ -27,6 +28,7 @@ export function installedGateway(seed: Seed | Error = {}): FakeGateway {
   const steps = data.steps ?? [];
   const stepListeners = new Set<(step: Step) => void>();
   const statusListeners = new Set<(status: RecordingStatus) => void>();
+  const workflowListeners = new Set<(workflow: Workflow) => void>();
   const calls: FakeGateway["calls"] = [];
   const fail = <T>(type: string, payload?: unknown): Promise<T> | undefined => {
     calls.push(payload === undefined ? { type } : { type, payload });
@@ -41,6 +43,7 @@ export function installedGateway(seed: Seed | Error = {}): FakeGateway {
     calls,
     emitStep: (step) => stepListeners.forEach((listener) => listener(step)),
     emitStatus: (status) => statusListeners.forEach((listener) => listener(status)),
+    emitWorkflow: (workflow) => workflowListeners.forEach((listener) => listener(workflow)),
     detect: async () => ({ status: "installed", extensionVersion: "0.1.0" }),
     status: async () => fail("status") ?? data.status ?? { missingOrigins: [] },
     start: async (draft) => fail("start", draft) ?? started(draft),
@@ -66,6 +69,10 @@ export function installedGateway(seed: Seed | Error = {}): FakeGateway {
     onRecordingChanged: (listener) => {
       statusListeners.add(listener);
       return removeFrom(statusListeners, listener);
+    },
+    onWorkflowChanged: (listener) => {
+      workflowListeners.add(listener);
+      return removeFrom(workflowListeners, listener);
     },
   };
 }
