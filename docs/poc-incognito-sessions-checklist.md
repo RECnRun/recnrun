@@ -8,7 +8,7 @@ Plan: [poc-incognito-sessions-plan.md](poc-incognito-sessions-plan.md). Assignme
 | Branch               | `poc/incognito-sessions`                                         |
 | Planned base         | `44c154da29860c7a8df829e902b177df5ce2ba2a` (2026-10-28)          |
 | Actual base (P0.1)   | `44c154d` (re-resolved 2026-10-28, unchanged)                    |
-| Last recorded commit | `047bfbf`                                                        |
+| Last recorded commit | `1658eae`                                                        |
 | Decisions OD-1…OD-4  | defaults of plan §3, accepted by the user ("Avance", 2026-10-28) |
 
 ## Status legend
@@ -579,6 +579,12 @@ Source facts (orchestrator, Chromium checkout): `tabs.discard` (`tabs_api.cc:429
   commit: 7a41212 Hand a normal window's page no response URLs without asking
   notes: the relay answers an empty list at once when `extension.inIncognitoContext` is false; ARCHITECTURE and `.claude/rules/extension.md` updated (Codex quoted the new rule sentence)
   verify: run `2026-10-29T23-52-51.844Z-1f52c92b` exit 0
+- [i] S7.15 An origin agent link no wait keeps is ended as soon as it connects
+  red: `vp run test:e2e -- tests/e2e/poc-stray-agent-links.spec.ts` → expected [] received [1754342187], the other tab's link still open during a held restore (run `2026-10-30T00-01-35.039Z-9cb49f2f`); `vp test run tests/background-start.test.ts` → expected [ false, false ] to deeply equal [ true, false ]
+  green: same e2e → 1 passed (run `2026-10-30T00-05-31.365Z-b369db02`); `vp run test:unit` 482 passed; `vp run test:components` passed; 11 related POC specs → 25 passed
+  commit: 1658eae End an origin agent link no wait keeps as soon as it connects
+  notes: chose central routing (`agent-ports.ts`) over unregistering lane 1 early, which only narrows the window (lane 0, helper-visit retries, the gap before a wait listens); the agent needs no unload since its only listener is on the closed port; scratch negatives (no disconnect, short-circuit, no name check, live set, no routing in start) each fail their test
+  verify: run `2026-10-30T00-08-27.345Z-060182f8` exit 0
 
 ## Stage 5 — Delivery
 
