@@ -1,5 +1,10 @@
 import { expect, test } from "vite-plus/test";
-import { contentScriptMatches, externalMatches, recorderMatches } from "@/config/origins";
+import {
+  dashboardUrl,
+  contentScriptMatches,
+  externalMatches,
+  recorderMatches,
+} from "@/config/origins";
 
 const PRODUCTION = ["https://recnrun.com/*"];
 const LOCAL = ["http://localhost/*", "http://127.0.0.1/*"];
@@ -25,4 +30,10 @@ test("only the test build pre-grants the recorder access to local servers", () =
   expect(recorderMatches("test")).toEqual(LOCAL);
   expect(recorderMatches("development")).toEqual([]);
   expect(recorderMatches("production")).toEqual([]);
+});
+
+test("the dashboard link points at the dev server only in development", () => {
+  expect(dashboardUrl("development")).toBe("http://localhost:5173/");
+  expect(dashboardUrl("test")).toBe("https://recnrun.com/");
+  expect(dashboardUrl("production")).toBe("https://recnrun.com/");
 });

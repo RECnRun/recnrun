@@ -23,3 +23,8 @@ export function externalMatches(mode: string): string[] {
 export function recorderMatches(mode: string): string[] {
   return mode === "test" ? LOCAL_MATCHES : [];
 }
+
+/** Where the popup's dashboard link goes: the dev server in development, else recnrun.com. */
+export function dashboardUrl(mode: string): string {
+  return mode === "development" ? "http://localhost:5173/" : "https://recnrun.com/";
+}
