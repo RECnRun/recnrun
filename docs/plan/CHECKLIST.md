@@ -19,7 +19,10 @@ Markers: `[ ]` not started · `[i]` implemented, awaiting the phase gate · `[x]
 
 ## F0: Contracts and skeleton
 
-- [ ] F0.1 ADRs, repository reshaping, `docs:check`
+- [i] F0.1 ADRs, repository reshaping, `docs:check`
+  - red: `vp run test:e2e -- tests/e2e/landing.spec.ts` on the old site (main showed the install banner, not "Chrome DevTools Protocol"); `node --test scripts/check-docs.checks.mjs` against an exit-0 stub (4 of 7 failed); `vp run test:coverage` after the deletion (lines 71.42%, statements 62.5%, branches 0%) and `mount.browser.test.tsx` against a no-op `mount` stub
+  - green: `vp run test:e2e` (4 passed), `vp run test:components` (5 passed), `vp run test:coverage` (87.5% statements, 100% branches), `node --test scripts/check-docs.checks.mjs` (7 passed), `vp run docs:check` exits 0 on the branch and exits 1 on a broken link in a scratch worktree
+  - commit: 96ea572 (delete the extension and bridge, landing), 7ca8326 (ADRs, docs, rules, skill), 62cd1c1 (`docs:check`), and the commit that adds this entry (testable `mount`, coverage)
 - [ ] F0.2 Workspace skeleton and dependency rules
 - [ ] F0.3 Protocol schemas v1 with JSON Schema drift test
 - [ ] F0.4 Capability matrix as code, `docs/CAPABILITIES.md` generated

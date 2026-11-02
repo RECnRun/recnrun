@@ -48,8 +48,8 @@ src/main.tsx ─► src/app ─► src/features/<name> ─► src/ui
 
 - `src/ui`: presentational components; props in, markup out. It imports nothing from `features` or `app`.
 - `src/features/<name>`: one part of the page with its own content (`install-guide`). Features never import each other.
-- `src/app`: composition of the page.
-- `src/main.tsx`: mounts `App`. Nothing imports it.
+- `src/app`: composition of the page; `mount.tsx` renders it into the page's root element.
+- `src/main.tsx`: imports the stylesheets and calls `mount`. Nothing imports it.
 - The website imports no workspace package other than `@recnrun/brand` (`website-only-brand`): it ships no engine, protocol, or UI code.
 
 ## Security model

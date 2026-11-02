@@ -11,8 +11,8 @@ paths:
 | --------------------- | ------------------------------------------------------- | ------------------------------- |
 | `src/ui`              | Presentational components; props in, markup out         | `src/ui`                        |
 | `src/features/<name>` | One part of the page with its content (`install-guide`) | its own feature, `src/ui`       |
-| `src/app`             | Composition of the page                                 | everything above                |
-| `src/main.tsx`        | Mounts `App`                                            | `src/app`, `@recnrun/brand` CSS |
+| `src/app`             | Composition of the page; `mount.tsx` renders it         | everything above                |
+| `src/main.tsx`        | Imports the stylesheets and calls `mount`               | `src/app`, `@recnrun/brand` CSS |
 
 - Features never import each other; share through `src/ui` or compose in `src/app`.
 - The only workspace package the website imports is `@recnrun/brand` (`website-only-brand`).
