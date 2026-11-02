@@ -1,4 +1,5 @@
 import * as v from "valibot";
+import { assertLoopbackEndpoint } from "./loopback.ts";
 import type { RawSocket } from "./raw-cdp.ts";
 
 /** A CDP event; `sessionId` names the flattened child session, absent for the browser's own. */
@@ -100,6 +101,7 @@ export function openCdpChannel(
   createSocket: (url: string) => RawSocket = (url) => new WebSocket(url),
 ): Promise<CdpChannel> {
   return new Promise((resolve, reject) => {
+    assertLoopbackEndpoint(endpoint);
     const socket = createSocket(endpoint);
     const refuse = () => reject(new Error(`No CDP endpoint answered at ${endpoint}.`));
     socket.addEventListener("error", refuse);

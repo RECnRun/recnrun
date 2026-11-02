@@ -1,4 +1,5 @@
 import * as v from "valibot";
+import { assertLoopbackEndpoint } from "./loopback.ts";
 
 /** The part of a WebSocket one raw command needs; Node's global WebSocket provides it. */
 export interface RawSocket {
@@ -39,6 +40,7 @@ export function rawCdpCall(
   }: RawCallOptions = {},
 ): Promise<unknown> {
   return new Promise((resolve, reject) => {
+    assertLoopbackEndpoint(endpoint);
     const socket = createSocket(endpoint);
     let settled = false;
     const finish = (error: Error | undefined, result?: unknown) => {

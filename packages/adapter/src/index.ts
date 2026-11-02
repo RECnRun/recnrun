@@ -22,3 +22,4 @@ export {
   type FunctionLocatorResolution,
   type LocatorTarget,
 } from "./function-locator.ts";
+export { isLoopbackEndpoint, NonLoopbackEndpointError } from "./loopback.ts";

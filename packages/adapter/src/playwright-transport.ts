@@ -1,5 +1,6 @@
 import { chromium, type CDPSession } from "playwright-core";
 import type { CdpLink, CdpTransport, PageSession } from "./cdp-link.ts";
+import { assertLoopbackEndpoint } from "./loopback.ts";
 import { rawCdpCall } from "./raw-cdp.ts";
 
 const CONNECT_TIMEOUT_MS = 15_000;
@@ -13,6 +14,7 @@ const rawSend = (session: CDPSession): RawSend => session.send.bind(session) as 
 export const playwrightTransport: CdpTransport = {
   preflightTargets: (endpoint) => rawCdpCall(endpoint, "Target.getTargets"),
   async open(endpoint): Promise<CdpLink> {
+    assertLoopbackEndpoint(endpoint);
     const browser = await chromium.connectOverCDP(endpoint, { timeout: CONNECT_TIMEOUT_MS });
     const session = await browser.newBrowserCDPSession();
     return {

@@ -24,6 +24,7 @@ import {
   trackContext,
   type TargetRecord,
 } from "./instrumentation-targets.ts";
+import { assertLoopbackEndpoint } from "./loopback.ts";
 
 export interface InstrumentOptions {
   onEvent?: (event: InstrumentationEvent) => void;
@@ -214,6 +215,7 @@ export async function instrument(
   endpoint: string,
   options: InstrumentOptions = {},
 ): Promise<Instrumentation> {
+  assertLoopbackEndpoint(endpoint);
   const channel = await (options.openChannel ?? openCdpChannel)(endpoint);
   return instrumentChannel(channel, options);
 }

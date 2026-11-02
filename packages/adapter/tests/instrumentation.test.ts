@@ -282,7 +282,9 @@ test("instrument opens its own channel and stop closes it; events default to the
 
 test("instrument without onEvent still counts installs", async () => {
   const channel = new FakeChannel();
-  const handle = await instrument("ws://x", { openChannel: () => Promise.resolve(channel) });
+  const handle = await instrument("ws://127.0.0.1:9222/devtools/browser/x", {
+    openChannel: () => Promise.resolve(channel),
+  });
   channel.attach("S1", { targetId: "T1", type: "page" });
   context(channel, "S1", 1, "T1");
   call(channel, "S1", 1, message());

@@ -9,6 +9,7 @@ import type {
 import type { CdpLink, CdpTransport } from "./cdp-link.ts";
 import { discover, type DiscoverOptions } from "./discovery.ts";
 import { parseTargets, readHandshake } from "./handshake.ts";
+import { assertLoopbackEndpoint } from "./loopback.ts";
 import { playwrightTransport } from "./playwright-transport.ts";
 import { describeProfile } from "./profile.ts";
 import type { ReplayPage } from "./replay.ts";
@@ -107,6 +108,7 @@ async function open(
   options: ConnectOptions,
   sequence: Sequence,
 ): Promise<CdpConnection> {
+  assertLoopbackEndpoint(endpoint);
   const now = options.now ?? (() => new Date());
   const { link, contested, handshake } = await openLink(
     options.transport ?? playwrightTransport,
