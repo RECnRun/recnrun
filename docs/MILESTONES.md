@@ -1,23 +1,25 @@
 # Milestones
 
-## M0: Bootstrap, detection, and read-only explorer
+Delivery follows the phases of [plan/PLAN.md](plan/PLAN.md). Each phase closes when its tasks pass and `vp run verify` exits 0 on the branch; progress is in [plan/CHECKLIST.md](plan/CHECKLIST.md). Checks that need a person (Chrome's dialog, the default profile on Windows and macOS, real agent sessions, publishing) never block a phase: they are listed in [plan/MANUAL_VALIDATION.md](plan/MANUAL_VALIDATION.md) and block only the release gate.
 
-The monorepo, its quality gates, and the first vertical slice: the website detects the extension and shows its recordings.
+## Phases
 
-Acceptance (all automated, run by `vp run verify`):
+| Phase | Goal                                                                                                               | Gate (automated)                                                                                                     |
+| ----- | ------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
+| F0    | Contracts and skeleton: ADRs, workspace layout, protocol schemas, capability matrix, fixture app, Chrome in Docker | `vp run verify`; ADRs committed; every requirement row of PLAN.md §1 points at a task                                |
+| F1    | Connection and fidelity spike against Google Chrome in Docker, and the spike report                                | `vp run verify` with `test:browser`; spike report committed                                                          |
+| F2    | First vertical flow without AI: record, assert, stop, restart the tool, reopen, replay, all from the localhost UI  | `tests/e2e/first-flow.spec.ts` and `vp run verify`                                                                   |
+| F3    | Diagnostics and robust persistence: network, console, snapshots, storage, coverage, crash recovery, run comparison | `vp run verify`; `docs/CAPABILITIES.md` regenerated                                                                  |
+| F4    | Editor, parameters, multiple profiles, export and import                                                           | `tests/e2e/export-import.spec.ts`: the A-B-A flow exported, imported with new bindings, replayed                     |
+| F4A   | Locator lists, the function registry, and macros                                                                   | `tests/e2e/locators-functions.spec.ts`: function, locator fallback, loop with counter, export, import, replay        |
+| F5    | Agents and the improvement cycle: MCP server, `agents setup`, skills, handoff, reproducers                         | `tests/contract/mcp.test.ts` scenario and `vp run verify`                                                            |
+| F6    | Deep capture: IndexedDB, workers, Cache Storage, cookies, files                                                    | `vp run verify`                                                                                                      |
+| F7    | Distribution and pilot: the `@recnrun/cli` package, lifecycle, documentation, release                              | `vp run verify` with `test:distribution`; release only after every manual item is recorded and publishing authorized |
 
-- [x] Without the extension, the website shows the install banner with a link to the install guide (`tests/e2e/install-banner.spec.ts`).
-- [x] With the extension and seeded data, the website shows each recording, newest first, with its start URL, duration, and event count (`tests/e2e/explorer.spec.ts`).
-- [x] With the extension and no data, the website shows an empty state instead of the banner (`tests/e2e/explorer.spec.ts`).
-- [x] A page on another origin cannot get an answer from the extension by posting bridge messages to the website's window (`tests/e2e/origin-guard.spec.ts`).
-- [x] The production build ships a CSP and loads without violations (`tests/e2e/install-banner.spec.ts`).
-- [x] The production manifest runs the content script only on `https://recnrun.com/*` and asks only for `storage` (`vp run test:extension-manifest`).
-- [x] Every gate in [AGENTS.md](../AGENTS.md#rules) runs in `vp run verify`, locally and in CI.
+Task lists, acceptance tests, and the manual items of each phase are in [PLAN.md §5](plan/PLAN.md#5-phases).
 
-Manual, once per release of the extension:
+## History
 
-- [ ] Load `apps/extension/.output/chrome-mv3` unpacked in Chrome, open recnrun.com, and see the empty state.
-
-## Next
-
-The direction changed on 2026-11-02: a local Node.js service connected to the installed Chrome over CDP replaces the extension as the owner of the data. Phases F0 to F7, their automated gates, and the deferred manual checks are in [plan/PLAN.md](plan/PLAN.md), tracked in [plan/CHECKLIST.md](plan/CHECKLIST.md) and [plan/MANUAL_VALIDATION.md](plan/MANUAL_VALIDATION.md). F0.1 rewrites this file with the new milestones.
+- **M0: bootstrap, detection, and read-only explorer** (done, October 2026). The monorepo, its quality gates, and a first slice in which recnrun.com detected a Manifest V3 extension and listed the recordings it stored. Its end-to-end tests covered the install banner, the explorer, an origin guard on the `window.postMessage` bridge, the website's CSP, and a production manifest guard.
+- **M1: workflow recording in the extension** (archived on 2026-11-02, never merged). Explicit start, stop, and resume per tab group from the extension. The work is kept at the tag `archive/workflow-recording-2026-11-02`.
+- **Change of direction** (2026-11-02). A local service connected to the installed Chrome over CDP replaces the extension as the owner of the data ([ADR 0001](adr/0001-local-service-over-cdp.md)). F0.1 deleted the extension and the bridge ([ADR 0002](adr/0002-retire-extension-and-bridge.md)); recnrun.com became the landing and install guide. Of M0's acceptance, the CSP check survives in `tests/e2e/landing.spec.ts`.

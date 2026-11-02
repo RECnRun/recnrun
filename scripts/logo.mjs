@@ -1,4 +1,4 @@
-// Logo geometry shared by the favicon and the extension icons (docs/BRAND.md).
+// Logo geometry shared by the favicon and the raster icons (docs/BRAND.md).
 const palette = {
   red: "#f3362b",
   green: "#30b050",
