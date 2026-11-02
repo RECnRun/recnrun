@@ -106,6 +106,8 @@ The capability matrix lives in code (`capability-matrix.ts`, fed by `capability-
 
   `dblclick` and `drag` are suggestions without a flow action yet; the editor converts or rejects them.
 
+  `toFlowSteps(suggestions)` turns suggestions into flow steps for `flow.finalize`: `navigate`, `click`, `fill`, `type`, `select`, and `keyPress` keep their id, actor, and value, and each locator list becomes its first candidate in the one-key form F2.5 replay resolves (`testId`, `css`, or `role` with `name` and `exact`); `dblclick`, `drag`, and `scroll` are left out, since replay has no step for them yet (`tests/flow-steps.test.ts`).
+
 ## Adapter
 
 `packages/adapter` is the only package that imports `playwright-core` or speaks CDP. `createCdpAdapter()` (`src/adapter.ts`) implements the engine's `BrowserAdapter` interface: `discover`, `connect`, `listTargets`, `reconnect`, `disconnect`, `onEvent`, and `describeProfile`, over one connection at a time: `connect()` while a connection is held (even a lost one) rejects with `AlreadyConnectedError` (`code: "already-connected"`) until `disconnect()`, and `connect`, `reconnect`, and `disconnect` run one after another through a single promise chain, so they never interleave. The [F1 spike report](spikes/2026-11-f1-cdp-connection.md) lists the versions, proofs, and observed limits behind this section.
