@@ -24,8 +24,11 @@ Markers: `[ ]` not started · `[i]` implemented, awaiting the phase gate · `[x]
 - [i] P0.1 Plan documents and `docs:check`
   - red: `node --test scripts/check-docs.checks.mjs` against a stub `check-docs.mjs` (no checks, identity slug): 4 of 7 failed (missing file, missing anchor, slug, checks array)
   - green: `node --test scripts/check-docs.checks.mjs` 7 passed; `vp run docs:check` exits 0; a scratch worktree with a broken link and anchor exits 1
-  - commit: "Check that every relative Markdown link and anchor resolves" (SHA in the orchestrator's cherry-pick)
-- [ ] P0.2 Google Chrome Stable in Docker and the browser layer
+  - commit: "Check that every relative Markdown link and anchor resolves" 049a482 on the branch
+- [i] P0.2 Google Chrome Stable in Docker and the browser layer
+  - red: `vp run test:browser` (image without Chrome) -> 2 failed, "Google Chrome was not found. Install Google Chrome Stable, set RECNRUN_CHROME_PATH ..."; `vp run test:container` -> `exec: "google-chrome": executable file not found in $PATH`, versions.json ENOENT
+  - green: `vp run test:browser` -> 2 passed, product `Chrome/156.0.8078.79` (Google Chrome 156.0.8078.79 on Linux in Docker); `vp run test:container` -> 12 passed; `vp run test:experiments` -> exit 0 (`--pass-with-no-tests`); `vp run test:e2e` -> 8 passed
+  - commit: a0ecbf1 (1f21735 in the agent worktree) "Run Google Chrome Stable in Docker behind browser and experiment layers"
 - [ ] P0.3 Load the unpacked extension into branded Chrome (E0)
 - [ ] P0.4 `chrome.debugger` capability probe (E1), `CAPABILITIES.md` generated
 - [ ] P0.5 SplitSession vendoring and license
