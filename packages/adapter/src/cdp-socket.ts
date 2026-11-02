@@ -95,16 +95,53 @@ function cdpChannel(socket: RawSocket, endpoint: string): CdpChannel {
   };
 }
 
-/** Opens a browser-level CDP WebSocket of our own (Node's global WebSocket). */
+export type CdpOpenFailure = "refused" | "closed-before-open" | "open-timeout";
+
+/** The CDP socket did not open: nothing answered, it closed first, or it missed the deadline. */
+export class CdpOpenError extends Error {
+  readonly code: CdpOpenFailure;
+
+  constructor(code: CdpOpenFailure, message: string) {
+    super(message);
+    this.name = "CdpOpenError";
+    this.code = code;
+  }
+}
+
+const DEFAULT_OPEN_TIMEOUT_MS = 5_000;
+
+/** Opens a browser-level CDP WebSocket of our own (Node's global WebSocket) within a deadline. */
 export function openCdpChannel(
   endpoint: string,
   createSocket: (url: string) => RawSocket = (url) => new WebSocket(url),
+  openTimeoutMs = DEFAULT_OPEN_TIMEOUT_MS,
 ): Promise<CdpChannel> {
   return new Promise((resolve, reject) => {
     assertLoopbackEndpoint(endpoint);
     const socket = createSocket(endpoint);
-    const refuse = () => reject(new Error(`No CDP endpoint answered at ${endpoint}.`));
-    socket.addEventListener("error", refuse);
-    socket.addEventListener("open", () => resolve(cdpChannel(socket, endpoint)));
+    let opening = true;
+    const fail = (code: CdpOpenFailure, message: string) => {
+      if (!opening) return;
+      opening = false;
+      clearTimeout(timer);
+      socket.close();
+      reject(new CdpOpenError(code, message));
+    };
+    const timer = setTimeout(
+      () => fail("open-timeout", `${endpoint} did not open within ${openTimeoutMs} ms.`),
+      openTimeoutMs,
+    );
+    socket.addEventListener("error", () =>
+      fail("refused", `No CDP endpoint answered at ${endpoint}.`),
+    );
+    socket.addEventListener("close", () =>
+      fail("closed-before-open", `The CDP socket to ${endpoint} closed before it opened.`),
+    );
+    socket.addEventListener("open", () => {
+      if (!opening) return;
+      opening = false;
+      clearTimeout(timer);
+      resolve(cdpChannel(socket, endpoint));
+    });
   });
 }

@@ -24,3 +24,4 @@ export {
 } from "./function-locator.ts";
 export { isLoopbackEndpoint, NonLoopbackEndpointError } from "./loopback.ts";
 export { AlreadyConnectedError } from "./adapter.ts";
+export { CdpOpenError, type CdpOpenFailure } from "./cdp-socket.ts";

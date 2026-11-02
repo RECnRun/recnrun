@@ -71,3 +71,50 @@ test("rejects when nothing answers at the endpoint", async () => {
   });
   await expect(opening).rejects.toThrow(`No CDP endpoint answered at ${ENDPOINT}.`);
 });
+
+function opening(play: (socket: FakeSocket) => void) {
+  const sockets: FakeSocket[] = [];
+  const channel = openCdpChannel(
+    ENDPOINT,
+    (url) => {
+      const socket = new FakeSocket(url);
+      sockets.push(socket);
+      queueMicrotask(() => play(socket));
+      return socket;
+    },
+    20,
+  );
+  return { channel, sockets };
+}
+
+test(
+  "rejects with open-timeout and closes a socket that never opens",
+  { timeout: 1_000 },
+  async () => {
+    const { channel, sockets } = opening(() => undefined);
+    await expect(channel).rejects.toMatchObject({
+      code: "open-timeout",
+      message: `${ENDPOINT} did not open within 20 ms.`,
+    });
+    expect(sockets[0]?.closed).toBe(true);
+  },
+);
+
+test(
+  "rejects with closed-before-open when the socket closes first",
+  { timeout: 1_000 },
+  async () => {
+    const { channel } = opening((socket) => socket.emit("close"));
+    await expect(channel).rejects.toMatchObject({ code: "closed-before-open" });
+  },
+);
+
+test("an opened socket outlives the open deadline", async () => {
+  const { channel, sockets } = opening((socket) => socket.emit("open"));
+  const open = await channel;
+  await new Promise((resolve) => setTimeout(resolve, 40));
+  expect(sockets[0]?.closed).toBe(false);
+  const reply = open.send("Target.getTargets");
+  sockets[0]?.emit("message", JSON.stringify({ id: 1, result: { targetInfos: [] } }));
+  await expect(reply).resolves.toEqual({ targetInfos: [] });
+});
