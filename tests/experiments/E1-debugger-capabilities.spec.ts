@@ -1,12 +1,12 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "../browser/fixtures/extension.ts";
 import type { LoadedExtension } from "../browser/fixtures/extension.ts";
+import { aggregate } from "./e1-aggregate.ts";
+import type { ProbeResult } from "./e1-aggregate.ts";
 import { appendVerdict, mergeCapabilities } from "./verdicts.ts";
-import type { Verdict } from "./verdicts.ts";
 
 // Hypotheses of PLAN.md P0.4; docs/poc/namespace-sessions/experiments/E1.md reports them.
 // The harness only drives pages and reads results: every chrome.debugger call runs in the isolator.
-const EXPERIMENT = "E1";
 const SAMPLES = 3;
 const APP = "http://app.localhost:4600";
 // Node does not resolve *.localhost everywhere, so the harness reaches the ledger on the loopback.
@@ -27,20 +27,6 @@ const WORKER_SCRIPTS = [
 const HARNESS = "globalThis.recnrunProbes";
 const INFOBAR = "infobar-hidden";
 const INFOBAR_SETTLE_MS = 1_000;
-
-type Status = "allowed" | "rejected" | "unavailable";
-interface ProbeResult {
-  id: string;
-  status: Status;
-  error?: string;
-  detail?: unknown;
-}
-
-const VERDICT_OF: Record<Status, Verdict["verdict"]> = {
-  allowed: "pass",
-  rejected: "fail",
-  unavailable: "unavailable",
-};
 
 async function ledgerPaths(): Promise<string[]> {
   const response = await fetch(`${CONTROL}/__ledger`);
@@ -112,37 +98,6 @@ async function infobarSample(
   } finally {
     await background(extension, `${HARNESS}.releaseTab(${tabId})`);
   }
-}
-
-function aggregate(id: string, results: ProbeResult[], chrome: string) {
-  const statuses = results.map((result) => result.status);
-  const ran = statuses.filter((status) => status !== "unavailable").length;
-  const uniform = statuses.every((status) => status === statuses[0]);
-  const status: Status = uniform ? (statuses[0] ?? "unavailable") : "rejected";
-  const errors = [...new Set(results.flatMap((result) => (result.error ? [result.error] : [])))];
-  const error = uniform
-    ? errors[0]
-    : `inconsistent across samples (${statuses.join(", ")}): ${errors.join(" | ")}`;
-  const verdict: Verdict = {
-    experiment: EXPERIMENT,
-    hypothesis: id,
-    verdict: VERDICT_OF[status],
-    ...(error && status !== "allowed" ? { error } : {}),
-    chrome,
-    samples: ran,
-    variants: results.map((result, index) => ({
-      name: `sample ${index + 1}`,
-      verdict: VERDICT_OF[result.status],
-      ...(result.error ? { error: result.error } : {}),
-    })),
-  };
-  const capability = {
-    status,
-    statuses,
-    ...(error ? { error } : {}),
-    detail: results[0]?.detail ?? null,
-  };
-  return { verdict, capability };
 }
 
 /** Records each probe's verdict and returns its `capabilities.json` entry. */
@@ -218,7 +173,7 @@ test.describe("E1: chrome.debugger capabilities from inside the isolator", () =>
       debugger: await record(extension, samples),
     });
     console.log(
-      JSON.stringify(merged.debugger, (key, value) => (key === "detail" ? undefined : value)),
+      JSON.stringify(merged.debugger, (key, value) => (key === "details" ? undefined : value)),
     );
   });
 });

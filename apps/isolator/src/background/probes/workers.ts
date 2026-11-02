@@ -2,10 +2,12 @@ import { workerScriptPatterns } from "@/background/probes/domains";
 import {
   attachTarget,
   attempt,
+  expectEffect,
   findTarget,
   messageOf,
   send,
   unavailable,
+  waitFor,
   withTimeout,
 } from "@/background/probes/helpers";
 import { workerTargetId } from "@/background/probes/targets";
@@ -52,11 +54,15 @@ const evaluate = onServiceWorker(
   "worker-runtime-evaluate",
   "Runtime.evaluate on the service worker session (attach by targetId)",
   async (context, worker) => {
-    const { result } = await send(context, worker, "Runtime.evaluate", {
+    const reply = await send(context, worker, "Runtime.evaluate", {
       expression: "self.location.pathname",
       returnByValue: true,
     });
-    return { value: (result as { value?: unknown } | undefined)?.value ?? null };
+    const exception = reply.exceptionDetails as { text?: string } | undefined;
+    expectEffect(!exception, `Runtime.evaluate threw: ${exception?.text ?? "unknown exception"}`);
+    const value = (reply.result as { value?: unknown } | undefined)?.value;
+    expectEffect(typeof value === "string", "Runtime.evaluate returned no string value");
+    return { value };
   },
 );
 
@@ -78,21 +84,27 @@ const serviceWorkerEnable = onServiceWorker(
   },
 );
 
-/** Resolves true when `Debugger.paused` arrives from `worker` within the window. */
-function pausedEvent(context: ProbeContext, worker: Debuggee): Promise<boolean> {
-  return new Promise((resolve) => {
-    const listener: EventListener = (source, method) => {
-      if (method !== "Debugger.paused" || source.targetId !== worker.targetId) return;
-      finish(true);
-    };
-    const timer = setTimeout(() => finish(false), PAUSE_WINDOW_MS);
-    function finish(paused: boolean): void {
-      clearTimeout(timer);
-      context.api.onEvent.removeListener(listener);
-      resolve(paused);
-    }
-    context.api.onEvent.addListener(listener);
-  });
+/** Sends `Debugger.pause` and reports whether `Debugger.paused` arrived from `worker` in time. */
+async function pauseWorker(context: ProbeContext, worker: Debuggee): Promise<boolean> {
+  let paused = false;
+  const listener: EventListener = (source, method) => {
+    if (method === "Debugger.paused" && source.targetId === worker.targetId) paused = true;
+  };
+  context.api.onEvent.addListener(listener);
+  try {
+    await send(context, worker, "Debugger.pause");
+    // An idle worker pauses only when script runs, so run some.
+    const evaluation = send(context, worker, "Runtime.evaluate", { expression: "1" }).catch(
+      messageOf,
+    );
+    await waitFor(context, () => paused, PAUSE_WINDOW_MS);
+    // Chrome refuses Debugger.resume when nothing is paused.
+    if (paused) await send(context, worker, "Debugger.resume");
+    await evaluation;
+    return paused;
+  } finally {
+    context.api.onEvent.removeListener(listener);
+  }
 }
 
 const pause = onServiceWorker(
@@ -100,17 +112,11 @@ const pause = onServiceWorker(
   "Debugger.pause then Debugger.resume on the service worker session",
   async (context, worker) => {
     await send(context, worker, "Debugger.enable");
-    const paused = pausedEvent(context, worker);
-    await send(context, worker, "Debugger.pause");
-    // An idle worker pauses only when script runs, so run some.
-    const evaluation = send(context, worker, "Runtime.evaluate", { expression: "1" }).catch(
-      messageOf,
-    );
-    const pausedEventArrived = await paused;
-    await send(context, worker, "Debugger.resume");
-    await evaluation;
+    const paused = await pauseWorker(context, worker);
     await send(context, worker, "Debugger.disable");
-    return { pausedEventArrived };
+    const missing = `Debugger.pause accepted but no Debugger.paused event within ${PAUSE_WINDOW_MS} ms`;
+    expectEffect(paused, missing);
+    return { pausedEventArrived: true };
   },
 );
 
@@ -134,10 +140,13 @@ const closeTarget = onServiceWorker(
     const { success } = await send(context, worker, "Target.closeTarget", {
       targetId: worker.targetId,
     });
+    expectEffect(success === true, `Target.closeTarget returned success=${String(success)}`);
     await context.wait(CLOSE_SETTLE_MS);
     const targets = await withTimeout(context.api.getTargets(), "getTargets");
     const listedAfter = targets.some((target) => target.id === worker.targetId);
-    return { success: success ?? null, listedAfter };
+    const missing = `worker still listed by getTargets() ${CLOSE_SETTLE_MS} ms after Target.closeTarget`;
+    expectEffect(!listedAfter, missing);
+    return { success, listedAfter };
   },
 );
 

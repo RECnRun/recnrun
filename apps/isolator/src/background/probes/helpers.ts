@@ -4,6 +4,7 @@ import type { Debuggee, ProbeContext, ProbeOutcome, TargetInfo } from "@/backgro
 export const PROTOCOL_VERSION = "1.3";
 /** A command Chrome never answers is a result too; the probe must not hang the run. */
 const COMMAND_TIMEOUT_MS = 5_000;
+const POLL_MS = 100;
 
 export function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -37,7 +38,10 @@ export async function send(
   return (result ?? {}) as CommandResult;
 }
 
-/** `allowed` with what `run` returned, or `rejected` with Chrome's exact error text. */
+/**
+ * `allowed` with what `run` returned, or `rejected` with Chrome's exact error text or, through
+ * `expectEffect`, with what Chrome accepted but did not do.
+ */
 export async function attempt(run: () => Promise<unknown>): Promise<ProbeOutcome> {
   try {
     const detail = await run();
@@ -45,6 +49,20 @@ export async function attempt(run: () => Promise<unknown>): Promise<ProbeOutcome
   } catch (error) {
     return { status: "rejected", error: messageOf(error) };
   }
+}
+
+/** Throws `missing` when an accepted command had no observable effect, so `attempt` rejects. */
+export function expectEffect(happened: boolean, missing: string): void {
+  if (!happened) throw new Error(missing);
+}
+
+/** Polls `done` until it holds or `ms` elapse, through the context's clock. */
+export async function waitFor(
+  context: ProbeContext,
+  done: () => boolean,
+  ms: number,
+): Promise<void> {
+  for (let waited = 0; waited < ms && !done(); waited += POLL_MS) await context.wait(POLL_MS);
 }
 
 export function unavailable(reason: string): ProbeOutcome {

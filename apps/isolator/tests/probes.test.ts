@@ -2,85 +2,7 @@ import { describe, expect, test } from "vite-plus/test";
 import { createProbeHarness, exposeProbes, HARNESS_GLOBAL } from "@/background/probes/expose";
 import type { ProbeHarness } from "@/background/probes/expose";
 import { createContext, PROBES, runAllProbes, runProbes } from "@/background/probes/runner";
-import type {
-  Debuggee,
-  DebuggerApi,
-  DetachListener,
-  EventListener,
-  ProbeResult,
-  ProbeTargets,
-  TargetInfo,
-} from "@/background/probes/types";
-
-const ORIGIN = "http://app.test";
-const URLS: ProbeTargets = {
-  pageUrl: `${ORIGIN}/workers.html`,
-  serviceWorkerUrl: `${ORIGIN}/sw-main.js`,
-  sharedWorkerUrl: `${ORIGIN}/shared-worker.js`,
-  dedicatedWorkerUrl: `${ORIGIN}/worker.js`,
-  iframeUrl: "http://idp.test/whoami",
-  cookieUrl: `${ORIGIN}/`,
-};
-const NOT_ALLOWED = '{"code":-32000,"message":"Not allowed"}';
-const TARGETS: TargetInfo[] = [
-  { type: "page", id: "page", url: URLS.pageUrl, attached: false, tabId: 7 },
-  { type: "worker", id: "sw", url: `${URLS.serviceWorkerUrl}?variant=classic`, attached: false },
-  { type: "worker", id: "shared", url: `${URLS.sharedWorkerUrl}?type=classic`, attached: false },
-];
-const noWait = async () => undefined;
-
-function listeners<T>() {
-  const set = new Set<T>();
-  return { set, addListener: (l: T) => set.add(l), removeListener: (l: T) => set.delete(l) };
-}
-
-/** A fake chrome.debugger: answers every command, refuses ServiceWorker.*, auto-attaches workers. */
-function fakeDebugger(refused: Record<string, string> = { "ServiceWorker.enable": NOT_ALLOWED }) {
-  const onEvent = listeners<EventListener>();
-  const onDetach = listeners<DetachListener>();
-  const sent: { target: Debuggee; method: string }[] = [];
-  const emit = (source: Debuggee, method: string, params?: object) =>
-    onEvent.set.forEach((listener) => listener(source, method, params));
-  const attachEvents = (source: Debuggee) => {
-    for (const [type, url] of [
-      ["worker", `${URLS.dedicatedWorkerUrl}?type=classic`],
-      ["shared_worker", `${URLS.sharedWorkerUrl}?type=classic`],
-      // Chrome reports a waiting iframe with an empty URL.
-      ["iframe", ""],
-    ]) {
-      const targetInfo = { targetId: `${type}-new`, type, url };
-      emit(source, "Target.attachedToTarget", {
-        sessionId: `s-${type}`,
-        targetInfo,
-        waitingForDebugger: true,
-      });
-    }
-  };
-  const api: DebuggerApi = {
-    getTargets: async () => TARGETS,
-    attach: async () => undefined,
-    detach: async (target) =>
-      onDetach.set.forEach((listener) => listener(target, "canceled_by_user")),
-    sendCommand: async (target, method) => {
-      sent.push({ target, method });
-      const error = refused[method];
-      if (error) throw new Error(error);
-      if (method === "Page.reload") attachEvents(target);
-      if (method === "Debugger.pause") emit(target, "Debugger.paused");
-      if (method === "Target.getTargets")
-        return { targetInfos: [{ type: "page", url: URLS.pageUrl }] };
-      if (method === "Network.setCookie") return { success: true };
-      return {};
-    },
-    onEvent,
-    onDetach,
-  };
-  return { api, sent, onEvent, onDetach };
-}
-
-function byId(results: ProbeResult[]): Record<string, ProbeResult> {
-  return Object.fromEntries(results.map((result) => [result.id, result]));
-}
+import { byId, fakeDebugger, NOT_ALLOWED, noWait, URLS } from "./fake-debugger";
 
 describe("the probe table", () => {
   test("has unique ids, each with a description", () => {
@@ -143,7 +65,10 @@ describe("a run against a fake chrome.debugger", () => {
     expect(results["worker-debugger-pause"]).toMatchObject({
       detail: { pausedEventArrived: true },
     });
-    expect(results["worker-close-target"]).toMatchObject({ detail: { listedAfter: true } });
+    expect(results["worker-close-target"]).toMatchObject({
+      status: "allowed",
+      detail: { listedAfter: false },
+    });
     expect(results.cleanup).toMatchObject({ status: "allowed" });
     expect(onEvent.set.size + onDetach.set.size).toBe(0);
   });
@@ -166,7 +91,9 @@ describe("a run against a fake chrome.debugger", () => {
   });
 
   test("records a failed release of a waiting target", async () => {
-    const { api } = fakeDebugger({ "Runtime.runIfWaitingForDebugger": "Not attached" });
+    const { api } = fakeDebugger({
+      refused: { "Runtime.runIfWaitingForDebugger": "Not attached" },
+    });
     const results = byId(await runAllProbes(api, URLS, noWait));
     expect(results["run-if-waiting-for-debugger"]).toMatchObject({
       status: "rejected",

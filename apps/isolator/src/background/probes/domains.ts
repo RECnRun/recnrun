@@ -1,4 +1,11 @@
-import { attempt, findTarget, send, tabDebuggee, unavailable } from "@/background/probes/helpers";
+import {
+  attempt,
+  expectEffect,
+  findTarget,
+  send,
+  tabDebuggee,
+  unavailable,
+} from "@/background/probes/helpers";
 import type { CommandResult } from "@/background/probes/helpers";
 import type {
   Debuggee,
@@ -33,7 +40,8 @@ function onTab(
 }
 
 function summarizeTargets(result: CommandResult) {
-  const infos = Array.isArray(result.targetInfos) ? (result.targetInfos as CommandResult[]) : [];
+  expectEffect(Array.isArray(result.targetInfos), "Target.getTargets returned no targetInfos");
+  const infos = result.targetInfos as CommandResult[];
   const types = [...new Set(infos.map((info) => String(info.type)))];
   // Browser-wide when it lists targets of other tabs or of extensions, not only this tab's tree.
   const pages = infos.filter((info) => info.type === "page").length;
@@ -65,8 +73,8 @@ const tabAttachToServiceWorker: ProbeDefinition = {
     return attempt(async () => {
       const params = { targetId: worker.id, flatten: true };
       const { sessionId } = await send(context, tab, "Target.attachToTarget", params);
+      expectEffect(typeof sessionId === "string", "Target.attachToTarget returned no sessionId");
       await send(context, tab, "Target.detachFromTarget", { sessionId });
-      return { sessionId: typeof sessionId === "string" };
     });
   },
 };
@@ -96,7 +104,8 @@ const storageGetCookies = onTab(
   "Storage.getCookies on the tab session (count only; values are never recorded)",
   async (context, tab) => {
     const { cookies } = await send(context, tab, "Storage.getCookies");
-    return { count: Array.isArray(cookies) ? cookies.length : null };
+    expectEffect(Array.isArray(cookies), "Storage.getCookies returned no cookies array");
+    return { count: (cookies as unknown[]).length };
   },
 );
 
@@ -111,7 +120,8 @@ const networkSetCookie = onTab(
       url,
     });
     await send(context, tab, "Network.deleteCookies", { name: PROBE_COOKIE, url });
-    return { success: set.success ?? null };
+    expectEffect(set.success === true, `Network.setCookie returned success=${String(set.success)}`);
+    return { success: true };
   },
 );
 
@@ -131,8 +141,9 @@ const addScript = onTab(
     const { identifier } = await send(context, tab, "Page.addScriptToEvaluateOnNewDocument", {
       source: "void 0;",
     });
+    const missing = "Page.addScriptToEvaluateOnNewDocument returned no identifier";
+    expectEffect(typeof identifier === "string", missing);
     await send(context, tab, "Page.removeScriptToEvaluateOnNewDocument", { identifier });
-    return { identifier: typeof identifier === "string" };
   },
 );
 

@@ -25,7 +25,13 @@ const capabilities = {
       description: "getTargets() lists the dedicated worker",
       status: "allowed",
       statuses: ["allowed", "allowed", "allowed"],
-      detail: { type: "other" },
+      details: [{ type: "other" }, { type: "other" }, { type: "other" }],
+    },
+    "attach-dedicated-worker": {
+      description: "attach to the dedicated worker",
+      status: "allowed",
+      statuses: ["allowed", "allowed", "allowed"],
+      details: [{ targetId: "A" }, { targetId: "B" }, { targetId: "C" }],
     },
     "service-worker-enable": {
       description: "ServiceWorker.enable on the tab session",
@@ -66,19 +72,26 @@ test("renders one row per probe with its status and exact error, escaping pipes"
   const rows = renderCapabilities(text)
     .split("\n")
     .filter((line) => line.startsWith("| `"));
-  assert.equal(rows.length, 3);
+  assert.equal(rows.length, 4);
   assert.match(
     rows[0],
-    /`get-targets-dedicated-worker` .*\| allowed .*\| 3 .*\| `\{"type":"other"\}`/,
-  );
-  assert.match(
-    rows[1],
-    /\| rejected .*`\{"code":-32601,"message":"'ServiceWorker\.enable' wasn't found"\}`/,
+    /`get-targets-dedicated-worker` .*\| allowed .*\| 3 .*\| `\{"type":"other"\}` +\|$/,
   );
   assert.match(
     rows[2],
+    /\| rejected .*`\{"code":-32601,"message":"'ServiceWorker\.enable' wasn't found"\}`/,
+  );
+  assert.match(
+    rows[3],
     /reports \\\| the service worker .*\| rejected \(allowed, rejected, allowed\) /,
   );
+});
+
+test("shows the first sample's detail and says when later samples differ", () => {
+  const row = renderCapabilities(text)
+    .split("\n")
+    .find((line) => line.startsWith("| `attach-dedicated-worker`"));
+  assert.match(row, /\| `\{"targetId":"A"\}` \(samples differ\) +\|$/);
 });
 
 test("pads every table row to the same width, as the formatter does", () => {

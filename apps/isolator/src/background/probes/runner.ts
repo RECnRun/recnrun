@@ -1,6 +1,6 @@
 import { AUTO_ATTACH_PROBES, autoAttachListener } from "@/background/probes/auto-attach";
 import { TAB_DOMAIN_PROBES } from "@/background/probes/domains";
-import { attempt, messageOf, withTimeout } from "@/background/probes/helpers";
+import { attempt, expectEffect, messageOf, withTimeout } from "@/background/probes/helpers";
 import { ATTACH_DEDICATED_PROBE, TARGET_PROBES } from "@/background/probes/targets";
 import type {
   DebuggerApi,
@@ -33,6 +33,8 @@ const cleanup: ProbeDefinition = {
       );
       state.attached = [];
       state.tabAttached = false;
+      const failures = [...new Set(detached.filter((outcome) => outcome !== "ok"))];
+      expectEffect(failures.length === 0, failures.join(" | "));
       await context.wait(DETACH_SETTLE_MS);
       return {
         detached,

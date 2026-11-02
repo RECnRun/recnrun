@@ -35,6 +35,15 @@ function summary(detail) {
   return code(text.length > DETAIL_LENGTH ? `${text.slice(0, DETAIL_LENGTH)}...` : text);
 }
 
+/** The first sample's detail; capabilities.json keeps every sample's. */
+function firstDetail(probe) {
+  const details = probe.details ?? [];
+  const text = summary(details[0]);
+  const first = JSON.stringify(details[0] ?? null);
+  const differs = details.some((detail) => JSON.stringify(detail ?? null) !== first);
+  return differs ? `${text} (samples differ)`.trim() : text;
+}
+
 function statusOf(probe) {
   const statuses = probe.statuses ?? [];
   const uniform = statuses.every((status) => status === statuses[0]);
@@ -47,7 +56,7 @@ function probeRows(probes) {
     probe.description ?? "",
     statusOf(probe),
     String(probe.statuses?.length ?? 0),
-    probe.error ? code(probe.error) : summary(probe.detail),
+    probe.error ? code(probe.error) : firstDetail(probe),
   ]);
 }
 
@@ -76,7 +85,7 @@ export function renderCapabilities(text) {
   return [
     "# Chrome capabilities",
     "",
-    `Generated from [capabilities.json](capabilities.json) by \`${COMMAND}\`; do not edit by hand. \`vp run docs:check\` fails when this file is stale. The probes and their reading are in [experiments/E1.md](experiments/E1.md). A status is what the isolator observed from inside the extension: \`allowed\` (the call answered, or the hypothesis held), \`rejected\` (Chrome refused, with its exact error, or the hypothesis did not hold), \`unavailable\` (a precondition was missing).`,
+    `Generated from [capabilities.json](capabilities.json) by \`${COMMAND}\`; do not edit by hand. \`vp run docs:check\` fails when this file is stale. The probes and their reading are in [experiments/E1.md](experiments/E1.md). A status is what the isolator observed from inside the extension: \`allowed\` (the call answered and its observable effect happened, or the hypothesis held), \`rejected\` (Chrome refused, with its exact error, or Chrome accepted the call without the effect, or the hypothesis did not hold, with what did not happen), \`unavailable\` (a precondition was missing). capabilities.json keeps every sample's detail; the table shows the first.`,
     "",
     facts,
     "",

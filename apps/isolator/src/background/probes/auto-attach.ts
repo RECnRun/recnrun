@@ -1,10 +1,12 @@
 import {
   attempt,
+  expectEffect,
   messageOf,
   PROTOCOL_VERSION,
   send,
   tabDebuggee,
   unavailable,
+  waitFor,
   withTimeout,
 } from "@/background/probes/helpers";
 import type {
@@ -20,7 +22,6 @@ import type {
 const AUTO_ATTACH_WINDOW_MS = 5_000;
 /** Extra time for a target that may never come (the service worker). */
 const AUTO_ATTACH_SETTLE_MS = 1_000;
-const POLL_MS = 100;
 
 interface AttachedEvent {
   sessionId: string;
@@ -57,11 +58,6 @@ export function autoAttachListener(context: ProbeContext): EventListener {
     context.state.autoAttached.push(entry);
     if (waitingForDebugger) void release(context, source, entry);
   };
-}
-
-/** Polls `done` until it holds or `ms` elapse. */
-async function waitFor(context: ProbeContext, done: () => boolean, ms: number): Promise<void> {
-  for (let waited = 0; waited < ms && !done(); waited += POLL_MS) await context.wait(POLL_MS);
 }
 
 type Matcher = (entry: AutoAttached, urls: ProbeTargets) => boolean;
@@ -115,6 +111,10 @@ async function reloadAndWatch(context: ProbeContext, tab: Debuggee): Promise<unk
   await send(context, tab, "Runtime.evaluate", { expression, returnByValue: true });
   await waitFor(context, () => seen(context, isIframe), AUTO_ATTACH_WINDOW_MS);
   await context.wait(AUTO_ATTACH_SETTLE_MS);
+  expectEffect(
+    state.autoAttached.length > 0,
+    `Target.setAutoAttach accepted but no Target.attachedToTarget within ${AUTO_ATTACH_WINDOW_MS} ms of the reload and the iframe`,
+  );
   return state.autoAttached.map(({ type, url, waitingForDebugger, phase }) => ({
     type,
     url,
@@ -163,7 +163,10 @@ const runIfWaiting: ProbeDefinition = {
     await waitFor(context, () => waiting.every((entry) => entry.released), AUTO_ATTACH_WINDOW_MS);
     const failed = waiting.find((entry) => entry.released !== "ok");
     const detail = waiting.map(({ type, released }) => ({ type, released }));
-    if (failed) return { status: "rejected", error: failed.released ?? "not released", detail };
+    if (failed) {
+      const silent = `Runtime.runIfWaitingForDebugger got no reply for the ${failed.type} within ${AUTO_ATTACH_WINDOW_MS} ms`;
+      return { status: "rejected", error: failed.released ?? silent, detail };
+    }
     return { status: "allowed", detail };
   },
 };

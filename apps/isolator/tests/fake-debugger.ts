@@ -1,0 +1,115 @@
+import type {
+  Debuggee,
+  DebuggerApi,
+  DetachListener,
+  EventListener,
+  ProbeResult,
+  ProbeTargets,
+  TargetInfo,
+} from "@/background/probes/types";
+
+const ORIGIN = "http://app.test";
+export const URLS: ProbeTargets = {
+  pageUrl: `${ORIGIN}/workers.html`,
+  serviceWorkerUrl: `${ORIGIN}/sw-main.js`,
+  sharedWorkerUrl: `${ORIGIN}/shared-worker.js`,
+  dedicatedWorkerUrl: `${ORIGIN}/worker.js`,
+  iframeUrl: "http://idp.test/whoami",
+  cookieUrl: `${ORIGIN}/`,
+};
+export const NOT_ALLOWED = '{"code":-32000,"message":"Not allowed"}';
+const TARGETS: TargetInfo[] = [
+  { type: "page", id: "page", url: URLS.pageUrl, attached: false, tabId: 7 },
+  { type: "worker", id: "sw", url: `${URLS.serviceWorkerUrl}?variant=classic`, attached: false },
+  { type: "worker", id: "shared", url: `${URLS.sharedWorkerUrl}?type=classic`, attached: false },
+];
+/** What Chrome answers when the command had its effect. */
+const REPLIES: Record<string, object> = {
+  "Target.getTargets": { targetInfos: [{ type: "page", url: URLS.pageUrl }] },
+  "Target.attachToTarget": { sessionId: "s-attached" },
+  "Target.closeTarget": { success: true },
+  "Network.setCookie": { success: true },
+  "Storage.getCookies": { cookies: [] },
+  "Page.addScriptToEvaluateOnNewDocument": { identifier: "1" },
+  "Runtime.evaluate": { result: { type: "string", value: "/sw-main.js" } },
+};
+
+export const noWait = async () => undefined;
+
+function listeners<T>() {
+  const set = new Set<T>();
+  return { set, addListener: (l: T) => set.add(l), removeListener: (l: T) => set.delete(l) };
+}
+
+export interface FakeOptions {
+  /** Commands Chrome refuses, with its error text. */
+  refused?: Record<string, string>;
+  /** Replies that replace the ones of a command that had its effect. */
+  replies?: Record<string, object>;
+  /** Events Chrome never sends, as if it accepted the command without the effect. */
+  muted?: string[];
+  /** Commands Chrome never answers. */
+  hanging?: string[];
+  /** getTargets() keeps listing a target after Target.closeTarget. */
+  keepsClosed?: boolean;
+  /** detach() fails with this text. */
+  detachError?: string;
+}
+
+/** A fake chrome.debugger: answers every command, refuses ServiceWorker.*, auto-attaches workers. */
+export function fakeDebugger(options: FakeOptions = {}) {
+  const { refused = { "ServiceWorker.enable": NOT_ALLOWED }, replies = {}, muted = [] } = options;
+  const onEvent = listeners<EventListener>();
+  const onDetach = listeners<DetachListener>();
+  const sent: { target: Debuggee; method: string; params?: object }[] = [];
+  const closed = new Set<string>();
+  const emit = (source: Debuggee, method: string, params?: object) => {
+    if (!muted.includes(method))
+      onEvent.set.forEach((listener) => listener(source, method, params));
+  };
+  const attachEvents = (source: Debuggee) => {
+    for (const [type, url] of [
+      ["worker", `${URLS.dedicatedWorkerUrl}?type=classic`],
+      ["shared_worker", `${URLS.sharedWorkerUrl}?type=classic`],
+      // Chrome reports a waiting iframe with an empty URL.
+      ["iframe", ""],
+    ]) {
+      const targetInfo = { targetId: `${type}-new`, type, url };
+      emit(source, "Target.attachedToTarget", {
+        sessionId: `s-${type}`,
+        targetInfo,
+        waitingForDebugger: true,
+      });
+    }
+  };
+  const effects: Record<string, (target: Debuggee, params?: { targetId?: unknown }) => void> = {
+    "Page.reload": attachEvents,
+    "Debugger.pause": (target) => emit(target, "Debugger.paused"),
+    "Target.closeTarget": (_, params) => {
+      if (!options.keepsClosed) closed.add(String(params?.targetId));
+    },
+  };
+  const api: DebuggerApi = {
+    getTargets: async () => TARGETS.filter((target) => !closed.has(target.id)),
+    attach: async () => undefined,
+    detach: async (target) => {
+      if (options.detachError) throw new Error(options.detachError);
+      onDetach.set.forEach((listener) => listener(target, "canceled_by_user"));
+    },
+    sendCommand: async (target, method, params) => {
+      sent.push({ target, method, params });
+      const error = refused[method];
+      if (error) throw new Error(error);
+      if (options.hanging?.includes(method)) return new Promise<never>(() => undefined);
+      effects[method]?.(target, params);
+      return replies[method] ?? REPLIES[method] ?? {};
+    },
+    onEvent,
+    onDetach,
+  };
+  return { api, sent, onEvent, onDetach };
+}
+
+export function byId(results: ProbeResult[]): Record<string, ProbeResult> {
+  return Object.fromEntries(results.map((result) => [result.id, result]));
+}
