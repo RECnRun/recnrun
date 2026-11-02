@@ -66,6 +66,12 @@ async function dropTruncatedTail(handle: FileHandle): Promise<void> {
   await handle.truncate(await lastLineEnd(handle, size));
 }
 
+// Closes the handle without letting a second failure hide the first, then rethrows the first.
+async function releaseAfter(handle: FileHandle, error: unknown): Promise<never> {
+  await handle.close().catch(() => undefined);
+  throw error;
+}
+
 /** The file opener; tests inject one whose handle fails on demand. */
 export type OpenFile = (path: string, flags: "a+") => Promise<FileHandle>;
 
@@ -73,7 +79,7 @@ export type OpenFile = (path: string, flags: "a+") => Promise<FileHandle>;
 export async function openJournal(path: string, openFile: OpenFile = open): Promise<JournalWriter> {
   await mkdir(dirname(path), { recursive: true });
   const handle = await openFile(path, "a+");
-  await dropTruncatedTail(handle);
+  await dropTruncatedTail(handle).catch((error: unknown) => releaseAfter(handle, error));
   let tail: Promise<void> = Promise.resolve();
   let failure: unknown;
   // A failed write may have left a partial line, so nothing more is appended after it.
@@ -103,7 +109,7 @@ export async function openJournal(path: string, openFile: OpenFile = open): Prom
         await handle.close();
         throw new JournalFailedError(path, failure);
       }
-      await handle.sync();
+      await handle.sync().catch((error: unknown) => releaseAfter(handle, error));
       await handle.close();
     },
   };

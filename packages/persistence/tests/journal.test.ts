@@ -99,7 +99,7 @@ test("a broken line before the last is corruption, reported with its line number
 });
 
 /** A journal on a real file whose handle is wrapped by `wrap`, to inject I/O failures. */
-async function journalWith(wrap: (handle: FileHandle) => Partial<FileHandle>) {
+async function journalWith(wrap: (handle: FileHandle) => Record<string, unknown>) {
   return openJournal(path, async (file, flags) => {
     const handle = await open(file, flags);
     const overrides = wrap(handle);
@@ -129,4 +129,33 @@ test("after a failed partial write every later append and close fail, and no lin
     events: [],
     gap: { reason: "journal-truncated" },
   });
+});
+
+test("close releases the handle once even when the flush fails, keeping the first error", async () => {
+  const flush = new Error("EIO: sync failed");
+  let closes = 0;
+  const writer = await journalWith((handle) => ({
+    sync: () => Promise.reject(flush),
+    close: async () => {
+      closes += 1;
+      await handle.close();
+    },
+  }));
+  await expect(writer.close()).rejects.toBe(flush);
+  expect(closes).toBe(1);
+});
+
+test("a failure while recovering the tail closes the handle it opened", async () => {
+  const stat = new Error("EIO: stat failed");
+  let closes = 0;
+  await expect(
+    journalWith((handle) => ({
+      stat: () => Promise.reject(stat),
+      close: async () => {
+        closes += 1;
+        await handle.close();
+      },
+    })),
+  ).rejects.toBe(stat);
+  expect(closes).toBe(1);
 });
