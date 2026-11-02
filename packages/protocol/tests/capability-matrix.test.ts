@@ -87,6 +87,11 @@ test.each([
   ["instrumentation-order", "implemented", "tests/browser/instrumentation.spec.ts"],
   ["frames-targets-normal", "partial", "tests/browser/instrumentation.spec.ts"],
   ["workers-deep", "partial", "tests/browser/instrumentation.spec.ts"],
+  ["dom-events-normal", "implemented", "tests/browser/capture.spec.ts"],
+  ["navigation-normal", "implemented", "tests/browser/capture.spec.ts"],
+  ["network-requests-normal", "implemented", "tests/browser/capture.spec.ts"],
+  ["console-normal", "implemented", "tests/browser/capture.spec.ts"],
+  ["frames-targets-normal", "partial", "tests/browser/capture.spec.ts"],
 ])("the F1 deliverable %s is %s and names %s", (id, status, spec) => {
   const entry = entries.find((candidate) => candidate.id === id);
   expect(entry?.status, id).toBe(status);

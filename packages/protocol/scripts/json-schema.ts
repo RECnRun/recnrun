@@ -6,6 +6,7 @@ import {
   BindingsFileSchema,
   BrowserHandshakeSchema,
   CapabilityMatrixSchema,
+  CapturedEventSchema,
   DiscoveryResultSchema,
   EventSchema,
   FlowSchema,
@@ -43,6 +44,7 @@ const DOCUMENTS: Record<string, AnySchema> = {
   "run-summary": RunSummarySchema,
   "service-request": RequestEnvelopeSchema,
   "service-response": ResponseEnvelopeSchema,
+  "captured-event": CapturedEventSchema,
 };
 
 // Named definitions give the flow's recursive schemas stable $ref names instead of generated ones.

@@ -65,6 +65,9 @@ const envelopeEntries = {
   payloadRef: v.optional(NonEmptyStringSchema),
 };
 
+/** The §11 envelope fields, for schemas that type an event's category, type, and payload. */
+export const EVENT_ENVELOPE_ENTRIES = envelopeEntries;
+
 export const GapPayloadSchema = v.strictObject({
   reason: v.picklist(GAP_REASONS),
   surface: v.optional(CaptureSurfaceSchema),

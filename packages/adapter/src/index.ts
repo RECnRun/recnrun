@@ -15,3 +15,4 @@ export {
   type InstrumentOptions,
 } from "./instrumentation.ts";
 export type { CdpChannel, CdpEvent } from "./cdp-socket.ts";
+export type { CaptureOptions } from "./capture.ts";

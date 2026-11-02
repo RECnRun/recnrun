@@ -30,7 +30,7 @@ test.each([
   ["a document id that is not 32 hex digits", { ...installed, documentId: "ABC" }],
   ["a negative time", { ...installed, ts: -1 }],
   ["an empty target id", { ...installed, targetId: "" }],
-  ["another hook version", { ...installed, payload: { url: "x", hookVersion: 2 } }],
+  ["another hook version", { ...installed, payload: { url: "x", hookVersion: HOOK_VERSION + 1 } }],
   ["an extra field", { ...installed, extra: true }],
   ["an extra payload field", { ...installed, payload: { ...installed.payload, more: 1 } }],
 ])("rejects %s", (_name, message) => {

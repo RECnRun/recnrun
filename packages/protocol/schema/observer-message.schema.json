@@ -15,7 +15,7 @@
           "additionalProperties": false,
           "properties": {
             "hookVersion": {
-              "const": 1
+              "const": 2
             },
             "url": {
               "type": "string"
@@ -38,6 +38,175 @@
         },
         "type": {
           "const": "document.hook-installed"
+        }
+      },
+      "required": ["kind", "type", "seq", "documentId", "ts", "targetId", "payload"],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "documentId": {
+          "pattern": "^[0-9a-f]{32}$",
+          "type": "string"
+        },
+        "kind": {
+          "const": "dom"
+        },
+        "payload": {
+          "additionalProperties": false,
+          "properties": {
+            "button": {
+              "type": "integer"
+            },
+            "checked": {
+              "type": "boolean"
+            },
+            "code": {
+              "maxLength": 1024,
+              "type": "string"
+            },
+            "data": {
+              "anyOf": [
+                {
+                  "maxLength": 1024,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "detail": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "inputType": {
+              "maxLength": 1024,
+              "type": "string"
+            },
+            "isComposing": {
+              "type": "boolean"
+            },
+            "isTrusted": {
+              "type": "boolean"
+            },
+            "key": {
+              "maxLength": 1024,
+              "type": "string"
+            },
+            "modifiers": {
+              "items": {
+                "enum": ["alt", "ctrl", "meta", "shift"],
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "pointerType": {
+              "maxLength": 1024,
+              "type": "string"
+            },
+            "redacted": {
+              "const": true
+            },
+            "repeat": {
+              "type": "boolean"
+            },
+            "scrollX": {
+              "type": "integer"
+            },
+            "scrollY": {
+              "type": "integer"
+            },
+            "selectedLength": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "selectionEnd": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "selectionStart": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "target": {
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "maxLength": 1024,
+                  "type": "string"
+                },
+                "inputType": {
+                  "maxLength": 1024,
+                  "type": "string"
+                },
+                "name": {
+                  "maxLength": 1024,
+                  "type": "string"
+                },
+                "role": {
+                  "maxLength": 1024,
+                  "type": "string"
+                },
+                "tag": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "testId": {
+                  "maxLength": 1024,
+                  "type": "string"
+                }
+              },
+              "required": ["tag"],
+              "type": "object"
+            },
+            "value": {
+              "maxLength": 1024,
+              "type": "string"
+            },
+            "x": {
+              "type": "integer"
+            },
+            "y": {
+              "type": "integer"
+            }
+          },
+          "required": ["target", "isTrusted"],
+          "type": "object"
+        },
+        "seq": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "targetId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "ts": {
+          "minimum": 0,
+          "type": "number"
+        },
+        "type": {
+          "enum": [
+            "pointerdown",
+            "pointerup",
+            "click",
+            "dblclick",
+            "keydown",
+            "keyup",
+            "input",
+            "change",
+            "compositionstart",
+            "compositionupdate",
+            "compositionend",
+            "selectionchange",
+            "focusin",
+            "focusout",
+            "scroll",
+            "submit"
+          ],
+          "type": "string"
         }
       },
       "required": ["kind", "type", "seq", "documentId", "ts", "targetId", "payload"],

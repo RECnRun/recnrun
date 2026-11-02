@@ -2,9 +2,11 @@ import {
   OBSERVER_BINDING,
   type InstallMode,
   type InstrumentationEvent,
+  type ObserverMessage,
   type InstrumentationReport,
 } from "@recnrun/protocol";
 import * as v from "valibot";
+import { Capture, type CaptureOptions } from "./capture.ts";
 import { openCdpChannel, type CdpChannel, type CdpEvent } from "./cdp-socket.ts";
 import {
   AUTO_ATTACH,
@@ -25,6 +27,8 @@ import {
 
 export interface InstrumentOptions {
   onEvent?: (event: InstrumentationEvent) => void;
+  /** Captures raw events into journal lines; without it only the hook is installed. */
+  capture?: CaptureOptions;
   now?: () => Date;
   openChannel?: (endpoint: string) => Promise<CdpChannel>;
 }
@@ -32,8 +36,9 @@ export interface InstrumentOptions {
 export interface Instrumentation {
   /** Every target attached so far, with its install mode and drop counters. */
   report(): InstrumentationReport;
-  /** Resolves once every install started so far has finished. */
+  /** Resolves once every install and body read started so far has finished. */
   settled(): Promise<void>;
+  /** Records bodies still loading as unavailable and closes the socket. */
   stop(): void;
 }
 
@@ -51,10 +56,20 @@ class Instrumenter {
   readonly pending = new Set<Promise<void>>();
   private readonly channel: CdpChannel;
   private readonly options: InstrumentOptions;
+  readonly capture: Capture | undefined;
 
   constructor(channel: CdpChannel, options: InstrumentOptions) {
     this.channel = channel;
     this.options = options;
+    const now = options.now ?? (() => new Date());
+    this.capture =
+      options.capture &&
+      new Capture(channel, { ...options.capture, now }, (work) => this.track(work));
+  }
+
+  track(work: Promise<void>): void {
+    this.pending.add(work);
+    void work.finally(() => this.pending.delete(work));
   }
 
   handle(event: CdpEvent): void {
@@ -65,6 +80,7 @@ class Instrumenter {
       if (!record) return;
       if (CONTEXT_EVENTS.has(event.method)) trackContext(record, event.method, event.params);
       else if (event.method === "Runtime.bindingCalled") this.receive(record, event.params);
+      else if (record.info.installMode !== "ignored") this.capture?.sessionEvent(record, event);
     }
   }
 
@@ -72,7 +88,7 @@ class Instrumenter {
     const attached = v.safeParse(AttachedSchema, params);
     if (!attached.success) return;
     const { sessionId, targetInfo, waitingForDebugger } = attached.output;
-    const { targetId, type, url } = targetInfo;
+    const { targetId, type, url, openerId } = targetInfo;
     const mode: InstallMode = !isInstrumented(type)
       ? "ignored"
       : waitingForDebugger
@@ -81,17 +97,18 @@ class Instrumenter {
     const record = newRecord(sessionId, { targetId, type, url, installMode: mode });
     this.records.push(record);
     this.sessions.set(sessionId, record);
-    const work = isInstrumented(type)
-      ? this.install(record, type, mode)
-      : this.resumeIgnored(sessionId, waitingForDebugger);
-    this.pending.add(work);
-    void work.finally(() => this.pending.delete(work));
+    this.capture?.attached(record, openerId);
+    this.track(
+      isInstrumented(type)
+        ? this.install(record, type, mode)
+        : this.resumeIgnored(sessionId, waitingForDebugger),
+    );
   }
 
   // Sent in one burst without awaiting replies: Chrome runs a session's commands in order, a held
   // worker answers nothing until resumed, and another client's resume releases a held popup.
   private async install(record: TargetRecord, type: InstrumentedType, mode: InstallMode) {
-    const commands = installCommands(type, record.info.targetId, mode);
+    const commands = installCommands(type, record.info.targetId, mode, Boolean(this.capture));
     const replies = commands.map(({ method, params }) =>
       this.channel.send(method, params, record.sessionId),
     );
@@ -108,7 +125,10 @@ class Instrumenter {
     const detached = v.safeParse(DetachedSchema, params);
     if (!detached.success) return;
     const record = this.sessions.get(detached.output.sessionId);
-    if (record) record.info.detached = true;
+    if (record) {
+      record.info.detached = true;
+      this.capture?.detached(record);
+    }
     this.sessions.delete(detached.output.sessionId);
   }
 
@@ -121,6 +141,18 @@ class Instrumenter {
     const verdict = judge(record, called.output.payload, called.output.executionContextId);
     if (!verdict.ok) return;
     const { message, frameId } = verdict;
+    this.capture?.observed(record, message, frameId, called.output.executionContextId);
+    if (message.type === "document.hook-installed") this.installed(record, message, frameId);
+  }
+
+  private installed(
+    record: TargetRecord,
+    message: Extract<ObserverMessage, { kind: "lifecycle" }>,
+    frameId: string | null,
+  ): void {
+    const { info } = record;
+    const { installMode } = info;
+    if (installMode === "ignored") return;
     info.hookInstalled = true;
     info.hookInstalls += 1;
     // Chrome attaches an OOPIF or a popup before it navigates; its main frame's id is the target id.
@@ -135,7 +167,7 @@ class Instrumenter {
       sessionId: record.sessionId,
       frameId,
       documentId: message.documentId,
-      installMode: info.installMode,
+      installMode,
       hookSeq: message.seq,
       monotonicTimeMs: message.ts,
       url: message.payload.url,
@@ -149,6 +181,7 @@ class Instrumenter {
       targets,
       dedicatedWorkers: observed("worker"),
       serviceWorkers: observed("service_worker"),
+      ...(this.capture && { capture: this.capture.counts() }),
     };
   }
 }
@@ -169,7 +202,10 @@ export async function instrumentChannel(
     settled: async () => {
       while (instrumenter.pending.size > 0) await Promise.all(instrumenter.pending);
     },
-    stop: () => channel.close(),
+    stop: () => {
+      instrumenter.capture?.stop();
+      channel.close();
+    },
   };
 }
 

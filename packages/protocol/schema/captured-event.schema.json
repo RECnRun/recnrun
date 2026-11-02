@@ -1,0 +1,2540 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "oneOf": [
+    {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "actor": {
+              "enum": ["human", "agent", "replay", "unknown"],
+              "type": "string"
+            },
+            "category": {
+              "const": "dom"
+            },
+            "causalConfidence": {
+              "enum": ["command-id", "initiator", "stack", "network-id", "temporal-only"],
+              "type": "string"
+            },
+            "commandId": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "component": {
+              "enum": ["application", "browser", "collector", "engine"],
+              "type": "string"
+            },
+            "documentId": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "frameId": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "monotonicTimeMs": {
+              "type": "number"
+            },
+            "payload": {
+              "additionalProperties": false,
+              "properties": {
+                "button": {
+                  "type": "integer"
+                },
+                "checked": {
+                  "type": "boolean"
+                },
+                "code": {
+                  "maxLength": 1024,
+                  "type": "string"
+                },
+                "data": {
+                  "anyOf": [
+                    {
+                      "maxLength": 1024,
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "detail": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "inputType": {
+                  "maxLength": 1024,
+                  "type": "string"
+                },
+                "isComposing": {
+                  "type": "boolean"
+                },
+                "isTrusted": {
+                  "type": "boolean"
+                },
+                "key": {
+                  "maxLength": 1024,
+                  "type": "string"
+                },
+                "modifiers": {
+                  "items": {
+                    "enum": ["alt", "ctrl", "meta", "shift"],
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "pointerType": {
+                  "maxLength": 1024,
+                  "type": "string"
+                },
+                "redacted": {
+                  "const": true
+                },
+                "repeat": {
+                  "type": "boolean"
+                },
+                "scrollX": {
+                  "type": "integer"
+                },
+                "scrollY": {
+                  "type": "integer"
+                },
+                "selectedLength": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "selectionEnd": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "selectionStart": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "target": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "maxLength": 1024,
+                      "type": "string"
+                    },
+                    "inputType": {
+                      "maxLength": 1024,
+                      "type": "string"
+                    },
+                    "name": {
+                      "maxLength": 1024,
+                      "type": "string"
+                    },
+                    "role": {
+                      "maxLength": 1024,
+                      "type": "string"
+                    },
+                    "tag": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "testId": {
+                      "maxLength": 1024,
+                      "type": "string"
+                    }
+                  },
+                  "required": ["tag"],
+                  "type": "object"
+                },
+                "value": {
+                  "maxLength": 1024,
+                  "type": "string"
+                },
+                "x": {
+                  "type": "integer"
+                },
+                "y": {
+                  "type": "integer"
+                }
+              },
+              "required": ["target", "isTrusted"],
+              "type": "object"
+            },
+            "payloadRef": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "producer": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "profileBinding": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "receivedAt": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "runId": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "schemaVersion": {
+              "const": 1
+            },
+            "seq": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "source": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "stepId": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "targetId": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "timestamp": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "type": {
+              "enum": [
+                "pointerdown",
+                "pointerup",
+                "click",
+                "dblclick",
+                "keydown",
+                "keyup",
+                "input",
+                "change",
+                "compositionstart",
+                "compositionupdate",
+                "compositionend",
+                "selectionchange",
+                "focusin",
+                "focusout",
+                "scroll",
+                "submit"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "id",
+            "runId",
+            "seq",
+            "source",
+            "producer",
+            "timestamp",
+            "targetId",
+            "frameId",
+            "documentId",
+            "type",
+            "category",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "actor": {
+              "enum": ["human", "agent", "replay", "unknown"],
+              "type": "string"
+            },
+            "category": {
+              "const": "dom"
+            },
+            "causalConfidence": {
+              "enum": ["command-id", "initiator", "stack", "network-id", "temporal-only"],
+              "type": "string"
+            },
+            "commandId": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "component": {
+              "enum": ["application", "browser", "collector", "engine"],
+              "type": "string"
+            },
+            "documentId": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "frameId": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "monotonicTimeMs": {
+              "type": "number"
+            },
+            "payload": {
+              "additionalProperties": false,
+              "properties": {
+                "dialogType": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": ["dialogType", "message", "url"],
+              "type": "object"
+            },
+            "payloadRef": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "producer": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "profileBinding": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "receivedAt": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "runId": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "schemaVersion": {
+              "const": 1
+            },
+            "seq": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "source": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "stepId": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "targetId": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "timestamp": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "type": {
+              "const": "dialog-opening"
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "id",
+            "runId",
+            "seq",
+            "source",
+            "producer",
+            "timestamp",
+            "targetId",
+            "frameId",
+            "documentId",
+            "type",
+            "category",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "actor": {
+              "enum": ["human", "agent", "replay", "unknown"],
+              "type": "string"
+            },
+            "category": {
+              "const": "dom"
+            },
+            "causalConfidence": {
+              "enum": ["command-id", "initiator", "stack", "network-id", "temporal-only"],
+              "type": "string"
+            },
+            "commandId": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "component": {
+              "enum": ["application", "browser", "collector", "engine"],
+              "type": "string"
+            },
+            "documentId": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "frameId": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "monotonicTimeMs": {
+              "type": "number"
+            },
+            "payload": {
+              "additionalProperties": false,
+              "properties": {
+                "result": {
+                  "type": "boolean"
+                },
+                "userInput": {
+                  "type": "string"
+                }
+              },
+              "required": ["result"],
+              "type": "object"
+            },
+            "payloadRef": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "producer": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "profileBinding": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "receivedAt": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "runId": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "schemaVersion": {
+              "const": 1
+            },
+            "seq": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "source": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "stepId": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "targetId": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "timestamp": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "type": {
+              "const": "dialog-closed"
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "id",
+            "runId",
+            "seq",
+            "source",
+            "producer",
+            "timestamp",
+            "targetId",
+            "frameId",
+            "documentId",
+            "type",
+            "category",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "actor": {
+              "enum": ["human", "agent", "replay", "unknown"],
+              "type": "string"
+            },
+            "category": {
+              "const": "network"
+            },
+            "causalConfidence": {
+              "enum": ["command-id", "initiator", "stack", "network-id", "temporal-only"],
+              "type": "string"
+            },
+            "commandId": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "component": {
+              "enum": ["application", "browser", "collector", "engine"],
+              "type": "string"
+            },
+            "documentId": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "frameId": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "monotonicTimeMs": {
+              "type": "number"
+            },
+            "payload": {
+              "additionalProperties": false,
+              "properties": {
+                "method": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "redirectChain": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "method": {
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "status": {
+                        "type": "integer"
+                      },
+                      "url": {
+                        "type": "string"
+                      }
+                    },
+                    "required": ["url", "method", "status"],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "requestId": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "resourceType": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": ["requestId", "url", "method"],
+              "type": "object"
+            },
+            "payloadRef": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "producer": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "profileBinding": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "receivedAt": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "runId": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "schemaVersion": {
+              "const": 1
+            },
+            "seq": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "source": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "stepId": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "targetId": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "timestamp": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "type": {
+              "const": "request"
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "id",
+            "runId",
+            "seq",
+            "source",
+            "producer",
+            "timestamp",
+            "targetId",
+            "frameId",
+            "documentId",
+            "type",
+            "category",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "actor": {
+              "enum": ["human", "agent", "replay", "unknown"],
+              "type": "string"
+            },
+            "category": {
+              "const": "network"
+            },
+            "causalConfidence": {
+              "enum": ["command-id", "initiator", "stack", "network-id", "temporal-only"],
+              "type": "string"
+            },
+            "commandId": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "component": {
+              "enum": ["application", "browser", "collector", "engine"],
+              "type": "string"
+            },
+            "documentId": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "frameId": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "monotonicTimeMs": {
+              "type": "number"
+            },
+            "payload": {
+              "additionalProperties": false,
+              "properties": {
+                "fromCache": {
+                  "type": "boolean"
+                },
+                "mimeType": {
+                  "type": "string"
+                },
+                "requestId": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "status": {
+                  "type": "integer"
+                },
+                "statusText": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": ["requestId", "url", "status", "statusText", "mimeType"],
+              "type": "object"
+            },
+            "payloadRef": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "producer": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "profileBinding": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "receivedAt": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "runId": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "schemaVersion": {
+              "const": 1
+            },
+            "seq": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "source": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "stepId": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "targetId": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "timestamp": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "type": {
+              "const": "response"
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "id",
+            "runId",
+            "seq",
+            "source",
+            "producer",
+            "timestamp",
+            "targetId",
+            "frameId",
+            "documentId",
+            "type",
+            "category",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "actor": {
+              "enum": ["human", "agent", "replay", "unknown"],
+              "type": "string"
+            },
+            "category": {
+              "const": "network"
+            },
+            "causalConfidence": {
+              "enum": ["command-id", "initiator", "stack", "network-id", "temporal-only"],
+              "type": "string"
+            },
+            "commandId": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "component": {
+              "enum": ["application", "browser", "collector", "engine"],
+              "type": "string"
+            },
+            "documentId": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "frameId": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "monotonicTimeMs": {
+              "type": "number"
+            },
+            "payload": {
+              "additionalProperties": false,
+              "properties": {
+                "encodedDataLength": {
+                  "type": "number"
+                },
+                "requestId": {
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": ["requestId", "encodedDataLength"],
+              "type": "object"
+            },
+            "payloadRef": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "producer": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "profileBinding": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "receivedAt": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "runId": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "schemaVersion": {
+              "const": 1
+            },
+            "seq": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "source": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "stepId": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "targetId": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "timestamp": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "type": {
+              "const": "finished"
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "id",
+            "runId",
+            "seq",
+            "source",
+            "producer",
+            "timestamp",
+            "targetId",
+            "frameId",
+            "documentId",
+            "type",
+            "category",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "actor": {
+              "enum": ["human", "agent", "replay", "unknown"],
+              "type": "string"
+            },
+            "category": {
+              "const": "network"
+            },
+            "causalConfidence": {
+              "enum": ["command-id", "initiator", "stack", "network-id", "temporal-only"],
+              "type": "string"
+            },
+            "commandId": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "component": {
+              "enum": ["application", "browser", "collector", "engine"],
+              "type": "string"
+            },
+            "documentId": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "frameId": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "monotonicTimeMs": {
+              "type": "number"
+            },
+            "payload": {
+              "additionalProperties": false,
+              "properties": {
+                "blockedReason": {
+                  "type": "string"
+                },
+                "canceled": {
+                  "type": "boolean"
+                },
+                "errorText": {
+                  "type": "string"
+                },
+                "requestId": {
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": ["requestId", "errorText", "canceled"],
+              "type": "object"
+            },
+            "payloadRef": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "producer": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "profileBinding": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "receivedAt": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "runId": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "schemaVersion": {
+              "const": 1
+            },
+            "seq": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "source": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "stepId": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "targetId": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "timestamp": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "type": {
+              "const": "failed"
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "id",
+            "runId",
+            "seq",
+            "source",
+            "producer",
+            "timestamp",
+            "targetId",
+            "frameId",
+            "documentId",
+            "type",
+            "category",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "actor": {
+              "enum": ["human", "agent", "replay", "unknown"],
+              "type": "string"
+            },
+            "category": {
+              "const": "network"
+            },
+            "causalConfidence": {
+              "enum": ["command-id", "initiator", "stack", "network-id", "temporal-only"],
+              "type": "string"
+            },
+            "commandId": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "component": {
+              "enum": ["application", "browser", "collector", "engine"],
+              "type": "string"
+            },
+            "documentId": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "frameId": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "monotonicTimeMs": {
+              "type": "number"
+            },
+            "payload": {
+              "additionalProperties": false,
+              "properties": {
+                "base64Encoded": {
+                  "type": "boolean"
+                },
+                "body": {
+                  "maxLength": 65536,
+                  "type": "string"
+                },
+                "condition": {
+                  "enum": ["captured", "truncated", "unavailable", "not-requested"],
+                  "type": "string"
+                },
+                "mimeType": {
+                  "type": "string"
+                },
+                "reason": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "requestId": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "size": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": ["requestId", "url", "condition"],
+              "type": "object"
+            },
+            "payloadRef": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "producer": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "profileBinding": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "receivedAt": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "runId": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "schemaVersion": {
+              "const": 1
+            },
+            "seq": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "source": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "stepId": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "targetId": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "timestamp": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "type": {
+              "const": "body"
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "id",
+            "runId",
+            "seq",
+            "source",
+            "producer",
+            "timestamp",
+            "targetId",
+            "frameId",
+            "documentId",
+            "type",
+            "category",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "actor": {
+              "enum": ["human", "agent", "replay", "unknown"],
+              "type": "string"
+            },
+            "category": {
+              "const": "console"
+            },
+            "causalConfidence": {
+              "enum": ["command-id", "initiator", "stack", "network-id", "temporal-only"],
+              "type": "string"
+            },
+            "commandId": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "component": {
+              "enum": ["application", "browser", "collector", "engine"],
+              "type": "string"
+            },
+            "documentId": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "frameId": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "monotonicTimeMs": {
+              "type": "number"
+            },
+            "payload": {
+              "additionalProperties": false,
+              "properties": {
+                "args": {
+                  "items": {
+                    "maxLength": 1024,
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "column": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "level": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "line": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": ["level", "args"],
+              "type": "object"
+            },
+            "payloadRef": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "producer": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "profileBinding": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "receivedAt": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "runId": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "schemaVersion": {
+              "const": 1
+            },
+            "seq": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "source": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "stepId": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "targetId": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "timestamp": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "type": {
+              "const": "api"
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "id",
+            "runId",
+            "seq",
+            "source",
+            "producer",
+            "timestamp",
+            "targetId",
+            "frameId",
+            "documentId",
+            "type",
+            "category",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "actor": {
+              "enum": ["human", "agent", "replay", "unknown"],
+              "type": "string"
+            },
+            "category": {
+              "const": "console"
+            },
+            "causalConfidence": {
+              "enum": ["command-id", "initiator", "stack", "network-id", "temporal-only"],
+              "type": "string"
+            },
+            "commandId": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "component": {
+              "enum": ["application", "browser", "collector", "engine"],
+              "type": "string"
+            },
+            "documentId": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "frameId": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "monotonicTimeMs": {
+              "type": "number"
+            },
+            "payload": {
+              "additionalProperties": false,
+              "properties": {
+                "level": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "networkRequestId": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "source": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "text": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": ["source", "level", "text"],
+              "type": "object"
+            },
+            "payloadRef": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "producer": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "profileBinding": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "receivedAt": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "runId": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "schemaVersion": {
+              "const": 1
+            },
+            "seq": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "source": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "stepId": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "targetId": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "timestamp": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "type": {
+              "const": "log"
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "id",
+            "runId",
+            "seq",
+            "source",
+            "producer",
+            "timestamp",
+            "targetId",
+            "frameId",
+            "documentId",
+            "type",
+            "category",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "actor": {
+          "enum": ["human", "agent", "replay", "unknown"],
+          "type": "string"
+        },
+        "category": {
+          "const": "error"
+        },
+        "causalConfidence": {
+          "enum": ["command-id", "initiator", "stack", "network-id", "temporal-only"],
+          "type": "string"
+        },
+        "commandId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "component": {
+          "enum": ["application", "browser", "collector", "engine"],
+          "type": "string"
+        },
+        "documentId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "frameId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "monotonicTimeMs": {
+          "type": "number"
+        },
+        "payload": {
+          "additionalProperties": false,
+          "properties": {
+            "column": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "description": {
+              "type": "string"
+            },
+            "line": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "text": {
+              "type": "string"
+            },
+            "url": {
+              "type": "string"
+            }
+          },
+          "required": ["text"],
+          "type": "object"
+        },
+        "payloadRef": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "producer": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "profileBinding": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "receivedAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "runId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "schemaVersion": {
+          "const": 1
+        },
+        "seq": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "source": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "stepId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "targetId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "timestamp": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "type": {
+          "const": "exception"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "id",
+        "runId",
+        "seq",
+        "source",
+        "producer",
+        "timestamp",
+        "targetId",
+        "frameId",
+        "documentId",
+        "type",
+        "category",
+        "payload"
+      ],
+      "type": "object"
+    },
+    {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "actor": {
+              "enum": ["human", "agent", "replay", "unknown"],
+              "type": "string"
+            },
+            "category": {
+              "const": "navigation"
+            },
+            "causalConfidence": {
+              "enum": ["command-id", "initiator", "stack", "network-id", "temporal-only"],
+              "type": "string"
+            },
+            "commandId": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "component": {
+              "enum": ["application", "browser", "collector", "engine"],
+              "type": "string"
+            },
+            "documentId": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "frameId": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "monotonicTimeMs": {
+              "type": "number"
+            },
+            "payload": {
+              "additionalProperties": false,
+              "properties": {
+                "parentFrameId": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": ["url"],
+              "type": "object"
+            },
+            "payloadRef": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "producer": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "profileBinding": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "receivedAt": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "runId": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "schemaVersion": {
+              "const": 1
+            },
+            "seq": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "source": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "stepId": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "targetId": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "timestamp": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "type": {
+              "const": "committed"
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "id",
+            "runId",
+            "seq",
+            "source",
+            "producer",
+            "timestamp",
+            "targetId",
+            "frameId",
+            "documentId",
+            "type",
+            "category",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "actor": {
+              "enum": ["human", "agent", "replay", "unknown"],
+              "type": "string"
+            },
+            "category": {
+              "const": "navigation"
+            },
+            "causalConfidence": {
+              "enum": ["command-id", "initiator", "stack", "network-id", "temporal-only"],
+              "type": "string"
+            },
+            "commandId": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "component": {
+              "enum": ["application", "browser", "collector", "engine"],
+              "type": "string"
+            },
+            "documentId": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "frameId": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "monotonicTimeMs": {
+              "type": "number"
+            },
+            "payload": {
+              "additionalProperties": false,
+              "properties": {
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": ["url"],
+              "type": "object"
+            },
+            "payloadRef": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "producer": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "profileBinding": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "receivedAt": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "runId": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "schemaVersion": {
+              "const": 1
+            },
+            "seq": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "source": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "stepId": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "targetId": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "timestamp": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "type": {
+              "const": "same-document"
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "id",
+            "runId",
+            "seq",
+            "source",
+            "producer",
+            "timestamp",
+            "targetId",
+            "frameId",
+            "documentId",
+            "type",
+            "category",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "actor": {
+              "enum": ["human", "agent", "replay", "unknown"],
+              "type": "string"
+            },
+            "category": {
+              "const": "target"
+            },
+            "causalConfidence": {
+              "enum": ["command-id", "initiator", "stack", "network-id", "temporal-only"],
+              "type": "string"
+            },
+            "commandId": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "component": {
+              "enum": ["application", "browser", "collector", "engine"],
+              "type": "string"
+            },
+            "documentId": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "frameId": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "monotonicTimeMs": {
+              "type": "number"
+            },
+            "payload": {
+              "additionalProperties": false,
+              "properties": {
+                "installMode": {
+                  "enum": ["before-first-script", "late", "ignored"],
+                  "type": "string"
+                },
+                "openerId": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "type": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": ["type", "url", "installMode"],
+              "type": "object"
+            },
+            "payloadRef": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "producer": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "profileBinding": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "receivedAt": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "runId": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "schemaVersion": {
+              "const": 1
+            },
+            "seq": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "source": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "stepId": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "targetId": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "timestamp": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "type": {
+              "const": "attached"
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "id",
+            "runId",
+            "seq",
+            "source",
+            "producer",
+            "timestamp",
+            "targetId",
+            "frameId",
+            "documentId",
+            "type",
+            "category",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "actor": {
+              "enum": ["human", "agent", "replay", "unknown"],
+              "type": "string"
+            },
+            "category": {
+              "const": "target"
+            },
+            "causalConfidence": {
+              "enum": ["command-id", "initiator", "stack", "network-id", "temporal-only"],
+              "type": "string"
+            },
+            "commandId": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "component": {
+              "enum": ["application", "browser", "collector", "engine"],
+              "type": "string"
+            },
+            "documentId": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "frameId": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "monotonicTimeMs": {
+              "type": "number"
+            },
+            "payload": {
+              "additionalProperties": false,
+              "properties": {},
+              "required": [],
+              "type": "object"
+            },
+            "payloadRef": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "producer": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "profileBinding": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "receivedAt": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "runId": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "schemaVersion": {
+              "const": 1
+            },
+            "seq": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "source": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "stepId": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "targetId": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "timestamp": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "type": {
+              "const": "detached"
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "id",
+            "runId",
+            "seq",
+            "source",
+            "producer",
+            "timestamp",
+            "targetId",
+            "frameId",
+            "documentId",
+            "type",
+            "category",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "actor": {
+              "enum": ["human", "agent", "replay", "unknown"],
+              "type": "string"
+            },
+            "category": {
+              "const": "target"
+            },
+            "causalConfidence": {
+              "enum": ["command-id", "initiator", "stack", "network-id", "temporal-only"],
+              "type": "string"
+            },
+            "commandId": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "component": {
+              "enum": ["application", "browser", "collector", "engine"],
+              "type": "string"
+            },
+            "documentId": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "frameId": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "monotonicTimeMs": {
+              "type": "number"
+            },
+            "payload": {
+              "additionalProperties": false,
+              "properties": {
+                "hookVersion": {
+                  "type": "integer"
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": ["url", "hookVersion"],
+              "type": "object"
+            },
+            "payloadRef": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "producer": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "profileBinding": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "receivedAt": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "runId": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "schemaVersion": {
+              "const": 1
+            },
+            "seq": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "source": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "stepId": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "targetId": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "timestamp": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "type": {
+              "const": "hook-installed"
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "id",
+            "runId",
+            "seq",
+            "source",
+            "producer",
+            "timestamp",
+            "targetId",
+            "frameId",
+            "documentId",
+            "type",
+            "category",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ]
+    }
+  ]
+}

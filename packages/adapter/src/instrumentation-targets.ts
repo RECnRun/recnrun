@@ -22,7 +22,12 @@ export type Verdict =
 
 export const AttachedSchema = v.object({
   sessionId: v.string(),
-  targetInfo: v.object({ targetId: v.string(), type: v.string(), url: v.string() }),
+  targetInfo: v.object({
+    targetId: v.string(),
+    type: v.string(),
+    url: v.string(),
+    openerId: v.optional(v.string()),
+  }),
   waitingForDebugger: v.boolean(),
 });
 

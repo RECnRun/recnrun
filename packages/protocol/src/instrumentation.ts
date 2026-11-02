@@ -1,11 +1,12 @@
 import * as v from "valibot";
+import { DomEventTypeSchema, DomPayloadSchema } from "./capture.ts";
 import { CountSchema, IsoTimestampSchema, NonEmptyStringSchema } from "./common.ts";
 
 /** The `Runtime.addBinding` name page instrumentation posts through. */
 export const OBSERVER_BINDING = "__recnrunObserver";
 
 /** The version of the hook injected into every document; it changes with the hook's messages. */
-export const HOOK_VERSION = 1;
+export const HOOK_VERSION = 2;
 
 /** Longer binding payloads are dropped unparsed, so a page cannot make the adapter parse megabytes. */
 export const MAX_OBSERVER_MESSAGE_LENGTH = 65_536;
@@ -42,8 +43,19 @@ export const HookInstalledMessageSchema = v.strictObject({
   payload: v.strictObject({ url: v.string(), hookVersion: v.literal(HOOK_VERSION) }),
 });
 
+/** A DOM event the hook observed in the capture phase on its window. */
+export const DomMessageSchema = v.strictObject({
+  kind: v.literal("dom"),
+  type: DomEventTypeSchema,
+  ...observerEntries,
+  payload: DomPayloadSchema,
+});
+
 /** A message page instrumentation posts through the observer binding; untrusted until it parses. */
-export const ObserverMessageSchema = v.variant("type", [HookInstalledMessageSchema]);
+export const ObserverMessageSchema = v.variant("type", [
+  HookInstalledMessageSchema,
+  DomMessageSchema,
+]);
 
 /** An observer message the adapter accepted, with what CDP itself says about where it came from. */
 export const InstrumentationEventSchema = v.strictObject({
@@ -83,6 +95,8 @@ export const InstrumentationReportSchema = v.strictObject({
   targets: v.array(InstrumentedTargetSchema),
   dedicatedWorkers: v.strictObject({ observed: v.boolean() }),
   serviceWorkers: v.strictObject({ observed: v.boolean() }),
+  // Present when raw capture is on: events handed to the sink, and drafts that failed validation.
+  capture: v.optional(v.strictObject({ events: CountSchema, dropped: CountSchema })),
 });
 
 export type InstallMode = v.InferOutput<typeof InstallModeSchema>;

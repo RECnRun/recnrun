@@ -17,6 +17,8 @@ export const RESUME: CdpCommand = { method: "Runtime.runIfWaitingForDebugger" };
 
 const RUNTIME: CdpCommand = { method: "Runtime.enable" };
 const BINDING: CdpCommand = { method: "Runtime.addBinding", params: { name: OBSERVER_BINDING } };
+// Raw capture adds the network and the browser log of every document target.
+const CAPTURE: CdpCommand[] = [{ method: "Network.enable" }, { method: "Log.enable" }];
 
 export function isInstrumented(type: string): type is InstrumentedType {
   return (INSTRUMENTED_TARGET_TYPES as readonly string[]).includes(type);
@@ -37,9 +39,11 @@ export function installCommands(
   type: InstrumentedType,
   targetId: string,
   mode: InstallMode,
+  capture = false,
 ): CdpCommand[] {
   let commands: CdpCommand[];
-  if (type === "page" || type === "iframe") commands = documentCommands(targetId);
+  if (type === "page" || type === "iframe")
+    commands = [...documentCommands(targetId), ...(capture ? CAPTURE : [])];
   // A dedicated worker can start nested workers; a service worker cannot.
   else if (type === "worker") commands = [AUTO_ATTACH, RUNTIME, BINDING];
   else commands = [RUNTIME, BINDING];

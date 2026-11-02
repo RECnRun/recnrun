@@ -2,6 +2,21 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "additionalProperties": false,
   "properties": {
+    "capture": {
+      "additionalProperties": false,
+      "properties": {
+        "dropped": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "events": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": ["events", "dropped"],
+      "type": "object"
+    },
     "dedicatedWorkers": {
       "additionalProperties": false,
       "properties": {
