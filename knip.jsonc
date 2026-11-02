@@ -11,5 +11,9 @@
         "tests/container/*.checks.mjs",
       ],
     },
+    // The future npm bin; F7 points package.json "bin" at its build output.
+    "apps/cli": {
+      "entry": ["src/bin.ts"],
+    },
   },
 }

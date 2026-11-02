@@ -2,11 +2,19 @@
 
 RECnRun is a local tool that drives the installed Google Chrome over the Chrome DevTools Protocol (CDP), records flows, and replays them with no AI involved. A Node.js service on the user's machine owns the data; a CLI (`npx @recnrun/cli`), a localhost UI, and an optional MCP server are its clients ([ADR 0001](docs/adr/0001-local-service-over-cdp.md)). The M0 browser extension and its bridge are retired ([ADR 0002](docs/adr/0002-retire-extension-and-bridge.md)). It is a Vite+ monorepo:
 
+- `apps/service`: `@recnrun/service`, the local service: loopback API, MCP adapter, and the UI's server.
+- `apps/ui`: `@recnrun/ui`, the Preact SPA the service serves on localhost.
+- `apps/cli`: `@recnrun/cli`, the command line published to npm (`setup`, `open`, `run`, `doctor`).
+- `apps/fixture`: `@recnrun/fixture`, the controllable test application the browser tests drive.
 - `apps/website`: Preact SPA at recnrun.com, deployed to GitHub Pages: the public landing and install guide. It holds no user data.
+- `packages/protocol`: `@recnrun/protocol`, the Valibot schemas of every shape that crosses a boundary.
+- `packages/engine`: `@recnrun/engine`, sessions, steps, and locator resolution over an adapter interface.
+- `packages/adapter`: `@recnrun/adapter`, that interface implemented over Playwright and CDP.
+- `packages/persistence`: `@recnrun/persistence`, flow folders, revisions, the journal, and the SQLite index.
 - `packages/brand`: `@recnrun/brand`, the Mona Sans font and the stylesheet every app imports.
 - `tests/`: Playwright end-to-end tests (`tests/e2e`) and Docker runner checks (`tests/container`).
 
-F0.2 adds `packages/protocol`, `engine`, `adapter`, `persistence` and `apps/service`, `ui`, `cli`, `fixture`; [ARCHITECTURE.md](docs/ARCHITECTURE.md#target-layout) has the target layout.
+The workspaces are skeletons until the phases of [PLAN.md](docs/plan/PLAN.md) fill them; [ARCHITECTURE.md](docs/ARCHITECTURE.md#target-layout) has the layout and what each may import.
 
 Durable decisions live in `docs/`:
 

@@ -14,7 +14,15 @@ RUN curl -fsSL https://vite.plus -o /tmp/install-vp.sh \
 WORKDIR /workspace
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/website/package.json ./apps/website/package.json
+COPY apps/ui/package.json ./apps/ui/package.json
+COPY apps/service/package.json ./apps/service/package.json
+COPY apps/cli/package.json ./apps/cli/package.json
+COPY apps/fixture/package.json ./apps/fixture/package.json
 COPY packages/brand/package.json ./packages/brand/package.json
+COPY packages/protocol/package.json ./packages/protocol/package.json
+COPY packages/engine/package.json ./packages/engine/package.json
+COPY packages/adapter/package.json ./packages/adapter/package.json
+COPY packages/persistence/package.json ./packages/persistence/package.json
 # Lifecycle scripts need the sources; prepare runs again after they are copied.
 RUN --mount=type=cache,target=/root/.local/share/pnpm/store,sharing=locked \
     vp install --frozen-lockfile --ignore-scripts

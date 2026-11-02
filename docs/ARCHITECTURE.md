@@ -17,26 +17,40 @@ apps/website ──► @recnrun/brand (landing and install guide; no engine code
 apps/fixture: the controllable test application; nothing imports it
 ```
 
-| Workspace              | Holds                                                                                                                                      | May import                                     | Exists |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------- | ------ |
-| `packages/protocol`    | Versioned schemas: flow DSL, locator lists, event envelope, run manifest, summary and coverage, capability matrix, service API, MCP shapes | `valibot`                                      | F0.2   |
-| `packages/engine`      | Sessions, leases, steps, locator resolution, recorder normalization, function registry, macro runtime                                      | `protocol`                                     | F0.2   |
-| `packages/adapter`     | Chrome discovery, the CDP connection, targets and frames, actions, instrumentation hooks, element references                               | `protocol`, `playwright-core`                  | F0.2   |
-| `packages/persistence` | Flow folders, revisions, the JSONL journal, blobs by hash, the SQLite index, export and import                                             | `protocol`                                     | F0.2   |
-| `packages/brand`       | The Mona Sans font and the stylesheet every app imports                                                                                    | nothing                                        | today  |
-| `apps/service`         | The loopback HTTP and WebSocket API, locks, lifecycle, logs, the MCP stdio adapter; serves the built UI                                    | `engine`, `adapter`, `persistence`, `protocol` | F0.2   |
-| `apps/ui`              | The Preact SPA on localhost: catalog, recorder, editor, run, diagnostics                                                                   | `protocol`, `brand`                            | F0.2   |
-| `apps/cli`             | `setup`, `open`, `run`, `doctor`, `agents setup`, `mcp`; published as `@recnrun/cli`                                                       | `service`                                      | F0.2   |
-| `apps/fixture`         | The deliberately controllable test application                                                                                             | nothing from the workspace                     | F0.2   |
-| `apps/website`         | The public landing at recnrun.com and the install guide                                                                                    | `brand`                                        | today  |
+| Workspace              | Holds                                                                                                                                      | May import                                                      | Since |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------- | ----- |
+| `packages/protocol`    | Versioned schemas: flow DSL, locator lists, event envelope, run manifest, summary and coverage, capability matrix, service API, MCP shapes | `valibot`                                                       | F0.2  |
+| `packages/engine`      | Sessions, leases, steps, locator resolution, recorder normalization, function registry, macro runtime                                      | `protocol`                                                      | F0.2  |
+| `packages/adapter`     | Chrome discovery, the CDP connection, targets and frames, actions, instrumentation hooks, element references                               | `engine` (the adapter interface), `protocol`, `playwright-core` | F0.2  |
+| `packages/persistence` | Flow folders, revisions, the JSONL journal, blobs by hash, the SQLite index, export and import                                             | `protocol`, `node:` builtins                                    | F0.2  |
+| `packages/brand`       | The Mona Sans font and the stylesheet every app imports                                                                                    | nothing                                                         | M0    |
+| `apps/service`         | The loopback HTTP and WebSocket API, locks, lifecycle, logs, the MCP stdio adapter; serves the built UI                                    | `engine`, `adapter`, `persistence`, `protocol`                  | F0.2  |
+| `apps/ui`              | The Preact SPA on localhost: catalog, recorder, editor, run, diagnostics                                                                   | `protocol`, `brand`, `preact`                                   | F0.2  |
+| `apps/cli`             | `setup`, `open`, `run`, `doctor`, `agents setup`, `mcp`; published as `@recnrun/cli`                                                       | `service`                                                       | F0.2  |
+| `apps/fixture`         | The deliberately controllable test application                                                                                             | nothing from the workspace                                      | F0.2  |
+| `apps/website`         | The public landing at recnrun.com and the install guide                                                                                    | `brand`                                                         | M0    |
 
-- The engine never imports Playwright or CDP types. It defines the adapter interface; unit tests use a fake adapter and browser tests use the real one.
+- The engine never imports Playwright or CDP types. It defines the adapter interface (`BrowserAdapter`); `packages/adapter` imports that interface from `engine` and implements it, and `engine` never imports the adapter. The service wires the two together, so unit tests use a fake adapter and browser tests use the real one.
 - Packages never import apps. Apps meet through `packages/protocol` and the service API; the only app that imports another is `apps/cli`, which starts `apps/service`.
-- Packages export their TypeScript sources (`exports` → `./src/index.ts`); apps bundle them. A package `build` only type checks.
+- Packages export their TypeScript sources (`exports` → `./src/index.ts`); apps bundle them. A package `build` only type checks, and so do the Node apps (`service`, `cli`, `fixture`) until F7 bundles the CLI; `apps/ui` builds with Vite.
 - `@recnrun/brand` holds no code: it exports `mona-sans.css`, which each app's entry imports, so the font and its license exist once. It imports nothing (`brand-is-leaf`).
 - Every module is reachable from an entrypoint, a test, or a config (`no-orphans`), and there are no import cycles (`no-circular`).
 
-Today the repository holds `apps/website` and `packages/brand`; F0.2 creates the other workspaces with their dependency rules.
+Each workspace has one dependency-cruiser rule that lists what its `src` may import; anything else is a violation:
+
+| Rule                         | From                   | Allowed targets                                                |
+| ---------------------------- | ---------------------- | -------------------------------------------------------------- |
+| `protocol-pure`              | `packages/protocol`    | itself, `valibot`                                              |
+| `engine-not-to-adapter-impl` | `packages/engine`      | itself, `protocol` (no adapter, Playwright, CDP, or Node APIs) |
+| `adapter-boundaries`         | `packages/adapter`     | itself, `engine`, `protocol`, `playwright-core`                |
+| `persistence-boundaries`     | `packages/persistence` | itself, `protocol`, `node:` builtins                           |
+| `service-boundaries`         | `apps/service`         | itself, `engine`, `adapter`, `persistence`, `protocol`         |
+| `cli-only-service`           | `apps/cli`             | itself, `apps/service`                                         |
+| `ui-only-protocol`           | `apps/ui`              | itself, `protocol`, `brand`, `preact`                          |
+| `fixture-isolated`           | `apps/fixture`         | nothing from `apps/` or `packages/`                            |
+| `website-only-brand`         | `apps/website`         | `brand` among the workspace packages                           |
+
+A later task that needs a new import (for example `node:http` in the service) widens that workspace's rule and this table in the same change, with the reason. `src/main.tsx` and `src/bin.ts` of any app are entrypoints that nothing imports (`not-to-entrypoints`).
 
 ## Website
 

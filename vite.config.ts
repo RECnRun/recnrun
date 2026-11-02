@@ -57,7 +57,18 @@ export default defineConfig({
   test: {
     fileParallelism: false,
     maxWorkers: 1,
-    projects: ["apps/website", "apps/website/vitest.browser.config.ts"],
+    projects: [
+      "apps/website",
+      "apps/website/vitest.browser.config.ts",
+      "apps/ui/vitest.browser.config.ts",
+      "apps/service",
+      "apps/cli",
+      "apps/fixture",
+      "packages/protocol",
+      "packages/engine",
+      "packages/adapter",
+      "packages/persistence",
+    ],
     coverage: {
       provider: "v8",
       include: ["apps/*/src/**/*.{ts,tsx}", "packages/*/src/**/*.{ts,tsx}"],

@@ -57,6 +57,74 @@ module.exports = {
       to: { pathNot: "^packages/brand/" },
     },
     {
+      name: "protocol-pure",
+      severity: "error",
+      comment:
+        "Protocol is the shared contract: Valibot schemas only, no runtime or workspace code.",
+      from: { path: "^packages/protocol/src/" },
+      to: { pathNot: ["^packages/protocol/src/", "/node_modules/valibot/"] },
+    },
+    {
+      name: "engine-not-to-adapter-impl",
+      severity: "error",
+      comment:
+        "The engine defines the adapter interface; Playwright, CDP, and Node APIs stay in adapters.",
+      from: { path: "^packages/engine/src/" },
+      to: { pathNot: ["^packages/engine/src/", "^packages/protocol/src/"] },
+    },
+    {
+      name: "adapter-boundaries",
+      severity: "error",
+      comment: "The adapter implements the engine's interface over playwright-core and CDP.",
+      from: { path: "^packages/adapter/src/" },
+      to: {
+        pathNot: ["^packages/(adapter|engine|protocol)/src/", "/node_modules/playwright-core/"],
+      },
+    },
+    {
+      name: "persistence-boundaries",
+      severity: "error",
+      comment: "Persistence owns the file system and SQLite; it knows only the protocol's shapes.",
+      from: { path: "^packages/persistence/src/" },
+      to: {
+        pathNot: ["^packages/(persistence|protocol)/src/"],
+        dependencyTypesNot: ["core"],
+      },
+    },
+    {
+      name: "service-boundaries",
+      severity: "error",
+      comment: "The service composes the engine, the adapter, and persistence behind its API.",
+      from: { path: "^apps/service/src/" },
+      to: {
+        pathNot: ["^apps/service/src/", "^packages/(engine|adapter|persistence|protocol)/src/"],
+      },
+    },
+    {
+      name: "cli-only-service",
+      severity: "error",
+      comment: "The CLI is a client of the service; it carries no engine of its own.",
+      from: { path: "^apps/cli/src/" },
+      to: { pathNot: ["^apps/(cli|service)/src/"] },
+    },
+    {
+      name: "ui-only-protocol",
+      severity: "error",
+      comment:
+        "The UI talks to the service over its API; it shares only protocol shapes and the brand.",
+      from: { path: "^apps/ui/src/" },
+      to: {
+        pathNot: ["^apps/ui/src/", "^packages/(protocol|brand)/src/", "/node_modules/preact/"],
+      },
+    },
+    {
+      name: "fixture-isolated",
+      severity: "error",
+      comment: "The fixture stands in for any web app under test; it shares no workspace code.",
+      from: { path: "^apps/fixture/src/" },
+      to: { path: "^(apps|packages)/", pathNot: "^apps/fixture/" },
+    },
+    {
       name: "website-only-brand",
       severity: "error",
       comment: "The website is the public landing; it ships no engine, protocol, or UI code.",
@@ -91,7 +159,7 @@ module.exports = {
       severity: "error",
       comment: "Entrypoints are thin wiring; nothing imports them.",
       from: {},
-      to: { path: "^apps/website/src/main\\.tsx$" },
+      to: { path: "^apps/[^/]+/src/(main\\.tsx|bin\\.ts)$" },
     },
   ],
   options: {
