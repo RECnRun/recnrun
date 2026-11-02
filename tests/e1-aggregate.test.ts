@@ -1,8 +1,13 @@
 import { describe, expect, test } from "vite-plus/test";
-import { aggregate } from "./experiments/e1-aggregate.ts";
-import type { ProbeResult } from "./experiments/e1-aggregate.ts";
+import { aggregate, browserOf, provenance, summarize } from "./experiments/e1-aggregate.ts";
+import type { E1Browser, ProbeResult } from "./experiments/e1-aggregate.ts";
 
-const CHROME = "Google Chrome 156.0.8078.79";
+const CHROME: E1Browser = { chrome: "Google Chrome 156.0.8078.79", method: "cdp-load-unpacked" };
+const CHROMIUM: E1Browser = {
+  chrome: "Google Chrome for Testing 156.0.8078.4",
+  method: "chromium-load-extension",
+  label: "diagnostic",
+};
 
 function sample(status: ProbeResult["status"], extra: Partial<ProbeResult> = {}): ProbeResult {
   return { id: "worker-close-target", status, ...extra };
@@ -22,6 +27,7 @@ describe("E1 aggregate", () => {
     expect(capability).toEqual({
       status: "allowed",
       statuses: ["allowed", "allowed", "allowed"],
+      method: "cdp-load-unpacked",
       details: [{ targetId: "A" }, { targetId: "B" }, null],
     });
   });
@@ -38,7 +44,7 @@ describe("E1 aggregate", () => {
       hypothesis: "worker-close-target",
       verdict: "fail",
       error: "inconsistent across samples (allowed, rejected, allowed): worker still listed",
-      chrome: CHROME,
+      chrome: CHROME.chrome,
       samples: 3,
     });
     expect(verdict.variants?.[1]).toEqual({
@@ -51,5 +57,42 @@ describe("E1 aggregate", () => {
   test("unavailable samples do not count as run", () => {
     const { verdict } = aggregate("tab-attach", [sample("unavailable")], CHROME);
     expect(verdict).toMatchObject({ verdict: "unavailable", samples: 0 });
+  });
+});
+
+describe("E1 provenance (PLAN.md decisions 3 and 7)", () => {
+  test("a diagnostic browser labels every verdict and capability entry", () => {
+    const samples = new Map([
+      ["tab-attach", [sample("allowed")]],
+      ["infobar-hidden", [sample("rejected", { error: "tab height 1333 -> 1277" })]],
+    ]);
+    const { verdicts, capabilities } = summarize(samples, { "tab-attach": "attach" }, CHROMIUM);
+    for (const verdict of verdicts) {
+      expect(verdict).toMatchObject({ label: "diagnostic", method: "chromium-load-extension" });
+    }
+    expect(capabilities).toMatchObject({
+      "tab-attach": { description: "attach", label: "diagnostic" },
+      "infobar-hidden": { description: "", method: "chromium-load-extension" },
+    });
+    expect(provenance(CHROMIUM)).toEqual({
+      method: "chromium-load-extension",
+      label: "diagnostic",
+    });
+  });
+
+  test("Google Chrome records its load method and no label", () => {
+    const { verdict, capability } = aggregate("tab-attach", [sample("allowed")], CHROME);
+    expect(verdict.method).toBe("cdp-load-unpacked");
+    expect(verdict).not.toHaveProperty("label");
+    expect(capability).not.toHaveProperty("label");
+    expect(provenance(CHROME)).toEqual({ method: "cdp-load-unpacked" });
+  });
+
+  test("reads the browser from the loaded extension", () => {
+    const chrome = { version: CHROMIUM.chrome } as Parameters<typeof browserOf>[0]["chrome"];
+    expect(browserOf({ chrome, method: "chromium-load-extension", label: "diagnostic" })).toEqual(
+      CHROMIUM,
+    );
+    expect(browserOf({ chrome, method: "cdp-load-unpacked" })).not.toHaveProperty("label");
   });
 });

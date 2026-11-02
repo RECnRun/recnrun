@@ -8,6 +8,7 @@
   "debuggerProbe": {
     "date": "2026-11-02",
     "samples": 3,
+    "method": "cdp-load-unpacked",
     "permissions": ["storage", "management", "debugger"],
     "hostPermissions": []
   },
@@ -16,6 +17,7 @@
       "description": "chrome.debugger.getTargets() answers; the whole list with types and URLs",
       "status": "allowed",
       "statuses": ["allowed", "allowed", "allowed"],
+      "method": "cdp-load-unpacked",
       "details": [
         [
           {
@@ -57,13 +59,13 @@
             "type": "page",
             "url": "http://app.localhost:4600/workers.html?type=classic",
             "attached": true,
-            "tabId": 836469882
+            "tabId": 1769689903
           },
           {
             "type": "page",
             "url": "http://app.localhost:4600/sw.html?sw=classic",
             "attached": true,
-            "tabId": 836469881
+            "tabId": 1769689902
           },
           {
             "type": "background_page",
@@ -106,12 +108,6 @@
             "type": "other",
             "url": "chrome://omnibox-popup.top-chrome/",
             "attached": false
-          },
-          {
-            "type": "page",
-            "url": "http://app.localhost:4600/workers.html?type=classic",
-            "attached": true,
-            "tabId": 836469882
           },
           {
             "type": "background_page",
@@ -119,6 +115,12 @@
             "attached": false
           },
           {
+            "type": "page",
+            "url": "http://app.localhost:4600/workers.html?type=classic",
+            "attached": true,
+            "tabId": 1769689903
+          },
+          {
             "type": "other",
             "url": "chrome://omnibox-popup.top-chrome/omnibox_popup_aim.html",
             "attached": false
@@ -127,7 +129,7 @@
             "type": "page",
             "url": "http://app.localhost:4600/sw.html?sw=classic",
             "attached": true,
-            "tabId": 836469881
+            "tabId": 1769689902
           },
           {
             "type": "background_page",
@@ -175,7 +177,7 @@
             "type": "page",
             "url": "http://app.localhost:4600/workers.html?type=classic",
             "attached": true,
-            "tabId": 836469882
+            "tabId": 1769689903
           },
           {
             "type": "other",
@@ -186,7 +188,7 @@
             "type": "page",
             "url": "http://app.localhost:4600/sw.html?sw=classic",
             "attached": true,
-            "tabId": 836469881
+            "tabId": 1769689902
           }
         ]
       ]
@@ -195,6 +197,7 @@
       "description": "getTargets() lists the fixture's service-worker, with its type string",
       "status": "allowed",
       "statuses": ["allowed", "allowed", "allowed"],
+      "method": "cdp-load-unpacked",
       "details": [
         {
           "type": "worker",
@@ -214,6 +217,7 @@
       "description": "getTargets() lists the fixture's shared-worker, with its type string",
       "status": "allowed",
       "statuses": ["allowed", "allowed", "allowed"],
+      "method": "cdp-load-unpacked",
       "details": [
         {
           "type": "worker",
@@ -233,6 +237,7 @@
       "description": "getTargets() lists the fixture's dedicated-worker, with its type string",
       "status": "allowed",
       "statuses": ["allowed", "allowed", "allowed"],
+      "method": "cdp-load-unpacked",
       "details": [
         {
           "type": "other",
@@ -252,15 +257,16 @@
       "description": "attach({ targetId }) to the fixture's service-worker, then detach",
       "status": "allowed",
       "statuses": ["allowed", "allowed", "allowed"],
+      "method": "cdp-load-unpacked",
       "details": [
         {
-          "targetId": "CDA1C5CB6D327C4F754B96D25DB14FC4"
+          "targetId": "4E61EE9BB074E4C964F5B9068D7175DA"
         },
         {
-          "targetId": "CDA1C5CB6D327C4F754B96D25DB14FC4"
+          "targetId": "4E61EE9BB074E4C964F5B9068D7175DA"
         },
         {
-          "targetId": "CDA1C5CB6D327C4F754B96D25DB14FC4"
+          "targetId": "4E61EE9BB074E4C964F5B9068D7175DA"
         }
       ]
     },
@@ -268,15 +274,16 @@
       "description": "attach({ targetId }) to the fixture's shared-worker, then detach",
       "status": "allowed",
       "statuses": ["allowed", "allowed", "allowed"],
+      "method": "cdp-load-unpacked",
       "details": [
         {
-          "targetId": "A1179AE73B7750F26E5C41645F35EF1F"
+          "targetId": "23036F4970B7DA6913AC77FC658CD359"
         },
         {
-          "targetId": "4BCE7B31A55FD9BF4C0534AE6AC9F6B0"
+          "targetId": "A43527DC377EB1D1DE3DCCEC39A27057"
         },
         {
-          "targetId": "30FA7AF96998957279C66EF0861934C1"
+          "targetId": "BA0BE18E6C67F85FA13BF377FE729E5D"
         }
       ]
     },
@@ -284,15 +291,16 @@
       "description": "attach({ tabId }) to the fixture page's tab",
       "status": "allowed",
       "statuses": ["allowed", "allowed", "allowed"],
+      "method": "cdp-load-unpacked",
       "details": [
         {
-          "tabId": 836469882
+          "tabId": 1769689903
         },
         {
-          "tabId": 836469882
+          "tabId": 1769689903
         },
         {
-          "tabId": 836469882
+          "tabId": 1769689903
         }
       ]
     },
@@ -300,6 +308,7 @@
       "description": "Target.setAutoAttach({ autoAttach, waitForDebuggerOnStart, flatten }) on the tab, then a reload and a cross-site iframe; every Target.attachedToTarget",
       "status": "allowed",
       "statuses": ["allowed", "allowed", "allowed"],
+      "method": "cdp-load-unpacked",
       "details": [
         [
           {
@@ -385,6 +394,7 @@
       "description": "auto-attach reports the dedicated-worker (Target.attachedToTarget)",
       "status": "allowed",
       "statuses": ["allowed", "allowed", "allowed"],
+      "method": "cdp-load-unpacked",
       "details": [
         [
           {
@@ -429,12 +439,14 @@
       "status": "rejected",
       "statuses": ["rejected", "rejected", "rejected"],
       "error": "no Target.attachedToTarget for the shared-worker",
+      "method": "cdp-load-unpacked",
       "details": [null, null, null]
     },
     "auto-attach-service-worker": {
       "description": "auto-attach reports the service-worker (Target.attachedToTarget)",
       "status": "allowed",
       "statuses": ["allowed", "allowed", "allowed"],
+      "method": "cdp-load-unpacked",
       "details": [
         [
           {
@@ -463,6 +475,7 @@
       "description": "auto-attach reports the iframe (Target.attachedToTarget)",
       "status": "allowed",
       "statuses": ["allowed", "allowed", "allowed"],
+      "method": "cdp-load-unpacked",
       "details": [
         [
           {
@@ -491,6 +504,7 @@
       "description": "Runtime.runIfWaitingForDebugger releases every auto-attached target that waited",
       "status": "allowed",
       "statuses": ["allowed", "allowed", "allowed"],
+      "method": "cdp-load-unpacked",
       "details": [
         [
           {
@@ -528,15 +542,16 @@
       "description": "attach({ targetId }) to the fixture's dedicated-worker, then detach",
       "status": "allowed",
       "statuses": ["allowed", "allowed", "allowed"],
+      "method": "cdp-load-unpacked",
       "details": [
         {
-          "targetId": "6C8150F07C5C2EE70E8431D0D44330F8"
+          "targetId": "92E4AB35E8CAB2361E0275EA6866E28B"
         },
         {
-          "targetId": "879F334FBDB8C20074FE1F8F9666EFE6"
+          "targetId": "A2495FE74F8B9E5112812B192CC106FA"
         },
         {
-          "targetId": "14137FD56E162C6CA0B961FF60A66509"
+          "targetId": "8E346F56BC470B1290DF3902127AE0EB"
         }
       ]
     },
@@ -545,6 +560,7 @@
       "status": "rejected",
       "statuses": ["rejected", "rejected", "rejected"],
       "error": "{\"code\":-32000,\"message\":\"Not allowed\"}",
+      "method": "cdp-load-unpacked",
       "details": [null, null, null]
     },
     "tab-attach-to-service-worker": {
@@ -552,6 +568,7 @@
       "status": "rejected",
       "statuses": ["rejected", "rejected", "rejected"],
       "error": "{\"code\":-32000,\"message\":\"Not allowed\"}",
+      "method": "cdp-load-unpacked",
       "details": [null, null, null]
     },
     "service-worker-enable": {
@@ -559,12 +576,14 @@
       "status": "rejected",
       "statuses": ["rejected", "rejected", "rejected"],
       "error": "{\"code\":-32601,\"message\":\"'ServiceWorker.enable' wasn't found\"}",
+      "method": "cdp-load-unpacked",
       "details": [null, null, null]
     },
     "fetch-enable-worker-scripts": {
       "description": "Fetch.enable with patterns on the worker scripts, on the tab session",
       "status": "allowed",
       "statuses": ["allowed", "allowed", "allowed"],
+      "method": "cdp-load-unpacked",
       "details": [
         {
           "patterns": 3
@@ -581,6 +600,7 @@
       "description": "Storage.getCookies on the tab session (count only; values are never recorded)",
       "status": "allowed",
       "statuses": ["allowed", "allowed", "allowed"],
+      "method": "cdp-load-unpacked",
       "details": [
         {
           "count": 0
@@ -597,6 +617,7 @@
       "description": "Network.setCookie on the fixture origin, then Network.deleteCookies",
       "status": "allowed",
       "statuses": ["allowed", "allowed", "allowed"],
+      "method": "cdp-load-unpacked",
       "details": [
         {
           "success": true
@@ -613,18 +634,21 @@
       "description": "Network.enable on the tab session",
       "status": "allowed",
       "statuses": ["allowed", "allowed", "allowed"],
+      "method": "cdp-load-unpacked",
       "details": [null, null, null]
     },
     "page-add-script-on-new-document": {
       "description": "Page.addScriptToEvaluateOnNewDocument on the tab session, then removed",
       "status": "allowed",
       "statuses": ["allowed", "allowed", "allowed"],
+      "method": "cdp-load-unpacked",
       "details": [null, null, null]
     },
     "worker-runtime-evaluate": {
       "description": "Runtime.evaluate on the service worker session (attach by targetId)",
       "status": "allowed",
       "statuses": ["allowed", "allowed", "allowed"],
+      "method": "cdp-load-unpacked",
       "details": [
         {
           "value": "/sw-main.js"
@@ -641,6 +665,7 @@
       "description": "Fetch.enable with worker-script patterns on the service worker session",
       "status": "allowed",
       "statuses": ["allowed", "allowed", "allowed"],
+      "method": "cdp-load-unpacked",
       "details": [null, null, null]
     },
     "worker-service-worker-enable": {
@@ -648,12 +673,14 @@
       "status": "rejected",
       "statuses": ["rejected", "rejected", "rejected"],
       "error": "{\"code\":-32601,\"message\":\"'ServiceWorker.enable' wasn't found\"}",
+      "method": "cdp-load-unpacked",
       "details": [null, null, null]
     },
     "worker-debugger-pause": {
       "description": "Debugger.pause then Debugger.resume on the service worker session",
       "status": "allowed",
       "statuses": ["allowed", "allowed", "allowed"],
+      "method": "cdp-load-unpacked",
       "details": [
         {
           "pausedEventArrived": true
@@ -671,12 +698,14 @@
       "status": "rejected",
       "statuses": ["rejected", "rejected", "rejected"],
       "error": "{\"code\":-32000,\"message\":\"Runtime.terminateExecution is not allowed for untrusted clients\"}",
+      "method": "cdp-load-unpacked",
       "details": [null, null, null]
     },
     "worker-close-target": {
       "description": "Target.closeTarget on the service worker, sent on its own session",
       "status": "allowed",
       "statuses": ["allowed", "allowed", "allowed"],
+      "method": "cdp-load-unpacked",
       "details": [
         {
           "success": true,
@@ -696,6 +725,7 @@
       "description": "detach every remaining session; chrome.debugger.onDetach reasons",
       "status": "allowed",
       "statuses": ["allowed", "allowed", "allowed"],
+      "method": "cdp-load-unpacked",
       "details": [
         {
           "detached": ["ok", "ok", "ok"],
@@ -715,6 +745,7 @@
       "description": "the debugger infobar stays hidden with --silent-debugger-extension-api",
       "status": "allowed",
       "statuses": ["allowed", "allowed", "allowed"],
+      "method": "cdp-load-unpacked",
       "details": [
         {
           "evidence": "chrome.tabs height",

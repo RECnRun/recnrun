@@ -12,6 +12,8 @@ export interface Verdict {
   chrome: string;
   samples: number;
   label?: "diagnostic" | "control";
+  /** How the extension was loaded (E0's methods), for experiments that run inside it. */
+  method?: string;
   /** Sub-cases of the hypothesis, when it was tried more than one way. */
   variants?: { name: string; verdict: Verdict["verdict"]; error?: string }[];
 }

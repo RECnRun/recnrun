@@ -9,6 +9,9 @@ export const SOURCE = join(DOCS, "capabilities.json");
 export const TARGET = join(DOCS, "CAPABILITIES.md");
 const COMMAND = `node scripts/generate-capabilities.mjs ${SOURCE.split("\\").join("/")}`;
 const DETAIL_LENGTH = 120;
+const DIAGNOSTIC = "diagnostic";
+const DIAGNOSTIC_NOTE =
+  "> **Diagnostic run.** These results come from a browser other than Google Chrome Stable; every probe is labelled `diagnostic` and must not feed a GO decision (PLAN.md decisions 3 and 7).";
 
 /** SHA-256 of the JSON without formatting, so reformatting the committed file keeps the hash. */
 export function canonicalHash(text) {
@@ -47,7 +50,8 @@ function firstDetail(probe) {
 function statusOf(probe) {
   const statuses = probe.statuses ?? [];
   const uniform = statuses.every((status) => status === statuses[0]);
-  return uniform ? probe.status : `${probe.status} (${statuses.join(", ")})`;
+  const status = uniform ? probe.status : `${probe.status} (${statuses.join(", ")})`;
+  return probe.label === DIAGNOSTIC ? `${status} (${DIAGNOSTIC})` : status;
 }
 
 function probeRows(probes) {
@@ -62,22 +66,35 @@ function probeRows(probes) {
 
 const list = (values) => (values?.length ? values.map(code).join(", ") : "none");
 
-/** The Markdown for one capabilities.json; `text` is its source, for the footer hash. */
-export function renderCapabilities(text) {
-  const capabilities = JSON.parse(text);
+/** What ran the probes: a `diagnostic` label means the fixture fell back to Playwright's Chromium. */
+function browserOf(probe) {
+  if (probe.label === DIAGNOSTIC)
+    return `${DIAGNOSTIC}: not Google Chrome Stable (PLAN.md decision 3)`;
+  return probe.method ? "Google Chrome Stable" : "unknown";
+}
+
+function factsTable(capabilities) {
   const probe = capabilities.debuggerProbe ?? {};
   const load = capabilities.extensionLoad ?? {};
-  const facts = table(
+  return table(
     ["Fact", "Value"],
     [
       ["Chrome", capabilities.chrome?.version ?? "unknown"],
+      ["Browser", browserOf(probe)],
       ["Probed on", probe.date ?? "unknown"],
       ["Extension load method", load.method ? code(load.method) : "unknown"],
+      ["Debugger probe load method", probe.method ? code(probe.method) : "unknown"],
       ["Permissions", list(probe.permissions)],
       ["Host permissions", list(probe.hostPermissions)],
       ["Samples per probe", String(probe.samples ?? "unknown")],
     ],
   );
+}
+
+/** The Markdown for one capabilities.json; `text` is its source, for the footer hash. */
+export function renderCapabilities(text) {
+  const capabilities = JSON.parse(text);
+  const diagnostic = capabilities.debuggerProbe?.label === DIAGNOSTIC;
   const probes = table(
     ["Probe", "Hypothesis", "Status", "Samples", "Exact error, or result of the first sample"],
     probeRows(capabilities.debugger ?? {}),
@@ -87,10 +104,11 @@ export function renderCapabilities(text) {
     "",
     `Generated from [capabilities.json](capabilities.json) by \`${COMMAND}\`; do not edit by hand. \`vp run docs:check\` fails when this file is stale. The probes and their reading are in [experiments/E1.md](experiments/E1.md). A status is what the isolator observed from inside the extension: \`allowed\` (the call answered and its observable effect happened, or the hypothesis held), \`rejected\` (Chrome refused, with its exact error, or Chrome accepted the call without the effect, or the hypothesis did not hold, with what did not happen), \`unavailable\` (a precondition was missing). capabilities.json keeps every sample's detail; the table shows the first.`,
     "",
-    facts,
+    factsTable(capabilities),
     "",
     "## chrome.debugger probes",
     "",
+    ...(diagnostic ? [DIAGNOSTIC_NOTE, ""] : []),
     probes,
     "",
     `Source: SHA-256 of the canonical JSON (\`JSON.stringify\` without whitespace) of capabilities.json: \`${canonicalHash(text)}\`.`,

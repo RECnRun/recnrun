@@ -17,6 +17,7 @@ const capabilities = {
   debuggerProbe: {
     date: "2026-11-02",
     samples: 3,
+    method: "cdp-load-unpacked",
     permissions: ["storage", "debugger"],
     hostPermissions: [],
   },
@@ -66,6 +67,34 @@ test("renders the Chrome version, date, load method, and permissions", () => {
   assert.match(markdown, /\| Probed on .*\| 2026-11-02 /);
   assert.match(markdown, /\| `cdp-load-unpacked` /);
   assert.match(markdown, /\| Host permissions .*\| none /);
+});
+
+test("names the browser and the probe's load method", () => {
+  const markdown = renderCapabilities(text);
+  assert.match(markdown, /\| Browser +\| Google Chrome Stable +\|/);
+  assert.match(markdown, /\| Debugger probe load method +\| `cdp-load-unpacked` +\|/);
+  assert.doesNotMatch(markdown, /diagnostic/i);
+});
+
+test("marks a diagnostic run in the facts, above the table, and on every probe", () => {
+  const diagnostic = structuredClone(capabilities);
+  diagnostic.chrome.version = "Google Chrome for Testing 156.0.8078.4";
+  Object.assign(diagnostic.debuggerProbe, {
+    method: "chromium-load-extension",
+    label: "diagnostic",
+  });
+  for (const entry of Object.values(diagnostic.debugger)) {
+    Object.assign(entry, { method: "chromium-load-extension", label: "diagnostic" });
+  }
+  const markdown = renderCapabilities(JSON.stringify(diagnostic));
+  assert.match(
+    markdown,
+    /\| Browser +\| diagnostic: not Google Chrome Stable \(PLAN\.md decision 3\) +\|/,
+  );
+  assert.match(markdown, /\n> \*\*Diagnostic run\.\*\* .*must not feed a GO decision/);
+  const rows = markdown.split("\n").filter((line) => line.startsWith("| `"));
+  assert.equal(rows.length, 4);
+  for (const row of rows) assert.match(row, /\| (allowed|rejected)[^|]* \(diagnostic\) +\|/);
 });
 
 test("renders one row per probe with its status and exact error, escaping pipes", () => {

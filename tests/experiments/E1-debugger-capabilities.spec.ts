@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "../browser/fixtures/extension.ts";
 import type { LoadedExtension } from "../browser/fixtures/extension.ts";
-import { aggregate } from "./e1-aggregate.ts";
+import { browserOf, provenance, summarize } from "./e1-aggregate.ts";
 import type { ProbeResult } from "./e1-aggregate.ts";
 import { appendVerdict, mergeCapabilities } from "./verdicts.ts";
 
@@ -26,6 +26,8 @@ const WORKER_SCRIPTS = [
 ];
 const HARNESS = "globalThis.recnrunProbes";
 const INFOBAR = "infobar-hidden";
+const INFOBAR_DESCRIPTION =
+  "the debugger infobar stays hidden with --silent-debugger-extension-api";
 const INFOBAR_SETTLE_MS = 1_000;
 
 async function ledgerPaths(): Promise<string[]> {
@@ -109,14 +111,12 @@ async function record(
     extension,
     `${HARNESS}.descriptions`,
   );
-  const capabilities: Record<string, unknown> = {};
-  for (const [id, results] of samples) {
-    const { verdict, capability } = aggregate(id, results, extension.chrome.version);
-    await appendVerdict(verdict);
-    const description =
-      descriptions[id] ?? "the debugger infobar stays hidden with --silent-debugger-extension-api";
-    capabilities[id] = { description, ...capability };
-  }
+  const { verdicts, capabilities } = summarize(
+    samples,
+    { ...descriptions, [INFOBAR]: INFOBAR_DESCRIPTION },
+    browserOf(extension),
+  );
+  for (const verdict of verdicts) await appendVerdict(verdict);
   return capabilities;
 }
 
@@ -168,6 +168,7 @@ test.describe("E1: chrome.debugger capabilities from inside the isolator", () =>
       debuggerProbe: {
         date: new Date().toISOString().slice(0, 10),
         samples: SAMPLES,
+        ...provenance(browserOf(extension)),
         ...(await permissions(extension)),
       },
       debugger: await record(extension, samples),
