@@ -11,6 +11,8 @@ export interface DiscoveryFileSystem {
 /** Where to look; platform, env, fs, and probe are injectable so tests need no real Chrome. */
 export interface DiscoverOptions {
   userDataDir?: string;
+  /** A DevToolsActivePort path; its folder is the user-data dir. */
+  activePortFile?: string;
   channel?: ChromeChannel;
   platform?: string;
   env?: Record<string, string | undefined>;
@@ -101,11 +103,14 @@ async function readActivePort(fs: DiscoveryFileSystem, file: string): Promise<st
 
 function locate(options: DiscoverOptions): { userDataDir: string; file: string } {
   const platform = options.platform ?? process.platform;
+  const path = platform === "win32" ? win32 : posix;
+  if (options.activePortFile) {
+    return { userDataDir: path.dirname(options.activePortFile), file: options.activePortFile };
+  }
   const userDataDir =
     options.userDataDir ??
     defaultUserDataDir(options.channel ?? "stable", platform, options.env ?? process.env);
-  const file = (platform === "win32" ? win32 : posix).join(userDataDir, ACTIVE_PORT_FILE);
-  return { userDataDir, file };
+  return { userDataDir, file: path.join(userDataDir, ACTIVE_PORT_FILE) };
 }
 
 /** Finds the CDP endpoint of a running Chrome through `<userDataDir>/DevToolsActivePort`. */

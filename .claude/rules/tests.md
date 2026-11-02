@@ -42,7 +42,8 @@ paths:
 
 ## Writing browser tests
 
-- Import `test` and `expect` from `tests/browser/fixtures/chrome.ts`. Its `chrome` fixture launches the installed Google Chrome headed with a fresh `--user-data-dir` and `--remote-debugging-port=0`, waits for `DevToolsActivePort`, exposes `port`, `wsPath`, `wsEndpoint`, `version`, and `pid`, and deletes the directory on teardown; `launchChrome()` starts extra instances.
+- Import `test` and `expect` from `tests/browser/fixtures/chrome.ts`. Its `chrome` fixture launches the installed Google Chrome headed with a fresh `--user-data-dir` and `--remote-debugging-port=0`, waits for `DevToolsActivePort`, exposes `port`, `wsPath`, `wsEndpoint`, `version`, and `pid`, and deletes the directory on teardown; `launchChrome()` starts extra instances. `relaunch()` waits for that Chrome to exit (stopping it if needed) and starts another on the same profile, for crash and reconnection tests.
+- `tests/browser/fixtures/cdp-client.ts` opens a raw CDP client of its own, standing in for DevTools or another debugger.
 - The fixture resolves Chrome from `RECNRUN_CHROME_PATH`, then `google-chrome` or `google-chrome-stable` on `PATH`, then the macOS app. Chrome runs as root in the container, so `--no-sandbox` is added only when `RECNRUN_TEST_CONTAINER=1`.
 - `tests/browser/fixtures/fixture-app.ts` extends that `test` with `app`: it connects Playwright with `chromium.connectOverCDP(chrome.wsEndpoint)`, opens a fixture route with `app.open(route, query)`, and waits for `window.__fixture.ready`. `playwright.browser.config.ts` starts the fixture application on ports 4600 and 4601 ([ARCHITECTURE.md](../../docs/ARCHITECTURE.md#fixture-application)).
 - Every Docker run writes `versions.json` (Chrome, Node, pnpm, Playwright, image id). Report results as "Google Chrome <version> on Linux", never as validation of the default profile.

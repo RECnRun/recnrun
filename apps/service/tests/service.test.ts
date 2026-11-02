@@ -3,7 +3,11 @@ import { flowFolderLayout as persistence } from "@recnrun/persistence";
 import { createLocalService, createService } from "@/index";
 
 test("reports health with the engine's protocol version", () => {
-  const engine = { version: 7, connect: async () => {}, disconnect: async () => {} };
+  const engine = {
+    version: 7,
+    connect: () => Promise.reject(new Error("unused")),
+    disconnect: async () => {},
+  };
   expect(createService({ engine, persistence }).health()).toEqual({ ok: true, version: 7 });
 });
 

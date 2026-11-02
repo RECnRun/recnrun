@@ -71,6 +71,9 @@ export const GapPayloadSchema = v.strictObject({
   fromSeq: v.optional(CountSchema),
   toSeq: v.optional(CountSchema),
   lost: v.optional(CountSchema),
+  // When the collector noticed the gap, and the last sequence it had seen before it.
+  startedAt: v.optional(IsoTimestampSchema),
+  lastSeq: v.optional(CountSchema),
 });
 
 /** One journal line (source plan §11): an observed event or an explicit gap. */
@@ -87,3 +90,37 @@ export const EventCategorySchema = v.picklist([...EVENT_CATEGORIES, "gap"]);
 
 export type Event = v.InferOutput<typeof EventSchema>;
 export type GapPayload = v.InferOutput<typeof GapPayloadSchema>;
+
+/** The CDP signals that show another client already controls a target. */
+export const CONTESTED_SIGNALS = ["attached-before-connect"] as const;
+
+// Producer sequence, time, and the browser endpoint every adapter event carries.
+const adapterEventEntries = {
+  seq: CountSchema,
+  at: IsoTimestampSchema,
+  endpoint: NonEmptyStringSchema,
+};
+
+/** The CDP connection dropped (Chrome crashed, quit, or closed the socket); `gap` is a journal gap payload. */
+export const ConnectionLostEventSchema = v.strictObject({
+  type: v.literal("connection.lost"),
+  ...adapterEventEntries,
+  gap: v.strictObject({ ...GapPayloadSchema.entries, reason: v.literal("connection-lost") }),
+});
+
+/** Another debugger (DevTools or a second client) is attached to a target; RECnRun never detaches it. */
+export const ControlContestedEventSchema = v.strictObject({
+  type: v.literal("control.contested"),
+  ...adapterEventEntries,
+  targetId: NonEmptyStringSchema,
+  url: v.string(),
+  signal: v.picklist(CONTESTED_SIGNALS),
+});
+
+/** What the browser adapter reports about its connection, before the engine journals it. */
+export const AdapterEventSchema = v.variant("type", [
+  ConnectionLostEventSchema,
+  ControlContestedEventSchema,
+]);
+
+export type AdapterEvent = v.InferOutput<typeof AdapterEventSchema>;

@@ -12,7 +12,8 @@
   "dependencies": {
     "@recnrun/engine": "workspace:*",
     "@recnrun/protocol": "workspace:*",
-    "playwright-core": "catalog:"
+    "playwright-core": "catalog:",
+    "valibot": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",

@@ -77,11 +77,13 @@ test("every F0 deliverable is implemented", () => {
   }
 });
 
-test.each([["chrome-discovery", "tests/browser/discover.spec.ts"]])(
-  "the F1 deliverable %s is implemented and names %s",
-  (id, spec) => {
-    const entry = entries.find((candidate) => candidate.id === id);
-    expect(entry?.status, id).toBe("implemented");
-    expect(entry?.notes, id).toContain(spec);
-  },
-);
+test.each([
+  ["chrome-discovery", "implemented", "tests/browser/discover.spec.ts"],
+  ["cdp-connection", "implemented", "tests/browser/connect.spec.ts"],
+  ["connection-loss-reconnect", "implemented", "tests/browser/connect.spec.ts"],
+  ["contested-control", "partial", "tests/browser/connect.spec.ts"],
+])("the F1 deliverable %s is %s and names %s", (id, status, spec) => {
+  const entry = entries.find((candidate) => candidate.id === id);
+  expect(entry?.status, id).toBe(status);
+  expect(entry?.notes, id).toContain(spec);
+});

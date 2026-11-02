@@ -66,12 +66,33 @@ export const FEATURE_CAPABILITIES: Feature[] = [
     notes:
       "Delivered by F1.1; tests/browser/discover.spec.ts on Linux in Docker. The default-profile dialog on macOS and Windows stays manual (M-F1.a, M-F1.b).",
   },
-  planned(
-    "cdp-connection",
-    "F1.2",
-    "CDP connection and handshake",
-    "Cannot attach to a Chrome that has not enabled remote debugging.",
-  ),
+  {
+    kind: "feature",
+    id: "cdp-connection",
+    title: "CDP connection and handshake",
+    status: "implemented",
+    phase: "F1.2",
+    notes:
+      "Delivered by F1.2; tests/browser/connect.spec.ts on Linux in Docker. Reads Browser.getVersion and probes eight domains. Cannot attach to a Chrome that has not enabled remote debugging.",
+  },
+  {
+    kind: "feature",
+    id: "connection-loss-reconnect",
+    title: "Connection loss and reconnection",
+    status: "implemented",
+    phase: "F1.2",
+    notes:
+      "Delivered by F1.2; tests/browser/connect.spec.ts kills Chrome: connection.lost carries a gap, and reconnect succeeds only once the same DevToolsActivePort answers again.",
+  },
+  {
+    kind: "feature",
+    id: "contested-control",
+    title: "Another debugger on a target",
+    status: "partial",
+    phase: "F1.2",
+    notes:
+      "F1.2; tests/browser/connect.spec.ts. control.contested is reported for a page another client attached before RECnRun connected or reconnected, and that client is never detached. CDP exposes only a per-target attached flag and no event once RECnRun is attached, so DevTools opened later goes unnoticed (M-F1.d).",
+  },
   planned(
     "profile-bindings",
     "F1.3",

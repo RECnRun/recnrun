@@ -178,3 +178,10 @@ describe("default user-data dir", () => {
     expect(result).toMatchObject({ userDataDir: "/profiles/a" });
   });
 });
+
+test("reads an explicit DevToolsActivePort file and reports its folder", async () => {
+  const port = await listen();
+  const activePortFile = join(userDataDir, "DevToolsActivePort");
+  await writeActivePort(`${port}\n${BROWSER_PATH}\n`);
+  expect(await discover({ activePortFile })).toMatchObject({ ok: true, port, userDataDir });
+});

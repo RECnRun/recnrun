@@ -1,0 +1,107 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "oneOf": [
+    {
+      "additionalProperties": false,
+      "properties": {
+        "at": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "endpoint": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "gap": {
+          "additionalProperties": false,
+          "properties": {
+            "fromSeq": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "lastSeq": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "lost": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "reason": {
+              "const": "connection-lost"
+            },
+            "startedAt": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "surface": {
+              "enum": [
+                "dom-events",
+                "navigation",
+                "network",
+                "websocket-sse",
+                "console-errors",
+                "dom-screen",
+                "web-storage",
+                "cookies",
+                "indexeddb",
+                "cache-storage",
+                "files-opfs",
+                "workers-frames"
+              ],
+              "type": "string"
+            },
+            "toSeq": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": ["reason"],
+          "type": "object"
+        },
+        "seq": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "type": {
+          "const": "connection.lost"
+        }
+      },
+      "required": ["type", "seq", "at", "endpoint", "gap"],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "at": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "endpoint": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "seq": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "signal": {
+          "enum": ["attached-before-connect"],
+          "type": "string"
+        },
+        "targetId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "type": {
+          "const": "control.contested"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": ["type", "seq", "at", "endpoint", "targetId", "url", "signal"],
+      "type": "object"
+    }
+  ]
+}
