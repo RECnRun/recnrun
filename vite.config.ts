@@ -82,6 +82,7 @@ export default defineConfig({
       "packages/domain",
       "packages/bridge",
       "packages/isolation-core",
+      "packages/worker-bootstrap",
       "apps/fixture",
       "apps/isolator",
       "tests/vitest.config.ts",

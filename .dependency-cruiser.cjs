@@ -141,6 +141,17 @@ module.exports = {
       },
     },
     {
+      name: "worker-bootstrap-only-core",
+      severity: "error",
+      comment:
+        "The worker bootstrap bundles isolation-core into one script and nothing else; its build helpers may use Node built-ins (POC PLAN.md §5).",
+      from: { path: "^packages/worker-bootstrap/src/" },
+      to: {
+        pathNot: ["^packages/worker-bootstrap/src/", "^packages/isolation-core/src/"],
+        dependencyTypesNot: ["core"],
+      },
+    },
+    {
       name: "brand-is-leaf",
       severity: "error",
       comment: "Brand holds assets shared by both apps; it depends on nothing.",

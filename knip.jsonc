@@ -17,6 +17,10 @@
       // cookie-capture.ts names upstream's runtime framework; P3 adapts it inside apps/isolator.
       "ignoreDependencies": ["wxt"],
     },
+    "packages/worker-bootstrap": {
+      // vite.config.ts names the bundle's entry by path.
+      "entry": ["src/entrypoints/*.ts"],
+    },
     "apps/fixture": {
       // Browsers load the public files by URL.
       "entry": ["public/**/*.js"],

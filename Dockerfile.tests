@@ -31,16 +31,18 @@ COPY apps/isolator/package.json ./apps/isolator/package.json
 COPY packages/domain/package.json ./packages/domain/package.json
 COPY packages/bridge/package.json ./packages/bridge/package.json
 COPY packages/isolation-core/package.json ./packages/isolation-core/package.json
+COPY packages/worker-bootstrap/package.json ./packages/worker-bootstrap/package.json
 COPY packages/brand/package.json ./packages/brand/package.json
 # Lifecycle scripts need the sources; prepare runs again after they are copied.
 RUN --mount=type=cache,target=/root/.local/share/pnpm/store,sharing=locked \
     vp install --frozen-lockfile --ignore-scripts
 
 COPY . .
-# pnpm skips "prepare" when node_modules is already current, so generate WXT's types explicitly.
+# pnpm skips "prepare" when node_modules is already current, so run its WXT and bootstrap steps explicitly.
 RUN vp install --frozen-lockfile --offline \
     && vp run extension#wxt:prepare \
     && vp run @recnrun/isolator#wxt:prepare \
+    && vp run @recnrun/worker-bootstrap#build \
     && mkdir -p coverage test-results playwright-report .artifacts/evidence /opt/recnrun
 
 # scripts/test-container.mjs copies this file into the run's versions.json.

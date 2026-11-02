@@ -1,0 +1,20 @@
+{
+  "name": "@recnrun/worker-bootstrap",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "vp build && tsc --noEmit"
+  },
+  "dependencies": {
+    "@recnrun/isolation-core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vite-plus": "catalog:"
+  }
+}
