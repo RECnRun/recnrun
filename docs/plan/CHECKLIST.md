@@ -27,10 +27,16 @@ Markers: `[ ]` not started · `[i]` implemented, awaiting the phase gate · `[x]
   - red: in a scratch worktree with the workspaces but no boundary rules, `packages/engine` depending on and importing `playwright-core` passed `vp run deps`; with the rules it failed with `error engine-not-to-adapter-impl: packages/engine/src/index.ts → node_modules/.pnpm/playwright-core@1.64.1/node_modules/playwright-core/index.d.ts`, and the fixture and ui negatives failed with `fixture-isolated` (`apps/fixture/src/index.ts → packages/protocol/src/index.ts`) and `ui-only-protocol` (`apps/ui/src/app/App.tsx → packages/engine/src/index.ts`); one negative each also tripped `protocol-pure`, `adapter-boundaries`, `persistence-boundaries`, `service-boundaries`, and `cli-only-service`. `vp run test:unit` against stub implementations failed 16 of 23; `vp run test:components` against a no-op ui `mount` failed 1 of 2 (`expected undefined to be 'RECnRun'`); a no-op default CLI writer failed `writes to standard output by default`
   - green: `vp run deps` (6 cruises, no violations), `vp run test:unit` (24 passed), `vp run test:components` (website 5, ui 2 passed), `vp run test:coverage` (91.42% statements, 100% branches, 100% functions, 90.62% lines), `vp check`, `vp lint --deny-warnings`, `vp run dead-code`, `vp run duplication` (0 clones), `vp run docs:check`, `vp run test:container` (10 passed), `vp run -r build` (11/11); `node apps/cli/src/bin.ts --version` prints `RECnRun protocol 1`
   - commit: the commit that adds this entry
-- [ ] F0.3 Protocol schemas v1 with JSON Schema drift test
+- [i] F0.3 Protocol schemas v1 with JSON Schema drift test
+  - red: `vp test --project=@recnrun/protocol` against accept-all stubs (64 of 91 failed, for example `expected [] to deeply equal [ [ 'unknown-action', … ] ]` per invalid fixture); drift in a scratch copy after adding a field to `FlowSchema` (`flow.schema.json is stale; run vp run schema:generate`); the `steps`/`otherwise` rename against the first commit (3 of 27 failed in `flow.test.ts`)
+  - green: `vp test --project=@recnrun/protocol` (110 passed); `vp run test:unit` (128 passed in Docker); `vp run test:coverage` (protocol 99.57% statements, 89.23% branches); `vp lint --deny-warnings` (no warnings); `deps`, `dead-code`, `duplication`, `docs:check`, `vp run -r build` exit 0
+  - commit: 72a0923, d47bd0e (cherry-picked from the agent worktree commits f7df0ba, c266235; the `if` block uses `steps`/`otherwise` because a `then` key makes a thenable)
 - [ ] F0.4 Capability matrix as code, `docs/CAPABILITIES.md` generated
 - [ ] F0.5 Fixture application
-- [ ] F0.6 Google Chrome in Docker, `test:browser` layer
+- [i] F0.6 Google Chrome in Docker, `test:browser` layer
+  - red: `vp run test:container` with the new checks before the Dockerfile change (`exec: "google-chrome": executable file not found in $PATH`, `versions.json` ENOENT, `manifest.scripts["test:browser"]` undefined); `vp run test:browser` against a stub fixture returning empty strings (`expect(lines).toHaveLength(2)` received `[""]`)
+  - green: `vp run test:browser` (2 passed on Google Chrome 156.0.8078.79, Linux arm64, Docker); `vp run test:container` (12 passed); `vp check`, `vp lint --deny-warnings`, `deps`, `dead-code`, `duplication`, `docs:check`, `test:hooks`, `test:scripts`, `test:e2e` (4 passed), `vp run -r build` exit 0
+  - commit: 57a0ed2 (cherry-picked from the agent worktree commit acc95ce)
 - Gate F0: `vp run verify` → (date, result)
 
 ## F1: Connection and fidelity spike
