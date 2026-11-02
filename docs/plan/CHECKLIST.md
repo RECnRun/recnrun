@@ -15,7 +15,7 @@ Markers: `[ ]` not started · `[i]` implemented, awaiting the phase gate · `[x]
 
 **Branch:** `local-engine-plan` (plan only; implementation branches are named after the phase, `f0-contracts`, `f1-spike`, …)
 **Last commit:** the branch tip whose subject is "Add the phased plan for the local engine over CDP" (no hash: the commit cannot name itself)
-**Current phase:** F0
+**Current phase:** F0 (assumptions of PLAN.md §8 confirmed by the owner on 2026-11-02; start with F0.1 on branch `f0-contracts`)
 
 ## F0: Contracts and skeleton
 

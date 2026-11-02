@@ -280,12 +280,12 @@ Implemented in the phase that introduces the surface, listed here so none is for
 - Spike results are reported as "Google Chrome <version> on Linux in Docker" until a manual item confirms the same on Windows or macOS.
 - Nothing is published and nothing is pushed to `master` without the owner's explicit authorization.
 
-## 8. Assumptions to confirm
+## 8. Assumptions, confirmed
 
-Work proceeds under these; the owner can overturn any of them before the affected phase starts.
+The owner confirmed all five on 2026-11-02. They are decisions now; F0.1 acts on them.
 
-1. Deleting `apps/extension` and `packages/bridge` is acceptable (decision 2). If not, F0.1 keeps them unbuilt and excluded from `verify`.
-2. `apps/website` stays as the public landing on GitHub Pages and only gains the install guide.
+1. `apps/extension` and `packages/bridge` are deleted in F0.1 (decision 2); history stays on `master` and in the archive tags.
+2. `apps/website` stays as the public landing on GitHub Pages and gains the install guide.
 3. Node 24 LTS is the official runtime; Node 22.18+ is tolerated.
-4. Google Chrome Stable for Linux in Docker is accepted as the automated target; the default profile on Windows and macOS is validated manually.
-5. The npm scope `@recnrun` is created by the owner before F7.4.
+4. Google Chrome Stable for Linux in Docker is the automated target; the default profile on Windows and macOS is validated manually.
+5. The owner creates the npm scope `@recnrun` before F7.4.
