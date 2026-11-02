@@ -28,6 +28,14 @@ export class JournalFileError extends Error {
   }
 }
 
+/** An earlier write to the journal failed, so it accepts no more lines (`journal-failed`). */
+export class JournalFailedError extends Error {
+  constructor(path: string, cause: unknown) {
+    super(`journal-failed: ${path} stopped after a write error.`, { cause });
+    this.name = "JournalFailedError";
+  }
+}
+
 const NEWLINE = 0x0a;
 const TAIL_CHUNK = 65_536;
 
@@ -58,12 +66,26 @@ async function dropTruncatedTail(handle: FileHandle): Promise<void> {
   await handle.truncate(await lastLineEnd(handle, size));
 }
 
+/** The file opener; tests inject one whose handle fails on demand. */
+export type OpenFile = (path: string, flags: "a+") => Promise<FileHandle>;
+
 /** Opens (creating it and its folder) the journal at `path` for appending. */
-export async function openJournal(path: string): Promise<JournalWriter> {
+export async function openJournal(path: string, openFile: OpenFile = open): Promise<JournalWriter> {
   await mkdir(dirname(path), { recursive: true });
-  const handle = await open(path, "a+");
+  const handle = await openFile(path, "a+");
   await dropTruncatedTail(handle);
   let tail: Promise<void> = Promise.resolve();
+  let failure: unknown;
+  // A failed write may have left a partial line, so nothing more is appended after it.
+  const write = async (line: string) => {
+    if (failure !== undefined) throw new JournalFailedError(path, failure);
+    try {
+      await handle.appendFile(line, "utf8");
+    } catch (error) {
+      failure = error;
+      throw error;
+    }
+  };
   return {
     path,
     append(event) {
@@ -71,13 +93,16 @@ export async function openJournal(path: string): Promise<JournalWriter> {
       if (!parsed.ok)
         return Promise.reject(new Error(`Refusing a journal line: ${parsed.message}`));
       // One write per line, chained, so concurrent appends never interleave.
-      const line = `${JSON.stringify(parsed.event)}\n`;
-      const written = tail.then(() => handle.appendFile(line, "utf8"));
+      const written = tail.then(() => write(`${JSON.stringify(parsed.event)}\n`));
       tail = written.catch(() => undefined);
       return written;
     },
     async close() {
       await tail;
+      if (failure !== undefined) {
+        await handle.close();
+        throw new JournalFailedError(path, failure);
+      }
       await handle.sync();
       await handle.close();
     },

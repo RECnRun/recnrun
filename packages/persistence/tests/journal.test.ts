@@ -1,4 +1,5 @@
-import { appendFile, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { appendFile, mkdtemp, open, readFile, rm, writeFile } from "node:fs/promises";
+import type { FileHandle } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Event } from "@recnrun/protocol";
@@ -95,4 +96,37 @@ test("a broken line before the last is corruption, reported with its line number
   await expect(readJournal(path)).rejects.toThrow(/line 2/);
   await writeFile(path, `${JSON.stringify({ ...event(3), category: "x" })}\n`);
   await expect(readJournal(path)).rejects.toThrow(/line 1: .*received "x"/);
+});
+
+/** A journal on a real file whose handle is wrapped by `wrap`, to inject I/O failures. */
+async function journalWith(wrap: (handle: FileHandle) => Partial<FileHandle>) {
+  return openJournal(path, async (file, flags) => {
+    const handle = await open(file, flags);
+    const overrides = wrap(handle);
+    return new Proxy(handle, {
+      get: (target, key) => {
+        if (key in overrides) return Reflect.get(overrides, key);
+        const value = Reflect.get(target, key) as unknown;
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    });
+  });
+}
+
+test("after a failed partial write every later append and close fail, and no line is glued on", async () => {
+  const disk = new Error("ENOSPC: no space left on device");
+  const writer = await journalWith((handle) => ({
+    appendFile: async (data: string) => {
+      await handle.appendFile(data.slice(0, 20));
+      throw disk;
+    },
+  }));
+  await expect(writer.append(event(1))).rejects.toBe(disk);
+  await expect(writer.append(event(2))).rejects.toThrow(/journal-failed/);
+  await expect(writer.close()).rejects.toThrow(/journal-failed/);
+  expect(await readFile(path, "utf8")).toBe(JSON.stringify(event(1)).slice(0, 20));
+  expect(await readJournal(path)).toMatchObject({
+    events: [],
+    gap: { reason: "journal-truncated" },
+  });
 });
