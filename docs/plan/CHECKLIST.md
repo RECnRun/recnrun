@@ -95,7 +95,11 @@ Markers: `[ ]` not started · `[i]` implemented, awaiting the phase gate · `[x]
 ## F2: First vertical flow without AI
 
 - [ ] F2.1 Service: loopback, token, Origin/Host, lock, logs, drain
-- [ ] F2.2 Sessions, control, leases, fencing, pause semantics
+- [i] F2.2 Sessions, control, leases, fencing, pause semantics
+  - red: `vp run test:unit -- packages/engine/tests/{session,lease,pause}.test.ts packages/protocol/tests/{lease,api,states}.test.ts` against stubs of today's behavior: 74 failed (e.g. "idle on start goes to recording" got illegal-transition; `tick()` returned `[]` instead of the expired lease; `pauseStepCreation` left steps on; `LeaseSchema` accepted `fencingToken` 0); capability-matrix F2 row expected `implemented`, received `planned`
+  - green: same command 198 passed; `vp run test:unit` 747 passed; `vp run test:coverage` 754 passed (engine/src 98.5% statements); check, lint `--deny-warnings`, deps, dead-code, duplication (0 clones), docs:check, `-r build` exit 0
+  - commit: 76ec0ca (worktree 53fa2da)
+  - note: transition tables in `packages/engine/src/machines.ts` (session, control, step, and one pause machine per mode), lease registry in `lease.ts` (`createLeaseRegistry({ now, ttlMs })`, injected time, `tick(now)` expires; lease id `<targetId>/<token>`, token starts at 1 and only grows per target; `acquire` on a held target is `lease-held`, `takeControl` succeeds at once over agent or replay, never over a person; `authorize` returns `stale-lease` with `currentFencingToken`), pauses in `session.ts` (a session is `paused` while any mode is paused; resuming `suspendCapture` returns a `capture-suspended` gap; a session stopped while capture is suspended leaves that gap for the service to close). Protocol: `RequestEnvelope.leaseToken` became `lease { leaseId, fencingToken }`, `SessionStatus` gained `pauses` and `lease`, `session.resume` requires `mode`, `PAUSE_MODES` moved to `states.ts`, new JSON Schema documents `lease` and `session-status`. Engine lease errors are TypeScript types; the service maps them to the protocol codes. Mutation check in a throwaway worktree: accepting older tokens failed 4 lease tests, one pause setting all modes failed 10 pause tests
 - [ ] F2.3 Normalization golden tests
 - [ ] F2.4 Flow persistence, revisions, journal, SQLite index rebuild
 - [ ] F2.5 Replay executor: actions, assertions, extraction, no blind retry
