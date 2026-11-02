@@ -9,6 +9,7 @@ import {
   CapturedEventSchema,
   DatasetSchema,
   DiscoveryResultSchema,
+  DoctorReportSchema,
   EventSchema,
   FlowManifestSchema,
   FlowSchema,
@@ -60,6 +61,7 @@ const DOCUMENTS: Record<string, AnySchema> = {
   "normalization-result": NormalizationResultSchema,
   "service-state": ServiceStateSchema,
   "service-lock": ServiceLockSchema,
+  "doctor-report": DoctorReportSchema,
 };
 
 // Named definitions give the flow's recursive schemas stable $ref names instead of generated ones.

@@ -1,0 +1,175 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "properties": {
+    "bindings": {
+      "additionalProperties": false,
+      "properties": {
+        "count": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "error": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "path": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "stale": {
+          "items": {
+            "pattern": "^\\S(?:.{0,78}\\S)?$",
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": ["path", "count", "stale"],
+      "type": "object"
+    },
+    "chrome": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "ok": {
+              "const": true
+            },
+            "path": {
+              "pattern": "^/devtools/browser/",
+              "type": "string"
+            },
+            "port": {
+              "maximum": 65535,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "source": {
+              "const": "active-port-file"
+            },
+            "userDataDir": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "wsEndpoint": {
+              "pattern": "^ws:\\/\\/127\\.0\\.0\\.1:\\d+\\/devtools\\/browser\\/",
+              "type": "string"
+            }
+          },
+          "required": ["ok", "wsEndpoint", "userDataDir", "source", "port", "path"],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "code": {
+              "enum": ["missing-file", "malformed-file", "stale-file"],
+              "type": "string"
+            },
+            "ok": {
+              "const": false
+            },
+            "remedy": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "userDataDir": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": ["ok", "code", "remedy", "userDataDir"],
+          "type": "object"
+        }
+      ]
+    },
+    "disk": {
+      "additionalProperties": false,
+      "properties": {
+        "freeBytes": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "path": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "totalBytes": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": ["path", "freeBytes", "totalBytes"],
+      "type": "object"
+    },
+    "node": {
+      "additionalProperties": false,
+      "properties": {
+        "required": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "satisfies": {
+          "type": "boolean"
+        },
+        "version": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": ["version", "required", "satisfies"],
+      "type": "object"
+    },
+    "ok": {
+      "type": "boolean"
+    },
+    "remoteDebugging": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "state": {
+          "enum": ["found", "not-found", "malformed", "stale"],
+          "type": "string"
+        }
+      },
+      "required": ["state"],
+      "type": "object"
+    },
+    "schemaVersion": {
+      "const": 1
+    },
+    "versions": {
+      "additionalProperties": false,
+      "properties": {
+        "cli": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "protocol": {
+          "const": 1
+        },
+        "service": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": ["cli", "service", "protocol"],
+      "type": "object"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "ok",
+    "node",
+    "chrome",
+    "remoteDebugging",
+    "bindings",
+    "disk",
+    "versions"
+  ],
+  "type": "object"
+}
