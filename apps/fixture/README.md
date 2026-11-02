@@ -7,7 +7,7 @@ vp run dev:fixture        # the four listeners on their default ports
 vp run fixture#freeze     # rewrite freeze.json (only with the owner's agreement, see below)
 ```
 
-Tests start it in-process with `startFixture({ ports })` from `src/server.ts`; port `0` picks a free port. One Node process serves four origins and keeps one in-memory ledger. There is no build: the files under `public/` are served as they are.
+Unit tests start it in-process with `startFixture({ ports })` from `src/server.ts`; port `0` picks a free port. The browser layer starts `scripts/serve.ts` on the default ports through Playwright's `webServer` (`playwright.browser.config.ts`), and `tests/browser/fixture.spec.ts` opens every route in Google Chrome Stable without the extension. One Node process serves four origins and keeps one in-memory ledger. There is no build: the files under `public/` are served as they are.
 
 ## Origins and routes
 
@@ -86,6 +86,12 @@ Observed on Google Chrome 156.0.8078.76 (macOS, headless, Playwright `channel: "
 - App → API requests carry `Sec-Fetch-Site: cross-site`; the app's own requests carry `same-origin`.
 - Every route answered as described: login by redirect and by popup, silent renew, logout, all storage probes, classic and module dedicated and shared workers, all five service worker variants (Background Sync registered and fired; the push subscription was refused with `NotAllowedError: Registration failed - permission denied`), WebSocket echo, EventSource, and the offline shell (network cut with Playwright's `setOffline` for this check only; POC tests cut it at the fixture with `/__network`).
 - Third-party cookies were allowed in that profile. A profile that blocks them would drop `api_sid` on the app's calls and `idp_sid` in the renew iframe; that is the browser's policy, not the fixture's.
+
+Observed on Google Chrome 156.0.8078.79 on Linux in Docker (headed on Xvfb, fresh profile, `tests/browser/fixture.spec.ts`, 2026-11-02), with the same results for every route and these facts, which are Chrome's behavior and not fixture failures:
+
+- `pushManager.subscribe()` waits on the notification permission prompt in headed Chrome, which nobody answers. The spec denies the permission with CDP `Browser.setPermission`, and the subscription then fails with `NotAllowedError: Registration failed - permission denied` in every variant.
+- A dynamic `import()` in a service worker rejects with `TypeError` by design (the HTML standard disallows it there), so the `dynamic` variant records the marker `sw:dynamic-import:TypeError`.
+- With the network cut by `/__network`, a navigation is answered by the service worker's offline shell, and the ledger records the dropped request for the page with `effect: "network:dropped"`.
 
 ## Freeze
 

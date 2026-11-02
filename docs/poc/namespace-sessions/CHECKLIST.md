@@ -42,15 +42,18 @@ Markers: `[ ]` not started · `[i]` implemented, awaiting the phase gate · `[x]
   - green: `vp test --project=@recnrun/isolation-core` (15 passed after trimming the vendor set to 11 runtime files); `vp check`, `vp run deps` pass; jscpd 0.20% (threshold 4%); Knip passes with `ignoreDependencies: ["wxt"]` scoped to the isolation-core workspace (the vendored `cookie-capture.ts` names upstream's runtime framework; P3 adapts it inside `apps/isolator`)
   - commit: the commit adding `packages/isolation-core` ("Vendor SplitSession modules into a new isolation-core package") and "Keep only the reusable SplitSession modules in the vendor set"
   - note: vendor set excludes upstream tests, fixtures, `dnr-simulator.ts`, and `legacy/`; Knip treats `vendor/splitsession/src/**/*.ts` as entries until P2
-- [~] P0.6 Fixture application, frozen
+- [i] P0.6 Fixture application, frozen
   - red: `vp run test:unit` exit 1, 21 fixture tests failed against a stub that answers 404 with no `freeze.json` (`expected 404 to be 400`, `No Location header on http://127.0.0.1:39743/login (404)`, `expected { …(2) } to deeply equal {}`)
   - green: `vp run test:unit` exit 0, 72 passed (fixture: `server.test.ts` 21, `freeze.test.ts` 2)
   - commit: the commit whose subject is "Add the frozen fixture application for the sessions POC"
-  - missing: `tests/browser/fixture.spec.ts` (needs P0.2)
   - red: `vp test --project fixture` with the new `tests/control.test.ts`: 6 failed (`expected { error: 'Not found' } to deeply equal { mode: 'online' }`, `expected 200 to be 'network error'`, `expected 404 to be 400`, the open EventSource still streaming after the cut)
   - green: `vp run test:unit` exit 0, 94 passed (fixture: `server.test.ts` 21, `control.test.ts` 7, `freeze.test.ts` 2)
   - commit: "Let the fixture server cut the network and expire sessions"
   - refreeze (orchestrator decision, before the freeze is final): added `POST /__network?mode=offline|online` (P6.1, the fixture-side network cut) and `POST /__expire?user=` (P6.6, T21) so no later phase refreezes; `freeze.json` changed only for `src/api.ts`, `src/context.ts`, `src/server.ts`, `src/sessions.ts`; no file under `public/` changed
+  - red: `node <scratch worktree>/scripts/test-container.mjs test:browser:local -- tests/browser/fixture.spec.ts` with the worker-before-first-paint assertion inverted: `Error: /worker.js?type=classic before workers:first-paint` `Expected: > 38` `Received: 35`
+  - green: `vp run test:browser -- tests/browser/fixture.spec.ts` 3 passed (also with `--repeat-each=4`, 12 passed); `vp run test:browser` 5 passed; `vp run test:container` 12 passed (Google Chrome 156.0.8078.79 on Linux in Docker)
+  - commit: "Open every fixture route in Google Chrome from the browser layer"
+  - note: Chrome facts recorded by the spec and the README: push subscription is `NotAllowedError` without the notification permission (headed Chrome otherwise waits on the prompt, so the spec denies it through CDP), and a dynamic `import()` in a service worker is a `TypeError` by design
 - [ ] P0.7 Evidence pipeline and observer allowlist
 - Gate P0: `vp run verify` → (date, result)
 
