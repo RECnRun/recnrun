@@ -51,6 +51,8 @@ export interface FakeOptions {
   muted?: string[];
   /** Commands Chrome never answers. */
   hanging?: string[];
+  /** Commands a session answers only once it sent the named command, as a paused service worker. */
+  heldUntil?: Record<string, string>;
   /** getTargets() keeps listing a target after Target.closeTarget. */
   keepsClosed?: boolean;
   /** detach() fails with this text. */
@@ -66,6 +68,13 @@ export function fakeDebugger(options: FakeOptions = {}) {
   const onDetach = listeners<DetachListener>();
   const sent: { target: Debuggee; method: string; params?: object }[] = [];
   const closed = new Set<string>();
+  const held = new Map<string, (() => void)[]>();
+  const heldKey = (target: Debuggee, method: string) => `${target.sessionId ?? ""} ${method}`;
+  const hold = (target: Debuggee, until: string, reply: object) =>
+    new Promise<object>((resolve) => {
+      const key = heldKey(target, until);
+      held.set(key, [...(held.get(key) ?? []), () => resolve(reply)]);
+    });
   const emit = (source: Debuggee, method: string, params?: object) => {
     if (!muted.includes(method))
       onEvent.set.forEach((listener) => listener(source, method, params));
@@ -105,7 +114,11 @@ export function fakeDebugger(options: FakeOptions = {}) {
       if (error) throw new Error(error);
       if (options.hanging?.includes(method)) return new Promise<never>(() => undefined);
       effects[method]?.(target, params);
-      return replies[method] ?? REPLIES[method] ?? {};
+      held.get(heldKey(target, method))?.forEach((answer) => answer());
+      held.delete(heldKey(target, method));
+      const reply = replies[method] ?? REPLIES[method] ?? {};
+      const until = options.heldUntil?.[method];
+      return until === undefined ? reply : hold(target, until, reply);
     },
     onEvent,
     onDetach,

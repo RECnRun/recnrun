@@ -88,6 +88,31 @@ describe("Route A auto-attach", () => {
     ]);
   });
 
+  // The 5 s command timeout answers first when the release waits for the bootstrap's reply.
+  test(
+    "releases a service worker that answers the bootstrap only once released",
+    {
+      timeout: 10_000,
+    },
+    async () => {
+      const heldUntil = { "Runtime.evaluate": "Runtime.runIfWaitingForDebugger" };
+      const { engine, sent, emit } = setup({ heldUntil });
+      await engine.arm({ tabId: TAB });
+      emit({ tabId: TAB }, "Target.attachedToTarget", attached("service_worker", "sw", "s-sw"));
+      const [entry] = (await engine.journal()).entries;
+      expect(on(sent, "s-sw")).toEqual([
+        "Runtime.evaluate",
+        "Target.setAutoAttach",
+        "Runtime.runIfWaitingForDebugger",
+      ]);
+      expect([entry?.error, entry?.installed, entry?.released]).toEqual([
+        undefined,
+        INSTALLED,
+        true,
+      ]);
+    },
+  );
+
   test("bootstraps a nested worker through the session of the worker that started it", async () => {
     const { engine, sent, emit } = setup();
     await engine.arm({ tabId: TAB });

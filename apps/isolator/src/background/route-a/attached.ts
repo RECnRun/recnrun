@@ -76,8 +76,8 @@ export function entryOf(
 }
 
 /**
- * Bootstraps a worker, auto-attaches the target's own children, then releases it if it waits: the
- * worker runs its first statement only after the bootstrap, and its nested workers pause in turn.
+ * Sends the bootstrap, auto-attaches the target's own children, then releases the worker if it
+ * waits: the session runs the bootstrap before the release, and nested workers pause in turn.
  */
 export async function handleAttached(
   api: DebuggerApi,
@@ -86,7 +86,13 @@ export async function handleAttached(
   now: () => number,
 ): Promise<void> {
   const session = { tabId: source.tabId, sessionId: entry.sessionId };
-  if (entry.marker !== undefined) await bootstrap(api, session, entry, now);
+  // A paused service worker answers Runtime.evaluate only once released, so its reply is awaited last.
+  const booted = entry.marker === undefined ? undefined : bootstrap(api, session, entry, now);
+  await release(api, session, entry);
+  await booted;
+}
+
+async function release(api: DebuggerApi, session: Debuggee, entry: JournalEntry): Promise<void> {
   try {
     await command(api, session, "Target.setAutoAttach", AUTO_ATTACH);
     entry.autoAttach = "ok";
