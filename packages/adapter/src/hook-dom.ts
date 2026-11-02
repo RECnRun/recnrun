@@ -55,7 +55,7 @@ export const DOM_CAPTURE = `
       ? { scrollX: round(element.scrollLeft), scrollY: round(element.scrollTop) }
       : { scrollX: round(window.scrollX), scrollY: round(window.scrollY) };
   };
-  const composition = (event) => ({ data: clip(event.data) });
+  const composition = (event) => (isSecret(event.target) ? { redacted: true } : { data: clip(event.data) });
   const DETAILS = {
     pointerdown: pointer, pointerup: pointer, click, dblclick: click,
     keydown: key, keyup: key, input, change: (event) => value(event.target),

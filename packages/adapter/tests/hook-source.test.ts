@@ -220,6 +220,38 @@ test("password fields report neither keys, data, nor values", () => {
   expect(JSON.stringify(target.posted)).not.toContain("hunter2");
 });
 
+test("no text-bearing event of a password field discloses its text", () => {
+  const target = page("http://127.0.0.1:4600/");
+  target.run();
+  const secret = element(
+    { type: "password" },
+    { type: "password", value: "hunter2", selectionStart: 0, selectionEnd: 7 },
+  );
+  const text = { key: "hunter2", code: "hunter2", data: "hunter2" };
+  for (const type of ["keydown", "keyup", "input", "change"])
+    target.dispatch({ type, target: secret, isTrusted: true, ...text });
+  for (const type of ["compositionstart", "compositionupdate", "compositionend"])
+    target.dispatch({ type, target: secret, isTrusted: true, ...text });
+  target.window.document = { activeElement: secret };
+  target.window.getSelection = () => "hunter2";
+  target.dispatch({ type: "selectionchange", target: { nodeType: 9 }, isTrusted: true });
+  const posted = domOf(target) as { type: string; payload: Record<string, unknown> }[];
+  expect(posted.map((message) => message.type)).toEqual([
+    "keydown",
+    "keyup",
+    "input",
+    "change",
+    "compositionstart",
+    "compositionupdate",
+    "compositionend",
+    "selectionchange",
+  ]);
+  for (const message of posted.slice(0, 7))
+    expect(message.payload, message.type).toMatchObject({ redacted: true });
+  expect(JSON.stringify(target.posted)).not.toContain("hunter2");
+  for (const message of posted) expect(v.is(ObserverMessageSchema, message)).toBe(true);
+});
+
 test("checkboxes report checked, selections their range, and long text is clipped", () => {
   const target = page("http://127.0.0.1:4600/");
   target.run();
