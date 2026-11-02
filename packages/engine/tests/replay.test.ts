@@ -163,4 +163,44 @@ describe("runSteps", () => {
       vars: {},
     });
   });
+
+  describe("actors", () => {
+    const withActors = (actors: string[], steps: Step[]): Flow => ({
+      ...flowOf(steps),
+      actors: Object.fromEntries(actors.map((name) => [name, {}])),
+    });
+    const go = (id: string, actor?: string): Step => ({
+      id,
+      action: "navigate",
+      url: "http://x.test/",
+      ...(actor && { actor }),
+    });
+
+    test("a flow whose steps name two actors is an error before any step runs", async () => {
+      const { driver, calls } = fakeDriver();
+      const flow = withActors(["a", "b"], [go("one", "a"), go("two", "b")]);
+      expect(await runSteps(driver, flow, OPTIONS)).toMatchObject({
+        status: "error",
+        steps: [],
+        error: { code: "multi-actor-unsupported" },
+      });
+      expect(calls).toEqual([]);
+    });
+
+    test("a step naming an actor the flow does not declare is the same error", async () => {
+      const { driver, calls } = fakeDriver();
+      const result = await runSteps(driver, withActors(["a"], [go("one", "ghost")]), OPTIONS);
+      expect(result).toMatchObject({ status: "error", error: { code: "multi-actor-unsupported" } });
+      expect(calls).toEqual([]);
+    });
+
+    test("one declared actor runs as before", async () => {
+      const { driver, calls } = fakeDriver();
+      const flow = withActors(["a", "b"], [go("one", "a"), go("two", "a"), go("three")]);
+      const result = await runSteps(driver, flow, OPTIONS);
+      expect(result.status).toBe("passed");
+      expect(result).not.toHaveProperty("error");
+      expect(calls).toHaveLength(3);
+    });
+  });
 });

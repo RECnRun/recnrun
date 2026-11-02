@@ -26,6 +26,8 @@ export interface ReplayOutcome {
   status: Exclude<RunStatus, "interrupted">;
   steps: StepResult[];
   vars: Record<string, string>;
+  /** Set when the run could not start; no step ran. */
+  error?: { code: string; message: string };
 }
 
 type Values = Record<string, string>;
@@ -138,6 +140,15 @@ function runStatus(last: StepResult | undefined): ReplayOutcome["status"] {
   return last.error?.code === ASSERTION_FAILED ? "failed" : "error";
 }
 
+// One driver means one browser, so a flow that needs several actors cannot run until F4.3.
+function actorProblem(flow: Flow): string | undefined {
+  const named = new Set(flow.steps.flatMap((step) => (step.actor ? [step.actor] : [])));
+  const undeclared = [...named].find((actor) => !Object.hasOwn(flow.actors, actor));
+  if (undeclared) return `Step actor ${JSON.stringify(undeclared)} is not declared in the flow.`;
+  if (named.size > 1) return `The steps use ${named.size} actors; binding-aware dispatch is F4.3.`;
+  return undefined;
+}
+
 /**
  * The F1.6 spike executor: runs top-level steps in order and stops at the first that does not
  * pass. F2.5 replaces it with the full executor (waits, every action, polling assertions).
@@ -147,6 +158,15 @@ export async function runSteps(
   flow: Flow,
   options: ReplayOptions = {},
 ): Promise<ReplayOutcome> {
+  const problem = actorProblem(flow);
+  if (problem) {
+    return {
+      status: "error",
+      steps: [],
+      vars: {},
+      error: { code: "multi-actor-unsupported", message: problem },
+    };
+  }
   const scope: Scope = { env: options.env ?? {}, inputs: options.inputs ?? {}, vars: {} };
   const now = options.now ?? (() => new Date());
   const steps: StepResult[] = [];

@@ -97,7 +97,7 @@ export const FEATURE_CAPABILITIES: Feature[] = [
     "profile-bindings",
     "F1.3",
     "Profiles as bindings",
-    "Delivered by F1.3 for two Chrome instances; tests/browser/profiles.spec.ts on Linux in Docker. Storage stays in its binding, each actor runs on its binding, a restart is reported stale, never remapped. Bindings live in ~/.recnrun/bindings.json, never in a flow. Two profiles in one Chrome stay manual (M-F1.c).",
+    "Delivered by F1.3 for two Chrome instances; tests/browser/profiles.spec.ts on Linux in Docker proves two Chrome instances share no storage, and that a flow's actor maps to its binding in that test's own dispatch. Engine-level actor dispatch is F4.3: until then the replay executor rejects multi-actor flows as multi-actor-unsupported. A restart is reported stale, never remapped. Bindings live in ~/.recnrun/bindings.json, never in a flow. Two profiles in one Chrome stay manual (M-F1.c).",
   ),
   {
     kind: "feature",
