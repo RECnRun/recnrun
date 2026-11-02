@@ -99,12 +99,15 @@ export const FEATURE_CAPABILITIES: Feature[] = [
     "Profiles as bindings",
     "Delivered by F1.3 for two Chrome instances; tests/browser/profiles.spec.ts on Linux in Docker. Storage stays in its binding, each actor runs on its binding, a restart is reported stale, never remapped. Bindings live in ~/.recnrun/bindings.json, never in a flow. Two profiles in one Chrome stay manual (M-F1.c).",
   ),
-  planned(
-    "instrumentation-order",
-    "F1.4",
-    "Instrumentation before application scripts",
-    "Ordering is proved on Chrome in Docker before any claim.",
-  ),
+  {
+    kind: "feature",
+    id: "instrumentation-order",
+    title: "Instrumentation before application scripts",
+    status: "implemented",
+    phase: "F1.4",
+    notes:
+      "Delivered by F1.4; tests/browser/instrumentation.spec.ts on Linux in Docker: the fixture's head script finds the hook on load, reload, SPA navigation, same-origin and cross-site iframes, and popups, and forged binding messages are dropped and counted.",
+  },
   planned(
     "replay-spike",
     "F1.6",

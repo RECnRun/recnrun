@@ -1,0 +1,74 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "properties": {
+    "at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "documentId": {
+      "pattern": "^[0-9a-f]{32}$",
+      "type": "string"
+    },
+    "frameId": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "hookSeq": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "installMode": {
+      "enum": ["before-first-script", "late"],
+      "type": "string"
+    },
+    "monotonicTimeMs": {
+      "minimum": 0,
+      "type": "number"
+    },
+    "seq": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "sessionId": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "source": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "targetId": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "type": {
+      "const": "document.hook-installed"
+    },
+    "url": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "type",
+    "source",
+    "seq",
+    "at",
+    "targetId",
+    "sessionId",
+    "frameId",
+    "documentId",
+    "installMode",
+    "hookSeq",
+    "monotonicTimeMs",
+    "url"
+  ],
+  "type": "object"
+}

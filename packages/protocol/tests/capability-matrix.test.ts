@@ -47,7 +47,8 @@ test("an implemented entry names the task or test that proves it", () => {
 test("a capture surface stays planned until a test proves it", () => {
   const surfaces = entries.filter((entry) => entry.kind === "surface");
   expect(surfaces.length).toBeGreaterThan(0);
-  expect(surfaces.filter((entry) => entry.status !== "planned")).toEqual([]);
+  for (const entry of surfaces.filter(({ status }) => status !== "planned"))
+    expect(entry.notes, entry.id).toMatch(/\btests\/\S+\.(spec|test)\.ts\b/);
 });
 
 test("the rendered document is deterministic, sorted, and lists every entry", () => {
@@ -83,6 +84,9 @@ test.each([
   ["connection-loss-reconnect", "implemented", "tests/browser/connect.spec.ts"],
   ["contested-control", "partial", "tests/browser/connect.spec.ts"],
   ["profile-bindings", "implemented", "tests/browser/profiles.spec.ts"],
+  ["instrumentation-order", "implemented", "tests/browser/instrumentation.spec.ts"],
+  ["frames-targets-normal", "partial", "tests/browser/instrumentation.spec.ts"],
+  ["workers-deep", "partial", "tests/browser/instrumentation.spec.ts"],
 ])("the F1 deliverable %s is %s and names %s", (id, status, spec) => {
   const entry = entries.find((candidate) => candidate.id === id);
   expect(entry?.status, id).toBe(status);

@@ -1,35 +1,6 @@
 import { expect, test } from "vite-plus/test";
-import { rawCdpCall, type RawSocket } from "../src/raw-cdp.ts";
-
-type Listener = (event: { data?: unknown }) => void;
-
-class FakeSocket implements RawSocket {
-  readonly sent: unknown[] = [];
-  closed = false;
-  private readonly listeners = new Map<string, Listener[]>();
-
-  readonly url: string;
-
-  constructor(url: string) {
-    this.url = url;
-  }
-
-  addEventListener(type: string, listener: Listener): void {
-    this.listeners.set(type, [...(this.listeners.get(type) ?? []), listener]);
-  }
-
-  send(data: string): void {
-    this.sent.push(JSON.parse(data));
-  }
-
-  close(): void {
-    this.closed = true;
-  }
-
-  emit(type: string, data?: unknown): void {
-    for (const listener of this.listeners.get(type) ?? []) listener({ data });
-  }
-}
+import { rawCdpCall } from "../src/raw-cdp.ts";
+import { FakeSocket } from "./fake-socket.ts";
 
 function call(timeoutMs = 1_000) {
   let socket: FakeSocket | undefined;

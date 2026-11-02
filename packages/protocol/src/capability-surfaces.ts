@@ -218,9 +218,10 @@ export const SURFACE_CAPABILITIES: Surface[] = [
     surface: "workers-frames",
     level: "normal",
     title: "Frames and cross-origin targets",
-    status: "planned",
-    phase: "F1.4",
-    notes: "Targets that cannot be attached produce declared gaps.",
+    status: "partial",
+    phase: "F1.5",
+    notes:
+      "F1.4; tests/browser/instrumentation.spec.ts attaches and hooks same-origin iframes, cross-site OOPIFs, and popups before their first script. Capture inside them arrives with F1.5, and a target whose install fails is recorded on the instrumentation report, not yet as a gap.",
   },
   {
     kind: "surface",
@@ -228,9 +229,10 @@ export const SURFACE_CAPABILITIES: Surface[] = [
     surface: "workers-frames",
     level: "deep",
     title: "Dedicated workers",
-    status: "planned",
+    status: "partial",
     phase: "F6.2",
-    notes: "Workers already running at connection time are reported as gaps.",
+    notes:
+      "F1.4; tests/browser/instrumentation.spec.ts observes dedicated workers as CDP targets, held until the binding is added and then resumed, but nothing is captured inside them yet. Workers already running at connection time are reported as gaps.",
   },
   {
     kind: "surface",

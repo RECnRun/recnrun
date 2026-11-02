@@ -29,7 +29,14 @@ export const ROUTES: readonly FixtureRoute[] = [
   { name: "download", title: "Download", summary: "An attachment download" },
   { name: "dialogs", title: "Dialogs", summary: "alert and confirm" },
   { name: "storage", title: "Storage", summary: "localStorage, sessionStorage, and cookies" },
+  { name: "worker", title: "Worker", summary: "A dedicated worker that answers messages" },
 ];
+
+/**
+ * The first script of every page, before any other: it records whether page instrumentation
+ * already ran, which proves the hook was installed before the application's first script.
+ */
+export const HEAD_CHECK = "window.__fixture = { hookSeenAtHead: Boolean(window.__recnrunHook) };";
 
 /** The index page: every route by its `data-testid`, and how to inject a defect. */
 export function renderIndex(): string {
@@ -41,6 +48,9 @@ export function renderIndex(): string {
 <html lang="en">
   <head>
     <meta charset="utf-8" />
+    <script>
+      ${HEAD_CHECK}
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>RECnRun fixture</title>
     <link rel="icon" href="data:," />

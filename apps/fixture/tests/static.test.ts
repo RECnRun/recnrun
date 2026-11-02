@@ -1,7 +1,7 @@
 import { readdir } from "node:fs/promises";
 import { describe, expect, test } from "vite-plus/test";
 import { createFixtureServer, portsFromEnvironment } from "@/index";
-import { ROUTES } from "@/routes";
+import { HEAD_CHECK, ROUTES } from "@/routes";
 import { rawRequest, useFixture } from "./harness.ts";
 
 const fixture = useFixture();
@@ -28,6 +28,18 @@ describe("pages", () => {
     expect(script.status).toBe(200);
     expect(script.headers.get("content-type")).toBe("text/javascript; charset=utf-8");
   });
+
+  test.each(["/", ...ROUTES.map(({ name }) => `/routes/${name}`)])(
+    "%s runs the head check before any other script",
+    async (path) => {
+      const html = await (await get(path)).text();
+      const first = html.indexOf("<script");
+      expect(first).toBeGreaterThan(html.indexOf("<head>"));
+      expect(html.slice(first, html.indexOf("</script>", first)).trim()).toBe(
+        `<script>\n      ${HEAD_CHECK}`,
+      );
+    },
+  );
 
   test("has exactly one listed route per page file", async () => {
     const files = await readdir(new URL("../public/routes/", import.meta.url));

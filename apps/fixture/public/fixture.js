@@ -12,6 +12,8 @@ const state = {
   fail: failCase,
   // Unchanged across pushState navigations; a reload gives a new one.
   loadId: crypto.randomUUID(),
+  // Set by the page's inline head script, which runs before this module.
+  hookSeenAtHead: window.__fixture?.hookSeenAtHead === true,
 };
 window.__fixture = state;
 

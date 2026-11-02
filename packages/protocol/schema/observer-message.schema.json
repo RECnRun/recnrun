@@ -1,0 +1,47 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "oneOf": [
+    {
+      "additionalProperties": false,
+      "properties": {
+        "documentId": {
+          "pattern": "^[0-9a-f]{32}$",
+          "type": "string"
+        },
+        "kind": {
+          "const": "lifecycle"
+        },
+        "payload": {
+          "additionalProperties": false,
+          "properties": {
+            "hookVersion": {
+              "const": 1
+            },
+            "url": {
+              "type": "string"
+            }
+          },
+          "required": ["url", "hookVersion"],
+          "type": "object"
+        },
+        "seq": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "targetId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "ts": {
+          "minimum": 0,
+          "type": "number"
+        },
+        "type": {
+          "const": "document.hook-installed"
+        }
+      },
+      "required": ["kind", "type", "seq", "documentId", "ts", "targetId", "payload"],
+      "type": "object"
+    }
+  ]
+}
