@@ -36,7 +36,11 @@ Markers: `[ ]` not started · `[i]` implemented, awaiting the phase gate · `[x]
   - green: `vp test --project=@recnrun/isolation-core` (15 passed after trimming the vendor set to 11 runtime files); `vp check`, `vp run deps` pass; jscpd 0.20% (threshold 4%); Knip passes with `ignoreDependencies: ["wxt"]` scoped to the isolation-core workspace (the vendored `cookie-capture.ts` names upstream's runtime framework; P3 adapts it inside `apps/isolator`)
   - commit: the commit adding `packages/isolation-core` ("Vendor SplitSession modules into a new isolation-core package") and "Keep only the reusable SplitSession modules in the vendor set"
   - note: vendor set excludes upstream tests, fixtures, `dnr-simulator.ts`, and `legacy/`; Knip treats `vendor/splitsession/src/**/*.ts` as entries until P2
-- [ ] P0.6 Fixture application, frozen
+- [~] P0.6 Fixture application, frozen
+  - red: `vp run test:unit` exit 1, 21 fixture tests failed against a stub that answers 404 with no `freeze.json` (`expected 404 to be 400`, `No Location header on http://127.0.0.1:39743/login (404)`, `expected { …(2) } to deeply equal {}`)
+  - green: `vp run test:unit` exit 0, 72 passed (fixture: `server.test.ts` 21, `freeze.test.ts` 2)
+  - commit: the commit whose subject is "Add the frozen fixture application for the sessions POC"
+  - missing: `tests/browser/fixture.spec.ts` (needs P0.2)
 - [ ] P0.7 Evidence pipeline and observer allowlist
 - Gate P0: `vp run verify` → (date, result)
 

@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Fixture app</title>
+    <script type="module" src="/index.js"></script>
+  </head>
+  <body>
+    <h1>Fixture app</h1>
+    <p id="user">Loading</p>
+    <p>
+      <a id="login" href="/">Log in</a>
+      <a id="logout" href="/">Log out</a>
+      <button id="popup-login" type="button">Log in in a popup</button>
+      <button id="renew" type="button">Silent renew</button>
+      <button id="act" type="button">Act</button>
+    </p>
+    <ul>
+      <li><a href="/storage.html">Storage</a></li>
+      <li><a href="/workers.html?type=classic">Workers, classic</a></li>
+      <li><a href="/workers.html?type=module">Workers, module</a></li>
+      <li><a href="/sw.html?sw=classic">Service worker, classic</a></li>
+      <li><a href="/sw.html?sw=module">Service worker, module</a></li>
+      <li><a href="/sw.html?sw=imports">Service worker, importScripts</a></li>
+      <li><a href="/sw.html?sw=static">Service worker, static import</a></li>
+      <li><a href="/sw.html?sw=dynamic">Service worker, dynamic import</a></li>
+      <li><a href="/sockets.html">WebSocket and EventSource</a></li>
+    </ul>
+    <pre id="log"></pre>
+  </body>
+</html>

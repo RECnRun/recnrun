@@ -8,6 +8,8 @@ apps/extension ─┘                    ▲
         └────────────────────────────┘
 
 apps/website, apps/extension ──► @recnrun/brand (CSS and fonts)
+
+apps/fixture: imports nothing from the workspace; only tests/ may import it
 ```
 
 ## Packages
@@ -20,12 +22,14 @@ apps/website, apps/extension ──► @recnrun/brand (CSS and fonts)
 | `packages/brand`          | Brand assets both apps style themselves with: Mona Sans and the stylesheet that loads it                                                                                                        | nothing                           |
 | `apps/website`            | The Preact SPA                                                                                                                                                                                  | all packages; never the extension |
 | `apps/extension`          | The WXT extension                                                                                                                                                                               | all packages; never the website   |
+| `apps/fixture`            | Development-only application under test for the namespaced-sessions POC; see its [README](../apps/fixture/README.md)                                                                            | Node built-ins only               |
 
 - Packages never import apps. Apps never import each other: they meet only at the bridge protocol.
 - Packages export their TypeScript sources (`exports` → `./src/index.ts`); apps bundle them. A package `build` only type checks.
 - `@recnrun/brand` holds no code: it exports `mona-sans.css`, which each app's entry imports, so the font and its license exist once instead of once per app. It imports nothing (`brand-is-leaf`).
 - `@recnrun/isolation-core` exists so the isolation logic (jar, DNR rules, namespace contract) stays free of extension APIs and testable on Node; this is why it is a package and not a folder of the extension (`isolation-core-pure`). `vendor/splitsession/` holds unmodified upstream files with `LICENSE`, `NOTICE`, and `vendor-manifest.json` (SHA-256 per file, checked by `tests/vendor.test.ts`); `src/` does not import `vendor/`, and Knip (as entries, until P2 imports them) and jscpd still scan the vendored files. Format and lint ignore `vendor/` because the files stay byte-identical, and `not-to-unresolvable` skips it because the files import siblings that are not vendored.
 - `@recnrun/domain/testing` exports fixtures for tests; no `src/` file imports a test file.
+- `apps/fixture` is the application the namespaced-sessions POC tests against ([PLAN.md §5](poc/namespace-sessions/PLAN.md#5-target-layout)). It must not share code with RECnRun, so it imports no workspace package (`fixture-isolated`), and only `tests/` may import it to start it (`only-tests-start-the-fixture`). Its served files and server modules are frozen by hash (`apps/fixture/freeze.json`).
 - Every module is reachable from an entrypoint, a test, or a config (`no-orphans`), and there are no import cycles (`no-circular`).
 
 ## Website

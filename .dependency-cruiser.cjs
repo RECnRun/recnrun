@@ -74,6 +74,21 @@ module.exports = {
       to: { path: "^apps/website/" },
     },
     {
+      name: "fixture-isolated",
+      severity: "error",
+      comment:
+        "The fixture is the application under test (docs/poc/namespace-sessions/PLAN.md §5): it must not share code with RECnRun.",
+      from: { path: "^apps/fixture/" },
+      to: { path: "^(apps/(website|extension|isolator)|packages)/" },
+    },
+    {
+      name: "only-tests-start-the-fixture",
+      severity: "error",
+      comment: "Only test harnesses start the fixture; product code never depends on it.",
+      from: { pathNot: ["^apps/fixture/", "^tests/"] },
+      to: { path: "^apps/fixture/" },
+    },
+    {
       name: "domain-pure",
       severity: "error",
       comment: "The domain is plain data and schemas: no UI, browser, or protocol code.",

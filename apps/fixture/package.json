@@ -1,0 +1,16 @@
+{
+  "name": "fixture",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/serve.ts",
+    "build": "tsc --noEmit",
+    "freeze": "node scripts/freeze.ts"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vite-plus": "catalog:"
+  }
+}
