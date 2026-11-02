@@ -28,3 +28,13 @@ export function createLocalService(): Service {
     persistence: flowFolderLayout,
   });
 }
+
+// The CLI and tests/contract compile this source with their own `@/`, so it imports itself with `./`.
+export { EgressForbiddenError } from "./egress.ts";
+export {
+  startService,
+  type RunningService,
+  type ServiceOptions,
+  type StartResult,
+} from "./service.ts";
+export { stopOnSignals } from "./signals.ts";

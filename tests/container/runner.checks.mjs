@@ -185,7 +185,7 @@ test(
 
 test("public tests route through Docker while local variants and the hooks retain every gate", () => {
   const manifest = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
-  for (const layer of ["unit", "components", "e2e", "browser", "coverage"]) {
+  for (const layer of ["unit", "components", "contract", "e2e", "browser", "coverage"]) {
     assert.equal(
       manifest.scripts[`test:${layer}`],
       `node scripts/test-container.mjs test:${layer}:local`,

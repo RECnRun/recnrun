@@ -24,3 +24,4 @@ export * from "./lease.ts";
 export * from "./flow-folder.ts";
 export * from "./stored-files.ts";
 export * from "./suggestions.ts";
+export * from "./service-state.ts";

@@ -41,6 +41,21 @@ export default defineConfig({
         },
       },
       {
+        // The CLI and tests/contract compile the service's source, where `@/` names their own src.
+        files: ["apps/service/src/**"],
+        rules: {
+          "no-restricted-imports": [
+            "error",
+            {
+              patterns: [
+                { regex: "^\\.\\./", message: "Import app source through the @/ alias." },
+                { regex: "^@/", message: "Service source imports itself with ./ paths." },
+              ],
+            },
+          ],
+        },
+      },
+      {
         // describe/test callbacks group many cases; production code keeps the stricter caps.
         files: testFiles,
         rules: {
@@ -68,6 +83,7 @@ export default defineConfig({
       "packages/engine",
       "packages/adapter",
       "packages/persistence",
+      "tests/contract/vitest.config.ts",
     ],
     coverage: {
       provider: "v8",
@@ -93,6 +109,7 @@ export default defineConfig({
         command: [
           "vp run --no-cache test:unit:local",
           "vp run --no-cache test:components:local",
+          "vp run --no-cache test:contract:local",
           "vp run --no-cache test:e2e:local",
           "vp run --no-cache test:browser:local",
         ],

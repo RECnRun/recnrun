@@ -101,10 +101,16 @@ module.exports = {
     {
       name: "service-boundaries",
       severity: "error",
-      comment: "The service composes the engine, the adapter, and persistence behind its API.",
+      comment:
+        "The service composes the engine, the adapter, and persistence behind its loopback HTTP and WebSocket API; Valibot validates every request at that boundary.",
       from: { path: "^apps/service/src/" },
       to: {
-        pathNot: ["^apps/service/src/", "^packages/(engine|adapter|persistence|protocol)/src/"],
+        pathNot: [
+          "^apps/service/src/",
+          "^packages/(engine|adapter|persistence|protocol)/src/",
+          "/node_modules/valibot/",
+          "^(crypto|http|net|os|stream)$",
+        ],
       },
     },
     {

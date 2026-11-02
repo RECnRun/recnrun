@@ -9,10 +9,16 @@
         "scripts/git-hooks/*.mjs",
         "scripts/*.checks.mjs",
         "tests/container/*.checks.mjs",
+        // Child processes the contract tests spawn.
+        "tests/contract/fixtures/*.ts",
       ],
     },
     // The future npm bin; F7 points package.json "bin" at its build output.
     "apps/cli": {
+      "entry": ["src/bin.ts"],
+    },
+    // The service's entrypoint; the CLI starts it in F2.7.
+    "apps/service": {
       "entry": ["src/bin.ts"],
     },
     // The page scripts, service worker, and dedicated worker the browser loads from public/.

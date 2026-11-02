@@ -2,11 +2,13 @@ import * as v from "valibot";
 import { AssertionStepSchema } from "./actions.ts";
 import { ProfileBindingSchema } from "./bindings.ts";
 import { CapabilityMatrixSchema } from "./capabilities.ts";
-import { IdSchema, NameSchema, NonEmptyStringSchema } from "./common.ts";
+import { CountSchema, IdSchema, NameSchema, NonEmptyStringSchema } from "./common.ts";
+import { DiscoveryResultSchema } from "./discovery.ts";
 import { EventCategorySchema, EventSchema } from "./events.ts";
 import { TargetSchema } from "./locators.ts";
 import { RunSummarySchema } from "./run.ts";
 import { LeaseSchema } from "./lease.ts";
+import { PidSchema } from "./service-state.ts";
 import {
   ControlStateSchema,
   PauseModeSchema,
@@ -49,6 +51,10 @@ export const SERVICE_COMMANDS = {
       status: v.literal("ok"),
       serviceVersion: NonEmptyStringSchema,
       protocolVersion: SchemaVersionSchema,
+      pid: PidSchema,
+      uptimeMs: CountSchema,
+      // What `adapter.discover()` finds for the default Chrome profile right now.
+      chrome: DiscoveryResultSchema,
     }),
   },
   "profiles.list": {

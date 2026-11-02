@@ -12,7 +12,9 @@
   "dependencies": {
     "@recnrun/adapter": "workspace:*",
     "@recnrun/engine": "workspace:*",
-    "@recnrun/persistence": "workspace:*"
+    "@recnrun/persistence": "workspace:*",
+    "@recnrun/protocol": "workspace:*",
+    "valibot": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",

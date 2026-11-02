@@ -120,11 +120,11 @@ export const FEATURE_CAPABILITIES: Feature[] = [
     "Custom locator function path",
     "Delivered by F1.7; tests/browser/function-locator.spec.ts on Linux in Docker. The function runs in an isolated world, its elements become references qualified by target, frame, and loader id, and cardinality picks from them. A synchronous infinite loop is cut with Runtime.terminateExecution on the same session, and the tab answered Runtime.evaluate afterwards without being closed; the result records blocked, terminated, and tabResponsive.",
   ),
-  planned(
+  implemented(
     "service",
     "F2.1",
     "Local service",
-    "Loopback only, bearer token, one instance per user.",
+    "Delivered by F2.1; tests/contract/service-auth.test.ts and tests/contract/service-lifecycle.test.ts. Binds 127.0.0.1 only; every HTTP request and WebSocket needs the bearer token from ~/.recnrun/service.json (0600), a foreign Origin or Host gets 403, a WebSocket without the token closes 4401. One instance per user with stale-lock recovery; SIGTERM drains open journals before exit. Implements capabilities.get and health.",
   ),
   implemented(
     "sessions-control-leases",

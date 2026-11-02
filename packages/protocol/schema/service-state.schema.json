@@ -1,0 +1,32 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "properties": {
+    "pid": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "port": {
+      "maximum": 65535,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "schemaVersion": {
+      "const": 1
+    },
+    "serviceVersion": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "startedAt": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "token": {
+      "pattern": "^[\\w-]{32,128}$",
+      "type": "string"
+    }
+  },
+  "required": ["schemaVersion", "pid", "port", "token", "startedAt", "serviceVersion"],
+  "type": "object"
+}

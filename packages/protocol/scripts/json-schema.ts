@@ -28,6 +28,7 @@ import {
 } from "../src/index.ts";
 import { FunctionLocatorRequestSchema, FunctionLocatorResultSchema } from "../src/index.ts";
 import { LeaseSchema, SessionStatusSchema } from "../src/index.ts";
+import { ServiceLockSchema, ServiceStateSchema } from "../src/index.ts";
 
 type AnySchema = v.GenericSchema;
 
@@ -57,6 +58,8 @@ const DOCUMENTS: Record<string, AnySchema> = {
   lease: LeaseSchema,
   "session-status": SessionStatusSchema,
   "normalization-result": NormalizationResultSchema,
+  "service-state": ServiceStateSchema,
+  "service-lock": ServiceLockSchema,
 };
 
 // Named definitions give the flow's recursive schemas stable $ref names instead of generated ones.
