@@ -1,6 +1,7 @@
 import { AUTO_ATTACH_PROBES, autoAttachListener } from "@/background/probes/auto-attach";
 import { TAB_DOMAIN_PROBES } from "@/background/probes/domains";
 import { attempt, expectEffect, messageOf, withTimeout } from "@/background/probes/helpers";
+import { assertLoopbackTargets } from "@/background/probes/loopback";
 import { ATTACH_DEDICATED_PROBE, TARGET_PROBES } from "@/background/probes/targets";
 import type {
   DebuggerApi,
@@ -93,13 +94,17 @@ export function createContext(
   };
 }
 
-/** Runs the probe table against the fixture page with the event listeners the probes rely on. */
+/**
+ * Runs the probe table against the fixture page with the event listeners the probes rely on.
+ * Throws before any debugger call when a target URL is outside the loopback.
+ */
 export async function runAllProbes(
   api: DebuggerApi,
   urls: ProbeTargets,
   wait: (ms: number) => Promise<void>,
   probes: readonly ProbeDefinition[] = PROBES,
 ): Promise<ProbeResult[]> {
+  assertLoopbackTargets(urls);
   const context = createContext(api, urls, wait);
   const onEvent = autoAttachListener(context);
   const onDetach: DetachListener = (source, reason) =>

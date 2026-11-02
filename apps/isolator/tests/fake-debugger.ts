@@ -8,13 +8,14 @@ import type {
   TargetInfo,
 } from "@/background/probes/types";
 
-const ORIGIN = "http://app.test";
+// Probes refuse targets outside the loopback, as the E1 fixture's *.localhost hosts are.
+const ORIGIN = "http://app.localhost:4600";
 export const URLS: ProbeTargets = {
   pageUrl: `${ORIGIN}/workers.html`,
   serviceWorkerUrl: `${ORIGIN}/sw-main.js`,
   sharedWorkerUrl: `${ORIGIN}/shared-worker.js`,
   dedicatedWorkerUrl: `${ORIGIN}/worker.js`,
-  iframeUrl: "http://idp.test/whoami",
+  iframeUrl: "http://idp.localhost:4602/whoami",
   cookieUrl: `${ORIGIN}/`,
 };
 export const NOT_ALLOWED = '{"code":-32000,"message":"Not allowed"}';

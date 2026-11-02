@@ -3,7 +3,11 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vite-plus/test";
 import { fakeBrowser } from "wxt/testing/fake-browser";
+import { HARNESS_GLOBAL } from "@/background/probes/expose";
+import type { ProbeHarness } from "@/background/probes/expose";
+import type { ProbeTargets } from "@/background/probes/types";
 import { GET_SELF, LOADED_KEY, startBackground } from "@/background/start";
+import { fakeDebugger, URLS } from "./fake-debugger";
 
 /** R11 (POC PLAN.md §1): the runtime talks to nothing but the loopback and itself. */
 function isLocal(target: string): boolean {
@@ -47,6 +51,15 @@ class GuardedXMLHttpRequest {
 const ISOLATOR = fileURLToPath(new URL("..", import.meta.url));
 const BUILT_MANIFEST = `${ISOLATOR}.output/chrome-mv3-test/manifest.json`;
 
+/** Starts the background with a fake chrome.debugger and returns the probe entrypoint it exposed. */
+function probeEntrypoint() {
+  const debuggerFake = fakeDebugger();
+  Object.assign(fakeBrowser, { debugger: debuggerFake.api });
+  startBackground();
+  const harness = (globalThis as Record<string, unknown>)[HARNESS_GLOBAL] as ProbeHarness;
+  return { harness, sent: debuggerFake.sent };
+}
+
 function expectNoExternalReach(manifest: Record<string, unknown>, source: string): void {
   expect(manifest, source).not.toHaveProperty("update_url");
   expect(manifest, source).not.toHaveProperty("externally_connectable");
@@ -71,6 +84,7 @@ describe("isolator egress", () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.useRealTimers();
   });
 
   test("the shim refuses every host but the loopback and the extension itself", async () => {
@@ -107,6 +121,37 @@ describe("isolator egress", () => {
     );
     expect(egress).toEqual([]);
   });
+
+  test("the probe entrypoint reaches no host outside the loopback", async () => {
+    const { harness, sent } = probeEntrypoint();
+    // The entrypoint waits in real time between probes; fake timers keep the test fast.
+    vi.useFakeTimers();
+    const run = harness.run(URLS);
+    await vi.runAllTimersAsync();
+    const results = await run;
+    expect(results.length).toBe(harness.ids.length);
+    expect(sent.length).toBeGreaterThan(0);
+    expect(egress).toEqual([]);
+  });
+
+  test.each<[keyof ProbeTargets, string]>([
+    ["cookieUrl", "https://example.com/"],
+    ["iframeUrl", "http://127.0.0.1.example.com/whoami"],
+    ["pageUrl", "http://localhost.example.com/workers.html"],
+    ["serviceWorkerUrl", "file:///etc/passwd"],
+    ["sharedWorkerUrl", "not a url"],
+    ["dedicatedWorkerUrl", "chrome-extension://abcdefghijklmnop/worker.js"],
+  ])(
+    "the probe entrypoint refuses a %s outside the loopback before any command",
+    async (key, url) => {
+      const { harness, sent } = probeEntrypoint();
+      await expect(harness.run({ ...URLS, [key]: url })).rejects.toThrow(
+        `probe targets outside the loopback: ${key}=${url}`,
+      );
+      expect(sent).toEqual([]);
+      expect(egress).toEqual([]);
+    },
+  );
 
   test("the manifest asks for no update URL, external connection, or native messaging", async () => {
     const config = (await import(pathToFileURL(`${ISOLATOR}wxt.config.ts`).href)) as {
