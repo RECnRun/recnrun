@@ -5,3 +5,4 @@ A spike report records what a time-boxed experiment proved, on which versions, a
 | Report                                                    | Phase | Scope                                                                                               |
 | --------------------------------------------------------- | ----- | --------------------------------------------------------------------------------------------------- |
 | [2026-11-f1-cdp-connection](2026-11-f1-cdp-connection.md) | F1    | Discovery, CDP connection, profiles, instrumentation, raw capture, replay, custom locator functions |
+| [2026-11-f1-codex-review](2026-11-f1-codex-review.md)     | F1    | Codex code review of the F1 branch (15 findings, all fixed before the gate)                         |
