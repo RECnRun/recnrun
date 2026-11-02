@@ -4,6 +4,12 @@ import {
   type ObserverMessage,
 } from "@recnrun/protocol";
 import type { CdpChannel, CdpEvent } from "./cdp-socket.ts";
+import {
+  ContextDocuments,
+  documentRead,
+  READ_HOOK_DOCUMENT,
+  withDeadline,
+} from "./capture-documents.ts";
 import { createEmitter, type Draft, type Emitter, type Origin } from "./capture-envelope.ts";
 import { NetworkCapture } from "./capture-network.ts";
 import { mapPageEvent } from "./capture-page.ts";
@@ -21,6 +27,8 @@ export interface CaptureOptions {
 }
 
 const DEFAULT_BODY_TIMEOUT_MS = 10_000;
+// How long events of a navigated context wait for its hook to name the new document.
+const DOCUMENT_READ_TIMEOUT_MS = 2_000;
 const BROWSER: Origin = {
   producer: "cdp:browser",
   source: "browser",
@@ -33,8 +41,7 @@ const BROWSER: Origin = {
 export class Capture {
   private readonly emitter: Emitter;
   private readonly networks = new Map<string, NetworkCapture>();
-  // The document the hook last reported from an execution context, by session and context id.
-  private readonly documents = new Map<string, string>();
+  private readonly documents = new ContextDocuments();
   private readonly channel: CdpChannel;
   private readonly options: CaptureOptions;
   private readonly track: (work: Promise<void>) => void;
@@ -68,6 +75,7 @@ export class Capture {
       .get(record.sessionId)
       ?.close("The target went away before the response finished loading.");
     this.networks.delete(record.sessionId);
+    this.documents.releaseAll(`${record.sessionId}:`);
     this.emitter.emit(
       { ...BROWSER, targetId: record.info.targetId },
       { category: "target", type: "detached", component: "browser", payload: {} },
@@ -81,7 +89,8 @@ export class Capture {
     frameId: string | null,
     contextId: number,
   ): void {
-    this.documents.set(`${record.sessionId}:${contextId}`, message.documentId);
+    const key = `${record.sessionId}:${contextId}`;
+    this.documents.set(key, message.documentId);
     const origin = { ...this.origin(record, frameId), documentId: message.documentId };
     const draft: Draft =
       message.kind === "dom"
@@ -98,6 +107,8 @@ export class Capture {
             payload: message.payload,
           };
     this.emitter.emit(origin, { ...draft, monotonicTimeMs: message.ts });
+    // An install starts a document in this context; what waited for it belongs to that document.
+    if (message.type === "document.hook-installed") this.documents.release(key, message.documentId);
   }
 
   /** A CDP event of an instrumented session that is neither a context nor a binding event. */
@@ -111,16 +122,45 @@ export class Capture {
     const contextFrame =
       mapped.contextId === undefined ? undefined : record.contexts.get(mapped.contextId);
     const origin = this.origin(record, mapped.frameId ?? contextFrame ?? null);
-    if (mapped.contextId !== undefined)
-      origin.documentId = this.documents.get(`${record.sessionId}:${mapped.contextId}`) ?? null;
-    this.emitter.emit(origin, mapped.draft);
+    if (mapped.contextId === undefined) this.emitter.emit(origin, mapped.draft);
+    else
+      this.documents.emit(`${record.sessionId}:${mapped.contextId}`, (documentId) =>
+        this.emitter.emit({ ...origin, documentId }, mapped.draft),
+      );
+    if (event.method === "Page.frameNavigated" && mapped.frameId)
+      this.reread(record, mapped.frameId);
   }
 
-  /** Settles every body still loading; nothing is emitted afterwards. */
+  /** Settles every body still loading and every held event; nothing is emitted afterwards. */
   stop(): void {
     for (const network of this.networks.values())
       network.close("Capture stopped before the response finished loading.");
     this.networks.clear();
+    this.documents.releaseAll();
+  }
+
+  // Chrome can hand a window, script context and hook included, to the frame's next document
+  // (a popup's about:blank): reading the hook there starts the new identity, so the frame's
+  // events wait for that install, or the read's answer, instead of carrying the old document.
+  private reread(record: TargetRecord, frameId: string): void {
+    for (const [contextId, contextFrame] of record.contexts) {
+      if (contextFrame !== frameId) continue;
+      const key = `${record.sessionId}:${contextId}`;
+      this.documents.hold(key);
+      const params = {
+        expression: READ_HOOK_DOCUMENT,
+        contextId,
+        returnByValue: true,
+        silent: true,
+      };
+      const read = this.channel.send("Runtime.evaluate", params, record.sessionId);
+      this.track(
+        withDeadline(read, DOCUMENT_READ_TIMEOUT_MS).then(
+          (reply) => this.documents.release(key, documentRead(reply)),
+          () => this.documents.release(key, null),
+        ),
+      );
+    }
   }
 
   private origin(record: TargetRecord, frameId: string | null): Origin {

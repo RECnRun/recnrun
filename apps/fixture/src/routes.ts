@@ -3,6 +3,8 @@ export interface FixtureRoute {
   readonly name: string;
   readonly title: string;
   readonly summary: string;
+  /** `false` for a page whose first script must not read the hook, so it starts with a log instead. */
+  readonly headCheck?: false;
 }
 
 /** Every page of the fixture; later phases depend on these names. */
@@ -16,6 +18,12 @@ export const ROUTES: readonly FixtureRoute[] = [
   { name: "iframe-child", title: "Iframe child", summary: "Posts its origin to the parent" },
   { name: "popup", title: "Popup", summary: "Opens a window that reports back" },
   { name: "popup-child", title: "Popup child", summary: "Reports to its opener" },
+  {
+    name: "popup-child-quiet",
+    title: "Quiet popup child",
+    summary: "Logs to the console before anything reads the hook",
+    headCheck: false,
+  },
   {
     name: "virtual-list",
     title: "Virtual list",
@@ -37,6 +45,9 @@ export const ROUTES: readonly FixtureRoute[] = [
  * already ran, which proves the hook was installed before the application's first script.
  */
 export const HEAD_CHECK = "window.__fixture = { hookSeenAtHead: Boolean(window.__recnrunHook) };";
+
+/** The first script of a page without the head check: a log that leaves the hook unread. */
+export const QUIET_LOG = 'console.log("Quiet popup child: first script");';
 
 /** The index page: every route by its `data-testid`, and how to inject a defect. */
 export function renderIndex(): string {

@@ -259,3 +259,34 @@ test("events inside a same-origin iframe and a cross-site OOPIF carry their own 
     ),
   ).toMatchObject({ payload: { type: "iframe" } });
 });
+
+test("a popup that logs before anything reads the hook logs under its own document", async ({
+  app,
+  captured,
+}) => {
+  const page = await app.open("popup");
+  const opened = app.context.waitForEvent("page");
+  await page.getByRole("button", { name: "Open quiet popup" }).click();
+  const popup = await opened;
+  await waitReady(popup, "popup-child-quiet");
+  const payload = (event: CapturedEvent) => event.payload as { args?: string[]; url?: string };
+  const logged = () =>
+    captured.events.find(
+      (event) =>
+        event.type === "api" && payload(event).args?.[0] === "Quiet popup child: first script",
+    );
+  await expect.poll(logged).toBeDefined();
+  const log = logged() as CapturedEvent;
+  const blank = captured.events
+    .filter(
+      (event) =>
+        event.type === "hook-installed" &&
+        event.targetId === log.targetId &&
+        payload(event).url === "about:blank",
+    )
+    .map((event) => event.documentId);
+  // Chrome hands the about:blank window, hook included, to the popup's first document.
+  expect(log.documentId).toMatch(/^[0-9a-f]{32}$/);
+  expect(blank).not.toContain(log.documentId);
+  expect(log.documentId).toBe(await captured.documentOf(popup));
+});
