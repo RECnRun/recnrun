@@ -59,7 +59,7 @@ Measured on Playwright Chromium or Chrome for Testing 156 (never branded Chrome)
 ## 4. How acceptance is checked
 
 - Every acceptance criterion names a test file and the `vp run` command that runs it. A criterion with no automated check does not close a task; it goes to [MANUAL_VALIDATION.md](MANUAL_VALIDATION.md).
-- A phase closes when its tasks are `[x]` in [CHECKLIST.md](CHECKLIST.md), `vp run verify` exits 0 on the branch, and, for phases that own an order-critical scenario, the checklist records the `vp run test:stress` run.
+- A phase closes when its tasks are `[x]` in [CHECKLIST.md](CHECKLIST.md), `vp run verify` exits 0 on the branch, for phases that own an order-critical scenario the checklist records the `vp run test:stress` run, and the checklist records a Codex code review of the phase's commits (model `gpt-6.1-sol`, high reasoning effort) with the findings the orchestrator applied and the ones it rejected, each with a reason (checklist resume protocol, step 6).
 - Layers, all run by `vp run verify` inside Docker unless noted:
 
 | Layer       | Files                                                                                      | Command                                 | Added in |

@@ -8,9 +8,10 @@ Tracks [PLAN.md](PLAN.md). One line per task; the orchestrator owns `[x]`, imple
 2. `git status` is clean and `git log --oneline -1` matches **Last commit** below; otherwise stop and report.
 3. Take the first task of the current phase that is `[ ]`. Do not start a later phase while an earlier one has `[ ]` or `[!]` tasks, unless the owner says so. P2 to P6 wait for the owner's route decision recorded under P1.8.
 4. Implement with red/green and one commit per task (see `.claude/agents/plan-implementer.md`). Mark `[i]` with indented `red:`, `green:`, and `commit:` lines. An experiment task also records its verdicts (`verdict:` line, one per hypothesis).
-5. A phase closes when the orchestrator runs `vp run verify` (exit 0), runs `vp run test:stress` when the phase owns an `@order-critical` scenario, marks every task `[x]`, records both gate lines, pushes the branch, and updates the pull request.
-6. Manual items are tracked only in [MANUAL_VALIDATION.md](MANUAL_VALIDATION.md); never mark a task `[x]` on the strength of a manual check.
-7. Changing the fixture after P0.6 requires a new `freeze.json`, a line under P0.6 saying what changed and why, and the owner's agreement (the application under test must not learn to cooperate).
+5. A phase closes when the orchestrator runs `vp run verify` (exit 0), runs `vp run test:stress` when the phase owns an `@order-critical` scenario, obtains the Codex review (step 6), marks every task `[x]`, records the gate lines, pushes the branch, and updates the pull request.
+6. **Codex review before a phase closes.** The orchestrator asks Codex for a professional-level code review of the phase's commits, with the model `gpt-6.1-sol` at high reasoning effort: `codex exec --ephemeral -s read-only -m gpt-6.1-sol -c model_reasoning_effort=high` with a prompt that names the commit range, the plan task IDs, and the repository rules (`AGENTS.md`). The orchestrator evaluates every finding, applies the changes it considers pertinent with red/green and one commit per change, rejects the rest with a reason, and records the outcome in the gate's `review:` line (date, findings, applied, rejected with reasons). A review that was not run blocks the gate.
+7. Manual items are tracked only in [MANUAL_VALIDATION.md](MANUAL_VALIDATION.md); never mark a task `[x]` on the strength of a manual check.
+8. Changing the fixture after P0.6 requires a new `freeze.json`, a line under P0.6 saying what changed and why, and the owner's agreement (the application under test must not learn to cooperate).
 
 Markers: `[ ]` not started · `[i]` implemented, awaiting the phase gate · `[x]` verified by `vp run verify` · `[!]` blocked (reason indented) · `[~]` partial (what is missing indented).
 
@@ -55,7 +56,7 @@ Markers: `[ ]` not started · `[i]` implemented, awaiting the phase gate · `[x]
   - commit: "Open every fixture route in Google Chrome from the browser layer"
   - note: Chrome facts recorded by the spec and the README: push subscription is `NotAllowedError` without the notification permission (headed Chrome otherwise waits on the prompt, so the spec denies it through CDP), and a dynamic `import()` in a service worker is a `TypeError` by design
 - [ ] P0.7 Evidence pipeline and observer allowlist
-- Gate P0: `vp run verify` → (date, result)
+- Gate P0: `vp run verify` → (date, result); `review:` Codex `gpt-6.1-sol` high → (date, findings, applied, rejected)
 
 ## P1: Minimal service-worker proof
 
@@ -67,7 +68,7 @@ Markers: `[ ]` not started · `[i]` implemented, awaiting the phase gate · `[x]
 - [ ] P1.6 Route C: composition for pages and non-service workers (E7)
 - [ ] P1.7 Original-session filter and prefix collision
 - [ ] P1.8 P1 report and decision point
-- Gate P1: `vp run verify` → (date, result); `vp run test:stress` (E3, E6) → (date, iterations, late attaches)
+- Gate P1: `vp run verify` → (date, result); `vp run test:stress` (E3, E6) → (date, iterations, late attaches); `review:` Codex `gpt-6.1-sol` high → (date, findings, applied, rejected)
 - Manual after gate: M-P1.a
 - Owner's route decision: (date, route per capability)
 
@@ -82,7 +83,7 @@ Markers: `[ ]` not started · `[i]` implemented, awaiting the phase gate · `[x]
 - [ ] P2.7 WebSocket and EventSource
 - [ ] P2.8 Worker realms
 - [ ] P2.9 OPFS, Storage Buckets, inventory
-- Gate P2: `vp run verify` → (date, result)
+- Gate P2: `vp run verify` → (date, result); `review:` Codex `gpt-6.1-sol` high → (date, findings, applied, rejected)
 
 ## P3: Cookies and network without staging
 
@@ -93,7 +94,7 @@ Markers: `[ ]` not started · `[i]` implemented, awaiting the phase gate · `[x]
 - [ ] P3.5 Late responses `@order-critical`
 - [ ] P3.6 HTTP cache and `Vary`
 - [ ] P3.7 Ports and same-name cookies
-- Gate P3: `vp run verify` → (date, result); `vp run test:stress` (P3.2, P3.5) → (date, iterations, leaks)
+- Gate P3: `vp run verify` → (date, result); `vp run test:stress` (P3.2, P3.5) → (date, iterations, leaks); `review:` Codex `gpt-6.1-sol` high → (date, findings, applied, rejected)
 
 ## P4: The switch transaction
 
@@ -105,7 +106,7 @@ Markers: `[ ]` not started · `[i]` implemented, awaiting the phase gate · `[x]
 - [ ] P4.6 Negative control: plain reload
 - [ ] P4.7 Reset of a suspended session
 - [ ] P4.8 A → B → A → C → A end to end `@order-critical`
-- Gate P4: `vp run verify` → (date, result); `vp run test:stress` (P4.3, P4.8) → (date, iterations, leaks)
+- Gate P4: `vp run verify` → (date, result); `vp run test:stress` (P4.3, P4.8) → (date, iterations, leaks); `review:` Codex `gpt-6.1-sol` high → (date, findings, applied, rejected)
 - Manual after gate: M-P4.a
 
 ## P5: Automatic discovery
@@ -114,7 +115,7 @@ Markers: `[ ]` not started · `[i]` implemented, awaiting the phase gate · `[x]
 - [ ] P5.2 Unknown dependencies first met in a worker
 - [ ] P5.3 Redirects, popups, silent renew, cross-origin API, subdomains, ports
 - [ ] P5.4 Shared resources across environments
-- Gate P5: `vp run verify` → (date, result)
+- Gate P5: `vp run verify` → (date, result); `review:` Codex `gpt-6.1-sol` high → (date, findings, applied, rejected)
 
 ## P6: Compatibility
 
@@ -125,7 +126,7 @@ Markers: `[ ]` not started · `[i]` implemented, awaiting the phase gate · `[x]
 - [ ] P6.5 Volume and pressure
 - [ ] P6.6 Expired sessions and extra APIs
 - [ ] P6.7 Framework lab
-- Gate P6: `vp run verify` → (date, result); `vp run test:stress` (P6.1, P6.2) → (date, iterations, leaks)
+- Gate P6: `vp run verify` → (date, result); `vp run test:stress` (P6.1, P6.2) → (date, iterations, leaks); `review:` Codex `gpt-6.1-sol` high → (date, findings, applied, rejected)
 - Manual after gate: M-P6.a, M-P6.b
 
 ## P7: Packaging
@@ -134,12 +135,12 @@ Markers: `[ ]` not started · `[i]` implemented, awaiting the phase gate · `[x]
 - [ ] P7.2 UI
 - [ ] P7.3 T23, automated part
 - [ ] P7.4 Uninstall and data
-- Gate P7: `vp run verify` → (date, result)
+- Gate P7: `vp run verify` → (date, result); `review:` Codex `gpt-6.1-sol` high → (date, findings, applied, rejected)
 - Manual after gate: M-P7.a, M-P7.b, M-P7.c, M-P7.d
 
 ## P8: Final report and decision
 
 - [ ] P8.1 Decision script
 - [ ] P8.2 Report
-- Gate P8: `vp run verify` → (date, result); decision printed by `scripts/decide.mjs` → (GO | GO partial | NO-GO)
+- Gate P8: `vp run verify` → (date, result); decision printed by `scripts/decide.mjs` → (GO | GO partial | NO-GO); `review:` Codex `gpt-6.1-sol` high → (date, findings, applied, rejected)
 - Manual before the report is final: every item of [MANUAL_VALIDATION.md](MANUAL_VALIDATION.md) has a recorded result or an explicit "not run" with the reason
