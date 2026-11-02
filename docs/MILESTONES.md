@@ -20,7 +20,4 @@ Manual, once per release of the extension:
 
 ## Next
 
-- M1: capture. A spike evaluates rrweb in the extension, then the extension records the current tab's timeline and stores it with its summary ([PRODUCT_BRIEF.md](PRODUCT_BRIEF.md#next)).
-- M2: replay a recording.
-- M3: extract re-runnable steps from a recording and run them.
-- Publish the extension to the Chrome Web Store, and point the install banner at the listing.
+The direction changed on 2026-11-02: a local Node.js service connected to the installed Chrome over CDP replaces the extension as the owner of the data. Phases F0 to F7, their automated gates, and the deferred manual checks are in [plan/PLAN.md](plan/PLAN.md), tracked in [plan/CHECKLIST.md](plan/CHECKLIST.md) and [plan/MANUAL_VALIDATION.md](plan/MANUAL_VALIDATION.md). F0.1 rewrites this file with the new milestones.
