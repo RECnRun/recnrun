@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { createWriteStream } from "node:fs";
-import { mkdir, readFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -14,6 +14,7 @@ const tasks = new Set([
   "test:unit:local",
   "test:components:local",
   "test:e2e:local",
+  "test:browser:local",
   "test:coverage:local",
 ]);
 const runId = `${new Date().toISOString().replaceAll(":", "-")}-${randomUUID()}`;
@@ -23,6 +24,7 @@ const artifacts = resolve(
 );
 const container = `recnrun-tests-${randomUUID()}`;
 let log;
+let image;
 let activeChild;
 let created = false;
 let interrupted = 0;
@@ -88,7 +90,7 @@ async function buildImage() {
   return { code: 0, stdout: (await readFile(imageFile, "utf8")).trim() };
 }
 
-async function startTests(image) {
+async function startTests() {
   const environment = ["CI", "DEBUG", "FORCE_COLOR"].flatMap((key) =>
     process.env[key] === undefined ? [] : ["--env", `${key}=${process.env[key]}`],
   );
@@ -123,6 +125,22 @@ async function startTests(image) {
   return code || attached.code;
 }
 
+async function collectVersions() {
+  const destination = join(artifacts, "versions.json");
+  try {
+    const result = await docker(["cp", `${container}:/opt/recnrun/versions.json`, destination], {
+      quiet: true,
+    });
+    if (result.code !== 0) throw new Error(`docker cp exited ${result.code}`);
+    const versions = JSON.parse(await readFile(destination, "utf8"));
+    await writeFile(destination, `${JSON.stringify({ ...versions, image }, null, 2)}\n`);
+    return 0;
+  } catch (error) {
+    message(`Could not export the image's versions.json: ${error.message}`);
+    return 1;
+  }
+}
+
 async function collectArtifacts() {
   let code = 0;
   for (const directory of ["coverage", "test-results", "playwright-report"]) {
@@ -138,15 +156,17 @@ async function collectArtifacts() {
       code = 1;
     }
   }
-  return code;
+  const versions = await collectVersions();
+  return code || versions;
 }
 
 async function executeTests() {
   const available = await requireDocker();
   if (available !== 0 || interrupted) return available || interrupted;
-  const image = await buildImage();
-  if (image.code !== 0 || interrupted) return image.code || interrupted;
-  return startTests(image.stdout);
+  const built = await buildImage();
+  if (built.code !== 0 || interrupted) return built.code || interrupted;
+  image = built.stdout;
+  return startTests();
 }
 
 async function run() {

@@ -15,6 +15,8 @@
     "test:components:local": "vp test --config apps/website/vitest.browser.config.ts && vp test --config apps/ui/vitest.browser.config.ts",
     "test:e2e": "node scripts/test-container.mjs test:e2e:local",
     "test:e2e:local": "vp run --no-cache website#build && playwright test --workers=1",
+    "test:browser": "node scripts/test-container.mjs test:browser:local",
+    "test:browser:local": "playwright test --config playwright.browser.config.ts",
     "test:coverage": "node scripts/test-container.mjs test:coverage:local",
     "test:coverage:local": "vp test --coverage",
     "test:container": "node --test tests/container/runner.checks.mjs",

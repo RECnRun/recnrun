@@ -81,18 +81,19 @@ RECnRun reads the user's real Chrome profile, including request bodies and stora
 
 ## Toolchain
 
-| Concern                  | Tool                                                                               |
-| ------------------------ | ---------------------------------------------------------------------------------- |
-| Package manager, tasks   | Vite+ (`vp`) with pnpm workspaces and a version catalog                            |
-| Format, lint, type check | `vp check`: Oxfmt, Oxlint (type aware, with `eslint-plugin-sonarjs`), tsgo         |
-| Architecture boundaries  | dependency-cruiser (`.dependency-cruiser.cjs`)                                     |
-| Dead code, duplication   | Knip (`knip.jsonc`), jscpd                                                         |
-| Documentation            | `scripts/check-docs.mjs` (`vp run docs:check`): relative links and anchors resolve |
-| Unit and component tests | Vitest with V8 coverage; Vitest Browser Mode with Playwright Chromium              |
-| End-to-end               | Playwright against the built website, in Docker                                    |
-| Browser layer (F0.6)     | Playwright `connectOverCDP` against Google Chrome Stable, headed on Xvfb in Docker |
+| Concern                  | Tool                                                                                                                |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| Package manager, tasks   | Vite+ (`vp`) with pnpm workspaces and a version catalog                                                             |
+| Format, lint, type check | `vp check`: Oxfmt, Oxlint (type aware, with `eslint-plugin-sonarjs`), tsgo                                          |
+| Architecture boundaries  | dependency-cruiser (`.dependency-cruiser.cjs`)                                                                      |
+| Dead code, duplication   | Knip (`knip.jsonc`), jscpd                                                                                          |
+| Documentation            | `scripts/check-docs.mjs` (`vp run docs:check`): relative links and anchors resolve                                  |
+| Unit and component tests | Vitest with V8 coverage; Vitest Browser Mode with Playwright Chromium                                               |
+| End-to-end               | Playwright against the built website, in Docker                                                                     |
+| Browser layer            | `vp run test:browser`: Google Chrome Stable for Linux, headed on Xvfb in Docker, found through `DevToolsActivePort` |
 
 Findings from the bootstrap spike, kept here because they explain the configuration:
 
 - **dependency-cruiser and TypeScript 7.** dependency-cruiser 18 supports TypeScript below 7, so it parses with SWC (`parser: "swc"`, `@swc/core`); type-only imports are still detected. Its tsconfig-paths plugin resolves `paths` from the working directory, so each app has a `tsconfig.deps.json` repeating its `@/` alias from the repo root, and `vp run deps` cruises each app with its own. npm packages are not followed but stay in the graph as leaves, so rules can name them (`not-to-dev-dep`); the `exclude` names only the workspaces' build output, since a pattern on `dist/` would also drop every package's own `dist/`.
 - **Docker display.** Vitest Browser Mode runs headed; the test container provides Xvfb, so no window opens on the host. Google Chrome in the browser layer uses the same display.
+- **Google Chrome in Docker.** `Dockerfile.tests` installs `google-chrome-stable` from Google's apt repository (amd64 and arm64) and writes `/opt/recnrun/versions.json`, which `scripts/test-container.mjs` copies with the image id into each run's `.artifacts/docker/<run-id>/versions.json`. Chrome runs as root in the container, where its sandbox cannot start, so the browser fixture adds `--no-sandbox` there and only there.

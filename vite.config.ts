@@ -94,6 +94,7 @@ export default defineConfig({
           "vp run --no-cache test:unit:local",
           "vp run --no-cache test:components:local",
           "vp run --no-cache test:e2e:local",
+          "vp run --no-cache test:browser:local",
         ],
       },
       verify: {

@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM mcr.microsoft.com/playwright:v1.64.1-noble@sha256:7852dc5a7d72f5fe458a597d690f6c42fbc8e9e26ddfa95f8e6ef552558d9bbf
+FROM mcr.microsoft.com/playwright:v1.64.1-noble@sha256:7852dc5a7d72f5fe458a597d690f6c42fbc8e9e26ddfa95f8e6ef552558d9bbf AS runtime
 
 ENV VP_HOME=/opt/vite-plus \
     VP_NODE_VERSION=24.21.0 \
@@ -11,6 +11,17 @@ RUN curl -fsSL https://vite.plus -o /tmp/install-vp.sh \
     && rm /tmp/install-vp.sh \
     && vp env install node@24.21.0 pnpm@12.14.0
 
+# Google Chrome Stable from Google's apt repository, not Chromium or Chrome for Testing (PLAN.md decision 5).
+RUN curl -fsSL https://dl.google.com/linux/linux_signing_key.pub -o /etc/apt/keyrings/google-chrome.asc \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/google-chrome.asc] https://dl.google.com/linux/chrome/deb/ stable main" \
+        > /etc/apt/sources.list.d/google-chrome.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends google-chrome-stable \
+    && rm -rf /var/lib/apt/lists/* \
+    && google-chrome --version
+
+# tests/container/runner.checks.mjs builds this stage alone to check the browser.
+FROM runtime
 WORKDIR /workspace
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/website/package.json ./apps/website/package.json
@@ -28,8 +39,20 @@ RUN --mount=type=cache,target=/root/.local/share/pnpm/store,sharing=locked \
     vp install --frozen-lockfile --ignore-scripts
 
 COPY . .
+# scripts/test-container.mjs copies this file into the run's versions.json.
 RUN vp install --frozen-lockfile --offline \
-    && mkdir -p coverage test-results playwright-report
+    && mkdir -p coverage test-results playwright-report /opt/recnrun \
+    && node -e ' \
+        const { execFileSync } = require("node:child_process"); \
+        const run = (file, ...args) => execFileSync(file, args, { encoding: "utf8" }).trim(); \
+        const versions = { \
+          chrome: run("google-chrome", "--version"), \
+          node: process.version, \
+          pnpm: run("pnpm", "--version"), \
+          playwright: run("node_modules/.bin/playwright", "--version").replace(/^Version /, ""), \
+        }; \
+        require("node:fs").writeFileSync("/opt/recnrun/versions.json", JSON.stringify(versions, null, 2) + "\n");' \
+    && cat /opt/recnrun/versions.json
 
 ENTRYPOINT ["xvfb-run", "-a", "--server-args=-screen 0 1920x1440x24 -nolisten tcp", "vp", "run", "--no-cache"]
 CMD ["verify:local"]

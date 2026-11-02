@@ -12,7 +12,7 @@ RECnRun is a local tool that drives the installed Google Chrome over the Chrome 
 - `packages/adapter`: `@recnrun/adapter`, that interface implemented over Playwright and CDP.
 - `packages/persistence`: `@recnrun/persistence`, flow folders, revisions, the journal, and the SQLite index.
 - `packages/brand`: `@recnrun/brand`, the Mona Sans font and the stylesheet every app imports.
-- `tests/`: Playwright end-to-end tests (`tests/e2e`) and Docker runner checks (`tests/container`).
+- `tests/`: Playwright end-to-end tests (`tests/e2e`), browser tests against Google Chrome over CDP (`tests/browser`), and Docker runner checks (`tests/container`).
 
 The workspaces are skeletons until the phases of [PLAN.md](docs/plan/PLAN.md) fill them; [ARCHITECTURE.md](docs/ARCHITECTURE.md#target-layout) has the layout and what each may import.
 
@@ -31,20 +31,20 @@ Update the relevant doc when a change alters what it describes.
 
 Vite+ (`vp`) is the only toolchain. `vp <name>` runs a built-in command and `vp run <name>` runs a `package.json` script or `vite.config.ts` task, so they can differ: `vp test` is plain Vitest, while `vp run test` is the project suite. Vite+ docs are in `node_modules/vite-plus/docs`. Run `vp env doctor` when setup or package-manager behavior looks wrong.
 
-| Command                                              | Purpose                                                     |
-| ---------------------------------------------------- | ----------------------------------------------------------- |
-| `vp install`                                         | After pulling, before starting work                         |
-| `vp run dev` (alias of `vp run dev:website`)         | Website dev server on port 5173                             |
-| `vp run clean`                                       | Delete builds, artifacts, and caches                        |
-| `vp check` (`--fix` to format)                       | Format (Oxfmt), lint (Oxlint), and type check while editing |
-| `vp run deps`                                        | Architecture boundaries (dependency-cruiser)                |
-| `vp run test:unit`, `test:components`, `test:e2e`    | One test layer: Node, Vitest Browser Mode, Playwright       |
-| `vp run test`                                        | All three layers                                            |
-| `vp run test:coverage`                               | Coverage with thresholds                                    |
-| `vp run dead-code`, `vp run duplication`             | Knip; jscpd                                                 |
-| `vp run docs:check`                                  | Relative Markdown links and anchors resolve                 |
-| `vp run test:e2e -- tests/e2e/landing.spec.ts -g ''` | Targeted Playwright run (arguments go after `--`)           |
-| `vp run verify`                                      | Full gate (`vp run ready` is an alias)                      |
+| Command                                                           | Purpose                                                                       |
+| ----------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `vp install`                                                      | After pulling, before starting work                                           |
+| `vp run dev` (alias of `vp run dev:website`)                      | Website dev server on port 5173                                               |
+| `vp run clean`                                                    | Delete builds, artifacts, and caches                                          |
+| `vp check` (`--fix` to format)                                    | Format (Oxfmt), lint (Oxlint), and type check while editing                   |
+| `vp run deps`                                                     | Architecture boundaries (dependency-cruiser)                                  |
+| `vp run test:unit`, `test:components`, `test:e2e`, `test:browser` | One test layer: Node, Vitest Browser Mode, Playwright, Google Chrome over CDP |
+| `vp run test`                                                     | All four layers                                                               |
+| `vp run test:coverage`                                            | Coverage with thresholds                                                      |
+| `vp run dead-code`, `vp run duplication`                          | Knip; jscpd                                                                   |
+| `vp run docs:check`                                               | Relative Markdown links and anchors resolve                                   |
+| `vp run test:e2e -- tests/e2e/landing.spec.ts -g ''`              | Targeted Playwright run (arguments go after `--`)                             |
+| `vp run verify`                                                   | Full gate (`vp run ready` is an alias)                                        |
 
 Test commands and `verify` run in Docker, so start Docker Desktop first. If Docker fails, the command fails; it never falls back to host browsers. `:local` variants (`vp run test:e2e:local`) and the built-in `vp test` run on the host and are for debugging only. Logs and failure artifacts are in `.artifacts/docker/<run-id>/`.
 
