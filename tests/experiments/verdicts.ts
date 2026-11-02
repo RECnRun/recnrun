@@ -15,7 +15,11 @@ export interface Verdict {
   /** How the extension was loaded (E0's methods), for experiments that run inside it. */
   method?: string;
   /** Sub-cases of the hypothesis, when it was tried more than one way. */
-  variants?: { name: string; verdict: Verdict["verdict"]; error?: string }[];
+  variants?: { name: string; verdict: Verdict["verdict"]; error?: string; samples?: number }[];
+  /** Named sample counts behind the verdict, for example `firstEffectBeforeMarker` (E2). */
+  counts?: Record<string, number>;
+  /** Percentiles, in milliseconds, of named durations over the samples. */
+  timings?: Record<string, { p50: number; p95: number; max: number }>;
 }
 
 const ROOT = fileURLToPath(new URL("../../", import.meta.url));
