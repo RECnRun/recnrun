@@ -132,11 +132,11 @@ export const FEATURE_CAPABILITIES: Feature[] = [
     "Sessions, control, and leases",
     "Delivered by F2.2 in the engine: session, control, step, and pause transition tables, every state and event checked (packages/engine/tests/session.test.ts); a lease per target with heartbeat, expiry, and a fencing token that turns a delayed command from a previous lease into stale-lease (packages/engine/tests/lease.test.ts); the three pauses resume independently (packages/engine/tests/pause.test.ts).",
   ),
-  planned(
+  implemented(
     "normalization",
     "F2.3",
     "Event normalization into steps",
-    "Suggested steps keep references to their raw events.",
+    "Delivered by F2.3; packages/engine/tests/normalization.test.ts runs one golden pair per rule over schema-valid captured events: fill grouping, redacted fill, type for special keys and transformed values, no navigate after a link or submit click, scroll policy, dblclick, drag, shortcuts, composition, overlay exclusion, replay-caused exclusion, and actor by producer or binding with untrusted events excluded. Suggested steps keep references to their raw events. dblclick and drag have no flow action yet, and role locators need an accessible name the hook does not capture yet.",
   ),
   implemented(
     "flow-persistence",

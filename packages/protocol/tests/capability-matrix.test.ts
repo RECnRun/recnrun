@@ -103,6 +103,7 @@ test.each([
 test.each([
   ["sessions-control-leases", "implemented", "packages/engine/tests/lease.test.ts"],
   ["flow-persistence", "implemented", "packages/persistence/tests/flow-store.test.ts"],
+  ["normalization", "implemented", "packages/engine/tests/normalization.test.ts"],
 ])("the F2 deliverable %s is %s and names %s", (id, status, spec) => {
   const entry = entries.find((candidate) => candidate.id === id);
   expect(entry?.status, id).toBe(status);

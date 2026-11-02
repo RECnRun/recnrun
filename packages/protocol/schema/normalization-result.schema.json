@@ -1,0 +1,1133 @@
+{
+  "$defs": {
+    "0": {
+      "anyOf": [
+        {
+          "oneOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "exact": {
+                  "type": "boolean"
+                },
+                "filter": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "hasNotText": {
+                      "type": "string"
+                    },
+                    "hasText": {
+                      "type": "string"
+                    },
+                    "visible": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [],
+                  "type": "object"
+                },
+                "has": {
+                  "$ref": "#/$defs/0"
+                },
+                "id": {
+                  "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "role": {
+                  "type": "string"
+                },
+                "strategy": {
+                  "const": "role"
+                },
+                "within": {
+                  "$ref": "#/$defs/0"
+                }
+              },
+              "required": ["strategy", "role"],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "exact": {
+                  "type": "boolean"
+                },
+                "filter": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "hasNotText": {
+                      "type": "string"
+                    },
+                    "hasText": {
+                      "type": "string"
+                    },
+                    "visible": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [],
+                  "type": "object"
+                },
+                "has": {
+                  "$ref": "#/$defs/0"
+                },
+                "id": {
+                  "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                  "type": "string"
+                },
+                "strategy": {
+                  "enum": ["text", "label"],
+                  "type": "string"
+                },
+                "value": {
+                  "type": "string"
+                },
+                "within": {
+                  "$ref": "#/$defs/0"
+                }
+              },
+              "required": ["strategy", "value"],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "filter": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "hasNotText": {
+                      "type": "string"
+                    },
+                    "hasText": {
+                      "type": "string"
+                    },
+                    "visible": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [],
+                  "type": "object"
+                },
+                "has": {
+                  "$ref": "#/$defs/0"
+                },
+                "id": {
+                  "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                  "type": "string"
+                },
+                "strategy": {
+                  "enum": ["testId", "css", "xpath"],
+                  "type": "string"
+                },
+                "value": {
+                  "type": "string"
+                },
+                "within": {
+                  "$ref": "#/$defs/0"
+                }
+              },
+              "required": ["strategy", "value"],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "args": {
+                  "additionalProperties": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "propertyNames": {
+                    "pattern": "^[A-Za-z_]\\w*$",
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                "filter": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "hasNotText": {
+                      "type": "string"
+                    },
+                    "hasText": {
+                      "type": "string"
+                    },
+                    "visible": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [],
+                  "type": "object"
+                },
+                "functionRef": {
+                  "pattern": "^[a-z][\\w-]*(\\.[A-Za-z_][\\w-]*)+@\\d+\\.\\d+\\.\\d+$",
+                  "type": "string"
+                },
+                "has": {
+                  "$ref": "#/$defs/0"
+                },
+                "id": {
+                  "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                  "type": "string"
+                },
+                "strategy": {
+                  "const": "function"
+                },
+                "within": {
+                  "$ref": "#/$defs/0"
+                }
+              },
+              "required": ["strategy", "functionRef"],
+              "type": "object"
+            }
+          ]
+        },
+        {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "testId": {
+                  "type": "string"
+                }
+              },
+              "required": ["testId"],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "exact": {
+                  "type": "boolean"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "role": {
+                  "type": "string"
+                }
+              },
+              "required": ["role"],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "exact": {
+                  "type": "boolean"
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": ["text"],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "exact": {
+                  "type": "boolean"
+                },
+                "label": {
+                  "type": "string"
+                }
+              },
+              "required": ["label"],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "css": {
+                  "type": "string"
+                }
+              },
+              "required": ["css"],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "xpath": {
+                  "type": "string"
+                }
+              },
+              "required": ["xpath"],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "args": {
+                  "additionalProperties": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "propertyNames": {
+                    "pattern": "^[A-Za-z_]\\w*$",
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                "functionRef": {
+                  "pattern": "^[a-z][\\w-]*(\\.[A-Za-z_][\\w-]*)+@\\d+\\.\\d+\\.\\d+$",
+                  "type": "string"
+                }
+              },
+              "required": ["functionRef"],
+              "type": "object"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "properties": {
+    "excluded": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "event": {
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "producer": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "seq": {
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": ["id", "producer", "seq"],
+            "type": "object"
+          },
+          "reason": {
+            "enum": [
+              "replay-caused",
+              "recorder-overlay",
+              "untrusted",
+              "scroll-dropped",
+              "navigation-caused"
+            ],
+            "type": "string"
+          },
+          "replayCaused": {
+            "const": true
+          }
+        },
+        "required": ["event", "reason"],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "steps": {
+      "items": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "action": {
+                "const": "navigate"
+              },
+              "actor": {
+                "pattern": "^[A-Za-z_]\\w*$",
+                "type": "string"
+              },
+              "events": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "producer": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "seq": {
+                      "minimum": 0,
+                      "type": "integer"
+                    }
+                  },
+                  "required": ["id", "producer", "seq"],
+                  "type": "object"
+                },
+                "minItems": 1,
+                "type": "array"
+              },
+              "id": {
+                "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                "type": "string"
+              },
+              "url": {
+                "type": "string"
+              }
+            },
+            "required": ["id", "events", "action", "url"],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "action": {
+                "enum": ["click", "dblclick"],
+                "type": "string"
+              },
+              "actor": {
+                "pattern": "^[A-Za-z_]\\w*$",
+                "type": "string"
+              },
+              "events": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "producer": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "seq": {
+                      "minimum": 0,
+                      "type": "integer"
+                    }
+                  },
+                  "required": ["id", "producer", "seq"],
+                  "type": "object"
+                },
+                "minItems": 1,
+                "type": "array"
+              },
+              "id": {
+                "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                "type": "string"
+              },
+              "target": {
+                "additionalProperties": false,
+                "properties": {
+                  "cardinality": {
+                    "default": "one",
+                    "enum": ["one", "many", "optional", "nth"],
+                    "type": "string"
+                  },
+                  "index": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "locators": {
+                    "items": {
+                      "anyOf": [
+                        {
+                          "oneOf": [
+                            {
+                              "additionalProperties": false,
+                              "properties": {
+                                "exact": {
+                                  "type": "boolean"
+                                },
+                                "filter": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "hasNotText": {
+                                      "type": "string"
+                                    },
+                                    "hasText": {
+                                      "type": "string"
+                                    },
+                                    "visible": {
+                                      "type": "boolean"
+                                    }
+                                  },
+                                  "required": [],
+                                  "type": "object"
+                                },
+                                "has": {
+                                  "$ref": "#/$defs/0"
+                                },
+                                "id": {
+                                  "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "role": {
+                                  "type": "string"
+                                },
+                                "strategy": {
+                                  "const": "role"
+                                },
+                                "within": {
+                                  "$ref": "#/$defs/0"
+                                }
+                              },
+                              "required": ["strategy", "role"],
+                              "type": "object"
+                            },
+                            {
+                              "additionalProperties": false,
+                              "properties": {
+                                "exact": {
+                                  "type": "boolean"
+                                },
+                                "filter": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "hasNotText": {
+                                      "type": "string"
+                                    },
+                                    "hasText": {
+                                      "type": "string"
+                                    },
+                                    "visible": {
+                                      "type": "boolean"
+                                    }
+                                  },
+                                  "required": [],
+                                  "type": "object"
+                                },
+                                "has": {
+                                  "$ref": "#/$defs/0"
+                                },
+                                "id": {
+                                  "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                                  "type": "string"
+                                },
+                                "strategy": {
+                                  "enum": ["text", "label"],
+                                  "type": "string"
+                                },
+                                "value": {
+                                  "type": "string"
+                                },
+                                "within": {
+                                  "$ref": "#/$defs/0"
+                                }
+                              },
+                              "required": ["strategy", "value"],
+                              "type": "object"
+                            },
+                            {
+                              "additionalProperties": false,
+                              "properties": {
+                                "filter": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "hasNotText": {
+                                      "type": "string"
+                                    },
+                                    "hasText": {
+                                      "type": "string"
+                                    },
+                                    "visible": {
+                                      "type": "boolean"
+                                    }
+                                  },
+                                  "required": [],
+                                  "type": "object"
+                                },
+                                "has": {
+                                  "$ref": "#/$defs/0"
+                                },
+                                "id": {
+                                  "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                                  "type": "string"
+                                },
+                                "strategy": {
+                                  "enum": ["testId", "css", "xpath"],
+                                  "type": "string"
+                                },
+                                "value": {
+                                  "type": "string"
+                                },
+                                "within": {
+                                  "$ref": "#/$defs/0"
+                                }
+                              },
+                              "required": ["strategy", "value"],
+                              "type": "object"
+                            },
+                            {
+                              "additionalProperties": false,
+                              "properties": {
+                                "args": {
+                                  "additionalProperties": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "boolean"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "propertyNames": {
+                                    "pattern": "^[A-Za-z_]\\w*$",
+                                    "type": "string"
+                                  },
+                                  "type": "object"
+                                },
+                                "filter": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "hasNotText": {
+                                      "type": "string"
+                                    },
+                                    "hasText": {
+                                      "type": "string"
+                                    },
+                                    "visible": {
+                                      "type": "boolean"
+                                    }
+                                  },
+                                  "required": [],
+                                  "type": "object"
+                                },
+                                "functionRef": {
+                                  "pattern": "^[a-z][\\w-]*(\\.[A-Za-z_][\\w-]*)+@\\d+\\.\\d+\\.\\d+$",
+                                  "type": "string"
+                                },
+                                "has": {
+                                  "$ref": "#/$defs/0"
+                                },
+                                "id": {
+                                  "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                                  "type": "string"
+                                },
+                                "strategy": {
+                                  "const": "function"
+                                },
+                                "within": {
+                                  "$ref": "#/$defs/0"
+                                }
+                              },
+                              "required": ["strategy", "functionRef"],
+                              "type": "object"
+                            }
+                          ]
+                        },
+                        {
+                          "anyOf": [
+                            {
+                              "additionalProperties": false,
+                              "properties": {
+                                "testId": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["testId"],
+                              "type": "object"
+                            },
+                            {
+                              "additionalProperties": false,
+                              "properties": {
+                                "exact": {
+                                  "type": "boolean"
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "role": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["role"],
+                              "type": "object"
+                            },
+                            {
+                              "additionalProperties": false,
+                              "properties": {
+                                "exact": {
+                                  "type": "boolean"
+                                },
+                                "text": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["text"],
+                              "type": "object"
+                            },
+                            {
+                              "additionalProperties": false,
+                              "properties": {
+                                "exact": {
+                                  "type": "boolean"
+                                },
+                                "label": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["label"],
+                              "type": "object"
+                            },
+                            {
+                              "additionalProperties": false,
+                              "properties": {
+                                "css": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["css"],
+                              "type": "object"
+                            },
+                            {
+                              "additionalProperties": false,
+                              "properties": {
+                                "xpath": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["xpath"],
+                              "type": "object"
+                            },
+                            {
+                              "additionalProperties": false,
+                              "properties": {
+                                "args": {
+                                  "additionalProperties": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "boolean"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "propertyNames": {
+                                    "pattern": "^[A-Za-z_]\\w*$",
+                                    "type": "string"
+                                  },
+                                  "type": "object"
+                                },
+                                "functionRef": {
+                                  "pattern": "^[a-z][\\w-]*(\\.[A-Za-z_][\\w-]*)+@\\d+\\.\\d+\\.\\d+$",
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["functionRef"],
+                              "type": "object"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "resolution": {
+                    "default": "orderedFallback",
+                    "enum": ["orderedFallback", "agreement"],
+                    "type": "string"
+                  },
+                  "timeoutMs": {
+                    "minimum": 1,
+                    "type": "integer"
+                  }
+                },
+                "required": ["locators"],
+                "type": "object"
+              }
+            },
+            "required": ["id", "events", "action", "target"],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "action": {
+                "const": "drag"
+              },
+              "actor": {
+                "pattern": "^[A-Za-z_]\\w*$",
+                "type": "string"
+              },
+              "events": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "producer": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "seq": {
+                      "minimum": 0,
+                      "type": "integer"
+                    }
+                  },
+                  "required": ["id", "producer", "seq"],
+                  "type": "object"
+                },
+                "minItems": 1,
+                "type": "array"
+              },
+              "id": {
+                "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                "type": "string"
+              },
+              "target": {
+                "additionalProperties": false,
+                "properties": {
+                  "cardinality": {
+                    "default": "one",
+                    "enum": ["one", "many", "optional", "nth"],
+                    "type": "string"
+                  },
+                  "index": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "locators": {
+                    "items": {
+                      "$ref": "#/$defs/0"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "resolution": {
+                    "default": "orderedFallback",
+                    "enum": ["orderedFallback", "agreement"],
+                    "type": "string"
+                  },
+                  "timeoutMs": {
+                    "minimum": 1,
+                    "type": "integer"
+                  }
+                },
+                "required": ["locators"],
+                "type": "object"
+              },
+              "to": {
+                "additionalProperties": false,
+                "properties": {
+                  "cardinality": {
+                    "default": "one",
+                    "enum": ["one", "many", "optional", "nth"],
+                    "type": "string"
+                  },
+                  "index": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "locators": {
+                    "items": {
+                      "$ref": "#/$defs/0"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "resolution": {
+                    "default": "orderedFallback",
+                    "enum": ["orderedFallback", "agreement"],
+                    "type": "string"
+                  },
+                  "timeoutMs": {
+                    "minimum": 1,
+                    "type": "integer"
+                  }
+                },
+                "required": ["locators"],
+                "type": "object"
+              }
+            },
+            "required": ["id", "events", "action", "target", "to"],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "action": {
+                "enum": ["fill", "type", "select"],
+                "type": "string"
+              },
+              "actor": {
+                "pattern": "^[A-Za-z_]\\w*$",
+                "type": "string"
+              },
+              "events": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "producer": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "seq": {
+                      "minimum": 0,
+                      "type": "integer"
+                    }
+                  },
+                  "required": ["id", "producer", "seq"],
+                  "type": "object"
+                },
+                "minItems": 1,
+                "type": "array"
+              },
+              "id": {
+                "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                "type": "string"
+              },
+              "redacted": {
+                "const": true
+              },
+              "target": {
+                "additionalProperties": false,
+                "properties": {
+                  "cardinality": {
+                    "default": "one",
+                    "enum": ["one", "many", "optional", "nth"],
+                    "type": "string"
+                  },
+                  "index": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "locators": {
+                    "items": {
+                      "$ref": "#/$defs/0"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "resolution": {
+                    "default": "orderedFallback",
+                    "enum": ["orderedFallback", "agreement"],
+                    "type": "string"
+                  },
+                  "timeoutMs": {
+                    "minimum": 1,
+                    "type": "integer"
+                  }
+                },
+                "required": ["locators"],
+                "type": "object"
+              },
+              "value": {
+                "type": "string"
+              }
+            },
+            "required": ["id", "events", "action", "target", "value"],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "action": {
+                "const": "keyPress"
+              },
+              "actor": {
+                "pattern": "^[A-Za-z_]\\w*$",
+                "type": "string"
+              },
+              "events": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "producer": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "seq": {
+                      "minimum": 0,
+                      "type": "integer"
+                    }
+                  },
+                  "required": ["id", "producer", "seq"],
+                  "type": "object"
+                },
+                "minItems": 1,
+                "type": "array"
+              },
+              "id": {
+                "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                "type": "string"
+              },
+              "key": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "target": {
+                "additionalProperties": false,
+                "properties": {
+                  "cardinality": {
+                    "default": "one",
+                    "enum": ["one", "many", "optional", "nth"],
+                    "type": "string"
+                  },
+                  "index": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "locators": {
+                    "items": {
+                      "$ref": "#/$defs/0"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "resolution": {
+                    "default": "orderedFallback",
+                    "enum": ["orderedFallback", "agreement"],
+                    "type": "string"
+                  },
+                  "timeoutMs": {
+                    "minimum": 1,
+                    "type": "integer"
+                  }
+                },
+                "required": ["locators"],
+                "type": "object"
+              }
+            },
+            "required": ["id", "events", "action", "key"],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "action": {
+                "const": "scroll"
+              },
+              "actor": {
+                "pattern": "^[A-Za-z_]\\w*$",
+                "type": "string"
+              },
+              "events": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "producer": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "seq": {
+                      "minimum": 0,
+                      "type": "integer"
+                    }
+                  },
+                  "required": ["id", "producer", "seq"],
+                  "type": "object"
+                },
+                "minItems": 1,
+                "type": "array"
+              },
+              "id": {
+                "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                "type": "string"
+              },
+              "scrollX": {
+                "type": "integer"
+              },
+              "scrollY": {
+                "type": "integer"
+              },
+              "target": {
+                "additionalProperties": false,
+                "properties": {
+                  "cardinality": {
+                    "default": "one",
+                    "enum": ["one", "many", "optional", "nth"],
+                    "type": "string"
+                  },
+                  "index": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "locators": {
+                    "items": {
+                      "$ref": "#/$defs/0"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  "resolution": {
+                    "default": "orderedFallback",
+                    "enum": ["orderedFallback", "agreement"],
+                    "type": "string"
+                  },
+                  "timeoutMs": {
+                    "minimum": 1,
+                    "type": "integer"
+                  }
+                },
+                "required": ["locators"],
+                "type": "object"
+              }
+            },
+            "required": ["id", "events", "action", "scrollX", "scrollY"],
+            "type": "object"
+          }
+        ]
+      },
+      "type": "array"
+    }
+  },
+  "required": ["steps", "excluded"],
+  "type": "object"
+}

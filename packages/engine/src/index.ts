@@ -66,3 +66,5 @@ export {
 export * from "./machines.ts";
 export * from "./session.ts";
 export * from "./lease.ts";
+export { normalize, type NormalizeOptions } from "./normalization/index.ts";
+export { suggestLocators, type LocatorHints } from "./normalization/locators.ts";

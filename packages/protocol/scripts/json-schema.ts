@@ -15,6 +15,7 @@ import {
   InstrumentationEventSchema,
   InstrumentationReportSchema,
   LocatorEntrySchema,
+  NormalizationResultSchema,
   ObserverMessageSchema,
   RequestEnvelopeSchema,
   ResponseEnvelopeSchema,
@@ -55,6 +56,7 @@ const DOCUMENTS: Record<string, AnySchema> = {
   "function-locator-result": FunctionLocatorResultSchema,
   lease: LeaseSchema,
   "session-status": SessionStatusSchema,
+  "normalization-result": NormalizationResultSchema,
 };
 
 // Named definitions give the flow's recursive schemas stable $ref names instead of generated ones.

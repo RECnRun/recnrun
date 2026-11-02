@@ -1,0 +1,133 @@
+{
+  "rule": "A pointerdown on one target and a pointerup on another become one drag; the click the browser fires on their common ancestor joins it.",
+  "input": [
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#1",
+      "runId": "rec-1",
+      "seq": 1,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:00.000Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "pointerdown",
+      "payload": {
+        "target": {
+          "tag": "div",
+          "testId": "card-1"
+        },
+        "isTrusted": true,
+        "x": 10,
+        "y": 20,
+        "button": 0,
+        "pointerType": "mouse",
+        "modifiers": []
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#2",
+      "runId": "rec-1",
+      "seq": 2,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:00.800Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "pointerup",
+      "payload": {
+        "target": {
+          "tag": "section",
+          "testId": "column-done"
+        },
+        "isTrusted": true,
+        "x": 400,
+        "y": 20,
+        "button": 0,
+        "pointerType": "mouse",
+        "modifiers": []
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#3",
+      "runId": "rec-1",
+      "seq": 3,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:00.801Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "click",
+      "payload": {
+        "target": {
+          "tag": "main",
+          "id": "board"
+        },
+        "isTrusted": true,
+        "x": 400,
+        "y": 20,
+        "button": 0,
+        "pointerType": "mouse",
+        "modifiers": [],
+        "detail": 1
+      }
+    }
+  ],
+  "expected": {
+    "steps": [
+      {
+        "id": "drag-1",
+        "action": "drag",
+        "target": {
+          "resolution": "orderedFallback",
+          "cardinality": "one",
+          "locators": [
+            {
+              "strategy": "testId",
+              "value": "card-1"
+            }
+          ]
+        },
+        "to": {
+          "resolution": "orderedFallback",
+          "cardinality": "one",
+          "locators": [
+            {
+              "strategy": "testId",
+              "value": "column-done"
+            }
+          ]
+        },
+        "events": [
+          {
+            "id": "cdp:S1#1",
+            "producer": "cdp:S1",
+            "seq": 1
+          },
+          {
+            "id": "cdp:S1#2",
+            "producer": "cdp:S1",
+            "seq": 2
+          },
+          {
+            "id": "cdp:S1#3",
+            "producer": "cdp:S1",
+            "seq": 3
+          }
+        ]
+      }
+    ],
+    "excluded": []
+  }
+}

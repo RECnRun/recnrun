@@ -1,0 +1,357 @@
+{
+  "rule": "A special key between inputs on one field turns the run into type and keyPress steps in order; a key after the last input is its own keyPress.",
+  "input": [
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#1",
+      "runId": "rec-1",
+      "seq": 1,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:00.000Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "keydown",
+      "payload": {
+        "target": {
+          "tag": "input",
+          "testId": "search",
+          "inputType": "search"
+        },
+        "isTrusted": true,
+        "key": "a",
+        "code": "KeyA",
+        "repeat": false,
+        "modifiers": []
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#2",
+      "runId": "rec-1",
+      "seq": 2,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:00.001Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "input",
+      "payload": {
+        "target": {
+          "tag": "input",
+          "testId": "search",
+          "inputType": "search"
+        },
+        "isTrusted": true,
+        "inputType": "insertText",
+        "data": "a",
+        "isComposing": false,
+        "value": "a"
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#3",
+      "runId": "rec-1",
+      "seq": 3,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:00.100Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "keydown",
+      "payload": {
+        "target": {
+          "tag": "input",
+          "testId": "search",
+          "inputType": "search"
+        },
+        "isTrusted": true,
+        "key": "b",
+        "code": "KeyB",
+        "repeat": false,
+        "modifiers": []
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#4",
+      "runId": "rec-1",
+      "seq": 4,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:00.101Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "input",
+      "payload": {
+        "target": {
+          "tag": "input",
+          "testId": "search",
+          "inputType": "search"
+        },
+        "isTrusted": true,
+        "inputType": "insertText",
+        "data": "b",
+        "isComposing": false,
+        "value": "ab"
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#5",
+      "runId": "rec-1",
+      "seq": 5,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:00.200Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "keydown",
+      "payload": {
+        "target": {
+          "tag": "input",
+          "testId": "search",
+          "inputType": "search"
+        },
+        "isTrusted": true,
+        "key": "ArrowLeft",
+        "code": "ArrowLeft",
+        "repeat": false,
+        "modifiers": []
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#6",
+      "runId": "rec-1",
+      "seq": 6,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:00.300Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "keydown",
+      "payload": {
+        "target": {
+          "tag": "input",
+          "testId": "search",
+          "inputType": "search"
+        },
+        "isTrusted": true,
+        "key": "c",
+        "code": "KeyC",
+        "repeat": false,
+        "modifiers": []
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#7",
+      "runId": "rec-1",
+      "seq": 7,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:00.301Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "input",
+      "payload": {
+        "target": {
+          "tag": "input",
+          "testId": "search",
+          "inputType": "search"
+        },
+        "isTrusted": true,
+        "inputType": "insertText",
+        "data": "c",
+        "isComposing": false,
+        "value": "acb"
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#8",
+      "runId": "rec-1",
+      "seq": 8,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:00.400Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "keydown",
+      "payload": {
+        "target": {
+          "tag": "input",
+          "testId": "search",
+          "inputType": "search"
+        },
+        "isTrusted": true,
+        "key": "Enter",
+        "code": "Enter",
+        "repeat": false,
+        "modifiers": []
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#9",
+      "runId": "rec-1",
+      "seq": 9,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:00.500Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "focusout",
+      "payload": {
+        "target": {
+          "tag": "input",
+          "testId": "search",
+          "inputType": "search"
+        },
+        "isTrusted": true
+      }
+    }
+  ],
+  "expected": {
+    "steps": [
+      {
+        "id": "type-1",
+        "action": "type",
+        "target": {
+          "resolution": "orderedFallback",
+          "cardinality": "one",
+          "locators": [
+            {
+              "strategy": "testId",
+              "value": "search"
+            }
+          ]
+        },
+        "value": "ab",
+        "events": [
+          {
+            "id": "cdp:S1#1",
+            "producer": "cdp:S1",
+            "seq": 1
+          },
+          {
+            "id": "cdp:S1#2",
+            "producer": "cdp:S1",
+            "seq": 2
+          },
+          {
+            "id": "cdp:S1#3",
+            "producer": "cdp:S1",
+            "seq": 3
+          },
+          {
+            "id": "cdp:S1#4",
+            "producer": "cdp:S1",
+            "seq": 4
+          }
+        ]
+      },
+      {
+        "id": "keyPress-2",
+        "action": "keyPress",
+        "key": "ArrowLeft",
+        "target": {
+          "resolution": "orderedFallback",
+          "cardinality": "one",
+          "locators": [
+            {
+              "strategy": "testId",
+              "value": "search"
+            }
+          ]
+        },
+        "events": [
+          {
+            "id": "cdp:S1#5",
+            "producer": "cdp:S1",
+            "seq": 5
+          }
+        ]
+      },
+      {
+        "id": "type-3",
+        "action": "type",
+        "target": {
+          "resolution": "orderedFallback",
+          "cardinality": "one",
+          "locators": [
+            {
+              "strategy": "testId",
+              "value": "search"
+            }
+          ]
+        },
+        "value": "c",
+        "events": [
+          {
+            "id": "cdp:S1#6",
+            "producer": "cdp:S1",
+            "seq": 6
+          },
+          {
+            "id": "cdp:S1#7",
+            "producer": "cdp:S1",
+            "seq": 7
+          }
+        ]
+      },
+      {
+        "id": "keyPress-4",
+        "action": "keyPress",
+        "key": "Enter",
+        "target": {
+          "resolution": "orderedFallback",
+          "cardinality": "one",
+          "locators": [
+            {
+              "strategy": "testId",
+              "value": "search"
+            }
+          ]
+        },
+        "events": [
+          {
+            "id": "cdp:S1#8",
+            "producer": "cdp:S1",
+            "seq": 8
+          }
+        ]
+      }
+    ],
+    "excluded": []
+  }
+}
