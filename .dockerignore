@@ -20,5 +20,3 @@
 **/.DS_Store
 .claude/worktrees
 .vite-hooks/_
-**/.output
-**/.wxt

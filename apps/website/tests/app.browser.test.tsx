@@ -1,48 +1,33 @@
-import { emptySnapshot } from "@recnrun/domain";
-import { sampleSnapshot } from "@recnrun/domain/testing";
 import { render } from "preact";
 import { expect, test } from "vite-plus/test";
 import { App } from "@/app/App";
-import type { ExtensionGateway } from "@/services/extension";
-import { INSTALL_GUIDE_URL } from "@/ui/InstallBanner";
-import { installedGateway, missingGateway } from "./fake-gateway.ts";
+import { OPEN_COMMAND, SETUP_COMMAND } from "@/features/install-guide/InstallGuide";
 
-function mount(gateway: ExtensionGateway) {
+function mount() {
   const root = document.createElement("div");
   document.body.replaceChildren(root);
-  render(<App gateway={gateway} />, root);
+  render(<App />, root);
   return root;
 }
 
-test("asks to install the extension when it is missing", async () => {
-  const root = mount(missingGateway);
-  await expect
-    .poll(() => root.querySelector(".banner h2")?.textContent)
-    .toBe("Install the RECnRun extension");
-  expect(root.querySelector("a.button")?.getAttribute("href")).toBe(INSTALL_GUIDE_URL);
+test("introduces RECnRun as a local tool that drives Chrome over CDP without AI", () => {
+  const root = mount();
+  expect(root.querySelector("h1")?.textContent).toBe("RECnRun");
+  const lead = root.querySelector(".lead")?.textContent ?? "";
+  expect(lead).toContain("Chrome DevTools Protocol");
+  expect(lead).toContain("no AI");
 });
 
-test("shows every recording, newest first", async () => {
-  const root = mount(installedGateway(sampleSnapshot()));
-  await expect.poll(() => root.querySelectorAll("article.recording").length).toBe(2);
-  const names = [...root.querySelectorAll("article.recording h2")].map((name) => name.textContent);
-  expect(names).toEqual(["Checkout with saved card", "Log in as admin"]);
-  expect(root.querySelector("article.recording .start-url")?.textContent).toBe(
-    "https://staging.shop.example/cart",
-  );
-  expect(root.querySelector('[data-testid="extension-version"]')?.textContent).toBe(
-    "Extension 0.1.0",
-  );
+test("lists the setup and open commands in order", () => {
+  const root = mount();
+  const install = root.querySelector('section[aria-labelledby="install-title"]');
+  expect(install?.querySelector("h2")?.textContent).toBe("Install");
+  const commands = [...(install?.querySelectorAll("li pre code") ?? [])].map((c) => c.textContent);
+  expect(commands).toEqual([SETUP_COMMAND, OPEN_COMMAND]);
+  expect(SETUP_COMMAND).toBe("npx @recnrun/cli setup");
+  expect(OPEN_COMMAND).toBe("npx @recnrun/cli open");
 });
 
-test("explains that an empty extension has no recordings yet", async () => {
-  const root = mount(installedGateway(emptySnapshot()));
-  await expect
-    .poll(() => root.querySelector(".empty-state h2")?.textContent)
-    .toBe("No recordings yet");
-});
-
-test("reports why the data could not be read", async () => {
-  const root = mount(installedGateway(new Error("Quota exceeded")));
-  await expect.poll(() => root.querySelector(".empty-state p")?.textContent).toBe("Quota exceeded");
+test("says the package is not published yet", () => {
+  expect(mount().querySelector(".install")?.textContent).toContain("not published yet");
 });

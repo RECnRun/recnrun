@@ -1,4 +1,4 @@
-// Deletes build outputs, test artifacts, tool caches, and the dev Chromium profile; keeps dependencies.
+// Deletes build outputs, test artifacts, and tool caches; keeps dependencies.
 import { readdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 
@@ -18,7 +18,7 @@ const targets = [
   "coverage",
   "playwright-report",
   "test-results",
-  ...workspaces.flatMap((dir) => [join(dir, "dist"), join(dir, ".output"), join(dir, ".wxt")]),
+  ...workspaces.map((dir) => join(dir, "dist")),
   ...caches,
 ];
 

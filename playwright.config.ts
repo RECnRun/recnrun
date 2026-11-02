@@ -12,8 +12,6 @@ export default defineConfig({
   reporter: [["list"], ["html", { open: "never", outputFolder: "playwright-report/e2e" }]],
   use: {
     baseURL,
-    // Chromium loads unpacked extensions only in headed mode; the container provides Xvfb.
-    headless: false,
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
     video: "retain-on-failure",

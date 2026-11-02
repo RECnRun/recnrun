@@ -1,13 +1,15 @@
 import { expect, test } from "@playwright/test";
 
-test("asks visitors without the extension to install it", async ({ page }) => {
+test("introduces RECnRun and shows the install commands", async ({ page }) => {
   await page.goto("/");
-  const banner = page.getByRole("region", { name: "Install the RECnRun extension" });
-  await expect(banner).toBeVisible();
-  await expect(banner.getByRole("link", { name: "How to install" })).toHaveAttribute(
-    "href",
-    "https://github.com/RECnRun/recnrun#install-the-extension",
-  );
+  await expect(page.getByRole("heading", { level: 1, name: "RECnRun" })).toBeVisible();
+  await expect(page.getByRole("main")).toContainText("Chrome DevTools Protocol");
+  const install = page.getByRole("region", { name: "Install" });
+  await expect(install.getByRole("listitem").getByRole("code")).toHaveText([
+    "npx @recnrun/cli setup",
+    "npx @recnrun/cli open",
+  ]);
+  await expect(install).toContainText("not published yet");
 });
 
 test("ships a content security policy without CSP violations", async ({ page }) => {

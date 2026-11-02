@@ -14,18 +14,13 @@ RUN curl -fsSL https://vite.plus -o /tmp/install-vp.sh \
 WORKDIR /workspace
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/website/package.json ./apps/website/package.json
-COPY apps/extension/package.json ./apps/extension/package.json
-COPY packages/domain/package.json ./packages/domain/package.json
-COPY packages/bridge/package.json ./packages/bridge/package.json
 COPY packages/brand/package.json ./packages/brand/package.json
 # Lifecycle scripts need the sources; prepare runs again after they are copied.
 RUN --mount=type=cache,target=/root/.local/share/pnpm/store,sharing=locked \
     vp install --frozen-lockfile --ignore-scripts
 
 COPY . .
-# pnpm skips "prepare" when node_modules is already current, so generate WXT's types explicitly.
 RUN vp install --frozen-lockfile --offline \
-    && vp run extension#wxt:prepare \
     && mkdir -p coverage test-results playwright-report
 
 ENTRYPOINT ["xvfb-run", "-a", "--server-args=-screen 0 1920x1440x24 -nolisten tcp", "vp", "run", "--no-cache"]

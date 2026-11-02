@@ -67,51 +67,36 @@ main {
   color: var(--muted);
 }
 
-.banner,
-.empty-state,
-.recording {
+.lead {
+  font-size: 1.125rem;
+}
+
+.install {
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: var(--space);
 }
 
-.button {
-  display: inline-block;
-  padding: 0.5rem 1rem;
-  border-radius: 999px;
-  background: var(--accent);
-  color: var(--accent-text);
-  text-decoration: none;
+.install h2 {
+  margin-top: 0;
 }
 
-.recordings {
+.command-steps {
   display: grid;
   gap: var(--space);
+  padding-left: 1.25rem;
 }
 
-.recording h2 {
+.command-step p {
+  margin: 0 0 0.5rem;
+}
+
+.command-step pre {
   margin: 0;
-  font-size: 1.125rem;
-}
-
-.start-url {
-  margin: 0.25rem 0 0.75rem;
-  color: var(--muted);
-  overflow-wrap: anywhere;
-}
-
-.recording dl {
-  display: grid;
-  grid-template-columns: max-content 1fr;
-  gap: 0.25rem var(--space);
-  margin: 0;
-}
-
-.recording dt {
-  color: var(--muted);
-}
-
-.recording dd {
-  margin: 0;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) / 2);
+  background: var(--surface);
+  overflow-x: auto;
 }

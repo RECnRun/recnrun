@@ -6,11 +6,7 @@ export default defineConfig({
   staged: {
     "*": "vp check --fix",
   },
-  fmt: {
-    ignorePatterns: ["**/.output/**", "**/.wxt/**"],
-  },
   lint: {
-    ignorePatterns: ["**/.output/**", "**/.wxt/**"],
     jsPlugins: [
       { name: "vite-plus", specifier: "vite-plus/oxlint-plugin" },
       { name: "sonarjs", specifier: "eslint-plugin-sonarjs" },
@@ -45,20 +41,6 @@ export default defineConfig({
         },
       },
       {
-        // The content script runs inside web pages; it reaches stored data only through the background.
-        files: ["apps/extension/src/content/**"],
-        rules: {
-          "no-restricted-properties": [
-            "error",
-            {
-              object: "browser",
-              property: "storage",
-              message: "The content script never touches storage; ask the background.",
-            },
-          ],
-        },
-      },
-      {
         // describe/test callbacks group many cases; production code keeps the stricter caps.
         files: testFiles,
         rules: {
@@ -75,14 +57,7 @@ export default defineConfig({
   test: {
     fileParallelism: false,
     maxWorkers: 1,
-    projects: [
-      "apps/website",
-      "apps/extension",
-      "packages/domain",
-      "packages/bridge",
-      "apps/website/vitest.browser.config.ts",
-      "apps/extension/vitest.browser.config.ts",
-    ],
+    projects: ["apps/website", "apps/website/vitest.browser.config.ts"],
     coverage: {
       provider: "v8",
       include: ["apps/*/src/**/*.{ts,tsx}", "packages/*/src/**/*.{ts,tsx}"],
@@ -127,7 +102,6 @@ export default defineConfig({
           "vp run --no-cache dead-code",
           "vp run --no-cache duplication",
           "vp run -r --no-cache build",
-          "vp run --no-cache test:extension-manifest",
         ],
       },
     },
