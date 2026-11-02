@@ -23,3 +23,4 @@ export {
   type LocatorTarget,
 } from "./function-locator.ts";
 export { isLoopbackEndpoint, NonLoopbackEndpointError } from "./loopback.ts";
+export { AlreadyConnectedError } from "./adapter.ts";

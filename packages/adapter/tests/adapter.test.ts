@@ -95,3 +95,25 @@ test("replays in one tab per connection and needs a connection first", async () 
   ]);
   expect(replayCalls(1)).toEqual(["browser openPage", "page goto http://127.0.0.1:4600/c"]);
 });
+
+test("a second connect while connected is refused and keeps the first link", async () => {
+  const { adapter, links } = setup();
+  await adapter.connect(ENDPOINT, { source: { userDataDir: "/p" } });
+  await expect(adapter.connect(AGAIN.wsEndpoint)).rejects.toMatchObject({
+    code: "already-connected",
+  });
+  expect(links).toHaveLength(1);
+  expect(links[0]?.closed).toBe(false);
+  expect(await adapter.listTargets()).toEqual([expect.objectContaining({ targetId: "P1" })]);
+  await adapter.disconnect();
+  expect(links[0]?.closed).toBe(true);
+});
+
+test("lifecycle calls run in order, so a concurrent connect and disconnect leave no open link", async () => {
+  const { adapter, links } = setup();
+  const connecting = adapter.connect(ENDPOINT);
+  const disconnecting = adapter.disconnect();
+  await Promise.all([connecting, disconnecting]);
+  expect(links.map((link) => link.closed)).toEqual([true]);
+  await expect(adapter.listTargets()).rejects.toThrow("Not connected");
+});
