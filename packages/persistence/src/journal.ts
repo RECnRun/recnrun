@@ -29,7 +29,7 @@ export class JournalFileError extends Error {
 }
 
 /** An earlier write to the journal failed, so it accepts no more lines (`journal-failed`). */
-export class JournalFailedError extends Error {
+class JournalFailedError extends Error {
   constructor(path: string, cause: unknown) {
     super(`journal-failed: ${path} stopped after a write error.`, { cause });
     this.name = "JournalFailedError";
