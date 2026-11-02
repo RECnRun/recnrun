@@ -81,9 +81,16 @@ function splitTarget(target) {
   return { path: target.slice(0, hash), anchor: target.slice(hash + 1) };
 }
 
+function sameFileError({ root, file, target, anchorsOf }) {
+  const anchor = target.slice(1);
+  if (!anchor || anchorsOf(file).has(decodeURIComponent(anchor).toLowerCase())) return undefined;
+  return `broken anchor ${target} in ${relative(root, file)}`;
+}
+
 function linkError({ root, file, target, anchorsOf }) {
-  if (SCHEME.test(target) || target.startsWith("#")) return undefined;
+  if (SCHEME.test(target)) return undefined;
   const { path, anchor } = splitTarget(target);
+  if (!path) return sameFileError({ root, file, target, anchorsOf });
   const base = path.startsWith("/") ? root : dirname(file);
   const resolved = resolve(base, decodeURIComponent(path.replace(/^\//, "")));
   if (!existsSync(resolved))

@@ -54,10 +54,10 @@ test("reports an anchor that matches no heading of the target", (context) => {
   });
 });
 
-test("ignores external links, bare anchors, and code", (context) => {
+test("ignores external links and code", (context) => {
   const root = tree(context, {
     "guide.md": [
-      "[site](https://example.com/missing.md) [mail](mailto:hello@recnrun.com) [top](#nowhere)",
+      "[site](https://example.com/missing.md) [mail](mailto:hello@recnrun.com)",
       "`[inline](missing.md)`",
       "```md",
       "[fenced](missing.md)",
@@ -65,6 +65,14 @@ test("ignores external links, bare anchors, and code", (context) => {
     ].join("\n"),
   });
   assert.deepEqual(run(root), { code: 0, errors: [] });
+});
+
+test("resolves same-document anchors against the file's own headings", (context) => {
+  const root = tree(context, { "guide.md": "# Guide\n\n[ok](#guide) [bad](#nowhere)\n" });
+  assert.deepEqual(run(root), {
+    code: 1,
+    errors: ["guide.md:3: broken anchor #nowhere in guide.md"],
+  });
 });
 
 test("skips dependencies and build output", (context) => {
