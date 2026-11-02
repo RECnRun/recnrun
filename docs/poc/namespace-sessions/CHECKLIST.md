@@ -33,7 +33,7 @@ Markers: `[ ]` not started · `[i]` implemented, awaiting the phase gate · `[x]
 - [ ] P0.4 `chrome.debugger` capability probe (E1), `CAPABILITIES.md` generated
 - [i] P0.5 SplitSession vendoring and license
   - red: `vp test --project=@recnrun/isolation-core` before the manifest existed: `Error: ENOENT: no such file or directory, open '.../vendor/splitsession/vendor-manifest.json'`; negative controls: a changed byte in `namespace.ts` and a LICENSE without "MIT License" each failed their test
-  - green: `vp test --project=@recnrun/isolation-core` (15 passed after trimming the vendor set to 11 runtime files); `vp check`, `vp run deps` pass; jscpd 0.20% (threshold 4%); Knip reports one finding, unlisted dependency `wxt/browser` in `vendor/splitsession/src/background/isolation/cookie-capture.ts:1:30` (awaiting orchestrator decision)
+  - green: `vp test --project=@recnrun/isolation-core` (15 passed after trimming the vendor set to 11 runtime files); `vp check`, `vp run deps` pass; jscpd 0.20% (threshold 4%); Knip passes with `ignoreDependencies: ["wxt"]` scoped to the isolation-core workspace (the vendored `cookie-capture.ts` names upstream's runtime framework; P3 adapts it inside `apps/isolator`)
   - commit: the commit adding `packages/isolation-core` ("Vendor SplitSession modules into a new isolation-core package") and "Keep only the reusable SplitSession modules in the vendor set"
   - note: vendor set excludes upstream tests, fixtures, `dnr-simulator.ts`, and `legacy/`; Knip treats `vendor/splitsession/src/**/*.ts` as entries until P2
 - [ ] P0.6 Fixture application, frozen
