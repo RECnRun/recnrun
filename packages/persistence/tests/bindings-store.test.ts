@@ -103,3 +103,24 @@ test("other read errors are not mistaken for a missing file", async () => {
   await mkdir(store.path, { recursive: true });
   await expect(store.list()).rejects.toThrow(/EISDIR/);
 });
+
+test("concurrent saves on one store keep every binding", async () => {
+  const store = openBindingsStore({ home });
+  await Promise.all([store.save(ana), store.save(bob)]);
+  expect((await store.list()).map(({ name }) => name)).toEqual(["Ana", "Bob"]);
+});
+
+test("a save concurrent with a remove applies both, in call order", async () => {
+  const store = openBindingsStore({ home });
+  await store.save(ana);
+  const [, removed] = await Promise.all([store.save(bob), store.remove("Ana")]);
+  expect(removed).toBe(true);
+  expect(await store.list()).toEqual([bob]);
+});
+
+test("a failed mutation does not block the next one", async () => {
+  const store = openBindingsStore({ home });
+  await expect(store.save({ ...ana, name: "" })).rejects.toThrow();
+  await store.save(ana);
+  expect(await store.list()).toEqual([ana]);
+});

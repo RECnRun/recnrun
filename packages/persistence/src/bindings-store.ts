@@ -80,22 +80,31 @@ async function writeBindings(path: string, bindings: ProfileBinding[]): Promise<
 /** Opens the bindings store of the user whose home folder is `home`. */
 export function openBindingsStore({ home }: { home: string }): BindingsStore {
   const path = join(home, ".recnrun", "bindings.json");
+  // One chain per store, so each read-modify-write sees the previous one's result.
+  let turn: Promise<unknown> = Promise.resolve();
+  const exclusive = <T>(work: () => Promise<T>): Promise<T> => {
+    const result = turn.then(work);
+    turn = result.catch(() => undefined);
+    return result;
+  };
   return {
     path,
     list: () => readBindings(path),
-    async save(binding) {
-      const bindings = await readBindings(path);
-      const index = bindings.findIndex(({ name }) => name === binding.name);
-      if (index === -1) bindings.push(binding);
-      else bindings[index] = binding;
-      await writeBindings(path, bindings);
-    },
-    async remove(name) {
-      const bindings = await readBindings(path);
-      const kept = bindings.filter((binding) => binding.name !== name);
-      if (kept.length === bindings.length) return false;
-      await writeBindings(path, kept);
-      return true;
-    },
+    save: (binding) =>
+      exclusive(async () => {
+        const bindings = await readBindings(path);
+        const index = bindings.findIndex(({ name }) => name === binding.name);
+        if (index === -1) bindings.push(binding);
+        else bindings[index] = binding;
+        await writeBindings(path, bindings);
+      }),
+    remove: (name) =>
+      exclusive(async () => {
+        const bindings = await readBindings(path);
+        const kept = bindings.filter((binding) => binding.name !== name);
+        if (kept.length === bindings.length) return false;
+        await writeBindings(path, kept);
+        return true;
+      }),
   };
 }
