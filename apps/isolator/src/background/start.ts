@@ -1,4 +1,5 @@
 import { browser } from "wxt/browser";
+import { exposeProbes } from "@/background/probes/expose";
 
 /** `chrome.storage.session` key the harness reads to see that the background ran. */
 export const LOADED_KEY = "isolatorLoaded";
@@ -23,6 +24,10 @@ async function recordLoaded(): Promise<void> {
 }
 
 export function startBackground(): void {
+  exposeProbes(
+    () => browser.debugger,
+    async (tabId) => (await browser.tabs.get(tabId)).height,
+  );
   const record = (): void => void recordLoaded();
   browser.runtime.onInstalled.addListener(record);
   browser.runtime.onStartup.addListener(record);

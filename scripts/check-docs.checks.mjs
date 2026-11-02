@@ -84,6 +84,20 @@ test("slugs headings the way GitHub does", () => {
   assert.equal(slug("F4: Editor, parameters, import/export"), "f4-editor-parameters-importexport");
 });
 
+test("reports a CAPABILITIES.md that no longer matches its capabilities.json", (context) => {
+  const json = JSON.stringify({ chrome: { version: "Google Chrome 156" }, debugger: {} });
+  const root = tree(context, {
+    "docs/poc/namespace-sessions/capabilities.json": json,
+    "docs/poc/namespace-sessions/CAPABILITIES.md": "# Chrome capabilities\n\nEdited by hand.\n",
+  });
+  assert.deepEqual(run(root), {
+    code: 1,
+    errors: [
+      "docs/poc/namespace-sessions/CAPABILITIES.md:1: stale; run `node scripts/generate-capabilities.mjs docs/poc/namespace-sessions/capabilities.json`",
+    ],
+  });
+});
+
 test("keeps an extension point for later documentation checks", () => {
   assert.ok(checks.length >= 1);
   assert.ok(checks.every((check) => typeof check === "function"));

@@ -1,0 +1,363 @@
+{
+  "chrome": {
+    "version": "Google Chrome 156.0.8078.79"
+  },
+  "extensionLoad": {
+    "method": "cdp-load-unpacked"
+  },
+  "debuggerProbe": {
+    "date": "2026-11-02",
+    "samples": 3,
+    "permissions": ["storage", "management", "debugger"],
+    "hostPermissions": []
+  },
+  "debugger": {
+    "get-targets": {
+      "description": "chrome.debugger.getTargets() answers; the whole list with types and URLs",
+      "status": "allowed",
+      "statuses": ["allowed", "allowed", "allowed"],
+      "detail": [
+        {
+          "type": "worker",
+          "url": "http://app.localhost:4600/shared-worker.js?type=classic",
+          "attached": false
+        },
+        {
+          "type": "worker",
+          "url": "http://app.localhost:4600/sw-main.js?variant=classic",
+          "attached": true
+        },
+        {
+          "type": "worker",
+          "url": "chrome-extension://fignfifoniblkonapihmkfakmlgkbkcf/service_worker.js",
+          "attached": true
+        },
+        {
+          "type": "worker",
+          "url": "chrome-extension://cnnlgpifiipneindfidichojchgggmfo/background.js",
+          "attached": true
+        },
+        {
+          "type": "other",
+          "url": "http://app.localhost:4600/worker.js?type=classic",
+          "attached": true
+        },
+        {
+          "type": "other",
+          "url": "chrome://omnibox-popup.top-chrome/",
+          "attached": false
+        },
+        {
+          "type": "other",
+          "url": "chrome://omnibox-popup.top-chrome/omnibox_popup_aim.html",
+          "attached": false
+        },
+        {
+          "type": "page",
+          "url": "http://app.localhost:4600/workers.html?type=classic",
+          "attached": true,
+          "tabId": 1676076356
+        },
+        {
+          "type": "page",
+          "url": "http://app.localhost:4600/sw.html?sw=classic",
+          "attached": true,
+          "tabId": 1676076355
+        },
+        {
+          "type": "background_page",
+          "url": "chrome-extension://nkeimhogjdpnpccoofpliimaahmaaome/background.html",
+          "attached": false
+        }
+      ]
+    },
+    "get-targets-service-worker": {
+      "description": "getTargets() lists the fixture's service-worker, with its type string",
+      "status": "allowed",
+      "statuses": ["allowed", "allowed", "allowed"],
+      "detail": {
+        "type": "worker",
+        "url": "http://app.localhost:4600/sw-main.js?variant=classic"
+      }
+    },
+    "get-targets-shared-worker": {
+      "description": "getTargets() lists the fixture's shared-worker, with its type string",
+      "status": "allowed",
+      "statuses": ["allowed", "allowed", "allowed"],
+      "detail": {
+        "type": "worker",
+        "url": "http://app.localhost:4600/shared-worker.js?type=classic"
+      }
+    },
+    "get-targets-dedicated-worker": {
+      "description": "getTargets() lists the fixture's dedicated-worker, with its type string",
+      "status": "allowed",
+      "statuses": ["allowed", "allowed", "allowed"],
+      "detail": {
+        "type": "other",
+        "url": "http://app.localhost:4600/worker.js?type=classic"
+      }
+    },
+    "attach-service-worker": {
+      "description": "attach({ targetId }) to the fixture's service-worker, then detach",
+      "status": "allowed",
+      "statuses": ["allowed", "allowed", "allowed"],
+      "detail": {
+        "targetId": "CE273582245BD1226980B5BEA2C46759"
+      }
+    },
+    "attach-shared-worker": {
+      "description": "attach({ targetId }) to the fixture's shared-worker, then detach",
+      "status": "allowed",
+      "statuses": ["allowed", "allowed", "allowed"],
+      "detail": {
+        "targetId": "8BA7B78AE651892E9078A8E8A0CDC6A0"
+      }
+    },
+    "tab-attach": {
+      "description": "attach({ tabId }) to the fixture page's tab",
+      "status": "allowed",
+      "statuses": ["allowed", "allowed", "allowed"],
+      "detail": {
+        "tabId": 1676076356
+      }
+    },
+    "auto-attach": {
+      "description": "Target.setAutoAttach({ autoAttach, waitForDebuggerOnStart, flatten }) on the tab, then a reload and a cross-site iframe; every Target.attachedToTarget",
+      "status": "allowed",
+      "statuses": ["allowed", "allowed", "allowed"],
+      "detail": [
+        {
+          "type": "service_worker",
+          "url": "http://app.localhost:4600/sw-main.js?variant=classic",
+          "waitingForDebugger": false,
+          "phase": "existing"
+        },
+        {
+          "type": "worker",
+          "url": "http://app.localhost:4600/worker.js?type=classic",
+          "waitingForDebugger": false,
+          "phase": "existing"
+        },
+        {
+          "type": "worker",
+          "url": "http://app.localhost:4600/worker.js?type=classic",
+          "waitingForDebugger": true,
+          "phase": "after-reload"
+        },
+        {
+          "type": "iframe",
+          "url": "",
+          "waitingForDebugger": true,
+          "phase": "after-reload"
+        }
+      ]
+    },
+    "auto-attach-dedicated-worker": {
+      "description": "auto-attach reports the dedicated-worker (Target.attachedToTarget)",
+      "status": "allowed",
+      "statuses": ["allowed", "allowed", "allowed"],
+      "detail": [
+        {
+          "type": "worker",
+          "waitingForDebugger": false,
+          "phase": "existing"
+        },
+        {
+          "type": "worker",
+          "waitingForDebugger": true,
+          "phase": "after-reload"
+        }
+      ]
+    },
+    "auto-attach-shared-worker": {
+      "description": "auto-attach reports the shared-worker (Target.attachedToTarget)",
+      "status": "rejected",
+      "statuses": ["rejected", "rejected", "rejected"],
+      "error": "no Target.attachedToTarget for the shared-worker",
+      "detail": null
+    },
+    "auto-attach-service-worker": {
+      "description": "auto-attach reports the service-worker (Target.attachedToTarget)",
+      "status": "allowed",
+      "statuses": ["allowed", "allowed", "allowed"],
+      "detail": [
+        {
+          "type": "service_worker",
+          "waitingForDebugger": false,
+          "phase": "existing"
+        }
+      ]
+    },
+    "auto-attach-iframe": {
+      "description": "auto-attach reports the iframe (Target.attachedToTarget)",
+      "status": "allowed",
+      "statuses": ["allowed", "allowed", "allowed"],
+      "detail": [
+        {
+          "type": "iframe",
+          "waitingForDebugger": true,
+          "phase": "after-reload"
+        }
+      ]
+    },
+    "run-if-waiting-for-debugger": {
+      "description": "Runtime.runIfWaitingForDebugger releases every auto-attached target that waited",
+      "status": "allowed",
+      "statuses": ["allowed", "allowed", "allowed"],
+      "detail": [
+        {
+          "type": "worker",
+          "released": "ok"
+        },
+        {
+          "type": "iframe",
+          "released": "ok"
+        }
+      ]
+    },
+    "attach-dedicated-worker": {
+      "description": "attach({ targetId }) to the fixture's dedicated-worker, then detach",
+      "status": "allowed",
+      "statuses": ["allowed", "allowed", "allowed"],
+      "detail": {
+        "targetId": "A0C446FC75E46E36DA8EDB3DBB9854C8"
+      }
+    },
+    "tab-target-get-targets": {
+      "description": "Target.getTargets sent on the tab session: does it list browser-wide targets?",
+      "status": "rejected",
+      "statuses": ["rejected", "rejected", "rejected"],
+      "error": "{\"code\":-32000,\"message\":\"Not allowed\"}",
+      "detail": null
+    },
+    "tab-attach-to-service-worker": {
+      "description": "Target.attachToTarget({ flatten: true }) to the service worker, from the tab session",
+      "status": "rejected",
+      "statuses": ["rejected", "rejected", "rejected"],
+      "error": "{\"code\":-32000,\"message\":\"Not allowed\"}",
+      "detail": null
+    },
+    "service-worker-enable": {
+      "description": "ServiceWorker.enable on the tab session",
+      "status": "rejected",
+      "statuses": ["rejected", "rejected", "rejected"],
+      "error": "{\"code\":-32601,\"message\":\"'ServiceWorker.enable' wasn't found\"}",
+      "detail": null
+    },
+    "fetch-enable-worker-scripts": {
+      "description": "Fetch.enable with patterns on the worker scripts, on the tab session",
+      "status": "allowed",
+      "statuses": ["allowed", "allowed", "allowed"],
+      "detail": {
+        "patterns": 3
+      }
+    },
+    "storage-get-cookies": {
+      "description": "Storage.getCookies on the tab session (count only; values are never recorded)",
+      "status": "allowed",
+      "statuses": ["allowed", "allowed", "allowed"],
+      "detail": {
+        "count": 0
+      }
+    },
+    "network-set-cookie": {
+      "description": "Network.setCookie on the fixture origin, then Network.deleteCookies",
+      "status": "allowed",
+      "statuses": ["allowed", "allowed", "allowed"],
+      "detail": {
+        "success": true
+      }
+    },
+    "network-enable": {
+      "description": "Network.enable on the tab session",
+      "status": "allowed",
+      "statuses": ["allowed", "allowed", "allowed"],
+      "detail": null
+    },
+    "page-add-script-on-new-document": {
+      "description": "Page.addScriptToEvaluateOnNewDocument on the tab session, then removed",
+      "status": "allowed",
+      "statuses": ["allowed", "allowed", "allowed"],
+      "detail": {
+        "identifier": true
+      }
+    },
+    "worker-runtime-evaluate": {
+      "description": "Runtime.evaluate on the service worker session (attach by targetId)",
+      "status": "allowed",
+      "statuses": ["allowed", "allowed", "allowed"],
+      "detail": {
+        "value": "/sw-main.js"
+      }
+    },
+    "worker-fetch-enable": {
+      "description": "Fetch.enable with worker-script patterns on the service worker session",
+      "status": "allowed",
+      "statuses": ["allowed", "allowed", "allowed"],
+      "detail": null
+    },
+    "worker-service-worker-enable": {
+      "description": "ServiceWorker.enable on the service worker session",
+      "status": "rejected",
+      "statuses": ["rejected", "rejected", "rejected"],
+      "error": "{\"code\":-32601,\"message\":\"'ServiceWorker.enable' wasn't found\"}",
+      "detail": null
+    },
+    "worker-debugger-pause": {
+      "description": "Debugger.pause then Debugger.resume on the service worker session",
+      "status": "allowed",
+      "statuses": ["allowed", "allowed", "allowed"],
+      "detail": {
+        "pausedEventArrived": true
+      }
+    },
+    "worker-terminate-execution": {
+      "description": "Runtime.terminateExecution on the dedicated worker (attach by targetId)",
+      "status": "rejected",
+      "statuses": ["rejected", "rejected", "rejected"],
+      "error": "{\"code\":-32000,\"message\":\"Runtime.terminateExecution is not allowed for untrusted clients\"}",
+      "detail": null
+    },
+    "worker-close-target": {
+      "description": "Target.closeTarget on the service worker, sent on its own session",
+      "status": "allowed",
+      "statuses": ["allowed", "allowed", "allowed"],
+      "detail": {
+        "success": true,
+        "listedAfter": false
+      }
+    },
+    "cleanup": {
+      "description": "detach every remaining session; chrome.debugger.onDetach reasons",
+      "status": "allowed",
+      "statuses": ["allowed", "allowed", "allowed"],
+      "detail": {
+        "detached": ["ok", "ok", "ok"],
+        "onDetach": []
+      }
+    },
+    "infobar-hidden": {
+      "description": "the debugger infobar stays hidden with --silent-debugger-extension-api",
+      "status": "allowed",
+      "statuses": ["allowed", "allowed", "allowed"],
+      "detail": {
+        "evidence": "chrome.tabs height",
+        "before": {
+          "tabHeight": 1333,
+          "chromeTargets": [
+            "browser_ui chrome://omnibox-popup.top-chrome/",
+            "browser_ui chrome://omnibox-popup.top-chrome/omnibox_popup_aim.html"
+          ]
+        },
+        "during": {
+          "tabHeight": 1333,
+          "chromeTargets": [
+            "browser_ui chrome://omnibox-popup.top-chrome/",
+            "browser_ui chrome://omnibox-popup.top-chrome/omnibox_popup_aim.html"
+          ]
+        }
+      }
+    }
+  }
+}

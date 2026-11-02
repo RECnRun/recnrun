@@ -11,7 +11,7 @@ export default defineConfig({
   manifest: {
     name: "RECnRun Isolator (POC)",
     description: "Namespaced sessions proof of concept.",
-    // E0 needs only these; P0.4 adds `debugger` (PLAN.md P0.3, P0.4).
-    permissions: ["storage", "management"],
+    // E0 needs storage and management; E1 adds debugger, which needs no host permission (PLAN.md P0.3, P0.4).
+    permissions: ["storage", "management", "debugger"],
   },
 });

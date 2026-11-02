@@ -38,7 +38,7 @@ Vite+ (`vp`) is the only toolchain. `vp <name>` runs a built-in command and `vp 
 | `vp run test`                                         | All five layers                                                      |
 | `vp run test:coverage`                                | Coverage with thresholds                                             |
 | `vp run dead-code`, `vp run duplication`              | Knip; jscpd                                                          |
-| `vp run docs:check`                                   | Relative Markdown links and anchors resolve                          |
+| `vp run docs:check`                                   | Relative Markdown links resolve; generated `CAPABILITIES.md` current |
 | `vp run test:e2e -- tests/e2e/explorer.spec.ts -g ''` | Targeted Playwright run (arguments go after `--`)                    |
 | `vp run verify`                                       | Full gate (`vp run ready` is an alias)                               |
 
@@ -69,7 +69,7 @@ Test commands and `verify` run in Docker, so start Docker Desktop first. If Dock
   - container, hook, and script checks;
   - coverage (at least 80% lines, statements, and functions; 75% branches);
   - Knip and jscpd (at most 4% duplication);
-  - `docs:check` (every relative Markdown link and anchor resolves);
+  - `docs:check` (every relative Markdown link and anchor resolves, and the POC's `CAPABILITIES.md` matches its `capabilities.json`);
   - workspace builds and the production manifest guard.
 - When a gate fails, fix the cause. Never lower thresholds, delete or skip tests, exclude code from analysis, add `@ts-ignore`/`@ts-nocheck`, disable lint rules, or loosen `.dependency-cruiser.cjs` to pass.
 - An architecture change (a new layer, package, or allowed dependency) updates `docs/ARCHITECTURE.md` and `.dependency-cruiser.cjs` in the same change, with the reason.

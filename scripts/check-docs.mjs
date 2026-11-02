@@ -2,6 +2,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { checkCapabilities } from "./generate-capabilities.mjs";
 
 const SKIPPED_DIRECTORIES = new Set([
   ".artifacts",
@@ -110,8 +111,7 @@ function checkLinks({ root, files }) {
 }
 
 // Extension point: each check gets { root, files } and returns "file:line: message" strings.
-// F0.4 adds the comparison of the generated docs/CAPABILITIES.md with packages/protocol here.
-export const checks = [checkLinks];
+export const checks = [checkLinks, checkCapabilities];
 
 /** Runs every check against the Markdown under root and returns the failures. */
 export function checkDocs(root) {
