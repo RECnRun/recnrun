@@ -76,6 +76,9 @@ function commandViolation(site: Site): string | undefined {
   if (site.name === "Runtime.evaluate" && !RUNTIME_EVALUATE_FILES.includes(site.file)) {
     return "Runtime.evaluate is allowed only in the extension loaders";
   }
+  if (site.name === "Browser.setPermission" && site.setting !== "denied") {
+    return "Browser.setPermission may only deny";
+  }
   return undefined;
 }
 
@@ -194,5 +197,36 @@ describe("observer allowlist", () => {
     expect(violations(scanSource("tests/browser/fixtures/chrome.ts", elsewhere))).toEqual([
       `tests/browser/fixtures/chrome.ts:1 --load-extension: --load-extension is allowed only in ${DIAGNOSTIC_LOADER} (${LOADERS_FILE})`,
     ]);
+  });
+
+  test("rejects Playwright calls that inject scripts, styles, or markup into the page", () => {
+    const code = [
+      'await page.addScriptTag({ content: "window.__injected = true" });',
+      'await page.addStyleTag({ content: "body { display: none }" });',
+      'await page.setContent("<script>window.__injected = true</script>");',
+    ].join("\n");
+    const injects = (line: number, name: string) =>
+      `tests/experiments/x.spec.ts:${line} ${name}: Playwright's ${name}() sends capability-providing CDP commands`;
+    expect(violations(scanSource("tests/experiments/x.spec.ts", code))).toEqual([
+      injects(1, "addScriptTag"),
+      injects(2, "addStyleTag"),
+      injects(3, "setContent"),
+    ]);
+  });
+
+  test("allows Browser.setPermission only with a literal denied setting", () => {
+    const call = (params: string) => `await cdp.send("Browser.setPermission", ${params});`;
+    const code = [
+      call('{ permission: { name: "notifications" }, setting: "denied", origin }'),
+      call('{ permission: { name: "notifications" }, setting: "granted", origin }'),
+      call("{ permission, setting, origin }"),
+      call("params"),
+      'await cdp.send("Browser.setPermission");',
+    ].join("\n");
+    const denyOnly = (line: number) =>
+      `tests/browser/x.spec.ts:${line} Browser.setPermission: Browser.setPermission may only deny`;
+    expect(violations(scanSource("tests/browser/x.spec.ts", code))).toEqual(
+      [2, 3, 4, 5].map(denyOnly),
+    );
   });
 });

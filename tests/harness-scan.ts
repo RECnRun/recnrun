@@ -15,6 +15,8 @@ export interface Site {
   name: string;
   /** The innermost named function around the site. */
   within?: string;
+  /** For `Browser.setPermission`, the `setting` written as a string literal in its params, if any. */
+  setting?: string;
 }
 
 interface AstNode {
@@ -25,8 +27,12 @@ interface AstNode {
 }
 
 const CDP_METHOD = /^[A-Z][A-Za-z]*\.[a-z][A-Za-z]*$/;
-// Playwright methods that send Fetch.*, Emulation.*, Network.setCookie(s), or page-target Runtime commands.
+// Playwright methods that send Fetch.*, Emulation.*, Network.setCookie(s), page-target Runtime
+// commands, or inject scripts, styles, or markup into the application page.
 const PLAYWRIGHT_FORBIDDEN = new Set([
+  "addScriptTag",
+  "addStyleTag",
+  "setContent",
   "route",
   "routeFromHAR",
   "routeWebSocket",
@@ -85,19 +91,34 @@ function hasExecutable(argument: unknown): boolean {
   return properties.some((property) => isNode(property.key) && property.key.name === "executable");
 }
 
+/** The `setting` property of an object literal, when it is written as a string literal. */
+function literalSetting(argument: unknown): string | undefined {
+  if (!isNode(argument) || argument.type !== "ObjectExpression") return undefined;
+  const properties = argument.properties as AstNode[];
+  const setting = properties.find(
+    (property) => !property.computed && isNode(property.key) && property.key.name === "setting",
+  );
+  return setting && !setting.shorthand ? stringValue(setting.value) : undefined;
+}
+
 type Found = Omit<Site, "file" | "line" | "within">;
+
+function sendSite(method: string | undefined, params: unknown): Found | undefined {
+  if (method === undefined) return { kind: "dynamic-cdp", name: "<computed>" };
+  if (!CDP_METHOD.test(method)) return undefined;
+  if (method !== "Browser.setPermission") return { kind: "cdp", name: method };
+  const setting = literalSetting(params);
+  return { kind: "cdp", name: method, ...(setting === undefined ? {} : { setting }) };
+}
 
 function callSite(node: AstNode): Found | undefined {
   const name = calleeName(node);
-  const [first] = node.arguments as unknown[];
+  const [first, second] = node.arguments as unknown[];
   if (name === "launchChrome") return { kind: "launch", name: String(hasExecutable(first)) };
   if (name && PLAYWRIGHT_FORBIDDEN.has(name) && isNode(node.callee)) {
     if (node.callee.type === "MemberExpression") return { kind: "playwright", name };
   }
-  if (name !== "send") return undefined;
-  const method = stringValue(first);
-  if (method === undefined) return { kind: "dynamic-cdp", name: "<computed>" };
-  return CDP_METHOD.test(method) ? { kind: "cdp", name: method } : undefined;
+  return name === "send" ? sendSite(stringValue(first), second) : undefined;
 }
 
 function flagSite(node: AstNode): Found | undefined {
