@@ -116,9 +116,16 @@ module.exports = {
     {
       name: "cli-only-service",
       severity: "error",
-      comment: "The CLI is a client of the service; it carries no engine of its own.",
+      comment:
+        "The CLI is a client of the service; it carries no engine of its own. It shares only protocol shapes, and uses Node built-ins to open a browser and to read the home folder for doctor.",
       from: { path: "^apps/cli/src/" },
-      to: { pathNot: ["^apps/(cli|service)/src/"] },
+      to: {
+        pathNot: [
+          "^apps/(cli|service)/src/",
+          "^packages/protocol/src/",
+          "^(child_process|fs/promises|os|path)$",
+        ],
+      },
     },
     {
       name: "ui-only-protocol",

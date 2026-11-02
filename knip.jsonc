@@ -13,11 +13,7 @@
         "tests/contract/fixtures/*.ts",
       ],
     },
-    // The future npm bin; F7 points package.json "bin" at its build output.
-    "apps/cli": {
-      "entry": ["src/bin.ts"],
-    },
-    // The service's entrypoint; the CLI starts it in F2.7.
+    // The service's entrypoint, run directly by the contract tests.
     "apps/service": {
       "entry": ["src/bin.ts"],
     },

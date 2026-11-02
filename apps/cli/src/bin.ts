@@ -1,4 +1,4 @@
 #!/usr/bin/env node
-import { main } from "./index.ts";
+import { main } from "./main.ts";
 
-process.exitCode = main(process.argv.slice(2));
+process.exitCode = await main(process.argv.slice(2));

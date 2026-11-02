@@ -103,16 +103,41 @@ export function upgradeStatus(port: number, headers: Record<string, string>): Pr
   });
 }
 
+/** The environment of a child: discovery resolves its profile from the temporary home. */
+const childEnv = (home: string) => ({
+  ...process.env,
+  HOME: home,
+  CHROME_CONFIG_HOME: join(home, ".config"),
+  LOCALAPPDATA: join(home, "AppData"),
+});
+
+export interface CliResult {
+  code: number | null;
+  stdout: string;
+  stderr: string;
+}
+
+/** Runs `recnrun <args>` to completion on a temporary home and collects its output. */
+export function runCli(args: string[], home: string): Promise<CliResult> {
+  const child = spawn(process.execPath, [join(ROOT, "apps/cli/src/bin.ts"), ...args], {
+    env: childEnv(home),
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  onTestFinished(() => {
+    if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
+  });
+  let stdout = "";
+  let stderr = "";
+  child.stdout.on("data", (chunk: Buffer) => (stdout += chunk.toString()));
+  child.stderr.on("data", (chunk: Buffer) => (stderr += chunk.toString()));
+  return new Promise((resolve) => child.on("close", (code) => resolve({ code, stdout, stderr })));
+}
+
 /** Runs a Node script with `HOME=home` and yields its stdout lines; it is killed if still running when the test ends. */
 export function runNode(script: string, args: string[], home: string) {
   const child: ChildProcess = spawn(process.execPath, [join(ROOT, script), ...args], {
     // Chrome discovery resolves its profile from these, so it never reaches the user's real Chrome.
-    env: {
-      ...process.env,
-      HOME: home,
-      CHROME_CONFIG_HOME: join(home, ".config"),
-      LOCALAPPDATA: join(home, "AppData"),
-    },
+    env: childEnv(home),
     stdio: ["ignore", "pipe", "inherit"],
   });
   const lines = createInterface({ input: child.stdout ?? process.stdin })[Symbol.asyncIterator]();

@@ -146,11 +146,11 @@ export const FEATURE_CAPABILITIES: Feature[] = [
   ),
   planned("replay-executor", "F2.5", "Replay executor", "Write actions are never retried blindly."),
   planned("ui-minimal", "F2.6", "Minimal UI", "Setup, catalog, recorder, editor, and run screens."),
-  planned(
+  implemented(
     "cli-local",
     "F2.7",
     "CLI: open, run, doctor",
-    "Exit codes 0, 1, and 2 for passed, failed, and error.",
+    "Delivered by F2.7; tests/contract/cli.test.ts runs the real recnrun binary on a temporary home: open starts or reuses the service and prints the UI URL, doctor --json reports Chrome, DevToolsActivePort, bindings, disk, and versions (exit 1 without Chrome), and run prints one JSON summary with exit 0, 1, or 2 for passed, failed, and error. The replay itself is F2.5.",
   ),
   planned(
     "coverage-loss-accounting",

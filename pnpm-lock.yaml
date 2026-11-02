@@ -265,6 +265,9 @@ importers:
 
   apps/cli:
     dependencies:
+      '@recnrun/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
       '@recnrun/service':
         specifier: workspace:*
         version: link:../service
