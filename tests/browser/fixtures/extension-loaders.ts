@@ -6,7 +6,7 @@ import type { AddressInfo } from "node:net";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { chromium } from "@playwright/test";
-import { connectWebSocket, evaluateInServiceWorker } from "./cdp-client.ts";
+import { CdpClosedError, connectWebSocket, evaluateInServiceWorker } from "./cdp-client.ts";
 import type { CdpClient } from "./cdp-client.ts";
 import { launchChrome } from "./chrome.ts";
 import type { LaunchedChrome } from "./chrome.ts";
@@ -44,7 +44,8 @@ async function firstAnswer(evaluate: (expression: string) => Promise<unknown>): 
       return await evaluate(SELF_ID);
     } catch (error) {
       const refused = error instanceof Error && error.message.startsWith("Target.attachToTarget");
-      if (refused || Date.now() > deadline) throw error;
+      // A closed connection cannot recover, so retrying would only wait out the deadline.
+      if (refused || error instanceof CdpClosedError || Date.now() > deadline) throw error;
       await delay(ANSWER_RETRY_MS);
     }
   }

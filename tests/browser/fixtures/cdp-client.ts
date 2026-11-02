@@ -5,15 +5,40 @@ import { setTimeout as delay } from "node:timers/promises";
  * A minimal CDP client with flattened sessions. Playwright's `CDPSession` cannot address child
  * sessions or speak over `--remote-debugging-pipe`, and both are needed to reach extensions.
  */
+export interface SendOptions {
+  /** Rejects the command when Chrome has not replied by then; 30 s by default. */
+  timeoutMs?: number;
+}
+
 export interface CdpClient {
-  send<T = unknown>(method: string, params?: object, sessionId?: string): Promise<T>;
+  send<T = unknown>(
+    method: string,
+    params?: object,
+    sessionId?: string,
+    options?: SendOptions,
+  ): Promise<T>;
+  /** Closes the transport and rejects every pending command. */
   close(): void;
+}
+
+/** The transport closed, failed, or ended, or the client was closed, before Chrome replied. */
+export class CdpClosedError extends Error {
+  constructor(method: string) {
+    super(`${method}: CDP connection closed`);
+  }
 }
 
 interface Reply {
   id?: number;
   result?: unknown;
   error?: { message: string };
+}
+
+interface Waiter {
+  method: string;
+  timer: ReturnType<typeof setTimeout>;
+  resolve(value: unknown): void;
+  reject(error: Error): void;
 }
 
 interface TargetInfo {
@@ -23,40 +48,60 @@ interface TargetInfo {
 }
 
 const TARGET_POLL_MS = 100;
+const DEFAULT_TIMEOUT_MS = 30_000;
 
-function createClient(write: (message: string) => void, close: () => void) {
-  const pending = new Map<number, { resolve(value: unknown): void; reject(error: Error): void }>();
+function createClient(write: (message: string) => void, closeTransport: () => void) {
+  const pending = new Map<number, Waiter>();
+  let closed = false;
   let nextId = 0;
+  const take = (id: number): Waiter | undefined => {
+    const waiter = pending.get(id);
+    pending.delete(id);
+    if (waiter) clearTimeout(waiter.timer);
+    return waiter;
+  };
   const receive = (raw: string): void => {
     const reply = JSON.parse(raw) as Reply;
-    const waiter = reply.id === undefined ? undefined : pending.get(reply.id);
-    if (!waiter || reply.id === undefined) return;
-    pending.delete(reply.id);
-    if (reply.error) waiter.reject(new Error(reply.error.message));
+    const waiter = reply.id === undefined ? undefined : take(reply.id);
+    if (!waiter) return;
+    if (reply.error) waiter.reject(new Error(`${waiter.method}: ${reply.error.message}`));
     else waiter.resolve(reply.result);
   };
-  const client: CdpClient = {
-    send: <T>(method: string, params: object = {}, sessionId?: string) =>
-      new Promise<T>((resolve, reject) => {
-        const id = ++nextId;
-        pending.set(id, {
-          resolve: (value) => resolve(value as T),
-          reject: (error) => reject(new Error(`${method}: ${error.message}`)),
-        });
-        write(JSON.stringify({ id, method, params, sessionId }));
-      }),
-    close,
+  const disconnect = (): void => {
+    closed = true;
+    for (const [id, waiter] of pending) {
+      take(id);
+      waiter.reject(new CdpClosedError(waiter.method));
+    }
   };
-  return { client, receive };
+  const send = <T>(method: string, params = {}, sessionId?: string, options: SendOptions = {}) =>
+    new Promise<T>((resolve, reject) => {
+      if (closed) throw new CdpClosedError(method);
+      const id = ++nextId;
+      const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+      const expire = () =>
+        take(id)?.reject(new Error(`${method}: no reply within ${timeoutMs} ms`));
+      // A stranded command must not keep the test process alive on its own.
+      const timer = setTimeout(expire, timeoutMs).unref();
+      pending.set(id, { method, timer, resolve: (value) => resolve(value as T), reject });
+      write(JSON.stringify({ id, method, params, sessionId }));
+    });
+  const close = (): void => {
+    disconnect();
+    closeTransport();
+  };
+  return { client: { send, close } satisfies CdpClient, receive, disconnect };
 }
 
 export async function connectWebSocket(url: string): Promise<CdpClient> {
   const socket = new WebSocket(url);
-  const { client, receive } = createClient(
+  const { client, receive, disconnect } = createClient(
     (message) => socket.send(message),
     () => socket.close(),
   );
   socket.addEventListener("message", (event) => receive(String(event.data)));
+  socket.addEventListener("close", disconnect);
+  socket.addEventListener("error", disconnect);
   await new Promise<void>((resolve, reject) => {
     socket.addEventListener("open", () => resolve(), { once: true });
     socket.addEventListener("error", () => reject(new Error(`Cannot connect to ${url}`)), {
@@ -68,10 +113,13 @@ export async function connectWebSocket(url: string): Promise<CdpClient> {
 
 /** CDP over `--remote-debugging-pipe`: Chrome reads fd 3 and writes fd 4, messages end in NUL. */
 export function connectPipe(input: Writable, output: Readable): CdpClient {
-  const { client, receive } = createClient(
+  const { client, receive, disconnect } = createClient(
     (message) => input.write(`${message}\0`),
     () => input.end(),
   );
+  // Chrome exiting ends fd 4 and breaks fd 3; either one strands every pending command.
+  for (const event of ["end", "close", "error"]) output.on(event, disconnect);
+  for (const event of ["close", "error"]) input.on(event, disconnect);
   let buffer = "";
   output.on("data", (data) => {
     buffer += String(data);
@@ -93,7 +141,12 @@ async function waitForServiceWorker(
   const prefix = `chrome-extension://${extensionId}/`;
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    const { targetInfos } = await client.send<{ targetInfos: TargetInfo[] }>("Target.getTargets");
+    const { targetInfos } = await client.send<{ targetInfos: TargetInfo[] }>(
+      "Target.getTargets",
+      {},
+      undefined,
+      { timeoutMs },
+    );
     const worker = targetInfos.find(
       (target) => target.type === "service_worker" && target.url.startsWith(prefix),
     );
@@ -103,7 +156,11 @@ async function waitForServiceWorker(
   throw new Error(`No service worker target for ${prefix} within ${timeoutMs} ms`);
 }
 
-/** Evaluates `expression` (awaiting a promise) in the extension's service worker and returns its value. */
+/**
+ * Evaluates `expression` (awaiting a promise) in the extension's service worker and returns its
+ * value. `timeoutMs` bounds finding and attaching to the worker; the evaluation keeps the default
+ * per-command deadline, since probes can run longer.
+ */
 export async function evaluateInServiceWorker(
   client: CdpClient,
   extensionId: string,
@@ -111,10 +168,12 @@ export async function evaluateInServiceWorker(
   timeoutMs = 10_000,
 ): Promise<unknown> {
   const { targetId } = await waitForServiceWorker(client, extensionId, timeoutMs);
-  const { sessionId } = await client.send<{ sessionId: string }>("Target.attachToTarget", {
-    targetId,
-    flatten: true,
-  });
+  const { sessionId } = await client.send<{ sessionId: string }>(
+    "Target.attachToTarget",
+    { targetId, flatten: true },
+    undefined,
+    { timeoutMs },
+  );
   try {
     const evaluation = await client.send<{
       result: { value?: unknown };
