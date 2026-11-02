@@ -213,3 +213,17 @@ test("storage sets and clears local, session, and cookie values", async ({ app }
   }
   expect(await page.evaluate(() => [localStorage.length, sessionStorage.length])).toEqual([0, 0]);
 });
+
+test("worker starts a dedicated worker that answers each ping", async ({ app }) => {
+  const page = await app.open("worker");
+  await expect(page.getByTestId("worker-state")).toHaveText("running");
+  await expect(page.getByTestId("worker-reply")).toHaveText("Worker replied: started");
+  await page.getByRole("button", { name: "Ping the worker" }).click();
+  await expect(page.getByTestId("worker-reply")).toHaveText("Worker replied: pong to ping");
+  expect(await counters(page)).toEqual({ pings: 1, replies: 2 });
+});
+
+test("without instrumentation the head check sees no hook", async ({ app }) => {
+  const page = await app.open("form");
+  expect((await state(page))?.hookSeenAtHead).toBe(false);
+});

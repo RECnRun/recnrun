@@ -1,0 +1,89 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "properties": {
+    "cardinality": {
+      "enum": ["one", "many", "optional", "nth"],
+      "type": "string"
+    },
+    "count": {
+      "minimum": 0,
+      "type": "integer"
+    },
+    "deadline": {
+      "additionalProperties": false,
+      "properties": {
+        "blocked": {
+          "type": "boolean"
+        },
+        "tabResponsive": {
+          "type": "boolean"
+        },
+        "terminated": {
+          "type": "boolean"
+        },
+        "timeoutMs": {
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": ["timeoutMs", "blocked", "terminated", "tabResponsive"],
+      "type": "object"
+    },
+    "durationMs": {
+      "minimum": 0,
+      "type": "number"
+    },
+    "elements": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "backendNodeId": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "frameId": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "loaderId": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "objectId": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "targetId": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": ["targetId", "frameId", "loaderId", "objectId", "backendNodeId"],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "error": {
+      "additionalProperties": false,
+      "properties": {
+        "message": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": ["message"],
+      "type": "object"
+    },
+    "objectGroup": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "status": {
+      "enum": ["matched", "not-found", "ambiguous", "unsupported", "error"],
+      "type": "string"
+    }
+  },
+  "required": ["status", "cardinality", "count", "elements", "durationMs", "objectGroup"],
+  "type": "object"
+}

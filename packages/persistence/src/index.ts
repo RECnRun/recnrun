@@ -9,3 +9,12 @@ export const flowFolderLayout = {
 } as const;
 
 export type FlowFolderLayout = typeof flowFolderLayout;
+
+export { BindingsFileError, openBindingsStore, type BindingsStore } from "./bindings-store.ts";
+export {
+  JournalFileError,
+  openJournal,
+  readJournal,
+  type JournalContents,
+  type JournalWriter,
+} from "./journal.ts";

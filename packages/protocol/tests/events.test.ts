@@ -1,6 +1,6 @@
 import * as v from "valibot";
 import { describe, expect, test } from "vite-plus/test";
-import { EventSchema } from "../src/index.ts";
+import { AdapterEventSchema, EventSchema, GapPayloadSchema } from "../src/index.ts";
 
 const envelope = {
   schemaVersion: 1,
@@ -73,5 +73,42 @@ describe("EventSchema", () => {
     ["a missing frame id", { frameId: undefined, category: "dom", type: "click", payload: {} }],
   ])("rejects %s", (_name, override) => {
     expect(v.safeParse(EventSchema, { ...envelope, payload: {}, ...override }).success).toBe(false);
+  });
+});
+
+describe("AdapterEventSchema", () => {
+  const base = { seq: 3, at: "2026-11-02T10:00:00.000Z", endpoint: "ws://127.0.0.1:9222/x" };
+
+  test("accepts a lost connection whose gap is a journal gap payload", () => {
+    const gap = { reason: "connection-lost", startedAt: base.at, lastSeq: 2 };
+    const event = { ...base, type: "connection.lost", gap };
+    expect(v.parse(AdapterEventSchema, event)).toEqual(event);
+    expect(v.safeParse(GapPayloadSchema, gap).success).toBe(true);
+  });
+
+  test("accepts contested control on a target", () => {
+    const event = {
+      ...base,
+      type: "control.contested",
+      targetId: "T1",
+      url: "about:blank",
+      signal: "attached-before-connect",
+    };
+    expect(v.parse(AdapterEventSchema, event)).toEqual(event);
+  });
+
+  test.each([
+    [
+      "a lost connection with another gap reason",
+      { type: "connection.lost", gap: { reason: "buffer-exhausted" } },
+    ],
+    [
+      "contested control without a target",
+      { type: "control.contested", url: "", signal: "attached-before-connect" },
+    ],
+    ["an unknown signal", { type: "control.contested", targetId: "T1", url: "", signal: "guess" }],
+    ["an unknown type", { type: "connection.flaky" }],
+  ])("rejects %s", (_name, override) => {
+    expect(v.safeParse(AdapterEventSchema, { ...base, ...override }).success).toBe(false);
   });
 });

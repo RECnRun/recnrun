@@ -10,10 +10,10 @@ export const SURFACE_CAPABILITIES: Surface[] = [
     surface: "dom-events",
     level: "normal",
     title: "DOM events",
-    status: "planned",
+    status: "implemented",
     phase: "F1.5",
     notes:
-      "Pointer, keyboard, input, composition, focus, scroll, submit, and dialog events as raw events.",
+      "Delivered by F1.5; tests/browser/capture.spec.ts on Linux in Docker matches pointer, keyboard, input, change, composition, focus, scroll, submit, and dialog events of scripted interactions against a golden file. Selection changes are captured but left out of the golden file, since Chrome coalesces them; password fields are redacted.",
   },
   {
     kind: "surface",
@@ -21,10 +21,10 @@ export const SURFACE_CAPABILITIES: Surface[] = [
     surface: "navigation",
     level: "normal",
     title: "Navigation and target lifecycle",
-    status: "planned",
+    status: "implemented",
     phase: "F1.5",
     notes:
-      "Events before the connection are not recovered, and a reload may be needed to cover initialization.",
+      "Delivered by F1.5; tests/browser/capture.spec.ts records committed and same-document navigations, target attach (with install mode and opener) and detach, and hook installs. Events before the connection are not recovered, and a reload may be needed to cover initialization.",
   },
   {
     kind: "surface",
@@ -32,10 +32,10 @@ export const SURFACE_CAPABILITIES: Surface[] = [
     surface: "network",
     level: "normal",
     title: "Network requests and responses",
-    status: "planned",
+    status: "implemented",
     phase: "F1.5",
     notes:
-      "Request, response, failure, and redirect events; bytes that were not collected are never reconstructed.",
+      "Delivered by F1.5; tests/browser/capture.spec.ts records request, response, failure, and redirect chains (a 303 form POST and three fetch redirects), a 500 with its body, and a body still loading at the deadline as unavailable with its reason. Bytes that were not collected are never reconstructed.",
   },
   {
     kind: "surface",
@@ -86,9 +86,10 @@ export const SURFACE_CAPABILITIES: Surface[] = [
     surface: "console-errors",
     level: "normal",
     title: "Console messages and errors",
-    status: "planned",
+    status: "implemented",
     phase: "F1.5",
-    notes: "Remote objects are serialized with limits at the instant of capture.",
+    notes:
+      "Delivered by F1.5; tests/browser/capture.spec.ts records console.error, an unhandled rejection, and an uncaught exception with their document, and log entries such as a failed resource. Remote objects are serialized as text with limits at the instant of capture.",
   },
   {
     kind: "surface",
@@ -218,9 +219,10 @@ export const SURFACE_CAPABILITIES: Surface[] = [
     surface: "workers-frames",
     level: "normal",
     title: "Frames and cross-origin targets",
-    status: "planned",
-    phase: "F1.4",
-    notes: "Targets that cannot be attached produce declared gaps.",
+    status: "partial",
+    phase: "F1.5",
+    notes:
+      "F1.4; tests/browser/instrumentation.spec.ts attaches and hooks same-origin iframes, cross-site OOPIFs, and popups before their first script, and F1.5's tests/browser/capture.spec.ts captures DOM events inside a same-origin iframe (its own frame) and an OOPIF (its own target). A target whose install fails is recorded on the instrumentation report, not yet as a gap.",
   },
   {
     kind: "surface",
@@ -228,9 +230,10 @@ export const SURFACE_CAPABILITIES: Surface[] = [
     surface: "workers-frames",
     level: "deep",
     title: "Dedicated workers",
-    status: "planned",
+    status: "partial",
     phase: "F6.2",
-    notes: "Workers already running at connection time are reported as gaps.",
+    notes:
+      "F1.4; tests/browser/instrumentation.spec.ts observes dedicated workers as CDP targets, held until the binding is added and then resumed, but nothing is captured inside them yet. A worker already running at connection time is recorded as late on the instrumentation report; reporting it as a gap comes with F3.5.",
   },
   {
     kind: "surface",

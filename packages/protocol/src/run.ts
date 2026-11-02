@@ -117,3 +117,10 @@ export type RunManifest = v.InferOutput<typeof RunManifestSchema>;
 export type RunSteps = v.InferOutput<typeof RunStepsSchema>;
 export type RunCoverage = v.InferOutput<typeof RunCoverageSchema>;
 export type RunSummary = v.InferOutput<typeof RunSummarySchema>;
+
+export type StepResult = v.InferOutput<typeof StepResultSchema>;
+
+/** True when `value` is one entry of runs/<id>/steps.json; the engine checks its results with it. */
+export function isStepResult(value: unknown): value is StepResult {
+  return v.is(StepResultSchema, value);
+}

@@ -2,10 +2,18 @@ import { toJsonSchema } from "@valibot/to-json-schema";
 import { format } from "oxfmt";
 import type * as v from "valibot";
 import {
+  AdapterEventSchema,
+  BindingsFileSchema,
+  BrowserHandshakeSchema,
   CapabilityMatrixSchema,
+  CapturedEventSchema,
+  DiscoveryResultSchema,
   EventSchema,
   FlowSchema,
+  InstrumentationEventSchema,
+  InstrumentationReportSchema,
   LocatorEntrySchema,
+  ObserverMessageSchema,
   RequestEnvelopeSchema,
   ResponseEnvelopeSchema,
   RunCoverageSchema,
@@ -15,20 +23,31 @@ import {
   StepSchema,
   TargetSchema,
 } from "../src/index.ts";
+import { FunctionLocatorRequestSchema, FunctionLocatorResultSchema } from "../src/index.ts";
 
 type AnySchema = v.GenericSchema;
 
 /** Every top-level document of the protocol, by the file name its JSON Schema is written to. */
 const DOCUMENTS: Record<string, AnySchema> = {
+  "adapter-event": AdapterEventSchema,
+  "bindings-file": BindingsFileSchema,
+  "browser-handshake": BrowserHandshakeSchema,
   "capability-matrix": CapabilityMatrixSchema,
+  "discovery-result": DiscoveryResultSchema,
   event: EventSchema,
   flow: FlowSchema,
+  "instrumentation-event": InstrumentationEventSchema,
+  "instrumentation-report": InstrumentationReportSchema,
+  "observer-message": ObserverMessageSchema,
   "run-coverage": RunCoverageSchema,
   "run-manifest": RunManifestSchema,
   "run-steps": RunStepsSchema,
   "run-summary": RunSummarySchema,
   "service-request": RequestEnvelopeSchema,
   "service-response": ResponseEnvelopeSchema,
+  "captured-event": CapturedEventSchema,
+  "function-locator-request": FunctionLocatorRequestSchema,
+  "function-locator-result": FunctionLocatorResultSchema,
 };
 
 // Named definitions give the flow's recursive schemas stable $ref names instead of generated ones.

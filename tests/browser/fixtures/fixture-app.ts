@@ -15,6 +15,8 @@ export interface FixtureState {
   counters: Record<string, number>;
   fail: string;
   loadId: string;
+  /** Whether page instrumentation had run when the page's first script did. */
+  hookSeenAtHead: boolean;
 }
 
 declare global {

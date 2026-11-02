@@ -1,10 +1,10 @@
 import type { Capability } from "./capabilities.ts";
 
-import { planned } from "./capability-planned.ts";
+import { implemented, planned } from "./capability-planned.ts";
 
 type Feature = Extract<Capability, { kind: "feature" }>;
 
-// Only what F0 delivers is implemented; everything else moves with its own test (PLAN.md §7).
+// Only what a task delivered is implemented; everything else moves with its own test (PLAN.md §7).
 export const FEATURE_CAPABILITIES: Feature[] = [
   {
     kind: "feature",
@@ -57,41 +57,68 @@ export const FEATURE_CAPABILITIES: Feature[] = [
     notes:
       "Delivered by F0.5; tests/browser/fixture.spec.ts opens every route on two origins in Google Chrome.",
   },
-  planned(
-    "chrome-discovery",
-    "F1.1",
-    "Chrome discovery",
-    "Reads DevToolsActivePort; the default-profile remote-debugging dialog stays manual (M-F1).",
-  ),
-  planned(
-    "cdp-connection",
-    "F1.2",
-    "CDP connection and handshake",
-    "Cannot attach to a Chrome that has not enabled remote debugging.",
-  ),
-  planned(
+  {
+    kind: "feature",
+    id: "chrome-discovery",
+    title: "Chrome discovery",
+    status: "implemented",
+    phase: "F1.1",
+    notes:
+      "Delivered by F1.1; tests/browser/discover.spec.ts on Linux in Docker. The default-profile dialog on macOS and Windows stays manual (M-F1.a, M-F1.b).",
+  },
+  {
+    kind: "feature",
+    id: "cdp-connection",
+    title: "CDP connection and handshake",
+    status: "implemented",
+    phase: "F1.2",
+    notes:
+      "Delivered by F1.2; tests/browser/connect.spec.ts on Linux in Docker. Reads Browser.getVersion and probes eight domains. Cannot attach to a Chrome that has not enabled remote debugging.",
+  },
+  {
+    kind: "feature",
+    id: "connection-loss-reconnect",
+    title: "Connection loss and reconnection",
+    status: "implemented",
+    phase: "F1.2",
+    notes:
+      "Delivered by F1.2; tests/browser/connect.spec.ts kills Chrome: connection.lost carries a gap, and reconnect succeeds only once the same DevToolsActivePort answers again.",
+  },
+  {
+    kind: "feature",
+    id: "contested-control",
+    title: "Another debugger on a target",
+    status: "partial",
+    phase: "F1.2",
+    notes:
+      "F1.2; tests/browser/connect.spec.ts. control.contested is reported for a page another client attached before RECnRun connected or reconnected, and that client is never detached. CDP exposes only a per-target attached flag and no event once RECnRun is attached, so DevTools opened later goes unnoticed (M-F1.d).",
+  },
+  implemented(
     "profile-bindings",
     "F1.3",
     "Profiles as bindings",
-    "Bindings stay outside flow packages in ~/.recnrun/bindings.json.",
+    "Delivered by F1.3 for two Chrome instances; tests/browser/profiles.spec.ts on Linux in Docker proves two Chrome instances share no storage, and that a flow's actor maps to its binding in that test's own dispatch. Engine-level actor dispatch is F4.3: until then the replay executor rejects multi-actor flows as multi-actor-unsupported. A restart is reported stale, never remapped. Bindings live in ~/.recnrun/bindings.json, never in a flow. Two profiles in one Chrome stay manual (M-F1.c).",
   ),
-  planned(
-    "instrumentation-order",
-    "F1.4",
-    "Instrumentation before application scripts",
-    "Ordering is proved on Chrome in Docker before any claim.",
-  ),
-  planned(
+  {
+    kind: "feature",
+    id: "instrumentation-order",
+    title: "Instrumentation before application scripts",
+    status: "implemented",
+    phase: "F1.4",
+    notes:
+      "Delivered by F1.4; tests/browser/instrumentation.spec.ts on Linux in Docker: the fixture's head script finds the hook on load, reload, SPA navigation, same-origin and cross-site iframes, and popups, and forged binding messages are dropped and counted.",
+  },
+  implemented(
     "replay-spike",
     "F1.6",
     "Replay spike",
-    "Actions use real input events, never direct value assignment.",
+    "Delivered by F1.6; tests/browser/replay-spike.spec.ts on Linux in Docker: the adapted source §9 example runs navigate, fill, click, extractText, and textEquals through the CDP adapter with trusted input events only; ?fail=status fails exactly the assertion, with the observed text. The full executor is F2.5.",
   ),
-  planned(
+  implemented(
     "custom-locator-path",
     "F1.7",
     "Custom locator function path",
-    "Synchronous infinite loops are cut with Runtime.terminateExecution and the outcome is recorded.",
+    "Delivered by F1.7; tests/browser/function-locator.spec.ts on Linux in Docker. The function runs in an isolated world, its elements become references qualified by target, frame, and loader id, and cardinality picks from them. A synchronous infinite loop is cut with Runtime.terminateExecution on the same session, and the tab answered Runtime.evaluate afterwards without being closed; the result records blocked, terminated, and tabResponsive.",
   ),
   planned(
     "service",

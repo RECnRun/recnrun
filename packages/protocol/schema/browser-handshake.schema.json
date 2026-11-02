@@ -1,0 +1,71 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "properties": {
+    "domains": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "domain": {
+            "enum": [
+              "Target",
+              "Network",
+              "Runtime",
+              "Page",
+              "Log",
+              "DOMStorage",
+              "Storage",
+              "Fetch"
+            ],
+            "type": "string"
+          },
+          "reason": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "scope": {
+            "enum": ["browser", "page"],
+            "type": "string"
+          },
+          "status": {
+            "enum": ["available", "unavailable"],
+            "type": "string"
+          }
+        },
+        "required": ["domain", "scope", "status"],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "endpoint": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "version": {
+      "properties": {
+        "jsVersion": {
+          "type": "string"
+        },
+        "product": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "protocolVersion": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "revision": {
+          "type": "string"
+        },
+        "userAgent": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": ["product", "protocolVersion", "userAgent"],
+      "type": "object"
+    }
+  },
+  "required": ["endpoint", "version", "domains"],
+  "type": "object"
+}

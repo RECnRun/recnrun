@@ -47,7 +47,8 @@ test("an implemented entry names the task or test that proves it", () => {
 test("a capture surface stays planned until a test proves it", () => {
   const surfaces = entries.filter((entry) => entry.kind === "surface");
   expect(surfaces.length).toBeGreaterThan(0);
-  expect(surfaces.filter((entry) => entry.status !== "planned")).toEqual([]);
+  for (const entry of surfaces.filter(({ status }) => status !== "planned"))
+    expect(entry.notes, entry.id).toMatch(/\btests\/\S+\.(spec|test)\.ts\b/);
 });
 
 test("the rendered document is deterministic, sorted, and lists every entry", () => {
@@ -75,4 +76,26 @@ test("every F0 deliverable is implemented", () => {
   for (const id of f0) {
     expect(byId.get(id), id).toBe("implemented");
   }
+});
+
+test.each([
+  ["chrome-discovery", "implemented", "tests/browser/discover.spec.ts"],
+  ["cdp-connection", "implemented", "tests/browser/connect.spec.ts"],
+  ["connection-loss-reconnect", "implemented", "tests/browser/connect.spec.ts"],
+  ["contested-control", "partial", "tests/browser/connect.spec.ts"],
+  ["profile-bindings", "implemented", "tests/browser/profiles.spec.ts"],
+  ["instrumentation-order", "implemented", "tests/browser/instrumentation.spec.ts"],
+  ["frames-targets-normal", "partial", "tests/browser/instrumentation.spec.ts"],
+  ["workers-deep", "partial", "tests/browser/instrumentation.spec.ts"],
+  ["dom-events-normal", "implemented", "tests/browser/capture.spec.ts"],
+  ["navigation-normal", "implemented", "tests/browser/capture.spec.ts"],
+  ["network-requests-normal", "implemented", "tests/browser/capture.spec.ts"],
+  ["console-normal", "implemented", "tests/browser/capture.spec.ts"],
+  ["frames-targets-normal", "partial", "tests/browser/capture.spec.ts"],
+  ["replay-spike", "implemented", "tests/browser/replay-spike.spec.ts"],
+  ["custom-locator-path", "implemented", "tests/browser/function-locator.spec.ts"],
+])("the F1 deliverable %s is %s and names %s", (id, status, spec) => {
+  const entry = entries.find((candidate) => candidate.id === id);
+  expect(entry?.status, id).toBe(status);
+  expect(entry?.notes, id).toContain(spec);
 });

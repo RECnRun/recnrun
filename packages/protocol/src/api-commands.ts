@@ -1,5 +1,6 @@
 import * as v from "valibot";
 import { AssertionStepSchema } from "./actions.ts";
+import { ProfileBindingSchema } from "./bindings.ts";
 import { CapabilityMatrixSchema } from "./capabilities.ts";
 import { IdSchema, NameSchema, NonEmptyStringSchema } from "./common.ts";
 import { EventCategorySchema, EventSchema } from "./events.ts";
@@ -12,14 +13,6 @@ import { SchemaVersionSchema } from "./version.ts";
 const NoParamsSchema = v.strictObject({});
 const SessionRefSchema = v.strictObject({ sessionId: NonEmptyStringSchema });
 const RunRefSchema = v.strictObject({ runId: NonEmptyStringSchema });
-
-/** A Chrome profile the user bound to a friendly name (PLAN.md F1.3); local, never exported. */
-export const ProfileBindingSchema = v.strictObject({
-  name: NonEmptyStringSchema,
-  userDataDir: NonEmptyStringSchema,
-  chromeVersion: v.optional(NonEmptyStringSchema),
-  browserContextIds: v.array(NonEmptyStringSchema),
-});
 
 export const SessionStatusSchema = v.strictObject({
   sessionId: NonEmptyStringSchema,

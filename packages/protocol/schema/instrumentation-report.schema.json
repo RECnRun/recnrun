@@ -1,0 +1,105 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "properties": {
+    "capture": {
+      "additionalProperties": false,
+      "properties": {
+        "dropped": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "events": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": ["events", "dropped"],
+      "type": "object"
+    },
+    "dedicatedWorkers": {
+      "additionalProperties": false,
+      "properties": {
+        "observed": {
+          "type": "boolean"
+        }
+      },
+      "required": ["observed"],
+      "type": "object"
+    },
+    "serviceWorkers": {
+      "additionalProperties": false,
+      "properties": {
+        "observed": {
+          "type": "boolean"
+        }
+      },
+      "required": ["observed"],
+      "type": "object"
+    },
+    "targets": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "detached": {
+            "type": "boolean"
+          },
+          "droppedInvalid": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "droppedUnknownFrame": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "error": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "hookInstalled": {
+            "type": "boolean"
+          },
+          "hookInstalls": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "installMode": {
+            "enum": ["before-first-script", "late", "ignored"],
+            "type": "string"
+          },
+          "sessionId": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "targetId": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "targetId",
+          "sessionId",
+          "type",
+          "url",
+          "installMode",
+          "hookInstalled",
+          "hookInstalls",
+          "droppedInvalid",
+          "droppedUnknownFrame",
+          "detached"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    }
+  },
+  "required": ["targets", "dedicatedWorkers", "serviceWorkers"],
+  "type": "object"
+}

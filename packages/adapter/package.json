@@ -11,9 +11,12 @@
   },
   "dependencies": {
     "@recnrun/engine": "workspace:*",
-    "playwright-core": "catalog:"
+    "@recnrun/protocol": "workspace:*",
+    "playwright-core": "catalog:",
+    "valibot": "catalog:"
   },
   "devDependencies": {
+    "@types/node": "catalog:",
     "typescript": "catalog:",
     "vite-plus": "catalog:"
   }

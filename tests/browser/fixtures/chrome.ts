@@ -28,6 +28,8 @@ export interface ChromeInstance {
   pid: number;
   /** Raw contents of `<userDataDir>/DevToolsActivePort`. */
   activePort: string;
+  /** Waits for this Chrome to exit (stopping it if needed) and starts another on the same profile. */
+  relaunch(): Promise<ChromeInstance>;
 }
 
 export interface LaunchedChrome extends ChromeInstance {
@@ -36,6 +38,7 @@ export interface LaunchedChrome extends ChromeInstance {
 
 interface WatchedProcess {
   child: ChildProcess;
+  exit: Promise<void>;
   exited: () => boolean;
   diagnostics: () => string;
 }
@@ -93,24 +96,34 @@ function watch(binary: string, userDataDir: string): WatchedProcess {
   child.stderr?.on("data", (data) => {
     stderr = (stderr + String(data)).slice(-STDERR_TAIL);
   });
-  child.once("error", (error) => {
-    failure = error.message;
+  const exit = new Promise<void>((resolve) => {
+    child.once("exit", () => resolve());
+    child.once("error", (error) => {
+      failure = error.message;
+      resolve();
+    });
   });
   return {
     child,
+    exit,
     exited: () => failure !== "" || child.exitCode !== null || child.signalCode !== null,
     diagnostics: () => [failure, stderr].filter(Boolean).join("\n"),
   };
 }
 
-async function waitForActivePort(file: string, chrome: WatchedProcess): Promise<string> {
+// After a crash the previous file stays behind, so a relaunch waits for different contents.
+async function waitForActivePort(
+  file: string,
+  chrome: WatchedProcess,
+  previous: string,
+): Promise<string> {
   const deadline = Date.now() + ACTIVE_PORT_TIMEOUT_MS;
   while (Date.now() < deadline) {
     if (chrome.exited()) {
       throw new Error(`Chrome exited before writing ${file}:\n${chrome.diagnostics()}`);
     }
     const content = await readFile(file, "utf8").catch(() => "");
-    if (content.trimEnd().split("\n").length >= 2) return content;
+    if (content !== previous && content.trimEnd().split("\n").length >= 2) return content;
     await delay(ACTIVE_PORT_POLL_MS);
   }
   throw new Error(
@@ -133,12 +146,11 @@ function parseActivePort(content: string): { port: number; wsPath: string } {
 
 async function stop(chrome: WatchedProcess): Promise<void> {
   if (chrome.exited()) return;
-  const exited = new Promise<void>((resolve) => chrome.child.once("exit", () => resolve()));
   chrome.child.kill("SIGTERM");
-  const outcome = await Promise.race([exited, delay(EXIT_TIMEOUT_MS, "timeout")]);
+  const outcome = await Promise.race([chrome.exit, delay(EXIT_TIMEOUT_MS, "timeout")]);
   if (outcome !== "timeout") return;
   chrome.child.kill("SIGKILL");
-  await exited;
+  await chrome.exit;
 }
 
 export async function launchChrome(): Promise<LaunchedChrome> {
@@ -147,18 +159,31 @@ export async function launchChrome(): Promise<LaunchedChrome> {
   const run = promisify(execFile);
   const version = (await run(binary, ["--version"], { timeout: VERSION_TIMEOUT_MS })).stdout.trim();
   const userDataDir = await mkdtemp(join(tmpdir(), "recnrun-chrome-"));
-  const chrome = watch(binary, userDataDir);
+  let current: WatchedProcess | undefined;
   const close = async (): Promise<void> => {
-    await stop(chrome);
+    if (current) await stop(current);
     // Chrome's helper processes can still hold files for a moment after the browser exits.
     await rm(userDataDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   };
-  try {
-    const activePort = await waitForActivePort(join(userDataDir, "DevToolsActivePort"), chrome);
+  const boot = async (previous: string): Promise<LaunchedChrome> => {
+    const chrome = watch(binary, userDataDir);
+    current = chrome;
+    const activePort = await waitForActivePort(
+      join(userDataDir, "DevToolsActivePort"),
+      chrome,
+      previous,
+    );
     const { port, wsPath } = parseActivePort(activePort);
     const wsEndpoint = `ws://127.0.0.1:${port}${wsPath}`;
     const pid = chrome.child.pid ?? 0;
-    return { userDataDir, port, wsPath, wsEndpoint, version, pid, activePort, close };
+    const relaunch = async (): Promise<LaunchedChrome> => {
+      await stop(chrome);
+      return boot(activePort);
+    };
+    return { userDataDir, port, wsPath, wsEndpoint, version, pid, activePort, close, relaunch };
+  };
+  try {
+    return await boot("");
   } catch (error) {
     await close();
     throw error;

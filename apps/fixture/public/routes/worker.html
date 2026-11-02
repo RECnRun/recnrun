@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <script>
+      window.__fixture = { hookSeenAtHead: Boolean(window.__recnrunHook) };
+    </script>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Worker · RECnRun fixture</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="/fixture.css" />
+    <script type="module" src="/routes/worker.js"></script>
+  </head>
+  <body>
+    <header>
+      <h1>Worker</h1>
+      <a href="/" data-testid="home">All routes</a>
+    </header>
+    <main>
+      <output data-testid="worker-state">starting</output>
+      <button type="button" data-testid="ping-worker">Ping the worker</button>
+      <output data-testid="worker-reply">No reply yet</output>
+    </main>
+  </body>
+</html>

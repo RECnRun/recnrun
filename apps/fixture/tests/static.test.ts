@@ -1,7 +1,7 @@
 import { readdir } from "node:fs/promises";
 import { describe, expect, test } from "vite-plus/test";
 import { createFixtureServer, portsFromEnvironment } from "@/index";
-import { ROUTES } from "@/routes";
+import { HEAD_CHECK, QUIET_LOG, ROUTES } from "@/routes";
 import { rawRequest, useFixture } from "./harness.ts";
 
 const fixture = useFixture();
@@ -28,6 +28,31 @@ describe("pages", () => {
     expect(script.status).toBe(200);
     expect(script.headers.get("content-type")).toBe("text/javascript; charset=utf-8");
   });
+
+  const firstScript = async (path: string) => {
+    const html = await (await get(path)).text();
+    const first = html.indexOf("<script");
+    expect(first).toBeGreaterThan(html.indexOf("<head>"));
+    return { html, first: html.slice(first, html.indexOf("</script>", first)).trim() };
+  };
+  const checked = ROUTES.filter(({ headCheck }) => headCheck !== false);
+  const quiet = ROUTES.filter(({ headCheck }) => headCheck === false);
+
+  test.each(["/", ...checked.map(({ name }) => `/routes/${name}`)])(
+    "%s runs the head check before any other script",
+    async (path) => {
+      expect((await firstScript(path)).first).toBe(`<script>\n      ${HEAD_CHECK}`);
+    },
+  );
+
+  test.each(quiet.map(({ name }) => `/routes/${name}`))(
+    "%s logs first and never reads the hook",
+    async (path) => {
+      const { html, first } = await firstScript(path);
+      expect(first).toBe(`<script>\n      ${QUIET_LOG}`);
+      expect(html).not.toContain("__recnrunHook");
+    },
+  );
 
   test("has exactly one listed route per page file", async () => {
     const files = await readdir(new URL("../public/routes/", import.meta.url));

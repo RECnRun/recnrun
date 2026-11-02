@@ -9,7 +9,11 @@
   "scripts": {
     "build": "tsc"
   },
+  "dependencies": {
+    "@recnrun/protocol": "workspace:*"
+  },
   "devDependencies": {
+    "@types/node": "catalog:",
     "typescript": "catalog:",
     "vite-plus": "catalog:"
   }

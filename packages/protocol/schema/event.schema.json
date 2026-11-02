@@ -66,6 +66,10 @@
               "minimum": 0,
               "type": "integer"
             },
+            "lastSeq": {
+              "minimum": 0,
+              "type": "integer"
+            },
             "lost": {
               "minimum": 0,
               "type": "integer"
@@ -78,6 +82,10 @@
                 "target-unattached",
                 "producer-restarted"
               ],
+              "type": "string"
+            },
+            "startedAt": {
+              "format": "date-time",
               "type": "string"
             },
             "surface": {
