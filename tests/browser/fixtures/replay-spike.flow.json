@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "id": "form-submit",
+  "name": "Submit the fixture form",
+  "description": "The source plan's first §9 example adapted to the fixture: one actor, the form route instead of orders, and env.fail carrying the fixture's ?fail= switch (empty for none).",
+  "actors": { "requester": {} },
+  "inputs": { "name": { "type": "string", "required": true } },
+  "requirements": [
+    { "id": "CA-01", "text": "The requester sees the submitted name in the status." }
+  ],
+  "steps": [
+    {
+      "id": "open",
+      "actor": "requester",
+      "action": "navigate",
+      "url": "${env.baseUrl}/routes/form?fail=${env.fail}"
+    },
+    {
+      "id": "fill-name",
+      "actor": "requester",
+      "action": "fill",
+      "target": { "role": "textbox", "name": "Name", "exact": true },
+      "value": "${inputs.name}"
+    },
+    {
+      "id": "submit",
+      "actor": "requester",
+      "action": "click",
+      "target": { "role": "button", "name": "Submit", "exact": true }
+    },
+    {
+      "id": "read-status",
+      "actor": "requester",
+      "action": "extractText",
+      "target": { "testId": "status" },
+      "saveAs": "status"
+    },
+    {
+      "id": "status",
+      "actor": "requester",
+      "assertion": "textEquals",
+      "target": { "testId": "status" },
+      "expected": "Submitted ${inputs.name} (free, no contact, terms declined, no file)",
+      "requirements": ["CA-01"]
+    }
+  ]
+}

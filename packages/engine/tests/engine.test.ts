@@ -21,6 +21,10 @@ function fakeAdapter() {
     disconnect: async () => void calls.push("disconnect"),
     onEvent: () => () => undefined,
     describeProfile: () => Promise.reject(new Error("unused")),
+    navigate: () => Promise.reject(new Error("unused")),
+    fill: () => Promise.reject(new Error("unused")),
+    click: () => Promise.reject(new Error("unused")),
+    readText: () => Promise.reject(new Error("unused")),
   };
   return { adapter, calls };
 }

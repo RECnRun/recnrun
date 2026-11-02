@@ -108,11 +108,11 @@ export const FEATURE_CAPABILITIES: Feature[] = [
     notes:
       "Delivered by F1.4; tests/browser/instrumentation.spec.ts on Linux in Docker: the fixture's head script finds the hook on load, reload, SPA navigation, same-origin and cross-site iframes, and popups, and forged binding messages are dropped and counted.",
   },
-  planned(
+  implemented(
     "replay-spike",
     "F1.6",
     "Replay spike",
-    "Actions use real input events, never direct value assignment.",
+    "Delivered by F1.6; tests/browser/replay-spike.spec.ts on Linux in Docker: the adapted source §9 example runs navigate, fill, click, extractText, and textEquals through the CDP adapter with trusted input events only; ?fail=status fails exactly the assertion, with the observed text. The full executor is F2.5.",
   ),
   planned(
     "custom-locator-path",

@@ -8,6 +8,7 @@ import {
   RunManifestSchema,
   RunStepsSchema,
   RunSummarySchema,
+  isStepResult,
 } from "../src/index.ts";
 
 const counts = {
@@ -80,6 +81,18 @@ test("RunStepsSchema records each executed instance with its path", () => {
   expect(
     v.safeParse(RunStepsSchema, { ...steps, steps: [{ stepId: "x", status: "ok" }] }).success,
   ).toBe(false);
+});
+
+test("isStepResult accepts a step result and rejects other shapes", () => {
+  const failed = {
+    stepId: "status",
+    status: "failed",
+    error: { code: "assertion-failed", message: "Expected Aprovado." },
+    evidence: ['expected: "Aprovado"', 'observed: "Pendente"'],
+  };
+  expect(isStepResult(failed)).toBe(true);
+  expect(isStepResult({ ...failed, status: "error" })).toBe(false);
+  expect(isStepResult({ ...failed, evidence: [""] })).toBe(false);
 });
 
 test("RunCoverageSchema and the capability matrix share statuses and surfaces", () => {

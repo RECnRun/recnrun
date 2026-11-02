@@ -1,3 +1,5 @@
+import type { ReplayPage } from "./replay.ts";
+
 /** One CDP session: the browser target's or a page's. */
 export interface CdpSession {
   send(method: string, params?: Record<string, unknown>): Promise<unknown>;
@@ -13,6 +15,8 @@ export interface CdpLink extends CdpSession {
   pageSession(): Promise<PageSession | undefined>;
   onDisconnected(listener: () => void): void;
   close(): Promise<void>;
+  /** A new tab in the default browser context, for replay. */
+  openPage(): Promise<ReplayPage>;
 }
 
 /** How a connection reaches Chrome; injectable so unit tests need no browser. */

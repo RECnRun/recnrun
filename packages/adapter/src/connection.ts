@@ -11,6 +11,7 @@ import { discover, type DiscoverOptions } from "./discovery.ts";
 import { parseTargets, readHandshake } from "./handshake.ts";
 import { playwrightTransport } from "./playwright-transport.ts";
 import { describeProfile } from "./profile.ts";
+import type { ReplayPage } from "./replay.ts";
 
 export type ReconnectOutcome =
   | { ok: true; connection: CdpConnection }
@@ -32,6 +33,7 @@ export interface CdpConnection {
   disconnect(): Promise<void>;
   reconnect(source?: ConnectionSource): Promise<ReconnectOutcome>;
   describeProfile(): Promise<ProfileDescription>;
+  openPage(): Promise<ReplayPage>;
 }
 
 type EventBody = AdapterEvent extends infer E
@@ -133,6 +135,7 @@ async function open(
       return reconnectThrough(options, source, sequence);
     },
     describeProfile: () => describeProfile(link, handshake, options.source),
+    openPage: () => link.openPage(),
   };
 }
 

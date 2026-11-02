@@ -25,6 +25,10 @@ export const playwrightTransport: CdpTransport = {
       },
       onDisconnected: (listener) => browser.on("disconnected", () => listener()),
       close: () => browser.close(),
+      async openPage() {
+        const context = browser.contexts()[0] ?? (await browser.newContext());
+        return context.newPage();
+      },
     };
   },
 };

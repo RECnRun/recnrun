@@ -76,3 +76,22 @@ test("a failed reconnection reports the endpoint as gone", async () => {
     remedy: "Open Chrome.",
   });
 });
+
+test("replays in one tab per connection and needs a connection first", async () => {
+  const { adapter, links } = setup();
+  await expect(adapter.navigate("http://127.0.0.1:4600/")).rejects.toThrow("Not connected");
+  await adapter.connect(ENDPOINT, { source: { userDataDir: "/p" } });
+  await adapter.navigate("http://127.0.0.1:4600/a");
+  await adapter.navigate("http://127.0.0.1:4600/b");
+  links[0]?.drop();
+  await adapter.reconnect();
+  await adapter.navigate("http://127.0.0.1:4600/c");
+  const replayCalls = (index: number) =>
+    links[index]?.calls.filter((call) => /openPage|goto/.test(call));
+  expect(replayCalls(0)).toEqual([
+    "browser openPage",
+    "page goto http://127.0.0.1:4600/a",
+    "page goto http://127.0.0.1:4600/b",
+  ]);
+  expect(replayCalls(1)).toEqual(["browser openPage", "page goto http://127.0.0.1:4600/c"]);
+});

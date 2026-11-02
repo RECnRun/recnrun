@@ -1,4 +1,5 @@
 import type { CdpLink, CdpTransport, PageSession } from "../src/cdp-link.ts";
+import type { ReplayPage } from "../src/replay.ts";
 
 export const NOW = "2026-11-02T10:00:00.000Z";
 export const now = (): Date => new Date(NOW);
@@ -108,6 +109,16 @@ export class FakeLink implements CdpLink {
     if (method === "Target.getTargets")
       return Promise.resolve({ targetInfos: this.chrome.targets });
     return Promise.resolve({});
+  }
+
+  /** A replay tab that records the URLs it goes to. */
+  openPage(): Promise<ReplayPage> {
+    this.calls.push("browser openPage");
+    const goto = (url: string) => {
+      this.calls.push(`page goto ${url}`);
+      return Promise.resolve(null);
+    };
+    return Promise.resolve({ goto } as unknown as ReplayPage);
   }
 }
 

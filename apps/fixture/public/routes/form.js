@@ -12,10 +12,16 @@ function describe(data) {
   return `Submitted ${name} (${data.get("plan")}, ${contact}, ${terms}, ${fileName})`;
 }
 
+// Only trusted events count: assigning .value fires none, and a dispatched event is untrusted.
+const countTrusted = (counter) => (event) => count(event.isTrusted ? counter : "untrusted");
+byTestId("name").addEventListener("input", countTrusted("inputs"));
+byTestId("name").addEventListener("change", countTrusted("changes"));
+byTestId("submit").addEventListener("click", countTrusted("clicks"));
+
 form.addEventListener("submit", (event) => {
   event.preventDefault();
   count("submits");
   show("status", describe(new FormData(form)));
 });
 
-await start("form", { counters: ["submits"] });
+await start("form", { counters: ["submits", "inputs", "changes", "clicks", "untrusted"] });
