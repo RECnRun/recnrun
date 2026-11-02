@@ -153,14 +153,15 @@ async function evaluate(run: LocatorRun, frame: FrameInfo, contextId: number): P
 }
 
 async function locate(run: LocatorRun): Promise<Outcome> {
-  const { session, request, probeMs } = run;
+  const { session, request, probeMs, objectGroup } = run;
   const frame = await findFrame(session, request.frameId);
   const evaluated = evaluate(run, frame, await createWorld(session, frame.id));
-  // A resolution cut at the deadline still settles later; its rejection is not the caller's.
-  evaluated.catch(() => undefined);
   const settled = await within(evaluated, request.timeoutMs);
   if (!timedOut(settled)) return settled;
   run.cut = true;
+  // A late result lands in the group after it was released, so the group is released again.
+  const late = () => releasing(session, probeMs, [["Runtime.releaseObjectGroup", { objectGroup }]]);
+  evaluated.then(late, late);
   return deadlineOutcome(await cutAtDeadline(session, request.timeoutMs, probeMs));
 }
 

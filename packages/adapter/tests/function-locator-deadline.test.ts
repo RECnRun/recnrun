@@ -34,7 +34,7 @@ test("a conversion that blocks the renderer is cut at the same deadline", async 
   expect(channel.sentOf("Runtime.terminateExecution")).toHaveLength(1);
 }, 2_000);
 
-test("a locator result that arrives after the deadline is never converted", async () => {
+test("a locator result that arrives after release() is never converted and is released", async () => {
   let settle: (reply: unknown) => void = () => undefined;
   const late = new Promise((resolve) => {
     settle = resolve;
@@ -42,11 +42,17 @@ test("a locator result that arrives after the deadline is never converted", asyn
   const { channel, target } = page(late);
   const result = await resolveFunctionLocator(target, request({ timeoutMs: 10 }));
   expect(result.deadline).toMatchObject({ blocked: false, terminated: false });
+  await result.release();
   const before = channel.sent.length;
   settle(object("late", "array"));
   await new Promise((resolve) => setTimeout(resolve, 0));
-  const after = channel.sent.slice(before).map(({ method }) => method);
-  expect(after).not.toContain("Runtime.callFunctionOn");
+  const after = channel.sent.slice(before);
+  expect(after.map(({ method }) => method)).not.toContain("Runtime.callFunctionOn");
+  expect(after).toContainEqual({
+    method: "Runtime.releaseObjectGroup",
+    params: { objectGroup: result.objectGroup },
+    sessionId: "S1",
+  });
 });
 
 test("a renderer that still answers is not terminated, and one that never does is unresponsive", async () => {
