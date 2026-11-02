@@ -110,6 +110,7 @@ Recording in the user's own applications needs more than `storage`. Whatever M1 
 | Documentation            | `scripts/check-docs.mjs` (`vp run docs:check`): relative links and anchors resolve |
 | Unit and component tests | Vitest with V8 coverage; Vitest Browser Mode with Playwright Chromium              |
 | End-to-end               | Playwright, headed Chromium with the test extension, in Docker on Xvfb             |
+| Browser and experiments  | Playwright `connectOverCDP` to Google Chrome Stable, headed on Xvfb                |
 | Extension build          | WXT with `@preact/preset-vite`                                                     |
 
 Findings from the bootstrap spike, kept here because they explain the configuration:
@@ -120,3 +121,4 @@ Findings from the bootstrap spike, kept here because they explain the configurat
 - **WXT dev browser.** WXT 0.21 opens a browser only when its optional peer `web-ext` is installed; without it, `wxt` builds and asks you to load the extension by hand. `apps/extension` depends on `web-ext` for that reason. `wxt.config.ts` opens `http://localhost:5173/` (the website's fixed dev port) in a persistent profile under `.wxt/chrome-data`, which `vp run clean` deletes.
 - **Knip and WXT.** Knip's WXT plugin expects `entrypoints/` at the package root; `knip.jsonc` lists `src/entrypoints` explicitly.
 - **Extensions need a headed Chromium.** Playwright and Vitest Browser Mode run headed; Docker provides the display, so no window opens on the host.
+- **Google Chrome in Docker.** `Dockerfile.tests` installs `google-chrome-stable` from Google's apt repository in its `runtime` stage and writes `/opt/recnrun/versions.json`, which `scripts/test-container.mjs` copies with the image id into each run's `.artifacts/docker/<run-id>/versions.json`. `tests/container/runner.checks.mjs` builds that stage alone (cached) and checks `google-chrome --version` reports 144 or later. Chrome runs as root in the container, where its sandbox cannot start, so `tests/browser/fixtures/chrome.ts` adds `--no-sandbox` there and only there.

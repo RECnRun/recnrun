@@ -7,7 +7,7 @@ RECnRun records and replays browser sessions for developers. The extension store
 - `packages/domain`: `@recnrun/domain`, Valibot schemas and types for Recording and the stored Snapshot.
 - `packages/bridge`: `@recnrun/bridge`, the versioned `window.postMessage` protocol between the website and the extension's content script.
 - `packages/brand`: `@recnrun/brand`, the Mona Sans font and the stylesheet both apps import.
-- `tests/`: Playwright end-to-end tests (`tests/e2e`) and Docker runner checks (`tests/container`).
+- `tests/`: Playwright end-to-end tests (`tests/e2e`), browser tests and experiments on Google Chrome Stable over CDP (`tests/browser`, `tests/experiments`), and Docker runner checks (`tests/container`).
 
 Durable decisions live in `docs/`:
 
@@ -32,7 +32,8 @@ Vite+ (`vp`) is the only toolchain. `vp <name>` runs a built-in command and `vp 
 | `vp check` (`--fix` to format)                        | Format (Oxfmt), lint (Oxlint), and type check while editing          |
 | `vp run deps`                                         | Architecture boundaries (dependency-cruiser)                         |
 | `vp run test:unit`, `test:components`, `test:e2e`     | One test layer: Node, Vitest Browser Mode, Playwright with extension |
-| `vp run test`                                         | All three layers                                                     |
+| `vp run test:browser`, `test:experiments`             | Google Chrome Stable over CDP: browser specs; POC hypotheses         |
+| `vp run test`                                         | All five layers                                                      |
 | `vp run test:coverage`                                | Coverage with thresholds                                             |
 | `vp run dead-code`, `vp run duplication`              | Knip; jscpd                                                          |
 | `vp run docs:check`                                   | Relative Markdown links and anchors resolve                          |

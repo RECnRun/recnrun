@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { delimiter, join, resolve } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const runner = join(root, "scripts/test-container.mjs");
@@ -49,6 +50,24 @@ function launch(context, scenario = "success", extra = []) {
   });
 }
 
+function directoryCopies(calls) {
+  return calls.filter(([command, source]) => command === "cp" && source.endsWith("/."));
+}
+
+async function imageVersions() {
+  const run = promisify(execFile);
+  // Inside the test container the image is the current system and Docker is not available.
+  if (process.env.RECNRUN_TEST_CONTAINER === "1") {
+    const versions = JSON.parse(readFileSync("/opt/recnrun/versions.json", "utf8"));
+    return { reported: (await run("google-chrome", ["--version"])).stdout.trim(), versions };
+  }
+  // The runtime stage holds Chrome without the workspace, so the build reuses Docker's cache.
+  const build = ["build", "--quiet", "--target", "runtime", "--file", "Dockerfile.tests", "."];
+  const image = (await run("docker", build, { cwd: root })).stdout.trim();
+  const version = ["run", "--rm", "--entrypoint", "google-chrome", image, "--version"];
+  return { reported: (await run("docker", version)).stdout.trim() };
+}
+
 function readCalls(directory) {
   try {
     return readFileSync(join(directory, "calls.jsonl"), "utf8")
@@ -82,8 +101,7 @@ test("forwards arguments literally and runs the current workspace in an isolated
 test("preserves a failing test's exit code and copies evidence before removing the container", async (context) => {
   const result = await launch(context, "test-failure");
   assert.equal(result.code, 7, result.output);
-  const copies = result.calls.filter(([command]) => command === "cp");
-  assert.equal(copies.length, 3);
+  assert.equal(directoryCopies(result.calls).length, 3);
   for (const artifact of ["coverage", "test-results", "playwright-report"]) {
     assert.equal(
       readFileSync(join(result.artifacts, artifact, "evidence.txt"), "utf8"),
@@ -91,6 +109,24 @@ test("preserves a failing test's exit code and copies evidence before removing t
     );
   }
   assert.equal(result.calls.at(-1)[0], "rm");
+});
+
+test("records the image's tool versions and id in versions.json", async (context) => {
+  const result = await launch(context, "test-failure");
+  assert.equal(result.code, 7, result.output);
+  const versions = JSON.parse(readFileSync(join(result.artifacts, "versions.json"), "utf8"));
+  assert.deepEqual(Object.keys(versions).sort(), ["chrome", "image", "node", "playwright", "pnpm"]);
+  assert.equal(versions.image, "sha256:fixture-image");
+  assert.match(versions.chrome, /^Google Chrome \d+\./);
+  assert.equal(result.calls.at(-1)[0], "rm");
+});
+
+test("the test image ships Google Chrome Stable 144 or later", { timeout: 900_000 }, async () => {
+  const { reported, versions } = await imageVersions();
+  const match = /^Google Chrome (\d+)\.\d+\.\d+\.\d+$/.exec(reported);
+  assert.ok(match, `Unexpected google-chrome --version output: ${reported}`);
+  assert.ok(Number(match[1]) >= 144, `Google Chrome ${match[1]} is older than 144`);
+  if (versions) assert.equal(versions.chrome, reported);
 });
 
 test("reports unavailable Docker without falling back to local browsers", async (context) => {
@@ -134,7 +170,7 @@ test("removes the container even if an artifact destination cannot be created", 
   const result = await launch(context, "blocked-export");
   assert.equal(result.code, 1, result.output);
   assert.match(result.output, /artifact/i);
-  assert.equal(result.calls.filter(([command]) => command === "cp").length, 2);
+  assert.equal(directoryCopies(result.calls).length, 2);
   assert.equal(result.calls.at(-1)[0], "rm");
 });
 
@@ -145,14 +181,14 @@ test(
     const result = await launch(context, "interrupt");
     assert.equal(result.code, 130, result.output);
     assert.ok(result.calls.some(([command]) => command === "stop"));
-    assert.equal(result.calls.filter(([command]) => command === "cp").length, 3);
+    assert.equal(directoryCopies(result.calls).length, 3);
     assert.equal(result.calls.at(-1)[0], "rm");
   },
 );
 
 test("public tests route through Docker while local variants and the hooks retain every gate", () => {
   const manifest = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
-  for (const layer of ["unit", "components", "e2e", "coverage"]) {
+  for (const layer of ["unit", "components", "e2e", "browser", "experiments", "coverage"]) {
     assert.equal(
       manifest.scripts[`test:${layer}`],
       `node scripts/test-container.mjs test:${layer}:local`,
