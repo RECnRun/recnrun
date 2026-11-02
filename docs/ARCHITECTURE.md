@@ -10,6 +10,7 @@ apps/extension ─┘                    ▲
 apps/website, apps/extension ──► @recnrun/brand (CSS and fonts)
 
 apps/fixture: imports nothing from the workspace; only tests/ may import it
+apps/isolator (POC) ──► isolation-core, worker-bootstrap, @recnrun/brand; nothing imports it
 ```
 
 ## Packages
@@ -23,6 +24,7 @@ apps/fixture: imports nothing from the workspace; only tests/ may import it
 | `apps/website`            | The Preact SPA                                                                                                                                                                                  | all packages; never the extension |
 | `apps/extension`          | The WXT extension                                                                                                                                                                               | all packages; never the website   |
 | `apps/fixture`            | Development-only application under test for the namespaced-sessions POC; see its [README](../apps/fixture/README.md)                                                                            | Node built-ins only               |
+| `apps/isolator`           | The namespaced-sessions POC extension (WXT, MV3); see [Isolator](#isolator-poc)                                                                                                                 | POC packages and brand only       |
 
 - Packages never import apps. Apps never import each other: they meet only at the bridge protocol.
 - Packages export their TypeScript sources (`exports` → `./src/index.ts`); apps bundle them. A package `build` only type checks.
@@ -61,6 +63,10 @@ Components take the gateway or data as props, so component tests use a fake gate
 | `src/messaging`   | Content and background | The internal content ↔ background message schema.                                          |
 
 `content` never imports `storage`, and `popup` never imports `content` or `background`.
+
+## Isolator (POC)
+
+`apps/isolator` is the runtime of the namespaced-sessions proof of concept on branch `poc-namespace-sessions` ([PLAN.md §5](poc/namespace-sessions/PLAN.md#5-target-layout)). It is separate from the recording product: it may import only `packages/isolation-core`, `packages/worker-bootstrap` (both added by later POC tasks), and `@recnrun/brand` (`isolator-only-poc-packages`), never `apps/extension` or `apps/website` (`isolator-not-to-recording-apps`), and nothing imports it (`nothing-to-isolator`): tests load its build output, `apps/isolator/.output/chrome-mv3-test` (`vp run @recnrun/isolator#build:test`, run by `test:browser:local` and `test:experiments:local`). Its entrypoints are thin like the extension's; `src/background` records a `chrome.storage.session` marker on install and startup and answers its own `getSelf` message with `chrome.management.getSelf()`. Permissions are `storage` and `management` until P0.4 adds `debugger`. `vp run dev:isolator` builds it in watch mode; without `web-ext` WXT opens no browser, so load it by hand (MANUAL_VALIDATION.md M-P0.a).
 
 ## Bridge protocol v1
 

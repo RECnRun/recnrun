@@ -25,5 +25,8 @@
       // Knip's WXT plugin looks for entrypoints/ at the root; this app uses srcDir: "src".
       "entry": ["src/entrypoints/**/*.{ts,tsx}", "scripts/*.checks.mjs"],
     },
+    "apps/isolator": {
+      "entry": ["src/entrypoints/**/*.{ts,tsx}"],
+    },
   },
 }

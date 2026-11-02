@@ -89,6 +89,31 @@ module.exports = {
       to: { path: "^apps/fixture/" },
     },
     {
+      name: "isolator-not-to-recording-apps",
+      severity: "error",
+      comment:
+        "The namespaced-sessions POC is independent of the recording product (POC PLAN.md §2).",
+      from: { path: "^apps/isolator/" },
+      to: { path: "^apps/(extension|website)/" },
+    },
+    {
+      name: "isolator-only-poc-packages",
+      severity: "error",
+      comment: "The isolator builds on the POC packages and the brand only (POC PLAN.md §5).",
+      from: { path: "^apps/isolator/" },
+      to: {
+        path: "^packages/",
+        pathNot: "^packages/(isolation-core|worker-bootstrap|brand)/",
+      },
+    },
+    {
+      name: "nothing-to-isolator",
+      severity: "error",
+      comment: "The isolator is a runtime; tests load its build output, never its modules.",
+      from: { pathNot: "^apps/isolator/" },
+      to: { path: "^apps/isolator/" },
+    },
+    {
       name: "domain-pure",
       severity: "error",
       comment: "The domain is plain data and schemas: no UI, browser, or protocol code.",
@@ -177,7 +202,7 @@ module.exports = {
       severity: "error",
       comment: "Entrypoints are thin wiring; nothing imports them.",
       from: {},
-      to: { path: "^apps/extension/src/entrypoints/|^apps/website/src/main\\.tsx$" },
+      to: { path: "^apps/(extension|isolator)/src/entrypoints/|^apps/website/src/main\\.tsx$" },
     },
   ],
   options: {

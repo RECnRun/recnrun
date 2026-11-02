@@ -27,6 +27,7 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/website/package.json ./apps/website/package.json
 COPY apps/extension/package.json ./apps/extension/package.json
 COPY apps/fixture/package.json ./apps/fixture/package.json
+COPY apps/isolator/package.json ./apps/isolator/package.json
 COPY packages/domain/package.json ./packages/domain/package.json
 COPY packages/bridge/package.json ./packages/bridge/package.json
 COPY packages/isolation-core/package.json ./packages/isolation-core/package.json
@@ -39,6 +40,7 @@ COPY . .
 # pnpm skips "prepare" when node_modules is already current, so generate WXT's types explicitly.
 RUN vp install --frozen-lockfile --offline \
     && vp run extension#wxt:prepare \
+    && vp run @recnrun/isolator#wxt:prepare \
     && mkdir -p coverage test-results playwright-report /opt/recnrun
 
 # scripts/test-container.mjs copies this file into the run's versions.json.

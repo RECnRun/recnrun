@@ -4,6 +4,7 @@ RECnRun records and replays browser sessions for developers. The extension store
 
 - `apps/extension`: WXT Chromium (MV3) extension with a Preact popup. It owns the data.
 - `apps/website`: Preact SPA at recnrun.com, deployed to GitHub Pages. It is also the extension's UI.
+- `apps/isolator`: WXT MV3 extension of the namespaced-sessions POC (branch `poc-namespace-sessions`); independent of the recording product.
 - `packages/domain`: `@recnrun/domain`, Valibot schemas and types for Recording and the stored Snapshot.
 - `packages/bridge`: `@recnrun/bridge`, the versioned `window.postMessage` protocol between the website and the extension's content script.
 - `packages/brand`: `@recnrun/brand`, the Mona Sans font and the stylesheet both apps import.
@@ -28,6 +29,7 @@ Vite+ (`vp`) is the only toolchain. `vp <name>` runs a built-in command and `vp 
 | `vp install`                                          | After pulling, before starting work                                  |
 | `vp run dev`                                          | Website (port 5173) and extension dev build in Chrome, together      |
 | `vp run dev:website`, `vp run dev:extension`          | One of them alone; the extension's Chrome keeps a persistent profile |
+| `vp run dev:isolator`                                 | Build the POC isolator in watch mode; load it by hand                |
 | `vp run clean`                                        | Delete builds, artifacts, caches, and the dev Chrome profile         |
 | `vp check` (`--fix` to format)                        | Format (Oxfmt), lint (Oxlint), and type check while editing          |
 | `vp run deps`                                         | Architecture boundaries (dependency-cruiser)                         |
