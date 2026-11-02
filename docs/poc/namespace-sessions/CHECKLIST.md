@@ -78,7 +78,15 @@ Markers: `[ ]` not started · `[i]` implemented, awaiting the phase gate · `[x]
 
 ## P1: Minimal service-worker proof
 
-- [ ] P1.1 Route A: tab attach and auto-attach before `register()` (E2)
+- [i] P1.1 Route A: tab attach and auto-attach before `register()` (E2)
+  - red: `vp test --project=@recnrun/isolation-core --project=@recnrun/worker-bootstrap` against identity stubs of `installMarker`, `markUrl`, `physicalName` -> 14 failed ("is one classic script that patches the realm's first fetch, database, and cache": the URL without `__rec`, no `__rec:e2-m1:` prefix); `vp test --project=@recnrun/isolator tests/route-a.test.ts` against a stub `RouteAEngine` -> 11 of 12 failed (`expected [] to deeply equal [ 'Runtime.evaluate', 'Target.setAutoAttach', 'Runtime.runIfWaitingForDebugger' ]`); with the release awaiting the bootstrap's reply -> "releases a service worker that answers the bootstrap only once released" received `[ "Runtime.evaluate: no reply within 5000 ms", undefined, true ]`; `vp test --project=harness tests/e2-samples.test.ts` against a stub evaluation -> 8 of 9 failed (`expected [] to deeply equal [ 'firstEffectBeforeMarker' ]`); `vp run test:experiments -- tests/experiments/E2-route-a-register.spec.ts` with the same stub -> `Expected: "number" Received: "undefined"`
+  - green: the same commands pass 38, 13, and 9 tests; `vp test --project=@recnrun/isolator` 50 passed; `vp run test:experiments -- tests/experiments/E2-route-a-register.spec.ts` 1 passed (run `2026-11-02T21-07-38.129Z-3ec346fc`, 140 loads in 14.9 s)
+  - verdict: Google Chrome 156.0.8078.79 on Linux in Docker, `cdp-load-unpacked`; report [experiments/E2.md](experiments/E2.md)
+  - verdict: `service-worker-register` fail: 100 of 100 first effect before the marker (`Cache Storage holds fixture-sw without the prefix (100)`); every service worker attached waiting, bootstrapped, released, with every request and IndexedDB marked; `bootstrapMs` p50 7.1, p95 9.7, max 12.3
+  - verdict: `dedicated-worker` fail: 10 of 10 first effect before the marker (`Cache Storage holds fixture-dedicated without the prefix (10)`); `bootstrapMs` p50 1.9, p95 3.7, max 3.7
+  - verdict: `shared-worker` fail: 10 of 10 first effect before the marker, `notAttached` 10 (`no Target.attachedToTarget for /shared-worker.js?type=classic (5)`, the same for `module`)
+  - verdict: `nested-worker` unavailable: `the frozen fixture starts no worker from a worker (apps/fixture/public/app/worker.js, shared-worker.js)`
+  - commit: "Build the marker bootstrap into one script for worker evaluation" c960507; "Bootstrap auto-attached workers before release in the isolator" 404c31d; "Release a paused worker without waiting for its bootstrap reply" 2ec68f8; "Record experiment E2 on Route A bootstraps before register" b42b95f
 - [ ] P1.2 Route A: direct worker target, cold start, the race (E3) `@order-critical`
   - note: the stress runner exists (`scripts/test-stress.mjs`): `vp run test:stress` in Docker (`-- --iterations N` or `RECNRUN_STRESS_ITERATIONS`; default 100), `vp run test:stress:local` on the host; it runs the tests whose title ends with `@order-critical` and writes `.artifacts/evidence/<run>/stress.json`
 - [ ] P1.3 Stop and restart control (E4)
