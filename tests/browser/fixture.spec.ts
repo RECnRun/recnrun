@@ -1,11 +1,12 @@
 import type { Page, TestInfo } from "@playwright/test";
-import { expect, test, type LaunchedChrome } from "./fixtures/chrome.ts";
+import { cookieValues, expect, expectRedactedEvidence, test } from "./observer/fixture.ts";
 
 // The fixture's public pages hardcode these default ports (apps/fixture/README.md).
 const APP = "http://app.localhost:4600";
 const STAGING = "http://app.localhost:4603";
 // Node does not resolve *.localhost everywhere, so the harness reaches the API on the loopback.
 const CONTROL = "http://127.0.0.1:4601";
+const ORIGINS = [APP, STAGING, "http://api.localhost:4601", "http://idp.localhost:4602"];
 const SW_VARIANTS = ["classic", "module", "imports", "static", "dynamic"] as const;
 
 interface LedgerEntry {
@@ -36,12 +37,6 @@ async function control(path: string, method = "POST"): Promise<Response> {
 
 async function ledger(): Promise<LedgerEntry[]> {
   return (await (await control("/__ledger", "GET")).json()) as LedgerEntry[];
-}
-
-async function firstPage(chrome: LaunchedChrome): Promise<Page> {
-  const [context] = chrome.browser.contexts();
-  if (!context) throw new Error("Chrome has no default browser context");
-  return context.pages()[0] ?? context.newPage();
 }
 
 async function report<T>(page: Page, url: string): Promise<T> {
@@ -103,10 +98,18 @@ test.beforeEach(async () => {
   await control("/__network?mode=online");
 });
 
+// Every test leaves the evidence set; the fixture's session cookies never appear in it unhashed.
+test.afterEach(async ({ chrome, observer }) => {
+  await observer.snapshotStorage(ORIGINS);
+  await observer.collectLedger(CONTROL);
+  const secrets = await cookieValues(chrome.cdp, ["api_sid", "idp_sid"]);
+  await expectRedactedEvidence(await observer.finish(), secrets);
+});
+
 test("serves storage, both worker types, and sockets to the user signed in by redirect", async ({
-  chrome,
+  observer,
 }, testInfo) => {
-  const page = await firstPage(chrome);
+  const { page } = observer;
   await signIn(page, "alice");
   await screenshot(page, testInfo, "signed-in");
 
@@ -133,9 +136,10 @@ test("serves storage, both worker types, and sockets to the user signed in by re
 
 test("runs every service worker variant and serves the offline shell when the fixture cuts the network", async ({
   chrome,
+  observer,
 }, testInfo) => {
   test.setTimeout(120_000);
-  const page = await firstPage(chrome);
+  const { page } = observer;
   // Headed Chrome holds pushManager.subscribe() on a permission prompt nobody answers; deny it instead.
   await chrome.cdp.send("Browser.setPermission", {
     permission: { name: "notifications" },
@@ -167,9 +171,9 @@ test("runs every service worker variant and serves the offline shell when the fi
 });
 
 test("logs in by popup, renews silently, logs out, and serves the staging copy", async ({
-  chrome,
+  observer,
 }, testInfo) => {
-  const page = await firstPage(chrome);
+  const { page } = observer;
   await page.goto(`${APP}/`);
   await expect(page.locator("#user")).toHaveText("Signed out");
 

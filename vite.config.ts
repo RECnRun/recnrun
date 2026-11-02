@@ -84,6 +84,7 @@ export default defineConfig({
       "packages/isolation-core",
       "apps/fixture",
       "apps/isolator",
+      "tests/vitest.config.ts",
       "apps/website/vitest.browser.config.ts",
       "apps/extension/vitest.browser.config.ts",
     ],

@@ -14,7 +14,7 @@ paths:
 
 | Layer       | Files                                                                         | Command                   |
 | ----------- | ----------------------------------------------------------------------------- | ------------------------- |
-| Node unit   | `{apps,packages}/*/tests/*.test.ts`                                           | `vp run test:unit`        |
+| Node unit   | `{apps,packages}/*/tests/*.test.ts`, `tests/*.test.ts` (the harness itself)   | `vp run test:unit`        |
 | Component   | `*.browser.test.ts(x)` in Vitest Browser Mode, Chromium                       | `vp run test:components`  |
 | End-to-end  | `tests/e2e/*.spec.ts`, headed Playwright Chromium, built website + extension  | `vp run test:e2e`         |
 | Browser     | `tests/browser/*.spec.ts`, Google Chrome Stable over CDP, headed on Xvfb      | `vp run test:browser`     |
@@ -48,4 +48,5 @@ paths:
 - The fixture resolves Chrome from `RECNRUN_CHROME_PATH`, then `google-chrome` or `google-chrome-stable` on `PATH`, then the macOS app, and fails with the remedy when none exists.
 - Every Docker run writes `versions.json` (Chrome, Node, pnpm, Playwright, image id). Report results as "Google Chrome <version> on Linux in Docker".
 - Import `test` and `expect` from `tests/browser/fixtures/extension.ts` when the isolator must be loaded. Its `extension` fixture loads `apps/isolator/.output/chrome-mv3-test` (built by `test:browser:local` and `test:experiments:local`) with the first method that works, in E0's order: CDP `Extensions.loadUnpacked`, managed policy, then Playwright's Chromium labelled `diagnostic` ([E0.md](../../docs/poc/namespace-sessions/experiments/E0.md)). It exposes `extensionId`, `method`, `label`, `chrome` (the `LaunchedChrome`), and `evaluateInBackground(expression)`, which runs in the extension's service worker through `tests/browser/fixtures/cdp-client.ts`.
+- Import `test` and `expect` from `tests/browser/observer/fixture.ts` to record evidence. Its `observer` fixture starts the CDP observer on Chrome's first page (`observer.page` is the page to drive); call `snapshotStorage(origins)` and `collectLedger(apiBase)` before `finish()`, which writes `trace.jsonl`, `ledger.json`, `storage.json`, and `counters.json` under `.artifacts/evidence/<RECNRUN_RUN_ID>/<spec>/<test>/`, redacted by `tests/browser/observer/redact.ts`. Teardown writes them even when the test failed. `expectRedactedEvidence` checks that raw cookie values never reach the files (`tests/browser/fixture.spec.ts` shows the pattern in `afterEach`).
 - Experiments record each hypothesis with `appendVerdict` and capabilities with `mergeCapabilities` (`tests/experiments/verdicts.ts`) under `.artifacts/evidence/<RECNRUN_RUN_ID>/`. A hypothesis that fails is a verdict, not a test failure; the spec fails when a hypothesis has no verdict. Docker runs set `RECNRUN_RUN_ID` to the run id and export the directory to `.artifacts/docker/<run-id>/evidence/`.

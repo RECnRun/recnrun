@@ -13,7 +13,7 @@
     "clean": "node scripts/clean.mjs && vp run extension#wxt:prepare && vp run @recnrun/isolator#wxt:prepare",
     "logo": "node scripts/favicon.mjs && node scripts/logo-png.mjs",
     "test:unit": "node scripts/test-container.mjs test:unit:local",
-    "test:unit:local": "vp test --project=website --project=extension --project=@recnrun/domain --project=@recnrun/bridge --project=@recnrun/isolation-core --project=fixture --project=@recnrun/isolator",
+    "test:unit:local": "vp test --project=website --project=extension --project=@recnrun/domain --project=@recnrun/bridge --project=@recnrun/isolation-core --project=fixture --project=@recnrun/isolator --project=harness",
     "test:components": "node scripts/test-container.mjs test:components:local",
     "test:components:local": "vp test --config apps/website/vitest.browser.config.ts && vp test --config apps/extension/vitest.browser.config.ts",
     "test:e2e": "node scripts/test-container.mjs test:e2e:local",
