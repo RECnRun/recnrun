@@ -2,6 +2,7 @@ export * from "./actions.ts";
 export * from "./api-commands.ts";
 export * from "./api.ts";
 export * from "./capabilities.ts";
+export * from "./capability-matrix.ts";
 export * from "./common.ts";
 export * from "./events.ts";
 export * from "./flow.ts";

@@ -34,6 +34,8 @@
           },
           "surface": {
             "enum": [
+              "dom-events",
+              "navigation",
               "network",
               "websocket-sse",
               "console-errors",

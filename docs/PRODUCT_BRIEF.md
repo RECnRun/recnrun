@@ -6,16 +6,16 @@ Why it is built this way: [ADR 0001](adr/0001-local-service-over-cdp.md) (local 
 
 ## Concepts
 
-| Concept          | Meaning                                                                                                                                                                                                          |
-| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Flow**         | A persistent, declarative description of a scenario (YAML or JSON): its actors, inputs, requirements, preconditions, and steps. It is a file the user can read, edit, version, export, and import; not code.     |
-| **Step**         | One unit of a flow: an action (`click`, `fill`, `navigate`, …), an assertion (`textEquals`, `visible`, …), or a built-in (extraction, variables, control blocks). Each step has a stable id and its own timeout. |
-| **Locator list** | How a step finds its element: an ordered list of strategies (role, text, test id, CSS, a registered function) with a resolution policy, a cardinality, and one shared deadline. Every attempt is traced.         |
-| **Actor**        | A portable role in a flow (`requester`, `approver`). The flow names actors, never machines or profiles.                                                                                                          |
-| **Binding**      | The local link between an actor and a Chrome profile reachable over CDP, with a friendly name the user chose. Bindings live in `~/.recnrun`, never inside a flow, so a flow moves between machines unchanged.    |
-| **Run**          | One replay of a flow revision with a dataset. It records each step's status (`passed`, `failed`, `blocked`, `cancelled`, `indeterminate`, …), a summary, and an exit code.                                       |
-| **Evidence**     | What a run or a recording captured: actions, navigations, network requests and bodies, console, errors, storage operations, DOM snapshots, and screenshots, in a journal with blobs stored by hash.              |
-| **Coverage**     | What a run could and could not observe, per surface, with every gap, truncation, and loss listed in `coverage.json`. Absence of evidence is never reported as evidence of absence.                               |
+| Concept          | Meaning                                                                                                                                                                                                                                                                 |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Flow**         | A persistent, declarative description of a scenario (YAML or JSON): its actors, inputs, requirements, preconditions, and steps. It is a file the user can read, edit, version, export, and import; not code.                                                            |
+| **Step**         | One unit of a flow: an action (`click`, `fill`, `navigate`, …), an assertion (`textEquals`, `visible`, …), or a built-in (extraction, variables, control blocks). Each step has a stable id and its own timeout.                                                        |
+| **Locator list** | How a step finds its element: an ordered list of strategies (role, text, test id, CSS, a registered function) with a resolution policy, a cardinality, and one shared deadline. Every attempt is traced.                                                                |
+| **Actor**        | A portable role in a flow (`requester`, `approver`). The flow names actors, never machines or profiles.                                                                                                                                                                 |
+| **Binding**      | The local link between an actor and a Chrome profile reachable over CDP, with a friendly name the user chose. Bindings live in `~/.recnrun`, never inside a flow, so a flow moves between machines unchanged.                                                           |
+| **Run**          | One replay of a flow revision with a dataset. It records each step's status (`passed`, `failed`, `blocked`, `cancelled`, `indeterminate`, …), a summary, and an exit code.                                                                                              |
+| **Evidence**     | What a run or a recording captured: actions, navigations, network requests and bodies, console, errors, storage operations, DOM snapshots, and screenshots, in a journal with blobs stored by hash.                                                                     |
+| **Coverage**     | What a run could and could not observe, per surface, with every gap, truncation, and loss listed in `coverage.json`. Absence of evidence is never reported as evidence of absence. What each surface can capture today is listed in [CAPABILITIES.md](CAPABILITIES.md). |
 
 ## Product rules
 

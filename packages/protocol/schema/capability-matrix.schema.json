@@ -9,7 +9,32 @@
             "additionalProperties": false,
             "properties": {
               "id": {
+                "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                "type": "string"
+              },
+              "kind": {
+                "const": "surface"
+              },
+              "level": {
+                "enum": ["normal", "deep"],
+                "type": "string"
+              },
+              "notes": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "phase": {
+                "pattern": "^F\\d[A]?\\.\\d+$",
+                "type": "string"
+              },
+              "status": {
+                "enum": ["implemented", "partial", "unavailable", "planned"],
+                "type": "string"
+              },
+              "surface": {
                 "enum": [
+                  "dom-events",
+                  "navigation",
                   "network",
                   "websocket-sse",
                   "console-errors",
@@ -23,22 +48,12 @@
                 ],
                 "type": "string"
               },
-              "kind": {
-                "const": "surface"
-              },
-              "notes": {
-                "type": "string"
-              },
-              "phase": {
-                "enum": ["F0", "F1", "F2", "F3", "F4", "F4A", "F5", "F6", "F7"],
-                "type": "string"
-              },
-              "status": {
-                "enum": ["implemented", "partial", "unavailable", "planned"],
+              "title": {
+                "minLength": 1,
                 "type": "string"
               }
             },
-            "required": ["kind", "id", "status", "phase"],
+            "required": ["kind", "id", "surface", "level", "title", "status", "phase", "notes"],
             "type": "object"
           },
           {
@@ -52,18 +67,23 @@
                 "const": "feature"
               },
               "notes": {
+                "minLength": 1,
                 "type": "string"
               },
               "phase": {
-                "enum": ["F0", "F1", "F2", "F3", "F4", "F4A", "F5", "F6", "F7"],
+                "pattern": "^F\\d[A]?\\.\\d+$",
                 "type": "string"
               },
               "status": {
                 "enum": ["implemented", "partial", "unavailable", "planned"],
                 "type": "string"
+              },
+              "title": {
+                "minLength": 1,
+                "type": "string"
               }
             },
-            "required": ["kind", "id", "status", "phase"],
+            "required": ["kind", "id", "title", "status", "phase", "notes"],
             "type": "object"
           }
         ]

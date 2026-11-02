@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
@@ -74,6 +74,20 @@ test("skips dependencies and build output", (context) => {
     "coverage/report.md": "[x](missing.md)",
   });
   assert.deepEqual(checkDocs(root), []);
+});
+
+test("reports a stale or missing docs/CAPABILITIES.md in a copy of the repository", (context) => {
+  const root = tree(context, {
+    "packages/protocol/package.json": "{}\n",
+    "docs/plan/PLAN.md": "## 7. Working rules specific to this plan\n",
+  });
+  const expected = ["docs/CAPABILITIES.md: stale; run vp run capabilities:generate"];
+  assert.deepEqual(run(root), { code: 1, errors: expected });
+  writeFileSync(join(root, "docs", "CAPABILITIES.md"), "# Capabilities\n\nedited by hand\n");
+  assert.deepEqual(run(root), { code: 1, errors: expected });
+  const generated = readFileSync(new URL("../docs/CAPABILITIES.md", import.meta.url), "utf8");
+  writeFileSync(join(root, "docs", "CAPABILITIES.md"), generated);
+  assert.deepEqual(run(root), { code: 0, errors: [] });
 });
 
 test("slugs headings the way GitHub does", () => {

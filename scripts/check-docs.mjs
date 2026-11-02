@@ -3,6 +3,9 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
+import { renderCapabilitiesMarkdown } from "../packages/protocol/scripts/render-capabilities.ts";
+import { CAPABILITY_MATRIX } from "../packages/protocol/src/index.ts";
+
 const SKIPPED_DIRECTORIES = new Set([
   ".artifacts",
   ".git",
@@ -109,9 +112,17 @@ function checkLinks({ root, files }) {
   );
 }
 
+/** Reports docs/CAPABILITIES.md when it differs from the matrix in packages/protocol. */
+function checkCapabilities({ root }) {
+  if (!existsSync(join(root, "packages", "protocol"))) return [];
+  const file = join(root, "docs", "CAPABILITIES.md");
+  const current = existsSync(file) ? readFileSync(file, "utf8") : undefined;
+  if (current === renderCapabilitiesMarkdown(CAPABILITY_MATRIX)) return [];
+  return ["docs/CAPABILITIES.md: stale; run vp run capabilities:generate"];
+}
+
 // Extension point: each check gets { root, files } and returns "file:line: message" strings.
-// F0.4 adds the comparison of the generated docs/CAPABILITIES.md with packages/protocol here.
-export const checks = [checkLinks];
+export const checks = [checkLinks, checkCapabilities];
 
 /** Runs every check against the Markdown under root and returns the failures. */
 export function checkDocs(root) {

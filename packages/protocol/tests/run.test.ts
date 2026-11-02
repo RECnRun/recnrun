@@ -92,12 +92,37 @@ test("RunCoverageSchema and the capability matrix share statuses and surfaces", 
   const matrix = {
     schemaVersion: 1,
     capabilities: [
-      { kind: "surface", id: "network", status: "partial", phase: "F3", notes: "No bodies yet" },
-      { kind: "feature", id: "action.click", status: "planned", phase: "F2" },
+      {
+        kind: "surface",
+        id: "network-bodies",
+        surface: "network",
+        level: "normal",
+        title: "Network bodies",
+        status: "partial",
+        phase: "F3.1",
+        notes: "No bodies yet.",
+      },
+      {
+        kind: "feature",
+        id: "action.click",
+        title: "Click action",
+        status: "planned",
+        phase: "F2.5",
+        notes: "Planned.",
+      },
     ],
   };
   expect(v.safeParse(CapabilityMatrixSchema, matrix).success).toBe(true);
-  const unknownSurface = { kind: "surface", id: "telepathy", status: "planned", phase: "F6" };
+  const unknownSurface = {
+    kind: "surface",
+    id: "telepathy",
+    surface: "telepathy",
+    level: "deep",
+    title: "Telepathy",
+    status: "planned",
+    phase: "F6.1",
+    notes: "Never.",
+  };
   expect(
     v.safeParse(CapabilityMatrixSchema, { ...matrix, capabilities: [unknownSurface] }).success,
   ).toBe(false);

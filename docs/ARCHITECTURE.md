@@ -71,6 +71,8 @@ The `if` block names its branches `steps` and `otherwise`, never `then`/`else`: 
 
 Each issue of `validateFlow` has a `code` (`unknown-action`, `unknown-namespace`, `duplicate-step-id`, `missing-input`, `cyclic-variable`, `nth-without-index`, and others in `FLOW_ISSUE_CODES`) and the `path` of the offending key from the flow's root.
 
+The capability matrix lives in code (`capability-matrix.ts`, fed by `capability-surfaces.ts`, `capability-features.ts`, and `capability-roadmap.ts`). `vp run capabilities:generate` renders it to [CAPABILITIES.md](CAPABILITIES.md), and `vp run docs:check` fails when that file is stale. A capability status moves only with a test that shows the new behavior.
+
 `vp run schema:generate` writes JSON Schema for the flow, the event, the run files, the capability matrix, and the service envelopes to `packages/protocol/schema/*.json` through `@valibot/to-json-schema`, and the files are committed. `tests/schema-drift.test.ts` fails when a schema changes without regenerating them. JSON Schema describes structure only: rules written as `v.check` (known interpolation namespaces, `nth` needs an index, the exit code matches the status) and the cross-step checks of `validateFlow` are enforced by the protocol code, not by the exported files. Only `src` must stay pure; `scripts/` and `tests/` use Node APIs to write and read those files.
 
 ## Website

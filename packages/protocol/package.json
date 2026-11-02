@@ -8,6 +8,7 @@
   },
   "scripts": {
     "build": "tsc",
+    "capabilities:generate": "node scripts/generate-capabilities.ts",
     "schema:generate": "node scripts/generate-schema.ts"
   },
   "dependencies": {

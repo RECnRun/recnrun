@@ -1,5 +1,5 @@
 import * as v from "valibot";
-import { IdSchema } from "./common.ts";
+import { IdSchema, NonEmptyStringSchema } from "./common.ts";
 import { SchemaVersionSchema } from "./version.ts";
 
 /** Shared by the capability matrix and each run's coverage.json. */
@@ -7,6 +7,8 @@ export const CAPABILITY_STATUSES = ["implemented", "partial", "unavailable", "pl
 
 /** The capture surfaces of source plan §10. */
 export const CAPTURE_SURFACES = [
+  "dom-events",
+  "navigation",
   "network",
   "websocket-sse",
   "console-errors",
@@ -19,32 +21,43 @@ export const CAPTURE_SURFACES = [
   "workers-frames",
 ] as const;
 
-export const PHASES = ["F0", "F1", "F2", "F3", "F4", "F4A", "F5", "F6", "F7"] as const;
+/** Capture levels of source plan §10. */
+export const CAPTURE_LEVELS = ["normal", "deep"] as const;
 
 export const CapabilityStatusSchema = v.picklist(CAPABILITY_STATUSES);
 export const CaptureSurfaceSchema = v.picklist(CAPTURE_SURFACES);
-export const PhaseSchema = v.picklist(PHASES);
+export const CaptureLevelSchema = v.picklist(CAPTURE_LEVELS);
+// The task of PLAN.md that changes the status next, such as `F3.4` or `F4A.1`.
+export const PhaseSchema = v.pipe(v.string(), v.regex(/^F\d[A]?\.\d+$/, "A phase is a task id."));
 
 const capabilityEntries = {
+  title: NonEmptyStringSchema,
   status: CapabilityStatusSchema,
-  // The phase of PLAN.md that changes this status next.
   phase: PhaseSchema,
-  notes: v.optional(v.string()),
+  // One sentence with the honest limit, or the test or task that proves an implemented entry.
+  notes: NonEmptyStringSchema,
 };
 
 /** One row of the matrix: a capture surface or a feature, with its status. */
 export const CapabilitySchema = v.variant("kind", [
-  v.strictObject({ kind: v.literal("surface"), id: CaptureSurfaceSchema, ...capabilityEntries }),
+  v.strictObject({
+    kind: v.literal("surface"),
+    id: IdSchema,
+    surface: CaptureSurfaceSchema,
+    level: CaptureLevelSchema,
+    ...capabilityEntries,
+  }),
   v.strictObject({ kind: v.literal("feature"), id: IdSchema, ...capabilityEntries }),
 ]);
 
-/** What this build can capture and do; F0.4 fills it, `capabilities.get` returns it. */
+/** What this build can capture and do: `CAPABILITY_MATRIX` is the value, and `capabilities.get` returns it. */
 export const CapabilityMatrixSchema = v.strictObject({
   schemaVersion: SchemaVersionSchema,
   capabilities: v.array(CapabilitySchema),
 });
 
 export type CapabilityStatus = v.InferOutput<typeof CapabilityStatusSchema>;
+export type CaptureLevel = v.InferOutput<typeof CaptureLevelSchema>;
 export type CaptureSurface = v.InferOutput<typeof CaptureSurfaceSchema>;
 export type Capability = v.InferOutput<typeof CapabilitySchema>;
 export type CapabilityMatrix = v.InferOutput<typeof CapabilityMatrixSchema>;
