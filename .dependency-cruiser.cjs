@@ -138,6 +138,34 @@ module.exports = {
       },
     },
     {
+      name: "ui-presentational",
+      severity: "error",
+      comment:
+        "apps/ui src/ui renders props only; it knows nothing about the api, features, or app.",
+      from: { path: "^apps/ui/src/ui/" },
+      to: { path: "^apps/ui/src/(api|features|app)/" },
+    },
+    {
+      name: "ui-api-headless",
+      severity: "error",
+      comment: "apps/ui src/api talks to the service and renders nothing of the screens.",
+      from: { path: "^apps/ui/src/api/" },
+      to: { path: "^apps/ui/src/(ui|features|app)/" },
+    },
+    {
+      name: "ui-features-isolated",
+      severity: "error",
+      comment: "Screens do not import each other; src/app routes between them.",
+      from: { path: "^apps/ui/src/features/([^/]+)/" },
+      to: { path: "^apps/ui/src/features/([^/]+)/", pathNot: "^apps/ui/src/features/$1/" },
+    },
+    {
+      name: "ui-app-is-top",
+      severity: "error",
+      from: { path: "^apps/ui/src/(ui|api|features)/" },
+      to: { path: "^apps/ui/src/(app/|main\\.tsx$)" },
+    },
+    {
       name: "fixture-isolated",
       severity: "error",
       comment: "The fixture stands in for any web app under test; it shares no workspace code.",

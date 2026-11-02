@@ -1,0 +1,243 @@
+/* Hex values live only in this palette; rules use semantic tokens (docs/BRAND.md). */
+:root {
+  color-scheme: light dark;
+  --brand-green: #1f883d;
+  --brand-green-dim: #238636;
+  --brand-red: #c62a21;
+  --brand-coral: #ff5c5f;
+  --brand-ink: #1c1d21;
+  --brand-paper: #f6f7f9;
+  --gray-0: #ffffff;
+  --gray-50: #e9eaee;
+  --gray-200: #dfe2e8;
+  --gray-300: #a1a6b3;
+  --gray-600: #5d6270;
+  --gray-800: #2c2e37;
+  --gray-900: #1b1c22;
+  --gray-950: #111216;
+
+  --surface: var(--brand-paper);
+  --card: var(--gray-0);
+  --border: var(--gray-200);
+  --text: var(--brand-ink);
+  --muted: var(--gray-600);
+  --accent: var(--brand-green);
+  --accent-text: var(--gray-0);
+  --link: var(--brand-red);
+  --success: var(--brand-green);
+  --danger: var(--brand-red);
+  --radius: 0.75rem;
+  --space: 1rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --surface: var(--gray-950);
+    --card: var(--gray-900);
+    --border: var(--gray-800);
+    --text: var(--gray-50);
+    --muted: var(--gray-300);
+    --accent: var(--brand-green-dim);
+    --accent-text: var(--gray-0);
+    --link: var(--brand-coral);
+    --success: var(--gray-50);
+    --danger: var(--brand-coral);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+a {
+  color: var(--link);
+}
+
+:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+}
+
+.app-header,
+main {
+  max-width: 64rem;
+  margin: 0 auto;
+  padding: var(--space);
+}
+
+.app-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space);
+}
+
+.app-header nav {
+  display: flex;
+  gap: var(--space);
+}
+
+.app-header a[aria-current="page"] {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.stack {
+  display: grid;
+  gap: var(--space);
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space);
+}
+
+.card + .card {
+  margin-top: var(--space);
+}
+
+.card-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(var(--space) / 2);
+}
+
+.card-header h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.actions,
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: calc(var(--space) / 2);
+}
+
+.button {
+  font: inherit;
+  border-radius: calc(var(--radius) / 2);
+  padding: 0.375rem 0.875rem;
+  cursor: pointer;
+}
+
+.button-primary {
+  background: var(--accent);
+  color: var(--accent-text);
+  border: none;
+}
+
+.button-secondary {
+  background: var(--card);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.button[aria-pressed="true"] {
+  background: var(--text);
+  color: var(--card);
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.badge {
+  display: inline-block;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  padding: 0 0.5rem;
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+
+.badge-success {
+  color: var(--success);
+}
+
+.badge-danger {
+  color: var(--danger);
+}
+
+.field {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.field-label {
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+
+.field input,
+.field select,
+.field textarea {
+  font: inherit;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) / 2);
+  padding: 0.25rem 0.5rem;
+}
+
+.list {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: calc(var(--space) / 2);
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.25rem var(--space);
+}
+
+.facts dd {
+  margin: 0;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table th,
+.table td {
+  text-align: left;
+  padding: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.muted,
+.empty {
+  color: var(--muted);
+}
+
+.error {
+  color: var(--danger);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

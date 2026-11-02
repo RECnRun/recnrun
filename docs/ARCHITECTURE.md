@@ -162,6 +162,28 @@ src/main.tsx ─► src/app ─► src/features/<name> ─► src/ui
 - `src/main.tsx`: imports the stylesheets and calls `mount`. Nothing imports it.
 - The website imports no workspace package other than `@recnrun/brand` (`website-only-brand`): it ships no engine, protocol, or UI code.
 
+## UI
+
+`apps/ui` (`@recnrun/ui`) is the Preact SPA the service serves on localhost (F2.6). It mirrors the website's layers, with one more for the service client:
+
+```text
+src/main.tsx ─► src/app ─► src/features/<screen> ─► src/ui
+                                     │
+                                     └─────────► src/api
+```
+
+- `src/ui`: presentational primitives (button, badge, card, field, loading, empty and error states); props in, markup out (`ui-presentational`).
+- `src/api`: the service client; it renders no screen (`ui-api-headless`). `api.ts` reads the bearer token from `<meta name="recnrun-token">`, which the service injects into the page it serves, and builds an `Api` of `call` and `on`. `http.ts` sends each command as a `POST /api` request envelope with `Authorization: Bearer <token>` and validates params before sending and the response envelope and result after; a failure is an `ApiError` with the service's error code, or `unreachable` or `invalid-response`. `events.ts` listens on `/ws?token=<token>`, sends `events.subscribe` on open, delivers the push messages `session.event`, `picker.picked`, `run.step`, and `run.finished` after validating them, drops anything else, and reconnects with backoff. `context.tsx` provides the `Api` to screens (`ApiProvider`, `useApi`, `useLoad`), so component tests pass a fake.
+- Validation uses the protocol's schemas through [Standard Schema](https://standardschema.dev) (`schema["~standard"].validate`), so the UI never imports Valibot (`ui-only-protocol`). `commands.ts` adds the commands and pushes the service gains in F2.6 as a typed facade built from protocol shapes, until the protocol lists them.
+- `src/features/<screen>`: one screen each; screens never import each other (`ui-features-isolated`) and navigate through callbacks the app passes.
+- `src/app`: routing and composition (`ui-app-is-top`). The route lives in `location.hash` (`#/flows`, `#/setup`, …), so the service serves one page and needs no router.
+- `src/main.tsx`: imports the brand font and `app.css`, then calls `mount`. Without the token meta tag, the page tells the user to open the UI with `npx @recnrun/cli open`.
+
+Screens:
+
+- **Setup** (`#/setup`): `health`, `profiles.list`, and `capabilities.get`; whether Chrome is reachable, with the remedy and the guidance to enable remote debugging at `chrome://inspect/#remote-debugging`; each binding, stale when its endpoint differs from the Chrome found now; the service, protocol, and UI versions.
+- **Catalog** (`#/flows`, the default): `flow.list` rows (name, status, revision, update time); opens a flow in the editor or starts a new recording.
+
 ## Fixture application
 
 `apps/fixture` (`@recnrun/fixture`) is the web application the browser tests drive. It stands in for any application under test, so it shares no workspace code (`fixture-isolated`). `src/` is a Node HTTP server on built-ins only: `createFixtureServer({ port, secondPort })` returns `start()`, `stop()`, and `urls`, and `src/bin.ts` runs it. `public/` holds the pages and their plain ES module scripts.
