@@ -15,5 +15,9 @@
     "apps/cli": {
       "entry": ["src/bin.ts"],
     },
+    // The page scripts and service worker the browser loads from public/.
+    "apps/fixture": {
+      "entry": ["public/index.js", "public/routes/*.js", "public/sw.js"],
+    },
   },
 }

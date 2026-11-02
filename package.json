@@ -7,6 +7,7 @@
     "ready": "vp run verify",
     "dev": "vp run dev:website",
     "dev:website": "vp run website#dev",
+    "dev:fixture": "vp run @recnrun/fixture#start",
     "clean": "node scripts/clean.mjs",
     "logo": "node scripts/favicon.mjs && node scripts/logo-png.mjs",
     "test:unit": "node scripts/test-container.mjs test:unit:local",

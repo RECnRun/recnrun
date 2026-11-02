@@ -13,4 +13,13 @@ export default defineConfig({
     headless: false,
     trace: "retain-on-failure",
   },
+  webServer: [
+    {
+      // tests/browser/fixtures/fixture-app.ts expects these two ports.
+      command: "vp run @recnrun/fixture#start",
+      url: "http://127.0.0.1:4600/",
+      reuseExistingServer: !process.env.CI,
+      timeout: 60_000,
+    },
+  ],
 });

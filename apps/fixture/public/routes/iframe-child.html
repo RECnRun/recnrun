@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Iframe child · RECnRun fixture</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="/fixture.css" />
+    <script type="module" src="/routes/iframe-child.js"></script>
+  </head>
+  <body>
+    <header>
+      <h1>Iframe child</h1>
+      <a href="/" data-testid="home">All routes</a>
+    </header>
+    <main>
+      <p>Origin: <output data-testid="origin"></output></p>
+      <button type="button" data-testid="child-button">Child button</button>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Network · RECnRun fixture</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="/fixture.css" />
+    <script type="module" src="/routes/network.js"></script>
+  </head>
+  <body>
+    <header>
+      <h1>Network</h1>
+      <a href="/" data-testid="home">All routes</a>
+    </header>
+    <main>
+      <p>
+        <button type="button" data-testid="fetch-json">Fetch JSON</button>
+        <output class="result" data-testid="result-json"></output>
+      </p>
+      <p>
+        <button type="button" data-testid="fetch-binary">Fetch a PNG</button>
+        <output class="result" data-testid="result-binary"></output>
+      </p>
+      <p>
+        <button type="button" data-testid="fetch-error">Fetch a 500</button>
+        <output class="result" data-testid="result-error"></output>
+      </p>
+      <p>
+        <button type="button" data-testid="fetch-redirect">Follow a redirect chain</button>
+        <output class="result" data-testid="result-redirect"></output>
+      </p>
+      <p>
+        <button type="button" data-testid="fetch-stream">Read a slow stream</button>
+        <output class="result" data-testid="result-stream"></output>
+      </p>
+      <p>
+        <button type="button" data-testid="fetch-websocket">Echo over WebSocket</button>
+        <output class="result" data-testid="result-websocket"></output>
+      </p>
+    </main>
+  </body>
+</html>

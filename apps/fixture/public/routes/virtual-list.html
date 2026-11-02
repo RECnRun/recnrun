@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Virtual list · RECnRun fixture</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="/fixture.css" />
+    <script type="module" src="/routes/virtual-list.js"></script>
+  </head>
+  <body>
+    <header>
+      <h1>Virtual list</h1>
+      <a href="/" data-testid="home">All routes</a>
+    </header>
+    <main>
+      <div
+        class="virtual-list"
+        data-testid="list"
+        role="list"
+        aria-label="Rows"
+        data-total="10000"
+        tabindex="0"
+      >
+        <div class="virtual-spacer" data-testid="spacer"></div>
+      </div>
+      <output data-testid="selected">Nothing selected</output>
+    </main>
+  </body>
+</html>

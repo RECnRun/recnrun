@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Submit and redirect · RECnRun fixture</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="/fixture.css" />
+    <script type="module" src="/routes/submit-redirect.js"></script>
+  </head>
+  <body>
+    <header>
+      <h1>Submit and redirect</h1>
+      <a href="/" data-testid="home">All routes</a>
+    </header>
+    <main>
+      <form method="post" action="/api/submit" data-testid="form" aria-label="Send a name">
+        <label>Name <input name="name" data-testid="name" autocomplete="off" /></label>
+        <button type="submit" data-testid="send">Send</button>
+      </form>
+    </main>
+  </body>
+</html>

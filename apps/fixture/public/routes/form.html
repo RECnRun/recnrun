@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Form · RECnRun fixture</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="/fixture.css" />
+    <script type="module" src="/routes/form.js"></script>
+  </head>
+  <body>
+    <header>
+      <h1>Form</h1>
+      <a href="/" data-testid="home">All routes</a>
+    </header>
+    <main>
+      <form data-testid="form" aria-label="Profile">
+        <label>Name <input name="name" data-testid="name" autocomplete="off" /></label>
+        <label
+          >Plan
+          <select name="plan" data-testid="plan">
+            <option value="free">Free</option>
+            <option value="pro">Pro</option>
+            <option value="team">Team</option>
+          </select>
+        </label>
+        <label><input type="checkbox" name="terms" data-testid="terms" /> Accept the terms</label>
+        <fieldset>
+          <legend>Contact by</legend>
+          <label
+            ><input type="radio" name="contact" value="email" data-testid="contact-email" />
+            Email</label
+          >
+          <label
+            ><input type="radio" name="contact" value="phone" data-testid="contact-phone" />
+            Phone</label
+          >
+        </fieldset>
+        <label>Attachment <input type="file" name="attachment" data-testid="attachment" /></label>
+        <button type="submit" data-testid="submit">Submit</button>
+      </form>
+      <p role="status" data-testid="status"></p>
+    </main>
+  </body>
+</html>

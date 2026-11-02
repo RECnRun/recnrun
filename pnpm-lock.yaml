@@ -281,6 +281,9 @@ importers:
 
   apps/fixture:
     devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.19.2
       typescript:
         specifier: 'catalog:'
         version: 7.0.2

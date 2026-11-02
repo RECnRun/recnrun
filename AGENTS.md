@@ -35,6 +35,7 @@ Vite+ (`vp`) is the only toolchain. `vp <name>` runs a built-in command and `vp 
 | ----------------------------------------------------------------- | ----------------------------------------------------------------------------- |
 | `vp install`                                                      | After pulling, before starting work                                           |
 | `vp run dev` (alias of `vp run dev:website`)                      | Website dev server on port 5173                                               |
+| `vp run dev:fixture`                                              | Fixture application on ports 4600 and 4601, the browser tests' target         |
 | `vp run clean`                                                    | Delete builds, artifacts, and caches                                          |
 | `vp check` (`--fix` to format)                                    | Format (Oxfmt), lint (Oxlint), and type check while editing                   |
 | `vp run deps`                                                     | Architecture boundaries (dependency-cruiser)                                  |

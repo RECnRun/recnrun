@@ -27,7 +27,7 @@ apps/fixture: the controllable test application; nothing imports it
 | `apps/service`         | The loopback HTTP and WebSocket API, locks, lifecycle, logs, the MCP stdio adapter; serves the built UI                                    | `engine`, `adapter`, `persistence`, `protocol`                  | F0.2  |
 | `apps/ui`              | The Preact SPA on localhost: catalog, recorder, editor, run, diagnostics                                                                   | `protocol`, `brand`, `preact`                                   | F0.2  |
 | `apps/cli`             | `setup`, `open`, `run`, `doctor`, `agents setup`, `mcp`; published as `@recnrun/cli`                                                       | `service`                                                       | F0.2  |
-| `apps/fixture`         | The deliberately controllable test application                                                                                             | nothing from the workspace                                      | F0.2  |
+| `apps/fixture`         | The controllable test application: pages on two ports, `?fail=<case>`, `window.__fixture` ([below](#fixture-application))                  | nothing from the workspace; `node:` builtins                    | F0.2  |
 | `apps/website`         | The public landing at recnrun.com and the install guide                                                                                    | `brand`                                                         | M0    |
 
 - The engine never imports Playwright or CDP types. It defines the adapter interface (`BrowserAdapter`); `packages/adapter` imports that interface from `engine` and implements it, and `engine` never imports the adapter. The service wires the two together, so unit tests use a fake adapter and browser tests use the real one.
@@ -86,6 +86,17 @@ src/main.tsx ─► src/app ─► src/features/<name> ─► src/ui
 - `src/app`: composition of the page; `mount.tsx` renders it into the page's root element.
 - `src/main.tsx`: imports the stylesheets and calls `mount`. Nothing imports it.
 - The website imports no workspace package other than `@recnrun/brand` (`website-only-brand`): it ships no engine, protocol, or UI code.
+
+## Fixture application
+
+`apps/fixture` (`@recnrun/fixture`) is the web application the browser tests drive. It stands in for any application under test, so it shares no workspace code (`fixture-isolated`). `src/` is a Node HTTP server on built-ins only: `createFixtureServer({ port, secondPort })` returns `start()`, `stop()`, and `urls`, and `src/bin.ts` runs it. `public/` holds the pages and their plain ES module scripts.
+
+- **Two origins.** It listens on `127.0.0.1` only, on port 4600 (`http://127.0.0.1:4600`) and port 4601, which pages address as `http://localhost:4601`. The other host name makes the second origin cross-site, so Chrome renders the `iframe` route's second child out of process. `RECNRUN_FIXTURE_PORT` and `RECNRUN_FIXTURE_SECOND_PORT` change the ports. `vp run dev:fixture` starts it by hand; `playwright.browser.config.ts` starts it for `vp run test:browser`.
+- **Routes.** `/` lists every page as a link with `data-testid="route-<name>"`. Each page is `/routes/<name>`: `form`, `debounce`, `spa`, `submit-redirect` (lands on `submit-result`), `iframe` (embeds `iframe-child`), `popup` (opens `popup-child`), `virtual-list`, `ime`, `indexeddb`, `service-worker` (registers `/sw.js`), `network`, `console`, `download`, `dialogs`, and `storage`. `src/routes.ts` is the list.
+- **API.** `/api/json`, `/api/binary` (a PNG), `/api/error` (500), `/api/redirect/<n>` (a 302 chain down to `/api/json`), `/api/stream` (10 chunks over 3 s), `/api/download` (an attachment), `/api/submit` (form POST answered 303), `/api/cacheable` (what the service worker caches), `/api/config` (both origins), and the WebSocket echo `/ws/echo`.
+- **Page contract.** Every control has a stable `data-testid` and an accessible name; `public/fixture.js` checks both, runs the page's own self-test, and only then sets `window.__fixture = { route, ready: true, counters, fail, loadId }`. `counters` counts handler runs (a button's clicks, the debounced handler, IndexedDB commits), so a test can prove an action ran exactly once; `loadId` changes only on a real reload.
+- **`?fail=<case>`.** Injects a defect on demand: `status` changes the form's status text, `api-500` makes `/api/json` answer 500, `slow` spaces the stream's chunks 1.5 s apart, and `throw` raises an uncaught error after the self-test.
+- **Safety.** Files are served from `public/` only: a path that decodes to a `..` segment, a backslash, or a NUL byte gets 400. Every answer sends `X-Content-Type-Options: nosniff` and `Cache-Control: no-store`. There is no Content Security Policy, because the fixture is a test target.
 
 ## Security model
 
