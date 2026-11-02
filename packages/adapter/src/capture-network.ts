@@ -25,6 +25,8 @@ interface Request {
   // `open` until the body is settled one way or another; a body is recorded at most once.
   body: "none" | "open" | "reading" | "done";
   timer?: ReturnType<typeof setTimeout>;
+  // Ends a body read that settled another way, so `settled()` never waits for a late reply.
+  abandon?: () => void;
 }
 
 // Bodies the page itself asked for; images, scripts, styles, and fonts are not requested.
@@ -196,7 +198,19 @@ export class NetworkCapture {
 
   private read(requestId: string, entry: Request): void {
     entry.body = "reading";
-    const work = this.session
+    const ms = this.session.bodyTimeoutMs;
+    clearTimeout(entry.timer);
+    entry.timer = setTimeout(() => {
+      if (entry.body !== "reading") return;
+      this.settle(entry, {
+        condition: "unavailable",
+        reason: `Chrome did not return the body within ${ms} ms.`,
+      });
+    }, ms);
+    const abandoned = new Promise<void>((resolve) => {
+      entry.abandon = resolve;
+    });
+    const reply = this.session
       .send("Network.getResponseBody", { requestId })
       .then(
         (result) => this.bodyFrom(result),
@@ -204,8 +218,8 @@ export class NetworkCapture {
       )
       .then((body) => {
         if (entry.body === "reading") this.settle(entry, body);
-        this.forget(requestId, entry);
       });
+    const work = Promise.race([reply, abandoned]).then(() => this.forget(requestId, entry));
     this.session.track(work);
   }
 
@@ -234,6 +248,7 @@ export class NetworkCapture {
   private settle(entry: Request, body: Partial<BodyPayload>): void {
     entry.body = "done";
     clearTimeout(entry.timer);
+    entry.abandon?.();
     const payload = {
       requestId: entry.requestId,
       url: entry.url,

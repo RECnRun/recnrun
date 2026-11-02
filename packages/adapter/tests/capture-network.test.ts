@@ -1,3 +1,4 @@
+import { MAX_INLINE_BODY_LENGTH } from "@recnrun/protocol";
 import { expect, test } from "vite-plus/test";
 import { capturing, type ReplyingChannel } from "./capture-harness.ts";
 
@@ -224,4 +225,78 @@ test("a response without its request, and stop or detach while loading, settle e
   ]);
   expect(channel.closed).toBe(true);
   await handle.settled();
+});
+
+// Fails instead of hanging when `settled()` never resolves.
+const within = (work: Promise<void>, ms: number) =>
+  Promise.race([
+    work,
+    new Promise<void>((_, reject) =>
+      setTimeout(() => reject(new Error(`settled() did not resolve within ${ms} ms`)), ms),
+    ),
+  ]);
+
+test("a body read Chrome never answers is unavailable at the deadline, once", async () => {
+  const { channel, handle, bodies } = await page({ bodyTimeoutMs: 20 });
+  channel.holding.add("Network.getResponseBody");
+  request(channel, "R1");
+  respond(channel, "R1");
+  finish(channel, "R1");
+  await within(handle.settled(), 1_000);
+  expect(bodies()).toEqual([
+    expect.objectContaining({
+      requestId: "R1",
+      condition: "unavailable",
+      reason: "Chrome did not return the body within 20 ms.",
+    }),
+  ]);
+  channel.held[0]?.({ body: "late", base64Encoded: false });
+  await within(handle.settled(), 1_000);
+  expect(bodies()).toHaveLength(1);
+});
+
+test("detach and stop settle a body read Chrome has not answered", async () => {
+  const { channel, handle, bodies } = await page();
+  channel.holding.add("Network.getResponseBody");
+  channel.attach("S2", { targetId: "T2", type: "iframe" });
+  for (const [sessionId, requestId] of [
+    ["S1", "R1"],
+    ["S2", "R2"],
+  ] as const) {
+    channel.emit(
+      "Network.requestWillBeSent",
+      { requestId, request: { url: API, method: "GET" }, type: "Fetch" },
+      sessionId,
+    );
+    channel.emit(
+      "Network.responseReceived",
+      { requestId, response: { url: API, status: 200, statusText: "", mimeType: "" } },
+      sessionId,
+    );
+    channel.emit("Network.loadingFinished", { requestId, encodedDataLength: 1 }, sessionId);
+  }
+  channel.emit("Target.detachedFromTarget", { sessionId: "S2" });
+  handle.stop();
+  await within(handle.settled(), 1_000);
+  for (const resolve of channel.held) resolve({ body: "late", base64Encoded: false });
+  await within(handle.settled(), 1_000);
+  expect(bodies()).toMatchObject([
+    { requestId: "R2", condition: "unavailable", reason: expect.stringMatching(/went away/) },
+    { requestId: "R1", condition: "unavailable", reason: expect.stringMatching(/stopped/) },
+  ]);
+});
+
+test("a maxBodyLength above the inline limit is clamped, so a long body is truncated", async () => {
+  const { channel, handle, bodies } = await page({ maxBodyLength: 100_000 });
+  channel.replies.set("Network.getResponseBody", {
+    body: "x".repeat(70_000),
+    base64Encoded: false,
+  });
+  request(channel, "R1");
+  respond(channel, "R1");
+  finish(channel, "R1");
+  await handle.settled();
+  expect(bodies()).toMatchObject([
+    { condition: "truncated", size: 70_000, body: "x".repeat(MAX_INLINE_BODY_LENGTH) },
+  ]);
 });

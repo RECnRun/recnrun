@@ -16,7 +16,7 @@ export interface CaptureOptions {
   onEvent: (event: CapturedEvent) => void;
   /** How long a response may keep loading before its body is recorded as unavailable. */
   bodyTimeoutMs?: number;
-  /** Bodies longer than this many characters are kept in part and marked truncated. */
+  /** Bodies longer than this many characters are kept in part and marked truncated; at most `MAX_INLINE_BODY_LENGTH`. */
   maxBodyLength?: number;
 }
 
@@ -141,7 +141,11 @@ export class Capture {
         emit: (draft, frameId) => this.emitter.emit(this.origin(record, frameId), draft),
         track: this.track,
         bodyTimeoutMs: this.options.bodyTimeoutMs ?? DEFAULT_BODY_TIMEOUT_MS,
-        maxBodyLength: this.options.maxBodyLength ?? MAX_INLINE_BODY_LENGTH,
+        // A longer inline body would fail the journal schema and be dropped instead of truncated.
+        maxBodyLength: Math.min(
+          this.options.maxBodyLength ?? MAX_INLINE_BODY_LENGTH,
+          MAX_INLINE_BODY_LENGTH,
+        ),
       });
       this.networks.set(record.sessionId, network);
     }

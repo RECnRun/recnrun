@@ -10,9 +10,13 @@ export const DOC = "0123456789abcdef0123456789abcdef";
 /** A fake channel whose replies can be scripted per method. */
 export class ReplyingChannel extends FakeChannel {
   readonly replies = new Map<string, unknown>();
+  /** Methods Chrome does not answer until a test calls the resolver `held` keeps. */
+  readonly holding = new Set<string>();
+  readonly held: ((reply: unknown) => void)[] = [];
 
   override send(method: string, params?: Record<string, unknown>, sessionId?: string) {
     const sent = super.send(method, params, sessionId);
+    if (this.holding.has(method)) return new Promise<unknown>((resolve) => this.held.push(resolve));
     return this.replies.has(method) ? sent.then(() => this.replies.get(method)) : sent;
   }
 
