@@ -14,3 +14,14 @@ export const planned = (
   phase,
   notes,
 });
+
+/** A feature a task delivered; `notes` names the test that proves it. */
+export const implemented = (
+  id: string,
+  phase: string,
+  title: string,
+  notes: string,
+): Extract<Capability, { kind: "feature" }> => ({
+  ...planned(id, phase, title, notes),
+  status: "implemented",
+});

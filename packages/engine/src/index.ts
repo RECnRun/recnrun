@@ -6,6 +6,7 @@ import {
   type ChromeChannel,
   type ConnectionSource,
   type DiscoveryResult,
+  type ProfileDescription,
   type ReconnectResult,
 } from "@recnrun/protocol";
 
@@ -21,6 +22,8 @@ export interface BrowserAdapter {
   disconnect(): Promise<void>;
   /** Subscribes to `connection.lost` and `control.contested`; returns the unsubscribe function. */
   onEvent(listener: (event: AdapterEvent) => void): () => void;
+  /** The profile behind the connection: its folder, the browser contexts seen, and Chrome's version. */
+  describeProfile(): Promise<ProfileDescription>;
 }
 
 export interface Engine {
@@ -37,3 +40,11 @@ export function createEngine(adapter: BrowserAdapter): Engine {
     disconnect: () => adapter.disconnect(),
   };
 }
+
+export {
+  classifyBinding,
+  detectDuplicateBinding,
+  resolveActorBindings,
+  type ActorResolution,
+  type BindingConflict,
+} from "./bindings.ts";

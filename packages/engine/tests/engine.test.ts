@@ -20,6 +20,7 @@ function fakeAdapter() {
     reconnect: () => Promise.resolve({ ok: false, code: "endpoint-gone", remedy: "unused" }),
     disconnect: async () => void calls.push("disconnect"),
     onEvent: () => () => undefined,
+    describeProfile: () => Promise.reject(new Error("unused")),
   };
   return { adapter, calls };
 }

@@ -4,11 +4,13 @@ import type {
   CdpTarget,
   ConnectionSource,
   DiscoveryResult,
+  ProfileDescription,
 } from "@recnrun/protocol";
 import type { CdpLink, CdpTransport } from "./cdp-link.ts";
 import { discover, type DiscoverOptions } from "./discovery.ts";
 import { parseTargets, readHandshake } from "./handshake.ts";
 import { playwrightTransport } from "./playwright-transport.ts";
+import { describeProfile } from "./profile.ts";
 
 export type ReconnectOutcome =
   | { ok: true; connection: CdpConnection }
@@ -29,6 +31,7 @@ export interface CdpConnection {
   listTargets(): Promise<CdpTarget[]>;
   disconnect(): Promise<void>;
   reconnect(source?: ConnectionSource): Promise<ReconnectOutcome>;
+  describeProfile(): Promise<ProfileDescription>;
 }
 
 type EventBody = AdapterEvent extends infer E
@@ -129,6 +132,7 @@ async function open(
       if (!state.lost) await disconnect();
       return reconnectThrough(options, source, sequence);
     },
+    describeProfile: () => describeProfile(link, handshake, options.source),
   };
 }
 

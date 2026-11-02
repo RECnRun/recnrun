@@ -15,3 +15,4 @@ export * from "./states.ts";
 export * from "./steps.ts";
 export * from "./validate.ts";
 export * from "./version.ts";
+export * from "./bindings.ts";

@@ -1,0 +1,60 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "properties": {
+    "bindings": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "browserContextIds": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "chrome": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "lastSeenAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "name": {
+            "pattern": "^\\S(?:.{0,78}\\S)?$",
+            "type": "string"
+          },
+          "userDataDir": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "wsEndpoint": {
+            "pattern": "^ws:\\/\\/127\\.0\\.0\\.1:\\d+\\/devtools\\/browser\\/",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "userDataDir",
+          "browserContextIds",
+          "chrome",
+          "wsEndpoint",
+          "createdAt",
+          "lastSeenAt"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "schemaVersion": {
+      "const": 1
+    }
+  },
+  "required": ["schemaVersion", "bindings"],
+  "type": "object"
+}

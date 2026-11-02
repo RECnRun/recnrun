@@ -82,6 +82,7 @@ test.each([
   ["cdp-connection", "implemented", "tests/browser/connect.spec.ts"],
   ["connection-loss-reconnect", "implemented", "tests/browser/connect.spec.ts"],
   ["contested-control", "partial", "tests/browser/connect.spec.ts"],
+  ["profile-bindings", "implemented", "tests/browser/profiles.spec.ts"],
 ])("the F1 deliverable %s is %s and names %s", (id, status, spec) => {
   const entry = entries.find((candidate) => candidate.id === id);
   expect(entry?.status, id).toBe(status);

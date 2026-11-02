@@ -37,5 +37,6 @@ export function createCdpAdapter(deps: AdapterDependencies = {}): BrowserAdapter
       listeners.add(listener);
       return () => listeners.delete(listener);
     },
+    describeProfile: async () => connected().describeProfile(),
   };
 }

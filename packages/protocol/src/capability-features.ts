@@ -1,6 +1,6 @@
 import type { Capability } from "./capabilities.ts";
 
-import { planned } from "./capability-planned.ts";
+import { implemented, planned } from "./capability-planned.ts";
 
 type Feature = Extract<Capability, { kind: "feature" }>;
 
@@ -93,11 +93,11 @@ export const FEATURE_CAPABILITIES: Feature[] = [
     notes:
       "F1.2; tests/browser/connect.spec.ts. control.contested is reported for a page another client attached before RECnRun connected or reconnected, and that client is never detached. CDP exposes only a per-target attached flag and no event once RECnRun is attached, so DevTools opened later goes unnoticed (M-F1.d).",
   },
-  planned(
+  implemented(
     "profile-bindings",
     "F1.3",
     "Profiles as bindings",
-    "Bindings stay outside flow packages in ~/.recnrun/bindings.json.",
+    "Delivered by F1.3 for two Chrome instances; tests/browser/profiles.spec.ts on Linux in Docker. Storage stays in its binding, each actor runs on its binding, a restart is reported stale, never remapped. Bindings live in ~/.recnrun/bindings.json, never in a flow. Two profiles in one Chrome stay manual (M-F1.c).",
   ),
   planned(
     "instrumentation-order",

@@ -3,6 +3,7 @@ import { format } from "oxfmt";
 import type * as v from "valibot";
 import {
   AdapterEventSchema,
+  BindingsFileSchema,
   BrowserHandshakeSchema,
   CapabilityMatrixSchema,
   DiscoveryResultSchema,
@@ -24,6 +25,7 @@ type AnySchema = v.GenericSchema;
 /** Every top-level document of the protocol, by the file name its JSON Schema is written to. */
 const DOCUMENTS: Record<string, AnySchema> = {
   "adapter-event": AdapterEventSchema,
+  "bindings-file": BindingsFileSchema,
   "browser-handshake": BrowserHandshakeSchema,
   "capability-matrix": CapabilityMatrixSchema,
   "discovery-result": DiscoveryResultSchema,
