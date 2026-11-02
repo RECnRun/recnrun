@@ -1,0 +1,51 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "properties": {
+    "args": {
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "number"
+          },
+          {
+            "type": "boolean"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "propertyNames": {
+        "pattern": "^[A-Za-z_]\\w*$",
+        "type": "string"
+      },
+      "type": "object"
+    },
+    "cardinality": {
+      "enum": ["one", "many", "optional", "nth"],
+      "type": "string"
+    },
+    "frameId": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "index": {
+      "minimum": 0,
+      "type": "integer"
+    },
+    "source": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "timeoutMs": {
+      "minimum": 1,
+      "type": "integer"
+    }
+  },
+  "required": ["source", "cardinality", "timeoutMs"],
+  "type": "object"
+}

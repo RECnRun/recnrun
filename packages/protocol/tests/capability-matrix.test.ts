@@ -93,6 +93,7 @@ test.each([
   ["console-normal", "implemented", "tests/browser/capture.spec.ts"],
   ["frames-targets-normal", "partial", "tests/browser/capture.spec.ts"],
   ["replay-spike", "implemented", "tests/browser/replay-spike.spec.ts"],
+  ["custom-locator-path", "implemented", "tests/browser/function-locator.spec.ts"],
 ])("the F1 deliverable %s is %s and names %s", (id, status, spec) => {
   const entry = entries.find((candidate) => candidate.id === id);
   expect(entry?.status, id).toBe(status);

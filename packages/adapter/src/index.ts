@@ -16,3 +16,9 @@ export {
 } from "./instrumentation.ts";
 export type { CdpChannel, CdpEvent } from "./cdp-socket.ts";
 export type { CaptureOptions } from "./capture.ts";
+export {
+  resolveFunctionLocator,
+  type FunctionLocatorOptions,
+  type FunctionLocatorResolution,
+  type LocatorTarget,
+} from "./function-locator.ts";

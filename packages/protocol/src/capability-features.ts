@@ -114,11 +114,11 @@ export const FEATURE_CAPABILITIES: Feature[] = [
     "Replay spike",
     "Delivered by F1.6; tests/browser/replay-spike.spec.ts on Linux in Docker: the adapted source §9 example runs navigate, fill, click, extractText, and textEquals through the CDP adapter with trusted input events only; ?fail=status fails exactly the assertion, with the observed text. The full executor is F2.5.",
   ),
-  planned(
+  implemented(
     "custom-locator-path",
     "F1.7",
     "Custom locator function path",
-    "Synchronous infinite loops are cut with Runtime.terminateExecution and the outcome is recorded.",
+    "Delivered by F1.7; tests/browser/function-locator.spec.ts on Linux in Docker. The function runs in an isolated world, its elements become references qualified by target, frame, and loader id, and cardinality picks from them. A synchronous infinite loop is cut with Runtime.terminateExecution on the same session, and the tab answered Runtime.evaluate afterwards without being closed; the result records blocked, terminated, and tabResponsive.",
   ),
   planned(
     "service",

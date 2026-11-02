@@ -19,3 +19,4 @@ export * from "./bindings.ts";
 export * from "./instrumentation.ts";
 export * from "./capture.ts";
 export * from "./journal.ts";
+export * from "./function-locator.ts";
