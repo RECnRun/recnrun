@@ -1,0 +1,7 @@
+schemaVersion: 1
+id: unknown-namespace
+name: A value interpolates a namespace outside the grammar
+steps:
+  - id: abrir
+    action: navigate
+    url: "${process.env.HOME}/pedidos"

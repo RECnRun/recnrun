@@ -1,121 +1,133 @@
 # Architecture
 
-[PRODUCT_BRIEF.md](PRODUCT_BRIEF.md) describes what the product does. This document fixes how the code is split and which way dependencies point. `.dependency-cruiser.cjs` enforces every boundary below (`vp run deps`); change both together.
+[PRODUCT_BRIEF.md](PRODUCT_BRIEF.md) describes what the product does. This document fixes how the code is split and which way dependencies point. `.dependency-cruiser.cjs` enforces every boundary below (`vp run deps`); change both together. The decisions behind it are [ADR 0001](adr/0001-local-service-over-cdp.md) and [ADR 0002](adr/0002-retire-extension-and-bridge.md).
+
+## Target layout
+
+The layout of [PLAN.md §4](plan/PLAN.md#4-target-layout). Workspaces stay `apps/*` and `packages/*`; arrows are allowed imports.
 
 ```text
-apps/website ──► @recnrun/bridge ──► @recnrun/domain ──► valibot
-apps/extension ─┘                    ▲
-        └────────────────────────────┘
-
-apps/website, apps/extension ──► @recnrun/brand (CSS and fonts)
+apps/cli ──► apps/service ──► packages/engine ──► packages/protocol ──► valibot
+   │              │              │    ▲
+   │              │              ▼    │
+   │              ├──► packages/adapter ──► playwright-core, CDP
+   │              └──► packages/persistence ──► node:sqlite, node:fs
+apps/ui ──► packages/protocol (types and schemas only), @recnrun/brand
+apps/website ──► @recnrun/brand (landing and install guide; no engine code)
+apps/fixture: the controllable test application; nothing imports it
 ```
 
-## Packages
+| Workspace              | Holds                                                                                                                                      | May import                                                      | Since |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------- | ----- |
+| `packages/protocol`    | Versioned schemas: flow DSL, locator lists, event envelope, run manifest, summary and coverage, capability matrix, service API, MCP shapes | `valibot`                                                       | F0.2  |
+| `packages/engine`      | Sessions, leases, steps, locator resolution, recorder normalization, function registry, macro runtime                                      | `protocol`                                                      | F0.2  |
+| `packages/adapter`     | Chrome discovery, the CDP connection, targets and frames, actions, instrumentation hooks, element references                               | `engine` (the adapter interface), `protocol`, `playwright-core` | F0.2  |
+| `packages/persistence` | Flow folders, revisions, the JSONL journal, blobs by hash, the SQLite index, export and import                                             | `protocol`, `node:` builtins                                    | F0.2  |
+| `packages/brand`       | The Mona Sans font and the stylesheet every app imports                                                                                    | nothing                                                         | M0    |
+| `apps/service`         | The loopback HTTP and WebSocket API, locks, lifecycle, logs, the MCP stdio adapter; serves the built UI                                    | `engine`, `adapter`, `persistence`, `protocol`                  | F0.2  |
+| `apps/ui`              | The Preact SPA on localhost: catalog, recorder, editor, run, diagnostics                                                                   | `protocol`, `brand`, `preact`                                   | F0.2  |
+| `apps/cli`             | `setup`, `open`, `run`, `doctor`, `agents setup`, `mcp`; published as `@recnrun/cli`                                                       | `service`                                                       | F0.2  |
+| `apps/fixture`         | The controllable test application: pages on two ports, `?fail=<case>`, `window.__fixture` ([below](#fixture-application))                  | nothing from the workspace; `node:` builtins                    | F0.2  |
+| `apps/website`         | The public landing at recnrun.com and the install guide                                                                                    | `brand`                                                         | M0    |
 
-| Package           | Holds                                                                                                         | May import                        |
-| ----------------- | ------------------------------------------------------------------------------------------------------------- | --------------------------------- |
-| `packages/domain` | Valibot schemas and inferred types for every concept; `Snapshot`, the versioned document the extension stores | `valibot` only                    |
-| `packages/bridge` | The website ↔ content script protocol, its client, host, and `window` transport                               | `@recnrun/domain`, `valibot`      |
-| `packages/brand`  | Brand assets both apps style themselves with: Mona Sans and the stylesheet that loads it                      | nothing                           |
-| `apps/website`    | The Preact SPA                                                                                                | all packages; never the extension |
-| `apps/extension`  | The WXT extension                                                                                             | all packages; never the website   |
-
-- Packages never import apps. Apps never import each other: they meet only at the bridge protocol.
-- Packages export their TypeScript sources (`exports` → `./src/index.ts`); apps bundle them. A package `build` only type checks.
-- `@recnrun/brand` holds no code: it exports `mona-sans.css`, which each app's entry imports, so the font and its license exist once instead of once per app. It imports nothing (`brand-is-leaf`).
-- `@recnrun/domain/testing` exports fixtures for tests; no `src/` file imports a test file.
+- The engine never imports Playwright or CDP types. It defines the adapter interface (`BrowserAdapter`); `packages/adapter` imports that interface from `engine` and implements it, and `engine` never imports the adapter. The service wires the two together, so unit tests use a fake adapter and browser tests use the real one.
+- Packages never import apps. Apps meet through `packages/protocol` and the service API; the only app that imports another is `apps/cli`, which starts `apps/service`.
+- Packages export their TypeScript sources (`exports` → `./src/index.ts`); apps bundle them. A package `build` only type checks, and so do the Node apps (`service`, `cli`, `fixture`) until F7 bundles the CLI; `apps/ui` builds with Vite.
+- `@recnrun/brand` holds no code: it exports `mona-sans.css`, which each app's entry imports, so the font and its license exist once. It imports nothing (`brand-is-leaf`).
 - Every module is reachable from an entrypoint, a test, or a config (`no-orphans`), and there are no import cycles (`no-circular`).
+
+Each workspace has one dependency-cruiser rule that lists what its `src` may import; anything else is a violation:
+
+| Rule                         | From                   | Allowed targets                                                |
+| ---------------------------- | ---------------------- | -------------------------------------------------------------- |
+| `protocol-pure`              | `packages/protocol`    | itself, `valibot`                                              |
+| `engine-not-to-adapter-impl` | `packages/engine`      | itself, `protocol` (no adapter, Playwright, CDP, or Node APIs) |
+| `adapter-boundaries`         | `packages/adapter`     | itself, `engine`, `protocol`, `playwright-core`                |
+| `persistence-boundaries`     | `packages/persistence` | itself, `protocol`, `node:` builtins                           |
+| `service-boundaries`         | `apps/service`         | itself, `engine`, `adapter`, `persistence`, `protocol`         |
+| `cli-only-service`           | `apps/cli`             | itself, `apps/service`                                         |
+| `ui-only-protocol`           | `apps/ui`              | itself, `protocol`, `brand`, `preact`                          |
+| `fixture-isolated`           | `apps/fixture`         | nothing from `apps/` or `packages/`                            |
+| `website-only-brand`         | `apps/website`         | `brand` among the workspace packages                           |
+
+A later task that needs a new import (for example `node:http` in the service) widens that workspace's rule and this table in the same change, with the reason. `src/main.tsx` and `src/bin.ts` of any app are entrypoints that nothing imports (`not-to-entrypoints`).
+
+## Protocol
+
+`packages/protocol/src` holds one module per concept; `index.ts` re-exports them.
+
+| Module                                             | Shapes                                                                                                           |
+| -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `flow.ts`, `steps.ts`, `actions.ts`, `locators.ts` | The flow DSL: actors, inputs, requirements, preconditions, action, assertion, and builtin steps, targets         |
+| `interpolation.ts`                                 | `${env.*}`, `${inputs.*}`, `${vars.*}`, `${locals.*}`, and `${secrets.*}`; any other namespace is rejected       |
+| `validate.ts`                                      | `validateFlow(input)`: the schema plus the cross-step checks, as `{ ok: true, flow }` or `{ ok: false, issues }` |
+| `events.ts`                                        | The event envelope of the journal (source plan §11) and the gap record                                           |
+| `run.ts`                                           | `manifest.json`, `steps.json`, `coverage.json`, and `summary.json` of a run, with the exit code of each status   |
+| `states.ts`                                        | Session, control, and step states and their legal transitions (source plan §6)                                   |
+| `capabilities.ts`                                  | Capture surfaces, statuses, and the capability matrix                                                            |
+| `api.ts`, `api-commands.ts`                        | The request and response envelopes, error codes, and the params and result of every command (`SERVICE_COMMANDS`) |
+
+The `if` block names its branches `steps` and `otherwise`, never `then`/`else`: an object with a `then` property is a thenable, so `await` or `return` in async code would treat a parsed step as a promise. The source plan's §9.3 example is adapted that way, with a comment in its fixture.
+
+Each issue of `validateFlow` has a `code` (`unknown-action`, `unknown-namespace`, `duplicate-step-id`, `missing-input`, `cyclic-variable`, `nth-without-index`, and others in `FLOW_ISSUE_CODES`) and the `path` of the offending key from the flow's root.
+
+The capability matrix lives in code (`capability-matrix.ts`, fed by `capability-surfaces.ts`, `capability-features.ts`, and `capability-roadmap.ts`). `vp run capabilities:generate` renders it to [CAPABILITIES.md](CAPABILITIES.md), and `vp run docs:check` fails when that file is stale. A capability status moves only with a test that shows the new behavior.
+
+`vp run schema:generate` writes JSON Schema for the flow, the event, the run files, the capability matrix, and the service envelopes to `packages/protocol/schema/*.json` through `@valibot/to-json-schema`, and the files are committed. `tests/schema-drift.test.ts` fails when a schema changes without regenerating them. JSON Schema describes structure only: rules written as `v.check` (known interpolation namespaces, `nth` needs an index, the exit code matches the status) and the cross-step checks of `validateFlow` are enforced by the protocol code, not by the exported files. Only `src` must stay pure; `scripts/` and `tests/` use Node APIs to write and read those files.
 
 ## Website
 
 ```text
-src/main.tsx ─► src/app ─► src/features/<name> ─► src/services ─► @recnrun/bridge
-                   │              │
-                   └──────────────┴──► src/ui
+src/main.tsx ─► src/app ─► src/features/<name> ─► src/ui
+                   │                                 ▲
+                   └─────────────────────────────────┘
 ```
 
-- `src/ui`: presentational components and pure helpers. It imports nothing from `features`, `services`, or `app`.
-- `src/services/extension.ts`: the extension gateway, `createExtensionGateway()`, and the only module that imports `@recnrun/bridge`.
-- `src/features/<name>`: state and views for one capability (`extension-status`, `explorer`). Features never import each other.
-- `src/app`: composition. It picks the banner, the empty state, or the explorer from the extension state.
-- `src/main.tsx`: mounts `App` with the real gateway. Nothing imports it.
+- `src/ui`: presentational components; props in, markup out. It imports nothing from `features` or `app`.
+- `src/features/<name>`: one part of the page with its own content (`install-guide`). Features never import each other.
+- `src/app`: composition of the page; `mount.tsx` renders it into the page's root element.
+- `src/main.tsx`: imports the stylesheets and calls `mount`. Nothing imports it.
+- The website imports no workspace package other than `@recnrun/brand` (`website-only-brand`): it ships no engine, protocol, or UI code.
 
-Components take the gateway or data as props, so component tests use a fake gateway.
+## Fixture application
 
-## Extension
+`apps/fixture` (`@recnrun/fixture`) is the web application the browser tests drive. It stands in for any application under test, so it shares no workspace code (`fixture-isolated`). `src/` is a Node HTTP server on built-ins only: `createFixtureServer({ port, secondPort })` returns `start()`, `stop()`, and `urls`, and `src/bin.ts` runs it. `public/` holds the pages and their plain ES module scripts.
 
-| Folder            | Runs in                | Role                                                                                       |
-| ----------------- | ---------------------- | ------------------------------------------------------------------------------------------ |
-| `src/entrypoints` | (WXT)                  | Thin wiring: each file calls one `start*` function. Nothing imports an entrypoint.         |
-| `src/content`     | The RECnRun website    | Bridge host. Relays known requests to the background and returns its reply.                |
-| `src/background`  | The service worker     | Validates requests and senders, answers them from storage.                                 |
-| `src/storage`     | The service worker     | Repositories over WXT `storage`; validates what it reads with the domain schemas.          |
-| `src/popup`       | The toolbar popup      | Preact UI. Reads through a function it is given, never through content or background code. |
-| `src/config`      | Build time             | `origins.ts`: the pages the content script runs on, per build mode.                        |
-| `src/messaging`   | Content and background | The internal content ↔ background message schema.                                          |
-
-`content` never imports `storage`, and `popup` never imports `content` or `background`.
-
-## Bridge protocol v1
-
-The website and the content script share a window, so they talk through `window.postMessage`. Every message is an envelope `{ channel: "recnrun", protocol: 1, kind, ... }`:
-
-| Kind       | Sender         | Fields                                              |
-| ---------- | -------------- | --------------------------------------------------- |
-| `announce` | content script | `extensionVersion`; sent once on start              |
-| `request`  | website        | `id`, `type`                                        |
-| `response` | content script | `id`, then `ok: true, result` or `ok: false, error` |
-
-Request types and their result schemas live in `RESULT_SCHEMAS` (`packages/bridge/src/protocol.ts`):
-
-| Type          | Result                 |
-| ------------- | ---------------------- |
-| `ping`        | `{ extensionVersion }` |
-| `getSnapshot` | `Snapshot`             |
-
-- **Detection.** `client.detect()` resolves `installed` on the first `announce` or `ping` reply, and `missing` after the timeout (1.5 s by default). Either signal is enough, so the order in which the page and the content script load does not matter.
-- **Validation.** The host answers only valid requests of a known type. The client validates every result against its schema and rejects with `BridgeError` on a timeout, an error reply, or a malformed result.
-- **Versioning.** `protocol` changes only for an incompatible envelope or message change; adding a request type does not change it.
-
-Inside the extension, the content script forwards `{ type }` with `browser.runtime.sendMessage`; the background replies `{ ok: true, result }` or `{ ok: false, error }`.
+- **Two origins.** It listens on `127.0.0.1` only, on port 4600 (`http://127.0.0.1:4600`) and port 4601, which pages address as `http://localhost:4601`. The other host name makes the second origin cross-site, so Chrome renders the `iframe` route's second child out of process. `RECNRUN_FIXTURE_PORT` and `RECNRUN_FIXTURE_SECOND_PORT` change the ports. `vp run dev:fixture` starts it by hand; `playwright.browser.config.ts` starts it for `vp run test:browser`.
+- **Routes.** `/` lists every page as a link with `data-testid="route-<name>"`. Each page is `/routes/<name>`: `form`, `debounce`, `spa`, `submit-redirect` (lands on `submit-result`), `iframe` (embeds `iframe-child`), `popup` (opens `popup-child`), `virtual-list`, `ime`, `indexeddb`, `service-worker` (registers `/sw.js`), `network`, `console`, `download`, `dialogs`, and `storage`. `src/routes.ts` is the list.
+- **API.** `/api/json`, `/api/binary` (a PNG), `/api/error` (500), `/api/redirect/<n>` (a 302 chain down to `/api/json`), `/api/stream` (10 chunks over 3 s), `/api/download` (an attachment), `/api/submit` (form POST answered 303), `/api/cacheable` (what the service worker caches), `/api/config` (both origins), and the WebSocket echo `/ws/echo`.
+- **Page contract.** Every control has a stable `data-testid` and an accessible name; `public/fixture.js` checks both, runs the page's own self-test, and only then sets `window.__fixture = { route, ready: true, counters, fail, loadId }`. `counters` counts handler runs (a button's clicks, the debounced handler, IndexedDB commits), so a test can prove an action ran exactly once; `loadId` changes only on a real reload.
+- **`?fail=<case>`.** Injects a defect on demand: `status` changes the form's status text, `api-500` makes `/api/json` answer 500, `slow` spaces the stream's chunks 1.5 s apart, and `throw` raises an uncaught error after the self-test.
+- **Safety.** Files are served from `public/` only: a path that decodes to a `..` segment, a backslash, or a NUL byte gets 400. Every answer sends `X-Content-Type-Options: nosniff` and `Cache-Control: no-store`. There is no Content Security Policy, because the fixture is a test target.
 
 ## Security model
 
-The extension holds the user's data; the website only displays it.
+RECnRun reads the user's real Chrome profile, including request bodies and storage, so these are product requirements ([PLAN.md §6](plan/PLAN.md#6-security-tests-cross-cutting-source-17-and-19) lists the test for each, in the phase that introduces the surface):
 
-- **Where the content script runs.** Production builds match only `https://recnrun.com/*`, where the website lives. The project also owns recnrun.app, recnrun.io, and recn.run; they only redirect to recnrun.com at the Cloudflare edge and never serve a page, so the extension does not match them. `development` and `test` builds add `http://localhost/*` and `http://127.0.0.1/*` (any port) for the dev server and end-to-end tests. `vp run test:extension-manifest` fails the build if a production manifest matches anything else.
-- **Permissions.** Only `storage`: no host permissions, no `externally_connectable`, no access to other sites. The same check enforces it.
-- **Who may ask.** The `window` transport accepts only messages whose `source` is the page's own window and whose `origin` is the page's own origin, and replies only to that origin. Pages on other origins, other windows, and frames get no answer (`tests/e2e/origin-guard.spec.ts`).
-- **What they can get.** The bridge is read-only. The content script cannot read storage itself; it can only relay known request types to the background, which checks that the sender is its own extension.
-- **What the website trusts.** Stored data is validated when the extension reads it and again when the website receives it. Data is rendered as text.
-- **Script injection on recnrun.com** would let an attacker read the user's data through the bridge, so the website ships a strict CSP (`default-src 'self'`, no inline scripts or styles; `apps/website/build/content-security-policy.ts`). GitHub Pages sends no headers, so the CSP is a `<meta>` tag added to production builds only. Third-party scripts are not allowed on the website.
-- Adding a write request widens this model; the `adding-a-bridge-message` skill requires documenting it here first.
-
-### Recording (not built)
-
-Recording in the user's own applications needs more than `storage`. Whatever M1 settles on follows these limits:
-
-- **Per-origin access, granted at run time** (optional host permissions and `permissions.request`), or `activeTab` for a one-off page. No install-time host permissions, and never `<all_urls>`.
-- Recording scripts in the user's applications never answer the bridge; they only report events to the background.
-- `apps/extension/scripts/manifest.checks.mjs` changes in the same commit, so the production manifest allows exactly the new permissions.
+- **No egress** (decision 8 of [ADR 0001](adr/0001-local-service-over-cdp.md#decision)). The service, the CLI, and the MCP server connect only to loopback. Tests run with `RECNRUN_FORBID_EGRESS=1`, which makes any other connection throw. Evidence is never sent to an AI, telemetry, or any external service.
+- **The local API.** The service binds to loopback only. Every HTTP request and WebSocket carries the per-user bearer token from `~/.recnrun/service.json` (mode 0600), and the service checks `Origin` and `Host`, so a page the user visits cannot drive it.
+- **Chrome connections.** The service connects only to a Chrome the user enabled remote debugging on, found through its `DevToolsActivePort`. Messages from page instrumentation are untrusted: they are validated with the protocol schemas and dropped when they come from an unknown target, frame, or document. Capture events never act as engine commands.
+- **Capture scope.** A session names the tabs, profiles, and origins it captures; tabs outside it produce no events.
+- **Captured content.** Viewers render captured HTML and bodies in a sandboxed frame where no script runs. Secrets are `${secrets.<name>}` references resolved from a local store and never written to a flow or an export; redaction runs before persistence.
+- **Imports.** Importing a flow or a function never executes it; archives are checked for path traversal and decompression bombs.
+- **Replay.** Write actions are never retried blindly; an unknown outcome is `indeterminate`.
+- **The website.** recnrun.com holds no user data. It still ships a strict CSP (`default-src 'self'`, no inline scripts or styles; `apps/website/build/content-security-policy.ts`) as a `<meta>` tag, because GitHub Pages sends no headers. Third-party scripts are not allowed.
 
 ## Toolchain
 
-| Concern                  | Tool                                                                       |
-| ------------------------ | -------------------------------------------------------------------------- |
-| Package manager, tasks   | Vite+ (`vp`) with pnpm workspaces and a version catalog                    |
-| Format, lint, type check | `vp check`: Oxfmt, Oxlint (type aware, with `eslint-plugin-sonarjs`), tsgo |
-| Architecture boundaries  | dependency-cruiser (`.dependency-cruiser.cjs`)                             |
-| Dead code, duplication   | Knip (`knip.jsonc`), jscpd                                                 |
-| Unit and component tests | Vitest with V8 coverage; Vitest Browser Mode with Playwright Chromium      |
-| End-to-end               | Playwright, headed Chromium with the test extension, in Docker on Xvfb     |
-| Extension build          | WXT with `@preact/preset-vite`                                             |
+| Concern                  | Tool                                                                                                                |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| Package manager, tasks   | Vite+ (`vp`) with pnpm workspaces and a version catalog                                                             |
+| Format, lint, type check | `vp check`: Oxfmt, Oxlint (type aware, with `eslint-plugin-sonarjs`), tsgo                                          |
+| Architecture boundaries  | dependency-cruiser (`.dependency-cruiser.cjs`)                                                                      |
+| Dead code, duplication   | Knip (`knip.jsonc`), jscpd                                                                                          |
+| Documentation            | `scripts/check-docs.mjs` (`vp run docs:check`): relative links and anchors resolve                                  |
+| Unit and component tests | Vitest with V8 coverage; Vitest Browser Mode with Playwright Chromium                                               |
+| End-to-end               | Playwright against the built website, in Docker                                                                     |
+| Browser layer            | `vp run test:browser`: Google Chrome Stable for Linux, headed on Xvfb in Docker, found through `DevToolsActivePort` |
 
 Findings from the bootstrap spike, kept here because they explain the configuration:
 
-- **WXT on Vite+.** The workspace overrides `vite` with `@voidzero-dev/vite-plus-core`; WXT 0.21 builds on it unchanged. `import.meta.env.MODE` is available in `defineContentScript` options, which is how `origins.ts` varies matches per build mode.
-- **WXT tests.** `vitest.config.ts` passes its own `root` to `WxtVitest`; without it, Vitest projects started from the repo root cannot resolve the `@/` alias. `.wxt/` is generated by `wxt prepare` (the root `prepare` script, and explicitly in `Dockerfile.tests`, because pnpm skips `prepare` when `node_modules` is current).
-- **dependency-cruiser and TypeScript 7.** dependency-cruiser 18 supports TypeScript below 7, so it parses with SWC (`parser: "swc"`, `@swc/core`); type-only imports are still detected. Its tsconfig-paths plugin resolves `paths` from the working directory, so each app has a `tsconfig.deps.json` repeating its `@/` alias from the repo root, and `vp run deps` cruises each app with its own. npm packages are not followed but stay in the graph as leaves, so rules can name them (`not-to-dev-dep`, `extension-content-not-to-storage`); the `exclude` names only the workspaces' build output, since a pattern on `dist/` would also drop every package's own `dist/`.
-- **WXT dev browser.** WXT 0.21 opens a browser only when its optional peer `web-ext` is installed; without it, `wxt` builds and asks you to load the extension by hand. `apps/extension` depends on `web-ext` for that reason. `wxt.config.ts` opens `http://localhost:5173/` (the website's fixed dev port) in a persistent profile under `.wxt/chrome-data`, which `vp run clean` deletes.
-- **Knip and WXT.** Knip's WXT plugin expects `entrypoints/` at the package root; `knip.jsonc` lists `src/entrypoints` explicitly.
-- **Extensions need a headed Chromium.** Playwright and Vitest Browser Mode run headed; Docker provides the display, so no window opens on the host.
+- **dependency-cruiser and TypeScript 7.** dependency-cruiser 18 supports TypeScript below 7, so it parses with SWC (`parser: "swc"`, `@swc/core`); type-only imports are still detected. Its tsconfig-paths plugin resolves `paths` from the working directory, so each app has a `tsconfig.deps.json` repeating its `@/` alias from the repo root, and `vp run deps` cruises each app with its own. npm packages are not followed but stay in the graph as leaves, so rules can name them (`not-to-dev-dep`); the `exclude` names only the workspaces' build output, since a pattern on `dist/` would also drop every package's own `dist/`.
+- **Docker display.** Vitest Browser Mode runs headed; the test container provides Xvfb, so no window opens on the host. Google Chrome in the browser layer uses the same display.
+- **Google Chrome in Docker.** `Dockerfile.tests` installs `google-chrome-stable` from Google's apt repository (amd64 and arm64) and writes `/opt/recnrun/versions.json`, which `scripts/test-container.mjs` copies with the image id into each run's `.artifacts/docker/<run-id>/versions.json`. Chrome runs as root in the container, where its sandbox cannot start, so the browser fixture adds `--no-sandbox` there and only there.

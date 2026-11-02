@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Console · RECnRun fixture</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="/fixture.css" />
+    <script type="module" src="/routes/console.js"></script>
+  </head>
+  <body>
+    <header>
+      <h1>Console</h1>
+      <a href="/" data-testid="home">All routes</a>
+    </header>
+    <main>
+      <p>
+        <button type="button" data-testid="log">console.log</button>
+        <button type="button" data-testid="warn">console.warn</button>
+        <button type="button" data-testid="error">console.error</button>
+        <button type="button" data-testid="throw">Throw an uncaught exception</button>
+        <button type="button" data-testid="reject">Reject a promise unhandled</button>
+      </p>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,81 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "properties": {
+    "bindings": {
+      "additionalProperties": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "propertyNames": {
+        "pattern": "^[A-Za-z_]\\w*$",
+        "type": "string"
+      },
+      "type": "object"
+    },
+    "captureLevel": {
+      "enum": ["normal", "deep"],
+      "type": "string"
+    },
+    "dataset": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "flowId": {
+      "pattern": "^[A-Za-z0-9][\\w.-]*$",
+      "type": "string"
+    },
+    "flowRevision": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "runId": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": 1
+    },
+    "startedAt": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "versions": {
+      "additionalProperties": false,
+      "properties": {
+        "chrome": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "engine": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "node": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "playwright": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "protocol": {
+          "const": 1
+        }
+      },
+      "required": ["engine", "protocol"],
+      "type": "object"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "runId",
+    "flowId",
+    "flowRevision",
+    "startedAt",
+    "captureLevel",
+    "versions",
+    "bindings"
+  ],
+  "type": "object"
+}

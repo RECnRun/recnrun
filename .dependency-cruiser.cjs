@@ -17,14 +17,7 @@ module.exports = {
       comment: "Unreachable module. Delete it or import it from where it belongs.",
       from: {
         orphan: true,
-        pathNot: [
-          TEST,
-          CONFIG,
-          "\\.d\\.ts$",
-          "(^|/)src/entrypoints/",
-          "(^|/)src/main\\.tsx$",
-          "(^|/)scripts/",
-        ],
+        pathNot: [TEST, CONFIG, "\\.d\\.ts$", "(^|/)src/main\\.tsx$", "(^|/)scripts/"],
       },
       to: {},
     },
@@ -41,8 +34,7 @@ module.exports = {
       from: { path: "^(apps|packages)/[^/]+/src/" },
       to: {
         dependencyTypes: ["npm-dev"],
-        // WXT is the extension runtime framework; its helpers are bundled into the build.
-        pathNot: ["/node_modules/wxt/", "/node_modules/@types/"],
+        pathNot: ["/node_modules/@types/"],
       },
     },
     {
@@ -58,56 +50,93 @@ module.exports = {
       to: { path: "^apps/" },
     },
     {
-      name: "website-not-to-extension",
-      severity: "error",
-      comment: "The website and the extension talk only through @recnrun/bridge messages.",
-      from: { path: "^apps/website/" },
-      to: { path: "^apps/extension/" },
-    },
-    {
-      name: "extension-not-to-website",
-      severity: "error",
-      comment: "The website and the extension talk only through @recnrun/bridge messages.",
-      from: { path: "^apps/extension/" },
-      to: { path: "^apps/website/" },
-    },
-    {
-      name: "domain-pure",
-      severity: "error",
-      comment: "The domain is plain data and schemas: no UI, browser, or protocol code.",
-      from: { path: "^packages/domain/src/" },
-      to: {
-        pathNot: ["^packages/domain/src/", "/node_modules/valibot/"],
-      },
-    },
-    {
-      name: "bridge-only-domain",
-      severity: "error",
-      from: { path: "^packages/bridge/src/" },
-      to: {
-        pathNot: ["^packages/bridge/src/", "^packages/domain/src/", "/node_modules/valibot/"],
-      },
-    },
-    {
       name: "brand-is-leaf",
       severity: "error",
-      comment: "Brand holds assets shared by both apps; it depends on nothing.",
+      comment: "Brand holds assets shared by the apps; it depends on nothing.",
       from: { path: "^packages/brand/" },
       to: { pathNot: "^packages/brand/" },
     },
     {
-      name: "website-bridge-only-in-services",
+      name: "protocol-pure",
       severity: "error",
-      comment: "Only src/services talks to the extension; the rest of the site uses its gateway.",
-      from: { path: "^apps/website/src/", pathNot: "^apps/website/src/services/" },
-      to: { path: "^packages/bridge/" },
+      comment:
+        "Protocol is the shared contract: Valibot schemas only, no runtime or workspace code.",
+      from: { path: "^packages/protocol/src/" },
+      to: { pathNot: ["^packages/protocol/src/", "/node_modules/valibot/"] },
+    },
+    {
+      name: "engine-not-to-adapter-impl",
+      severity: "error",
+      comment:
+        "The engine defines the adapter interface; Playwright, CDP, and Node APIs stay in adapters.",
+      from: { path: "^packages/engine/src/" },
+      to: { pathNot: ["^packages/engine/src/", "^packages/protocol/src/"] },
+    },
+    {
+      name: "adapter-boundaries",
+      severity: "error",
+      comment: "The adapter implements the engine's interface over playwright-core and CDP.",
+      from: { path: "^packages/adapter/src/" },
+      to: {
+        pathNot: ["^packages/(adapter|engine|protocol)/src/", "/node_modules/playwright-core/"],
+      },
+    },
+    {
+      name: "persistence-boundaries",
+      severity: "error",
+      comment: "Persistence owns the file system and SQLite; it knows only the protocol's shapes.",
+      from: { path: "^packages/persistence/src/" },
+      to: {
+        pathNot: ["^packages/(persistence|protocol)/src/"],
+        dependencyTypesNot: ["core"],
+      },
+    },
+    {
+      name: "service-boundaries",
+      severity: "error",
+      comment: "The service composes the engine, the adapter, and persistence behind its API.",
+      from: { path: "^apps/service/src/" },
+      to: {
+        pathNot: ["^apps/service/src/", "^packages/(engine|adapter|persistence|protocol)/src/"],
+      },
+    },
+    {
+      name: "cli-only-service",
+      severity: "error",
+      comment: "The CLI is a client of the service; it carries no engine of its own.",
+      from: { path: "^apps/cli/src/" },
+      to: { pathNot: ["^apps/(cli|service)/src/"] },
+    },
+    {
+      name: "ui-only-protocol",
+      severity: "error",
+      comment:
+        "The UI talks to the service over its API; it shares only protocol shapes and the brand.",
+      from: { path: "^apps/ui/src/" },
+      to: {
+        pathNot: ["^apps/ui/src/", "^packages/(protocol|brand)/src/", "/node_modules/preact/"],
+      },
+    },
+    {
+      name: "fixture-isolated",
+      severity: "error",
+      comment: "The fixture stands in for any web app under test; it shares no workspace code.",
+      from: { path: "^apps/fixture/src/" },
+      to: { path: "^(apps|packages)/", pathNot: "^apps/fixture/" },
+    },
+    {
+      name: "website-only-brand",
+      severity: "error",
+      comment: "The website is the public landing; it ships no engine, protocol, or UI code.",
+      from: { path: "^apps/website/" },
+      to: { path: "^packages/", pathNot: "^packages/brand/" },
     },
     {
       name: "website-ui-presentational",
       severity: "error",
-      comment: "src/ui renders props only; it knows nothing about features, services, or the app.",
+      comment: "src/ui renders props only; it knows nothing about features or the app.",
       from: { path: "^apps/website/src/ui/" },
-      to: { path: "^apps/website/src/(features|services|app)/" },
+      to: { path: "^apps/website/src/(features|app)/" },
     },
     {
       name: "website-features-isolated",
@@ -122,35 +151,15 @@ module.exports = {
     {
       name: "website-app-is-top",
       severity: "error",
-      from: { path: "^apps/website/src/(ui|features|services)/" },
+      from: { path: "^apps/website/src/(ui|features)/" },
       to: { path: "^apps/website/src/(app/|main\\.tsx$)" },
-    },
-    {
-      name: "website-services-not-to-ui",
-      severity: "error",
-      from: { path: "^apps/website/src/services/" },
-      to: { path: "^apps/website/src/(ui|features)/" },
-    },
-    {
-      name: "extension-content-not-to-storage",
-      severity: "error",
-      comment:
-        "Content scripts run inside web pages; they reach data only by messaging the background.",
-      from: { path: "^apps/extension/src/content/" },
-      to: { path: ["^apps/extension/src/storage/", "node_modules/wxt/.*storage"] },
-    },
-    {
-      name: "extension-popup-isolated",
-      severity: "error",
-      from: { path: "^apps/extension/src/popup/" },
-      to: { path: "^apps/extension/src/(content|background)/" },
     },
     {
       name: "not-to-entrypoints",
       severity: "error",
       comment: "Entrypoints are thin wiring; nothing imports them.",
       from: {},
-      to: { path: "^apps/extension/src/entrypoints/|^apps/website/src/main\\.tsx$" },
+      to: { path: "^apps/[^/]+/src/(main\\.tsx|bin\\.ts)$" },
     },
   ],
   options: {
@@ -158,7 +167,7 @@ module.exports = {
     // npm packages stay in the graph as leaves, so rules can name them; only the workspaces' build
     // output is left out (a package's own dist/ must stay in).
     doNotFollow: { path: "node_modules" },
-    exclude: { path: "^(apps|packages)/[^/]+/(\\.output|\\.wxt|dist)/" },
+    exclude: { path: "^(apps|packages)/[^/]+/dist/" },
     enhancedResolveOptions: {
       exportsFields: ["exports"],
       conditionNames: ["import", "require", "node", "default", "types"],

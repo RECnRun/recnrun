@@ -13,19 +13,37 @@ Tracks [PLAN.md](PLAN.md). One line per task; the orchestrator owns `[x]`, imple
 
 Markers: `[ ]` not started · `[i]` implemented, awaiting the phase gate · `[x]` verified by `vp run verify` · `[!]` blocked (reason indented) · `[~]` partial (what is missing indented).
 
-**Branch:** `local-engine-plan` (plan only; implementation branches are named after the phase, `f0-contracts`, `f1-spike`, …)
-**Last commit:** the branch tip whose subject is "Add the phased plan for the local engine over CDP" (no hash: the commit cannot name itself)
-**Current phase:** F0 (assumptions of PLAN.md §8 confirmed by the owner on 2026-11-02; start with F0.1 on branch `f0-contracts`)
+**Branch:** `f0-contracts` holds F0 (closed); F1 starts on `f1-spike`, branched from it (plan only on `local-engine-plan`; implementation branches are named after the phase)
+**Last commit:** the branch tip whose subject is "Close phase F0 after the verify gate" (no hash: the commit cannot name itself)
+**Current phase:** F1 (F0 closed on 2026-11-02; start with F1.1 on branch `f1-spike`)
 
 ## F0: Contracts and skeleton
 
-- [ ] F0.1 ADRs, repository reshaping, `docs:check`
-- [ ] F0.2 Workspace skeleton and dependency rules
-- [ ] F0.3 Protocol schemas v1 with JSON Schema drift test
-- [ ] F0.4 Capability matrix as code, `docs/CAPABILITIES.md` generated
-- [ ] F0.5 Fixture application
-- [ ] F0.6 Google Chrome in Docker, `test:browser` layer
-- Gate F0: `vp run verify` → (date, result)
+- [x] F0.1 ADRs, repository reshaping, `docs:check`
+  - red: `vp run test:e2e -- tests/e2e/landing.spec.ts` on the old site (main showed the install banner, not "Chrome DevTools Protocol"); `node --test scripts/check-docs.checks.mjs` against an exit-0 stub (4 of 7 failed); `vp run test:coverage` after the deletion (lines 71.42%, statements 62.5%, branches 0%) and `mount.browser.test.tsx` against a no-op `mount` stub
+  - green: `vp run test:e2e` (4 passed), `vp run test:components` (5 passed), `vp run test:coverage` (87.5% statements, 100% branches), `node --test scripts/check-docs.checks.mjs` (7 passed), `vp run docs:check` exits 0 on the branch and exits 1 on a broken link in a scratch worktree
+  - commit: 96ea572 (delete the extension and bridge, landing), 7ca8326 (ADRs, docs, rules, skill), 62cd1c1 (`docs:check`), and the commit that adds this entry (testable `mount`, coverage)
+- [x] F0.2 Workspace skeleton and dependency rules
+  - red: in a scratch worktree with the workspaces but no boundary rules, `packages/engine` depending on and importing `playwright-core` passed `vp run deps`; with the rules it failed with `error engine-not-to-adapter-impl: packages/engine/src/index.ts → node_modules/.pnpm/playwright-core@1.64.1/node_modules/playwright-core/index.d.ts`, and the fixture and ui negatives failed with `fixture-isolated` (`apps/fixture/src/index.ts → packages/protocol/src/index.ts`) and `ui-only-protocol` (`apps/ui/src/app/App.tsx → packages/engine/src/index.ts`); one negative each also tripped `protocol-pure`, `adapter-boundaries`, `persistence-boundaries`, `service-boundaries`, and `cli-only-service`. `vp run test:unit` against stub implementations failed 16 of 23; `vp run test:components` against a no-op ui `mount` failed 1 of 2 (`expected undefined to be 'RECnRun'`); a no-op default CLI writer failed `writes to standard output by default`
+  - green: `vp run deps` (6 cruises, no violations), `vp run test:unit` (24 passed), `vp run test:components` (website 5, ui 2 passed), `vp run test:coverage` (91.42% statements, 100% branches, 100% functions, 90.62% lines), `vp check`, `vp lint --deny-warnings`, `vp run dead-code`, `vp run duplication` (0 clones), `vp run docs:check`, `vp run test:container` (10 passed), `vp run -r build` (11/11); `node apps/cli/src/bin.ts --version` prints `RECnRun protocol 1`
+  - commit: the commit that adds this entry
+- [x] F0.3 Protocol schemas v1 with JSON Schema drift test
+  - red: `vp test --project=@recnrun/protocol` against accept-all stubs (64 of 91 failed, for example `expected [] to deeply equal [ [ 'unknown-action', … ] ]` per invalid fixture); drift in a scratch copy after adding a field to `FlowSchema` (`flow.schema.json is stale; run vp run schema:generate`); the `steps`/`otherwise` rename against the first commit (3 of 27 failed in `flow.test.ts`)
+  - green: `vp test --project=@recnrun/protocol` (110 passed); `vp run test:unit` (128 passed in Docker); `vp run test:coverage` (protocol 99.57% statements, 89.23% branches); `vp lint --deny-warnings` (no warnings); `deps`, `dead-code`, `duplication`, `docs:check`, `vp run -r build` exit 0
+  - commit: 72a0923, d47bd0e (cherry-picked from the agent worktree commits f7df0ba, c266235; the `if` block uses `steps`/`otherwise` because a `then` key makes a thenable)
+- [x] F0.4 Capability matrix as code, `docs/CAPABILITIES.md` generated
+  - red: `vp run docs:check` after editing one status in `docs/CAPABILITIES.md` (`docs/CAPABILITIES.md: stale; run vp run capabilities:generate`); `vp test --project=@recnrun/protocol` against an empty matrix (21 failed, `expected 0 to be greater than 0`); the fixture-app status test against the `planned` entry (`fixture-app: expected 'planned' to be 'implemented'`)
+  - green: `vp run docs:check` exits 0; `vp test --project=@recnrun/protocol` (130 passed); `vp run test:scripts` (8 passed); `vp run test:unit` (203 passed in Docker); `vp run capabilities:generate` twice leaves the tree clean
+  - commit: 273b9df (cherry-picked from the agent worktree commit 79218ab), cc7a8fd (fixture-app marked implemented once F0.5 landed)
+- [x] F0.5 Fixture application
+  - red: `vp run test:unit -- apps/fixture` against a stub server answering 404 (48 of 55 failed, `expected 404 to be 200`, `expected 404 to be 303`); `vp run test:browser -- tests/browser/fixture.spec.ts` against a stub index that never sets `window.__fixture` (19 of 19 failed, `page.waitForFunction: Timeout 10000ms exceeded`, `net::ERR_HTTP_RESPONSE_CODE_FAILURE` per route)
+  - green: `vp run test:unit` (79 passed); `vp run test:browser` (21 passed on Google Chrome 156 in Docker); `vp run test:coverage` (fixture 93.65% statements, 84.54% branches); `test:container` (12 passed); `vp check`, `vp lint --deny-warnings`, `deps`, `dead-code`, `duplication`, `docs:check`, `vp run -r build` exit 0
+  - commit: a425f3f (cherry-picked from the agent worktree commit 88d0288; second origin is `http://localhost:4601` so the iframe is cross-site, not only cross-origin)
+- [x] F0.6 Google Chrome in Docker, `test:browser` layer
+  - red: `vp run test:container` with the new checks before the Dockerfile change (`exec: "google-chrome": executable file not found in $PATH`, `versions.json` ENOENT, `manifest.scripts["test:browser"]` undefined); `vp run test:browser` against a stub fixture returning empty strings (`expect(lines).toHaveLength(2)` received `[""]`)
+  - green: `vp run test:browser` (2 passed on Google Chrome 156.0.8078.79, Linux arm64, Docker); `vp run test:container` (12 passed); `vp check`, `vp lint --deny-warnings`, `deps`, `dead-code`, `duplication`, `docs:check`, `test:hooks`, `test:scripts`, `test:e2e` (4 passed), `vp run -r build` exit 0
+  - commit: 57a0ed2 (cherry-picked from the agent worktree commit acc95ce)
+- Gate F0: `vp run verify` → 2026-11-02, exit 0 (33/33 tasks; unit 203, components 7, e2e 4, browser 21 on Google Chrome 156.0.8078.79 Linux in Docker; coverage 96.45% statements, 86.88% branches)
 
 ## F1: Connection and fidelity spike
 

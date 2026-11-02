@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Storage · RECnRun fixture</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="/fixture.css" />
+    <script type="module" src="/routes/storage.js"></script>
+  </head>
+  <body>
+    <header>
+      <h1>Storage</h1>
+      <a href="/" data-testid="home">All routes</a>
+    </header>
+    <main>
+      <p>
+        <button type="button" data-testid="local-set">Set localStorage</button>
+        <button type="button" data-testid="local-remove">Remove localStorage</button>
+        <output data-testid="local-value"></output>
+      </p>
+      <p>
+        <button type="button" data-testid="session-set">Set sessionStorage</button>
+        <button type="button" data-testid="session-remove">Remove sessionStorage</button>
+        <output data-testid="session-value"></output>
+      </p>
+      <p>
+        <button type="button" data-testid="cookie-set">Set the cookie</button>
+        <button type="button" data-testid="cookie-clear">Clear the cookie</button>
+        <output data-testid="cookie-value"></output>
+      </p>
+    </main>
+  </body>
+</html>

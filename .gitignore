@@ -38,7 +38,3 @@ test-results/
 # AI agent worktrees
 .claude/worktrees/
 .claude/settings.local.json
-
-# WXT
-.output/
-.wxt/

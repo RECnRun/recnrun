@@ -1,7 +1,6 @@
 import type { Plugin } from "vite-plus";
 
-// GitHub Pages cannot send headers, so the policy ships as a meta tag. Any script
-// running on this origin can read the user's recordings through the extension.
+// GitHub Pages cannot send headers, so the policy ships as a meta tag.
 export const CONTENT_SECURITY_POLICY = [
   "default-src 'self'",
   "script-src 'self'",

@@ -1,0 +1,10 @@
+schemaVersion: 1
+id: missing-input
+name: A step reads an input the flow does not declare
+inputs:
+  descricao: { type: string, required: true }
+steps:
+  - id: preencher
+    action: fill
+    target: { testId: titulo }
+    value: "${inputs.titulo}"

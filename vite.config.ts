@@ -6,11 +6,7 @@ export default defineConfig({
   staged: {
     "*": "vp check --fix",
   },
-  fmt: {
-    ignorePatterns: ["**/.output/**", "**/.wxt/**"],
-  },
   lint: {
-    ignorePatterns: ["**/.output/**", "**/.wxt/**"],
     jsPlugins: [
       { name: "vite-plus", specifier: "vite-plus/oxlint-plugin" },
       { name: "sonarjs", specifier: "eslint-plugin-sonarjs" },
@@ -45,20 +41,6 @@ export default defineConfig({
         },
       },
       {
-        // The content script runs inside web pages; it reaches stored data only through the background.
-        files: ["apps/extension/src/content/**"],
-        rules: {
-          "no-restricted-properties": [
-            "error",
-            {
-              object: "browser",
-              property: "storage",
-              message: "The content script never touches storage; ask the background.",
-            },
-          ],
-        },
-      },
-      {
         // describe/test callbacks group many cases; production code keeps the stricter caps.
         files: testFiles,
         rules: {
@@ -77,11 +59,15 @@ export default defineConfig({
     maxWorkers: 1,
     projects: [
       "apps/website",
-      "apps/extension",
-      "packages/domain",
-      "packages/bridge",
       "apps/website/vitest.browser.config.ts",
-      "apps/extension/vitest.browser.config.ts",
+      "apps/ui/vitest.browser.config.ts",
+      "apps/service",
+      "apps/cli",
+      "apps/fixture",
+      "packages/protocol",
+      "packages/engine",
+      "packages/adapter",
+      "packages/persistence",
     ],
     coverage: {
       provider: "v8",
@@ -108,6 +94,7 @@ export default defineConfig({
           "vp run --no-cache test:unit:local",
           "vp run --no-cache test:components:local",
           "vp run --no-cache test:e2e:local",
+          "vp run --no-cache test:browser:local",
         ],
       },
       verify: {
@@ -123,11 +110,12 @@ export default defineConfig({
           "vp run --no-cache test:local",
           "vp run --no-cache test:container",
           "vp run --no-cache test:hooks",
+          "vp run --no-cache test:scripts",
           "vp run --no-cache test:coverage:local",
           "vp run --no-cache dead-code",
           "vp run --no-cache duplication",
+          "vp run --no-cache docs:check",
           "vp run -r --no-cache build",
-          "vp run --no-cache test:extension-manifest",
         ],
       },
     },

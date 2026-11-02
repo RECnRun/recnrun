@@ -5,7 +5,7 @@ import { contentSecurityPolicy } from "./build/content-security-policy.ts";
 
 export default defineConfig({
   plugins: [preact(), contentSecurityPolicy()],
-  // The dev extension opens this exact URL, so the port must not drift.
+  // Docs and AGENTS.md name this port; fail rather than drift to another one.
   server: { port: 5173, strictPort: true },
   test: {
     name: "website",

@@ -1,0 +1,19 @@
+# The locator list of the source plan §9.1, verbatim.
+target:
+  resolution: orderedFallback
+  cardinality: one
+  timeoutMs: 5000
+  locators:
+    - id: by-test-id
+      strategy: testId
+      value: aprovar-pedido
+    - id: by-role
+      strategy: role
+      role: button
+      name: Aprovar
+      exact: true
+    - id: by-custom
+      strategy: function
+      functionRef: team.approvalButton@1.0.0
+      args:
+        pedidoId: "${vars.pedidoId}"

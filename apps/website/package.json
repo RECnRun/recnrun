@@ -10,8 +10,6 @@
   },
   "dependencies": {
     "@recnrun/brand": "workspace:*",
-    "@recnrun/bridge": "workspace:*",
-    "@recnrun/domain": "workspace:*",
     "preact": "catalog:"
   },
   "devDependencies": {

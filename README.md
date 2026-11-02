@@ -1,37 +1,34 @@
 # RECnRun
 
-Record a browser session once, replay it whenever you need it: log in, fill long forms, and reproduce bugs in seconds. The browser extension keeps your data in your browser; [recnrun.com](https://recnrun.com) shows it.
+Record a browser flow once, replay it whenever you need it, with no AI involved. RECnRun is a local tool: it drives the Google Chrome already installed on your machine through the Chrome DevTools Protocol (CDP), saves what you do as a declarative flow, and keeps flows and their evidence on your machine. [recnrun.com](https://recnrun.com) explains how to install it.
 
-- [Product brief](docs/PRODUCT_BRIEF.md): concepts (recordings and what comes next).
-- [Architecture](docs/ARCHITECTURE.md): packages, layers, the website ↔ extension protocol, and the security model.
-- [Milestones](docs/MILESTONES.md): what is done and what comes next.
+- [Product brief](docs/PRODUCT_BRIEF.md): concepts (flows, steps, locator lists, actors, runs, evidence, coverage) and product rules.
+- [Architecture](docs/ARCHITECTURE.md): workspaces, layers, the security model, and the toolchain.
+- [Decisions](docs/adr/README.md): why a local service over CDP, and why the M0 extension was retired.
+- [Milestones](docs/MILESTONES.md) and the [plan](docs/plan/PLAN.md): phases F0 to F7 and their gates.
 - [Brand](docs/BRAND.md): logo, colors, typography, and CSS tokens.
 - [AGENTS.md](AGENTS.md): rules for contributors, human or AI.
 
-## Install the extension
+## Install
 
-The extension is not in the Chrome Web Store yet. To load it in Chrome, Edge, or Brave:
+The `@recnrun/cli` package is not published yet; the engine is being built in phases ([plan](docs/plan/PLAN.md)). Once it is, you will need Node.js 22.18 or later (24 LTS recommended) and Google Chrome 144 or later:
 
-1. Build it: `vp install`, then `vp run extension#build`.
-2. Open `chrome://extensions`, turn on **Developer mode**, and choose **Load unpacked**.
-3. Select `apps/extension/.output/chrome-mv3`.
-4. Open [recnrun.com](https://recnrun.com). The install banner is replaced by your recordings.
+```sh
+npx @recnrun/cli setup   # once; Chrome shows its own permission dialog
+npx @recnrun/cli open    # opens RECnRun in your browser
+```
+
+While RECnRun is connected, Chrome shows a banner saying that the browser is being debugged.
 
 ## Development
 
 Requirements: Node.js 22.18 or later, [Vite+](https://viteplus.dev) (`vp`), and Docker Desktop for tests.
 
 ```sh
-vp install              # dependencies, Git hooks, and WXT types
-vp run dev              # website and extension together; Ctrl+C stops both
-vp run dev:website      # only the website, at http://localhost:5173
-vp run dev:extension    # only the extension, in Chrome opened at the website, reloaded on change
-vp run clean            # delete builds, test artifacts, caches, and the dev Chrome profile
+vp install              # dependencies and Git hooks
+vp run dev              # the website, at http://localhost:5173
+vp run clean            # delete builds, test artifacts, and caches
 ```
-
-Development builds of the extension also run on `localhost`, so the local website talks to it. Production builds run only on recnrun.com; recnrun.app, recnrun.io, and recn.run redirect there.
-
-The dev Chrome keeps its profile in `apps/extension/.wxt/chrome-data`, so extension data survives restarts. `vp run clean` resets it; the next `vp run dev` creates a fresh one. The website always uses port 5173 and fails if the port is busy, because the dev Chrome opens that URL.
 
 ## Quality gates
 
@@ -39,10 +36,11 @@ The dev Chrome keeps its profile in `apps/extension/.wxt/chrome-data`, so extens
 | ------------------------------------------------- | ----------------------------------------------------------------------- |
 | `vp check`                                        | Formatting, lint (complexity, size, nesting, TypeScript rules), types   |
 | `vp run deps`                                     | Architecture boundaries and import cycles                               |
-| `vp run test:unit`, `test:components`, `test:e2e` | Node tests; components in Chromium; the website with the real extension |
+| `vp run test:unit`, `test:components`, `test:e2e` | Node tests; components in Chromium; the built website in Playwright     |
 | `vp run test:coverage`                            | Coverage of at least 80% lines, statements, and functions; 75% branches |
 | `vp run dead-code`, `vp run duplication`          | Unused files, exports, and dependencies; duplicated code                |
-| `vp run verify`                                   | All of the above, plus builds and the production manifest guard         |
+| `vp run docs:check`                               | Relative Markdown links and anchors resolve                             |
+| `vp run verify`                                   | All of the above, plus builds                                           |
 
 Tests and `verify` run in Docker on a virtual display, so browser windows never open on your desktop. Results and failure artifacts are in `.artifacts/docker/<run-id>/`. Git hooks run the fast gates before each commit and `vp run verify` before each push.
 

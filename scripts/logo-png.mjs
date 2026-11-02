@@ -1,9 +1,8 @@
-// Writes the logo as transparent rasters: extension icons, website ICO and touch icon, docs/logo.png (docs/BRAND.md).
-import { mkdirSync, writeFileSync } from "node:fs";
+// Writes the logo as transparent rasters: website ICO and touch icon, docs/logo.png (docs/BRAND.md).
+import { writeFileSync } from "node:fs";
 import { crc32, deflateSync } from "node:zlib";
 import { layers } from "./logo.mjs";
 
-const SIZES = [16, 32, 48, 128];
 const LOGO_SIZE = 512;
 const SAMPLES = 8;
 
@@ -111,8 +110,5 @@ const site = new URL("../apps/website/icons/", import.meta.url);
 writeFileSync(new URL("favicon.ico", site), ico([16, 32, 48]));
 writeFileSync(new URL("apple-touch-icon.png", site), png(180, 0.12));
 
-const dir = new URL("../apps/extension/public/icon/", import.meta.url);
-mkdirSync(dir, { recursive: true });
-for (const size of SIZES) writeFileSync(new URL(`${size}.png`, dir), png(size, 0.04));
 // Wider margin so avatars that crop to a circle keep the triangle's corners.
 writeFileSync(new URL("../docs/logo.png", import.meta.url), png(LOGO_SIZE, 0.12));
