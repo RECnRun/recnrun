@@ -6,6 +6,7 @@ export default defineConfig({
   staged: {
     "*": "vp check --fix",
   },
+  // The vendored SplitSession files must stay byte-identical to upstream (vendor.test.ts hashes them).
   fmt: {
     ignorePatterns: ["**/.output/**", "**/.wxt/**", "packages/isolation-core/vendor/**"],
   },

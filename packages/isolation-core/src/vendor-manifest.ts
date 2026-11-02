@@ -2,7 +2,7 @@ import * as v from "valibot";
 
 const Sha256Schema = v.pipe(v.string(), v.regex(/^[0-9a-f]{64}$/));
 
-export const VendorManifestSchema = v.object({
+const VendorManifestSchema = v.object({
   repository: v.string(),
   commit: v.pipe(v.string(), v.regex(/^[0-9a-f]{40}$/)),
   license: v.string(),
