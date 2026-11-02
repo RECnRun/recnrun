@@ -32,7 +32,10 @@ Markers: `[ ]` not started · `[i]` implemented, awaiting the phase gate · `[x]
   - green: `vp test --project=@recnrun/protocol` (110 passed); `vp run test:unit` (128 passed in Docker); `vp run test:coverage` (protocol 99.57% statements, 89.23% branches); `vp lint --deny-warnings` (no warnings); `deps`, `dead-code`, `duplication`, `docs:check`, `vp run -r build` exit 0
   - commit: 72a0923, d47bd0e (cherry-picked from the agent worktree commits f7df0ba, c266235; the `if` block uses `steps`/`otherwise` because a `then` key makes a thenable)
 - [ ] F0.4 Capability matrix as code, `docs/CAPABILITIES.md` generated
-- [ ] F0.5 Fixture application
+- [i] F0.5 Fixture application
+  - red: `vp run test:unit -- apps/fixture` against a stub server answering 404 (48 of 55 failed, `expected 404 to be 200`, `expected 404 to be 303`); `vp run test:browser -- tests/browser/fixture.spec.ts` against a stub index that never sets `window.__fixture` (19 of 19 failed, `page.waitForFunction: Timeout 10000ms exceeded`, `net::ERR_HTTP_RESPONSE_CODE_FAILURE` per route)
+  - green: `vp run test:unit` (79 passed); `vp run test:browser` (21 passed on Google Chrome 156 in Docker); `vp run test:coverage` (fixture 93.65% statements, 84.54% branches); `test:container` (12 passed); `vp check`, `vp lint --deny-warnings`, `deps`, `dead-code`, `duplication`, `docs:check`, `vp run -r build` exit 0
+  - commit: a425f3f (cherry-picked from the agent worktree commit 88d0288; second origin is `http://localhost:4601` so the iframe is cross-site, not only cross-origin)
 - [i] F0.6 Google Chrome in Docker, `test:browser` layer
   - red: `vp run test:container` with the new checks before the Dockerfile change (`exec: "google-chrome": executable file not found in $PATH`, `versions.json` ENOENT, `manifest.scripts["test:browser"]` undefined); `vp run test:browser` against a stub fixture returning empty strings (`expect(lines).toHaveLength(2)` received `[""]`)
   - green: `vp run test:browser` (2 passed on Google Chrome 156.0.8078.79, Linux arm64, Docker); `vp run test:container` (12 passed); `vp check`, `vp lint --deny-warnings`, `deps`, `dead-code`, `duplication`, `docs:check`, `test:hooks`, `test:scripts`, `test:e2e` (4 passed), `vp run -r build` exit 0
