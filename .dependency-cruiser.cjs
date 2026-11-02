@@ -90,10 +90,11 @@ module.exports = {
     {
       name: "persistence-boundaries",
       severity: "error",
-      comment: "Persistence owns the file system and SQLite; it knows only the protocol's shapes.",
+      comment:
+        "Persistence owns the file system and SQLite; it knows only the protocol's shapes, and yaml reads and writes flow.yaml.",
       from: { path: "^packages/persistence/src/" },
       to: {
-        pathNot: ["^packages/(persistence|protocol)/src/"],
+        pathNot: ["^packages/(persistence|protocol)/src/", "/node_modules/yaml/"],
         dependencyTypesNot: ["core"],
       },
     },

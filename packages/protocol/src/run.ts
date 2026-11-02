@@ -7,6 +7,7 @@ import {
   NameSchema,
   NonEmptyStringSchema,
 } from "./common.ts";
+import { RevisionHashSchema } from "./flow-folder.ts";
 import { StepStateSchema } from "./states.ts";
 import { SchemaVersionSchema } from "./version.ts";
 
@@ -30,7 +31,7 @@ const EvidenceSchema = v.array(NonEmptyStringSchema);
 export const RunManifestSchema = v.strictObject({
   ...runEntries,
   flowId: IdSchema,
-  flowRevision: v.pipe(v.string(), v.regex(/^[0-9a-f]{64}$/, "A revision is a sha256 hex digest.")),
+  flowRevision: RevisionHashSchema,
   startedAt: IsoTimestampSchema,
   captureLevel: v.picklist(["normal", "deep"]),
   dataset: v.optional(NonEmptyStringSchema),

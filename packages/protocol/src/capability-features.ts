@@ -138,11 +138,11 @@ export const FEATURE_CAPABILITIES: Feature[] = [
     "Event normalization into steps",
     "Suggested steps keep references to their raw events.",
   ),
-  planned(
+  implemented(
     "flow-persistence",
     "F2.4",
     "Flow folders and immutable revisions",
-    "The SQLite index can always be rebuilt from the folders.",
+    "Delivered by F2.4; packages/persistence/tests/flow-store.test.ts, flow-runs.test.ts, and flow-yaml.test.ts. flow.yaml round-trips byte for byte, every change writes an immutable revision named by the sha256 of its canonical JSON, runs reference that hash, metadata writes are atomic, a truncated events.jsonl reads with a gap, and the node:sqlite index rebuilt from the folders lists the same catalog; a corrupt manifest is reported and skipped.",
   ),
   planned("replay-executor", "F2.5", "Replay executor", "Write actions are never retried blindly."),
   planned("ui-minimal", "F2.6", "Minimal UI", "Setup, catalog, recorder, editor, and run screens."),

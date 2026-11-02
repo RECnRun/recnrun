@@ -21,3 +21,5 @@ export * from "./capture.ts";
 export * from "./journal.ts";
 export * from "./function-locator.ts";
 export * from "./lease.ts";
+export * from "./flow-folder.ts";
+export * from "./stored-files.ts";
