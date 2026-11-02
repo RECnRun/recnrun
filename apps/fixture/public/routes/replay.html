@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <script>
+      window.__fixture = { hookSeenAtHead: Boolean(window.__recnrunHook) };
+    </script>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Replay · RECnRun fixture</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="/fixture.css" />
+    <script type="module" src="/routes/replay.js"></script>
+  </head>
+  <body>
+    <header>
+      <h1>Replay</h1>
+      <a href="/" data-testid="home">All routes</a>
+    </header>
+    <main>
+      <p data-testid="intro">Every action, assertion, and extraction of a replayed flow.</p>
+      <label>Search <input type="search" data-testid="search" autocomplete="off" /></label>
+      <p role="status" data-testid="search-status"></p>
+      <label>Note <textarea data-testid="note"></textarea></label>
+      <label
+        >Color
+        <select data-testid="color">
+          <option value="red">Red</option>
+          <option value="green">Green</option>
+          <option value="blue">Blue</option>
+        </select>
+      </label>
+      <label><input type="checkbox" data-testid="terms" /> Accept the terms</label>
+      <button type="button" data-testid="continue" disabled>Continue</button>
+      <p data-testid="done-panel" hidden>All set</p>
+      <ul data-testid="items">
+        <li data-testid="item">Apples</li>
+        <li data-testid="item">Pears</li>
+        <li data-testid="item">Plums</li>
+      </ul>
+      <a href="#product" data-testid="product" data-sku="P-42">Product P-42</a>
+      <p data-testid="price">Price: <span>12.50</span> EUR</p>
+      <p data-testid="late-slot"></p>
+      <p role="status" data-testid="late-status"></p>
+      <button type="button" data-testid="open-popup">Open popup</button>
+      <form method="post" action="/api/orders" data-testid="order-form" aria-label="Order">
+        <input type="hidden" name="key" data-testid="order-key" aria-label="Order key" />
+        <input type="hidden" name="delay" data-testid="order-delay" aria-label="Answer delay" />
+        <button type="submit" data-testid="place-order">Place order</button>
+      </form>
+      <p role="status" data-testid="order-status"></p>
+      <p role="status" data-testid="scroll-y">Scrolled 0</p>
+      <div class="replay-spacer"></div>
+      <p data-testid="bottom">Bottom of the page</p>
+    </main>
+  </body>
+</html>

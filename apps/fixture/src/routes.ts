@@ -38,6 +38,11 @@ export const ROUTES: readonly FixtureRoute[] = [
   { name: "dialogs", title: "Dialogs", summary: "alert and confirm" },
   { name: "storage", title: "Storage", summary: "localStorage, sessionStorage, and cookies" },
   { name: "worker", title: "Worker", summary: "A dedicated worker that answers messages" },
+  {
+    name: "replay",
+    title: "Replay",
+    summary: "Every replay action and assertion, a late button, and a slow order form",
+  },
 ];
 
 /**

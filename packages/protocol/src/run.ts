@@ -55,6 +55,8 @@ export const StepResultSchema = v.strictObject({
   startedAt: v.optional(IsoTimestampSchema),
   endedAt: v.optional(IsoTimestampSchema),
   durationMs: v.optional(v.pipe(v.number(), v.minValue(0))),
+  // Reads of the page before acting or deciding; a write action is dispatched at most once.
+  attempts: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1))),
   error: v.optional(v.strictObject({ code: NonEmptyStringSchema, message: NonEmptyStringSchema })),
   evidence: v.optional(EvidenceSchema),
 });

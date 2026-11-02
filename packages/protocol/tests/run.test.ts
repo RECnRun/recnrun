@@ -95,6 +95,13 @@ test("isStepResult accepts a step result and rejects other shapes", () => {
   expect(isStepResult({ ...failed, evidence: [""] })).toBe(false);
 });
 
+test("a step result counts its page reads as attempts, at least one", () => {
+  const located = { stepId: "late", status: "passed", attempts: 4 };
+  expect(isStepResult(located)).toBe(true);
+  expect(isStepResult({ ...located, attempts: 0 })).toBe(false);
+  expect(isStepResult({ ...located, attempts: 1.5 })).toBe(false);
+});
+
 test("RunCoverageSchema and the capability matrix share statuses and surfaces", () => {
   const coverage = {
     schemaVersion: 1,

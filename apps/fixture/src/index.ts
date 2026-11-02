@@ -55,6 +55,7 @@ export function createFixtureServer(options: FixtureOptions = {}): FixtureServer
       return urls;
     },
     nextSerial: () => (serial += 1),
+    orders: new Map(),
   };
   const servers = [0, 1].map(() => {
     const server = createServer((request, response) => {

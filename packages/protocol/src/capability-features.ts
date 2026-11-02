@@ -144,7 +144,12 @@ export const FEATURE_CAPABILITIES: Feature[] = [
     "Flow folders and immutable revisions",
     "Delivered by F2.4; packages/persistence/tests/flow-store.test.ts, flow-runs.test.ts, and flow-yaml.test.ts. flow.yaml round-trips byte for byte, every change writes an immutable revision named by the sha256 of its canonical JSON, runs reference that hash, metadata writes are atomic, a truncated events.jsonl reads with a gap, and the node:sqlite index rebuilt from the folders lists the same catalog; a corrupt manifest is reported and skipped.",
   ),
-  planned("replay-executor", "F2.5", "Replay executor", "Write actions are never retried blindly."),
+  implemented(
+    "replay-executor",
+    "F2.5",
+    "Replay executor",
+    "Delivered by F2.5 in the engine over the CDP adapter; tests/browser/replay.spec.ts and packages/engine/tests/replay-*.test.ts. Every action, assertion, and extraction replays on the fixture into steps.json and summary.json with exit codes 0, 1, and 2; reads poll until the step's deadline (no networkidle); a write is dispatched once, and a click whose navigation times out leaves the step indeterminate while the fixture counts exactly one order; pauseReplay holds the next step until resumed; secrets are redacted from every stored file.",
+  ),
   planned("ui-minimal", "F2.6", "Minimal UI", "Setup, catalog, recorder, editor, and run screens."),
   implemented(
     "cli-local",
