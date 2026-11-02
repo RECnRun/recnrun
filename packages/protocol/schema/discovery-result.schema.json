@@ -1,0 +1,57 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "oneOf": [
+    {
+      "additionalProperties": false,
+      "properties": {
+        "ok": {
+          "const": true
+        },
+        "path": {
+          "pattern": "^/devtools/browser/",
+          "type": "string"
+        },
+        "port": {
+          "maximum": 65535,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "source": {
+          "const": "active-port-file"
+        },
+        "userDataDir": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "wsEndpoint": {
+          "pattern": "^ws:\\/\\/127\\.0\\.0\\.1:\\d+\\/devtools\\/browser\\/",
+          "type": "string"
+        }
+      },
+      "required": ["ok", "wsEndpoint", "userDataDir", "source", "port", "path"],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "enum": ["missing-file", "malformed-file", "stale-file"],
+          "type": "string"
+        },
+        "ok": {
+          "const": false
+        },
+        "remedy": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "userDataDir": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": ["ok", "code", "remedy", "userDataDir"],
+      "type": "object"
+    }
+  ]
+}

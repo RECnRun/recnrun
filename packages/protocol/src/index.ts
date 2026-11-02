@@ -4,6 +4,7 @@ export * from "./api.ts";
 export * from "./capabilities.ts";
 export * from "./capability-matrix.ts";
 export * from "./common.ts";
+export * from "./discovery.ts";
 export * from "./events.ts";
 export * from "./flow.ts";
 export * from "./interpolation.ts";

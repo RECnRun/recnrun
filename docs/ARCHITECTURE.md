@@ -17,18 +17,18 @@ apps/website ──► @recnrun/brand (landing and install guide; no engine code
 apps/fixture: the controllable test application; nothing imports it
 ```
 
-| Workspace              | Holds                                                                                                                                      | May import                                                      | Since |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------- | ----- |
-| `packages/protocol`    | Versioned schemas: flow DSL, locator lists, event envelope, run manifest, summary and coverage, capability matrix, service API, MCP shapes | `valibot`                                                       | F0.2  |
-| `packages/engine`      | Sessions, leases, steps, locator resolution, recorder normalization, function registry, macro runtime                                      | `protocol`                                                      | F0.2  |
-| `packages/adapter`     | Chrome discovery, the CDP connection, targets and frames, actions, instrumentation hooks, element references                               | `engine` (the adapter interface), `protocol`, `playwright-core` | F0.2  |
-| `packages/persistence` | Flow folders, revisions, the JSONL journal, blobs by hash, the SQLite index, export and import                                             | `protocol`, `node:` builtins                                    | F0.2  |
-| `packages/brand`       | The Mona Sans font and the stylesheet every app imports                                                                                    | nothing                                                         | M0    |
-| `apps/service`         | The loopback HTTP and WebSocket API, locks, lifecycle, logs, the MCP stdio adapter; serves the built UI                                    | `engine`, `adapter`, `persistence`, `protocol`                  | F0.2  |
-| `apps/ui`              | The Preact SPA on localhost: catalog, recorder, editor, run, diagnostics                                                                   | `protocol`, `brand`, `preact`                                   | F0.2  |
-| `apps/cli`             | `setup`, `open`, `run`, `doctor`, `agents setup`, `mcp`; published as `@recnrun/cli`                                                       | `service`                                                       | F0.2  |
-| `apps/fixture`         | The controllable test application: pages on two ports, `?fail=<case>`, `window.__fixture` ([below](#fixture-application))                  | nothing from the workspace; `node:` builtins                    | F0.2  |
-| `apps/website`         | The public landing at recnrun.com and the install guide                                                                                    | `brand`                                                         | M0    |
+| Workspace              | Holds                                                                                                                                      | May import                                                                                                 | Since |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------- | ----- |
+| `packages/protocol`    | Versioned schemas: flow DSL, locator lists, event envelope, run manifest, summary and coverage, capability matrix, service API, MCP shapes | `valibot`                                                                                                  | F0.2  |
+| `packages/engine`      | Sessions, leases, steps, locator resolution, recorder normalization, function registry, macro runtime                                      | `protocol`                                                                                                 | F0.2  |
+| `packages/adapter`     | Chrome discovery, the CDP connection, targets and frames, actions, instrumentation hooks, element references                               | `engine` (the adapter interface), `protocol`, `playwright-core`, four `node:` builtins ([below](#adapter)) | F0.2  |
+| `packages/persistence` | Flow folders, revisions, the JSONL journal, blobs by hash, the SQLite index, export and import                                             | `protocol`, `node:` builtins                                                                               | F0.2  |
+| `packages/brand`       | The Mona Sans font and the stylesheet every app imports                                                                                    | nothing                                                                                                    | M0    |
+| `apps/service`         | The loopback HTTP and WebSocket API, locks, lifecycle, logs, the MCP stdio adapter; serves the built UI                                    | `engine`, `adapter`, `persistence`, `protocol`                                                             | F0.2  |
+| `apps/ui`              | The Preact SPA on localhost: catalog, recorder, editor, run, diagnostics                                                                   | `protocol`, `brand`, `preact`                                                                              | F0.2  |
+| `apps/cli`             | `setup`, `open`, `run`, `doctor`, `agents setup`, `mcp`; published as `@recnrun/cli`                                                       | `service`                                                                                                  | F0.2  |
+| `apps/fixture`         | The controllable test application: pages on two ports, `?fail=<case>`, `window.__fixture` ([below](#fixture-application))                  | nothing from the workspace; `node:` builtins                                                               | F0.2  |
+| `apps/website`         | The public landing at recnrun.com and the install guide                                                                                    | `brand`                                                                                                    | M0    |
 
 - The engine never imports Playwright or CDP types. It defines the adapter interface (`BrowserAdapter`); `packages/adapter` imports that interface from `engine` and implements it, and `engine` never imports the adapter. The service wires the two together, so unit tests use a fake adapter and browser tests use the real one.
 - Packages never import apps. Apps meet through `packages/protocol` and the service API; the only app that imports another is `apps/cli`, which starts `apps/service`.
@@ -38,17 +38,17 @@ apps/fixture: the controllable test application; nothing imports it
 
 Each workspace has one dependency-cruiser rule that lists what its `src` may import; anything else is a violation:
 
-| Rule                         | From                   | Allowed targets                                                |
-| ---------------------------- | ---------------------- | -------------------------------------------------------------- |
-| `protocol-pure`              | `packages/protocol`    | itself, `valibot`                                              |
-| `engine-not-to-adapter-impl` | `packages/engine`      | itself, `protocol` (no adapter, Playwright, CDP, or Node APIs) |
-| `adapter-boundaries`         | `packages/adapter`     | itself, `engine`, `protocol`, `playwright-core`                |
-| `persistence-boundaries`     | `packages/persistence` | itself, `protocol`, `node:` builtins                           |
-| `service-boundaries`         | `apps/service`         | itself, `engine`, `adapter`, `persistence`, `protocol`         |
-| `cli-only-service`           | `apps/cli`             | itself, `apps/service`                                         |
-| `ui-only-protocol`           | `apps/ui`              | itself, `protocol`, `brand`, `preact`                          |
-| `fixture-isolated`           | `apps/fixture`         | nothing from `apps/` or `packages/`                            |
-| `website-only-brand`         | `apps/website`         | `brand` among the workspace packages                           |
+| Rule                         | From                   | Allowed targets                                                                                         |
+| ---------------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------- |
+| `protocol-pure`              | `packages/protocol`    | itself, `valibot`                                                                                       |
+| `engine-not-to-adapter-impl` | `packages/engine`      | itself, `protocol` (no adapter, Playwright, CDP, or Node APIs)                                          |
+| `adapter-boundaries`         | `packages/adapter`     | itself, `engine`, `protocol`, `playwright-core`, `node:fs/promises`, `node:net`, `node:os`, `node:path` |
+| `persistence-boundaries`     | `packages/persistence` | itself, `protocol`, `node:` builtins                                                                    |
+| `service-boundaries`         | `apps/service`         | itself, `engine`, `adapter`, `persistence`, `protocol`                                                  |
+| `cli-only-service`           | `apps/cli`             | itself, `apps/service`                                                                                  |
+| `ui-only-protocol`           | `apps/ui`              | itself, `protocol`, `brand`, `preact`                                                                   |
+| `fixture-isolated`           | `apps/fixture`         | nothing from `apps/` or `packages/`                                                                     |
+| `website-only-brand`         | `apps/website`         | `brand` among the workspace packages                                                                    |
 
 A later task that needs a new import (for example `node:http` in the service) widens that workspace's rule and this table in the same change, with the reason. `src/main.tsx` and `src/bin.ts` of any app are entrypoints that nothing imports (`not-to-entrypoints`).
 
@@ -56,16 +56,17 @@ A later task that needs a new import (for example `node:http` in the service) wi
 
 `packages/protocol/src` holds one module per concept; `index.ts` re-exports them.
 
-| Module                                             | Shapes                                                                                                           |
-| -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `flow.ts`, `steps.ts`, `actions.ts`, `locators.ts` | The flow DSL: actors, inputs, requirements, preconditions, action, assertion, and builtin steps, targets         |
-| `interpolation.ts`                                 | `${env.*}`, `${inputs.*}`, `${vars.*}`, `${locals.*}`, and `${secrets.*}`; any other namespace is rejected       |
-| `validate.ts`                                      | `validateFlow(input)`: the schema plus the cross-step checks, as `{ ok: true, flow }` or `{ ok: false, issues }` |
-| `events.ts`                                        | The event envelope of the journal (source plan §11) and the gap record                                           |
-| `run.ts`                                           | `manifest.json`, `steps.json`, `coverage.json`, and `summary.json` of a run, with the exit code of each status   |
-| `states.ts`                                        | Session, control, and step states and their legal transitions (source plan §6)                                   |
-| `capabilities.ts`                                  | Capture surfaces, statuses, and the capability matrix                                                            |
-| `api.ts`, `api-commands.ts`                        | The request and response envelopes, error codes, and the params and result of every command (`SERVICE_COMMANDS`) |
+| Module                                             | Shapes                                                                                                                  |
+| -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `flow.ts`, `steps.ts`, `actions.ts`, `locators.ts` | The flow DSL: actors, inputs, requirements, preconditions, action, assertion, and builtin steps, targets                |
+| `interpolation.ts`                                 | `${env.*}`, `${inputs.*}`, `${vars.*}`, `${locals.*}`, and `${secrets.*}`; any other namespace is rejected              |
+| `validate.ts`                                      | `validateFlow(input)`: the schema plus the cross-step checks, as `{ ok: true, flow }` or `{ ok: false, issues }`        |
+| `discovery.ts`                                     | `DiscoveryResultSchema`: the endpoint found in `DevToolsActivePort`, or a failure code with its remedy; Chrome channels |
+| `events.ts`                                        | The event envelope of the journal (source plan §11) and the gap record                                                  |
+| `run.ts`                                           | `manifest.json`, `steps.json`, `coverage.json`, and `summary.json` of a run, with the exit code of each status          |
+| `states.ts`                                        | Session, control, and step states and their legal transitions (source plan §6)                                          |
+| `capabilities.ts`                                  | Capture surfaces, statuses, and the capability matrix                                                                   |
+| `api.ts`, `api-commands.ts`                        | The request and response envelopes, error codes, and the params and result of every command (`SERVICE_COMMANDS`)        |
 
 The `if` block names its branches `steps` and `otherwise`, never `then`/`else`: an object with a `then` property is a thenable, so `await` or `return` in async code would treat a parsed step as a promise. The source plan's §9.3 example is adapted that way, with a comment in its fixture.
 
@@ -74,6 +75,14 @@ Each issue of `validateFlow` has a `code` (`unknown-action`, `unknown-namespace`
 The capability matrix lives in code (`capability-matrix.ts`, fed by `capability-surfaces.ts`, `capability-features.ts`, and `capability-roadmap.ts`). `vp run capabilities:generate` renders it to [CAPABILITIES.md](CAPABILITIES.md), and `vp run docs:check` fails when that file is stale. A capability status moves only with a test that shows the new behavior.
 
 `vp run schema:generate` writes JSON Schema for the flow, the event, the run files, the capability matrix, and the service envelopes to `packages/protocol/schema/*.json` through `@valibot/to-json-schema`, and the files are committed. `tests/schema-drift.test.ts` fails when a schema changes without regenerating them. JSON Schema describes structure only: rules written as `v.check` (known interpolation namespaces, `nth` needs an index, the exit code matches the status) and the cross-step checks of `validateFlow` are enforced by the protocol code, not by the exported files. Only `src` must stay pure; `scripts/` and `tests/` use Node APIs to write and read those files.
+
+## Adapter
+
+`packages/adapter` is the only package that imports `playwright-core` or speaks CDP. It implements the engine's `BrowserAdapter` interface.
+
+- **Discovery** (`src/discovery.ts`, F1.1). `discover({ userDataDir?, channel? })` reads `<userDataDir>/DevToolsActivePort`, which Chrome writes when remote debugging is on: line 1 is the port (1 to 65535), line 2 the browser path (`/devtools/browser/<id>`). It answers `{ ok: true, wsEndpoint: "ws://127.0.0.1:<port><path>", userDataDir, source: "active-port-file", port, path }`, or `{ ok: false, code, remedy, userDataDir }` with `missing-file`, `malformed-file`, or `stale-file` (the port does not accept a TCP connection on 127.0.0.1 within 500 ms, as after Chrome crashed). Every remedy says to enable remote debugging at `chrome://inspect/#remote-debugging` and keep Chrome open. `DiscoveryResultSchema` in `packages/protocol` is the shape, so the service and `doctor` reuse it.
+- **Default user-data dirs.** Without `userDataDir`, the channel (`stable`, `beta`, `dev`, `canary`) picks the folder Chromium uses: macOS `~/Library/Application Support/Google/Chrome` (`Chrome Beta`, `Chrome Dev`, `Chrome Canary`); Windows `%LOCALAPPDATA%\Google\Chrome\User Data` (`Chrome Beta`, `Chrome Dev`, `Chrome SxS`); Linux `$CHROME_CONFIG_HOME`, else `$XDG_CONFIG_HOME`, else `~/.config`, then `google-chrome` (`google-chrome-beta`, `google-chrome-unstable`, `google-chrome-canary`). The platform, environment, file reader, and port probe are options, so unit tests run on temporary directories.
+- **Node built-ins.** Discovery is why `adapter-boundaries` allows `node:fs/promises` (read the file), `node:net` (probe the port), `node:os` (the home folder), and `node:path` (Windows and POSIX joins); no other built-in. The adapter only reads Chrome's file; persistence still owns RECnRun's own files.
 
 ## Website
 

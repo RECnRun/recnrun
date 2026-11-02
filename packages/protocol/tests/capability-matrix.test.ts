@@ -76,3 +76,12 @@ test("every F0 deliverable is implemented", () => {
     expect(byId.get(id), id).toBe("implemented");
   }
 });
+
+test.each([["chrome-discovery", "tests/browser/discover.spec.ts"]])(
+  "the F1 deliverable %s is implemented and names %s",
+  (id, spec) => {
+    const entry = entries.find((candidate) => candidate.id === id);
+    expect(entry?.status, id).toBe("implemented");
+    expect(entry?.notes, id).toContain(spec);
+  },
+);

@@ -18,3 +18,5 @@ export function createCdpAdapter(): BrowserAdapter {
     disconnect: () => Promise.reject(new NotImplementedError("Disconnecting from CDP")),
   };
 }
+
+export { discover, type DiscoverOptions, type DiscoveryFileSystem } from "./discovery.ts";

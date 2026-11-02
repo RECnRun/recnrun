@@ -47,7 +47,10 @@ Markers: `[ ]` not started · `[i]` implemented, awaiting the phase gate · `[x]
 
 ## F1: Connection and fidelity spike
 
-- [ ] F1.1 Discovery (`DevToolsActivePort`, per-OS defaults)
+- [i] F1.1 Discovery (`DevToolsActivePort`, per-OS defaults)
+  - red: `vp test --project=@recnrun/adapter` against a stub `discover()` that always answers `missing-file` (28 of 31 failed, for example `expected { ok: false, …(3) } to deeply equal { ok: true, …(5) }` and `expected 'Not implemented.' to match /chrome:\/\/inspect\/#remote-debuggin…/`); `vp run test:browser -- tests/browser/discover.spec.ts` against the same stub (2 of 2 failed, `expect(received).toEqual(expected)`); `vp test --project=@recnrun/protocol` before `schema:generate` (`discovery-result.schema.json is stale`) and before the matrix change (`chrome-discovery: expected 'planned' to be 'implemented'`); `vp run deps` before widening `adapter-boundaries` (`discovery.ts → fs/promises`, `net`, `os`, `path`); in a scratch worktree `node:child_process` and `node:http` still fail the widened rule
+  - green: `vp test --project=@recnrun/adapter` (31 passed); `vp run test:browser -- tests/browser/discover.spec.ts` (2 passed on Google Chrome 156.0.8078.79 on Linux in Docker; the file stays after SIGKILL and reads as `stale-file`); `vp run test:unit` (240 passed); `vp run test:coverage` (96.67% statements, 88.26% branches; adapter 98.41%); `vp run test:browser` (23 passed); `vp check`, `vp lint --deny-warnings`, `deps`, `dead-code`, `duplication`, `docs:check`, `vp run -r build` (11/11) exit 0
+  - commit: the commit that adds this entry
 - [ ] F1.2 Connection, handshake, loss, reconnection, contested control
 - [ ] F1.3 Profiles as bindings, two instances isolated
 - [ ] F1.4 Instrumentation installation order and message validation

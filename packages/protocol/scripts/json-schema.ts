@@ -3,6 +3,7 @@ import { format } from "oxfmt";
 import type * as v from "valibot";
 import {
   CapabilityMatrixSchema,
+  DiscoveryResultSchema,
   EventSchema,
   FlowSchema,
   LocatorEntrySchema,
@@ -21,6 +22,7 @@ type AnySchema = v.GenericSchema;
 /** Every top-level document of the protocol, by the file name its JSON Schema is written to. */
 const DOCUMENTS: Record<string, AnySchema> = {
   "capability-matrix": CapabilityMatrixSchema,
+  "discovery-result": DiscoveryResultSchema,
   event: EventSchema,
   flow: FlowSchema,
   "run-coverage": RunCoverageSchema,

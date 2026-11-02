@@ -4,7 +4,7 @@ import { planned } from "./capability-planned.ts";
 
 type Feature = Extract<Capability, { kind: "feature" }>;
 
-// Only what F0 delivers is implemented; everything else moves with its own test (PLAN.md §7).
+// Only what a task delivered is implemented; everything else moves with its own test (PLAN.md §7).
 export const FEATURE_CAPABILITIES: Feature[] = [
   {
     kind: "feature",
@@ -57,12 +57,15 @@ export const FEATURE_CAPABILITIES: Feature[] = [
     notes:
       "Delivered by F0.5; tests/browser/fixture.spec.ts opens every route on two origins in Google Chrome.",
   },
-  planned(
-    "chrome-discovery",
-    "F1.1",
-    "Chrome discovery",
-    "Reads DevToolsActivePort; the default-profile remote-debugging dialog stays manual (M-F1).",
-  ),
+  {
+    kind: "feature",
+    id: "chrome-discovery",
+    title: "Chrome discovery",
+    status: "implemented",
+    phase: "F1.1",
+    notes:
+      "Delivered by F1.1; tests/browser/discover.spec.ts on Linux in Docker. The default-profile dialog on macOS and Windows stays manual (M-F1.a, M-F1.b).",
+  },
   planned(
     "cdp-connection",
     "F1.2",

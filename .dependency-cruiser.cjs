@@ -75,10 +75,15 @@ module.exports = {
     {
       name: "adapter-boundaries",
       severity: "error",
-      comment: "The adapter implements the engine's interface over playwright-core and CDP.",
+      comment:
+        "The adapter implements the engine's interface over playwright-core and CDP; discovery reads DevToolsActivePort and probes its loopback port.",
       from: { path: "^packages/adapter/src/" },
       to: {
-        pathNot: ["^packages/(adapter|engine|protocol)/src/", "/node_modules/playwright-core/"],
+        pathNot: [
+          "^packages/(adapter|engine|protocol)/src/",
+          "/node_modules/playwright-core/",
+          "^(fs/promises|net|os|path)$",
+        ],
       },
     },
     {
