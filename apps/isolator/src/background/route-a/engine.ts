@@ -1,0 +1,193 @@
+import { parseMarker } from "@recnrun/isolation-core";
+import { BOOTSTRAP_HASH, BOOTSTRAP_VERSION } from "@recnrun/worker-bootstrap";
+import { isAttachedEvent } from "@/background/probes/auto-attach";
+import { PROTOCOL_VERSION, withTimeout } from "@/background/probes/helpers";
+import { isLoopbackUrl } from "@/background/probes/loopback";
+import type { Debuggee, DebuggerApi, EventListener, TargetInfo } from "@/background/probes/types";
+import {
+  AUTO_ATTACH,
+  bootstrap,
+  command,
+  entryOf,
+  handleAttached,
+} from "@/background/route-a/attached";
+import { tabIdOf, targetIdOf } from "@/background/route-a/requests";
+import type {
+  JournalEntry,
+  RouteA,
+  RouteAJournal,
+  UnattachedTarget,
+} from "@/background/route-a/types";
+
+/** What `Storage.clearDataForOrigin` removes between iterations: registrations and their storage. */
+const CLEARED_STORAGE = "service_workers,indexeddb,cache_storage";
+
+function originOf(url: string): string | undefined {
+  const origin = URL.canParse(url) ? new URL(url).origin : "null";
+  return origin === "null" ? undefined : origin;
+}
+
+function pageOf(targets: TargetInfo[], tabId: number): TargetInfo {
+  const page = targets.find((target) => target.type === "page" && target.tabId === tabId);
+  if (!page) throw new Error(`no tab ${tabId}`);
+  return page;
+}
+
+/** Route A (POC PLAN.md P1.1): the tab's debugger session auto-attaches workers paused. */
+export class RouteAEngine implements RouteA {
+  readonly #debuggerApi: () => DebuggerApi;
+  readonly #now: () => number;
+  #marker: string | undefined;
+  #entries: JournalEntry[] = [];
+  readonly #pending = new Set<Promise<void>>();
+  readonly #armed = new Map<number, EventListener>();
+  readonly #direct = new Set<string>();
+
+  constructor(debuggerApi: () => DebuggerApi, now: () => number = () => performance.now()) {
+    this.#debuggerApi = debuggerApi;
+    this.#now = now;
+  }
+
+  setMarker(marker: unknown): string {
+    this.#marker = parseMarker(marker);
+    return this.#marker;
+  }
+
+  async arm(request: unknown): Promise<void> {
+    const tabId = tabIdOf(request);
+    this.#requireMarker();
+    if (this.#armed.has(tabId)) throw new Error(`tab ${tabId} is already armed`);
+    const api = this.#debuggerApi();
+    const listener = this.#listenerFor(tabId);
+    // Listening first: auto-attach reports the targets that already exist right away.
+    api.onEvent.addListener(listener);
+    this.#armed.set(tabId, listener);
+    try {
+      await withTimeout(api.attach({ tabId }, PROTOCOL_VERSION), "attach");
+      await command(api, { tabId }, "Target.setAutoAttach", AUTO_ATTACH);
+    } catch (error) {
+      await this.#release(tabId);
+      throw error;
+    }
+  }
+
+  async journal(): Promise<RouteAJournal> {
+    await Promise.allSettled(this.#pending);
+    const unattached = await this.#unattached([...this.#armed.keys()]);
+    return {
+      ...(this.#marker === undefined ? {} : { marker: this.#marker }),
+      bootstrap: { hash: BOOTSTRAP_HASH, version: BOOTSTRAP_VERSION },
+      entries: this.#entries.map((entry) => ({ ...entry })),
+      unattached,
+    };
+  }
+
+  async disarm(request: unknown): Promise<RouteAJournal> {
+    const tabId = tabIdOf(request);
+    if (!this.#armed.has(tabId)) throw new Error(`tab ${tabId} is not armed`);
+    const journal = await this.journal();
+    await this.#release(tabId);
+    const api = this.#debuggerApi();
+    for (const targetId of this.#direct) {
+      await withTimeout(api.detach({ targetId }), "detach").catch(() => undefined);
+    }
+    this.#direct.clear();
+    this.#entries = [];
+    return journal;
+  }
+
+  async attachTarget(request: unknown): Promise<JournalEntry> {
+    const targetId = targetIdOf(request);
+    const marker = this.#requireMarker();
+    const api = this.#debuggerApi();
+    const target = (await api.getTargets()).find((candidate) => candidate.id === targetId);
+    if (!target) throw new Error(`no target ${targetId}`);
+    const entry: JournalEntry = {
+      sessionId: "",
+      targetId,
+      type: target.type,
+      url: target.url,
+      waitingForDebugger: false,
+      attachedAt: this.#now(),
+      marker,
+      released: false,
+    };
+    this.#entries.push(entry);
+    await withTimeout(api.attach({ targetId }, PROTOCOL_VERSION), "attach");
+    this.#direct.add(targetId);
+    await bootstrap(api, { targetId }, entry, this.#now);
+    return { ...entry };
+  }
+
+  async clearOrigin(request: unknown): Promise<{ origin: string }> {
+    const tabId = tabIdOf(request);
+    const api = this.#debuggerApi();
+    const { url } = pageOf(await api.getTargets(), tabId);
+    const origin = originOf(url);
+    // R11: the isolator never touches the data of a site outside the loopback.
+    if (origin === undefined || !isLoopbackUrl(origin)) {
+      throw new Error(`refuses to clear ${origin ?? url}, which is not on the loopback`);
+    }
+    const tab: Debuggee = { tabId };
+    const borrowed = !this.#armed.has(tabId);
+    if (borrowed) await withTimeout(api.attach(tab, PROTOCOL_VERSION), "attach");
+    try {
+      await command(api, tab, "Storage.clearDataForOrigin", {
+        origin,
+        storageTypes: CLEARED_STORAGE,
+      });
+    } finally {
+      if (borrowed) await withTimeout(api.detach(tab), "detach").catch(() => undefined);
+    }
+    return { origin };
+  }
+
+  async tabs(): Promise<{ tabId: number; url: string }[]> {
+    const targets = await this.#debuggerApi().getTargets();
+    return targets.flatMap(({ type, tabId, url }) =>
+      type === "page" && tabId !== undefined ? [{ tabId, url }] : [],
+    );
+  }
+
+  #requireMarker(): string {
+    if (this.#marker === undefined) throw new Error("call setMarker() first");
+    return this.#marker;
+  }
+
+  #listenerFor(tabId: number): EventListener {
+    return (source, method, params) => {
+      if (method !== "Target.attachedToTarget" || source.tabId !== tabId) return;
+      if (!isAttachedEvent(params) || this.#marker === undefined) return;
+      const entry = entryOf(source, params, this.#now(), this.#marker);
+      this.#entries.push(entry);
+      const handled = handleAttached(this.#debuggerApi(), source, entry, this.#now);
+      this.#pending.add(handled);
+      void handled.finally(() => this.#pending.delete(handled));
+    };
+  }
+
+  /** Stops listening for the tab and detaches it; Chrome drops its flattened child sessions too. */
+  async #release(tabId: number): Promise<void> {
+    const api = this.#debuggerApi();
+    const listener = this.#armed.get(tabId);
+    if (listener) api.onEvent.removeListener(listener);
+    this.#armed.delete(tabId);
+    await withTimeout(api.detach({ tabId }), "detach").catch(() => undefined);
+  }
+
+  /** Worker targets on an armed tab's origin that no auto-attach or direct attach reached. */
+  async #unattached(tabIds: number[]): Promise<UnattachedTarget[]> {
+    if (tabIds.length === 0) return [];
+    const targets = await this.#debuggerApi().getTargets();
+    const pages = targets.filter((target) => target.type === "page");
+    const origins = new Set(
+      pages.filter((page) => tabIds.includes(page.tabId ?? -1)).map((page) => originOf(page.url)),
+    );
+    origins.delete(undefined);
+    const seen = new Set(this.#entries.map((entry) => entry.targetId));
+    return targets
+      .filter((target) => target.type !== "page" && !seen.has(target.id))
+      .filter((target) => origins.has(originOf(target.url)))
+      .map(({ id, type, url }) => ({ targetId: id, type, url }));
+  }
+}

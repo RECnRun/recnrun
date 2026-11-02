@@ -3,7 +3,7 @@ import type { ProbeTargets } from "@/background/probes/types";
 const LOOPBACK_HOSTS = ["127.0.0.1", "localhost", "[::1]"];
 
 /** R11 (POC PLAN.md §1): an http(s) URL on the loopback, which Chrome resolves *.localhost to. */
-function isLoopbackUrl(value: string): boolean {
+export function isLoopbackUrl(value: string): boolean {
   if (!URL.canParse(value)) return false;
   const { protocol, hostname } = new URL(value);
   if (protocol !== "http:" && protocol !== "https:") return false;

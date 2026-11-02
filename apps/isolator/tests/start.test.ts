@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vite-plus/test";
 import { fakeBrowser } from "wxt/testing/fake-browser";
+import { RouteAEngine } from "@/background/route-a/engine";
+import { ROUTE_A_GLOBAL } from "@/background/route-a/expose";
 import { GET_SELF, LOADED_KEY, startBackground } from "@/background/start";
 
 const self = {
@@ -60,5 +62,9 @@ describe("startBackground", () => {
     expect(await send({ type: "unknown" }).listeners).toEqual([false]);
     expect(await send("getSelf").listeners).toEqual([false]);
     expect(fakeBrowser.management.getSelf).not.toHaveBeenCalled();
+  });
+
+  test("exposes Route A to the harness", () => {
+    expect(Reflect.get(globalThis, ROUTE_A_GLOBAL)).toBeInstanceOf(RouteAEngine);
   });
 });

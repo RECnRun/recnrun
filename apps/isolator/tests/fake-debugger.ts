@@ -55,6 +55,8 @@ export interface FakeOptions {
   keepsClosed?: boolean;
   /** detach() fails with this text. */
   detachError?: string;
+  /** What getTargets() lists instead of the fixture's page, service worker, and shared worker. */
+  targets?: TargetInfo[];
 }
 
 /** A fake chrome.debugger: answers every command, refuses ServiceWorker.*, auto-attaches workers. */
@@ -91,7 +93,7 @@ export function fakeDebugger(options: FakeOptions = {}) {
     },
   };
   const api: DebuggerApi = {
-    getTargets: async () => TARGETS.filter((target) => !closed.has(target.id)),
+    getTargets: async () => (options.targets ?? TARGETS).filter((target) => !closed.has(target.id)),
     attach: async () => undefined,
     detach: async (target) => {
       if (options.detachError) throw new Error(options.detachError);
@@ -108,7 +110,7 @@ export function fakeDebugger(options: FakeOptions = {}) {
     onEvent,
     onDetach,
   };
-  return { api, sent, onEvent, onDetach };
+  return { api, sent, onEvent, onDetach, emit };
 }
 
 export function byId(results: ProbeResult[]): Record<string, ProbeResult> {

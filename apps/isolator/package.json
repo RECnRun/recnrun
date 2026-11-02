@@ -6,9 +6,13 @@
   "type": "module",
   "scripts": {
     "dev": "wxt",
-    "build": "tsc --noEmit && wxt build",
-    "build:test": "wxt build --mode test",
+    "build": "vp run @recnrun/worker-bootstrap#build && tsc --noEmit && wxt build",
+    "build:test": "vp run @recnrun/worker-bootstrap#build && wxt build --mode test",
     "wxt:prepare": "wxt prepare"
+  },
+  "dependencies": {
+    "@recnrun/isolation-core": "workspace:*",
+    "@recnrun/worker-bootstrap": "workspace:*"
   },
   "devDependencies": {
     "typescript": "catalog:",

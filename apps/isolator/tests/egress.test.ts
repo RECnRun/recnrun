@@ -6,6 +6,8 @@ import { fakeBrowser } from "wxt/testing/fake-browser";
 import { HARNESS_GLOBAL } from "@/background/probes/expose";
 import type { ProbeHarness } from "@/background/probes/expose";
 import type { ProbeTargets } from "@/background/probes/types";
+import { ROUTE_A_GLOBAL } from "@/background/route-a/expose";
+import type { RouteA } from "@/background/route-a/types";
 import { GET_SELF, LOADED_KEY, startBackground } from "@/background/start";
 import { fakeDebugger, URLS } from "./fake-debugger";
 
@@ -57,7 +59,7 @@ function probeEntrypoint() {
   Object.assign(fakeBrowser, { debugger: debuggerFake.api });
   startBackground();
   const harness = (globalThis as Record<string, unknown>)[HARNESS_GLOBAL] as ProbeHarness;
-  return { harness, sent: debuggerFake.sent };
+  return { harness, sent: debuggerFake.sent, emit: debuggerFake.emit };
 }
 
 function expectNoExternalReach(manifest: Record<string, unknown>, source: string): void {
@@ -152,6 +154,23 @@ describe("isolator egress", () => {
       expect(egress).toEqual([]);
     },
   );
+
+  test("Route A reaches no host outside the loopback", async () => {
+    const { sent, emit } = probeEntrypoint();
+    const routeA = (globalThis as Record<string, unknown>)[ROUTE_A_GLOBAL] as RouteA;
+    routeA.setMarker("egress");
+    await routeA.arm({ tabId: 7 });
+    emit({ tabId: 7 }, "Target.attachedToTarget", {
+      sessionId: "s-sw",
+      waitingForDebugger: true,
+      targetInfo: { targetId: "sw", type: "service_worker", url: URLS.serviceWorkerUrl },
+    });
+    await routeA.attachTarget({ targetId: "shared" });
+    await routeA.disarm({ tabId: 7 });
+    await routeA.clearOrigin({ tabId: 7 });
+    expect(sent.map((entry) => entry.method)).toContain("Runtime.runIfWaitingForDebugger");
+    expect(egress).toEqual([]);
+  });
 
   test("the manifest asks for no update URL, external connection, or native messaging", async () => {
     const config = (await import(pathToFileURL(`${ISOLATOR}wxt.config.ts`).href)) as {

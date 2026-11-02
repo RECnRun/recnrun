@@ -23,13 +23,14 @@ const AUTO_ATTACH_WINDOW_MS = 5_000;
 /** Extra time for a target that may never come (the service worker). */
 const AUTO_ATTACH_SETTLE_MS = 1_000;
 
-interface AttachedEvent {
+/** The parameters of `Target.attachedToTarget`. */
+export interface AttachedEvent {
   sessionId: string;
   waitingForDebugger: boolean;
   targetInfo: { targetId: string; type: string; url: string };
 }
 
-function isAttachedEvent(params: unknown): params is AttachedEvent {
+export function isAttachedEvent(params: unknown): params is AttachedEvent {
   if (typeof params !== "object" || params === null) return false;
   const { sessionId, targetInfo } = params as Partial<AttachedEvent>;
   return typeof sessionId === "string" && typeof targetInfo?.targetId === "string";
