@@ -61,3 +61,18 @@ test("the rendered document is deterministic, sorted, and lists every entry", ()
       ?.slice(2) ?? [];
   expect(surfaceIds).toEqual(surfaceIds.toSorted());
 });
+
+test("every F0 deliverable is implemented", () => {
+  const f0 = [
+    "docs-link-check",
+    "workspace-skeleton",
+    "protocol-schemas",
+    "capability-matrix",
+    "fixture-app",
+    "chrome-in-docker",
+  ];
+  const byId = new Map(entries.map((entry) => [entry.id, entry.status]));
+  for (const id of f0) {
+    expect(byId.get(id), id).toBe("implemented");
+  }
+});

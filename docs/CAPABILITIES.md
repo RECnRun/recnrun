@@ -53,7 +53,7 @@ Statuses: `implemented` (proved by a test), `partial` (works with a stated limit
 | diagnostics-ui           | Diagnostics timeline                           | planned     | F3.7  | Causal confidence is labeled; correlation is not proof.                                                |
 | docs-link-check          | Documentation link and generated-file check    | implemented | F0.1  | Delivered by F0.1 and F0.4; scripts/check-docs.checks.mjs covers it.                                   |
 | events-before-connection | Events from before the connection              | unavailable | F1.2  | Events that happened before CDP attached are not recoverable and are reported as a gap.                |
-| fixture-app              | Fixture application                            | planned     | F0.5  | Two-origin app for browser tests; marked implemented when F0.5 lands.                                  |
+| fixture-app              | Fixture application                            | implemented | F0.5  | Delivered by F0.5; tests/browser/fixture.spec.ts opens every route on two origins in Google Chrome.    |
 | flow-persistence         | Flow folders and immutable revisions           | planned     | F2.4  | The SQLite index can always be rebuilt from the folders.                                               |
 | flow-status-requirements | Flow status and requirement coverage           | planned     | F4.5  | A recording is not validated until a replay passes.                                                    |
 | full-editor              | Full flow editor                               | planned     | F4.1  | Every change creates a revision and past runs keep theirs.                                             |

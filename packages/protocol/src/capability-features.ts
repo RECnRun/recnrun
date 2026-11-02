@@ -48,12 +48,15 @@ export const FEATURE_CAPABILITIES: Feature[] = [
     notes:
       "Delivered by F0.6; tests/container/runner.checks.mjs asserts Google Chrome 144 or newer on Linux only.",
   },
-  planned(
-    "fixture-app",
-    "F0.5",
-    "Fixture application",
-    "Two-origin app for browser tests; marked implemented when F0.5 lands.",
-  ),
+  {
+    kind: "feature",
+    id: "fixture-app",
+    title: "Fixture application",
+    status: "implemented",
+    phase: "F0.5",
+    notes:
+      "Delivered by F0.5; tests/browser/fixture.spec.ts opens every route on two origins in Google Chrome.",
+  },
   planned(
     "chrome-discovery",
     "F1.1",
