@@ -16,6 +16,7 @@ const tasks = new Set([
   "test:e2e:local",
   "test:browser:local",
   "test:experiments:local",
+  "test:stress:local",
   "test:coverage:local",
 ]);
 const runId = `${new Date().toISOString().replaceAll(":", "-")}-${randomUUID()}`;
@@ -92,7 +93,8 @@ async function buildImage() {
 }
 
 async function startTests() {
-  const environment = ["CI", "DEBUG", "FORCE_COLOR"].flatMap((key) =>
+  const forwarded = ["CI", "DEBUG", "FORCE_COLOR", "RECNRUN_STRESS_ITERATIONS"];
+  const environment = forwarded.flatMap((key) =>
     process.env[key] === undefined ? [] : ["--env", `${key}=${process.env[key]}`],
   );
   // Experiments name their evidence directory after the run (tests/experiments/verdicts.ts).

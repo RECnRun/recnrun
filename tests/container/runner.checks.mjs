@@ -11,7 +11,7 @@ const root = fileURLToPath(new URL("../../", import.meta.url));
 const runner = join(root, "scripts/test-container.mjs");
 const fixture = fileURLToPath(new URL("./docker-fixture.mjs", import.meta.url));
 
-function launch(context, scenario = "success", extra = []) {
+function launch(context, scenario = "success", extra = [], task = "test:e2e:local") {
   const directory = mkdtempSync(join(tmpdir(), "recnrun-container-"));
   context.after(() => rmSync(directory, { recursive: true, force: true }));
   const docker = join(directory, "docker");
@@ -19,10 +19,11 @@ function launch(context, scenario = "success", extra = []) {
     writeFileSync(docker, `#!${process.execPath}\nimport ${JSON.stringify(fixture)};\n`);
     chmodSync(docker, 0o755);
   }
-  const child = spawn(process.execPath, [runner, "test:e2e:local", ...extra], {
+  const child = spawn(process.execPath, [runner, task, ...extra], {
     cwd: directory,
     env: {
       ...process.env,
+      RECNRUN_STRESS_ITERATIONS: "3",
       PATH: scenario === "missing-cli" ? directory : `${directory}${delimiter}${process.env.PATH}`,
       DOCKER_FIXTURE_DIR: directory,
       DOCKER_FIXTURE_SCENARIO: scenario,
@@ -103,6 +104,15 @@ test("forwards arguments literally and runs the current workspace in an isolated
     /Container diagnostic output/,
   );
   assert.equal(result.calls.at(-1)[0], "rm");
+});
+
+test("runs the stress task in Docker and forwards the iteration count", async (context) => {
+  const result = await launch(context, "success", ["--", "--iterations", "2"], "test:stress:local");
+  assert.equal(result.code, 0, result.output);
+  const create = result.calls.find(([command]) => command === "create");
+  assert.ok(create.includes("RECNRUN_STRESS_ITERATIONS=3"));
+  assert.deepEqual(create.slice(-3), ["test:stress:local", "--iterations", "2"]);
+  assert.equal(directoryCopies(result.calls).length, 4);
 });
 
 test("preserves a failing test's exit code and copies evidence before removing the container", async (context) => {
@@ -195,7 +205,8 @@ test(
 
 test("public tests route through Docker while local variants and the hooks retain every gate", () => {
   const manifest = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
-  for (const layer of ["unit", "components", "e2e", "browser", "experiments", "coverage"]) {
+  const layers = ["unit", "components", "e2e", "browser", "experiments", "stress", "coverage"];
+  for (const layer of layers) {
     assert.equal(
       manifest.scripts[`test:${layer}`],
       `node scripts/test-container.mjs test:${layer}:local`,
@@ -204,6 +215,8 @@ test("public tests route through Docker while local variants and the hooks retai
   }
   assert.match(manifest.scripts["test:container"], /runner\.checks\.mjs/);
   assert.equal(manifest.scripts.ready, "vp run verify");
+  // PLAN.md decision 8: stress is too slow for verify and runs on its own.
+  assert.doesNotMatch(readFileSync(join(root, "vite.config.ts"), "utf8"), /test:stress/);
   assert.match(
     readFileSync(join(root, ".vite-hooks/pre-commit"), "utf8"),
     /vp staged\nvp check\nvp run --no-cache deps\nvp run --no-cache test:unit\n/,

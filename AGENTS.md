@@ -35,6 +35,7 @@ Vite+ (`vp`) is the only toolchain. `vp <name>` runs a built-in command and `vp 
 | `vp run deps`                                         | Architecture boundaries (dependency-cruiser)                         |
 | `vp run test:unit`, `test:components`, `test:e2e`     | One test layer: Node, Vitest Browser Mode, Playwright with extension |
 | `vp run test:browser`, `test:experiments`             | Google Chrome Stable over CDP: browser specs; POC hypotheses         |
+| `vp run test:stress` (`-- --iterations N`)            | `@order-critical` specs 100 times, varied conditions; not in verify  |
 | `vp run test`                                         | All five layers                                                      |
 | `vp run test:coverage`                                | Coverage with thresholds                                             |
 | `vp run dead-code`, `vp run duplication`              | Knip; jscpd                                                          |
@@ -93,12 +94,12 @@ Add a body only when the reason is not obvious from the subject. For behavior ch
 
 Claude Code loads these automatically. Codex must read the matching file before editing these paths.
 
-| Rule                         | Paths                                                                                                                        | Covers                                           |
-| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
-| `.claude/rules/extension.md` | `apps/extension/**`                                                                                                          | Entrypoints, allowed origins, messaging, storage |
-| `.claude/rules/website.md`   | `apps/website/**`                                                                                                            | `ui`/`features`/`services`/`app` layers, CSP     |
-| `.claude/rules/domain.md`    | `packages/**`                                                                                                                | Domain purity, schemas, protocol versioning      |
-| `.claude/rules/tests.md`     | `tests/**`, `**/tests/**`, `playwright*.config.ts`, `**/vitest*.config.ts`, `scripts/test-container.mjs`, `Dockerfile.tests` | Test layers, extension fixture, Docker runs      |
+| Rule                         | Paths                                                                                                                                                   | Covers                                           |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| `.claude/rules/extension.md` | `apps/extension/**`                                                                                                                                     | Entrypoints, allowed origins, messaging, storage |
+| `.claude/rules/website.md`   | `apps/website/**`                                                                                                                                       | `ui`/`features`/`services`/`app` layers, CSP     |
+| `.claude/rules/domain.md`    | `packages/**`                                                                                                                                           | Domain purity, schemas, protocol versioning      |
+| `.claude/rules/tests.md`     | `tests/**`, `**/tests/**`, `playwright*.config.ts`, `**/vitest*.config.ts`, `scripts/test-container.mjs`, `scripts/test-stress.mjs`, `Dockerfile.tests` | Test layers, extension fixture, Docker runs      |
 
 ## Skills
 

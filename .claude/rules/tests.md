@@ -5,6 +5,7 @@ paths:
   - "playwright*.config.ts"
   - "**/vitest*.config.ts"
   - "scripts/test-container.mjs"
+  - "scripts/test-stress.mjs"
   - "Dockerfile.tests"
 ---
 
@@ -12,15 +13,16 @@ paths:
 
 ## Layers
 
-| Layer       | Files                                                                         | Command                   |
-| ----------- | ----------------------------------------------------------------------------- | ------------------------- |
-| Node unit   | `{apps,packages}/*/tests/*.test.ts`, `tests/*.test.ts` (the harness itself)   | `vp run test:unit`        |
-| Component   | `*.browser.test.ts(x)` in Vitest Browser Mode, Chromium                       | `vp run test:components`  |
-| End-to-end  | `tests/e2e/*.spec.ts`, headed Playwright Chromium, built website + extension  | `vp run test:e2e`         |
-| Browser     | `tests/browser/*.spec.ts`, Google Chrome Stable over CDP, headed on Xvfb      | `vp run test:browser`     |
-| Experiments | `tests/experiments/*.spec.ts`, POC hypotheses on the browser layer's fixtures | `vp run test:experiments` |
-| Container   | `tests/container/*.checks.mjs` (Node): runner, image ships Google Chrome 144+ | `vp run test:container`   |
-| Scripts     | `scripts/*.checks.mjs` (Node)                                                 | `vp run test:scripts`     |
+| Layer       | Files                                                                                  | Command                   |
+| ----------- | -------------------------------------------------------------------------------------- | ------------------------- |
+| Node unit   | `{apps,packages}/*/tests/*.test.ts`, `tests/*.test.ts` (the harness itself)            | `vp run test:unit`        |
+| Component   | `*.browser.test.ts(x)` in Vitest Browser Mode, Chromium                                | `vp run test:components`  |
+| End-to-end  | `tests/e2e/*.spec.ts`, headed Playwright Chromium, built website + extension           | `vp run test:e2e`         |
+| Browser     | `tests/browser/*.spec.ts`, Google Chrome Stable over CDP, headed on Xvfb               | `vp run test:browser`     |
+| Experiments | `tests/experiments/*.spec.ts`, POC hypotheses on the browser layer's fixtures          | `vp run test:experiments` |
+| Stress      | browser and experiment specs tagged `@order-critical`, 100 iterations, not in `verify` | `vp run test:stress`      |
+| Container   | `tests/container/*.checks.mjs` (Node): runner, image ships Google Chrome 144+          | `vp run test:container`   |
+| Scripts     | `scripts/*.checks.mjs` (Node)                                                          | `vp run test:scripts`     |
 
 - Keep schemas, protocol handling, handlers, and view models in Node unit tests; extract pure functions when that makes a rule testable.
 - Prove detection, the install banner, data display, origin checks, and CSP end to end, with the real extension loaded.
@@ -50,4 +52,5 @@ paths:
 - Import `test` and `expect` from `tests/browser/fixtures/extension.ts` when the isolator must be loaded. Its `extension` fixture loads `apps/isolator/.output/chrome-mv3-test` (built by `test:browser:local` and `test:experiments:local`) with the first method that works, in E0's order: CDP `Extensions.loadUnpacked`, managed policy, then Playwright's Chromium labelled `diagnostic` ([E0.md](../../docs/poc/namespace-sessions/experiments/E0.md)). It exposes `extensionId`, `method`, `label`, `chrome` (the `LaunchedChrome`), and `evaluateInBackground(expression)`, which runs in the extension's service worker through `tests/browser/fixtures/cdp-client.ts`. That client rejects every pending command when its WebSocket or pipe closes, fails, or is closed, and rejects a command Chrome has not answered within 30 s (`send`'s `timeoutMs` option changes it).
 - **Calling CDP.** Send commands only as `<session>.send("Domain.method", params)` with the method as a string literal at the call site (a Playwright `CDPSession`, `chrome.pipe`, or the `cdp-client.ts` client); `tests/observer-allowlist.test.ts` scans `tests/browser` and `tests/experiments` for those call sites and fails on a command outside its allowlist (inspection commands, plus `Browser.setPermission` to deny notifications, accepted only when its params object literal says `setting: "denied"`), on `ServiceWorker.*`, `Fetch.*`, `Debugger.*`, `Emulation.*`, `Storage.clear*`, `Target.setAutoAttach`, `Page.addScriptToEvaluateOnNewDocument`, `Page.setBypassCSP`, cookie writes, `Network.setExtraHTTPHeaders`, `Network.setUserAgentOverride`, on raw `Runtime.evaluate` outside the extension loaders, on Playwright calls that send such commands or inject into the page (`route`, `addInitScript`, `addScriptTag`, `addStyleTag`, `setContent`, `evaluate`, `addCookies`, `setOffline`, and the rest of its list), and on launch flags outside decision 5 (any `--disable-*`; `--load-extension` only in `loadInChromium`). A method name passed as data to anything other than `send` is not a call site; adding a command means adding it to the allowlist with its reason.
 - Import `test` and `expect` from `tests/browser/observer/fixture.ts` to record evidence. Its `observer` fixture starts the CDP observer on Chrome's first page (`observer.page` is the page to drive); call `snapshotStorage(origins)` and `collectLedger(apiBase)` before `finish()`, which writes `trace.jsonl`, `ledger.json`, `storage.json`, and `counters.json` under `.artifacts/evidence/<RECNRUN_RUN_ID>/<spec>/<test>/`, redacted by `tests/browser/observer/redact.ts`. Teardown writes them even when the test failed. `expectRedactedEvidence` checks that raw cookie values never reach the files (`tests/browser/fixture.spec.ts` shows the pattern in `afterEach`). Reset the fixture's ledger once per test, in `beforeEach`, and scope assertions with sequence checkpoints (the last `seq` before a step) instead of resetting mid-test, so `ledger.json` holds the whole test.
+- **Stress** ([PLAN.md decision 8](../../docs/poc/namespace-sessions/PLAN.md#2-decisions)). Tag an order-critical spec by ending its test title with `@order-critical`. `scripts/test-stress.mjs` runs the tagged tests of `playwright.experiments.config.ts` and `playwright.browser.config.ts` serially, 100 iterations (`--iterations N` or `RECNRUN_STRESS_ITERATIONS`), with `RECNRUN_RUN_ID=<run>/stress/<iteration>-<condition>`, `RECNRUN_STRESS_ITERATION`, and `RECNRUN_STRESS_CONDITION` cycling `baseline`, `net-delay`, `cpu-load`, `cold`, `warm`, `switch-early`, `switch-late`. The spec applies `net-delay` (the fixture's `/slow?ms=`), `cold`/`warm` (worker state), and the switch moment itself, and records the condition in every verdict, even one it ignores; for `cpu-load` the runner keeps one busy thread per core running (`RECNRUN_STRESS_CPU_THREADS`). Put a late-attach count in `lateAttaches` (or `firstEffectBeforeMarker`) and make a leak a `fail` verdict, never a retry (the runner passes `--retries=0`). The runner writes `.artifacts/evidence/<run>/stress.json` (iterations, conditions, specs, per-hypothesis `pass`/`fail`/`unavailable`/`lateAttaches`, failed iterations) and exits non-zero on any `fail`, any failed Playwright run, or when no test is tagged.
 - Experiments record each hypothesis with `appendVerdict` and capabilities with `mergeCapabilities` (`tests/experiments/verdicts.ts`) under `.artifacts/evidence/<RECNRUN_RUN_ID>/`. A hypothesis that fails is a verdict, not a test failure; the spec fails when a hypothesis has no verdict. Docker runs set `RECNRUN_RUN_ID` to the run id and export the directory to `.artifacts/docker/<run-id>/evidence/`.

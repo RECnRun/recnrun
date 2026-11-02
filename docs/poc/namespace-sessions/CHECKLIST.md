@@ -80,6 +80,7 @@ Markers: `[ ]` not started · `[i]` implemented, awaiting the phase gate · `[x]
 
 - [ ] P1.1 Route A: tab attach and auto-attach before `register()` (E2)
 - [ ] P1.2 Route A: direct worker target, cold start, the race (E3) `@order-critical`
+  - note: the stress runner exists (`scripts/test-stress.mjs`): `vp run test:stress` in Docker (`-- --iterations N` or `RECNRUN_STRESS_ITERATIONS`; default 100), `vp run test:stress:local` on the host; it runs the tests whose title ends with `@order-critical` and writes `.artifacts/evidence/<run>/stress.json`
 - [ ] P1.3 Stop and restart control (E4)
 - [ ] P1.4 Route B: script response transformation through `Fetch` (E5)
 - [ ] P1.5 Route B: namespace selection without baking it into the script (E6) `@order-critical`

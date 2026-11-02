@@ -22,6 +22,8 @@
     "test:browser:local": "vp run --no-cache @recnrun/isolator#build:test && playwright test --config playwright.browser.config.ts",
     "test:experiments": "node scripts/test-container.mjs test:experiments:local",
     "test:experiments:local": "vp run --no-cache @recnrun/isolator#build:test && playwright test --config playwright.experiments.config.ts",
+    "test:stress": "node scripts/test-container.mjs test:stress:local",
+    "test:stress:local": "vp run --no-cache @recnrun/isolator#build:test && node scripts/test-stress.mjs",
     "test:coverage": "node scripts/test-container.mjs test:coverage:local",
     "test:coverage:local": "vp test --coverage",
     "test:container": "node --test tests/container/runner.checks.mjs",
