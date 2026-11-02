@@ -1,5 +1,5 @@
 import { execFile, spawn } from "node:child_process";
-import type { ChildProcess } from "node:child_process";
+import type { ChildProcess, StdioOptions } from "node:child_process";
 import { accessSync, constants } from "node:fs";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -8,6 +8,9 @@ import { setTimeout as delay } from "node:timers/promises";
 import { promisify } from "node:util";
 import { chromium, test as base } from "@playwright/test";
 import type { Browser, CDPSession } from "@playwright/test";
+import type { Readable, Writable } from "node:stream";
+import { connectPipe } from "./cdp-client.ts";
+import type { CdpClient } from "./cdp-client.ts";
 
 export { expect } from "@playwright/test";
 
@@ -23,6 +26,10 @@ const REMEDY =
 export interface ChromeLaunchOptions {
   /** Flags appended to the base set; later tasks add only what PLAN.md decision 5 allows. */
   args?: readonly string[];
+  /** Another Chromium build, such as Playwright's, for runs labelled `diagnostic` (PLAN.md decision 3). */
+  executable?: string;
+  /** Also open `--remote-debugging-pipe` (fds 3 and 4) next to the port, for pipe-only CDP commands. */
+  pipe?: boolean;
 }
 
 export interface LaunchedChrome {
@@ -35,6 +42,8 @@ export interface LaunchedChrome {
   userDataDir: string;
   wsEndpoint: string;
   pid: number;
+  /** The `--remote-debugging-pipe` connection, when launched with `pipe: true`. */
+  pipe?: CdpClient;
   close(): Promise<void>;
 }
 
@@ -53,7 +62,7 @@ function isExecutable(path: string): boolean {
   }
 }
 
-function resolveChromePath(): string {
+export function resolveChromePath(): string {
   const configured = process.env.RECNRUN_CHROME_PATH;
   if (configured) {
     if (isExecutable(configured)) return configured;
@@ -89,8 +98,13 @@ function chromeFlags(userDataDir: string, extra: readonly string[] = []): string
   return [...flags, ...extra, "about:blank"];
 }
 
-function watch(binary: string, flags: string[]): WatchedProcess {
-  const child = spawn(binary, flags, { stdio: ["ignore", "ignore", "pipe"] });
+function watch(binary: string, flags: string[], pipe: boolean): WatchedProcess {
+  const stdio: StdioOptions = pipe
+    ? ["ignore", "ignore", "pipe", "pipe", "pipe"]
+    : ["ignore", "ignore", "pipe"];
+  const child: ChildProcess = spawn(binary, pipe ? ["--remote-debugging-pipe", ...flags] : flags, {
+    stdio,
+  });
   let stderr = "";
   let failure = "";
   child.stderr?.on("data", (data) => {
@@ -146,13 +160,17 @@ async function stop(chrome: WatchedProcess): Promise<void> {
 
 export async function launchChrome(options: ChromeLaunchOptions = {}): Promise<LaunchedChrome> {
   requireDisplay();
-  const executable = resolveChromePath();
+  const executable = options.executable ?? resolveChromePath();
   const run = promisify(execFile);
   const version = (await run(executable, ["--version"], { timeout: VERSION_TIMEOUT_MS })).stdout;
   const userDataDir = await mkdtemp(join(tmpdir(), "recnrun-chrome-"));
-  const chrome = watch(executable, chromeFlags(userDataDir, options.args));
+  const chrome = watch(executable, chromeFlags(userDataDir, options.args), options.pipe === true);
+  const pipe = options.pipe
+    ? connectPipe(chrome.child.stdio[3] as Writable, chrome.child.stdio[4] as Readable)
+    : undefined;
   let browser: Browser | undefined;
   const close = async (): Promise<void> => {
+    pipe?.close();
     await browser?.close().catch(() => undefined);
     await stop(chrome);
     // Chrome's helper processes can still hold files for a moment after the browser exits.
@@ -172,6 +190,7 @@ export async function launchChrome(options: ChromeLaunchOptions = {}): Promise<L
       userDataDir,
       wsEndpoint,
       pid,
+      ...(pipe ? { pipe } : {}),
       close,
     };
   } catch (error) {

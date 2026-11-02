@@ -95,6 +95,8 @@ async function startTests() {
   const environment = ["CI", "DEBUG", "FORCE_COLOR"].flatMap((key) =>
     process.env[key] === undefined ? [] : ["--env", `${key}=${process.env[key]}`],
   );
+  // Experiments name their evidence directory after the run (tests/experiments/verdicts.ts).
+  environment.push("--env", `RECNRUN_RUN_ID=${runId}`);
   const result = await docker(
     [
       "create",
@@ -128,9 +130,15 @@ async function startTests() {
 
 async function collectArtifacts() {
   let code = 0;
-  for (const directory of ["coverage", "test-results", "playwright-report"]) {
+  const directories = [
+    ["coverage", "coverage"],
+    ["test-results", "test-results"],
+    ["playwright-report", "playwright-report"],
+    [".artifacts/evidence", "evidence"],
+  ];
+  for (const [directory, exported] of directories) {
     try {
-      const destination = join(artifacts, directory);
+      const destination = join(artifacts, exported);
       await mkdir(destination, { recursive: true });
       const result = await docker(["cp", `${container}:/workspace/${directory}/.`, destination], {
         quiet: true,

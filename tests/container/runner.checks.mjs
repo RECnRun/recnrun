@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { execFile, spawn } from "node:child_process";
 import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { delimiter, join, resolve } from "node:path";
+import { basename, delimiter, join, resolve } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
@@ -88,6 +88,13 @@ test("forwards arguments literally and runs the current workspace in an isolated
   const create = result.calls.find(([command]) => command === "create");
   assert.ok(create.includes("--init"));
   assert.ok(create.includes("--shm-size=2g"));
+  assert.ok(create.includes(`RECNRUN_RUN_ID=${basename(result.artifacts)}`));
+  assert.ok(
+    result.calls.some(
+      ([command, source]) =>
+        command === "cp" && source.endsWith(":/workspace/.artifacts/evidence/."),
+    ),
+  );
   assert.ok(!create.includes("--volume"));
   assert.ok(!create.includes("--publish"));
   assert.deepEqual(create.slice(-4), ["sha256:fixture-image", "test:e2e:local", "--grep", grep]);
@@ -101,8 +108,8 @@ test("forwards arguments literally and runs the current workspace in an isolated
 test("preserves a failing test's exit code and copies evidence before removing the container", async (context) => {
   const result = await launch(context, "test-failure");
   assert.equal(result.code, 7, result.output);
-  assert.equal(directoryCopies(result.calls).length, 3);
-  for (const artifact of ["coverage", "test-results", "playwright-report"]) {
+  assert.equal(directoryCopies(result.calls).length, 4);
+  for (const artifact of ["coverage", "test-results", "playwright-report", "evidence"]) {
     assert.equal(
       readFileSync(join(result.artifacts, artifact, "evidence.txt"), "utf8"),
       "Test evidence",
@@ -170,7 +177,7 @@ test("removes the container even if an artifact destination cannot be created", 
   const result = await launch(context, "blocked-export");
   assert.equal(result.code, 1, result.output);
   assert.match(result.output, /artifact/i);
-  assert.equal(directoryCopies(result.calls).length, 2);
+  assert.equal(directoryCopies(result.calls).length, 3);
   assert.equal(result.calls.at(-1)[0], "rm");
 });
 
@@ -181,7 +188,7 @@ test(
     const result = await launch(context, "interrupt");
     assert.equal(result.code, 130, result.output);
     assert.ok(result.calls.some(([command]) => command === "stop"));
-    assert.equal(directoryCopies(result.calls).length, 3);
+    assert.equal(directoryCopies(result.calls).length, 4);
     assert.equal(result.calls.at(-1)[0], "rm");
   },
 );

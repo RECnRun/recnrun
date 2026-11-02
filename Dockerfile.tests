@@ -41,7 +41,7 @@ COPY . .
 RUN vp install --frozen-lockfile --offline \
     && vp run extension#wxt:prepare \
     && vp run @recnrun/isolator#wxt:prepare \
-    && mkdir -p coverage test-results playwright-report /opt/recnrun
+    && mkdir -p coverage test-results playwright-report .artifacts/evidence /opt/recnrun
 
 # scripts/test-container.mjs copies this file into the run's versions.json.
 RUN node -e ' \

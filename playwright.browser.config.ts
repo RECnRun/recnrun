@@ -1,5 +1,8 @@
 import { defineConfig } from "@playwright/test";
 
+// One evidence directory per run; workers inherit it (tests/experiments/verdicts.ts).
+process.env.RECNRUN_RUN_ID ??= new Date().toISOString().replaceAll(":", "-");
+
 export default defineConfig({
   testDir: "./tests/browser",
   outputDir: "test-results/browser",
