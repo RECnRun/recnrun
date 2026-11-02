@@ -11,7 +11,7 @@
     "clean": "node scripts/clean.mjs && vp run extension#wxt:prepare",
     "logo": "node scripts/favicon.mjs && node scripts/logo-png.mjs",
     "test:unit": "node scripts/test-container.mjs test:unit:local",
-    "test:unit:local": "vp test --project=website --project=extension --project=@recnrun/domain --project=@recnrun/bridge",
+    "test:unit:local": "vp test --project=website --project=extension --project=@recnrun/domain --project=@recnrun/bridge --project=@recnrun/isolation-core",
     "test:components": "node scripts/test-container.mjs test:components:local",
     "test:components:local": "vp test --config apps/website/vitest.browser.config.ts && vp test --config apps/extension/vitest.browser.config.ts",
     "test:e2e": "node scripts/test-container.mjs test:e2e:local",
@@ -28,7 +28,7 @@
     "test:extension-manifest": "vp run extension#test:manifest",
     "deps": "depcruise packages tests --config .dependency-cruiser.cjs && depcruise apps/website --config .dependency-cruiser.cjs --ts-config apps/website/tsconfig.deps.json && depcruise apps/extension --config .dependency-cruiser.cjs --ts-config apps/extension/tsconfig.deps.json",
     "dead-code": "knip --include files,exports,dependencies,unlisted",
-    "duplication": "jscpd --threshold 4 --fail-on-empty apps/website/src apps/extension/src packages/domain/src packages/bridge/src packages/brand/src",
+    "duplication": "jscpd --threshold 4 --fail-on-empty apps/website/src apps/extension/src packages/domain/src packages/bridge/src packages/isolation-core/src packages/isolation-core/vendor packages/brand/src",
     "docs:check": "node scripts/check-docs.mjs",
     "prepare": "vp config && vp run extension#wxt:prepare"
   },

@@ -31,7 +31,9 @@ module.exports = {
     {
       name: "not-to-unresolvable",
       severity: "error",
-      from: {},
+      comment:
+        "Vendored SplitSession files are unmodified partial copies, so their imports of non-vendored siblings cannot resolve.",
+      from: { pathNot: "^packages/isolation-core/vendor/" },
       to: { couldNotResolve: true },
     },
     {
@@ -86,6 +88,16 @@ module.exports = {
       from: { path: "^packages/bridge/src/" },
       to: {
         pathNot: ["^packages/bridge/src/", "^packages/domain/src/", "/node_modules/valibot/"],
+      },
+    },
+    {
+      name: "isolation-core-pure",
+      severity: "error",
+      comment:
+        "The isolation core is browser-agnostic logic: its own src and valibot only. It does not import vendor/ (vendored SplitSession files are reference copies; adapt them into src before use).",
+      from: { path: "^packages/isolation-core/src/" },
+      to: {
+        pathNot: ["^packages/isolation-core/src/", "/node_modules/valibot/"],
       },
     },
     {

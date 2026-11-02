@@ -1,0 +1,26 @@
+{
+  "repository": "https://github.com/Misyuk-T/splitsession",
+  "commit": "475afe88cd1ec7208b2a5510759036955032e0d4",
+  "license": "LICENSE",
+  "files": {
+    "src/background/isolation/cookie-capture.ts": "2b4676bec8a8532d0e6f0e754f689c978bf7cca0e20acd919a8dbb4ab7d42ff7",
+    "src/content/namespace.ts": "93d0bd73aacf9384f3961459156c6cd1749cdf0a1ec06fd71379fdee3156b9b9",
+    "src/content/shim/patches/cache-storage.ts": "8e472902c118ccef6144b7a4dbb413a22c5614119173d6d654ed2fd95e8988b5",
+    "src/content/shim/patches/cookies.ts": "3597166865074a4712a9fea88336d7eb8422e72aae9076b4bb7fe41b570e199c",
+    "src/content/shim/patches/indexed-db.ts": "89ed184db9d91bbbf9c4b95795773dfeae4f07c2063c2d0de2d508b59223b577",
+    "src/content/shim/patches/network-barrier.ts": "ac29fdf2680515e869b07267610b142ecc2f030f26c1a392039b5c55fd521603",
+    "src/content/shim/patches/storage.ts": "ba8cbcef734cc2983cc4f5b06569c7a2f2190a5e937b10892f7d40e1fcf6292d",
+    "src/content/shim/patches/workers.ts": "28fd76d23984a2e10a461a20e76379673b3d1f5c7ee01cb3dfacf8d8ceac7341",
+    "src/core/dnr/dnr-simulator.ts": "c3851249ac5d4d9f1546d45e31f140d3464e80c826efb18067d6d4a9e98f248a",
+    "src/core/dnr/legacy/rule-compiler-0.1.12.ts": "560379fa2673e1525f3cdec03b3981575ada557c45d05956f8d80423e938e4d2",
+    "src/core/dnr/rule-budget.fixtures.ts": "fedacc99f4a11431a06c117677e288c4eb942f57c367f116159fbad218ef34c0",
+    "src/core/dnr/rule-budget.test.ts": "13b2b173fb90d726163349a4201f11ba097e97c8d3a0d69a9d57dbfb874403d1",
+    "src/core/dnr/rule-compiler.test.ts": "f1fca20e2e85c8d0e01f4783b2fb2602961e90f68477cfc27046ac8029257719",
+    "src/core/dnr/rule-compiler.ts": "d05d939e4a82dcc9218cf54f4d294ae8da9eb2c6310f8563f9c7b041b25176f8",
+    "src/core/dnr/rule-compression.test.ts": "d978c2551a91853ca312a6b695e5ef58ceba3bd778e24dc92744eb73f198d08d",
+    "src/core/jar/cookie-jar.test.ts": "ec671810aec910360ba136e38dce6cabf0c6726c02608261dbad988077028f65",
+    "src/core/jar/cookie-jar.ts": "1df172f59b6bf4f1d0237ef04013ee7703b95e8cc102f5e1ba3ebb95167040eb",
+    "src/core/jar/set-cookie-parser.test.ts": "bc56b9d5358a377e5e3fa9509f8676933ae5282e324b0fd91dfc4d610e1f7e1d",
+    "src/core/jar/set-cookie-parser.ts": "047beddd9b94003ac0bc64c726251c71d1d504624933a35cf329944eec5b9749"
+  }
+}

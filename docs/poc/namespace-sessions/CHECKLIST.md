@@ -31,7 +31,11 @@ Markers: `[ ]` not started · `[i]` implemented, awaiting the phase gate · `[x]
   - commit: a0ecbf1 (1f21735 in the agent worktree) "Run Google Chrome Stable in Docker behind browser and experiment layers"
 - [ ] P0.3 Load the unpacked extension into branded Chrome (E0)
 - [ ] P0.4 `chrome.debugger` capability probe (E1), `CAPABILITIES.md` generated
-- [ ] P0.5 SplitSession vendoring and license
+- [i] P0.5 SplitSession vendoring and license
+  - red: `vp test --project=@recnrun/isolation-core` before the manifest existed: `Error: ENOENT: no such file or directory, open '.../vendor/splitsession/vendor-manifest.json'`; negative controls: a changed byte in `namespace.ts` and a LICENSE without "MIT License" each failed their test
+  - green: `vp test --project=@recnrun/isolation-core` (23 passed); `vp check`, `vp run deps` pass
+  - commit: see the commit that adds `packages/isolation-core` (subject "Vendor SplitSession modules into a new isolation-core package")
+  - note: `vp run dead-code` and `vp run duplication` fail only on vendored files (Knip: 8 unused files, 5 unlisted `vitest`, 54 unused exports; jscpd 8.23% over 4%, `vendor/.../legacy/rule-compiler-0.1.12.ts` clones `rule-compiler.ts`); the orchestrator decides
 - [ ] P0.6 Fixture application, frozen
 - [ ] P0.7 Evidence pipeline and observer allowlist
 - Gate P0: `vp run verify` → (date, result)

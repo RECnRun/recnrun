@@ -7,10 +7,10 @@ export default defineConfig({
     "*": "vp check --fix",
   },
   fmt: {
-    ignorePatterns: ["**/.output/**", "**/.wxt/**"],
+    ignorePatterns: ["**/.output/**", "**/.wxt/**", "packages/isolation-core/vendor/**"],
   },
   lint: {
-    ignorePatterns: ["**/.output/**", "**/.wxt/**"],
+    ignorePatterns: ["**/.output/**", "**/.wxt/**", "packages/isolation-core/vendor/**"],
     jsPlugins: [
       { name: "vite-plus", specifier: "vite-plus/oxlint-plugin" },
       { name: "sonarjs", specifier: "eslint-plugin-sonarjs" },
@@ -80,6 +80,7 @@ export default defineConfig({
       "apps/extension",
       "packages/domain",
       "packages/bridge",
+      "packages/isolation-core",
       "apps/website/vitest.browser.config.ts",
       "apps/extension/vitest.browser.config.ts",
     ],

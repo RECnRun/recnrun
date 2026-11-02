@@ -1,0 +1,39 @@
+RECnRun vendors modules of SplitSession, which is licensed under the MIT License
+(see LICENSE in this directory; copyright (c) 2026 Taras Misiuk).
+
+Upstream repository: https://github.com/Misyuk-T/splitsession
+Upstream commit:     475afe88cd1ec7208b2a5510759036955032e0d4
+Retrieved:           2026-11-02
+Retrieved from:      https://raw.githubusercontent.com/Misyuk-T/splitsession/475afe88cd1ec7208b2a5510759036955032e0d4/<path>
+
+The files below are unmodified copies. Each file lives here at the same relative path
+as upstream (upstream path = "src/..." as listed). vendor-manifest.json holds the SHA-256 of each
+file; packages/isolation-core/tests/vendor.test.ts fails when a file differs from it.
+
+Mapping notes: every module named in docs/poc/namespace-sessions/source-2026-11-02.pt-BR.md
+section 3 exists at the pinned commit under its listed path; no substitution was needed.
+"src/core/jar" and "src/core/dnr" are copied whole, including their tests, fixtures, and
+src/core/dnr/legacy. The copies import siblings that are not vendored (for example ../types,
+../natives, ../patch-helpers, ../site, wxt/browser); they are a reference for later adaptation, not
+yet compiled by RECnRun.
+
+Files:
+  src/background/isolation/cookie-capture.ts  (upstream: src/background/isolation/cookie-capture.ts)
+  src/content/namespace.ts  (upstream: src/content/namespace.ts)
+  src/content/shim/patches/cache-storage.ts  (upstream: src/content/shim/patches/cache-storage.ts)
+  src/content/shim/patches/cookies.ts  (upstream: src/content/shim/patches/cookies.ts)
+  src/content/shim/patches/indexed-db.ts  (upstream: src/content/shim/patches/indexed-db.ts)
+  src/content/shim/patches/network-barrier.ts  (upstream: src/content/shim/patches/network-barrier.ts)
+  src/content/shim/patches/storage.ts  (upstream: src/content/shim/patches/storage.ts)
+  src/content/shim/patches/workers.ts  (upstream: src/content/shim/patches/workers.ts)
+  src/core/dnr/dnr-simulator.ts  (upstream: src/core/dnr/dnr-simulator.ts)
+  src/core/dnr/legacy/rule-compiler-0.1.12.ts  (upstream: src/core/dnr/legacy/rule-compiler-0.1.12.ts)
+  src/core/dnr/rule-budget.fixtures.ts  (upstream: src/core/dnr/rule-budget.fixtures.ts)
+  src/core/dnr/rule-budget.test.ts  (upstream: src/core/dnr/rule-budget.test.ts)
+  src/core/dnr/rule-compiler.test.ts  (upstream: src/core/dnr/rule-compiler.test.ts)
+  src/core/dnr/rule-compiler.ts  (upstream: src/core/dnr/rule-compiler.ts)
+  src/core/dnr/rule-compression.test.ts  (upstream: src/core/dnr/rule-compression.test.ts)
+  src/core/jar/cookie-jar.test.ts  (upstream: src/core/jar/cookie-jar.test.ts)
+  src/core/jar/cookie-jar.ts  (upstream: src/core/jar/cookie-jar.ts)
+  src/core/jar/set-cookie-parser.test.ts  (upstream: src/core/jar/set-cookie-parser.test.ts)
+  src/core/jar/set-cookie-parser.ts  (upstream: src/core/jar/set-cookie-parser.ts)
