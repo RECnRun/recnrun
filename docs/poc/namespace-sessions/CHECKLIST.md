@@ -47,6 +47,10 @@ Markers: `[ ]` not started · `[i]` implemented, awaiting the phase gate · `[x]
   - green: `vp run test:unit` exit 0, 72 passed (fixture: `server.test.ts` 21, `freeze.test.ts` 2)
   - commit: the commit whose subject is "Add the frozen fixture application for the sessions POC"
   - missing: `tests/browser/fixture.spec.ts` (needs P0.2)
+  - red: `vp test --project fixture` with the new `tests/control.test.ts`: 6 failed (`expected { error: 'Not found' } to deeply equal { mode: 'online' }`, `expected 200 to be 'network error'`, `expected 404 to be 400`, the open EventSource still streaming after the cut)
+  - green: `vp run test:unit` exit 0, 94 passed (fixture: `server.test.ts` 21, `control.test.ts` 7, `freeze.test.ts` 2)
+  - commit: "Let the fixture server cut the network and expire sessions"
+  - refreeze (orchestrator decision, before the freeze is final): added `POST /__network?mode=offline|online` (P6.1, the fixture-side network cut) and `POST /__expire?user=` (P6.6, T21) so no later phase refreezes; `freeze.json` changed only for `src/api.ts`, `src/context.ts`, `src/server.ts`, `src/sessions.ts`; no file under `public/` changed
 - [ ] P0.7 Evidence pipeline and observer allowlist
 - Gate P0: `vp run verify` → (date, result)
 

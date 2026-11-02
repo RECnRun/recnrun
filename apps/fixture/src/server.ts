@@ -5,6 +5,7 @@ import type { Duplex } from "node:stream";
 import { fileURLToPath } from "node:url";
 import { apiHandler } from "./api.ts";
 import {
+  isCut,
   isFixtureOrigin,
   SESSION_COOKIES,
   type Call,
@@ -15,7 +16,7 @@ import {
 } from "./context.ts";
 import { noContent, readCookie, sendJson, serveStatic } from "./http.ts";
 import { idpHandler } from "./idp.ts";
-import { createLedger, type Ledger } from "./ledger.ts";
+import { createLedger, type Ledger, type LedgerEntry } from "./ledger.ts";
 import { createSessions } from "./sessions.ts";
 import { acceptEcho } from "./websocket.ts";
 
@@ -84,12 +85,19 @@ function dispatch(handler: Handler, call: Call): void | Promise<void> {
   return handler(call);
 }
 
+// No response at all, so the browser sees a network error rather than an HTTP status.
+function drop(entry: LedgerEntry, socket: Duplex): void {
+  entry.effect = "network:dropped";
+  socket.destroy();
+}
+
 function createListener(ctx: FixtureContext, role: Role, sockets: Set<Duplex>): Server {
   const handler = HANDLERS[role](ctx);
   const server = createServer((req, res) => {
     const url = new URL(req.url ?? "/", ctx.origins[role]);
     const user = userOf(ctx, role, req);
     const entry = ctx.ledger.record(req, url, user);
+    if (isCut(ctx, role, url)) return drop(entry, req.socket);
     Promise.resolve(dispatch(handler, { ctx, req, res, url, entry, user })).catch(() => {
       if (!res.headersSent) sendJson(res, 500, { error: "Fixture error" });
       else res.destroy();
@@ -97,7 +105,8 @@ function createListener(ctx: FixtureContext, role: Role, sockets: Set<Duplex>): 
   });
   server.on("upgrade", (req: IncomingMessage, socket: Duplex) => {
     const url = new URL(req.url ?? "/", ctx.origins[role]);
-    ctx.ledger.record(req, url, userOf(ctx, role, req));
+    const entry = ctx.ledger.record(req, url, userOf(ctx, role, req));
+    if (isCut(ctx, role, url)) return drop(entry, socket);
     if (role !== "api" || url.pathname !== "/ws") return void socket.destroy();
     sockets.add(socket.on("close", () => sockets.delete(socket)));
     acceptEcho(req, socket);
@@ -125,17 +134,27 @@ function closeAll(servers: Server[], sockets: Set<Duplex>): Promise<void> {
   ).then(() => undefined);
 }
 
+function cutOpen(servers: Server[], sockets: Set<Duplex>): void {
+  ROLES.forEach((role, index) => {
+    if (role !== "idp") servers[index]?.closeAllConnections();
+  });
+  // Only the API accepts WebSocket upgrades, so every open socket belongs to a cut origin.
+  for (const socket of sockets) socket.destroy();
+}
+
 /** Starts the app, API, IdP, and staging listeners in one process sharing one ledger. */
 export async function startFixture(options: FixtureOptions = {}): Promise<Fixture> {
   const host = options.host ?? "127.0.0.1";
+  const sockets = new Set<Duplex>();
+  const servers: Server[] = [];
   const ctx: FixtureContext = {
     origins: { app: "", api: "", idp: "", staging: "" },
     ledger: createLedger(),
     sessions: createSessions(),
+    network: { offline: false, closeOpen: () => cutOpen(servers, sockets) },
     publicDir: fileURLToPath(new URL("../public", import.meta.url)),
   };
-  const sockets = new Set<Duplex>();
-  const servers = ROLES.map((role) => createListener(ctx, role, sockets));
+  servers.push(...ROLES.map((role) => createListener(ctx, role, sockets)));
   const ports = await Promise.allSettled(
     ROLES.map((role, index) =>
       listen(servers[index] as Server, options.ports?.[role] ?? DEFAULT_PORTS[role], host),

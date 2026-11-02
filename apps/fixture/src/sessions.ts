@@ -7,6 +7,8 @@ export interface Sessions {
   /** A one-time code the API exchanges for its own session after the IdP login. */
   issueCode(user: string): string;
   redeemCode(code: string | null): string | null;
+  /** Ends every session and pending code of the user, as a server-side expiry; returns how many sessions ended. */
+  expire(user: string): number;
 }
 
 function token(): string {
@@ -36,6 +38,12 @@ export function createSessions(): Sessions {
       const user = codes.get(code) ?? null;
       codes.delete(code);
       return user;
+    },
+    expire(user) {
+      let ended = 0;
+      for (const [sid, owner] of sessions) if (owner === user && sessions.delete(sid)) ended++;
+      for (const [code, owner] of codes) if (owner === user) codes.delete(code);
+      return ended;
     },
   };
 }

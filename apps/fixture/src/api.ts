@@ -67,6 +67,29 @@ function ledger({ ctx, req, res }: Call): void {
   sendJson(res, 200, ctx.ledger.entries());
 }
 
+function network({ ctx, req, res, url }: Call): void {
+  if (req.method === "POST") {
+    const mode = url.searchParams.get("mode");
+    if (mode !== "offline" && mode !== "online") {
+      sendJson(res, 400, { error: "The mode is offline or online" });
+      return;
+    }
+    ctx.network.offline = mode === "offline";
+    // Connections close after this answer is out, or the caller would lose it.
+    if (ctx.network.offline) res.once("finish", () => setImmediate(() => ctx.network.closeOpen()));
+  }
+  sendJson(res, 200, { mode: ctx.network.offline ? "offline" : "online" });
+}
+
+function expire({ ctx, res, url }: Call): void {
+  const user = url.searchParams.get("user");
+  if (!user) {
+    sendJson(res, 400, { error: "A user is required" });
+    return;
+  }
+  sendJson(res, 200, { user, expired: ctx.sessions.expire(user) });
+}
+
 const ROUTES: Record<string, (call: Call) => void | Promise<void>> = {
   "GET /me": me,
   "GET /slow": slow,
@@ -76,9 +99,12 @@ const ROUTES: Record<string, (call: Call) => void | Promise<void>> = {
   "GET /logout": logout,
   "GET /__ledger": ledger,
   "POST /__ledger/reset": ledger,
+  "GET /__network": network,
+  "POST /__network": network,
+  "POST /__expire": expire,
 };
 
-/** api.localhost: credentialed JSON endpoints, the session exchange, and the shared ledger. */
+/** api.localhost: credentialed JSON endpoints, the session exchange, the shared ledger, and the test controls. */
 export function apiHandler(): Handler {
   const actions = new Map<string, number>();
   const act = ({ res, user, url, entry }: Call) => {

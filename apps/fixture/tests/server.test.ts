@@ -1,58 +1,9 @@
 import { createHash } from "node:crypto";
-import { afterAll, beforeAll, beforeEach, describe, expect, test } from "vite-plus/test";
-import type { LedgerEntry } from "@/ledger.ts";
-import { startFixture, type Fixture } from "@/server.ts";
+import { describe, expect, test } from "vite-plus/test";
+import { cookieOf, local, location, useFixture } from "./harness.ts";
 
-const EPHEMERAL = { app: 0, api: 0, idp: 0, staging: 0 };
-let fixture: Fixture;
-
-// *.localhost does not resolve in every container, so tests reach the listeners on 127.0.0.1.
-function local(url: string): string {
-  return url.replace(/\/\/[a-z]+\.localhost:/, "//127.0.0.1:");
-}
-
-function location(response: Response): string {
-  const value = response.headers.get("location");
-  if (!value) throw new Error(`No Location header on ${response.url} (${response.status})`);
-  return value;
-}
-
-function cookieOf(response: Response): string {
-  const [first = ""] = response.headers.getSetCookie();
-  return first.split(";")[0] ?? "";
-}
-
-async function ledger(): Promise<LedgerEntry[]> {
-  const response = await fetch(local(`${fixture.origins.api}/__ledger`));
-  return (await response.json()) as LedgerEntry[];
-}
-
-async function signIn(username: string) {
-  const login = await fetch(local(`${fixture.origins.idp}/login`), {
-    method: "POST",
-    body: new URLSearchParams({ username, redirect: `${fixture.origins.app}/` }),
-    redirect: "manual",
-  });
-  const session = await fetch(local(location(login)), { redirect: "manual" });
-  return { login, session, idpCookie: cookieOf(login), apiCookie: cookieOf(session) };
-}
-
-async function me(cookie: string) {
-  const response = await fetch(local(`${fixture.origins.api}/me`), { headers: { cookie } });
-  return { status: response.status, body: (await response.json()) as { user: string | null } };
-}
-
-beforeAll(async () => {
-  fixture = await startFixture({ ports: EPHEMERAL });
-});
-
-afterAll(async () => {
-  await fixture.close();
-});
-
-beforeEach(async () => {
-  await fetch(local(`${fixture.origins.api}/__ledger/reset`), { method: "POST" });
-});
+const fixture = useFixture();
+const { ledger, signIn, me } = fixture;
 
 describe("identity provider and API session", () => {
   test("logging in redirects through the API session exchange back to the app", async () => {
