@@ -20,7 +20,7 @@ type FlowCheckIssue = {
 type StepRecord = Record<string, unknown>;
 
 // Keys under which a control block nests its steps; their contents are walked as steps.
-const CHILD_STEP_KEYS = ["steps", "then", "else"];
+const CHILD_STEP_KEYS = ["steps", "otherwise"];
 
 function isRecord(value: unknown): value is StepRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value);

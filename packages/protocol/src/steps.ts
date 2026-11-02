@@ -85,7 +85,7 @@ type Head<TEntries extends v.ObjectEntries> = v.InferOutput<
 type Nested = { steps: Step[] };
 
 export type BuiltinStep =
-  | (Head<typeof ifEntries> & { then: Step[]; else?: Step[] | undefined })
+  | (Head<typeof ifEntries> & { steps: Step[]; otherwise?: Step[] | undefined })
   | (Head<typeof repeatEntries> & Nested)
   | (Head<typeof forEachEntries> & Nested)
   | (Head<typeof conditionalLoopEntries> & Nested)
@@ -97,7 +97,8 @@ const StepListSchema: v.GenericSchema<unknown, Step[]> = v.array(v.lazy(() => St
 
 /** A control block step. Loops declare their iteration limit and deadline up front. */
 export const BuiltinStepSchema = v.variant("builtin", [
-  v.strictObject({ ...ifEntries, then: StepListSchema, else: v.optional(StepListSchema) }),
+  // Not `then`/`else`: an object with `then` is a thenable, which `await` would treat as a promise.
+  v.strictObject({ ...ifEntries, steps: StepListSchema, otherwise: v.optional(StepListSchema) }),
   v.strictObject({ ...repeatEntries, steps: StepListSchema }),
   v.strictObject({ ...forEachEntries, steps: StepListSchema }),
   v.strictObject({ ...conditionalLoopEntries, steps: StepListSchema }),

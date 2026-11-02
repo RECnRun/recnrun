@@ -6,7 +6,8 @@ id: aprovar-pedidos
 name: Aprovar pedidos em lote
 inputs:
   pedidos: { type: array, required: true }
-# From here on, verbatim.
+# Adapted: the source's `if` branches `then:`/`else:` are `steps:`/`otherwise:`, because an object
+# with a `then` key is a thenable that `await` would treat as a promise. Otherwise verbatim.
 steps:
   - id: iniciar-contador
     builtin: counter
@@ -25,7 +26,7 @@ steps:
         condition:
           functionRef: team.canApprove@1.0.0
           args: { pedido: "${locals.pedido}" }
-        then:
+        steps:
           - id: processar
             builtin: call
             functionRef: team.approvePedido@1.0.0
@@ -35,4 +36,4 @@ steps:
             operation: increment
             name: aprovados
             by: 1
-        else: []
+        otherwise: []

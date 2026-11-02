@@ -942,15 +942,15 @@
                 "description": {
                   "type": "string"
                 },
-                "else": {
+                "id": {
+                  "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                  "type": "string"
+                },
+                "otherwise": {
                   "items": {
                     "$ref": "#/$defs/Step"
                   },
                   "type": "array"
-                },
-                "id": {
-                  "pattern": "^[A-Za-z0-9][\\w.-]*$",
-                  "type": "string"
                 },
                 "requirements": {
                   "items": {
@@ -959,7 +959,7 @@
                   },
                   "type": "array"
                 },
-                "then": {
+                "steps": {
                   "items": {
                     "$ref": "#/$defs/Step"
                   },
@@ -970,7 +970,7 @@
                   "type": "integer"
                 }
               },
-              "required": ["id", "builtin", "condition", "then"],
+              "required": ["id", "builtin", "condition", "steps"],
               "type": "object"
             },
             {

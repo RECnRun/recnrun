@@ -21,6 +21,10 @@ describe("the source plan examples", () => {
       ok: true,
       flow: { steps: [{ builtin: "counter" }, { builtin: "forEach", steps: [{ builtin: "if" }] }] },
     });
+    const branch = result.ok ? result.flow.steps[1] : undefined;
+    expect(branch).toMatchObject({
+      steps: [{ steps: [{ id: "processar" }, { id: "contar" }], otherwise: [] }],
+    });
   });
 
   test("§9.1 locator list parses as a target", () => {
@@ -84,6 +88,39 @@ describe("validateFlow rejects", () => {
       "invalid-interpolation",
       "invalid-schema",
     ]);
+  });
+
+  test("an if block with thenable `then`/`else` branches", () => {
+    // Written as YAML, the way a user would, since a `then` key in code is itself a thenable.
+    const flow = parse(`
+      schemaVersion: 1
+      id: thenable
+      name: Thenable
+      steps:
+        - { id: a, builtin: if, condition: { functionRef: team.ok@1.0.0 }, then: [], else: [] }
+    `);
+    expect(validateFlow(flow)).toMatchObject({ ok: false, issues: [{ code: "invalid-schema" }] });
+  });
+
+  test("a duplicate step id inside an `otherwise` branch", () => {
+    const flow = {
+      schemaVersion: 1,
+      id: "branches",
+      name: "Branches",
+      steps: [
+        {
+          id: "a",
+          builtin: "if",
+          condition: { functionRef: "team.ok@1.0.0" },
+          steps: [],
+          otherwise: [{ id: "a", builtin: "break" }],
+        },
+      ],
+    };
+    expect(validateFlow(flow)).toMatchObject({
+      ok: false,
+      issues: [{ code: "duplicate-step-id", path: ["steps", 0, "otherwise", 0, "id"] }],
+    });
   });
 
   test("a variable defined from itself", () => {

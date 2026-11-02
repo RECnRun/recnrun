@@ -67,6 +67,8 @@ A later task that needs a new import (for example `node:http` in the service) wi
 | `capabilities.ts`                                  | Capture surfaces, statuses, and the capability matrix                                                            |
 | `api.ts`, `api-commands.ts`                        | The request and response envelopes, error codes, and the params and result of every command (`SERVICE_COMMANDS`) |
 
+The `if` block names its branches `steps` and `otherwise`, never `then`/`else`: an object with a `then` property is a thenable, so `await` or `return` in async code would treat a parsed step as a promise. The source plan's §9.3 example is adapted that way, with a comment in its fixture.
+
 Each issue of `validateFlow` has a `code` (`unknown-action`, `unknown-namespace`, `duplicate-step-id`, `missing-input`, `cyclic-variable`, `nth-without-index`, and others in `FLOW_ISSUE_CODES`) and the `path` of the offending key from the flow's root.
 
 `vp run schema:generate` writes JSON Schema for the flow, the event, the run files, the capability matrix, and the service envelopes to `packages/protocol/schema/*.json` through `@valibot/to-json-schema`, and the files are committed. `tests/schema-drift.test.ts` fails when a schema changes without regenerating them. JSON Schema describes structure only: rules written as `v.check` (known interpolation namespaces, `nth` needs an index, the exit code matches the status) and the cross-step checks of `validateFlow` are enforced by the protocol code, not by the exported files. Only `src` must stay pure; `scripts/` and `tests/` use Node APIs to write and read those files.
