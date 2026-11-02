@@ -15,6 +15,7 @@ Durable decisions live in `docs/`:
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md): packages, layers, the bridge protocol, the security model, and the toolchain.
 - [MILESTONES.md](docs/MILESTONES.md): delivery and acceptance.
 - [BRAND.md](docs/BRAND.md): logo, palette, contrast, typography, and CSS tokens.
+- [poc/namespace-sessions/PLAN.md](docs/poc/namespace-sessions/PLAN.md): the plan of the namespaced-sessions POC on branch `poc-namespace-sessions`, with [CHECKLIST.md](docs/poc/namespace-sessions/CHECKLIST.md) (progress and resume protocol) and [MANUAL_VALIDATION.md](docs/poc/namespace-sessions/MANUAL_VALIDATION.md) (checks that need a person).
 
 Update the relevant doc when a change alters what it describes.
 
