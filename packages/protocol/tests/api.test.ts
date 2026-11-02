@@ -9,12 +9,12 @@ import {
 } from "../src/index.ts";
 
 describe("RequestEnvelopeSchema", () => {
-  test("accepts a mutation with its lease token", () => {
+  test("accepts a mutation with its lease fence", () => {
     const request = {
       requestId: "req-1",
       command: "session.handoff",
       params: { sessionId: "s-1", to: "manual" },
-      leaseToken: "lease-7",
+      lease: { leaseId: "target-1/7", fencingToken: 7 },
     };
     expect(v.parse(RequestEnvelopeSchema, request)).toEqual(request);
   });
@@ -22,7 +22,10 @@ describe("RequestEnvelopeSchema", () => {
   test.each([
     ["an unknown command", { requestId: "r", command: "shell.exec", params: {} }],
     ["an empty request id", { requestId: "", command: "health", params: {} }],
-    ["an empty lease token", { requestId: "r", command: "health", params: {}, leaseToken: "" }],
+    [
+      "an empty lease id",
+      { requestId: "r", command: "health", params: {}, lease: { leaseId: "", fencingToken: 1 } },
+    ],
   ])("rejects %s", (_name, request) => {
     expect(v.safeParse(RequestEnvelopeSchema, request).success).toBe(false);
   });

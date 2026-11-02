@@ -36,9 +36,20 @@
       ],
       "type": "string"
     },
-    "leaseToken": {
-      "minLength": 1,
-      "type": "string"
+    "lease": {
+      "additionalProperties": false,
+      "properties": {
+        "fencingToken": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "leaseId": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": ["leaseId", "fencingToken"],
+      "type": "object"
     },
     "params": {},
     "requestId": {

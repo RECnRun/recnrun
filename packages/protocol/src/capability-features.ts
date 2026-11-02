@@ -126,11 +126,11 @@ export const FEATURE_CAPABILITIES: Feature[] = [
     "Local service",
     "Loopback only, bearer token, one instance per user.",
   ),
-  planned(
+  implemented(
     "sessions-control-leases",
     "F2.2",
     "Sessions, control, and leases",
-    "Exclusive control per target with fencing tokens.",
+    "Delivered by F2.2 in the engine: session, control, step, and pause transition tables, every state and event checked (packages/engine/tests/session.test.ts); a lease per target with heartbeat, expiry, and a fencing token that turns a delayed command from a previous lease into stale-lease (packages/engine/tests/lease.test.ts); the three pauses resume independently (packages/engine/tests/pause.test.ts).",
   ),
   planned(
     "normalization",

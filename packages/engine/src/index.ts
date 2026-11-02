@@ -57,3 +57,12 @@ export {
   type BindingConflict,
 } from "./bindings.ts";
 export { runSteps, type ReplayDriver, type ReplayOptions, type ReplayOutcome } from "./replay.ts";
+export {
+  defineMachine,
+  type IllegalTransition,
+  type Transition,
+  type TransitionTable,
+} from "./machine.ts";
+export * from "./machines.ts";
+export * from "./session.ts";
+export * from "./lease.ts";

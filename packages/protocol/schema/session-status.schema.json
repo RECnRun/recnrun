@@ -1,0 +1,82 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "properties": {
+    "control": {
+      "enum": ["manual", "agent", "replay", "unassigned"],
+      "type": "string"
+    },
+    "lease": {
+      "additionalProperties": false,
+      "properties": {
+        "acquiredAt": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "expiresAt": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "fencingToken": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "holderId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "kind": {
+          "enum": ["manual", "agent", "replay"],
+          "type": "string"
+        },
+        "leaseId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "targetId": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "leaseId",
+        "fencingToken",
+        "targetId",
+        "holderId",
+        "kind",
+        "acquiredAt",
+        "expiresAt"
+      ],
+      "type": "object"
+    },
+    "pauses": {
+      "additionalProperties": false,
+      "properties": {
+        "pauseReplay": {
+          "enum": ["active", "paused"],
+          "type": "string"
+        },
+        "pauseStepCreation": {
+          "enum": ["active", "paused"],
+          "type": "string"
+        },
+        "suspendCapture": {
+          "enum": ["active", "paused"],
+          "type": "string"
+        }
+      },
+      "required": ["pauseStepCreation", "pauseReplay", "suspendCapture"],
+      "type": "object"
+    },
+    "sessionId": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "state": {
+      "enum": ["idle", "recording", "paused", "finalizing", "completed", "interrupted"],
+      "type": "string"
+    }
+  },
+  "required": ["sessionId", "state", "control", "pauses"],
+  "type": "object"
+}

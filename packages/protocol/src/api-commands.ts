@@ -6,23 +6,34 @@ import { IdSchema, NameSchema, NonEmptyStringSchema } from "./common.ts";
 import { EventCategorySchema, EventSchema } from "./events.ts";
 import { TargetSchema } from "./locators.ts";
 import { RunSummarySchema } from "./run.ts";
-import { ControlStateSchema, SessionStateSchema } from "./states.ts";
+import { LeaseSchema } from "./lease.ts";
+import {
+  ControlStateSchema,
+  PauseModeSchema,
+  SessionPausesSchema,
+  SessionStateSchema,
+} from "./states.ts";
 import { FlowValidationResultSchema } from "./validate.ts";
 import { SchemaVersionSchema } from "./version.ts";
 
 const NoParamsSchema = v.strictObject({});
 const SessionRefSchema = v.strictObject({ sessionId: NonEmptyStringSchema });
 const RunRefSchema = v.strictObject({ runId: NonEmptyStringSchema });
+const SessionPauseSchema = v.strictObject({
+  sessionId: NonEmptyStringSchema,
+  mode: PauseModeSchema,
+});
 
+/** A session's state, who controls its target, each pause, and the lease when one is held. */
 export const SessionStatusSchema = v.strictObject({
   sessionId: NonEmptyStringSchema,
   state: SessionStateSchema,
   control: ControlStateSchema,
-  leaseToken: v.optional(NonEmptyStringSchema),
+  pauses: SessionPausesSchema,
+  lease: v.optional(LeaseSchema),
 });
 
-/** The three distinct pauses of PLAN.md F2.2. */
-export const PAUSE_MODES = ["pauseStepCreation", "pauseReplay", "suspendCapture"] as const;
+export type SessionStatus = v.InferOutput<typeof SessionStatusSchema>;
 
 const session = { params: SessionRefSchema, result: SessionStatusSchema };
 
@@ -58,10 +69,11 @@ export const SERVICE_COMMANDS = {
     result: SessionStatusSchema,
   },
   "session.pause": {
-    params: v.strictObject({ sessionId: NonEmptyStringSchema, mode: v.picklist(PAUSE_MODES) }),
+    params: SessionPauseSchema,
     result: SessionStatusSchema,
   },
-  "session.resume": session,
+  // Each pause resumes on its own.
+  "session.resume": { params: SessionPauseSchema, result: SessionStatusSchema },
   "session.stop": session,
   // F5.1 defines the page inspection and the agent's action shapes.
   "browser.inspect": unspecified,
