@@ -161,6 +161,31 @@ test("a synchronous infinite loop is terminated and the tab still answers", asyn
   expect(await locate({ source: INPUTS, cardinality: "many" })).toMatchObject({ count: 5 });
 });
 
+// Converting the result runs code the locator controls: an array's own iterator or a proxy's getter.
+const BLOCKING_LISTS = [
+  "() => { const list = [document.body]; list[Symbol.iterator] = () => ({ next() { while (true) {} } }); return list; }",
+  "() => new Proxy([document.body], { get(target, key) { if (key === 'length') while (true) {} return target[key]; } })",
+];
+
+test("a result whose conversion blocks is terminated within the same deadline", async ({
+  open,
+}) => {
+  const { inspector, locate } = await open("form");
+  for (const source of BLOCKING_LISTS) {
+    const started = Date.now();
+    const blocked = await locate({ source, timeoutMs: 500 });
+    const elapsed = Date.now() - started;
+    console.log(`blocking conversion after ${elapsed} ms: ${JSON.stringify(blocked)}`);
+    expect(blocked).toMatchObject({
+      status: "error",
+      deadline: { timeoutMs: 500, blocked: true, terminated: true, tabResponsive: true },
+    });
+    expect(elapsed).toBeLessThan(500 + 3 * 1_000);
+    const { result } = await inspector.send("Runtime.evaluate", { expression: "1+1" });
+    expect(result.value).toBe(2);
+  }
+});
+
 test("a promise that never settles is cut without terminating anything", async ({ open }) => {
   const { locate } = await open("form");
   const pending = await locate({ source: "() => new Promise(() => {})", timeoutMs: 300 });

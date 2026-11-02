@@ -1,76 +1,7 @@
-import type { FunctionLocatorRequest } from "@recnrun/protocol";
 import { expect, test } from "vite-plus/test";
-import type { CdpSession } from "../src/cdp-link.ts";
 import { applyCardinality } from "../src/function-locator-cardinality.ts";
 import { resolveFunctionLocator } from "../src/index.ts";
-import { FakeChannel } from "./fake-channel.ts";
-
-type Params = Record<string, unknown> | undefined;
-type Responder = (params: Params) => unknown;
-
-const NEVER = new Promise<never>(() => undefined);
-
-/** The fake channel with scripted replies per method; an unscripted method answers `{}`. */
-class ScriptedChannel extends FakeChannel {
-  readonly replies = new Map<string, Responder>();
-
-  override send(method: string, params?: Params, sessionId?: string): Promise<unknown> {
-    const sent = super.send(method, params, sessionId);
-    if (this.failing.has(method)) return sent;
-    const reply = this.replies.get(method)?.(params) ?? {};
-    return reply instanceof Promise ? reply : Promise.resolve(reply);
-  }
-
-  sentOf(method: string) {
-    return this.sent.filter((each) => each.method === method);
-  }
-}
-
-const object = (objectId: string, subtype?: string) => ({
-  result: { type: "object", objectId, ...(subtype && { subtype }) },
-});
-
-/** A page whose locator returns `value`, whose list holds `items`, and whose nodes map by handle. */
-function page(value: unknown, items: string[] = [], nodes: Record<string, number> = {}) {
-  const channel = new ScriptedChannel();
-  channel.replies.set("Page.getFrameTree", () => ({
-    frameTree: {
-      frame: { id: "F1", loaderId: "L1" },
-      childFrames: [{ frame: { id: "F2", loaderId: "L2" } }],
-    },
-  }));
-  channel.replies.set("Page.createIsolatedWorld", () => ({ executionContextId: 7 }));
-  channel.replies.set("Runtime.evaluate", (params) =>
-    params?.expression === "1+1" ? { result: { type: "number", value: 2 } } : object("scope"),
-  );
-  channel.replies.set("Runtime.callFunctionOn", (params) =>
-    params?.objectId === undefined ? value : object("list", "array"),
-  );
-  channel.replies.set("Runtime.getProperties", () => ({
-    result: [
-      ...items.map((objectId, index) => ({
-        name: String(index),
-        value: { type: "object", objectId },
-      })),
-      { name: "length", value: { type: "number", value: items.length } },
-    ],
-  }));
-  channel.replies.set("DOM.describeNode", (params) => ({
-    node: { backendNodeId: nodes[String(params?.objectId)] ?? 1 },
-  }));
-  const session: CdpSession = { send: (method, params) => channel.send(method, params, "S1") };
-  return { channel, target: { session, targetId: "T1" } };
-}
-
-const request = (overrides: Partial<FunctionLocatorRequest> = {}): FunctionLocatorRequest => ({
-  source: "({ root }) => root.querySelectorAll('li')",
-  cardinality: "one",
-  timeoutMs: 1_000,
-  ...overrides,
-});
-
-const released = (channel: ScriptedChannel) =>
-  channel.sentOf("Runtime.releaseObject").map(({ params }) => params?.objectId);
+import { object, page, request, released, ScriptedChannel } from "./function-locator-page.ts";
 
 test.each([
   ["one", [], undefined, ["not-found", []]],
@@ -225,66 +156,6 @@ test("a named frame runs the function there, and an unknown frame is an error", 
     error: { message: "The target has no frame F9." },
   });
 });
-
-test("a blocked renderer is terminated on the same session and probed again", async () => {
-  const { channel, target } = page(NEVER);
-  let probes = 0;
-  channel.replies.set("Runtime.evaluate", (params) => {
-    if (params?.expression !== "1+1") return object("scope");
-    probes += 1;
-    return probes === 1 ? NEVER : { result: { type: "number", value: 2 } };
-  });
-  const result = await resolveFunctionLocator(target, request({ timeoutMs: 20 }), {
-    probeTimeoutMs: 20,
-  });
-  expect(result).toMatchObject({
-    status: "error",
-    error: { message: "The locator function did not finish within 20 ms." },
-    deadline: { timeoutMs: 20, blocked: true, terminated: true, tabResponsive: true },
-  });
-  expect(channel.sentOf("Runtime.terminateExecution")).toEqual([
-    { method: "Runtime.terminateExecution", sessionId: "S1" },
-  ]);
-});
-
-test("a renderer that still answers is not terminated, and one that never does is unresponsive", async () => {
-  const awaiting = page(NEVER);
-  const pending = await resolveFunctionLocator(awaiting.target, request({ timeoutMs: 10 }));
-  expect(pending.deadline).toEqual({
-    timeoutMs: 10,
-    blocked: false,
-    terminated: false,
-    tabResponsive: true,
-  });
-  expect(awaiting.channel.sentOf("Runtime.terminateExecution")).toEqual([]);
-
-  const stuck = page(NEVER);
-  stuck.channel.replies.set("Runtime.evaluate", (params) =>
-    params?.expression === "1+1" ? NEVER : object("scope"),
-  );
-  stuck.channel.replies.set("Runtime.terminateExecution", () => NEVER);
-  const hung = await resolveFunctionLocator(stuck.target, request({ timeoutMs: 10 }), {
-    probeTimeoutMs: 10,
-  });
-  expect(hung.deadline).toEqual({
-    timeoutMs: 10,
-    blocked: true,
-    terminated: false,
-    tabResponsive: false,
-  });
-});
-
-test("releasing handles of a renderer that never answers does not hang", async () => {
-  const stuck = page(object("el", "node"), ["el"]);
-  stuck.channel.replies.set("Runtime.releaseObject", () => NEVER);
-  stuck.channel.replies.set("Runtime.releaseObjectGroup", () => NEVER);
-  const options = { probeTimeoutMs: 10 };
-  const matched = await resolveFunctionLocator(stuck.target, request(), options);
-  await matched.release();
-  const none = page({ result: { type: "object", subtype: "null" } });
-  none.channel.replies.set("Runtime.releaseObjectGroup", () => NEVER);
-  expect((await resolveFunctionLocator(none.target, request(), options)).status).toBe("not-found");
-}, 2_000);
 
 test("an endpoint attaches a flat session, and closes it once nothing is held", async () => {
   const { channel } = page(object("el", "node"), ["el"]);

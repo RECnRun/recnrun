@@ -39,12 +39,15 @@ type Outcome = Pick<FunctionLocatorResult, "status" | "count" | "elements" | "er
 
 interface LocatorRun {
   session: CdpSession;
+  /** The same session for steps that run locator code; it refuses to send once the deadline passed. */
+  page: CdpSession;
   targetId: string;
   request: FunctionLocatorRequest;
   objectGroup: string;
   probeMs: number;
   /** Handles a matched result does not hand out; released one by one. */
   transient: string[];
+  cut: boolean;
 }
 
 // Runs in the isolated world with `this` bound to what the locator returned.
@@ -72,21 +75,28 @@ const failed = (status: "error" | "unsupported", message: string): Outcome => ({
   error: { message },
 });
 
-async function callLocator(
-  run: LocatorRun,
-  contextId: number,
-): Promise<{ deadline: LocatorDeadline } | { evaluation: Evaluation }> {
-  const { session, request, objectGroup } = run;
+/** A session that sends nothing once `cut()` is true, so an abandoned resolution stops where it is. */
+function guarded(session: CdpSession, cut: () => boolean): CdpSession {
+  return {
+    send: (method, params) =>
+      cut()
+        ? Promise.reject(new Error("The locator deadline has passed."))
+        : session.send(method, params),
+  };
+}
+
+async function callLocator(run: LocatorRun, contextId: number): Promise<Evaluation> {
+  const { page, request, objectGroup } = run;
   const scope = v.parse(
     EvaluationSchema,
-    await session.send("Runtime.evaluate", {
+    await page.send("Runtime.evaluate", {
       expression: "({ root: document })",
       contextId,
       objectGroup,
     }),
   ).result.objectId;
   if (scope) run.transient.push(scope);
-  const call = session.send("Runtime.callFunctionOn", {
+  const reply = await page.send("Runtime.callFunctionOn", {
     functionDeclaration: request.source,
     executionContextId: contextId,
     arguments: [{ objectId: scope }, { value: request.args ?? {} }],
@@ -94,12 +104,7 @@ async function callLocator(
     awaitPromise: true,
     objectGroup,
   });
-  // A call cut at the deadline still settles later; its rejection is not the caller's.
-  call.catch(() => undefined);
-  const reply = await within(call, request.timeoutMs);
-  if (timedOut(reply))
-    return { deadline: await cutAtDeadline(session, request.timeoutMs, run.probeMs) };
-  return { evaluation: v.parse(EvaluationSchema, reply) };
+  return v.parse(EvaluationSchema, reply);
 }
 
 /** The handles of the elements a locator returned, or why the value is not elements. */
@@ -111,7 +116,7 @@ async function elementHandles(
   if (value.type !== "object" || !value.objectId)
     return { unsupported: `The locator function returned a ${value.type}, not elements.` };
   run.transient.push(value.objectId);
-  const reply = await run.session.send("Runtime.callFunctionOn", {
+  const reply = await run.page.send("Runtime.callFunctionOn", {
     functionDeclaration: TO_ELEMENTS,
     objectId: value.objectId,
     returnByValue: false,
@@ -121,12 +126,12 @@ async function elementHandles(
   if (exceptionDetails) return { unsupported: exceptionText(exceptionDetails) };
   if (!result.objectId) throw new Error("Chrome returned no handle for the element list.");
   run.transient.push(result.objectId);
-  return { handles: await arrayItems(run.session, result.objectId) };
+  return { handles: await arrayItems(run.page, result.objectId) };
 }
 
 async function pick(run: LocatorRun, frame: FrameInfo, handles: string[]): Promise<Outcome> {
   const { references, duplicates } = await describeElements(
-    run.session,
+    run.page,
     { targetId: run.targetId, frame },
     handles,
   );
@@ -138,15 +143,25 @@ async function pick(run: LocatorRun, frame: FrameInfo, handles: string[]): Promi
   return { status: picked.status, count: references.length, elements: picked.selected };
 }
 
-async function locate(run: LocatorRun): Promise<Outcome> {
-  const frame = await findFrame(run.session, run.request.frameId);
-  const called = await callLocator(run, await createWorld(run.session, frame.id));
-  if ("deadline" in called) return deadlineOutcome(called.deadline);
-  const { result, exceptionDetails } = called.evaluation;
+/** Every step that runs code the locator controls: the call, the conversion, and the description. */
+async function evaluate(run: LocatorRun, frame: FrameInfo, contextId: number): Promise<Outcome> {
+  const { result, exceptionDetails } = await callLocator(run, contextId);
   if (exceptionDetails) return failed("error", exceptionText(exceptionDetails));
   const listed = await elementHandles(run, result);
   if ("unsupported" in listed) return failed("unsupported", listed.unsupported);
   return pick(run, frame, listed.handles);
+}
+
+async function locate(run: LocatorRun): Promise<Outcome> {
+  const { session, request, probeMs } = run;
+  const frame = await findFrame(session, request.frameId);
+  const evaluated = evaluate(run, frame, await createWorld(session, frame.id));
+  // A resolution cut at the deadline still settles later; its rejection is not the caller's.
+  evaluated.catch(() => undefined);
+  const settled = await within(evaluated, request.timeoutMs);
+  if (!timedOut(settled)) return settled;
+  run.cut = true;
+  return deadlineOutcome(await cutAtDeadline(session, request.timeoutMs, probeMs));
 }
 
 function deadlineOutcome(deadline: LocatorDeadline): Outcome {
@@ -185,7 +200,16 @@ async function resolveOn(
 ): Promise<FunctionLocatorResolution> {
   const started = performance.now();
   const objectGroup = `recnrun-locator-${crypto.randomUUID()}`;
-  const run: LocatorRun = { session, targetId, request, objectGroup, probeMs, transient: [] };
+  const run: LocatorRun = {
+    session,
+    page: guarded(session, () => run.cut),
+    targetId,
+    request,
+    objectGroup,
+    probeMs,
+    transient: [],
+    cut: false,
+  };
   const outcome = await locate(run).catch((error: unknown) => failed("error", reason(error)));
   await releaseTransient(run, outcome);
   const { status, count, elements, ...rest } = outcome;
