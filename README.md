@@ -39,6 +39,7 @@ vp run clean            # delete builds, test artifacts, and caches
 | `vp run test:unit`, `test:components`, `test:e2e` | Node tests; components in Chromium; the built website in Playwright     |
 | `vp run test:coverage`                            | Coverage of at least 80% lines, statements, and functions; 75% branches |
 | `vp run dead-code`, `vp run duplication`          | Unused files, exports, and dependencies; duplicated code                |
+| `vp run docs:check`                               | Relative Markdown links and anchors resolve                             |
 | `vp run verify`                                   | All of the above, plus builds                                           |
 
 Tests and `verify` run in Docker on a virtual display, so browser windows never open on your desktop. Results and failure artifacts are in `.artifacts/docker/<run-id>/`. Git hooks run the fast gates before each commit and `vp run verify` before each push.

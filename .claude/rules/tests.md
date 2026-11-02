@@ -12,12 +12,12 @@ paths:
 
 ## Layers
 
-| Layer      | Files                                                                 | Command                                      |
-| ---------- | --------------------------------------------------------------------- | -------------------------------------------- |
-| Node unit  | `{apps,packages}/*/tests/*.test.ts`                                   | `vp run test:unit`                           |
-| Component  | `*.browser.test.ts(x)` in Vitest Browser Mode, Chromium               | `vp run test:components`                     |
-| End-to-end | `tests/e2e/*.spec.ts`, Playwright against the built website           | `vp run test:e2e`                            |
-| Hooks      | `scripts/*-hooks/*.checks.mjs`, `tests/container/*.checks.mjs` (Node) | `vp run test:hooks`, `vp run test:container` |
+| Layer      | Files                                                                                         | Command                                               |
+| ---------- | --------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| Node unit  | `{apps,packages}/*/tests/*.test.ts`                                                           | `vp run test:unit`                                    |
+| Component  | `*.browser.test.ts(x)` in Vitest Browser Mode, Chromium                                       | `vp run test:components`                              |
+| End-to-end | `tests/e2e/*.spec.ts`, Playwright against the built website                                   | `vp run test:e2e`                                     |
+| Scripts    | `scripts/*.checks.mjs`, `scripts/*-hooks/*.checks.mjs`, `tests/container/*.checks.mjs` (Node) | `vp run test:scripts`, `test:hooks`, `test:container` |
 
 [PLAN.md §3](../../docs/plan/PLAN.md#3-how-acceptance-is-checked) adds layers as the engine arrives: `tests/browser/*.spec.ts` (`vp run test:browser`, the engine against Google Chrome over CDP and the fixture app) in F0.6, `tests/contract` in F2.1, and `tests/distribution` in F7.1. Each lands with its Docker wiring and its own section here.
 

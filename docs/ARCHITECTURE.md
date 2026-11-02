@@ -73,6 +73,7 @@ RECnRun reads the user's real Chrome profile, including request bodies and stora
 | Format, lint, type check | `vp check`: Oxfmt, Oxlint (type aware, with `eslint-plugin-sonarjs`), tsgo         |
 | Architecture boundaries  | dependency-cruiser (`.dependency-cruiser.cjs`)                                     |
 | Dead code, duplication   | Knip (`knip.jsonc`), jscpd                                                         |
+| Documentation            | `scripts/check-docs.mjs` (`vp run docs:check`): relative links and anchors resolve |
 | Unit and component tests | Vitest with V8 coverage; Vitest Browser Mode with Playwright Chromium              |
 | End-to-end               | Playwright against the built website, in Docker                                    |
 | Browser layer (F0.6)     | Playwright `connectOverCDP` against Google Chrome Stable, headed on Xvfb in Docker |
