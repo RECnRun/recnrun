@@ -32,7 +32,15 @@
         "functions.test",
         "functions.call",
         "functions.proposeBuiltin",
-        "macros.extract"
+        "macros.extract",
+        "flow.list",
+        "flow.get",
+        "flow.save",
+        "flow.import",
+        "session.suggestions",
+        "picker.start",
+        "picker.stop",
+        "events.subscribe"
       ],
       "type": "string"
     },

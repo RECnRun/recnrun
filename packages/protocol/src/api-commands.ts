@@ -5,10 +5,14 @@ import { CapabilityMatrixSchema } from "./capabilities.ts";
 import { CountSchema, IdSchema, NameSchema, NonEmptyStringSchema } from "./common.ts";
 import { DiscoveryResultSchema } from "./discovery.ts";
 import { EventCategorySchema, EventSchema } from "./events.ts";
+import { FlowSchema } from "./flow.ts";
+import { FlowManifestSchema, RevisionHashSchema } from "./flow-folder.ts";
 import { TargetSchema } from "./locators.ts";
 import { RunSummarySchema } from "./run.ts";
 import { LeaseSchema } from "./lease.ts";
 import { PidSchema } from "./service-state.ts";
+import { FlowCatalogEntrySchema } from "./stored-files.ts";
+import { NormalizationResultSchema } from "./suggestions.ts";
 import {
   ControlStateSchema,
   PauseModeSchema,
@@ -38,6 +42,13 @@ export const SessionStatusSchema = v.strictObject({
 export type SessionStatus = v.InferOutput<typeof SessionStatusSchema>;
 
 const session = { params: SessionRefSchema, result: SessionStatusSchema };
+
+const SavedFlowSchema = v.strictObject({ flowId: IdSchema, revision: RevisionHashSchema });
+
+const picker = {
+  params: SessionRefSchema,
+  result: v.strictObject({ sessionId: NonEmptyStringSchema, picking: v.boolean() }),
+};
 
 // Shapes a later phase specifies; until then the service accepts and returns any JSON.
 const unspecified = { params: v.unknown(), result: v.unknown() };
@@ -133,6 +144,32 @@ export const SERVICE_COMMANDS = {
   "functions.call": unspecified,
   "functions.proposeBuiltin": unspecified,
   "macros.extract": unspecified,
+  "flow.list": {
+    params: NoParamsSchema,
+    result: v.strictObject({ flows: v.array(FlowCatalogEntrySchema) }),
+  },
+  "flow.get": {
+    params: v.strictObject({ flowId: IdSchema }),
+    result: v.strictObject({
+      flow: FlowSchema,
+      manifest: FlowManifestSchema,
+      revision: RevisionHashSchema,
+    }),
+  },
+  "flow.save": { params: v.strictObject({ flow: FlowSchema }), result: SavedFlowSchema },
+  // A flow file from outside the store, such as `recnrun run --flow`; stored like `flow.save`.
+  "flow.import": { params: v.strictObject({ flow: FlowSchema }), result: SavedFlowSchema },
+  "session.suggestions": { params: SessionRefSchema, result: NormalizationResultSchema },
+  "picker.start": picker,
+  "picker.stop": picker,
+  // WebSocket only: the channel then receives every ServiceMessage of that session or run.
+  "events.subscribe": {
+    params: v.strictObject({
+      sessionId: v.optional(NonEmptyStringSchema),
+      runId: v.optional(NonEmptyStringSchema),
+    }),
+    result: v.strictObject({ subscriptionId: NonEmptyStringSchema }),
+  },
 } as const;
 
 export type CommandName = keyof typeof SERVICE_COMMANDS;
