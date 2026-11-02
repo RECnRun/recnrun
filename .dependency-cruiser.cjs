@@ -109,7 +109,7 @@ module.exports = {
           "^apps/service/src/",
           "^packages/(engine|adapter|persistence|protocol)/src/",
           "/node_modules/valibot/",
-          "^(crypto|http|net|os|stream)$",
+          "^(crypto|fs/promises|http|net|os|path|stream)$",
         ],
       },
     },

@@ -38,3 +38,7 @@ export {
   type StartResult,
 } from "./service.ts";
 export { stopOnSignals } from "./signals.ts";
+export { createServiceClient, ServiceCallError, type ServiceClient } from "./client.ts";
+export type { CommandHandlers } from "./dispatch.ts";
+export { loadFlowFile } from "./flow-file.ts";
+export { SERVICE_VERSION } from "./version.ts";

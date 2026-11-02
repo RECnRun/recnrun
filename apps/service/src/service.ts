@@ -12,6 +12,7 @@ import {
   type ServiceState,
 } from "@recnrun/protocol";
 import { forbidEgress } from "./egress.ts";
+import type { CommandHandlers } from "./dispatch.ts";
 import { createHandlers } from "./handlers.ts";
 import { claimInstance } from "./instance.ts";
 import { createJournalRegistry, type JournalRegistry } from "./journals.ts";
@@ -25,6 +26,8 @@ export interface ServiceOptions {
   /** 0 (the default) lets the system pick a free port, written to service.json. */
   port?: number;
   discover?: () => Promise<DiscoveryResult>;
+  /** Handlers that replace or add to the built-in ones; the F2.5 executor and tests pass theirs here. */
+  handlers?: CommandHandlers;
   /** `RECNRUN_FORBID_EGRESS=1` here forbids non-loopback connections in this process. */
   env?: Readonly<Record<string, string | undefined>>;
   log?: { maxBytes?: number; keep?: number };
@@ -107,7 +110,11 @@ async function listen(options: ServiceOptions, store: ServiceStateStore, nonce: 
   );
   const discover = options.discover ?? (() => createCdpAdapter().discover());
   const guard = { port: 0, token };
-  const api = createApiServer({ guard, handlers: createHandlers({ startedAt, discover }), logger });
+  const api = createApiServer({
+    guard,
+    handlers: { ...createHandlers({ startedAt, discover }), ...options.handlers },
+    logger,
+  });
   guard.port = await bind(api.server, options.port ?? 0);
   await store
     .writeState({
