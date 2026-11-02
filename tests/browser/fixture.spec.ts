@@ -35,12 +35,18 @@ async function control(path: string, method = "POST"): Promise<Response> {
   return response;
 }
 
-async function ledger(): Promise<LedgerEntry[]> {
-  return (await (await control("/__ledger", "GET")).json()) as LedgerEntry[];
+/** The ledger's entries after sequence number `since`; the whole ledger by default. */
+async function ledger(since = 0): Promise<LedgerEntry[]> {
+  const entries = (await (await control("/__ledger", "GET")).json()) as LedgerEntry[];
+  return entries.filter((entry) => entry.seq > since);
+}
+
+/** The ledger's last sequence number, so later checks see only what follows it. */
+async function checkpoint(): Promise<number> {
+  return (await ledger()).at(-1)?.seq ?? 0;
 }
 
 async function report<T>(page: Page, url: string): Promise<T> {
-  await control("/__ledger/reset");
   await page.goto(url);
   const element = page.locator("#report[data-ready]");
   await element.waitFor();
@@ -63,13 +69,21 @@ function seqOf(entries: LedgerEntry[], what: string, match: (entry: LedgerEntry)
   return entry?.seq ?? Number.NaN;
 }
 
-/** The worker's first authenticated request lands between the page's start and first-paint markers. */
-async function expectFirstRequestBeforePaint(page: string, scripts: string[], user: string) {
+/**
+ * After checkpoint `since`, the worker's first authenticated request lands between the page's
+ * start and first-paint markers.
+ */
+async function expectFirstRequestBeforePaint(
+  page: string,
+  scripts: string[],
+  user: string,
+  since: number,
+) {
   // The page sends first-paint after it shows its report, so wait for the marker to land.
   await expect
-    .poll(async () => (await ledger()).some((entry) => entry.marker === `${page}:first-paint`))
+    .poll(async () => (await ledger(since)).some((e) => e.marker === `${page}:first-paint`))
     .toBe(true);
-  const entries = await ledger();
+  const entries = await ledger(since);
   const start = seqOf(entries, `${page}:start`, (entry) => entry.marker === `${page}:start`);
   const paint = seqOf(
     entries,
@@ -85,6 +99,16 @@ async function expectFirstRequestBeforePaint(page: string, scripts: string[], us
   }
 }
 
+/** The ledger the observer collects still holds each worker script's first authenticated request. */
+async function expectLedgerKeeps(scripts: string[]): Promise<void> {
+  const paths = (await ledger()).map((entry) => entry.path);
+  for (const script of scripts) {
+    expect(paths, `the ledger keeps ${script}'s /me`).toContain(
+      `/me?from=${encodeURIComponent(script)}`,
+    );
+  }
+}
+
 async function screenshot(page: Page, testInfo: TestInfo, name: string): Promise<void> {
   await page.screenshot({ path: testInfo.outputPath(`${name}.png`) });
 }
@@ -94,8 +118,10 @@ function recordFact(testInfo: TestInfo, description: string): void {
   console.log(`Chrome fact: ${description}`);
 }
 
+// One reset per test: the observer collects the whole test's ledger in afterEach.
 test.beforeEach(async () => {
   await control("/__network?mode=online");
+  await control("/__ledger/reset");
 });
 
 // Every test leaves the evidence set; the fixture's session cookies never appear in it unhashed.
@@ -118,13 +144,14 @@ test("serves storage, both worker types, and sockets to the user signed in by re
   expect(Object.values(storage).filter((value) => value.startsWith("error:"))).toEqual([]);
 
   for (const type of ["classic", "module"]) {
+    const since = await checkpoint();
     const workers = await report<Record<string, WorkerReport>>(
       page,
       `${APP}/workers.html?type=${type}`,
     );
     expect([workers.dedicated?.user, workers.shared?.user]).toEqual(["alice", "alice"]);
     const scripts = [`/worker.js?type=${type}`, `/shared-worker.js?type=${type}`];
-    await expectFirstRequestBeforePaint("workers", scripts, "alice");
+    await expectFirstRequestBeforePaint("workers", scripts, "alice", since);
   }
 
   const sockets = await report<{ webSocket: string; eventSource: WorkerReport }>(
@@ -132,6 +159,12 @@ test("serves storage, both worker types, and sockets to the user signed in by re
     `${APP}/sockets.html`,
   );
   expect(sockets).toEqual({ webSocket: "ping", eventSource: { user: "alice" } });
+  await expectLedgerKeeps(
+    ["classic", "module"].flatMap((type) => [
+      `/worker.js?type=${type}`,
+      `/shared-worker.js?type=${type}`,
+    ]),
+  );
 });
 
 test("runs every service worker variant and serves the offline shell when the fixture cuts the network", async ({
@@ -148,11 +181,14 @@ test("runs every service worker variant and serves the offline shell when the fi
   });
   await signIn(page, "alice");
 
+  const swScripts: string[] = [];
   for (const variant of SW_VARIANTS) {
+    const since = await checkpoint();
     const sw = await report<ServiceWorkerPageReport>(page, `${APP}/sw.html?sw=${variant}`);
+    swScripts.push(sw.worker.script ?? variant);
     expect(sw.worker.user, variant).toBe("alice");
     expect(sw.sync, variant).toBe("ok");
-    await expectFirstRequestBeforePaint("sw", [sw.worker.script ?? ""], "alice");
+    await expectFirstRequestBeforePaint("sw", [sw.worker.script ?? ""], "alice", since);
     // A fact, not a failure: without the notification permission Chrome refuses the subscription.
     expect(sw.push, variant).toMatch(/^error: NotAllowedError: /);
     recordFact(testInfo, `${variant}: push subscription ${sw.push}`);
@@ -162,12 +198,15 @@ test("runs every service worker variant and serves the offline shell when the fi
   expect(dynamic?.marker).toBe("sw:dynamic-import:TypeError");
   recordFact(testInfo, `dynamic: import() in a service worker gives ${dynamic?.marker}`);
 
+  // Before the cut: going offline closes the fixture's keep-alive sockets, which fetch may reuse.
+  const offline = await checkpoint();
   await control("/__network?mode=offline");
   await page.goto(`${APP}/storage.html`);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Offline");
   await screenshot(page, testInfo, "offline-shell");
-  const navigation = (await ledger()).find((entry) => entry.path === "/storage.html");
+  const navigation = (await ledger(offline)).find((entry) => entry.path === "/storage.html");
   expect(navigation?.effect).toBe("network:dropped");
+  await expectLedgerKeeps(swScripts);
 });
 
 test("logs in by popup, renews silently, logs out, and serves the staging copy", async ({
@@ -197,4 +236,9 @@ test("logs in by popup, renews silently, logs out, and serves the staging copy",
   await screenshot(page, testInfo, "staging");
   const staging = (await ledger()).filter((entry) => entry.origin === STAGING);
   expect(staging.some((entry) => entry.path === "/index.js")).toBe(true);
+  const [first] = await ledger();
+  expect(first, "the ledger starts with this test's first navigation").toMatchObject({
+    origin: APP,
+    path: "/",
+  });
 });
