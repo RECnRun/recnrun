@@ -1,0 +1,59 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "properties": {
+    "runId": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": 1
+    },
+    "surfaces": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "gaps": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "lostEvents": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "reasons": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "status": {
+            "enum": ["implemented", "partial", "unavailable", "planned"],
+            "type": "string"
+          },
+          "surface": {
+            "enum": [
+              "network",
+              "websocket-sse",
+              "console-errors",
+              "dom-screen",
+              "web-storage",
+              "cookies",
+              "indexeddb",
+              "cache-storage",
+              "files-opfs",
+              "workers-frames"
+            ],
+            "type": "string"
+          }
+        },
+        "required": ["surface", "status", "reasons"],
+        "type": "object"
+      },
+      "type": "array"
+    }
+  },
+  "required": ["schemaVersion", "runId", "surfaces"],
+  "type": "object"
+}

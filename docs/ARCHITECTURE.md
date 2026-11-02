@@ -52,6 +52,25 @@ Each workspace has one dependency-cruiser rule that lists what its `src` may imp
 
 A later task that needs a new import (for example `node:http` in the service) widens that workspace's rule and this table in the same change, with the reason. `src/main.tsx` and `src/bin.ts` of any app are entrypoints that nothing imports (`not-to-entrypoints`).
 
+## Protocol
+
+`packages/protocol/src` holds one module per concept; `index.ts` re-exports them.
+
+| Module                                             | Shapes                                                                                                           |
+| -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `flow.ts`, `steps.ts`, `actions.ts`, `locators.ts` | The flow DSL: actors, inputs, requirements, preconditions, action, assertion, and builtin steps, targets         |
+| `interpolation.ts`                                 | `${env.*}`, `${inputs.*}`, `${vars.*}`, `${locals.*}`, and `${secrets.*}`; any other namespace is rejected       |
+| `validate.ts`                                      | `validateFlow(input)`: the schema plus the cross-step checks, as `{ ok: true, flow }` or `{ ok: false, issues }` |
+| `events.ts`                                        | The event envelope of the journal (source plan §11) and the gap record                                           |
+| `run.ts`                                           | `manifest.json`, `steps.json`, `coverage.json`, and `summary.json` of a run, with the exit code of each status   |
+| `states.ts`                                        | Session, control, and step states and their legal transitions (source plan §6)                                   |
+| `capabilities.ts`                                  | Capture surfaces, statuses, and the capability matrix                                                            |
+| `api.ts`, `api-commands.ts`                        | The request and response envelopes, error codes, and the params and result of every command (`SERVICE_COMMANDS`) |
+
+Each issue of `validateFlow` has a `code` (`unknown-action`, `unknown-namespace`, `duplicate-step-id`, `missing-input`, `cyclic-variable`, `nth-without-index`, and others in `FLOW_ISSUE_CODES`) and the `path` of the offending key from the flow's root.
+
+`vp run schema:generate` writes JSON Schema for the flow, the event, the run files, the capability matrix, and the service envelopes to `packages/protocol/schema/*.json` through `@valibot/to-json-schema`, and the files are committed. `tests/schema-drift.test.ts` fails when a schema changes without regenerating them. JSON Schema describes structure only: rules written as `v.check` (known interpolation namespaces, `nth` needs an index, the exit code matches the status) and the cross-step checks of `validateFlow` are enforced by the protocol code, not by the exported files. Only `src` must stay pure; `scripts/` and `tests/` use Node APIs to write and read those files.
+
 ## Website
 
 ```text

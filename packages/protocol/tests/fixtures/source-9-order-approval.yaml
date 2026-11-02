@@ -1,0 +1,58 @@
+# The first example of the source plan §9, copied verbatim except where marked "Adapted".
+schemaVersion: 1
+id: pedido-aprovacao
+name: Criar e aprovar pedido
+# Adapted: the source gives each actor `{ profileBinding: ... }`, but its §7 and §12 (and PLAN.md F1.3)
+# keep profile bindings in the local service, outside the portable flow; actors are roles only.
+actors:
+  solicitante: {}
+  aprovador: {}
+inputs:
+  descricao: { type: string, required: true }
+requirements:
+  - id: CA-01
+    text: O solicitante deve visualizar o pedido aprovado.
+# Adapted: the source lists `authenticated: <actor>` alone, but its §13 requires checking identity
+# before replay instead of presuming a cookie means a valid login, so each precondition declares a check.
+preconditions:
+  - authenticated: solicitante
+    check: { visible: { testId: usuario-logado } }
+  - authenticated: aprovador
+    check: { visible: { testId: usuario-logado } }
+steps:
+  - id: abrir
+    actor: solicitante
+    action: navigate
+    url: "${env.baseUrl}/pedidos"
+  - id: preencher
+    actor: solicitante
+    action: fill
+    target: { role: textbox, name: Descrição, exact: true }
+    value: "${inputs.descricao}"
+  - id: criar
+    actor: solicitante
+    action: click
+    target: { role: button, name: Criar, exact: true }
+  - id: obter-id
+    actor: solicitante
+    action: extractText
+    target: { testId: pedido-id }
+    saveAs: pedidoId
+  - id: abrir-aprovacao
+    actor: aprovador
+    action: navigate
+    url: "${env.baseUrl}/pedidos/${vars.pedidoId}"
+  - id: aprovar
+    actor: aprovador
+    action: click
+    target: { role: button, name: Aprovar, exact: true }
+  - id: conferir
+    actor: solicitante
+    action: navigate
+    url: "${env.baseUrl}/pedidos/${vars.pedidoId}"
+  - id: status
+    actor: solicitante
+    assertion: textEquals
+    target: { testId: pedido-status }
+    expected: Aprovado
+    requirements: [CA-01]

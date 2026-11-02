@@ -1,0 +1,118 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "properties": {
+    "counts": {
+      "additionalProperties": false,
+      "properties": {
+        "blocked": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "cancelled": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "failed": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "indeterminate": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "passed": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "pending": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "running": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "total": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "total",
+        "pending",
+        "running",
+        "passed",
+        "failed",
+        "blocked",
+        "cancelled",
+        "indeterminate"
+      ],
+      "type": "object"
+    },
+    "endedAt": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "exitCode": {
+      "enum": [0, 1, 2],
+      "type": "number"
+    },
+    "failures": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "evidence": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "message": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "stepId": {
+            "pattern": "^[A-Za-z0-9][\\w.-]*$",
+            "type": "string"
+          }
+        },
+        "required": ["stepId", "message"],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "flowId": {
+      "pattern": "^[A-Za-z0-9][\\w.-]*$",
+      "type": "string"
+    },
+    "runId": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": 1
+    },
+    "startedAt": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "status": {
+      "enum": ["passed", "failed", "error", "interrupted"],
+      "type": "string"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "runId",
+    "flowId",
+    "status",
+    "exitCode",
+    "startedAt",
+    "endedAt",
+    "counts",
+    "failures"
+  ],
+  "type": "object"
+}

@@ -1,0 +1,86 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "properties": {
+    "runId": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": 1
+    },
+    "steps": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "durationMs": {
+            "minimum": 0,
+            "type": "number"
+          },
+          "endedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "error": {
+            "additionalProperties": false,
+            "properties": {
+              "code": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "message": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": ["code", "message"],
+            "type": "object"
+          },
+          "evidence": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "iterationId": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "startedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "running",
+              "passed",
+              "failed",
+              "blocked",
+              "cancelled",
+              "indeterminate"
+            ],
+            "type": "string"
+          },
+          "stepId": {
+            "pattern": "^[A-Za-z0-9][\\w.-]*$",
+            "type": "string"
+          },
+          "stepPath": {
+            "items": {
+              "pattern": "^[A-Za-z0-9][\\w.-]*$",
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": ["stepId", "status"],
+        "type": "object"
+      },
+      "type": "array"
+    }
+  },
+  "required": ["schemaVersion", "runId", "steps"],
+  "type": "object"
+}

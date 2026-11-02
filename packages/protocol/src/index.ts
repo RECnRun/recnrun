@@ -1,9 +1,14 @@
-import * as v from "valibot";
-
-/** The version every stored file and service message of this protocol carries. */
-export const PROTOCOL_SCHEMA_VERSION = 1;
-
-/** Accepts only the protocol version this build reads; F0.3 adds migrations for older ones. */
-export const SchemaVersionSchema = v.literal(PROTOCOL_SCHEMA_VERSION);
-
-export type SchemaVersion = v.InferOutput<typeof SchemaVersionSchema>;
+export * from "./actions.ts";
+export * from "./api-commands.ts";
+export * from "./api.ts";
+export * from "./capabilities.ts";
+export * from "./common.ts";
+export * from "./events.ts";
+export * from "./flow.ts";
+export * from "./interpolation.ts";
+export * from "./locators.ts";
+export * from "./run.ts";
+export * from "./states.ts";
+export * from "./steps.ts";
+export * from "./validate.ts";
+export * from "./version.ts";

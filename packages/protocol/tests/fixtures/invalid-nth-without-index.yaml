@@ -1,0 +1,11 @@
+schemaVersion: 1
+id: nth-without-index
+name: A locator list asks for the nth match without saying which
+steps:
+  - id: abrir-linha
+    action: click
+    target:
+      cardinality: nth
+      locators:
+        - strategy: role
+          role: row

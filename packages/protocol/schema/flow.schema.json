@@ -1,0 +1,1593 @@
+{
+  "$defs": {
+    "Locator": {
+      "anyOf": [
+        {
+          "oneOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "exact": {
+                  "type": "boolean"
+                },
+                "filter": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "hasNotText": {
+                      "type": "string"
+                    },
+                    "hasText": {
+                      "type": "string"
+                    },
+                    "visible": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [],
+                  "type": "object"
+                },
+                "has": {
+                  "$ref": "#/$defs/Locator"
+                },
+                "id": {
+                  "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "role": {
+                  "type": "string"
+                },
+                "strategy": {
+                  "const": "role"
+                },
+                "within": {
+                  "$ref": "#/$defs/Locator"
+                }
+              },
+              "required": ["strategy", "role"],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "exact": {
+                  "type": "boolean"
+                },
+                "filter": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "hasNotText": {
+                      "type": "string"
+                    },
+                    "hasText": {
+                      "type": "string"
+                    },
+                    "visible": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [],
+                  "type": "object"
+                },
+                "has": {
+                  "$ref": "#/$defs/Locator"
+                },
+                "id": {
+                  "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                  "type": "string"
+                },
+                "strategy": {
+                  "enum": ["text", "label"],
+                  "type": "string"
+                },
+                "value": {
+                  "type": "string"
+                },
+                "within": {
+                  "$ref": "#/$defs/Locator"
+                }
+              },
+              "required": ["strategy", "value"],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "filter": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "hasNotText": {
+                      "type": "string"
+                    },
+                    "hasText": {
+                      "type": "string"
+                    },
+                    "visible": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [],
+                  "type": "object"
+                },
+                "has": {
+                  "$ref": "#/$defs/Locator"
+                },
+                "id": {
+                  "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                  "type": "string"
+                },
+                "strategy": {
+                  "enum": ["testId", "css", "xpath"],
+                  "type": "string"
+                },
+                "value": {
+                  "type": "string"
+                },
+                "within": {
+                  "$ref": "#/$defs/Locator"
+                }
+              },
+              "required": ["strategy", "value"],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "args": {
+                  "additionalProperties": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "propertyNames": {
+                    "pattern": "^[A-Za-z_]\\w*$",
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                "filter": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "hasNotText": {
+                      "type": "string"
+                    },
+                    "hasText": {
+                      "type": "string"
+                    },
+                    "visible": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [],
+                  "type": "object"
+                },
+                "functionRef": {
+                  "pattern": "^[a-z][\\w-]*(\\.[A-Za-z_][\\w-]*)+@\\d+\\.\\d+\\.\\d+$",
+                  "type": "string"
+                },
+                "has": {
+                  "$ref": "#/$defs/Locator"
+                },
+                "id": {
+                  "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                  "type": "string"
+                },
+                "strategy": {
+                  "const": "function"
+                },
+                "within": {
+                  "$ref": "#/$defs/Locator"
+                }
+              },
+              "required": ["strategy", "functionRef"],
+              "type": "object"
+            }
+          ]
+        },
+        {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "testId": {
+                  "type": "string"
+                }
+              },
+              "required": ["testId"],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "exact": {
+                  "type": "boolean"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "role": {
+                  "type": "string"
+                }
+              },
+              "required": ["role"],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "exact": {
+                  "type": "boolean"
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": ["text"],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "exact": {
+                  "type": "boolean"
+                },
+                "label": {
+                  "type": "string"
+                }
+              },
+              "required": ["label"],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "css": {
+                  "type": "string"
+                }
+              },
+              "required": ["css"],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "xpath": {
+                  "type": "string"
+                }
+              },
+              "required": ["xpath"],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "args": {
+                  "additionalProperties": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "propertyNames": {
+                    "pattern": "^[A-Za-z_]\\w*$",
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                "functionRef": {
+                  "pattern": "^[a-z][\\w-]*(\\.[A-Za-z_][\\w-]*)+@\\d+\\.\\d+\\.\\d+$",
+                  "type": "string"
+                }
+              },
+              "required": ["functionRef"],
+              "type": "object"
+            }
+          ]
+        }
+      ]
+    },
+    "Step": {
+      "anyOf": [
+        {
+          "oneOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "action": {
+                  "const": "navigate"
+                },
+                "actor": {
+                  "pattern": "^[A-Za-z_]\\w*$",
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "id": {
+                  "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                  "type": "string"
+                },
+                "requirements": {
+                  "items": {
+                    "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "timeoutMs": {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": ["id", "action", "url"],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "action": {
+                  "const": "openTab"
+                },
+                "actor": {
+                  "pattern": "^[A-Za-z_]\\w*$",
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "id": {
+                  "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                  "type": "string"
+                },
+                "requirements": {
+                  "items": {
+                    "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "timeoutMs": {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": ["id", "action"],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "action": {
+                  "enum": ["reload", "closeTab"],
+                  "type": "string"
+                },
+                "actor": {
+                  "pattern": "^[A-Za-z_]\\w*$",
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "id": {
+                  "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                  "type": "string"
+                },
+                "requirements": {
+                  "items": {
+                    "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "timeoutMs": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              },
+              "required": ["id", "action"],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "action": {
+                  "const": "selectTab"
+                },
+                "actor": {
+                  "pattern": "^[A-Za-z_]\\w*$",
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "id": {
+                  "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                  "type": "string"
+                },
+                "requirements": {
+                  "items": {
+                    "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "tab": {
+                  "anyOf": [
+                    {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    {
+                      "type": "string"
+                    }
+                  ]
+                },
+                "timeoutMs": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              },
+              "required": ["id", "action", "tab"],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "action": {
+                  "enum": ["click", "check", "uncheck"],
+                  "type": "string"
+                },
+                "actor": {
+                  "pattern": "^[A-Za-z_]\\w*$",
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "id": {
+                  "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                  "type": "string"
+                },
+                "requirements": {
+                  "items": {
+                    "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "target": {
+                  "$ref": "#/$defs/Target"
+                },
+                "timeoutMs": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              },
+              "required": ["id", "action", "target"],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "action": {
+                  "enum": ["fill", "type", "select"],
+                  "type": "string"
+                },
+                "actor": {
+                  "pattern": "^[A-Za-z_]\\w*$",
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "id": {
+                  "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                  "type": "string"
+                },
+                "requirements": {
+                  "items": {
+                    "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "target": {
+                  "$ref": "#/$defs/Target"
+                },
+                "timeoutMs": {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "value": {
+                  "type": "string"
+                }
+              },
+              "required": ["id", "action", "target", "value"],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "action": {
+                  "const": "keyPress"
+                },
+                "actor": {
+                  "pattern": "^[A-Za-z_]\\w*$",
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "id": {
+                  "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                  "type": "string"
+                },
+                "key": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "requirements": {
+                  "items": {
+                    "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "target": {
+                  "$ref": "#/$defs/Target"
+                },
+                "timeoutMs": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              },
+              "required": ["id", "action", "key"],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "action": {
+                  "const": "scroll"
+                },
+                "actor": {
+                  "pattern": "^[A-Za-z_]\\w*$",
+                  "type": "string"
+                },
+                "deltaX": {
+                  "type": "number"
+                },
+                "deltaY": {
+                  "type": "number"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "id": {
+                  "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                  "type": "string"
+                },
+                "requirements": {
+                  "items": {
+                    "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "target": {
+                  "$ref": "#/$defs/Target"
+                },
+                "timeoutMs": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              },
+              "required": ["id", "action"],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "action": {
+                  "const": "waitFor"
+                },
+                "actor": {
+                  "pattern": "^[A-Za-z_]\\w*$",
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "id": {
+                  "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                  "type": "string"
+                },
+                "requirements": {
+                  "items": {
+                    "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "state": {
+                  "enum": ["visible", "hidden", "attached", "detached"],
+                  "type": "string"
+                },
+                "target": {
+                  "$ref": "#/$defs/Target"
+                },
+                "timeoutMs": {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": ["id", "action"],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "action": {
+                  "const": "extractText"
+                },
+                "actor": {
+                  "pattern": "^[A-Za-z_]\\w*$",
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "id": {
+                  "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                  "type": "string"
+                },
+                "requirements": {
+                  "items": {
+                    "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "saveAs": {
+                  "pattern": "^[A-Za-z_]\\w*$",
+                  "type": "string"
+                },
+                "target": {
+                  "$ref": "#/$defs/Target"
+                },
+                "timeoutMs": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              },
+              "required": ["id", "action", "target", "saveAs"],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "action": {
+                  "const": "extractAttribute"
+                },
+                "actor": {
+                  "pattern": "^[A-Za-z_]\\w*$",
+                  "type": "string"
+                },
+                "attribute": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "id": {
+                  "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                  "type": "string"
+                },
+                "requirements": {
+                  "items": {
+                    "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "saveAs": {
+                  "pattern": "^[A-Za-z_]\\w*$",
+                  "type": "string"
+                },
+                "target": {
+                  "$ref": "#/$defs/Target"
+                },
+                "timeoutMs": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              },
+              "required": ["id", "action", "target", "attribute", "saveAs"],
+              "type": "object"
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "actor": {
+                  "pattern": "^[A-Za-z_]\\w*$",
+                  "type": "string"
+                },
+                "assertion": {
+                  "enum": ["visible", "hidden", "enabled", "disabled"],
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "id": {
+                  "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                  "type": "string"
+                },
+                "requirements": {
+                  "items": {
+                    "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "target": {
+                  "$ref": "#/$defs/Target"
+                },
+                "timeoutMs": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              },
+              "required": ["id", "assertion", "target"],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "actor": {
+                  "pattern": "^[A-Za-z_]\\w*$",
+                  "type": "string"
+                },
+                "assertion": {
+                  "enum": ["textEquals", "textContains", "value"],
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "expected": {
+                  "type": "string"
+                },
+                "id": {
+                  "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                  "type": "string"
+                },
+                "requirements": {
+                  "items": {
+                    "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "target": {
+                  "$ref": "#/$defs/Target"
+                },
+                "timeoutMs": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              },
+              "required": ["id", "assertion", "target", "expected"],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "actor": {
+                  "pattern": "^[A-Za-z_]\\w*$",
+                  "type": "string"
+                },
+                "assertion": {
+                  "const": "count"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "expected": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "id": {
+                  "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                  "type": "string"
+                },
+                "requirements": {
+                  "items": {
+                    "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "target": {
+                  "$ref": "#/$defs/Target"
+                },
+                "timeoutMs": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              },
+              "required": ["id", "assertion", "target", "expected"],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "actor": {
+                  "pattern": "^[A-Za-z_]\\w*$",
+                  "type": "string"
+                },
+                "assertion": {
+                  "const": "url"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "expected": {
+                  "type": "string"
+                },
+                "id": {
+                  "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                  "type": "string"
+                },
+                "requirements": {
+                  "items": {
+                    "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "timeoutMs": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              },
+              "required": ["id", "assertion", "expected"],
+              "type": "object"
+            }
+          ]
+        },
+        {
+          "oneOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "actor": {
+                  "pattern": "^[A-Za-z_]\\w*$",
+                  "type": "string"
+                },
+                "builtin": {
+                  "const": "if"
+                },
+                "condition": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "args": {
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "boolean"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "propertyNames": {
+                        "pattern": "^[A-Za-z_]\\w*$",
+                        "type": "string"
+                      },
+                      "type": "object"
+                    },
+                    "functionRef": {
+                      "pattern": "^[a-z][\\w-]*(\\.[A-Za-z_][\\w-]*)+@\\d+\\.\\d+\\.\\d+$",
+                      "type": "string"
+                    }
+                  },
+                  "required": ["functionRef"],
+                  "type": "object"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "else": {
+                  "items": {
+                    "$ref": "#/$defs/Step"
+                  },
+                  "type": "array"
+                },
+                "id": {
+                  "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                  "type": "string"
+                },
+                "requirements": {
+                  "items": {
+                    "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "then": {
+                  "items": {
+                    "$ref": "#/$defs/Step"
+                  },
+                  "type": "array"
+                },
+                "timeoutMs": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              },
+              "required": ["id", "builtin", "condition", "then"],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "actor": {
+                  "pattern": "^[A-Za-z_]\\w*$",
+                  "type": "string"
+                },
+                "builtin": {
+                  "const": "repeat"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "id": {
+                  "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                  "type": "string"
+                },
+                "requirements": {
+                  "items": {
+                    "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "steps": {
+                  "items": {
+                    "$ref": "#/$defs/Step"
+                  },
+                  "type": "array"
+                },
+                "timeoutMs": {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "times": {
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": ["id", "builtin", "times", "steps"],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "actor": {
+                  "pattern": "^[A-Za-z_]\\w*$",
+                  "type": "string"
+                },
+                "builtin": {
+                  "const": "forEach"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "id": {
+                  "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                  "type": "string"
+                },
+                "indexAs": {
+                  "pattern": "^[A-Za-z_]\\w*$",
+                  "type": "string"
+                },
+                "itemAs": {
+                  "pattern": "^[A-Za-z_]\\w*$",
+                  "type": "string"
+                },
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "items": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "boolean"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "type": "array"
+                    }
+                  ]
+                },
+                "maxIterations": {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "requirements": {
+                  "items": {
+                    "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "steps": {
+                  "items": {
+                    "$ref": "#/$defs/Step"
+                  },
+                  "type": "array"
+                },
+                "timeoutMs": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "id",
+                "timeoutMs",
+                "builtin",
+                "items",
+                "itemAs",
+                "maxIterations",
+                "steps"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "actor": {
+                  "pattern": "^[A-Za-z_]\\w*$",
+                  "type": "string"
+                },
+                "builtin": {
+                  "enum": ["while", "until"],
+                  "type": "string"
+                },
+                "condition": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "args": {
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "boolean"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "propertyNames": {
+                        "pattern": "^[A-Za-z_]\\w*$",
+                        "type": "string"
+                      },
+                      "type": "object"
+                    },
+                    "functionRef": {
+                      "pattern": "^[a-z][\\w-]*(\\.[A-Za-z_][\\w-]*)+@\\d+\\.\\d+\\.\\d+$",
+                      "type": "string"
+                    }
+                  },
+                  "required": ["functionRef"],
+                  "type": "object"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "id": {
+                  "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                  "type": "string"
+                },
+                "maxIterations": {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "requirements": {
+                  "items": {
+                    "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "steps": {
+                  "items": {
+                    "$ref": "#/$defs/Step"
+                  },
+                  "type": "array"
+                },
+                "timeoutMs": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              },
+              "required": ["id", "timeoutMs", "builtin", "condition", "maxIterations", "steps"],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "actor": {
+                  "pattern": "^[A-Za-z_]\\w*$",
+                  "type": "string"
+                },
+                "builtin": {
+                  "const": "counter"
+                },
+                "by": {
+                  "type": "number"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "id": {
+                  "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                  "type": "string"
+                },
+                "name": {
+                  "pattern": "^[A-Za-z_]\\w*$",
+                  "type": "string"
+                },
+                "operation": {
+                  "enum": ["init", "increment", "decrement", "get"],
+                  "type": "string"
+                },
+                "requirements": {
+                  "items": {
+                    "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "saveAs": {
+                  "pattern": "^[A-Za-z_]\\w*$",
+                  "type": "string"
+                },
+                "timeoutMs": {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "value": {
+                  "type": "number"
+                }
+              },
+              "required": ["id", "builtin", "operation", "name"],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "actor": {
+                  "pattern": "^[A-Za-z_]\\w*$",
+                  "type": "string"
+                },
+                "builtin": {
+                  "const": "setVariable"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "id": {
+                  "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                  "type": "string"
+                },
+                "name": {
+                  "pattern": "^[A-Za-z_]\\w*$",
+                  "type": "string"
+                },
+                "requirements": {
+                  "items": {
+                    "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "timeoutMs": {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "value": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": ["id", "builtin", "name", "value"],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "actor": {
+                  "pattern": "^[A-Za-z_]\\w*$",
+                  "type": "string"
+                },
+                "args": {
+                  "additionalProperties": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "propertyNames": {
+                    "pattern": "^[A-Za-z_]\\w*$",
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                "builtin": {
+                  "const": "call"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "functionRef": {
+                  "pattern": "^[a-z][\\w-]*(\\.[A-Za-z_][\\w-]*)+@\\d+\\.\\d+\\.\\d+$",
+                  "type": "string"
+                },
+                "id": {
+                  "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                  "type": "string"
+                },
+                "requirements": {
+                  "items": {
+                    "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "saveAs": {
+                  "pattern": "^[A-Za-z_]\\w*$",
+                  "type": "string"
+                },
+                "timeoutMs": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              },
+              "required": ["id", "builtin", "functionRef"],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "actor": {
+                  "pattern": "^[A-Za-z_]\\w*$",
+                  "type": "string"
+                },
+                "builtin": {
+                  "enum": ["break", "continue"],
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "id": {
+                  "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                  "type": "string"
+                },
+                "requirements": {
+                  "items": {
+                    "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "timeoutMs": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              },
+              "required": ["id", "builtin"],
+              "type": "object"
+            }
+          ]
+        }
+      ]
+    },
+    "Target": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "$ref": "#/$defs/Locator"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "cardinality": {
+              "default": "one",
+              "enum": ["one", "many", "optional", "nth"],
+              "type": "string"
+            },
+            "index": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "locators": {
+              "items": {
+                "$ref": "#/$defs/Locator"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "resolution": {
+              "default": "orderedFallback",
+              "enum": ["orderedFallback", "agreement"],
+              "type": "string"
+            },
+            "timeoutMs": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          "required": ["locators"],
+          "type": "object"
+        }
+      ]
+    }
+  },
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "properties": {
+    "actors": {
+      "additionalProperties": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "type": "string"
+          }
+        },
+        "required": [],
+        "type": "object"
+      },
+      "default": {},
+      "propertyNames": {
+        "pattern": "^[A-Za-z_]\\w*$",
+        "type": "string"
+      },
+      "type": "object"
+    },
+    "description": {
+      "type": "string"
+    },
+    "id": {
+      "pattern": "^[A-Za-z0-9][\\w.-]*$",
+      "type": "string"
+    },
+    "inputs": {
+      "additionalProperties": {
+        "additionalProperties": false,
+        "properties": {
+          "default": {},
+          "description": {
+            "type": "string"
+          },
+          "required": {
+            "default": false,
+            "type": "boolean"
+          },
+          "secret": {
+            "type": "boolean"
+          },
+          "type": {
+            "enum": ["string", "number", "boolean", "array", "object"],
+            "type": "string"
+          }
+        },
+        "required": ["type"],
+        "type": "object"
+      },
+      "default": {},
+      "propertyNames": {
+        "pattern": "^[A-Za-z_]\\w*$",
+        "type": "string"
+      },
+      "type": "object"
+    },
+    "name": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "preconditions": {
+      "default": [],
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "authenticated": {
+            "pattern": "^[A-Za-z_]\\w*$",
+            "type": "string"
+          },
+          "check": {
+            "anyOf": [
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "url": {
+                    "type": "string"
+                  }
+                },
+                "required": ["url"],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "visible": {
+                    "$ref": "#/$defs/Target"
+                  }
+                },
+                "required": ["visible"],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "args": {
+                    "additionalProperties": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "boolean"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "propertyNames": {
+                      "pattern": "^[A-Za-z_]\\w*$",
+                      "type": "string"
+                    },
+                    "type": "object"
+                  },
+                  "functionRef": {
+                    "pattern": "^[a-z][\\w-]*(\\.[A-Za-z_][\\w-]*)+@\\d+\\.\\d+\\.\\d+$",
+                    "type": "string"
+                  }
+                },
+                "required": ["functionRef"],
+                "type": "object"
+              }
+            ]
+          }
+        },
+        "required": ["authenticated", "check"],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "requirements": {
+      "default": [],
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "pattern": "^[A-Za-z0-9][\\w.-]*$",
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "text": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": ["id", "text"],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "schemaVersion": {
+      "const": 1
+    },
+    "steps": {
+      "items": {
+        "$ref": "#/$defs/Step"
+      },
+      "type": "array"
+    }
+  },
+  "required": ["schemaVersion", "id", "name", "steps"],
+  "type": "object"
+}

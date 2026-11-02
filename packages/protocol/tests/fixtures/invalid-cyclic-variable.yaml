@@ -1,0 +1,13 @@
+schemaVersion: 1
+id: cyclic-variable
+name: Two variables are defined from each other
+steps:
+  - id: definir-a
+    builtin: setVariable
+    name: a
+    value: "${vars.b}-x"
+  - id: obter-b
+    action: extractAttribute
+    target: { testId: "linha-${vars.a}" }
+    attribute: data-id
+    saveAs: b

@@ -26,6 +26,7 @@
     "dead-code": "knip --include files,exports,dependencies,unlisted",
     "duplication": "jscpd --threshold 4 --fail-on-empty apps/website/src apps/ui/src apps/service/src apps/cli/src apps/fixture/src packages/protocol/src packages/engine/src packages/adapter/src packages/persistence/src packages/brand/src",
     "docs:check": "node scripts/check-docs.mjs",
+    "schema:generate": "vp run @recnrun/protocol#schema:generate",
     "prepare": "vp config"
   },
   "devDependencies": {

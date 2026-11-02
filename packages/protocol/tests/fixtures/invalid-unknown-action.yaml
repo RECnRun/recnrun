@@ -1,0 +1,7 @@
+schemaVersion: 1
+id: unknown-action
+name: A step names an action the engine does not have
+steps:
+  - id: passar
+    action: hover
+    target: { testId: menu }

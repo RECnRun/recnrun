@@ -1,0 +1,9 @@
+schemaVersion: 1
+id: duplicate-step-id
+name: Two steps share an id
+steps:
+  - id: abrir
+    action: navigate
+    url: "${env.baseUrl}/pedidos"
+  - id: abrir
+    action: reload

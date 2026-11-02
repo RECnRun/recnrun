@@ -1,0 +1,38 @@
+# The second example of the source plan §9.3. The source shows only `steps:`.
+# Adapted: the flow header (schemaVersion, id, name) and the `pedidos` input are added so the
+# fragment is a whole flow; `${inputs.pedidos}` must name a declared input.
+schemaVersion: 1
+id: aprovar-pedidos
+name: Aprovar pedidos em lote
+inputs:
+  pedidos: { type: array, required: true }
+# From here on, verbatim.
+steps:
+  - id: iniciar-contador
+    builtin: counter
+    operation: init
+    name: aprovados
+    value: 0
+  - id: percorrer
+    builtin: forEach
+    items: "${inputs.pedidos}"
+    itemAs: pedido
+    maxIterations: 100
+    timeoutMs: 120000
+    steps:
+      - id: decidir
+        builtin: if
+        condition:
+          functionRef: team.canApprove@1.0.0
+          args: { pedido: "${locals.pedido}" }
+        then:
+          - id: processar
+            builtin: call
+            functionRef: team.approvePedido@1.0.0
+            args: { pedido: "${locals.pedido}" }
+          - id: contar
+            builtin: counter
+            operation: increment
+            name: aprovados
+            by: 1
+        else: []

@@ -1,0 +1,51 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "properties": {
+    "command": {
+      "enum": [
+        "capabilities.get",
+        "health",
+        "profiles.list",
+        "session.start",
+        "session.status",
+        "session.handoff",
+        "session.pause",
+        "session.resume",
+        "session.stop",
+        "browser.inspect",
+        "browser.act",
+        "flow.validate",
+        "flow.addAssertion",
+        "flow.finalize",
+        "flow.replay",
+        "run.summary",
+        "run.queryEvents",
+        "run.getArtifact",
+        "run.compare",
+        "issue.createReproducer",
+        "locators.validate",
+        "locators.preview",
+        "functions.list",
+        "functions.register",
+        "functions.validate",
+        "functions.test",
+        "functions.call",
+        "functions.proposeBuiltin",
+        "macros.extract"
+      ],
+      "type": "string"
+    },
+    "leaseToken": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "params": {},
+    "requestId": {
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": ["requestId", "command", "params"],
+  "type": "object"
+}

@@ -1,0 +1,82 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "oneOf": [
+    {
+      "additionalProperties": false,
+      "properties": {
+        "ok": {
+          "const": true
+        },
+        "requestId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "result": {}
+      },
+      "required": ["requestId", "ok", "result"],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "error": {
+          "additionalProperties": false,
+          "properties": {
+            "alternative": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "capability": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "code": {
+              "enum": [
+                "invalid-request",
+                "unauthorized",
+                "forbidden",
+                "not-found",
+                "conflict",
+                "stale-lease",
+                "capability-unavailable",
+                "step-failed",
+                "timeout",
+                "internal"
+              ],
+              "type": "string"
+            },
+            "evidence": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "message": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "retryable": {
+              "type": "boolean"
+            },
+            "step": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": ["code", "message", "retryable"],
+          "type": "object"
+        },
+        "ok": {
+          "const": false
+        },
+        "requestId": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": ["requestId", "ok", "error"],
+      "type": "object"
+    }
+  ]
+}

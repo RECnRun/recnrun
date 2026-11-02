@@ -1,0 +1,79 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "properties": {
+    "capabilities": {
+      "items": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "enum": [
+                  "network",
+                  "websocket-sse",
+                  "console-errors",
+                  "dom-screen",
+                  "web-storage",
+                  "cookies",
+                  "indexeddb",
+                  "cache-storage",
+                  "files-opfs",
+                  "workers-frames"
+                ],
+                "type": "string"
+              },
+              "kind": {
+                "const": "surface"
+              },
+              "notes": {
+                "type": "string"
+              },
+              "phase": {
+                "enum": ["F0", "F1", "F2", "F3", "F4", "F4A", "F5", "F6", "F7"],
+                "type": "string"
+              },
+              "status": {
+                "enum": ["implemented", "partial", "unavailable", "planned"],
+                "type": "string"
+              }
+            },
+            "required": ["kind", "id", "status", "phase"],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "pattern": "^[A-Za-z0-9][\\w.-]*$",
+                "type": "string"
+              },
+              "kind": {
+                "const": "feature"
+              },
+              "notes": {
+                "type": "string"
+              },
+              "phase": {
+                "enum": ["F0", "F1", "F2", "F3", "F4", "F4A", "F5", "F6", "F7"],
+                "type": "string"
+              },
+              "status": {
+                "enum": ["implemented", "partial", "unavailable", "planned"],
+                "type": "string"
+              }
+            },
+            "required": ["kind", "id", "status", "phase"],
+            "type": "object"
+          }
+        ]
+      },
+      "type": "array"
+    },
+    "schemaVersion": {
+      "const": 1
+    }
+  },
+  "required": ["schemaVersion", "capabilities"],
+  "type": "object"
+}

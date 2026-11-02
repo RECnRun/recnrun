@@ -43,6 +43,7 @@ Vite+ (`vp`) is the only toolchain. `vp <name>` runs a built-in command and `vp 
 | `vp run test:coverage`                                            | Coverage with thresholds                                                      |
 | `vp run dead-code`, `vp run duplication`                          | Knip; jscpd                                                                   |
 | `vp run docs:check`                                               | Relative Markdown links and anchors resolve                                   |
+| `vp run schema:generate`                                          | Regenerate the committed JSON Schema of `packages/protocol`                   |
 | `vp run test:e2e -- tests/e2e/landing.spec.ts -g ''`              | Targeted Playwright run (arguments go after `--`)                             |
 | `vp run verify`                                                   | Full gate (`vp run ready` is an alias)                                        |
 
