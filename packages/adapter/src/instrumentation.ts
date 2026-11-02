@@ -197,16 +197,23 @@ export async function instrumentChannel(
 ): Promise<Instrumentation> {
   const instrumenter = new Instrumenter(channel, options);
   channel.onEvent((event) => instrumenter.handle(event));
-  await channel.send(AUTO_ATTACH.method, AUTO_ATTACH.params);
+  const stop = () => {
+    instrumenter.capture?.stop();
+    channel.close();
+  };
+  try {
+    await channel.send(AUTO_ATTACH.method, AUTO_ATTACH.params);
+  } catch (error) {
+    // Nobody gets a handle to stop, so the channel and any capture started so far end here.
+    stop();
+    throw error;
+  }
   return {
     report: () => instrumenter.report(),
     settled: async () => {
       while (instrumenter.pending.size > 0) await Promise.all(instrumenter.pending);
     },
-    stop: () => {
-      instrumenter.capture?.stop();
-      channel.close();
-    },
+    stop,
   };
 }
 

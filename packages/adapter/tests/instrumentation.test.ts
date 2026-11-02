@@ -290,3 +290,14 @@ test("instrument without onEvent still counts installs", async () => {
   call(channel, "S1", 1, message());
   expect(target(handle, "S1")?.hookInstalls).toBe(1);
 });
+
+test("a failed start closes the channel it opened and rethrows", async () => {
+  const channel = new FakeChannel();
+  channel.failing.set("Target.setAutoAttach", "Not allowed");
+  const opening = instrument("ws://127.0.0.1:9222/devtools/browser/x", {
+    openChannel: () => Promise.resolve(channel),
+    capture: { runId: "run-1", onEvent: () => undefined },
+  });
+  await expect(opening).rejects.toThrow("Not allowed");
+  expect(channel.closed).toBe(true);
+});
