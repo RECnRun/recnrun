@@ -19,11 +19,13 @@
     "test:coverage": "node scripts/test-container.mjs test:coverage:local",
     "test:coverage:local": "vp test --coverage",
     "test:container": "node --test tests/container/runner.checks.mjs",
+    "test:scripts": "node --test scripts/*.checks.mjs",
     "test:hooks": "node --test scripts/agent-hooks/*.checks.mjs scripts/git-hooks/*.checks.mjs",
     "test:extension-manifest": "vp run extension#test:manifest",
     "deps": "depcruise packages tests --config .dependency-cruiser.cjs && depcruise apps/website --config .dependency-cruiser.cjs --ts-config apps/website/tsconfig.deps.json && depcruise apps/extension --config .dependency-cruiser.cjs --ts-config apps/extension/tsconfig.deps.json",
     "dead-code": "knip --include files,exports,dependencies,unlisted",
     "duplication": "jscpd --threshold 4 --fail-on-empty apps/website/src apps/extension/src packages/domain/src packages/bridge/src packages/brand/src",
+    "docs:check": "node scripts/check-docs.mjs",
     "prepare": "vp config && vp run extension#wxt:prepare"
   },
   "devDependencies": {

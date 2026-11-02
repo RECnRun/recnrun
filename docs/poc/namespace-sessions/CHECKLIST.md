@@ -21,7 +21,10 @@ Markers: `[ ]` not started · `[i]` implemented, awaiting the phase gate · `[x]
 
 ## P0: Audit, harness, and capability map
 
-- [ ] P0.1 Plan documents and `docs:check`
+- [i] P0.1 Plan documents and `docs:check`
+  - red: `node --test scripts/check-docs.checks.mjs` against a stub `check-docs.mjs` (no checks, identity slug): 4 of 7 failed (missing file, missing anchor, slug, checks array)
+  - green: `node --test scripts/check-docs.checks.mjs` 7 passed; `vp run docs:check` exits 0; a scratch worktree with a broken link and anchor exits 1
+  - commit: "Check that every relative Markdown link and anchor resolves" (SHA in the orchestrator's cherry-pick)
 - [ ] P0.2 Google Chrome Stable in Docker and the browser layer
 - [ ] P0.3 Load the unpacked extension into branded Chrome (E0)
 - [ ] P0.4 `chrome.debugger` capability probe (E1), `CAPABILITIES.md` generated

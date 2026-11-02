@@ -17,6 +17,7 @@ paths:
 | Node unit  | `{apps,packages}/*/tests/*.test.ts`                                      | `vp run test:unit`       |
 | Component  | `*.browser.test.ts(x)` in Vitest Browser Mode, Chromium                  | `vp run test:components` |
 | End-to-end | `tests/e2e/*.spec.ts`, headed Playwright, built website + test extension | `vp run test:e2e`        |
+| Scripts    | `scripts/*.checks.mjs` (Node)                                            | `vp run test:scripts`    |
 
 - Keep schemas, protocol handling, handlers, and view models in Node unit tests; extract pure functions when that makes a rule testable.
 - Prove detection, the install banner, data display, origin checks, and CSP end to end, with the real extension loaded.
