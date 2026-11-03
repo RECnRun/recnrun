@@ -24,7 +24,7 @@ function fail(entry: JournalEntry, error: unknown): void {
 }
 
 /** The exception's description, or the text Chrome gives when there is none. */
-function exceptionText(reply: Record<string, unknown>): string | undefined {
+export function exceptionText(reply: Record<string, unknown>): string | undefined {
   const details = reply.exceptionDetails as
     | { text?: string; exception?: { description?: string } }
     | undefined;

@@ -99,7 +99,8 @@ module.exports = {
     {
       name: "isolator-only-poc-packages",
       severity: "error",
-      comment: "The isolator builds on the POC packages and the brand only (POC PLAN.md §5).",
+      comment:
+        "The isolator builds on the POC packages and the brand only (POC PLAN.md §5); from npm it adds valibot for E4's request schemas.",
       from: { path: "^apps/isolator/" },
       to: {
         path: "^packages/",

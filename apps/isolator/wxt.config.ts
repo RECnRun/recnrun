@@ -24,8 +24,9 @@ export default defineConfig({
     name: "RECnRun Isolator (POC)",
     description: "Namespaced sessions proof of concept.",
     // E0 needs storage and management; E1 adds debugger, which needs no host permission (PLAN.md P0.3, P0.4).
-    // E7 adds scripting for Route C's MAIN-world page bootstrap (PLAN.md P1.6).
-    permissions: ["storage", "management", "debugger", "scripting"],
+    // E7 adds scripting for Route C's MAIN-world page bootstrap (PLAN.md P1.6); E4 adds declarativeNetRequest to block
+    // the fixture apps' service-worker scripts and close their tabs, on the loopback only (P1.3).
+    permissions: ["storage", "management", "debugger", "scripting", "declarativeNetRequest"],
     // Route C injects on the app origins, and on loopback frames and popups only when E7 names them (no SSO host here, R5).
     host_permissions: [
       "http://app.localhost:4600/*",

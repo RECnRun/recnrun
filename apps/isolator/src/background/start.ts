@@ -3,6 +3,7 @@ import { exposeProbes } from "@/background/probes/expose";
 import { exposeRouteA } from "@/background/route-a/expose";
 import { exposeRouteB } from "@/background/route-b/expose";
 import { exposeRouteC } from "@/background/route-c/expose";
+import { exposeStop } from "@/background/stop/expose";
 
 /** `chrome.storage.session` key the harness reads to see that the background ran. */
 export const LOADED_KEY = "isolatorLoaded";
@@ -37,6 +38,11 @@ export function startBackground(): void {
     () => browser.debugger,
     () => browser.runtime.getURL("/"),
   );
+  exposeStop(() => ({
+    debugger: browser.debugger,
+    dnr: browser.declarativeNetRequest,
+    tabs: browser.tabs,
+  }));
   const record = (): void => void recordLoaded();
   browser.runtime.onInstalled.addListener(record);
   browser.runtime.onStartup.addListener(record);

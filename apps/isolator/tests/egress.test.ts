@@ -9,6 +9,8 @@ import type { ProbeTargets } from "@/background/probes/types";
 import { ROUTE_A_GLOBAL } from "@/background/route-a/expose";
 import type { RouteA } from "@/background/route-a/types";
 import { GET_SELF, LOADED_KEY, startBackground } from "@/background/start";
+import { STOP_GLOBAL } from "@/background/stop/expose";
+import type { Stop } from "@/background/stop/types";
 import { fakeDebugger, URLS } from "./fake-debugger";
 
 /** R11 (POC PLAN.md §1): the runtime talks to nothing but the loopback and itself. */
@@ -67,6 +69,11 @@ function expectNoExternalReach(manifest: Record<string, unknown>, source: string
   expect(manifest, source).not.toHaveProperty("externally_connectable");
   const permissions = [manifest.permissions, manifest.optional_permissions].flat();
   expect(permissions, source).not.toContain("nativeMessaging");
+  const hosts = [manifest.host_permissions, manifest.optional_host_permissions].flat();
+  for (const host of hosts.filter((entry) => entry !== undefined)) {
+    const pattern = typeof host === "string" ? host : JSON.stringify(host);
+    expect(URL.canParse(pattern) && isLocal(pattern), `${source}: ${pattern}`).toBe(true);
+  }
 }
 
 describe("isolator egress", () => {
@@ -87,6 +94,7 @@ describe("isolator egress", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.useRealTimers();
+    vi.restoreAllMocks();
   });
 
   test("the shim refuses every host but the loopback and the extension itself", async () => {
@@ -170,6 +178,38 @@ describe("isolator egress", () => {
     await routeA.clearOrigin({ tabId: 7 });
     expect(sent.map((entry) => entry.method)).toContain("Runtime.runIfWaitingForDebugger");
     expect(egress).toEqual([]);
+  });
+
+  test("the stop mechanisms reach no host outside the loopback", async () => {
+    const { sent, emit } = probeEntrypoint();
+    vi.spyOn(fakeBrowser.declarativeNetRequest, "updateSessionRules").mockResolvedValue();
+    vi.spyOn(fakeBrowser.tabs, "query").mockResolvedValue([] as never);
+    const stop = (globalThis as Record<string, unknown>)[STOP_GLOBAL] as Stop;
+    stop.watch({ marker: "egress" });
+    await stop.terminateExecution({ targetId: "sw" });
+    await stop.pauseHold({ targetId: "sw" });
+    await stop.release({ targetId: "sw" });
+    await stop.blockScope({ origin: "http://app.localhost:4600" });
+    await stop.unblock();
+    await stop.unregister({ tabId: 7 });
+    await stop.client({ tabId: 7, action: "status" });
+    await stop.closeTarget({ targetId: "sw" });
+    emit({ tabId: 7, sessionId: "s-sw" }, "Inspector.targetReloadedAfterCrash");
+    await stop.unwatch();
+    expect(sent.map((entry) => entry.method)).toContain("Runtime.runIfWaitingForDebugger");
+    expect(egress).toEqual([]);
+  });
+
+  test("the manifest's host permissions stay on the loopback, with the origins the stop mechanisms evict", async () => {
+    const config = (await import(pathToFileURL(`${ISOLATOR}wxt.config.ts`).href)) as {
+      default: { manifest: { permissions?: string[]; host_permissions?: string[] } };
+    };
+    expect(config.default.manifest.permissions).toContain("declarativeNetRequest");
+    const hosts = config.default.manifest.host_permissions ?? [];
+    expect(hosts).toEqual(
+      expect.arrayContaining(["http://app.localhost:4600/*", "http://app.localhost:4603/*"]),
+    );
+    for (const host of hosts) expect(host).toMatch(/^http:\/\/(\*\.|app\.)localhost(:\d+)?\/\*$/);
   });
 
   test("the manifest asks for no update URL, external connection, or native messaging", async () => {
