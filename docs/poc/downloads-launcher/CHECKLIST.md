@@ -89,7 +89,17 @@ Gate P0: verify · baseline counts · Chrome versions (lab, host) · review
   verdict: E2.traces pass / pass
   verdict: E2.path.absoluteRefused pass / pass
   commit: the commit that adds this line (Probe Downloads writes and their real path in experiment E2)
-- [ ] P1.4 Read in page and offscreen, E3
+- [i] P1.4 Read in page and offscreen, E3 (lab, host), report `experiments/E3.md`
+  red: `npx vitest run tests/poc-file-read.test.ts` (in `apps/extension`) against stubs that register nothing and read nothing: 20 of 20 failed (`expected undefined to deeply equal { ok: true, status: 200, …(1) }`, `expected [] to deeply equal [ false ]`); `vp run test:experiments -- tests/experiments/E3-file-read.spec.ts` (smoke, scratch worktree at `2d27b01` with only the spec): the four sampled hypotheses `fail` with `window.__poc.readFile is not defined in diagnostics.html`, the listing test threw it, "every hypothesis ran" failed (2 failed, 4 passed); new manifest checks against a scratch copy of the builds with `POC_READ_FILE` in the production `background.js`, a `file:///*` content-script match in production and `poc-d0`, and the message stripped from `poc-d1`'s offscreen chunks: 5 checks `not ok`; negative control (scratch worktree, the offscreen handler answering the first content it read for a URL): `E3.offscreen.cache` `fail` "offscreen: the default cache mode saw the change after null polls (no-store: null)" while `E3.page.cache` passed
+  green: `npx vitest run tests/poc-file-read.test.ts` 21 passed; `vp run test:unit` 58 files / 474 tests passed on the tree with E2 cherry-picked; `vp run test:extension-manifest` 19 passed; production build byte-identical to `2d27b01` and to E2 alone (`diff -r` empty); `vp run test:experiments -- tests/experiments/E3-file-read.spec.ts` 6 passed in 6.1 s, 3 samples per hypothesis (run `2026-11-03T23-52-59.172Z-849c9445-bf40-4b19-8ff8-aea4d9819ce8`); smoke 6 passed in 2.7 s, same verdicts (run `2026-11-03T23-52-46.073Z-b9a9b7cc-10bf-4055-818f-31b8537a6095`), both on the tree with E2; `vp check`, `vp run deps`, `vp run docs:check` clean
+  host: `RECNRUN_HOST_ROOTS=~/Documents/RECnRun/poc-downloads-launcher vp run test:host tests/host/E3-file-read.spec.ts` 5 passed in 9.8 s; run `host-2026-11-03T23-46-55.536Z`: `Chrome/156.0.8078.80`, macOS 27.0.1 (26A434) arm64; 4 cells sampled 3 times, 0 gestures; afterwards no Chrome on the roots and `roots/` empty
+  verdict: E3.page.fetch pass / pass (status 200, the probe's exact bytes)
+  verdict: E3.offscreen.fetch pass / pass (the background creates the offscreen document and relays; `XMLHttpRequest` never needed)
+  verdict: E3.page.cache pass / pass (the first read after a same-length rewrite sees it: 0 polls, 1 to 3 ms; `no-store` never needed)
+  verdict: E3.offscreen.cache pass / pass (same; poll 1000 ms and TTL 60 s read from `folder-watch.ts` and `folder-rendezvous.ts`)
+  verdict: E3.directoryListing unavailable / not run ("no dedicated experiment and validated parser (§6.3)"; the folder URL resolves with status 0 and Chrome's 9447-character HTML listing with `addRow(...)` naming both files, page and offscreen alike)
+  rule: no content script matches `file:` in any build (`vp run test:extension-manifest`, not a verdict) · lab Google Chrome 157.0.8103.38 on Linux in Docker · files `experiments/verdicts/E3-{lab-full,lab-smoke,lab-versions,host}.json`
+  commit: the commit that adds this line
 
 Gate P1: verify · E1–E3 · review
 

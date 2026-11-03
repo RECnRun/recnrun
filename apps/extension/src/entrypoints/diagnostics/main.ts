@@ -1,6 +1,7 @@
 import { browser } from "wxt/browser";
 import { errorMessage } from "@recnrun/domain";
 import type { Presence } from "@/p2p/folder-rendezvous";
+import { installReadFile } from "@/diagnostics/read-file";
 import { fileUrlFor, readTolerant } from "@/p2p/downloads-rendezvous";
 
 interface ProbeOptions {
@@ -39,6 +40,7 @@ const poc = {
   },
 };
 Object.assign(window, { __poc: poc });
+installReadFile(window);
 
 const permissions = browser.runtime.getManifest().permissions ?? [];
 

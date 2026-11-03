@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
@@ -73,4 +73,17 @@ await test("the production build leaves out every POC-only permission and page",
   );
   const background = readFileSync(new URL("../.output/chrome-mv3/background.js", import.meta.url));
   assert.doesNotMatch(String(background), /downloads\.download/);
+});
+
+await test("the production build leaves out the POC's file:// read", () => {
+  const output = new URL("../.output/chrome-mv3/", import.meta.url);
+  for (const file of readdirSync(output, { recursive: true, encoding: "utf8" })) {
+    if (!file.endsWith(".js") && !file.endsWith(".html")) continue;
+    assert.doesNotMatch(readFileSync(new URL(file, output), "utf8"), /POC_READ_FILE/, file);
+  }
+});
+
+await test("no content script of the production build matches file:// (POC §4)", () => {
+  const matches = productionManifest().content_scripts.flatMap((script) => script.matches);
+  assert.ok(!matches.some((pattern) => /^(file|\*):/.test(pattern)), matches.join(", "));
 });

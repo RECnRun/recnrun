@@ -44,3 +44,34 @@ for (const [mode, permissions] of Object.entries(VARIANTS)) {
     assert.ok(matches.includes("http://localhost/*"), `${mode} does not match localhost`);
   });
 }
+
+/** A built script with every chunk it imports, since WXT moves shared code into hashed chunks. */
+function withChunks(mode, file, seen = new Set()) {
+  if (seen.has(file)) return "";
+  seen.add(file);
+  const code = readFileSync(`${outputDir(mode)}${file}`, "utf8");
+  const base = file.includes("/") ? file.slice(0, file.lastIndexOf("/") + 1) : "";
+  const chunks = [...code.matchAll(/from\s*"\.\/([^"]+)"/g)].map((match) => base + match[1]);
+  return [code, ...chunks.map((chunk) => withChunks(mode, chunk, seen))].join("\n");
+}
+
+/** The code an extension page runs: its module script and the chunks that one imports. */
+function pageScript(mode, page) {
+  const html = readFileSync(`${outputDir(mode)}${page}`, "utf8");
+  const src = /<script[^>]+src="\/?([^"]+)"/.exec(html)?.[1];
+  assert.ok(src, `${mode} ${page} loads no script`);
+  return withChunks(mode, src);
+}
+
+for (const mode of Object.keys(VARIANTS)) {
+  await test(`${mode} reads file:// in the offscreen document through the background (E3)`, () => {
+    assert.match(readFileSync(`${outputDir(mode)}background.js`, "utf8"), /POC_READ_FILE/);
+    assert.match(pageScript(mode, "offscreen.html"), /POC_READ_FILE/);
+    assert.match(pageScript(mode, "diagnostics.html"), /POC_READ_FILE/);
+  });
+
+  await test(`${mode} has no content script that matches file:// (POC §4)`, () => {
+    const matches = pocManifest(mode).content_scripts.flatMap((script) => script.matches);
+    assert.ok(!matches.some((pattern) => /^(file|\*):/.test(pattern)), matches.join(", "));
+  });
+}

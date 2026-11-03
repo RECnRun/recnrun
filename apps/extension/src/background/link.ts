@@ -8,7 +8,7 @@ import type { LinkCommand } from "@/messaging/peer-messages";
 let creating: Promise<void> | undefined;
 
 /** One offscreen document holds the RTCPeerConnection, which a service worker cannot. */
-async function ensureOffscreen(): Promise<void> {
+export async function ensureOffscreen(): Promise<void> {
   const contexts = await browser.runtime.getContexts({
     contextTypes: [browser.runtime.ContextType.OFFSCREEN_DOCUMENT],
   });

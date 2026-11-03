@@ -207,9 +207,9 @@ module.exports = {
       name: "extension-poc-stays-out-of-the-main-flow",
       severity: "error",
       comment:
-        "Cross-profile POC: the content script and the dashboard never load it; entrypoints inject it.",
+        "POC code (the cross-profile link and the diagnostics page): the content script and the dashboard never load it; entrypoints inject it.",
       from: { path: "^apps/extension/src/(content|dashboard|tabs|ports)/" },
-      to: { path: "^apps/extension/src/(offscreen|peers)/" },
+      to: { path: "^apps/extension/src/(offscreen|peers|diagnostics)/" },
     },
     {
       name: "not-to-entrypoints",

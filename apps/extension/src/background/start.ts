@@ -5,8 +5,9 @@ import { createBackgroundListener } from "@/background/listener";
 import { startPeers } from "@/background/peers";
 import { createRoutes } from "@/background/routes";
 import { recordingSessionRepository } from "@/storage/recording-session-repository";
-// Imported last, so the production bundle (which drops it) keeps its module order and bytes.
+// Imported last, so the production bundle (which drops them) keeps its module order and bytes.
 import { startDownloadsPublisher } from "@/background/downloads-publisher";
+import { startPocFileReadRelay } from "@/background/poc-file-read";
 
 // Spelled out, not peersEnabled(), so the production build can drop the POC's background code.
 const PEERS = import.meta.env.MODE === "development" || import.meta.env.MODE === "test";
@@ -44,4 +45,5 @@ export function startBackground(): void {
   const identity = { extensionId: browser.runtime.id, extensionUrl: browser.runtime.getURL("/") };
   browser.runtime.onMessage.addListener(createBackgroundListener(routes, identity));
   if (POC) startDownloadsPublisher();
+  if (POC) startPocFileReadRelay();
 }
