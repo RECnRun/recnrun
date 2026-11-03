@@ -17,6 +17,7 @@ paths:
 | Node unit  | `{apps,packages}/*/tests/*.test.ts`                                      | `vp run test:unit`       |
 | Component  | `*.browser.test.ts(x)` in Vitest Browser Mode, Chromium                  | `vp run test:components` |
 | End-to-end | `tests/e2e/*.spec.ts`, headed Playwright, built website + test extension | `vp run test:e2e`        |
+| Scripts    | `scripts/*.checks.mjs` (Node)                                            | `vp run test:scripts`    |
 
 - Keep schemas, protocol handling, handlers, and view models in Node unit tests; extract pure functions when that makes a rule testable.
 - Both apps' `vitest.browser.config.ts` call `browserProject(name, dir)` from the root `vitest.browser.shared.ts`; change the Browser Mode setup there, once.

@@ -157,15 +157,16 @@ Recording in the user's own applications needs more than `storage`. Whatever M1 
 
 ## Toolchain
 
-| Concern                  | Tool                                                                       |
-| ------------------------ | -------------------------------------------------------------------------- |
-| Package manager, tasks   | Vite+ (`vp`) with pnpm workspaces and a version catalog                    |
-| Format, lint, type check | `vp check`: Oxfmt, Oxlint (type aware, with `eslint-plugin-sonarjs`), tsgo |
-| Architecture boundaries  | dependency-cruiser (`.dependency-cruiser.cjs`)                             |
-| Dead code, duplication   | Knip (`knip.jsonc`), jscpd                                                 |
-| Unit and component tests | Vitest with V8 coverage; Vitest Browser Mode with Playwright Chromium      |
-| End-to-end               | Playwright, headed Chromium with the test extension, in Docker on Xvfb     |
-| Extension build          | WXT with `@preact/preset-vite`                                             |
+| Concern                  | Tool                                                                               |
+| ------------------------ | ---------------------------------------------------------------------------------- |
+| Package manager, tasks   | Vite+ (`vp`) with pnpm workspaces and a version catalog                            |
+| Format, lint, type check | `vp check`: Oxfmt, Oxlint (type aware, with `eslint-plugin-sonarjs`), tsgo         |
+| Architecture boundaries  | dependency-cruiser (`.dependency-cruiser.cjs`)                                     |
+| Dead code, duplication   | Knip (`knip.jsonc`), jscpd                                                         |
+| Documentation            | `scripts/check-docs.mjs` (`vp run docs:check`): relative links and anchors resolve |
+| Unit and component tests | Vitest with V8 coverage; Vitest Browser Mode with Playwright Chromium              |
+| End-to-end               | Playwright, headed Chromium with the test extension, in Docker on Xvfb             |
+| Extension build          | WXT with `@preact/preset-vite`                                                     |
 
 Findings from the bootstrap spike, kept here because they explain the configuration:
 
