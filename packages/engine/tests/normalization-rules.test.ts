@@ -69,6 +69,36 @@ describe("normalization rules beyond the goldens", () => {
     expect(summary(normalize(r.events).steps)).toEqual(["fill abc (4)"]);
   });
 
+  test("Backspace and Delete keys the value explains stay inside one fill", () => {
+    const r = recorder();
+    r.key(0, FIELD, "a");
+    r.input(1, FIELD, ["insertText", "a"], "a");
+    r.key(10, FIELD, "x");
+    r.input(11, FIELD, ["insertText", "x"], "ax");
+    r.key(20, FIELD, "Backspace");
+    r.input(21, FIELD, ["deleteContentBackward", null], "a");
+    r.key(30, FIELD, "Delete");
+    r.input(31, FIELD, ["deleteContentForward", null], "a");
+    r.dom(40, "focusout", FIELD);
+    expect(summary(normalize(r.events).steps)).toEqual(["fill a (8)"]);
+  });
+
+  test("a deletion key after a special key is pressed on replay, even past the typed text", () => {
+    const r = recorder();
+    r.input(0, FIELD, ["insertText", "a"], "a");
+    r.key(10, FIELD, "Home");
+    r.key(20, FIELD, "Delete");
+    r.input(21, FIELD, ["deleteContentForward", null], "");
+    r.key(30, FIELD, "Backspace");
+    r.dom(40, "focusout", FIELD);
+    expect(summary(normalize(r.events).steps)).toEqual([
+      "type a (1)",
+      "keyPress Home (1)",
+      "keyPress Delete (2)",
+      "keyPress Backspace (1)",
+    ]);
+  });
+
   test("Tab after typing is a keyPress after the fill, and its keyup on the next field joins it", () => {
     const r = recorder();
     r.key(0, FIELD, "a");

@@ -4,6 +4,8 @@ import { keyOf, type DomEvent, type DomTarget, type Draft } from "./types.ts";
 /** A stretch of the run: typed text, or one special key or shortcut (`combo`). */
 interface Token {
   combo?: string;
+  /** A deletion key: a fill already holds its effect, but per-key replay must press it. */
+  deletion?: boolean;
   text: string;
   typed: boolean;
   events: DomEvent[];
@@ -65,6 +67,17 @@ function compare(run: FieldRun): void {
   if (!run.composing && run.value !== undefined && run.value !== run.model) run.transformed = true;
 }
 
+const DELETION_KEYS = new Set(["Backspace", "Delete"]);
+
+function feedDeletion(run: FieldRun, token: Token, event: DomEvent): void {
+  const { value } = event.payload;
+  token.events.push(event);
+  token.typed = true;
+  if (value !== undefined) run.value = value;
+  run.model = value ?? run.model.slice(0, -1);
+  compare(run);
+}
+
 function feedInput(run: FieldRun, event: DomEvent): void {
   const token = textToken(run);
   const { inputType, value } = event.payload;
@@ -84,6 +97,14 @@ function feedInput(run: FieldRun, event: DomEvent): void {
     run.model = value ?? run.model + data;
   }
   compare(run);
+}
+
+function feedEdit(run: FieldRun, event: DomEvent): void {
+  const last = run.tokens.at(-1);
+  if (last?.deletion && event.payload.inputType?.startsWith("delete")) {
+    return feedDeletion(run, last, event);
+  }
+  feedInput(run, event);
 }
 
 function feedCompositionEnd(run: FieldRun, event: DomEvent): void {
@@ -111,14 +132,17 @@ function feedChange(run: FieldRun, event: DomEvent): void {
 
 function feedKey(run: FieldRun, event: DomEvent): void {
   const combo = shortcutOf(event.payload);
-  if (combo === undefined) textToken(run).events.push(event);
-  else run.tokens.push({ combo, text: "", typed: false, events: [event] });
+  const { key } = event.payload;
+  if (combo !== undefined) run.tokens.push({ combo, text: "", typed: false, events: [event] });
+  else if (key !== undefined && DELETION_KEYS.has(key)) {
+    run.tokens.push({ combo: key, deletion: true, text: "", typed: false, events: [event] });
+  } else textToken(run).events.push(event);
 }
 
 export function feedRun(run: FieldRun, event: DomEvent): void {
   if (event.payload.redacted) run.redacted = true;
   if (event.type === "keydown") return feedKey(run, event);
-  if (event.type === "input") return feedInput(run, event);
+  if (event.type === "input") return feedEdit(run, event);
   if (event.type === "change") return feedChange(run, event);
   if (event.type === "compositionend") return feedCompositionEnd(run, event);
   if (event.type === "compositionstart") run.composing = true;
@@ -187,7 +211,8 @@ export function closeRun(run: FieldRun): Draft[] {
   const tail = run.tokens.slice(lastTyped + 1);
   const none = () => undefined;
   if (lastTyped < 0) return emitTokens(run, tail, none);
-  const perKey = run.transformed || head.some((token) => token.combo !== undefined);
+  const perKey =
+    run.transformed || head.some((token) => token.combo !== undefined && !token.deletion);
   const drafts = perKey
     ? emitTokens(run, head, (token) => typeDraft(run, token))
     : [
