@@ -7,6 +7,7 @@ import {
   openFlowStore,
   openRotatingLog,
   openServiceStateStore,
+  recoverRuns,
   type FlowStore,
   type ServiceStateStore,
 } from "@recnrun/persistence";
@@ -164,6 +165,16 @@ function commandDeps(
   return { commands, discover };
 }
 
+/** Closes the runs a killed service left open; a run it cannot read is logged and left as it is. */
+async function recoverInterrupted(flows: FlowStore, logger: Logger) {
+  const report = await recoverRuns(flows, () => new Date()).catch((error: unknown) => {
+    logger.error("run.recovery-failed", { message: error instanceof Error ? error.message : "" });
+    return { recovered: [], problems: [] };
+  });
+  for (const run of report.recovered) logger.warn("run.recovered", run);
+  for (const problem of report.problems) logger.error("run.recovery-skipped", problem);
+}
+
 const openLogger = (options: ServiceOptions, store: ServiceStateStore) =>
   createLogger(
     openRotatingLog({
@@ -179,6 +190,7 @@ async function listen(options: ServiceOptions, store: ServiceStateStore, nonce: 
   const token = randomBytes(32).toString("base64url");
   const logger = openLogger(options, store);
   const flows = await openFlowStore({ home: options.home });
+  await recoverInterrupted(flows, logger);
   const journals = createJournalRegistry();
   const { commands, discover } = commandDeps(options, { logger, flows, journals });
   const guard = { port: 0, token };

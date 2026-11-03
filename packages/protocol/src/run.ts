@@ -9,6 +9,7 @@ import {
 } from "./common.ts";
 import { RevisionHashSchema } from "./flow-folder.ts";
 import { StepStateSchema } from "./states.ts";
+import type { Step } from "./steps.ts";
 import { SchemaVersionSchema } from "./version.ts";
 
 export const RUN_STATUSES = ["passed", "failed", "error", "interrupted"] as const;
@@ -126,4 +127,17 @@ export type StepResult = v.InferOutput<typeof StepResultSchema>;
 /** True when `value` is one entry of runs/<id>/steps.json; the engine checks its results with it. */
 export function isStepResult(value: unknown): value is StepResult {
   return v.is(StepResultSchema, value);
+}
+
+/** The actions that only read the page: a run cut short in one of them changed nothing. */
+export const READ_ONLY_ACTIONS: ReadonlySet<string> = new Set([
+  "waitFor",
+  "extractText",
+  "extractAttribute",
+]);
+
+/** True when `step` only reads the page; recovery calls any other interrupted step indeterminate. */
+export function isReadOnlyStep(step: Step): boolean {
+  if ("assertion" in step) return true;
+  return "action" in step && READ_ONLY_ACTIONS.has(step.action);
 }

@@ -174,11 +174,11 @@ export const FEATURE_CAPABILITIES: Feature[] = [
     "Coverage and loss accounting",
     "Bounded buffers emit explicit gap events instead of dropping silently.",
   ),
-  planned(
+  implemented(
     "crash-recovery",
     "F3.6",
     "Crash recovery",
-    "In-flight write steps become indeterminate and nothing is re-executed.",
+    "Delivered by F3.6; tests/contract/recovery.test.ts kills the service with SIGKILL mid-replay and restarts it on the same home: the run is interrupted (exit 2), the in-flight write step indeterminate, the journal ends with a producer-restarted gap, and nothing is re-executed. A read-only step cut short is cancelled.",
   ),
   planned(
     "diagnostics-ui",

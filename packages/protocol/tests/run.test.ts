@@ -8,6 +8,7 @@ import {
   RunManifestSchema,
   RunStepsSchema,
   RunSummarySchema,
+  isReadOnlyStep,
   isStepResult,
 } from "../src/index.ts";
 
@@ -146,4 +147,14 @@ test("RunCoverageSchema and the capability matrix share statuses and surfaces", 
   expect(
     v.safeParse(CapabilityMatrixSchema, { ...matrix, capabilities: [unknownSurface] }).success,
   ).toBe(false);
+});
+
+test("only assertions, waits, and extractions count as read-only steps", () => {
+  const target = { testId: "send" };
+  expect(isReadOnlyStep({ id: "a", assertion: "visible", target })).toBe(true);
+  expect(isReadOnlyStep({ id: "w", action: "waitFor", target })).toBe(true);
+  expect(isReadOnlyStep({ id: "t", action: "extractText", target, saveAs: "text" })).toBe(true);
+  expect(isReadOnlyStep({ id: "c", action: "click", target })).toBe(false);
+  expect(isReadOnlyStep({ id: "s", action: "selectTab", tab: 0 })).toBe(false);
+  expect(isReadOnlyStep({ id: "v", builtin: "setVariable", name: "x", value: 1 })).toBe(false);
 });
