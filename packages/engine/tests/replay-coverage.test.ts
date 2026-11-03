@@ -70,7 +70,7 @@ test("a lost connection is journaled as the adapter's gap, and coverage.json rec
     clock: fakeClock(),
     run: { store, manifest: MANIFEST },
   });
-  expect(result.status).toBe("failed");
+  expect(result.status).toBe("interrupted");
   expect(events.filter(({ category }) => category === "gap")).toEqual([
     {
       schemaVersion: 1,

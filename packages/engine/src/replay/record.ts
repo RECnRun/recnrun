@@ -14,7 +14,7 @@ import {
   type SnapshotPayload,
   type StepResult,
 } from "@recnrun/protocol";
-import { APPLICATION_FAILURES } from "./outcome.ts";
+import { APPLICATION_FAILURES, CONNECTION_LOST } from "./outcome.ts";
 
 /** The journal of one run; persistence's `JournalWriter` satisfies it. */
 export interface ReplayJournal {
@@ -83,10 +83,13 @@ type Emit = (
 
 const iso = (ms: number): string => new Date(ms).toISOString();
 
+const cutShort = ({ status, error }: StepResult): boolean =>
+  status === "cancelled" || error?.code === CONNECTION_LOST;
+
 /** The run's status from its step results: the first step that did not pass decides it. */
 function runStatus(results: readonly StepResult[], problem?: RunProblem): RunStatus {
   if (problem) return "error";
-  if (results.some(({ status }) => status === "cancelled")) return "interrupted";
+  if (results.some(cutShort)) return "interrupted";
   const stop = results.find(({ status }) => status === "failed" || status === "indeterminate");
   if (!stop) return "passed";
   const blamesApplication =
@@ -109,12 +112,15 @@ function counts(results: readonly StepResult[]): RunSummary["counts"] {
   return tally;
 }
 
+// A cancelled step with an error was cut short; its error names the cause.
+const FAILURES: ReadonlySet<string> = new Set(["failed", "indeterminate"]);
+
 function failures(results: readonly StepResult[], problem?: RunProblem): RunSummary["failures"] {
   const first = results[0];
   if (problem && first)
     return [{ stepId: first.stepId, message: `${problem.code}: ${problem.message}` }];
   return results
-    .filter(({ status }) => status === "failed" || status === "indeterminate")
+    .filter(({ status, error }) => FAILURES.has(status) || (status === "cancelled" && error))
     .map(({ stepId, status, error, evidence }) => ({
       stepId,
       message: error?.message ?? status,
@@ -232,7 +238,8 @@ export async function openRecorder(options: RecorderOptions): Promise<Recorder> 
     lost: (event) => writer.detached(lostEvent(options.runId, event)),
     async finished(result, index) {
       results.push(result);
-      if (result.status === "blocked" || result.status === "cancelled") return;
+      // A step that never started has nothing to close in the journal.
+      if (result.startedAt === undefined) return;
       const { stepId, ...payload } = result;
       await emit(stepId, "step.finished", { index, ...payload });
     },

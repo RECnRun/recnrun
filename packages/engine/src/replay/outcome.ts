@@ -2,7 +2,8 @@ import { APPLICATION_FAILURE_CODES } from "@recnrun/protocol";
 
 /** How a running step ended, before timestamps and redaction. */
 export interface StepOutcome {
-  status: "passed" | "failed" | "indeterminate";
+  // `cancelled` only for a read the lost connection cut short.
+  status: "passed" | "failed" | "indeterminate" | "cancelled";
   attempts?: number | undefined;
   error?: { code: string; message: string } | undefined;
   evidence?: string[] | undefined;
@@ -20,6 +21,9 @@ export class StepFailure extends Error {
 
 /** Failure codes that blame the application under test (exit 1); any other code is a run error. */
 export const APPLICATION_FAILURES: ReadonlySet<string> = new Set(APPLICATION_FAILURE_CODES);
+
+/** The failure code of a step the lost connection cut short; the run is then interrupted. */
+export const CONNECTION_LOST = "connection-lost";
 
 export const quoted = (label: string, text: string): string => `${label}: ${JSON.stringify(text)}`;
 

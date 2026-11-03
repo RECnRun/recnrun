@@ -31,6 +31,31 @@ describe("compareRuns", () => {
     expect(result.divergence?.message).toMatch(/^The baseline lost events/);
   });
 
+  test("a step the lost connection cut short is a collector gap, never the application's", () => {
+    const cut = [
+      ...clean.slice(0, 3),
+      gap({ reason: "connection-lost" }),
+      finished("submit", "indeterminate", "connection-lost"),
+    ];
+    const result = compareRuns(
+      storedRun("base", clean, passed("open", "submit")),
+      storedRun("now", cut, [
+        { stepId: "open", status: "passed" },
+        {
+          stepId: "submit",
+          status: "indeterminate",
+          error: { code: "connection-lost", message: "The connection to Chrome was lost." },
+        },
+      ]),
+    );
+    expect(result.divergence).toMatchObject({
+      kind: "collector-gap",
+      reason: "collector-gap",
+      stepId: "submit",
+      run: { gap: { reason: "connection-lost" } },
+    });
+  });
+
   test("a gap both runs have is no divergence, and a gap before any step has no step", () => {
     const both = [...clean, gap({ reason: "buffer-exhausted" })];
     expect(

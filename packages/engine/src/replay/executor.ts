@@ -23,6 +23,7 @@ import {
 import { createScope, redact, secretValues, type Scope, type ScopeOptions } from "./scope.ts";
 import { snapshotter, type Snapshotter } from "./snapshots.ts";
 import { startEvidence } from "./evidence.ts";
+import { untilLost, watchConnection, type Interruption } from "./interruption.ts";
 import { executeStep } from "./step.ts";
 import { deadlineIn, systemClock, type Clock } from "./wait.ts";
 
@@ -63,6 +64,7 @@ const OUTCOME_EVENTS: Readonly<Record<StepOutcome["status"], StepEvent>> = {
   passed: "pass",
   failed: "fail",
   indeterminate: "outcomeUnknown",
+  cancelled: "cancel",
 };
 
 /** Moves a step through the F2.2 step machine; an illegal move is a defect of the executor. */
@@ -117,11 +119,13 @@ interface Run {
   timeoutMs: number;
   recorder: Recorder;
   snapshot: Snapshotter | undefined;
+  interruption?: Interruption | undefined;
 }
 
 // Actions are captured before and after; any step that does not pass is captured on failure.
 async function capture(run: Run, step: Step, milestone: SnapshotMilestone): Promise<void> {
-  if (!run.snapshot) return;
+  // A lost connection has no page left to capture.
+  if (!run.snapshot || run.interruption?.lost()) return;
   if (milestone !== "failure" && !("action" in step)) return;
   await run.snapshot(step.id, milestone);
 }
@@ -131,8 +135,11 @@ async function runStep(run: Run, step: Step, index: number): Promise<StepResult>
   await run.recorder.started(step.id, index);
   await capture(run, step, "before");
   const startedAt = run.clock.now();
-  const deadline = deadlineIn(step.timeoutMs ?? run.timeoutMs, run.clock);
-  const outcome = await executeStep(step, { driver: run.driver, scope: run.scope, deadline });
+  const { interruption } = run;
+  const stopped = () => interruption?.lost() !== undefined;
+  const deadline = deadlineIn(step.timeoutMs ?? run.timeoutMs, run.clock, stopped);
+  const execution = executeStep(step, { driver: run.driver, scope: run.scope, deadline });
+  const outcome = interruption ? await untilLost(step, execution, interruption) : await execution;
   state = advance(state, OUTCOME_EVENTS[outcome.status]);
   const endedAt = run.clock.now();
   await capture(run, step, "after");
@@ -163,7 +170,7 @@ async function runAll(
 ): Promise<StepResult[]> {
   const results: StepResult[] = [];
   for (const [index, step] of steps.entries()) {
-    if (!(await mayStart(control))) {
+    if (run.interruption?.lost() || !(await mayStart(control))) {
       await skip(run, steps, index, "cancel");
       break;
     }
@@ -171,7 +178,7 @@ async function runAll(
     results.push(result);
     await run.recorder.finished(result, index);
     if (result.status !== "passed") {
-      await skip(run, steps, index + 1, "block");
+      await skip(run, steps, index + 1, run.interruption?.lost() ? "cancel" : "block");
       break;
     }
   }
@@ -186,19 +193,17 @@ async function observed(
   runId: string,
 ): Promise<StepResult[]> {
   const { driver, recorder } = run;
-  const stopListening = driver.onEvent?.((event) => {
-    if (event.type === "connection.lost") recorder.lost(event);
-  });
+  const connection = watchConnection(driver, (event) => recorder.lost(event));
   try {
     const evidence = await startEvidence(driver, recorder, run.secrets, runId);
     // What the last step started (a response still loading) lands before the journal closes.
     try {
-      return await runAll(run, steps, control);
+      return await runAll({ ...run, interruption: connection.interruption }, steps, control);
     } finally {
       await evidence?.drain();
     }
   } finally {
-    stopListening?.();
+    connection.stop();
   }
 }
 

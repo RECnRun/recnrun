@@ -93,7 +93,9 @@ test("killing Chrome mid-run journals a connection-lost gap that coverage.json c
     timeoutMs: 10_000,
   };
   let killed = false;
-  const { stored } = await replayStored(chrome.wsEndpoint, flowOf("killed", [OPEN, wait]), {
+  const later: Step = { id: "later", action: "click", target: { testId: "never-there" } };
+  const flow = flowOf("killed", [OPEN, wait, later]);
+  const { outcome, stored } = await replayStored(chrome.wsEndpoint, flow, {
     observe: (event) => {
       if (killed || event.type !== "step.started" || event.stepId !== "wait") return;
       killed = true;
@@ -101,6 +103,17 @@ test("killing Chrome mid-run journals a connection-lost gap that coverage.json c
     },
   });
   expect(killed).toBe(true);
+  expect(outcome.status).toBe("interrupted");
+  expect(outcome.exitCode).toBe(2);
+  const cut = outcome.steps.find(({ stepId }) => stepId === "wait");
+  expect(cut).toMatchObject({ status: "cancelled", error: { code: "connection-lost" } });
+  // The assertion polls for 10 s unless the loss cuts it short.
+  expect(cut?.durationMs).toBeLessThan(5_000);
+  expect(stored.summary).toMatchObject({ status: "interrupted", exitCode: 2 });
+  expect(stored.summary?.counts).toMatchObject({ passed: 1, cancelled: 2 });
+  expect(stored.summary?.failures).toEqual([
+    { stepId: "wait", message: expect.stringContaining("collector gap connection-lost") },
+  ]);
   expect(gapsOf(stored.journal.events)).toEqual([
     expect.objectContaining({
       producer: "adapter:connection",

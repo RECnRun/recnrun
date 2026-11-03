@@ -172,7 +172,7 @@ export const FEATURE_CAPABILITIES: Feature[] = [
     "coverage-loss-accounting",
     "F3.5",
     "Coverage and loss accounting",
-    "Delivered by F3.5; tests/browser/coverage.spec.ts bursts 1000 events through a hook that keeps 10 unacknowledged messages, and the buffer-exhausted gaps name every sequence number that never arrived; killing Chrome with SIGKILL mid-run journals a connection-lost gap; coverage.json counts events per surface and gaps per reason, and equals the count of the journal. The hook resends what the adapter did not acknowledge; a hole no resend filled is a delivery-lost gap. A document that dies before pagehide can still lose its last unreported messages.",
+    "Delivered by F3.5; tests/browser/coverage.spec.ts bursts 1000 events through a hook that keeps 10 unacknowledged messages, and the buffer-exhausted gaps name every sequence number that never arrived; killing Chrome with SIGKILL mid-run journals a connection-lost gap and cuts the step under way short at once (a read cancelled, a write indeterminate; packages/engine/tests/replay-interrupted.test.ts), so the run is interrupted (exit 2), summary.json names the collector gap, and run.compare reports a collector gap; coverage.json counts events per surface and gaps per reason, and equals the count of the journal. The hook resends what the adapter did not acknowledge; a hole no resend filled is a delivery-lost gap. A document that dies before pagehide can still lose its last unreported messages.",
   ),
   implemented(
     "crash-recovery",

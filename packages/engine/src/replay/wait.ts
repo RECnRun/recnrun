@@ -23,13 +23,16 @@ export interface Deadline {
   readonly at: number;
   readonly timeoutMs: number;
   readonly clock: Clock;
+  /** True once the run was cut short; the step's time is then up. */
+  readonly stopped?: (() => boolean) | undefined;
 }
 
-export function deadlineIn(timeoutMs: number, clock: Clock): Deadline {
-  return { at: clock.now() + timeoutMs, timeoutMs, clock };
+export function deadlineIn(timeoutMs: number, clock: Clock, stopped?: () => boolean): Deadline {
+  return { at: clock.now() + timeoutMs, timeoutMs, clock, stopped };
 }
 
 export function remaining(deadline: Deadline): number {
+  if (deadline.stopped?.()) return 0;
   return deadline.at - deadline.clock.now();
 }
 
