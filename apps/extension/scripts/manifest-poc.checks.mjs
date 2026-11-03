@@ -26,6 +26,8 @@ for (const [mode, permissions] of Object.entries(VARIANTS)) {
     const manifest = pocManifest(mode);
     assert.deepEqual(manifest.permissions, permissions);
     assert.equal(manifest.key, POC_PUBLIC_KEY);
+    // MV3 reads file:// from an extension page only with this host permission and the toggle (E1).
+    assert.deepEqual(manifest.host_permissions, ["file:///*"]);
     for (const page of ["diagnostics.html", "offscreen.html"]) {
       assert.ok(existsSync(`${outputDir(mode)}${page}`), `${mode} lacks ${page}`);
     }

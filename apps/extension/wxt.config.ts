@@ -47,7 +47,8 @@ export default defineConfig({
     },
   },
   manifest: ({ mode }) => ({
-    ...(pocEnabled(mode) ? { key: POC_PUBLIC_KEY } : {}),
+    // file:///* lets the POC pages fetch file:// once the owner allows file access (E1); never in production.
+    ...(pocEnabled(mode) ? { key: POC_PUBLIC_KEY, host_permissions: ["file:///*"] } : {}),
     name: "RECnRun",
     description: "Records and replays browser sessions for developers.",
     // tabs lets the dashboard list every tab, with its title and address, to record one.

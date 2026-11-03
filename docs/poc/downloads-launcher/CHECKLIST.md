@@ -67,6 +67,7 @@ Gate P0: verify · baseline counts · Chrome versions (lab, host) · review
   red: `vp run test:extension-manifest` with the new checks before the config change: `poc-d0/d1/d2 declare their permissions...` fail, actual `[ 'storage', 'tabs' ]` vs expected `[ 'storage', 'tabs', 'offscreen', 'downloads', 'debugger' ]`
   green: `vp run test:extension-manifest` 11 passed (production + three POC builds); `origins.test.ts` 8 passed; production and test manifests byte-identical before and after (empty `diff`); negative control in a scratch worktree, production with `downloads`: 2 checks fail; pinned id `omllgeochjfpkjbkpcgjmnnbncdpiedd`
   commit: cherry-picked from agent/p1-variants 45da8e7 (Add the POC build variants with a pinned extension id); SHA recorded at the gate
+  follow-up: `host_permissions: ["file:///*"]` added to the POC variants after E1 showed `fetch(file://)` needs it besides the toggle; red `vp run test:extension-manifest` 3 POC checks fail (`host_permissions` undefined), green 11 passed, production manifest byte-identical (Give the POC variants the file host permission)
 - [ ] P1.2 Clean install and the file-scheme state, E1 (lab, host)
 - [ ] P1.3 Probe write and real path, E2 (lab, host)
 - [ ] P1.4 Read in page and offscreen, E3
