@@ -47,6 +47,15 @@ function screenshotPart(
   return blobs.put(png.value, meta);
 }
 
+// A blob store that cannot write loses the part, never the step's outcome.
+async function stored(part: Promise<SnapshotPart> | SnapshotPart): Promise<SnapshotPart> {
+  try {
+    return await part;
+  } catch {
+    return unavailable("capture-failed");
+  }
+}
+
 async function tryCapture(capture: Capture): Promise<PageCapture | undefined> {
   try {
     return await capture({ timeoutMs: SNAPSHOT_TIMEOUT_MS });
@@ -72,8 +81,8 @@ async function snapshotOf(
   }
   if (!page.tab)
     return { milestone, dom: unavailable("no-tab"), screenshot: unavailable("no-tab") };
-  const dom = await domPart(page.html, blobs, secrets);
-  const screenshot = await screenshotPart(page.screenshot, blobs);
+  const dom = await stored(domPart(page.html, blobs, secrets));
+  const screenshot = await stored(screenshotPart(page.screenshot, blobs));
   return { milestone, url: redact(page.url, secrets), dom, screenshot };
 }
 

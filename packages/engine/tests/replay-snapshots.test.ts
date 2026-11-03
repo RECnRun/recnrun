@@ -39,12 +39,13 @@ const MANIFEST: RunManifest = {
 type Put = { content: Uint8Array | string; meta: Parameters<ReplayBlobs["put"]>[1] };
 
 /** A run store whose blobs cap like persistence's and name each blob by its order. */
-function fakeStore(withBlobs = true) {
+function fakeStore(withBlobs = true, failing: (put: Put) => boolean = () => false) {
   const events: Event[] = [];
   const puts: Put[] = [];
   const blobs: ReplayBlobs = {
     async put(content, meta) {
       puts.push({ content, meta });
+      if (failing({ content, meta })) throw new Error("ENOSPC: no space left on device");
       const cap = meta.maxBytes ?? 1_048_576;
       const sha256 = puts.length.toString(16).padStart(64, "0");
       const condition = content.length > cap ? "truncated" : "captured";
@@ -223,6 +224,35 @@ describe("snapshot caps and gaps", () => {
         expect.anything(),
       ],
     );
+  });
+
+  test("a blob store that cannot write a part leaves it unavailable and the step passed", async () => {
+    const { driver } = capturing(() => page("<p/>"));
+    const { store, events } = fakeStore(true, ({ meta }) => meta.mime === "text/html");
+    const outcome = await replayFlow(driver, flowOf([GO]), {
+      clock: fakeClock(),
+      run: { store, manifest: MANIFEST },
+    });
+    expect(outcome.status).toBe("passed");
+    expect(outcome.steps.map(({ status }) => status)).toEqual(["passed"]);
+    expect(snapshots(events).map(({ payload }) => [payload["dom"], payload["screenshot"]])).toEqual(
+      [
+        [
+          { condition: "unavailable", reason: "capture-failed" },
+          expect.objectContaining({ size: 4 }),
+        ],
+        [
+          { condition: "unavailable", reason: "capture-failed" },
+          expect.objectContaining({ size: 4 }),
+        ],
+      ],
+    );
+    expect(events.map(({ type }) => type)).toEqual([
+      "step.started",
+      "captured",
+      "captured",
+      "step.finished",
+    ]);
   });
 
   test("nothing is captured when the run has no blob store", async () => {
