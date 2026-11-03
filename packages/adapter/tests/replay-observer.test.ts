@@ -104,6 +104,50 @@ test("response bodies go to the run's blobs as text, so the run can redact them"
   expect(network[1]?.payload).toMatchObject({ status: 500 });
 });
 
+// Fails instead of hanging when `drain()` never resolves.
+const within = (work: Promise<void>, ms: number) =>
+  Promise.race([
+    work,
+    new Promise<void>((_, reject) =>
+      setTimeout(() => reject(new Error(`drain() did not resolve within ${ms} ms`)), ms),
+    ),
+  ]);
+
+test("losing the evidence socket is a connection-lost gap, and capture under way settles", async () => {
+  const { channel, events, observer } = await observe();
+  await observer.adopt(pageOf("REPLAY"));
+  channel.holding.add("Network.getResponseBody");
+  const request = { url: API, method: "GET" };
+  channel.emit(
+    "Network.requestWillBeSent",
+    { requestId: "R1", request, type: "Fetch" },
+    "S-REPLAY",
+  );
+  const response = { url: API, status: 200, statusText: "", mimeType: "application/json" };
+  channel.emit(
+    "Network.responseReceived",
+    { requestId: "R1", type: "Fetch", response },
+    "S-REPLAY",
+  );
+  channel.emit("Network.loadingFinished", { requestId: "R1", encodedDataLength: 2 }, "S-REPLAY");
+  channel.lose();
+  await within(observer.drain(), 1_000);
+  const gaps = events.filter(({ category }) => category === "gap");
+  expect(gaps.map(({ type, producer, payload }) => [type, producer, payload])).toEqual([
+    [
+      "connection-lost",
+      "cdp:browser",
+      { reason: "connection-lost", startedAt: expect.any(String) },
+    ],
+  ]);
+  const body = events.find(({ category, type }) => category === "network" && type === "body");
+  expect(body?.payload).toMatchObject({
+    condition: "unavailable",
+    reason: expect.stringContaining("connection to Chrome was lost"),
+  });
+  expect(events.map(({ type }) => type)).not.toContain("capture-stopped");
+});
+
 test("a tab that cannot be adopted is a target-unattached gap, never a failed step", async () => {
   const { events, observer } = await observe();
   await observer.adopt(pageOf("REPLAY", true));

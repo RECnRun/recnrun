@@ -56,6 +56,20 @@ test("closing rejects pending and later commands and closes the socket", async (
   await expect(channel.send("Target.getTargets")).rejects.toThrow("closed");
 });
 
+test("a socket that closes or fails on its own notifies the close listeners once; close() does not", async () => {
+  const { channel, socket } = await open();
+  let notified = 0;
+  channel.onClose(() => (notified += 1));
+  socket.emit("close");
+  socket.emit("error");
+  expect(notified).toBe(1);
+  const { channel: other, socket: otherSocket } = await open();
+  other.onClose(() => (notified += 1));
+  other.close();
+  otherSocket.emit("close");
+  expect(notified, "an expected close is no loss").toBe(1);
+});
+
 test("the socket failing rejects what is pending", async () => {
   const { channel, socket } = await open();
   const pending = channel.send("Target.getTargets");

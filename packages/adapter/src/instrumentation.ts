@@ -27,6 +27,11 @@ export async function instrumentChannel(
 ): Promise<Instrumentation> {
   const instrumenter = new Instrumenter(channel, options);
   channel.onEvent((event) => instrumenter.handle(event));
+  // A socket that closes on its own ends every document and settles capture under way as lost.
+  channel.onClose(() => {
+    instrumenter.closeDocuments(() => true);
+    instrumenter.capture?.lost();
+  });
   const stop = () => {
     instrumenter.closeDocuments(() => true);
     instrumenter.capture?.stop();

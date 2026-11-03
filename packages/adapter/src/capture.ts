@@ -57,7 +57,7 @@ export class Capture {
   private readonly storages = new Map<string, StorageCapture>();
   private readonly documents = new ContextDocuments();
   private readonly channel: CdpChannel;
-  private readonly options: CaptureOptions;
+  private readonly options: CaptureOptions & { now: () => Date };
   private readonly track: (work: Promise<void>) => void;
 
   constructor(
@@ -165,8 +165,18 @@ export class Capture {
 
   /** Settles every body still loading and every held event; nothing is emitted afterwards. */
   stop(): void {
-    for (const network of this.networks.values())
-      network.close("Capture stopped before the response finished loading.");
+    this.end("Capture stopped before the response finished loading.");
+  }
+
+  /** The socket closed on its own: a gap says so, then everything under way settles as lost. */
+  lost(): void {
+    const payload = { reason: "connection-lost", startedAt: this.options.now().toISOString() };
+    void this.emitter.emit(BROWSER, gapDraft(payload));
+    this.end("The connection to Chrome was lost before the response finished loading.");
+  }
+
+  private end(why: string): void {
+    for (const network of this.networks.values()) network.close(why);
     this.networks.clear();
     for (const storage of this.storages.values()) storage.close();
     this.storages.clear();

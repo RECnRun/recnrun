@@ -11,10 +11,13 @@ export class FakeChannel implements CdpChannel {
   readonly sent: SentCommand[] = [];
   readonly failing = new Map<string, string>();
   closed = false;
+  lost = false;
   private readonly listeners: ((event: CdpEvent) => void)[] = [];
+  private readonly closeListeners: (() => void)[] = [];
 
   send(method: string, params?: Record<string, unknown>, sessionId?: string): Promise<unknown> {
     this.sent.push({ method, ...(params && { params }), ...(sessionId && { sessionId }) });
+    if (this.lost) return Promise.reject(new Error("CDP socket closed."));
     const failure = this.failing.get(method);
     return failure ? Promise.reject(new Error(failure)) : Promise.resolve({});
   }
@@ -23,8 +26,18 @@ export class FakeChannel implements CdpChannel {
     this.listeners.push(listener);
   }
 
+  onClose(listener: () => void): void {
+    this.closeListeners.push(listener);
+  }
+
   close(): void {
     this.closed = true;
+  }
+
+  /** Chrome went away: the socket closed without `close()`, and nothing answers afterwards. */
+  lose(): void {
+    this.lost = true;
+    for (const listener of this.closeListeners) listener();
   }
 
   emit(method: string, params: Record<string, unknown>, sessionId?: string): void {

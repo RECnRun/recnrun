@@ -116,16 +116,20 @@ test("killing Chrome mid-run journals a connection-lost gap that coverage.json c
   expect(stored.summary?.failures).toEqual([
     { stepId: "wait", message: expect.stringContaining("collector gap connection-lost") },
   ]);
-  expect(gapsOf(stored.journal.events)).toEqual([
-    expect.objectContaining({
-      producer: "adapter:connection",
+  // The evidence socket reports its own loss too, unless the drain closed it first.
+  const gaps = gapsOf(stored.journal.events);
+  expect(gaps.map(({ producer }) => producer)).toContain("adapter:connection");
+  for (const gap of gaps)
+    expect(gap).toMatchObject({
+      producer: expect.stringMatching(/^(adapter:connection|cdp:browser)$/),
       component: "collector",
       type: "connection-lost",
       payload: expect.objectContaining({ reason: "connection-lost" }),
-    }),
-  ]);
+    });
   expect(stored.coverage).toEqual(coverageOf(stored.manifest.runId, stored.journal.events));
-  expect(stored.coverage?.gaps).toEqual([{ reason: "connection-lost", gaps: 1, lostEvents: 0 }]);
+  expect(stored.coverage?.gaps).toEqual([
+    { reason: "connection-lost", gaps: gaps.length, lostEvents: 0 },
+  ]);
 });
 
 test("the counts in coverage.json reconcile with the run's journal", async ({ chrome }) => {

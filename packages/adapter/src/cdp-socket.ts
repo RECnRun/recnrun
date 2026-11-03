@@ -13,6 +13,8 @@ export interface CdpEvent {
 export interface CdpChannel {
   send(method: string, params?: Record<string, unknown>, sessionId?: string): Promise<unknown>;
   onEvent(listener: (event: CdpEvent) => void): void;
+  /** Called once if the socket closes or fails without `close()`: whatever it carried is cut off. */
+  onClose(listener: () => void): void;
   close(): void;
 }
 
@@ -48,10 +50,29 @@ function settle(pending: Pending, message: Message): void {
   else pending.resolve(message.result ?? {});
 }
 
+/** A reply settles its command; anything else with a method is an event for the listeners. */
+function dispatch(
+  data: unknown,
+  pending: Map<number, Pending>,
+  listeners: ((event: CdpEvent) => void)[],
+): void {
+  const message = parseMessage(data);
+  if (message?.id !== undefined) {
+    const waiting = pending.get(message.id);
+    pending.delete(message.id);
+    if (waiting) settle(waiting, message);
+  } else if (message?.method) {
+    const event: CdpEvent = { method: message.method, params: message.params ?? {} };
+    if (message.sessionId) event.sessionId = message.sessionId;
+    for (const listener of listeners) listener(event);
+  }
+}
+
 /** Wraps an open socket; every reply settles its command, and the socket closing rejects the rest. */
 function cdpChannel(socket: RawSocket, endpoint: string): CdpChannel {
   const pending = new Map<number, Pending>();
   const listeners: ((event: CdpEvent) => void)[] = [];
+  const closeListeners: (() => void)[] = [];
   let lastId = 0;
   let closed = false;
   const fail = () => {
@@ -60,20 +81,15 @@ function cdpChannel(socket: RawSocket, endpoint: string): CdpChannel {
       each.reject(new Error(`CDP socket to ${endpoint} closed.`));
     pending.clear();
   };
-  socket.addEventListener("close", fail);
-  socket.addEventListener("error", fail);
-  socket.addEventListener("message", ({ data }) => {
-    const message = parseMessage(data);
-    if (message?.id !== undefined) {
-      const waiting = pending.get(message.id);
-      pending.delete(message.id);
-      if (waiting) settle(waiting, message);
-    } else if (message?.method) {
-      const event: CdpEvent = { method: message.method, params: message.params ?? {} };
-      if (message.sessionId) event.sessionId = message.sessionId;
-      for (const listener of listeners) listener(event);
-    }
-  });
+  // A socket that closes on its own cuts off what it carried; `close()` has already marked it closed.
+  const lost = () => {
+    const unexpected = !closed;
+    fail();
+    if (unexpected) for (const listener of closeListeners) listener();
+  };
+  socket.addEventListener("close", lost);
+  socket.addEventListener("error", lost);
+  socket.addEventListener("message", ({ data }) => dispatch(data, pending, listeners));
   return {
     send: (method, params = {}, sessionId) =>
       new Promise((resolve, reject) => {
@@ -88,6 +104,7 @@ function cdpChannel(socket: RawSocket, endpoint: string): CdpChannel {
         );
       }),
     onEvent: (listener) => listeners.push(listener),
+    onClose: (listener) => closeListeners.push(listener),
     close: () => {
       fail();
       socket.close();
