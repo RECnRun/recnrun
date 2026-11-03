@@ -13,7 +13,7 @@ import {
 import type { RunResult, StoredRun } from "./runs.ts";
 
 /** The producer of the gaps recovery writes into a journal it did not start. */
-export const RECOVERY_PRODUCER = "service:recovery";
+const RECOVERY_PRODUCER = "service:recovery";
 
 const INTERRUPTED_WRITE = {
   code: "run-interrupted",
@@ -56,7 +56,7 @@ function journaledSteps(events: readonly Event[]) {
 }
 
 /** Each top-level step's result: a write cut short is indeterminate, anything else unfinished is cancelled. */
-export function interruptedSteps(flow: Flow, events: readonly Event[]): StepResult[] {
+function interruptedSteps(flow: Flow, events: readonly Event[]): StepResult[] {
   const { started, finished } = journaledSteps(events);
   return flow.steps.map((step) => {
     const result = finished.get(step.id);
