@@ -15,8 +15,8 @@ Tracks [PLAN.md](PLAN.md). One line per task; the orchestrator owns `[x]`, imple
 Markers: `[ ]` not started · `[i]` implemented, awaiting the phase gate · `[x]` verified by `vp run verify` · `[!]` blocked (reason indented) · `[~]` partial (what is missing indented).
 
 **Branch:** `f0-contracts` holds F0 (closed), `f1-spike` holds F1 (closed), and `f2-vertical` holds F2 (closed), each stacked on the previous; F3 starts on `f3-diagnostics`, branched from `f2-vertical` (plan only on `local-engine-plan`; implementation branches are named after the phase)
-**Last commit:** the branch tip whose subject is "Close phase F2 after the verify gate" (no hash: the commit cannot name itself)
-**Current phase:** F3 (F2 closed on 2026-11-03; start with F3.1 on branch `f3-diagnostics`)
+**Last commit:** 3769534 "Capture server-sent events with their name, id, and truncation" (F3.1 on `f3-diagnostics`; the checklist commit after it records F3.1, F3.6, and F3.8)
+**Current phase:** F3 (F2 closed on 2026-11-03; F3.1, F3.6, F3.8 implemented `[i]`; next F3.2, F3.4, F3.3, F3.5, then F3.7 and F3.9, on branch `f3-diagnostics`)
 
 ## F0: Contracts and skeleton
 
@@ -146,14 +146,26 @@ Markers: `[ ]` not started · `[i]` implemented, awaiting the phase gate · `[x]
 
 ## F3: Diagnostics and robust persistence
 
-- [ ] F3.1 Network evidence, blobs, conditions, redaction
+- [i] F3.1 Network evidence, blobs, conditions, redaction
+  - red: protocol `tests/network.test.ts` 2 of 23 failed (`received "eventsource-message"`); adapter `tests/capture-network-evidence.test.ts` 1 of 12 failed (`expected [] to deeply equal [...]`); fixture `tests/api.test.ts` 4 of 20 failed (`expected 'no-store' to be 'max-age=60'`); service `tests/sessions.test.ts -t "blob store"` failed (`The session recorded without a blob store.`); `tests/browser/network.spec.ts` with the blob cap, header redaction, frame truncation, and cache state switched off in a scratch worktree 4 of 4 failed (condition `captured` instead of `truncated`, authorization `Bearer ...` instead of `redacted`, cache `network` with no `fromCache`, frames without `truncated: true`)
+  - green: protocol 367, adapter 12, fixture 90, service 109 passed; `tests/browser/network.spec.ts` plus `capture.spec.ts` 13 of 13 passed (the implementer ran these on the host; the Docker run is the gate's)
+  - commit: 1ff1659, e4d929d, 81efd10, c349ae1, 473d007, 3769534 (worktree 4ac27e8, f7bb460, e793cd2, 94860b2, 2425900, bda08cf)
+  - note: `network-response` events carry request and response headers (authorization, cookie, and set-cookie values redacted), timing, cache state, and a body condition (`captured`, `truncated` at the cap, `redacted`, `unavailable`); bodies are stored by SHA-256 in `sessions/<id>/blobs/` (files 0600, folder 0700) and referenced from the journal; WebSocket frames and server-sent events (`eventsource-message`, with name and id) are captured with truncation; the fixture gained `/api/large`, `/api/secret`, `/api/cached`, `/api/abort`, `/api/events`, and a frame echo; capabilities network-bodies-normal, network-evidence-normal, websocket-frames-normal, and sse-events-normal are implemented
 - [ ] F3.2 Console and errors
 - [ ] F3.3 Snapshots, screenshots, sandboxed viewer
 - [ ] F3.4 Storage, normal level
 - [ ] F3.5 Coverage and loss accounting
-- [ ] F3.6 Crash recovery
+- [i] F3.6 Crash recovery
+  - red: `vp run test:contract -- tests/contract/recovery.test.ts` 1 failed (`conflict: Run run-... has no summary; it did not finish.`)
+  - green: same command 1 passed; `vp run test:unit` 1199 passed; `vp run test:contract` 41 passed
+  - commit: 6ee7e8e, 1debad7 (worktree c4fe46e, f178c8b)
+  - note: on start, before binding its port, the service closes every run the index lists as running: a `producer-restarted` gap is written, a `journal-truncated` gap when the last line was cut, the in-flight write step ends `indeterminate`, read-only and unstarted steps are `cancelled`, the run is stored as `interrupted`, and nothing is re-executed; 1debad7 keeps the recovery producer and step results private to their module (Knip)
 - [ ] F3.7 Diagnostics UI and run comparison
-- [ ] F3.8 `run.compare`, `run.queryEvents`
+- [i] F3.8 `run.compare`, `run.queryEvents`
+  - red: at c4fe46e `tests/contract/runs-api.test.ts` 9 of 10 failed and persistence mutation tests 4 of 8 failed
+  - green: `tests/contract/runs-api.test.ts` 10 passed; persistence 78, protocol 351, service 108, engine 296 passed
+  - commit: 6ced57f (worktree cbba95e)
+  - note: `run.queryEvents` filters by event types, URL origin, profile binding, and time range, with a cursor that is a journal position; `run.compare` answers the first divergence between two runs and counts lost events as collector gaps; `run-comparison.schema.json` is committed and capability run-compare-query is implemented; no UI change (the diagnostics screen is F3.7) and no MCP adapter yet; the security model is unchanged; jscpd reported 7 clones, to be checked against the 4% cap at the gate; `tests/contract/cli.test.ts` SIGINT/SIGTERM is flaky on the macOS host only (`ENOENT ... service.json`), to be checked in Docker
 - [ ] F3.9 Overhead benchmark and bounded memory
 - Gate F3: `vp run verify` → (date, result)
 - Manual after gate: M-F3.a

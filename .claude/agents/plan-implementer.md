@@ -18,7 +18,7 @@ You implement only the task IDs the orchestrator assigns, from the plan and chec
 2. **Change.** Smallest correct implementation in the surrounding style. App source and tests import through `@/`. Comments are one line stating a reason. Code, comments, docs, UI copy, and diagnostics are English. Update every doc the change makes inaccurate in the same commit; a boundary change updates `docs/ARCHITECTURE.md` and `.dependency-cruiser.cjs` together.
 3. **Green.** Rerun the same command until it passes.
 4. **Check.** `vp check` (`vp check --fix` formats) and `vp run deps`.
-5. **Exercise.** UI changes: run the relevant headed Playwright test, save screenshots under `.artifacts/screens/<task-id>/`, and open them with the Read tool. Docs: links and commands work. Rules, skills, or agent instructions: confirm Codex loads them with `codex exec --ephemeral -s read-only`.
+5. **Exercise.** UI changes: run the relevant Playwright spec through its Docker command (`vp run test:e2e -- <spec>` or `vp run test:browser -- <spec>`), save screenshots from its `.artifacts/docker/<run-id>/` output under `.artifacts/screens/<task-id>/`, and open them with the Read tool. Docs: links and commands work. Rules, skills, or agent instructions: confirm Codex loads them with `codex exec --ephemeral -s read-only`.
 6. **Commit.** Stage only the task's files. Subject: one imperative English sentence, capitalized, no type or scope prefix, no trailing period, under 72 characters. Body: `Red:` and `Green:` lines with the commands and the observed failure, or `No-behavior-change: <reason>` for a change with no behavior. End with a `Co-Authored-By` trailer naming the model you run as. The pre-commit hook runs checks, boundaries, and unit tests, and the commit-msg hook validates the message; when either fails, fix the cause and commit again.
 7. **Track.** Mark the task `[i]` in the checklist with indented `red:`, `green:`, and `commit:` lines. Only the orchestrator marks `[x]`, after `vp run verify`.
 
@@ -26,10 +26,14 @@ You implement only the task IDs the orchestrator assigns, from the plan and chec
 
 Docker Desktop must be running. Run test commands one at a time:
 
-- `vp run test:unit`
+- `vp run test:unit`, or `npx vitest run <file>` inside one package for a targeted Node run
 - `vp run test:components`
+- `vp run test:contract -- tests/contract/<file>.test.ts`
 - `vp run test:e2e -- tests/e2e/<file>.spec.ts -g '<title>'`
+- `vp run test:browser -- tests/browser/<file>.spec.ts -g '<title>'`
 - `vp run deps`
+
+Anything that opens a browser (component, end-to-end, and browser layers) runs only through these Docker commands, even when the orchestrator asks you to avoid Docker: then skip the layer and report it as not exercised. Never run `playwright test`, a `:local` script, or `vp test` against a browser project on the host; that opens a Google Chrome on the user's machine.
 
 Failure artifacts are in `.artifacts/docker/<run-id>/`. Do not run `vp run verify`; the orchestrator runs phase gates.
 
