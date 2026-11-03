@@ -83,6 +83,8 @@ Hypothesis (§5 row 4, P1.3): `chrome.downloads.download` writes a relative path
 
 Predictions: `RecnRun/poc/<ns>/probe.json` is accepted; an absolute or `..` path is refused synchronously; `%` in a name becomes `_` (the E2 Unicode and URL-encoding cases must expect it). With "Ask where to save each file" on, `saveAs: false` still prompts (`PREFERENCE`), so the prompt is a gesture; a policy-managed `DownloadDirectory` suppresses it. Whether `OVERWRITE` ever falls back to a uniquified name (target not writable, file in use) lives in `download_path_reservation_tracker.cc`, not read; E2's 100 overwrites measure it.
 
+Observed ([E2](experiments/E2.md), lab 157.0.8103.38 and host 156.0.8078.80): `?` in a name is refused with `Invalid filename` instead of being rewritten, so `%` is not the only URL-encoding character the cases had to expect to change; the 100 overwrites never produced a uniquified name.
+
 ## 5. Service-worker startup on profile load and `runtime.onStartup`
 
 Hypothesis (§5 row 5, P2.2, §9 T2): when a profile loads with no window, its extension's worker starts and receives `onStartup`.

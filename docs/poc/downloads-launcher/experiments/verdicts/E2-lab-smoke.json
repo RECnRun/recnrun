@@ -1,0 +1,370 @@
+[
+  {
+    "experiment": "E2",
+    "hypothesis": "E2.write.completes",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "single",
+    "debugger": "none",
+    "observations": [
+      {
+        "filename": "<root>/downloads/RECnRun/poc/e2-36719fcd/probe.json",
+        "state": "complete",
+        "onDisk": true,
+        "nodeBytes": true
+      }
+    ],
+    "mode": "smoke",
+    "verdict": "pass",
+    "samples": 1
+  },
+  {
+    "experiment": "E2",
+    "hypothesis": "E2.filename.fileUrl",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "single",
+    "debugger": "none",
+    "observations": [
+      {
+        "filename": "<root>/downloads/RECnRun/poc/e2-e77abbfe/probe.json",
+        "state": "complete",
+        "onDisk": true,
+        "nodeBytes": true,
+        "url": "file://<root>/downloads/RECnRun/poc/e2-e77abbfe/probe.json",
+        "pageRead": true
+      }
+    ],
+    "mode": "smoke",
+    "verdict": "pass",
+    "samples": 1
+  },
+  {
+    "experiment": "E2",
+    "hypothesis": "E2.overwrite.100",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "single",
+    "debugger": "none",
+    "observations": [
+      {
+        "writes": 5,
+        "reported": ["<root>/downloads/RECnRun/poc/e2-b4011a5a/probe.json"],
+        "entries": ["probe.json"],
+        "lastWins": true,
+        "msPerWrite": 7
+      }
+    ],
+    "mode": "smoke",
+    "verdict": "pass",
+    "samples": 1
+  },
+  {
+    "experiment": "E2",
+    "hypothesis": "E2.content.roundTrip",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "single",
+    "debugger": "none",
+    "observations": [
+      {
+        "cases": [
+          {
+            "name": "empty content",
+            "requested": "probe.json",
+            "reported": "probe.json",
+            "state": "complete",
+            "node": true,
+            "page": true,
+            "url": "file://<root>/downloads/RECnRun/poc/e2-d748c46d/probe.json"
+          },
+          {
+            "name": "spaces",
+            "requested": "probe with spaces.json",
+            "reported": "probe with spaces.json",
+            "state": "complete",
+            "node": true,
+            "page": true,
+            "url": "file://<root>/downloads/RECnRun/poc/e2-d748c46d/probe%20with%20spaces.json"
+          },
+          {
+            "name": "unicode",
+            "requested": "próbé 日本.json",
+            "reported": "próbé 日本.json",
+            "state": "complete",
+            "node": true,
+            "page": true,
+            "url": "file://<root>/downloads/RECnRun/poc/e2-d748c46d/pr%C3%B3b%C3%A9%20%E6%97%A5%E6%9C%AC.json"
+          },
+          {
+            "name": "percent",
+            "requested": "probe%20x%.json",
+            "reported": "probe_20x_.json",
+            "state": "complete",
+            "node": true,
+            "page": true,
+            "url": "file://<root>/downloads/RECnRun/poc/e2-d748c46d/probe_20x_.json"
+          },
+          {
+            "name": "hash",
+            "requested": "probe#1.json",
+            "reported": "probe#1.json",
+            "state": "complete",
+            "node": true,
+            "page": true,
+            "url": "file://<root>/downloads/RECnRun/poc/e2-d748c46d/probe%231.json"
+          },
+          {
+            "name": "question mark",
+            "requested": "probe?x=1.json",
+            "refused": "Invalid filename"
+          }
+        ]
+      }
+    ],
+    "mode": "smoke",
+    "verdict": "fail",
+    "error": "question mark refused: Invalid filename",
+    "samples": 1
+  },
+  {
+    "experiment": "E2",
+    "hypothesis": "E2.interrupted.crdownload",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "single",
+    "debugger": "none",
+    "observations": [
+      {
+        "relative": "RECnRun/poc/e2-d0790abd/probe.json",
+        "cancelled": {
+          "during": ["Unconfirmed 409101.crdownload"],
+          "readDuring": {
+            "publication": {
+              "profileId": "4edadf01-d179-4741-8bb3-47234d4881da",
+              "displayName": "E2",
+              "fingerprint": "AB:CD",
+              "createdAt": 1793749479634,
+              "expiresAt": 1793749509634
+            },
+            "reason": "fresh"
+          },
+          "stoppedWithin15s": true,
+          "settled": {
+            "state": "interrupted",
+            "error": "USER_CANCELED",
+            "filename": "<root>/downloads/RECnRun/poc/e2-d0790abd/probe.json"
+          },
+          "entries": ["probe.json"],
+          "downloads": ["RECnRun"],
+          "readAfter": {
+            "publication": {
+              "profileId": "4edadf01-d179-4741-8bb3-47234d4881da",
+              "displayName": "E2",
+              "fingerprint": "AB:CD",
+              "createdAt": 1793749479634,
+              "expiresAt": 1793749509634
+            },
+            "reason": "fresh"
+          }
+        },
+        "dropped": {
+          "during": ["Unconfirmed 913154.crdownload"],
+          "readDuring": {
+            "publication": {
+              "profileId": "4edadf01-d179-4741-8bb3-47234d4881da",
+              "displayName": "E2",
+              "fingerprint": "AB:CD",
+              "createdAt": 1793749479634,
+              "expiresAt": 1793749509634
+            },
+            "reason": "fresh"
+          },
+          "stoppedWithin15s": false,
+          "settled": {
+            "state": "interrupted",
+            "error": "USER_CANCELED",
+            "filename": "<root>/downloads/stall.json"
+          },
+          "entries": ["probe.json"],
+          "downloads": ["RECnRun"],
+          "readAfter": {
+            "publication": {
+              "profileId": "4edadf01-d179-4741-8bb3-47234d4881da",
+              "displayName": "E2",
+              "fingerprint": "AB:CD",
+              "createdAt": 1793749479634,
+              "expiresAt": 1793749509634
+            },
+            "reason": "fresh"
+          }
+        },
+        "requests": ["no range", "no range", "no range"]
+      }
+    ],
+    "mode": "smoke",
+    "verdict": "pass",
+    "samples": 1
+  },
+  {
+    "experiment": "E2",
+    "hypothesis": "E2.saveAs.prompt",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "single",
+    "debugger": "none",
+    "observations": [
+      {
+        "title": "Save File",
+        "newWindows": ["google-chrome", "Save File", "google-chrome"],
+        "gestures": 1,
+        "answered": {
+          "ok": true,
+          "result": {
+            "id": 1,
+            "filename": "",
+            "state": "interrupted",
+            "error": "USER_CANCELED",
+            "exists": true,
+            "bytesReceived": 0
+          }
+        },
+        "written": false,
+        "screenshot": "test-results/experiments/E2-downloads-probe-E2-prob-1fad3-ome-Stable-E2-saveAs-prompt/E2-save-as.png"
+      }
+    ],
+    "mode": "smoke",
+    "verdict": "pass",
+    "samples": 1
+  },
+  {
+    "experiment": "E2",
+    "hypothesis": "E2.location.custom",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "single",
+    "debugger": "none",
+    "observations": [
+      {
+        "learned": "<root>/downloads",
+        "set": "<root>/downloads",
+        "state": "complete"
+      }
+    ],
+    "mode": "smoke",
+    "verdict": "pass",
+    "samples": 1
+  },
+  {
+    "experiment": "E2",
+    "hypothesis": "E2.location.default",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "single",
+    "debugger": "none",
+    "observations": [
+      {
+        "learned": "~/Downloads",
+        "relative": "RECnRun/poc/e2-4ec30816/probe.json",
+        "cleaned": {
+          "removed": ["Downloads/RECnRun/poc/e2-4ec30816/probe.json"]
+        },
+        "state": "complete"
+      }
+    ],
+    "mode": "smoke",
+    "verdict": "pass",
+    "samples": 1
+  },
+  {
+    "experiment": "E2",
+    "hypothesis": "E2.traces",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "single",
+    "debugger": "none",
+    "observations": [
+      {
+        "newWindows": [],
+        "history": 1,
+        "notifications": "D0 declares no notifications permission; Chrome's own download UI only",
+        "screenshot": "test-results/experiments/E2-downloads-probe-E2-prob-d1411-gle-Chrome-Stable-E2-traces/E2-traces.png"
+      }
+    ],
+    "mode": "smoke",
+    "verdict": "pass",
+    "samples": 1
+  },
+  {
+    "experiment": "E2",
+    "hypothesis": "E2.path.absoluteRefused",
+    "verdict": "pass",
+    "samples": 1,
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "single",
+    "debugger": "none",
+    "observations": [
+      {
+        "cases": [
+          {
+            "requested": "<root>/escape-absolute.json",
+            "error": "Invalid filename",
+            "written": false
+          },
+          {
+            "requested": "RECnRun/poc/e2-e713041d/../escape.json",
+            "error": "Invalid filename",
+            "written": false
+          },
+          {
+            "requested": "../escape.json",
+            "error": "Invalid filename",
+            "written": false
+          }
+        ]
+      }
+    ],
+    "mode": "smoke"
+  }
+]

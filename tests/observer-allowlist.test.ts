@@ -19,6 +19,8 @@ const ALLOWED_COMMANDS: Record<string, string> = {
   "Runtime.evaluate": "pings the extension's own worker and reads its pages (cdp-client.ts)",
   "Input.dispatchMouseEvent":
     "E1's recorded fallback click on the file-access toggle where no xdotool exists (macOS host)",
+  "Browser.setDownloadBehavior":
+    "E2 resets to Chrome's default the download override Playwright's connectOverCDP installs",
 };
 
 /** Commands that pause, instrument, block, or rewrite. */

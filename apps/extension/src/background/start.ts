@@ -5,9 +5,16 @@ import { createBackgroundListener } from "@/background/listener";
 import { startPeers } from "@/background/peers";
 import { createRoutes } from "@/background/routes";
 import { recordingSessionRepository } from "@/storage/recording-session-repository";
+// Imported last, so the production bundle (which drops it) keeps its module order and bytes.
+import { startDownloadsPublisher } from "@/background/downloads-publisher";
 
 // Spelled out, not peersEnabled(), so the production build can drop the POC's background code.
 const PEERS = import.meta.env.MODE === "development" || import.meta.env.MODE === "test";
+// pocEnabled() spelled out for the same reason: production must not carry chrome.downloads calls.
+const POC =
+  import.meta.env.MODE === "poc-d0" ||
+  import.meta.env.MODE === "poc-d1" ||
+  import.meta.env.MODE === "poc-d2";
 
 /** Keeps a dashboard in front of the user: on the toolbar icon, on install, and as the profile opens. */
 function openDashboardOnDemand() {
@@ -36,4 +43,5 @@ export function startBackground(): void {
   });
   const identity = { extensionId: browser.runtime.id, extensionUrl: browser.runtime.getURL("/") };
   browser.runtime.onMessage.addListener(createBackgroundListener(routes, identity));
+  if (POC) startDownloadsPublisher();
 }

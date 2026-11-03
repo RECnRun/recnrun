@@ -74,7 +74,21 @@ Gate P0: verify · baseline counts · Chrome versions (lab, host) · review
   host: `RECNRUN_HOST_ROOTS=~/Documents/RECnRun/poc-downloads-launcher vp run test:host tests/host/E1-file-access.spec.ts` 10 passed in 32.7 s; run `host-2026-11-03T23-24-49.000Z`: `Chrome/156.0.8078.80`, macOS 27.0.1 (26A434) arm64; 6 cells sampled 3 times (gestures 0, 2, 3, 2, 0, 1, all `cdp-click`), 3 `unavailable`; afterwards no Chrome on the roots and `roots/` empty
   verdict: E1.unpacked.default fail lab and host (access true and the fetch reads the probe with no gesture; pref `newAllowFileAccess: true`, flags 32806) · E1.unpacked.toggleOff pass lab and host (2 gestures: Developer mode, toggle) · E1.unpacked.toggleOn pass lab and host (3 gestures; the read follows the toggle) · E1.unpacked.reinstall fail lab and host (the revoke survives quit, relaunch, and reinstall; the toggled install still runs after a relaunch, flags 38) · E1.unpacked.noHostPermission pass lab and host (control with `host_permissions` removed: access true, fetch `TypeError: Failed to fetch`) · E1.unpacked.noDeveloperMode pass lab and host (toggle with Developer mode off disables the build, `unsupportedDeveloperExtension`) · E1.policy.default pass lab (strict, location 7, no access pref; fetch unavailable without a channel), unavailable host (no system plist) · E1.packed unavailable lab and host (decision 4, M-P9.c) · E1.gesture.default unavailable host (M-P1.a) · lab Google Chrome 156.0.8078.79 on Linux in Docker, xdotool every click · files `experiments/verdicts/E1-{lab-full,lab-smoke,lab-versions,host}.json`
   commit: `223b800` first round and harness · the commit that adds this line (rerun on the fixed build)
-- [ ] P1.3 Probe write and real path, E2 (lab, host)
+- [i] P1.3 Probe write and real path, E2 (lab, host)
+  red: `npx vitest run tests/downloads-rendezvous.test.ts` against a stub `readTolerant` that kept nothing: `Tests  30 failed | 2 passed (32)`; `npx vitest run tests/downloads-publisher.test.ts` against a listener that ignored every message: `Tests  6 failed | 1 passed (7)`, `expected 'ignored' to match object { ok: true, result: { id: 1 } }`; `vp run test:experiments -- tests/experiments/E2-downloads-probe.spec.ts -g E2.write.completes` with the diagnostics page lacking `__poc`: verdict fail, `window.__poc.probe is not defined on the diagnostics page`; negative control in a scratch worktree, `readTolerant` accepting partial JSON: `Tests  3 failed | 29 passed (32)`
+  green: `vp run test:unit` 56 files / 450 tests passed; `downloads-rendezvous.test.ts` 32 and `downloads-publisher.test.ts` 8 passed; `vp run test:experiments -- tests/experiments/E2-downloads-probe.spec.ts` full 11 passed in 1.2 min (run `2026-11-03T23-36-54.382Z-9c60631f`), smoke 11 passed in 24 s (run `2026-11-03T23-44-32.508Z-db206fa7`), Google Chrome 157.0.8103.38 on Linux; `vp run test:extension-manifest` 11 passed, production `background.js` has no `downloads.download` and the production build is byte-identical to `ae5a735`
+  host: `vp run test:host -- tests/host/E2-downloads-probe.spec.ts` run `host-2026-11-03T23-38-29.899Z`, Google Chrome 156.0.8078.80, macOS 27.0.1 (26A434) arm64: 10 cells (9 run, `E2.saveAs.prompt` unavailable), 14 passed with `chrome.spec.ts`; afterwards no launched Chrome, no root left, nothing under `~/Downloads/RECnRun`
+  verdict: E2.write.completes pass / pass
+  verdict: E2.filename.fileUrl pass / pass
+  verdict: E2.overwrite.100 pass / pass (one name, no `(1)`, 3 to 4 ms and 73 to 97 ms per write)
+  verdict: E2.content.roundTrip fail / fail (`?` refused with `Invalid filename`; `%` became `_`)
+  verdict: E2.interrupted.crdownload pass / pass (an auto-restarted download takes the URL's name)
+  verdict: E2.saveAs.prompt pass, 1 gesture / unavailable (native dialog on macOS, no xdotool; M-P1 manual not scheduled)
+  verdict: E2.location.custom pass / pass
+  verdict: E2.location.default pass / pass
+  verdict: E2.traces pass / pass
+  verdict: E2.path.absoluteRefused pass / pass
+  commit: the commit that adds this line (Probe Downloads writes and their real path in experiment E2)
 - [ ] P1.4 Read in page and offscreen, E3
 
 Gate P1: verify · E1–E3 · review

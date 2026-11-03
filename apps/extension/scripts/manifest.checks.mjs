@@ -71,4 +71,6 @@ await test("the production build leaves out every POC-only permission and page",
     existsSync(new URL("../.output/chrome-mv3/diagnostics.html", import.meta.url)),
     false,
   );
+  const background = readFileSync(new URL("../.output/chrome-mv3/background.js", import.meta.url));
+  assert.doesNotMatch(String(background), /downloads\.download/);
 });
