@@ -1,6 +1,7 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { Duplex } from "node:stream";
 import { handleApi, type ApiContext } from "./api.ts";
+import { redirectExpired } from "./session.ts";
 import { serveStatic } from "./static.ts";
 import { acceptEcho } from "./websocket.ts";
 
@@ -32,7 +33,9 @@ async function route(
 ): Promise<void> {
   const url = new URL(request.url ?? "/", "http://fixture.invalid");
   if (url.pathname.startsWith("/api/")) await handleApi(request, response, url, context);
-  else await serveStatic(request, response, url.pathname);
+  else if (!redirectExpired(request, response, url)) {
+    await serveStatic(request, response, url.pathname);
+  }
 }
 
 function listen(server: Server, port: number): Promise<number> {

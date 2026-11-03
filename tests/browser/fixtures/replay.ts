@@ -47,8 +47,8 @@ export function loadFlow(name: string): Flow {
   return checkedFlow(JSON.parse(readFileSync(file, "utf8")));
 }
 
-/** A flow of `steps` with no actors or inputs, validated like a flow file. */
-export function flowOf(id: string, steps: Step[]): Flow {
+/** A flow of `steps`, with no actors or inputs unless `extra` gives them, validated like a flow file. */
+export function flowOf(id: string, steps: Step[], extra: Partial<Flow> = {}): Flow {
   return checkedFlow({
     schemaVersion: 1,
     id,
@@ -58,6 +58,7 @@ export function flowOf(id: string, steps: Step[]): Flow {
     requirements: [],
     preconditions: [],
     steps,
+    ...extra,
   });
 }
 

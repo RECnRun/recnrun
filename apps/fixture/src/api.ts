@@ -9,6 +9,7 @@ import {
   startStream,
 } from "./http.ts";
 import { handleOrders, type OrderCounts } from "./orders.ts";
+import { handleSession } from "./session.ts";
 
 export interface ApiContext {
   readonly urls: { readonly first: string; readonly second: string };
@@ -102,6 +103,7 @@ const GET_HANDLERS: Readonly<Record<string, Handler>> = {
   "/api/large": large,
   "/api/secret": secret,
   "/api/cookies": cookies,
+  "/api/session": handleSession,
   "/api/cached": (response) =>
     send(response, 200, JSON.stringify({ cached: true }), {
       "Content-Type": "application/json; charset=utf-8",
