@@ -144,3 +144,27 @@ test("WebSocket frames are recorded both ways, with their encoding and truncatio
       }),
     ]);
 });
+
+test("server-sent events are recorded with their name, id, and truncation", async ({
+  app,
+  captured,
+}) => {
+  const page = await app.open("network");
+  expect(await networkResult(page, "events")).toBe("3 events");
+  const messages = () =>
+    captured.events
+      .filter((event) => event.category === "network" && event.type === "eventsource-message")
+      .map(({ payload }) => payload);
+  await expect.poll(() => messages().length).toBe(3);
+  const long = "y".repeat(LONG_FRAME_LENGTH);
+  expect(messages()).toEqual([
+    expect.objectContaining({ eventName: "message", data: "hello fixture", truncated: false }),
+    expect.objectContaining({ eventName: "tick", eventId: "7", data: "tock", truncated: false }),
+    expect.objectContaining({
+      eventName: "message",
+      data: long.slice(0, MAX_FRAME_PAYLOAD_LENGTH),
+      size: LONG_FRAME_LENGTH,
+      truncated: true,
+    }),
+  ]);
+});

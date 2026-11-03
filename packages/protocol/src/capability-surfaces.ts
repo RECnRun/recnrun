@@ -76,10 +76,10 @@ export const SURFACE_CAPABILITIES: Surface[] = [
     surface: "websocket-sse",
     level: "normal",
     title: "Server-sent events",
-    status: "planned",
+    status: "implemented",
     phase: "F3.1",
     notes:
-      "Captured only when Chrome reports them; long-lived streams are bounded by volume limits.",
+      "Delivered by F3.1; tests/browser/network.spec.ts records each event of an EventSource stream with its name, id, size, and data clipped and flagged truncated. Captured only when Chrome reports them.",
   },
   {
     kind: "surface",

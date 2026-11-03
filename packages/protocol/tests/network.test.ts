@@ -49,6 +49,14 @@ const frame = {
   size: 5,
   truncated: false,
 };
+const sse = {
+  requestId: "E1",
+  eventName: "tick",
+  eventId: "1",
+  data: "hello",
+  size: 5,
+  truncated: false,
+};
 const response = { requestId: "R", url: "u", status: 200, statusText: "", mimeType: "" };
 
 const VALID: [string, ReturnType<typeof network>][] = [
@@ -112,6 +120,16 @@ const VALID: [string, ReturnType<typeof network>][] = [
   ],
   ["a WebSocket error", network("websocket-error", { requestId: "W1", errorMessage: "boom" })],
   ["a WebSocket close", network("websocket-closed", { requestId: "W1" })],
+  ["a server-sent event", network("eventsource-message", sse)],
+  [
+    "a truncated server-sent event",
+    network("eventsource-message", {
+      ...sse,
+      data: "x".repeat(MAX_FRAME_PAYLOAD_LENGTH),
+      size: 9000,
+      truncated: true,
+    }),
+  ],
 ];
 
 const body = (blob: Record<string, unknown>, condition = "captured") =>
@@ -147,6 +165,14 @@ describe("network evidence", () => {
     [
       "a frame past the inline cap",
       network("websocket-frame", { ...frame, payload: "x".repeat(MAX_FRAME_PAYLOAD_LENGTH + 1) }),
+    ],
+    [
+      "a server-sent event past the inline cap",
+      network("eventsource-message", { ...sse, data: "x".repeat(MAX_FRAME_PAYLOAD_LENGTH + 1) }),
+    ],
+    [
+      "a server-sent event without its size",
+      network("eventsource-message", { ...sse, size: undefined }),
     ],
   ])("rejects %s", (_name, event) => {
     expect(v.is(CapturedEventSchema, event)).toBe(false);

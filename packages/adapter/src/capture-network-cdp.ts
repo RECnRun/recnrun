@@ -56,6 +56,13 @@ export const WebSocketFrameSchema = v.object({
 
 export const WebSocketErrorSchema = v.object({ requestId: v.string(), errorMessage: v.string() });
 
+export const EventSourceMessageSchema = v.object({
+  requestId: v.string(),
+  eventName: v.string(),
+  eventId: v.string(),
+  data: v.string(),
+});
+
 export const network = (type: string, payload: Record<string, unknown>): Draft => ({
   category: "network",
   type,

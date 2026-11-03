@@ -30,6 +30,7 @@ const STREAM_INTERVAL_MS = 300;
 const SLOW_STREAM_INTERVAL_MS = 1_500;
 const MAX_LARGE_BYTES = 4 * 1024 * 1024;
 const LARGE_PATTERN = "0123456789abcdef";
+const LONG_EVENT_LENGTH = 5_000;
 
 const failCase = (url: URL) => url.searchParams.get("fail") ?? "";
 
@@ -52,6 +53,15 @@ function large(response: ServerResponse, url: URL): void {
   const bytes = Math.min(Math.max(Number(url.searchParams.get("bytes")) || 0, 0), MAX_LARGE_BYTES);
   const body = LARGE_PATTERN.repeat(Math.ceil(bytes / LARGE_PATTERN.length)).slice(0, bytes);
   send(response, 200, body, { "Content-Type": "text/plain; charset=utf-8" });
+}
+
+// A long `retry` keeps EventSource from reconnecting at once after the stream ends.
+function events(response: ServerResponse): void {
+  startStream(response, "text/event-stream");
+  const long = "y".repeat(LONG_EVENT_LENGTH);
+  response.end(
+    `retry: 60000\n\ndata: hello fixture\n\nevent: tick\nid: 7\ndata: tock\n\ndata: ${long}\n\n`,
+  );
 }
 
 // Sensitive values in both directions; the body only says whether credentials arrived.
@@ -77,6 +87,7 @@ const GET_HANDLERS: Readonly<Record<string, Handler>> = {
   "/api/cacheable": (response, _url, context) =>
     sendJson(response, 200, { serial: context.nextSerial() }),
   "/api/stream": stream,
+  "/api/events": events,
   "/api/large": large,
   "/api/secret": secret,
   "/api/cached": (response) =>

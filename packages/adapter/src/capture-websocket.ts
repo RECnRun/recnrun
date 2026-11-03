@@ -2,6 +2,7 @@ import { MAX_FRAME_PAYLOAD_LENGTH } from "@recnrun/protocol";
 import * as v from "valibot";
 import type { Draft } from "./capture-envelope.ts";
 import {
+  EventSourceMessageSchema,
   network,
   RequestIdSchema,
   WebSocketCreatedSchema,
@@ -30,6 +31,20 @@ function frame(direction: "sent" | "received", params: unknown): Draft | undefin
   });
 }
 
+function eventSourceMessage(params: unknown): Draft | undefined {
+  const parsed = v.safeParse(EventSourceMessageSchema, params);
+  if (!parsed.success) return undefined;
+  const { requestId, eventName, eventId, data } = parsed.output;
+  return network("eventsource-message", {
+    requestId,
+    eventName,
+    eventId,
+    data: data.slice(0, MAX_FRAME_PAYLOAD_LENGTH),
+    size: data.length,
+    truncated: data.length > MAX_FRAME_PAYLOAD_LENGTH,
+  });
+}
+
 function handshake(params: unknown, sensitive: ReadonlySet<string>): Draft | undefined {
   const parsed = v.safeParse(WebSocketHandshakeSchema, params);
   if (!parsed.success) return undefined;
@@ -48,8 +63,8 @@ function simple(type: string, schema: v.GenericSchema, params: unknown): Draft |
   return parsed.success ? network(type, parsed.output as Record<string, unknown>) : undefined;
 }
 
-/** The event of one CDP WebSocket notification, or undefined for one capture does not record. */
-export function webSocketDraft(
+/** The event of one CDP WebSocket or EventSource notification, or undefined for one capture does not record. */
+export function streamDraft(
   method: string,
   params: unknown,
   sensitive: ReadonlySet<string>,
@@ -67,6 +82,8 @@ export function webSocketDraft(
       return simple("websocket-error", WebSocketErrorSchema, params);
     case "Network.webSocketClosed":
       return simple("websocket-closed", RequestIdSchema, params);
+    case "Network.eventSourceMessageReceived":
+      return eventSourceMessage(params);
     default:
       return undefined;
   }

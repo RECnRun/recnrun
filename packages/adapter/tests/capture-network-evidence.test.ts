@@ -229,6 +229,38 @@ test("WebSocket frames are recorded both ways, with encoding and truncation flag
   ]);
 });
 
+test("server-sent events are recorded with their name, id, and truncation flagged", async () => {
+  const { channel, handle, payloads } = await page();
+  const long = "B".repeat(MAX_FRAME_PAYLOAD_LENGTH + 2);
+  const message = (eventName: string, eventId: string, data: string) =>
+    channel.emit(
+      "Network.eventSourceMessageReceived",
+      { requestId: "E1", timestamp: 1, eventName, eventId, data },
+      "S1",
+    );
+  message("message", "", "hello");
+  message("tick", "7", long);
+  await handle.settled();
+  expect(payloads("eventsource-message")).toEqual([
+    {
+      requestId: "E1",
+      eventName: "message",
+      eventId: "",
+      data: "hello",
+      size: 5,
+      truncated: false,
+    },
+    {
+      requestId: "E1",
+      eventName: "tick",
+      eventId: "7",
+      data: long.slice(0, MAX_FRAME_PAYLOAD_LENGTH),
+      size: long.length,
+      truncated: true,
+    },
+  ]);
+});
+
 test("malformed WebSocket notifications and unknown Network methods record nothing", async () => {
   const { channel, handle, of } = await page();
   for (const method of [
@@ -236,6 +268,7 @@ test("malformed WebSocket notifications and unknown Network methods record nothi
     "Network.webSocketHandshakeResponseReceived",
     "Network.webSocketFrameSent",
     "Network.webSocketClosed",
+    "Network.eventSourceMessageReceived",
     "Network.dataReceived",
   ])
     channel.emit(method, { requestId: 7 }, "S1");

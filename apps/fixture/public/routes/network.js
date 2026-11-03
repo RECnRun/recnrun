@@ -36,6 +36,7 @@ async function stream() {
 
 const LARGE_BYTES = 200_000;
 const LONG_FRAME_LENGTH = 5_000;
+const SSE_EVENTS = 3;
 
 async function large() {
   const text = await (await fetch(`/api/large?bytes=${LARGE_BYTES}`)).text();
@@ -83,6 +84,25 @@ async function frames() {
   return `${echoed.length} frames echoed`;
 }
 
+function events() {
+  return new Promise((resolve, reject) => {
+    const source = new EventSource("/api/events");
+    const received = [];
+    const take = (event) => {
+      received.push(event.data);
+      if (received.length < SSE_EVENTS) return;
+      source.close();
+      resolve(`${received.length} events`);
+    };
+    source.addEventListener("message", take);
+    source.addEventListener("tick", take);
+    source.addEventListener("error", () => {
+      source.close();
+      reject(new Error("EventSource failed"));
+    });
+  });
+}
+
 async function websocket() {
   const [reply] = await echo(["hello fixture"]);
   return `echo: ${reply}`;
@@ -100,6 +120,7 @@ const CASES = {
   cached,
   abort,
   frames,
+  events,
 };
 
 async function run(name, request) {

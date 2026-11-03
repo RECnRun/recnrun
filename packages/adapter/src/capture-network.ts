@@ -17,7 +17,7 @@ import {
   timingOf,
   type BodySink,
 } from "./capture-network-evidence.ts";
-import { webSocketDraft } from "./capture-websocket.ts";
+import { streamDraft } from "./capture-websocket.ts";
 
 /** What one session's network capture needs from the capture around it. */
 export interface NetworkSession {
@@ -73,7 +73,7 @@ export class NetworkCapture {
     else if (method === "Network.loadingFailed") this.failed(params);
     else if (method === "Network.requestServedFromCache") this.servedFromCache(params);
     else {
-      const draft = webSocketDraft(method, params, this.session.sensitive);
+      const draft = streamDraft(method, params, this.session.sensitive);
       if (draft) this.session.emit(draft, null);
     }
   }

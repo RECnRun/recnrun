@@ -125,7 +125,18 @@ export const WebSocketFramePayloadSchema = v.strictObject({
   truncated: v.boolean(),
 });
 
-/** The network events of the capture: HTTP requests with their bodies, and WebSocket frames. */
+/** One server-sent event, its data clipped to `MAX_FRAME_PAYLOAD_LENGTH` and flagged when it was. */
+export const EventSourceMessagePayloadSchema = v.strictObject({
+  requestId,
+  eventName: v.string(),
+  eventId: v.string(),
+  data: v.pipe(v.string(), v.maxLength(MAX_FRAME_PAYLOAD_LENGTH)),
+  // The whole data's length in characters, as Chrome delivered it.
+  size: CountSchema,
+  truncated: v.boolean(),
+});
+
+/** The network events of the capture: HTTP requests with their bodies, WebSocket frames, and server-sent events. */
 export const NetworkEventSchema = v.variant("type", [
   typedEvent(
     "network",
@@ -175,6 +186,7 @@ export const NetworkEventSchema = v.variant("type", [
   typedEvent("network", "websocket-frame", WebSocketFramePayloadSchema),
   typedEvent("network", "websocket-error", v.strictObject({ requestId, errorMessage: v.string() })),
   typedEvent("network", "websocket-closed", v.strictObject({ requestId })),
+  typedEvent("network", "eventsource-message", EventSourceMessagePayloadSchema),
 ]);
 
 export type BodyCondition = v.InferOutput<typeof BodyConditionSchema>;
@@ -183,4 +195,5 @@ export type BodyRef = v.InferOutput<typeof BodyRefSchema>;
 export type BodyEncoding = BodyRef["encoding"];
 export type CacheState = v.InferOutput<typeof CacheStateSchema>;
 export type ResourceTiming = v.InferOutput<typeof ResourceTimingSchema>;
+export type EventSourceMessagePayload = v.InferOutput<typeof EventSourceMessagePayloadSchema>;
 export type WebSocketFramePayload = v.InferOutput<typeof WebSocketFramePayloadSchema>;

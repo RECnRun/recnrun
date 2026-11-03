@@ -135,6 +135,18 @@ describe("network evidence", () => {
     expect(await response.json()).toEqual({ cached: true });
   });
 
+  test("streams three server-sent events, a named one and a long one among them", async () => {
+    const response = await get("/api/events");
+    expect(response.headers.get("content-type")).toBe("text/event-stream");
+    const text = await response.text();
+    expect(text.split("\n\n").filter(Boolean)).toEqual([
+      "retry: 60000",
+      "data: hello fixture",
+      "event: tick\nid: 7\ndata: tock",
+      `data: ${"y".repeat(5_000)}`,
+    ]);
+  });
+
   test("drops the connection of the abort route without answering", async () => {
     await expect(get("/api/abort")).rejects.toThrow();
   });
