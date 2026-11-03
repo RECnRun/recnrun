@@ -19,6 +19,7 @@ const DISCOVERY_LABELS = {
   "missing-file": "Not found",
   "malformed-file": "Unreadable",
   "stale-file": "Not answering",
+  "unreadable-file": "Blocked",
 } as const;
 
 type Doctor = {
@@ -50,7 +51,8 @@ function Connection({ chrome }: { chrome: DiscoveryResult }) {
       <p>
         <Badge tone="danger">{DISCOVERY_LABELS[chrome.code]}</Badge> {chrome.remedy}
       </p>
-      <p>{REMOTE_DEBUGGING_GUIDANCE}</p>
+      {/* A blocked read says nothing about remote debugging; the remedy already names the fix. */}
+      {chrome.code === "unreadable-file" ? null : <p>{REMOTE_DEBUGGING_GUIDANCE}</p>}
     </>
   );
 }

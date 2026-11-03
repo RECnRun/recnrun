@@ -64,7 +64,7 @@
           "additionalProperties": false,
           "properties": {
             "code": {
-              "enum": ["missing-file", "malformed-file", "stale-file"],
+              "enum": ["missing-file", "malformed-file", "stale-file", "unreadable-file"],
               "type": "string"
             },
             "ok": {
@@ -132,7 +132,7 @@
           "type": "string"
         },
         "state": {
-          "enum": ["found", "not-found", "malformed", "stale"],
+          "enum": ["found", "not-found", "malformed", "stale", "unreadable"],
           "type": "string"
         }
       },

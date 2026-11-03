@@ -23,6 +23,11 @@ test("accepts a found endpoint and a failure with its remedy", () => {
   expect(v.parse(DiscoveryResultSchema, failed)).toEqual(failed);
 });
 
+test("accepts a DevToolsActivePort the operating system refuses to let RECnRun read", () => {
+  const blocked = { ...failed, code: "unreadable-file" };
+  expect(v.parse(DiscoveryResultSchema, blocked)).toEqual(blocked);
+});
+
 test.each([
   ["a remote host", { ...found, wsEndpoint: "ws://example.test:9222/devtools/browser/abc" }],
   ["a port out of range", { ...found, port: 70_000 }],

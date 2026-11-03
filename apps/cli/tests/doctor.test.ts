@@ -72,6 +72,7 @@ test("no Chrome is not ok, reports not-found, and every binding is stale", async
 test.each([
   ["malformed-file", "malformed"],
   ["stale-file", "stale"],
+  ["unreadable-file", "unreadable"],
 ] as const)("a %s discovery is reported as %s", async (code, state) => {
   const report = await assembleReport(
     probes({ health: async () => ({ serviceVersion: "0.0.0", chrome: { ...missing, code } }) }),

@@ -5,7 +5,13 @@ import { NonEmptyStringSchema } from "./common.ts";
 export const CHROME_CHANNELS = ["stable", "beta", "dev", "canary"] as const;
 
 /** Why discovery found no endpoint; each failure carries a remedy for the user. */
-export const DISCOVERY_ERROR_CODES = ["missing-file", "malformed-file", "stale-file"] as const;
+export const DISCOVERY_ERROR_CODES = [
+  "missing-file",
+  "malformed-file",
+  "stale-file",
+  // The operating system refused the read (macOS app-data protection), so the file may be fine.
+  "unreadable-file",
+] as const;
 
 export const ChromeChannelSchema = v.picklist(CHROME_CHANNELS);
 

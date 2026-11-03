@@ -21,6 +21,15 @@ test("accepts a report of a machine with no Chrome", () => {
   expect(parseDoctorReport(report)).toEqual({ ok: true, value: report });
 });
 
+test("accepts a DevToolsActivePort the operating system blocks, as unreadable", () => {
+  const blocked = {
+    ...report,
+    chrome: { ...report.chrome, code: "unreadable-file" },
+    remoteDebugging: { ...report.remoteDebugging, state: "unreadable" },
+  };
+  expect(parseDoctorReport(blocked)).toEqual({ ok: true, value: blocked });
+});
+
 test("accepts a bindings file that cannot be read, with its reason", () => {
   const broken = { ...report, bindings: { ...report.bindings, error: "not JSON" } };
   expect(parseDoctorReport(broken).ok).toBe(true);

@@ -27,6 +27,7 @@ const DISCOVERY_STATES = {
   "missing-file": "not-found",
   "malformed-file": "malformed",
   "stale-file": "stale",
+  "unreadable-file": "unreadable",
 } as const;
 
 function remoteDebugging(chrome: DiscoveryResult): DoctorReport["remoteDebugging"] {

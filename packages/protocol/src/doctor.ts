@@ -4,8 +4,14 @@ import { CountSchema, NonEmptyStringSchema } from "./common.ts";
 import { DiscoveryResultSchema } from "./discovery.ts";
 import { SchemaVersionSchema } from "./version.ts";
 
-/** What `DevToolsActivePort` says: absent, unreadable, pointing at a dead port, or usable. */
-export const REMOTE_DEBUGGING_STATES = ["found", "not-found", "malformed", "stale"] as const;
+/** What `DevToolsActivePort` says: absent, malformed, pointing at a dead port, blocked by the OS, or usable. */
+export const REMOTE_DEBUGGING_STATES = [
+  "found",
+  "not-found",
+  "malformed",
+  "stale",
+  "unreadable",
+] as const;
 
 /** `recnrun doctor --json`: the state of the machine as RECnRun needs it. */
 export const DoctorReportSchema = v.strictObject({

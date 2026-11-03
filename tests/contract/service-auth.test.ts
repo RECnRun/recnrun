@@ -68,6 +68,26 @@ test("health answers with the version, pid, uptime, and Chrome discovery", async
   });
 });
 
+test("health carries a DevToolsActivePort the operating system blocks, not internal", async () => {
+  const blocked = {
+    ...NO_CHROME,
+    code: "unreadable-file" as const,
+    remedy:
+      "macOS blocks reading /Users/ana/Library/Application Support/Google/Chrome/DevToolsActivePort.",
+  };
+  const other = await tempHome();
+  const started = await startService({ home: other, discover: async () => blocked });
+  if (started.reused) throw new Error("unexpected reuse");
+  try {
+    const response = await command(started.service, health);
+    expect(response.status).toBe(200);
+    expect(response.json).toMatchObject({ ok: true, result: { chrome: blocked } });
+  } finally {
+    await started.service.stop();
+    await rm(other, { recursive: true, force: true });
+  }
+});
+
 test("capabilities.get returns the protocol's capability matrix", async () => {
   const request = { requestId: "r-2", command: "capabilities.get", params: {} };
   expect((await command(service, request)).json).toEqual({

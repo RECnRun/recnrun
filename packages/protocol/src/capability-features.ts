@@ -160,7 +160,7 @@ export const FEATURE_CAPABILITIES: Feature[] = [
     "cli-local",
     "F2.7",
     "CLI: open, run, doctor",
-    "Delivered by F2.7; tests/contract/cli.test.ts runs the real recnrun binary on a temporary home: open starts or reuses the service and prints the UI URL, doctor --json reports Chrome, DevToolsActivePort, bindings, disk, and versions (exit 1 without Chrome), and run prints one JSON summary with exit 0, 1, or 2 for passed, failed, and error. The replay itself is F2.5.",
+    "Delivered by F2.7; tests/contract/cli.test.ts runs the real recnrun binary on a temporary home: open starts or reuses the service and prints the UI URL, doctor --json reports Chrome, DevToolsActivePort (found, not-found, malformed, stale, or unreadable when the operating system blocks the read), bindings, disk, and versions (exit 1 without Chrome), and run prints one JSON summary with exit 0, 1, or 2 for passed, failed, and error. The replay itself is F2.5.",
   ),
   implemented(
     "service-session",

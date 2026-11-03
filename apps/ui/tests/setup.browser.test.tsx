@@ -21,6 +21,14 @@ const MISSING: DiscoveryResult = {
   userDataDir: "/home/ana/.config/google-chrome",
 };
 
+const BLOCKED: DiscoveryResult = {
+  ok: false,
+  code: "unreadable-file",
+  remedy:
+    "macOS blocks reading /Users/ana/Library/Application Support/Google/Chrome/DevToolsActivePort.",
+  userDataDir: "/Users/ana/Library/Application Support/Google/Chrome",
+};
+
 function binding(name: string, wsEndpoint: string) {
   const description = { userDataDir: "/u", browserContextIds: [], chrome: "Chrome/156.0" };
   return { name, ...description, wsEndpoint, createdAt: NOW, lastSeenAt: NOW };
@@ -65,6 +73,15 @@ test("guides the user to enable remote debugging when Chrome is missing", async 
   await expect.element(bindings.getByText("Fresh")).not.toBeInTheDocument();
   await page.getByRole("button", { name: "Check again" }).click();
   await expect.poll(() => fake.paramsOf("health")).toHaveLength(2);
+});
+
+test("explains a DevToolsActivePort macOS blocks instead of asking to enable remote debugging", async () => {
+  renderWith(doctor(BLOCKED).api, <Setup />);
+  const chrome = page.getByRole("region", { name: "Chrome" });
+  await expectTexts(chrome, "Blocked", BLOCKED.ok ? "" : BLOCKED.remedy);
+  await expect.element(chrome.getByText(REMOTE_DEBUGGING_GUIDANCE)).not.toBeInTheDocument();
+  await expect.element(page.getByRole("alert")).not.toBeInTheDocument();
+  await expect.element(page.getByRole("button", { name: "Check again" })).toBeVisible();
 });
 
 test("shows an empty state without bindings", async () => {
