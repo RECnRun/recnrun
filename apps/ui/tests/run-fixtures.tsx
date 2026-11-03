@@ -23,7 +23,7 @@ export const FLOW = {
   steps: [{ id: "open", action: "navigate", url: "http://localhost:4600/login" }],
 } as Flow;
 
-export const MANIFEST: FlowManifest = {
+const MANIFEST: FlowManifest = {
   schemaVersion: 1,
   id: "login",
   name: "Log in",

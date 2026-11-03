@@ -14,7 +14,7 @@ import {
 } from "./wait.ts";
 
 /** The run problem of a declared check that did not hold: no step runs, every step is blocked. */
-export const PRECONDITION_FAILED = "precondition-failed";
+const PRECONDITION_FAILED = "precondition-failed";
 
 interface Check {
   readonly driver: ReplayDriver;
