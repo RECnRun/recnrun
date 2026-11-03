@@ -1,10 +1,13 @@
 import { existsSync, lstatSync, realpathSync } from "node:fs";
-import { mkdir } from "node:fs/promises";
+import { lstat, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { isAbsolute, join, sep } from "node:path";
+import { basename, dirname, isAbsolute, join, sep } from "node:path";
 
 /** The only folder host runs may use for Chrome roots (POC PLAN.md §8). */
 export const HOST_FOLDER = join(homedir(), "Documents", "RECnRun", "poc-downloads-launcher");
+
+/** The file every host root holds with its run id; teardown deletes only roots that hold it. */
+export const ROOT_MARKER = ".recnrun-host-root";
 
 const SAFE_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 
@@ -43,7 +46,35 @@ export function hostRoots(
   return requireInside(value, folder);
 }
 
-/** Creates `<roots>/roots/<runId>/<name>/` and checks it is still inside `folder` once created. */
+/** `parent/segment` as a real folder, created when missing; a symlink in its place is refused. */
+async function childFolder(parent: string, segment: string, folder: string): Promise<string> {
+  const path = join(parent, segment);
+  if (!existsSync(path)) await mkdir(path);
+  const real = requireInside(path, folder);
+  if (real !== path)
+    throw new Error(`${path} is a symlink to ${real}; host roots never go through one.`);
+  return real;
+}
+
+/** Creates `<parent>/<name>` exclusively, so a root is never an existing folder or a planted symlink. */
+async function freshFolder(parent: string, name: string): Promise<string> {
+  const path = join(parent, name);
+  try {
+    await mkdir(path);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+    throw new Error(`${path} already exists; every host root starts fresh.`);
+  }
+  if (realpathSync(path) !== path || dirname(path) !== parent) {
+    throw new Error(`${path} is not a folder of its own below ${parent}.`);
+  }
+  return path;
+}
+
+/**
+ * Creates `<roots>/roots/<runId>/<name>/` fresh, strictly below the run folder, and marks it with
+ * the run id so teardown deletes only roots this run created.
+ */
 export async function rootFor(
   roots: string,
   runId: string,
@@ -53,12 +84,38 @@ export async function rootFor(
   for (const segment of [runId, name]) {
     if (!SAFE_NAME.test(segment)) throw new Error(`Unsafe root name segment: ${segment}`);
   }
-  let path = hostRoots(roots, folder);
+  let parent = hostRoots(roots, folder);
   // One level at a time, so a symlink planted on the way is refused before anything is written through it.
-  for (const segment of ["roots", runId, name]) {
-    path = join(path, segment);
-    if (!existsSync(path)) await mkdir(path);
-    path = requireInside(path, folder);
+  for (const segment of ["roots", runId]) parent = await childFolder(parent, segment, folder);
+  const root = await freshFolder(parent, name);
+  await writeFile(join(root, ROOT_MARKER), runId, { flag: "wx" });
+  return root;
+}
+
+async function markerOf(root: string): Promise<string | undefined> {
+  const marker = join(root, ROOT_MARKER);
+  const entry = await lstat(marker).catch(() => undefined);
+  return entry?.isFile() ? readFile(marker, "utf8") : undefined;
+}
+
+/** Deletes a root only when it is a real folder `roots/<runId>/<name>` holding this run's marker. */
+export async function removeHostRoot(
+  root: string,
+  runId: string,
+  folder: string = HOST_FOLDER,
+): Promise<void> {
+  const entry = await lstat(root);
+  if (entry.isSymbolicLink() || !entry.isDirectory()) {
+    throw new Error(`${root} is a symlink or not a folder; refusing to delete it.`);
   }
-  return path;
+  const real = requireInside(root, folder);
+  const run = dirname(real);
+  if (real !== root || basename(run) !== runId || basename(dirname(run)) !== "roots") {
+    throw new Error(`${root} is not a root of run ${runId}; refusing to delete it.`);
+  }
+  if ((await markerOf(root)) !== runId) {
+    throw new Error(`${root} has no ${ROOT_MARKER} marker of run ${runId}; refusing to delete it.`);
+  }
+  // Chrome's helper processes can still hold files for a moment after the browser exits.
+  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 }

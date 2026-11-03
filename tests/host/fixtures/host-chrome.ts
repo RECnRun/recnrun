@@ -1,4 +1,4 @@
-import { readFile, rm, rmdir } from "node:fs/promises";
+import { readFile, rmdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { test as base } from "@playwright/test";
@@ -9,7 +9,7 @@ import { EXTENSION_PATH, loadUnpacked } from "../../browser/fixtures/extension-l
 import type { LoadedExtension } from "../../browser/fixtures/extension-loaders.ts";
 import { CHROME_BINARY, evidence, hostRunId, requireHost } from "./host-env.ts";
 import type { Evidence } from "./host-env.ts";
-import { rootFor } from "./roots.ts";
+import { removeHostRoot, rootFor } from "./roots.ts";
 
 export { expect } from "@playwright/test";
 
@@ -48,11 +48,10 @@ function rootName(method: string, headless: boolean, testInfo: TestInfo): string
 
 const newRoot = (name: string): Promise<string> => rootFor(requireHost(), hostRunId(), name);
 
-/** Deletes the root and its run folder once empty, unless RECNRUN_HOST_KEEP_ROOTS=1. */
+/** Deletes this run's marked root and its run folder once empty, unless RECNRUN_HOST_KEEP_ROOTS=1. */
 async function removeRoot(root: string): Promise<void> {
   if (process.env.RECNRUN_HOST_KEEP_ROOTS === "1") return;
-  // Chrome's helper processes can still hold files for a moment after the browser exits.
-  await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+  await removeHostRoot(root, hostRunId());
   await rmdir(dirname(root)).catch(() => undefined);
 }
 
