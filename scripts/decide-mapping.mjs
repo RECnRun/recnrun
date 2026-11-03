@@ -35,6 +35,7 @@ export const NOT_MAPPED = {
 const SW = "serviceWorker";
 
 // Keys are "E<n>/<hypothesis>" or "E<n>/<hypothesis>/<variant>" (a trailing * matches a prefix).
+// A third element "supporting" keeps a measurement in the evidence table but out of the cells.
 const BY_ROUTE = {
   A: {
     [`${SW}.first`]: [
@@ -70,7 +71,11 @@ const BY_ROUTE = {
       ["E3/pre-existing-running", "a worker already running when Route A arrives"],
       ["E4/close-target", "Target.closeTarget stops the worker; the restart must be caught"],
       ["E4/terminate-execution", "Runtime.terminateExecution is refused to untrusted clients"],
-      ["E4/debugger-pause", "a pause holds the worker without stopping it"],
+      [
+        "E4/debugger-pause",
+        "a pause holds the worker without stopping it; it proves no restart was caught",
+        "supporting",
+      ],
       ["E4/dnr-block-evict", "a DNR block does not evict a running worker"],
       ["E4/unregister", "unregister() leaves the target listed"],
       ["E8/b-restart", "without CDP a reload after closeTarget restarts the worker marked"],
@@ -82,7 +87,11 @@ const BY_ROUTE = {
   B: {
     [`${SW}.first`]: [
       ["E5/first", "the main script is fulfilled with the wrapper on the first registration"],
-      ["E5/imports", "importScripts and static imports pause on the worker session"],
+      [
+        "E5/imports",
+        "importScripts and static imports pause on the worker session; interception, not isolation",
+        "supporting",
+      ],
       ["E5/imports-transform", "imports fulfilled too"],
       ["E5/tab-session-main-script", "the main script never pauses on the tab session"],
       ["E6/a-switch", "a slot switch without rewriting the stored script"],
@@ -128,9 +137,9 @@ const BY_ROUTE = {
 /** One flat row per mapped hypothesis. */
 export const MAPPING = Object.entries(BY_ROUTE).flatMap(([route, capabilities]) =>
   Object.entries(capabilities).flatMap(([capability, rows]) =>
-    rows.map(([key, reason]) => {
+    rows.map(([key, reason, label]) => {
       const [experiment, hypothesis, variant] = key.split("/");
-      return { experiment, hypothesis, variant, capability, route, reason };
+      return { experiment, hypothesis, variant, capability, route, reason, label };
     }),
   ),
 );

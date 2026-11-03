@@ -31,73 +31,73 @@ Chrome: Google Chrome 156.0.8078.79 (73 verdicts); Google Chrome for Testing 156
 
 **Which route passed, per capability**
 
-| Capability            | Route A                               | Route B                | Route C                       |
-| --------------------- | ------------------------------------- | ---------------------- | ----------------------------- |
-| page                  | not tested                            | not tested             | mixed (3 pass, 3 unavailable) |
-| dedicated             | mixed (1 pass, 2 fail, 1 unavailable) | pass (3)               | fail (1)                      |
-| shared                | fail (1)                              | pass (3)               | fail (2)                      |
-| serviceWorker.first   | mixed (2 pass, 2 fail)                | mixed (1 pass, 2 fail) | not tested                    |
-| serviceWorker.update  | not tested                            | fail (2)               | not tested                    |
-| serviceWorker.cold    | mixed (2 pass, 6 fail)                | pass (1)               | not tested                    |
-| serviceWorker.offline | not tested                            | fail (2)               | not tested                    |
-| serviceWorker.wake    | unavailable (1)                       | not tested             | not tested                    |
+| Capability            | Route A                               | Route B    | Route C                       |
+| --------------------- | ------------------------------------- | ---------- | ----------------------------- |
+| page                  | not tested                            | not tested | mixed (3 pass, 3 unavailable) |
+| dedicated             | mixed (1 pass, 2 fail, 1 unavailable) | pass (3)   | fail (1)                      |
+| shared                | fail (1)                              | pass (3)   | fail (2)                      |
+| serviceWorker.first   | mixed (2 pass, 2 fail)                | fail (2)   | not tested                    |
+| serviceWorker.update  | not tested                            | fail (2)   | not tested                    |
+| serviceWorker.cold    | mixed (1 pass, 6 fail)                | pass (1)   | not tested                    |
+| serviceWorker.offline | not tested                            | fail (2)   | not tested                    |
+| serviceWorker.wake    | unavailable (1)                       | not tested | not tested                    |
 
 **Capabilities per route**
 
 | Route   | Pass | Mixed | Fail | Unavailable | Not tested |
 | ------- | ---- | ----- | ---- | ----------- | ---------- |
 | Route A | 0    | 3     | 1    | 1           | 3          |
-| Route B | 3    | 1     | 2    | 0           | 2          |
+| Route B | 3    | 0     | 3    | 0           | 2          |
 | Route C | 0    | 1     | 2    | 0           | 5          |
 
-**Evidence behind each cell** (diagnostic and control rows are not counted)
+**Evidence behind each cell** (diagnostic, control, and supporting rows are not counted)
 
-| Capability            | Route | Hypothesis                               | Verdict           | Spec                                               | Reason                                                                  |
-| --------------------- | ----- | ---------------------------------------- | ----------------- | -------------------------------------------------- | ----------------------------------------------------------------------- |
-| serviceWorker.first   | A     | E2 service-worker-register               | fail              | tests/experiments/E2-route-a-register.spec.ts      | auto-attach before register(); caches is undefined at the pause         |
-| serviceWorker.first   | A     | E3 before-script-execution [sw-*]        | pass              | tests/experiments/E3-route-a-cold.spec.ts          | armed tab, auto-attach and a breakpoint hold each worker                |
-| serviceWorker.first   | A     | E3 direct-attach-race [sw-*]             | fail              | tests/experiments/E3-route-a-cold.spec.ts          | attaching by target id as getTargets() lists it loses the race          |
-| serviceWorker.first   | A     | E8 a-cold-start                          | pass              | tests/experiments/E8-strict.spec.ts                | the same hold in Chrome without CDP, the isolator installed by policy   |
-| dedicated             | A     | E2 dedicated-worker                      | fail              | tests/experiments/E2-route-a-register.spec.ts      | auto-attach before the worker starts; caches is undefined at the pause  |
-| dedicated             | A     | E2 nested-worker                         | unavailable       | tests/experiments/E2-route-a-register.spec.ts      | the frozen fixture starts no worker from a worker                       |
-| dedicated             | A     | E3 before-script-execution [dedicated-*] | pass              | tests/experiments/E3-route-a-cold.spec.ts          | armed tab, auto-attach and a breakpoint hold each worker                |
-| dedicated             | A     | E3 direct-attach-race [dedicated-*]      | fail              | tests/experiments/E3-route-a-cold.spec.ts          | attaching by target id loses the race                                   |
-| shared                | A     | E2 shared-worker                         | fail              | tests/experiments/E2-route-a-register.spec.ts      | a tab session never auto-attaches shared workers (E1)                   |
-| serviceWorker.cold    | A     | E3 cold-start-navigation                 | fail              | tests/experiments/E3-route-a-cold.spec.ts          | a navigation restarts a worker the isolator stopped                     |
-| serviceWorker.cold    | A     | E3 pre-existing-running                  | fail              | tests/experiments/E3-route-a-cold.spec.ts          | a worker already running when Route A arrives                           |
-| serviceWorker.cold    | A     | E4 close-target                          | fail              | tests/experiments/E4-stop-restart.spec.ts          | Target.closeTarget stops the worker; the restart must be caught         |
-| serviceWorker.cold    | A     | E4 terminate-execution                   | fail              | tests/experiments/E4-stop-restart.spec.ts          | Runtime.terminateExecution is refused to untrusted clients              |
-| serviceWorker.cold    | A     | E4 debugger-pause                        | pass              | tests/experiments/E4-stop-restart.spec.ts          | a pause holds the worker without stopping it                            |
-| serviceWorker.cold    | A     | E4 dnr-block-evict                       | fail              | tests/experiments/E4-stop-restart.spec.ts          | a DNR block does not evict a running worker                             |
-| serviceWorker.cold    | A     | E4 unregister                            | fail              | tests/experiments/E4-stop-restart.spec.ts          | unregister() leaves the target listed                                   |
-| serviceWorker.cold    | A     | E8 b-restart                             | pass              | tests/experiments/E8-strict.spec.ts                | without CDP a reload after closeTarget restarts the worker marked       |
-| serviceWorker.wake    | A     | E3 wake-without-tab                      | unavailable       | tests/experiments/E3-route-a-cold.spec.ts          | a worker woken with no tab open is attached by watch                    |
-| serviceWorker.first   | B     | E5 first                                 | fail              | tests/experiments/E5-route-b-fetch.spec.ts         | the main script is fulfilled with the wrapper on the first registration |
-| serviceWorker.first   | B     | E5 imports                               | pass              | tests/experiments/E5-route-b-fetch.spec.ts         | importScripts and static imports pause on the worker session            |
-| serviceWorker.first   | B     | E5 imports-transform                     | pass (diagnostic) | tests/experiments/E5-route-b-fetch.spec.ts         | imports fulfilled too                                                   |
-| serviceWorker.first   | B     | E5 tab-session-main-script               | fail (diagnostic) | tests/experiments/E5-route-b-fetch.spec.ts         | the main script never pauses on the tab session                         |
-| serviceWorker.first   | B     | E6 a-switch                              | fail              | tests/experiments/E6-route-b-selection.spec.ts     | a slot switch without rewriting the stored script                       |
-| serviceWorker.update  | B     | E5 update                                | fail              | tests/experiments/E5-route-b-fetch.spec.ts         | the update check is not interceptable                                   |
-| serviceWorker.update  | B     | E6 b-update                              | fail              | tests/experiments/E6-route-b-selection.spec.ts     | the namespace survives update()                                         |
-| serviceWorker.cold    | B     | E6 restart                               | pass              | tests/experiments/E6-route-b-selection.spec.ts     | Chrome relaunched on the profile keeps the stored wrapper               |
-| serviceWorker.offline | B     | E5 offline                               | fail              | tests/experiments/E5-route-b-fetch.spec.ts         | a stopped worker restarts offline from the stored wrapper               |
-| serviceWorker.offline | B     | E5 fulfilled-worker-address-space        | fail (diagnostic) | tests/experiments/E5-route-b-fetch.spec.ts         | a fulfilled worker leaves from Unknown                                  |
-| serviceWorker.offline | B     | E6 a-offline                             | fail              | tests/experiments/E6-route-b-selection.spec.ts     | a slot switch while the fixture is offline                              |
-| dedicated             | B     | E6 c-workers [dedicated:*]               | pass              | tests/experiments/E6-route-b-selection.spec.ts     | the slot switch reaches dedicated workers                               |
-| dedicated             | B     | E6 suspend [dedicated:*]                 | pass              | tests/experiments/E6-route-b-selection.spec.ts     | dedicated workers survive a suspended background                        |
-| dedicated             | B     | E8 c-selection-workers [dedicated:*]     | pass              | tests/experiments/E8-strict.spec.ts                | the same switch in Chrome without CDP                                   |
-| shared                | B     | E6 c-workers [shared:*]                  | pass              | tests/experiments/E6-route-b-selection.spec.ts     | the slot switch reaches shared workers                                  |
-| shared                | B     | E6 suspend [shared:*]                    | pass              | tests/experiments/E6-route-b-selection.spec.ts     | shared workers survive a suspended background                           |
-| shared                | B     | E8 c-selection-workers [shared:*]        | pass              | tests/experiments/E8-strict.spec.ts                | the same switch in Chrome without CDP                                   |
-| page                  | C     | E7 page                                  | pass              | tests/experiments/E7-route-c-pages-workers.spec.ts | a registered content script marks the page before its first script      |
-| page                  | C     | E7 cross-site-iframe                     | pass              | tests/experiments/E7-route-c-pages-workers.spec.ts | a cross-site frame is marked only when its origin is registered         |
-| page                  | C     | E7 popup                                 | pass              | tests/experiments/E7-route-c-pages-workers.spec.ts | a popup is marked before its first script                               |
-| page                  | C     | E7 same-origin-iframe                    | unavailable       | tests/experiments/E7-route-c-pages-workers.spec.ts | not exercisable on the frozen fixture                                   |
-| page                  | C     | E7 about-blank-child                     | unavailable       | tests/experiments/E7-route-c-pages-workers.spec.ts | not exercisable on the frozen fixture                                   |
-| page                  | C     | E7 sandboxed-frame                       | unavailable       | tests/experiments/E7-route-c-pages-workers.spec.ts | not exercisable on the frozen fixture                                   |
-| dedicated             | C     | E7 dedicated-worker                      | fail              | tests/experiments/E7-route-c-pages-workers.spec.ts | Route C refuses new Worker() rather than wrap it                        |
-| shared                | C     | E7 shared-worker                         | fail              | tests/experiments/E7-route-c-pages-workers.spec.ts | Route C refuses new SharedWorker() rather than wrap it                  |
-| shared                | C     | E7 shared-worker-identity                | fail              | tests/experiments/E7-route-c-pages-workers.spec.ts | a blob wrapper splits one shared worker into two                        |
+| Capability            | Route | Hypothesis                               | Verdict           | Spec                                               | Reason                                                                                    |
+| --------------------- | ----- | ---------------------------------------- | ----------------- | -------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| serviceWorker.first   | A     | E2 service-worker-register               | fail              | tests/experiments/E2-route-a-register.spec.ts      | auto-attach before register(); caches is undefined at the pause                           |
+| serviceWorker.first   | A     | E3 before-script-execution [sw-*]        | pass              | tests/experiments/E3-route-a-cold.spec.ts          | armed tab, auto-attach and a breakpoint hold each worker                                  |
+| serviceWorker.first   | A     | E3 direct-attach-race [sw-*]             | fail              | tests/experiments/E3-route-a-cold.spec.ts          | attaching by target id as getTargets() lists it loses the race                            |
+| serviceWorker.first   | A     | E8 a-cold-start                          | pass              | tests/experiments/E8-strict.spec.ts                | the same hold in Chrome without CDP, the isolator installed by policy                     |
+| dedicated             | A     | E2 dedicated-worker                      | fail              | tests/experiments/E2-route-a-register.spec.ts      | auto-attach before the worker starts; caches is undefined at the pause                    |
+| dedicated             | A     | E2 nested-worker                         | unavailable       | tests/experiments/E2-route-a-register.spec.ts      | the frozen fixture starts no worker from a worker                                         |
+| dedicated             | A     | E3 before-script-execution [dedicated-*] | pass              | tests/experiments/E3-route-a-cold.spec.ts          | armed tab, auto-attach and a breakpoint hold each worker                                  |
+| dedicated             | A     | E3 direct-attach-race [dedicated-*]      | fail              | tests/experiments/E3-route-a-cold.spec.ts          | attaching by target id loses the race                                                     |
+| shared                | A     | E2 shared-worker                         | fail              | tests/experiments/E2-route-a-register.spec.ts      | a tab session never auto-attaches shared workers (E1)                                     |
+| serviceWorker.cold    | A     | E3 cold-start-navigation                 | fail              | tests/experiments/E3-route-a-cold.spec.ts          | a navigation restarts a worker the isolator stopped                                       |
+| serviceWorker.cold    | A     | E3 pre-existing-running                  | fail              | tests/experiments/E3-route-a-cold.spec.ts          | a worker already running when Route A arrives                                             |
+| serviceWorker.cold    | A     | E4 close-target                          | fail              | tests/experiments/E4-stop-restart.spec.ts          | Target.closeTarget stops the worker; the restart must be caught                           |
+| serviceWorker.cold    | A     | E4 terminate-execution                   | fail              | tests/experiments/E4-stop-restart.spec.ts          | Runtime.terminateExecution is refused to untrusted clients                                |
+| serviceWorker.cold    | A     | E4 debugger-pause                        | pass (supporting) | tests/experiments/E4-stop-restart.spec.ts          | a pause holds the worker without stopping it; it proves no restart was caught             |
+| serviceWorker.cold    | A     | E4 dnr-block-evict                       | fail              | tests/experiments/E4-stop-restart.spec.ts          | a DNR block does not evict a running worker                                               |
+| serviceWorker.cold    | A     | E4 unregister                            | fail              | tests/experiments/E4-stop-restart.spec.ts          | unregister() leaves the target listed                                                     |
+| serviceWorker.cold    | A     | E8 b-restart                             | pass              | tests/experiments/E8-strict.spec.ts                | without CDP a reload after closeTarget restarts the worker marked                         |
+| serviceWorker.wake    | A     | E3 wake-without-tab                      | unavailable       | tests/experiments/E3-route-a-cold.spec.ts          | a worker woken with no tab open is attached by watch                                      |
+| serviceWorker.first   | B     | E5 first                                 | fail              | tests/experiments/E5-route-b-fetch.spec.ts         | the main script is fulfilled with the wrapper on the first registration                   |
+| serviceWorker.first   | B     | E5 imports                               | pass (supporting) | tests/experiments/E5-route-b-fetch.spec.ts         | importScripts and static imports pause on the worker session; interception, not isolation |
+| serviceWorker.first   | B     | E5 imports-transform                     | pass (diagnostic) | tests/experiments/E5-route-b-fetch.spec.ts         | imports fulfilled too                                                                     |
+| serviceWorker.first   | B     | E5 tab-session-main-script               | fail (diagnostic) | tests/experiments/E5-route-b-fetch.spec.ts         | the main script never pauses on the tab session                                           |
+| serviceWorker.first   | B     | E6 a-switch                              | fail              | tests/experiments/E6-route-b-selection.spec.ts     | a slot switch without rewriting the stored script                                         |
+| serviceWorker.update  | B     | E5 update                                | fail              | tests/experiments/E5-route-b-fetch.spec.ts         | the update check is not interceptable                                                     |
+| serviceWorker.update  | B     | E6 b-update                              | fail              | tests/experiments/E6-route-b-selection.spec.ts     | the namespace survives update()                                                           |
+| serviceWorker.cold    | B     | E6 restart                               | pass              | tests/experiments/E6-route-b-selection.spec.ts     | Chrome relaunched on the profile keeps the stored wrapper                                 |
+| serviceWorker.offline | B     | E5 offline                               | fail              | tests/experiments/E5-route-b-fetch.spec.ts         | a stopped worker restarts offline from the stored wrapper                                 |
+| serviceWorker.offline | B     | E5 fulfilled-worker-address-space        | fail (diagnostic) | tests/experiments/E5-route-b-fetch.spec.ts         | a fulfilled worker leaves from Unknown                                                    |
+| serviceWorker.offline | B     | E6 a-offline                             | fail              | tests/experiments/E6-route-b-selection.spec.ts     | a slot switch while the fixture is offline                                                |
+| dedicated             | B     | E6 c-workers [dedicated:*]               | pass              | tests/experiments/E6-route-b-selection.spec.ts     | the slot switch reaches dedicated workers                                                 |
+| dedicated             | B     | E6 suspend [dedicated:*]                 | pass              | tests/experiments/E6-route-b-selection.spec.ts     | dedicated workers survive a suspended background                                          |
+| dedicated             | B     | E8 c-selection-workers [dedicated:*]     | pass              | tests/experiments/E8-strict.spec.ts                | the same switch in Chrome without CDP                                                     |
+| shared                | B     | E6 c-workers [shared:*]                  | pass              | tests/experiments/E6-route-b-selection.spec.ts     | the slot switch reaches shared workers                                                    |
+| shared                | B     | E6 suspend [shared:*]                    | pass              | tests/experiments/E6-route-b-selection.spec.ts     | shared workers survive a suspended background                                             |
+| shared                | B     | E8 c-selection-workers [shared:*]        | pass              | tests/experiments/E8-strict.spec.ts                | the same switch in Chrome without CDP                                                     |
+| page                  | C     | E7 page                                  | pass              | tests/experiments/E7-route-c-pages-workers.spec.ts | a registered content script marks the page before its first script                        |
+| page                  | C     | E7 cross-site-iframe                     | pass              | tests/experiments/E7-route-c-pages-workers.spec.ts | a cross-site frame is marked only when its origin is registered                           |
+| page                  | C     | E7 popup                                 | pass              | tests/experiments/E7-route-c-pages-workers.spec.ts | a popup is marked before its first script                                                 |
+| page                  | C     | E7 same-origin-iframe                    | unavailable       | tests/experiments/E7-route-c-pages-workers.spec.ts | not exercisable on the frozen fixture                                                     |
+| page                  | C     | E7 about-blank-child                     | unavailable       | tests/experiments/E7-route-c-pages-workers.spec.ts | not exercisable on the frozen fixture                                                     |
+| page                  | C     | E7 sandboxed-frame                       | unavailable       | tests/experiments/E7-route-c-pages-workers.spec.ts | not exercisable on the frozen fixture                                                     |
+| dedicated             | C     | E7 dedicated-worker                      | fail              | tests/experiments/E7-route-c-pages-workers.spec.ts | Route C refuses new Worker() rather than wrap it                                          |
+| shared                | C     | E7 shared-worker                         | fail              | tests/experiments/E7-route-c-pages-workers.spec.ts | Route C refuses new SharedWorker() rather than wrap it                                    |
+| shared                | C     | E7 shared-worker-identity                | fail              | tests/experiments/E7-route-c-pages-workers.spec.ts | a blob wrapper splits one shared worker into two                                          |
 
 **Not mapped to a capability**
 

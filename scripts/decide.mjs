@@ -199,7 +199,7 @@ export function decide(root, mapping = MAPPING) {
   const rows = mapping.map((row) => ({
     ...row,
     status: resultOf(verdicts, row).verdict,
-    label: resultOf(verdicts, row).label,
+    label: resultOf(verdicts, row).label ?? row.label,
     spec: SPECS[row.experiment] ?? "",
   }));
   const cells = grid(rows);
@@ -215,7 +215,7 @@ export function decide(root, mapping = MAPPING) {
     "",
     table(["Route", ...SUMMARY.map((s) => s[0].toUpperCase() + s.slice(1))], summaryRows(cells)),
     "",
-    "**Evidence behind each cell** (diagnostic and control rows are not counted)",
+    "**Evidence behind each cell** (diagnostic, control, and supporting rows are not counted)",
     "",
     table(["Capability", "Route", "Hypothesis", "Verdict", "Spec", "Reason"], evidenceRows(rows)),
     "",

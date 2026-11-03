@@ -95,6 +95,26 @@ test("shows a cell that mixes a pass and a fail as mixed, and skips diagnostics"
   assert.match(out, /\| page \| A \| E2 c \| fail \(diagnostic\) \|/);
 });
 
+test("keeps a supporting row out of the cells and says so in the evidence table", (context) => {
+  const root = tree(context, {
+    "E2.json": [verdict("E2", "a", "pass"), verdict("E2", "b", "pass")],
+  });
+  const rows = [pair[0], { ...pair[1], route: "A", label: "supporting" }];
+  const out = squash(decide(root, rows));
+  assert.match(out, /\| page \| pass \(1\) \| not tested \| not tested \|/);
+  assert.match(out, /\| page \| A \| E2 b \| pass \(supporting\) \|/);
+  assert.match(out, /diagnostic, control, and supporting rows are not counted/);
+});
+
+test("maps E4's pause and E5's imports as supporting rows, not capability passes", () => {
+  const labels = Object.fromEntries(
+    MAPPING.map((row) => [`${row.experiment}/${row.hypothesis}`, row.label]),
+  );
+  assert.equal(labels["E4/debugger-pause"], "supporting");
+  assert.equal(labels["E5/imports"], "supporting");
+  assert.equal(labels["E5/first"], undefined);
+});
+
 test("judges a variant group by its variants", (context) => {
   const variants = [
     { name: "sw-x", verdict: "pass" },
