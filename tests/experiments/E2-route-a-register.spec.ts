@@ -1,4 +1,3 @@
-import type { LoadedExtension } from "../browser/fixtures/extension.ts";
 import type { OriginInventory } from "../browser/observer/storage.ts";
 import { browserOf } from "./e1-aggregate.ts";
 import { evaluateSample, summarize, unavailable } from "./e2-samples.ts";
@@ -7,9 +6,10 @@ import {
   API,
   APP,
   CONTROL,
+  SERVICE_WORKERS,
+  call,
   checkpoint,
   closeAndSettle,
-  evaluate,
   expect,
   fromOf,
   inventoryOf,
@@ -27,17 +27,9 @@ import { appendVerdict } from "./verdicts.ts";
 
 // Hypotheses of PLAN.md P1.1; docs/poc/namespace-sessions/experiments/E2.md reports them.
 // The harness drives pages and reads results: every chrome.debugger call runs in the isolator.
-const ROUTE_A = "globalThis.recnrunRouteA";
 const BLANK = "about:blank#recnrun-e2";
 const SW_ITERATIONS = 20;
 const WORKER_ITERATIONS = 10;
-const SERVICE_WORKERS: Record<string, string> = {
-  classic: "/sw-main.js?variant=classic",
-  module: "/sw-main.js?variant=module",
-  imports: "/sw-imports.js?variant=imports",
-  static: "/sw-static.js?variant=static",
-  dynamic: "/sw-dynamic.js?variant=dynamic",
-};
 const NESTED =
   "the frozen fixture starts no worker from a worker (apps/fixture/public/app/worker.js, shared-worker.js)";
 // Base 36 has no 32-hex run, which the evidence redaction would hash.
@@ -57,10 +49,6 @@ interface Loaded {
 }
 
 type SampleBase = Pick<E2Sample, "hypothesis" | "variant" | "marker" | "script" | "store">;
-
-async function call<T>(extension: LoadedExtension, expression: string): Promise<T> {
-  return evaluate<T>(extension, `${ROUTE_A}.${expression}`);
-}
 
 /** Arms a new tab with `marker`, loads `url`, and returns what the load left once it painted. */
 async function load(run: Run, name: "sw" | "workers", url: string, marker: string) {

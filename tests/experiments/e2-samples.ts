@@ -60,12 +60,12 @@ interface Reason {
   text: string;
 }
 
-function isMarked(path: string, marker: string): boolean {
+export function isMarked(path: string, marker: string): boolean {
   return new URL(path, "http://localhost").searchParams.get(MARKER_PARAM) === marker;
 }
 
 /** The path without the marker parameter, so the same reason groups across iterations. */
-function unmarked(path: string): string {
+export function unmarked(path: string): string {
   const at = path.indexOf("?");
   if (at < 0) return path;
   const kept = path
@@ -141,7 +141,9 @@ export function evaluateSample(sample: E2Sample): SampleOutcome {
 }
 
 /** Every distinct reason with how often it happened, or `undefined` when every sample passed. */
-function failureOf(outcomes: SampleOutcome[]): string | undefined {
+export function failureOf(
+  outcomes: Pick<SampleOutcome, "passed" | "reasons">[],
+): string | undefined {
   if (outcomes.length === 0) return "no sample ran";
   const failed = outcomes.filter((outcome) => !outcome.passed).length;
   if (failed === 0) return undefined;
@@ -154,7 +156,7 @@ function failureOf(outcomes: SampleOutcome[]): string | undefined {
 }
 
 /** Whether the bootstrap's answer lists a patch it skipped because its global was missing. */
-function skippedPatch(entry: JournalEntry | undefined): boolean {
+export function skippedPatch(entry: JournalEntry | undefined): boolean {
   const patches = (entry?.installed as { patches?: unknown } | undefined)?.patches;
   if (typeof patches !== "object" || patches === null) return false;
   return Object.values(patches).some(
@@ -175,7 +177,7 @@ function countsOf(samples: E2Sample[], outcomes: SampleOutcome[]): Record<string
 }
 
 /** Nearest-rank percentile of ascending `sorted`, to a tenth of a millisecond. */
-function percentile(sorted: number[], p: number): number {
+export function percentile(sorted: number[], p: number): number {
   const value = sorted[Math.max(0, Math.ceil((p / 100) * sorted.length) - 1)] ?? 0;
   return Math.round(value * 10) / 10;
 }

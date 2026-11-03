@@ -10,13 +10,20 @@ import { takeSnapshot } from "../browser/observer/storage.ts";
 
 export { expect };
 
-// What E2, E5, and E7 share: one new tab per load, the fixture ledger, and the stores a load left.
+// What E2, E3, E5, and E7 share: one new tab per load, the fixture ledger, and the stores a load left.
 export const APP = "http://app.localhost:4600";
 export const API = "http://api.localhost:4601";
 export const IDP = "http://idp.localhost:4602";
 // Node does not resolve *.localhost everywhere, so the harness reaches the ledger on the loopback.
 export const CONTROL = "http://127.0.0.1:4601";
 export const REPORT_TIMEOUT_MS = 15_000;
+export const SERVICE_WORKERS: Record<string, string> = {
+  classic: "/sw-main.js?variant=classic",
+  module: "/sw-main.js?variant=module",
+  imports: "/sw-imports.js?variant=imports",
+  static: "/sw-static.js?variant=static",
+  dynamic: "/sw-dynamic.js?variant=dynamic",
+};
 
 export interface LedgerEntry {
   seq: number;

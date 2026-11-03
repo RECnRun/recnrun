@@ -20,6 +20,10 @@ export interface Verdict {
   counts?: Record<string, number>;
   /** Percentiles, in milliseconds, of named durations over the samples. */
   timings?: Record<string, { p50: number; p95: number; max: number }>;
+  /** `RECNRUN_STRESS_CONDITION` of the run (scripts/test-stress.mjs), or `baseline`. */
+  condition?: string;
+  /** Samples where the worker ran before the bootstrap reached it; scripts/test-stress.mjs sums them. */
+  lateAttaches?: number;
 }
 
 const ROOT = fileURLToPath(new URL("../../", import.meta.url));
