@@ -114,3 +114,14 @@ test.each([
   expect(entry?.status, id).toBe(status);
   expect(entry?.notes, id).toContain(spec);
 });
+
+test.each([
+  ["dom-snapshots-normal", "implemented", "tests/browser/snapshots.spec.ts"],
+  ["dom-snapshots-normal", "implemented", "tests/e2e/viewer-sandbox.spec.ts"],
+  ["screenshots-normal", "implemented", "tests/browser/snapshots.spec.ts"],
+  ["dom-snapshots-deep", "planned", "F6.5"],
+])("the F3.3 surface %s is %s and names %s", (id, status, proof) => {
+  const entry = entries.find((candidate) => candidate.id === id);
+  expect(entry?.status, id).toBe(status);
+  expect(`${entry?.phase} ${entry?.notes}`, id).toContain(proof);
+});

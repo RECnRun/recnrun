@@ -209,6 +209,22 @@ main {
   gap: calc(var(--space) / 2);
 }
 
+/* A captured page or screenshot: never wider than its card. */
+.viewer {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-height: 24rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+
+img.viewer {
+  min-height: 0;
+  height: auto;
+}
+
 .facts {
   display: grid;
   grid-template-columns: max-content 1fr;

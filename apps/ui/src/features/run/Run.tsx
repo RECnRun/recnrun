@@ -12,6 +12,7 @@ import {
   withoutSecrets,
 } from "@/features/run/inputs";
 import { StepResults, Summary } from "@/features/run/Results";
+import { Snapshots } from "@/features/run/Snapshots";
 import { useRun } from "@/features/run/useRun";
 import { Button } from "@/ui/Button";
 import { Card } from "@/ui/Card";
@@ -133,6 +134,11 @@ function RunFlow({ flowId, flow }: { flowId: string; flow: Flow }) {
       {replay.summary ? (
         <Card title="Summary">
           <Summary summary={replay.summary} />
+        </Card>
+      ) : null}
+      {replay.summary ? (
+        <Card title="Snapshots">
+          <Snapshots runId={replay.summary.runId} />
         </Card>
       ) : null}
     </>

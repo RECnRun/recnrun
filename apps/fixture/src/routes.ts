@@ -43,6 +43,11 @@ export const ROUTES: readonly FixtureRoute[] = [
     title: "Replay",
     summary: "Every replay action and assertion, a late button, and a slow order form",
   },
+  {
+    name: "hostile",
+    title: "Hostile markup",
+    summary: "Inert scripts, a remote image, and a remote form for the snapshot viewer",
+  },
 ];
 
 /**

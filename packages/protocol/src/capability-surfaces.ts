@@ -109,9 +109,10 @@ export const SURFACE_CAPABILITIES: Surface[] = [
     surface: "dom-screen",
     level: "normal",
     title: "DOM snapshots at milestones",
-    status: "planned",
+    status: "implemented",
     phase: "F3.3",
-    notes: "Taken at milestones, around actions, and on failure; not a heap snapshot.",
+    notes:
+      "Delivered by F3.3; tests/browser/snapshots.spec.ts proves DOM.getOuterHTML of the document before and after each replayed step and on its failure, kept as a blob up to 2 MiB; tests/e2e/viewer-sandbox.spec.ts proves the UI shows it in an empty-sandbox iframe that runs no script and fetches nothing. Not a heap snapshot.",
   },
   {
     kind: "surface",
@@ -129,9 +130,10 @@ export const SURFACE_CAPABILITIES: Surface[] = [
     surface: "dom-screen",
     level: "normal",
     title: "Screenshots",
-    status: "planned",
+    status: "implemented",
     phase: "F3.3",
-    notes: "Still images at milestones, not a full video.",
+    notes:
+      "Delivered by F3.3; tests/browser/snapshots.spec.ts proves Page.captureScreenshot as PNG before and after each replayed step and on its failure, kept as a blob up to 8 MiB. Still images, not a video, and never redacted.",
   },
   {
     kind: "surface",

@@ -29,6 +29,14 @@ describe("pages", () => {
     expect(script.headers.get("content-type")).toBe("text/javascript; charset=utf-8");
   });
 
+  test("the hostile page's own policy keeps its remote markup from leaving loopback", async () => {
+    const policy = (await get("/routes/hostile")).headers.get("content-security-policy");
+    expect(policy).toBe(
+      "default-src 'self'; script-src 'self' 'unsafe-inline'; form-action 'self'",
+    );
+    expect((await get("/routes/form")).headers.get("content-security-policy")).toBeNull();
+  });
+
   const firstScript = async (path: string) => {
     const html = await (await get(path)).text();
     const first = html.indexOf("<script");

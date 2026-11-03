@@ -14,6 +14,13 @@ const TYPES: Readonly<Record<string, string>> = {
   ".png": "image/png",
   ".svg": "image/svg+xml",
 };
+// The hostile page holds remote URLs for the snapshot viewer to ignore; it never loads them itself.
+const PAGE_HEADERS: Readonly<Record<string, Record<string, string>>> = {
+  "/routes/hostile": {
+    "Content-Security-Policy":
+      "default-src 'self'; script-src 'self' 'unsafe-inline'; form-action 'self'",
+  },
+};
 
 /** Decodes a request path, or returns undefined when it is malformed or could leave `public/`. */
 function decodePath(pathname: string): string | undefined {
@@ -60,5 +67,6 @@ export async function serveStatic(
     return;
   }
   const type = TYPES[extname(file)] ?? "application/octet-stream";
-  send(response, 200, request.method === "HEAD" ? "" : body, { "Content-Type": type });
+  const headers = { "Content-Type": type, ...PAGE_HEADERS[path] };
+  send(response, 200, request.method === "HEAD" ? "" : body, headers);
 }

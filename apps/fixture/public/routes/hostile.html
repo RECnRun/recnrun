@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <script>
+      window.__fixture = { hookSeenAtHead: Boolean(window.__recnrunHook) };
+    </script>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Hostile markup · RECnRun fixture</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="/fixture.css" />
+    <script type="module" src="/routes/hostile.js"></script>
+  </head>
+  <body>
+    <header>
+      <h1>Hostile markup</h1>
+      <a href="/" data-testid="home">All routes</a>
+    </header>
+    <main>
+      <p data-testid="hostile-intro">
+        Markup a snapshot viewer must render without running a script or fetching a file.
+      </p>
+      <section data-testid="hostile"></section>
+    </main>
+  </body>
+</html>
