@@ -3,6 +3,11 @@ import { messageOf } from "@/background/probes/helpers";
 import type { Debuggee, DebuggerApi } from "@/background/probes/types";
 import { command } from "@/background/route-a/attached";
 import type { ArmRequest } from "@/background/route-b/requests";
+import {
+  fetchedSelection,
+  isFetchedSelection,
+  selectionWrapper,
+} from "@/background/route-b/select";
 import type { PausedEntry } from "@/background/route-b/types";
 import {
   byteLength,
@@ -33,6 +38,8 @@ export interface PausedContext {
   api: DebuggerApi;
   request: ArmRequest;
   moduleUrl: string;
+  /** `chrome-extension://<id>/`, where E6's selection wrappers import from. */
+  extensionOrigin: string;
   now: () => number;
 }
 
@@ -72,10 +79,19 @@ function isScript(event: PausedEvent): boolean {
   );
 }
 
-/** Main scripts always; imported scripts on a worker's session only when the harness asked. */
-function shouldTransform(entry: PausedEntry, imports: ArmRequest["imports"]): boolean {
+/** Main scripts always; imported scripts on a worker's session when asked, or every one for sync-xhr. */
+function shouldTransform(entry: PausedEntry, request: ArmRequest): boolean {
   if (entry.role === "main") return true;
-  return entry.role === "imported" && entry.session === "worker" && imports === "transform";
+  if (entry.role !== "imported" || entry.session !== "worker") return false;
+  // A dedicated or shared worker's own script carries no Service-Worker header.
+  return request.imports === "transform" || request.selection === "sync-xhr";
+}
+
+function wrapperOf(context: PausedContext, original: string) {
+  const { request, moduleUrl, extensionOrigin } = context;
+  if (request.selection === undefined) return wrapScript(request.marker, original, moduleUrl);
+  const body = selectionWrapper(request.selection, original, extensionOrigin);
+  return { body, wrapper: request.selection };
 }
 
 async function fulfill(
@@ -84,12 +100,12 @@ async function fulfill(
   entry: PausedEntry,
   event: PausedEvent,
 ): Promise<void> {
-  const { api, request, moduleUrl, now } = context;
+  const { api, now } = context;
   const { requestId } = event;
   const reply = await command(api, target, "Fetch.getResponseBody", { requestId });
   const text = typeof reply.body === "string" ? reply.body : "";
   const original = reply.base64Encoded === true ? decodeBase64(text) : text;
-  const wrapped = wrapScript(request.marker, original, moduleUrl);
+  const wrapped = wrapperOf(context, original);
   await command(api, target, "Fetch.fulfillRequest", {
     requestId,
     responseCode: event.responseStatusCode,
@@ -105,6 +121,32 @@ async function fulfill(
     fulfilledBytes: byteLength(wrapped.body),
     waitedMs: now() - entry.pausedAt,
   });
+}
+
+/** Answers the selection path, whatever the origin answered, with the bootstrap of the armed marker. */
+async function fulfillSelection(
+  context: PausedContext,
+  target: Debuggee,
+  entry: PausedEntry,
+  event: PausedEvent,
+): Promise<void> {
+  const body = fetchedSelection(context.request.marker);
+  await command(context.api, target, "Fetch.fulfillRequest", {
+    requestId: event.requestId,
+    responseCode: 200,
+    responseHeaders: [{ name: "Content-Type", value: "text/javascript" }],
+    body: encodeBase64(body),
+  });
+  Object.assign(entry, {
+    action: "fulfilled",
+    fulfilledBytes: byteLength(body),
+    waitedMs: context.now() - entry.pausedAt,
+  });
+}
+
+function isSelectionPath(context: PausedContext, entry: PausedEntry, event: PausedEvent): boolean {
+  if (context.request.selection !== "fetch-import" || entry.stage !== "response") return false;
+  return isFetchedSelection(event.request.url);
 }
 
 async function letGo(context: PausedContext, target: Debuggee, entry: PausedEntry, id: string) {
@@ -125,13 +167,15 @@ export async function handlePaused(
   entry: PausedEntry,
   event: PausedEvent,
 ): Promise<void> {
-  if (entry.stage === "response" && isScript(event)) {
+  if (isSelectionPath(context, entry, event)) entry.role = "selection";
+  else if (entry.stage === "response" && isScript(event)) {
     const main = headerOf(event.request.headers, "service-worker") === "script";
     entry.role = main ? "main" : "imported";
   }
-  if (shouldTransform(entry, context.request.imports)) {
+  const selection = entry.role === "selection";
+  if (selection || shouldTransform(entry, context.request)) {
     try {
-      await fulfill(context, target, entry, event);
+      await (selection ? fulfillSelection : fulfill)(context, target, entry, event);
       return;
     } catch (error) {
       entry.error = messageOf(error);

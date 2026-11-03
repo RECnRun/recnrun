@@ -1,5 +1,6 @@
 import { MarkerSchema } from "@recnrun/isolation-core";
 import * as v from "valibot";
+import { SELECTIONS } from "@/background/route-b/select";
 
 // The harness calls Route B through Runtime.evaluate, so every argument is checked where it enters.
 const TabIdSchema = v.pipe(v.number(), v.integer(), v.minValue(0));
@@ -17,6 +18,8 @@ const ArmRequestSchema = v.object({
   imports: v.optional(v.picklist(["continue", "transform"]), "continue"),
   /** `Network.enable` on each worker's session, to record why its requests failed. */
   network: v.optional(v.boolean(), false),
+  /** E6: wrap with a first statement that selects the session at run time instead of the bootstrap. */
+  selection: v.optional(v.picklist(SELECTIONS)),
 });
 
 export type ArmRequest = v.InferOutput<typeof ArmRequestSchema>;

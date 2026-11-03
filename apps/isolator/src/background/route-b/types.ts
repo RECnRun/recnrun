@@ -1,8 +1,10 @@
+import type { Selection } from "@/background/route-b/select";
+
 /** Where Chrome paused a request: the armed tab's own session or a worker's flattened session. */
 export type SessionKind = "tab" | "worker";
 
-/** How Route B wrapped a script: the bootstrap prepended, or a static import of it first. */
-export type WrapperKind = "prepend" | "module-import";
+/** How Route B wrapped a script: the bootstrap prepended, a static import of it first, or an E6 selection. */
+export type WrapperKind = "prepend" | "module-import" | Selection;
 
 /** One request Chrome paused through `Fetch.requestPaused` on a session of an armed tab. */
 export interface PausedEntry {
@@ -13,8 +15,11 @@ export interface PausedEntry {
   /** Chrome's `resourceType` for the request, exactly as it reported it. */
   resourceType: string;
   stage: "request" | "response";
-  /** `main` when the request carries `Service-Worker: script`; set for JavaScript responses only. */
-  role?: "main" | "imported";
+  /**
+   * `main` when the request carries `Service-Worker: script`, `imported` for another JavaScript response,
+   * `selection` for the E6 selection path Route B answers itself.
+   */
+  role?: "main" | "imported" | "selection";
   status?: number;
   /** Chrome's `responseErrorReason` when the response failed before Route B saw it. */
   errorReason?: string;

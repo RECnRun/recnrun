@@ -4,6 +4,7 @@ import { exposeProbes } from "@/background/probes/expose";
 import { exposeRouteA } from "@/background/route-a/expose";
 import { exposeRouteB } from "@/background/route-b/expose";
 import { exposeRouteC } from "@/background/route-c/expose";
+import { exposeSelection } from "@/background/selection/expose";
 import { exposeStop } from "@/background/stop/expose";
 
 /** `chrome.storage.session` key the harness reads to see that the background ran. */
@@ -45,6 +46,15 @@ export function startBackground(): void {
     tabs: browser.tabs,
   }));
   exposeOriginal(() => browser.scripting);
+  exposeSelection(
+    () => ({
+      debugger: browser.debugger,
+      dnr: browser.declarativeNetRequest,
+      storage: browser.storage.session,
+      extensionOrigin: browser.runtime.getURL("/"),
+    }),
+    browser.tabs.onCreated,
+  );
   const record = (): void => void recordLoaded();
   browser.runtime.onInstalled.addListener(record);
   browser.runtime.onStartup.addListener(record);

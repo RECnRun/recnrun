@@ -10,6 +10,7 @@ import { handlePaused, pausedEntryOf, pausedEventOf } from "@/background/route-b
 import type { PausedContext } from "@/background/route-b/paused";
 import { armRequestOf, tabIdOf, targetIdOf } from "@/background/route-b/requests";
 import type { ArmRequest } from "@/background/route-b/requests";
+import { FETCHED_PATTERN } from "@/background/route-b/select";
 import type {
   PausedEntry,
   RouteB,
@@ -43,10 +44,14 @@ async function attempt(
   }
 }
 
-function enableFetch(api: DebuggerApi, target: Debuggee, urlPattern: string) {
-  return attempt(api, target, "Fetch.enable", {
-    patterns: [{ urlPattern, requestStage: "Response" }],
-  });
+function enableFetch(api: DebuggerApi, target: Debuggee, request: ArmRequest) {
+  // E6's fetch-import answers the selection path, which the harness's pattern does not name.
+  const extra = request.selection === "fetch-import" ? [FETCHED_PATTERN] : [];
+  const patterns = [request.urlPattern, ...extra].map((urlPattern) => ({
+    urlPattern,
+    requestStage: "Response",
+  }));
+  return attempt(api, target, "Fetch.enable", { patterns });
 }
 
 /** Route B (POC PLAN.md P1.4): Chrome fetches the worker's script and Route B fulfills it wrapped. */
@@ -72,7 +77,7 @@ export class RouteBEngine implements RouteB {
 
   async arm(request: unknown): Promise<{ fetchEnable: string }> {
     const armRequest = armRequestOf(request);
-    const { tabId, urlPattern } = armRequest;
+    const { tabId } = armRequest;
     if (this.#armed.has(tabId)) throw new Error(`tab ${tabId} is already armed`);
     const api = this.#debuggerApi();
     const armed: Armed = {
@@ -85,7 +90,7 @@ export class RouteBEngine implements RouteB {
     this.#armed.set(tabId, armed);
     try {
       await withTimeout(api.attach({ tabId }, PROTOCOL_VERSION), "attach");
-      if (armRequest.tabFetch) armed.fetchEnable = await enableFetch(api, { tabId }, urlPattern);
+      if (armRequest.tabFetch) armed.fetchEnable = await enableFetch(api, { tabId }, armRequest);
       await command(api, { tabId }, "Target.setAutoAttach", AUTO_ATTACH);
     } catch (error) {
       await this.#release(tabId);
@@ -166,7 +171,8 @@ export class RouteBEngine implements RouteB {
 
   #context(request: ArmRequest): PausedContext {
     const moduleUrl = `${this.#extensionOrigin()}${MODULE_BOOTSTRAP_PATH}`;
-    return { api: this.#debuggerApi(), request, moduleUrl, now: this.#now };
+    const extensionOrigin = this.#extensionOrigin();
+    return { api: this.#debuggerApi(), request, moduleUrl, extensionOrigin, now: this.#now };
   }
 
   #track(handled: Promise<void>): void {
@@ -193,7 +199,7 @@ export class RouteBEngine implements RouteB {
     const session = { tabId: source.tabId, sessionId };
     const worker = WORKER_TYPES.has(entry.type);
     if (worker && request.workerFetch) {
-      entry.fetchEnable = await enableFetch(api, session, request.urlPattern);
+      entry.fetchEnable = await enableFetch(api, session, request);
     }
     // A paused worker answers Network.enable only once it runs, so the reply is awaited after release.
     const network = worker && request.network ? attempt(api, session, "Network.enable") : undefined;
