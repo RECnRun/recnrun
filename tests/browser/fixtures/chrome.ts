@@ -32,6 +32,8 @@ export interface ChromeLaunchOptions {
   pipe?: boolean;
   /** A profile to reuse, as E6 does to restart Chrome on it; the caller owns it, so close() keeps it. */
   userDataDir?: string;
+  /** `false` leaves out `--silent-debugger-extension-api`; the infobar spec is the one reason. */
+  silentDebugger?: boolean;
 }
 
 export interface LaunchedChrome {
@@ -87,14 +89,14 @@ function requireDisplay(): void {
   }
 }
 
-function chromeFlags(userDataDir: string, extra: readonly string[] = []): string[] {
-  const flags = [
-    `--user-data-dir=${userDataDir}`,
-    "--remote-debugging-port=0",
-    "--no-first-run",
-    // Hides the "started debugging" infobar; it grants no capability (PLAN.md decision 5).
-    "--silent-debugger-extension-api",
-  ];
+export function chromeFlags(
+  userDataDir: string,
+  extra: readonly string[] = [],
+  silentDebugger = true,
+): string[] {
+  const flags = [`--user-data-dir=${userDataDir}`, "--remote-debugging-port=0", "--no-first-run"];
+  // Hides the "started debugging" infobar; it grants no capability (PLAN.md decision 5).
+  if (silentDebugger) flags.push("--silent-debugger-extension-api");
   // Chrome runs as root in the test container, where its sandbox cannot start.
   if (process.env.RECNRUN_TEST_CONTAINER === "1") flags.push("--no-sandbox");
   return [...flags, ...extra, "about:blank"];
@@ -168,7 +170,8 @@ export async function launchChrome(options: ChromeLaunchOptions = {}): Promise<L
   const userDataDir = options.userDataDir ?? (await mkdtemp(join(tmpdir(), "recnrun-chrome-")));
   // The previous launch's port file would be read before this Chrome writes its own.
   await rm(join(userDataDir, "DevToolsActivePort"), { force: true });
-  const chrome = watch(executable, chromeFlags(userDataDir, options.args), options.pipe === true);
+  const flags = chromeFlags(userDataDir, options.args, options.silentDebugger);
+  const chrome = watch(executable, flags, options.pipe === true);
   const pipe = options.pipe
     ? connectPipe(chrome.child.stdio[3] as Writable, chrome.child.stdio[4] as Readable)
     : undefined;

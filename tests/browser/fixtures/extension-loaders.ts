@@ -87,16 +87,24 @@ export interface LoadUnpackedOptions {
   unsafeDebugging?: boolean;
   /** Loads into this existing profile instead of a new one (E6 restarts Chrome on it). */
   userDataDir?: string;
+  /** `false` shows the debugger infobar (`launchChrome`'s `silentDebugger`). */
+  silentDebugger?: boolean;
 }
 
 /** Hypothesis (a): `Extensions.loadUnpacked` over the port, or over `--remote-debugging-pipe`. */
 export async function loadUnpackedOverCdp(
   path: string,
-  { transport = "port", unsafeDebugging = true, userDataDir }: LoadUnpackedOptions = {},
+  {
+    transport = "port",
+    unsafeDebugging = true,
+    userDataDir,
+    silentDebugger,
+  }: LoadUnpackedOptions = {},
 ): Promise<LoadedExtension> {
   const pipe = transport === "pipe";
   const args = unsafeDebugging ? [UNSAFE_EXTENSION_DEBUGGING] : [];
-  const chrome = await launchChrome({ args, pipe, ...(userDataDir ? { userDataDir } : {}) });
+  const profile = userDataDir ? { userDataDir } : {};
+  const chrome = await launchChrome({ args, pipe, silentDebugger, ...profile });
   let id: string;
   try {
     const params = { path };
