@@ -1,5 +1,19 @@
-import { compareRuns, pageRunEvents, type RunEventFilter } from "@recnrun/persistence";
-import type { Event, RunComparison } from "@recnrun/protocol";
+import {
+  BlobStoreError,
+  compareRuns,
+  pageRunEvents,
+  type BlobStoreErrorCode,
+  type RunEventFilter,
+} from "@recnrun/persistence";
+import {
+  BodyRefSchema,
+  type Artifact,
+  type BodyRef,
+  type Event,
+  type RunComparison,
+  type ServiceError,
+} from "@recnrun/protocol";
+import * as v from "valibot";
 import { ServiceFailure } from "./dispatch.ts";
 import { flowOfRun, type RunDeps } from "./runs.ts";
 
@@ -46,4 +60,50 @@ export async function compare(
       `Run ${runId} replays ${run.manifest.flowId}, not ${baseline.manifest.flowId}.`,
     );
   return compareRuns(baseline, run);
+}
+
+export interface ArtifactRequest {
+  runId: string;
+  sha256: string;
+}
+
+const isRef = (value: unknown): value is BodyRef => v.is(BodyRefSchema, value);
+
+/** The blob reference with this `sha256` among the payload fields of the run's events. */
+function referenced(events: readonly Event[], sha256: string): BodyRef | undefined {
+  for (const { payload } of events) {
+    const found = Object.values(payload).find((value) => isRef(value) && value.sha256 === sha256);
+    if (found) return found as BodyRef;
+  }
+  return undefined;
+}
+
+const BLOB_CODES: Record<BlobStoreErrorCode, ServiceError["code"]> = {
+  "not-found": "not-found",
+  "invalid-name": "invalid-request",
+  corrupt: "internal",
+};
+
+async function blobOf(deps: RunDeps, flowId: string, { runId, sha256 }: ArtifactRequest) {
+  try {
+    return await deps.store().readRunBlob(flowId, runId, sha256);
+  } catch (error) {
+    if (!(error instanceof BlobStoreError)) throw error;
+    // The store's message names a path under the user's home, which a client has no use for.
+    throw new ServiceFailure(
+      BLOB_CODES[error.code],
+      `Run ${runId} has no readable blob ${sha256}.`,
+    );
+  }
+}
+
+/** One blob of the run, only when one of the run's own events references it. */
+export async function getArtifact(deps: RunDeps, request: ArtifactRequest): Promise<Artifact> {
+  const { manifest, journal } = await storedRun(deps, request.runId);
+  const ref = referenced(journal.events, request.sha256);
+  if (!ref)
+    throw new ServiceFailure("not-found", `No event of run ${request.runId} references that blob.`);
+  const bytes = await blobOf(deps, manifest.flowId, request);
+  const data = ref.encoding === "utf8" ? bytes.toString("utf8") : bytes.toString("base64");
+  return { sha256: ref.sha256, mime: ref.mime, encoding: ref.encoding, size: bytes.length, data };
 }

@@ -11,14 +11,16 @@ import {
   type StoreProblem,
 } from "@recnrun/protocol";
 import { hasCode } from "./atomic-file.ts";
+import { openBlobStore, type BlobStore } from "./blobs.ts";
 import { openJournal, readJournal, type JournalContents, type JournalWriter } from "./journal.ts";
 import { FlowStoreError, readStored, readStoredIfPresent, writeStored } from "./store-files.ts";
 
-/** A run just created: its folder and the open journal of its events. */
+/** A run just created: its folder, the open journal of its events, and its blobs. */
 export interface RunHandle {
   folder: string;
   manifest: RunManifest;
   journal: JournalWriter;
+  blobs: BlobStore;
 }
 
 /** The files a finished run adds next to its manifest and journal. */
@@ -50,6 +52,9 @@ export function runFolder(flowFolder: string, runId: string): string {
   return join(flowFolder, "runs", runId);
 }
 
+/** The blob folder of a run: snapshots and screenshots its events reference. */
+export const runBlobs = (folder: string): string => join(folder, "blobs");
+
 /** The catalog row of a run: `running` until summary.json exists. */
 export const runEntry = (manifest: RunManifest, summary?: RunSummary): RunCatalogEntry => ({
   id: manifest.runId,
@@ -74,7 +79,8 @@ export async function createRunFolder(
     throw error;
   }
   await writeStored("run-manifest", join(folder, RUN_FILES.manifest), manifest);
-  return { folder, manifest, journal: await openJournal(join(folder, JOURNAL_FILE)) };
+  const journal = await openJournal(join(folder, JOURNAL_FILE));
+  return { folder, manifest, journal, blobs: await openBlobStore({ folder: runBlobs(folder) }) };
 }
 
 /** Writes steps, coverage, and last the summary, which marks the run finished. */

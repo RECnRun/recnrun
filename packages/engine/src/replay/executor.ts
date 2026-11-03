@@ -4,6 +4,7 @@ import type {
   RunManifest,
   RunStatus,
   RunSummary,
+  SnapshotMilestone,
   Step,
   StepResult,
   StepState,
@@ -20,6 +21,7 @@ import {
   type RunProblem,
 } from "./record.ts";
 import { createScope, redact, secretValues, type Scope, type ScopeOptions } from "./scope.ts";
+import { snapshotter, type Snapshotter } from "./snapshots.ts";
 import { executeStep } from "./step.ts";
 import { deadlineIn, systemClock, type Clock } from "./wait.ts";
 
@@ -112,16 +114,27 @@ interface Run {
   clock: Clock;
   timeoutMs: number;
   recorder: Recorder;
+  snapshot: Snapshotter | undefined;
+}
+
+// Actions are captured before and after; any step that does not pass is captured on failure.
+async function capture(run: Run, step: Step, milestone: SnapshotMilestone): Promise<void> {
+  if (!run.snapshot) return;
+  if (milestone !== "failure" && !("action" in step)) return;
+  await run.snapshot(step.id, milestone);
 }
 
 async function runStep(run: Run, step: Step, index: number): Promise<StepResult> {
   let state = advance("pending", "start");
   await run.recorder.started(step.id, index);
+  await capture(run, step, "before");
   const startedAt = run.clock.now();
   const deadline = deadlineIn(step.timeoutMs ?? run.timeoutMs, run.clock);
   const outcome = await executeStep(step, { driver: run.driver, scope: run.scope, deadline });
   state = advance(state, OUTCOME_EVENTS[outcome.status]);
   const endedAt = run.clock.now();
+  await capture(run, step, "after");
+  if (state !== "passed") await capture(run, step, "failure");
   const result: StepResult = {
     stepId: step.id,
     ...outcome,
@@ -196,7 +209,8 @@ export async function replayFlow(
   const { scope, problem } = prepare(flow, options);
   const secrets = secretValues(flow, scope);
   const timeoutMs = options.defaultTimeoutMs ?? DEFAULT_STEP_TIMEOUT_MS;
-  const run: Run = { driver, scope, secrets, clock, timeoutMs, recorder };
+  const snapshot = snapshotter(driver, recorder, secrets);
+  const run: Run = { driver, scope, secrets, clock, timeoutMs, recorder, snapshot };
   if (problem) await skip(run, flow.steps, 0, "block");
   const steps = problem ? [] : await runAll(run, flow.steps, options.control);
   const summary = await recorder.finish(problem);

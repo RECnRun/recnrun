@@ -1,12 +1,15 @@
 import {
   PROTOCOL_SCHEMA_VERSION,
   RUN_EXIT_CODES,
+  type BodyEncoding,
+  type BodyRef,
   type Event,
   type RunCoverage,
   type RunManifest,
   type RunStatus,
   type RunSteps,
   type RunSummary,
+  type SnapshotPayload,
   type StepResult,
 } from "@recnrun/protocol";
 import { APPLICATION_FAILURES } from "./outcome.ts";
@@ -17,9 +20,19 @@ export interface ReplayJournal {
   close(): Promise<void>;
 }
 
+/** The run's own blob store; persistence's `BlobStore` satisfies it. */
+export interface ReplayBlobs {
+  put(
+    content: Uint8Array | string,
+    meta: { mime: string; encoding: BodyEncoding; maxBytes?: number | undefined },
+  ): Promise<BodyRef>;
+}
+
 /** Where a run is stored; persistence's `FlowStore` satisfies it. */
 export interface ReplayRunStore {
-  createRun(manifest: RunManifest): Promise<{ journal: ReplayJournal }>;
+  createRun(
+    manifest: RunManifest,
+  ): Promise<{ journal: ReplayJournal; blobs?: ReplayBlobs | undefined }>;
   finishRun(result: { steps: RunSteps; coverage: RunCoverage; summary: RunSummary }): Promise<void>;
 }
 
@@ -36,6 +49,9 @@ export interface RecorderOptions {
 export interface Recorder {
   started(stepId: string, index: number): Promise<void>;
   finished(result: StepResult, index: number): Promise<void>;
+  /** The run's blob store; undefined when the run is not stored or its store keeps no blobs. */
+  readonly blobs: ReplayBlobs | undefined;
+  snapshot(stepId: string, payload: SnapshotPayload): Promise<void>;
   /** `problem` is why the run could not start; its steps are all blocked. */
   finish(problem?: RunProblem): Promise<RunSummary>;
 }
@@ -48,6 +64,13 @@ export interface RunProblem {
 const PRODUCER = "engine:replay";
 
 type StepEvent = Exclude<Event, { category: "gap" }>;
+type Category = "step" | "snapshot";
+type Emit = (
+  stepId: string,
+  type: string,
+  payload: Record<string, unknown>,
+  category?: Category,
+) => Promise<void>;
 
 const iso = (ms: number): string => new Date(ms).toISOString();
 
@@ -94,6 +117,7 @@ function stepEnvelope(
   options: RecorderOptions,
   seq: number,
   stepId: string,
+  category: Category,
 ): Omit<StepEvent, "type" | "payload"> {
   return {
     schemaVersion: PROTOCOL_SCHEMA_VERSION,
@@ -109,7 +133,7 @@ function stepEnvelope(
     frameId: null,
     documentId: null,
     stepId,
-    category: "step" as const,
+    category,
   };
 }
 
@@ -119,14 +143,16 @@ export async function openRecorder(options: RecorderOptions): Promise<Recorder> 
   const startedAt = options.now();
   const results: StepResult[] = [];
   let seq = 0;
-  const emit = async (stepId: string, type: string, payload: Record<string, unknown>) => {
+  const emit: Emit = async (stepId, type, payload, category = "step") => {
     seq += 1;
-    const event: StepEvent = { ...stepEnvelope(options, seq, stepId), type, payload };
+    const event: StepEvent = { ...stepEnvelope(options, seq, stepId, category), type, payload };
     options.observe?.(event);
     await run?.journal.append(event);
   };
   return {
+    blobs: run?.blobs,
     started: (stepId, index) => emit(stepId, "step.started", { index }),
+    snapshot: (stepId, payload) => emit(stepId, "captured", payload, "snapshot"),
     async finished(result, index) {
       results.push(result);
       if (result.status === "blocked" || result.status === "cancelled") return;

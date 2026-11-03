@@ -95,3 +95,20 @@ test("a cap that is not a positive integer is refused", async () => {
   await expect(openBlobStore({ folder, maxBytes: 0 })).rejects.toThrow(RangeError);
   await expect(openBlobStore({ folder, maxBytes: 1.5 })).rejects.toThrow(RangeError);
 });
+
+test("a put may set a cap of its own, below or above the store's", async () => {
+  const store = await openBlobStore({ folder, maxBytes: 4 });
+  const body = bytes("0123456789");
+  const kept = await store.put(body, { ...JSON_META, maxBytes: 8 });
+  expect(kept).toMatchObject({ size: 10, condition: "truncated" });
+  expect(await store.read(kept.sha256)).toEqual(Buffer.from("01234567"));
+  const whole = await store.put(body, { ...JSON_META, maxBytes: 64 });
+  expect(whole).toMatchObject({ size: 10, condition: "captured" });
+});
+
+test("a string is stored as its UTF-8 bytes, and its size and cap count bytes", async () => {
+  const store = await openBlobStore({ folder, maxBytes: 3 });
+  const ref = await store.put("café", { mime: "text/html", encoding: "utf8" });
+  expect(ref).toMatchObject({ sha256: sha256(bytes("caf")), size: 5, condition: "truncated" });
+  expect(String(await store.read(ref.sha256))).toBe("caf");
+});

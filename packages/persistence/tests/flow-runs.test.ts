@@ -1,4 +1,4 @@
-import { appendFile, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { appendFile, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Event } from "@recnrun/protocol";
@@ -140,4 +140,18 @@ test("rebuilding lists the same runs and reports a corrupt one", async () => {
     expect.objectContaining({ code: "invalid", path: join(runsRoot(), "run-3", "summary.json") }),
   ]);
   expect((await store.listRuns("form-submit")).map(({ id }) => id)).toEqual(["run-1", "run-2"]);
+});
+
+test("a run stores blobs in its own folder and reads them back by sha256", async () => {
+  const run = await store.createRun(runManifest(revision));
+  const ref = await run.blobs.put(new TextEncoder().encode("<p>hi</p>"), {
+    mime: "text/html",
+    encoding: "utf8",
+  });
+  await run.journal.close();
+  const bytes = await store.readRunBlob("form-submit", "run-1", ref.sha256);
+  expect(String(bytes)).toBe("<p>hi</p>");
+  expect(await readdir(join(runsRoot(), "run-1", "blobs"))).toEqual([ref.sha256]);
+  const missing = store.readRunBlob("form-submit", "run-1", "f".repeat(64));
+  await expect(missing).rejects.toMatchObject({ code: "not-found" });
 });

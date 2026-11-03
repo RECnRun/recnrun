@@ -60,10 +60,10 @@ function owned(
 ): ReplayRunStore {
   return {
     createRun: async (manifest) => {
-      const { journal } = await store.createRun(manifest);
+      const { journal, blobs } = await store.createRun(manifest);
       const tracked = await journals.adopt(journal);
       opened.push(tracked);
-      return { journal: tracked };
+      return { journal: tracked, blobs };
     },
     finishRun: (result) => store.finishRun(result),
   };

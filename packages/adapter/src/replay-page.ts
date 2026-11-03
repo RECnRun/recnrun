@@ -18,6 +18,7 @@ export type ReplayPage = Pick<
   | "isClosed"
   | "on"
   | "keyboard"
+  | "context"
 >;
 
 type AriaRole = Parameters<Page["getByRole"]>[0];

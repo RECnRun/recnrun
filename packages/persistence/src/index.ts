@@ -13,6 +13,7 @@ export type FlowFolderLayout = typeof flowFolderLayout;
 export {
   BlobStoreError,
   openBlobStore,
+  readBlob,
   type BlobMeta,
   type BlobStore,
   type BlobStoreErrorCode,

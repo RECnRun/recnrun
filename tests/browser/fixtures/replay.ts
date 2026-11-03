@@ -8,13 +8,31 @@ import {
   type ReplayOptions,
   type ReplayOutcome,
 } from "../../../packages/engine/src/index.ts";
-import { openFlowStore, type StoredRun } from "../../../packages/persistence/src/index.ts";
+import {
+  openFlowStore,
+  type FlowStore,
+  type StoredRun,
+} from "../../../packages/persistence/src/index.ts";
 import { validateFlow, type Flow, type Step } from "../../../packages/protocol/src/index.ts";
 
 export interface Replayed {
   outcome: ReplayOutcome;
   /** The run as the flow store holds it after the replay: manifest, steps, summary, journal. */
   stored: StoredRun;
+  /** Every blob the run's events reference, by sha256, read back before the store is removed. */
+  blobs: ReadonlyMap<string, Buffer>;
+}
+
+async function readBlobs(store: FlowStore, { manifest, journal }: StoredRun) {
+  const blobs = new Map<string, Buffer>();
+  for (const { payload } of journal.events) {
+    for (const value of Object.values(payload)) {
+      const sha256 = (value as { sha256?: unknown } | null)?.sha256;
+      if (typeof sha256 !== "string" || blobs.has(sha256)) continue;
+      blobs.set(sha256, await store.readRunBlob(manifest.flowId, manifest.runId, sha256));
+    }
+  }
+  return blobs;
 }
 
 function checkedFlow(value: unknown): Flow {
@@ -71,7 +89,8 @@ export async function replayStored(
     await adapter.connect(wsEndpoint);
     const outcome = await replayFlow(adapter, flow, { ...options, run: { store, manifest } });
     await whileConnected?.(outcome);
-    return { outcome, stored: await store.getRun(flow.id, manifest.runId) };
+    const stored = await store.getRun(flow.id, manifest.runId);
+    return { outcome, stored, blobs: await readBlobs(store, stored) };
   } finally {
     await adapter.disconnect();
     store.close();

@@ -45,6 +45,14 @@ export type ActResult =
   | { status: "done" }
   | { status: "not-dispatched" | "failed" | "unknown"; code: string; message: string };
 
+/** One part of a page capture: its value, or why it could not be read. */
+export type Captured<T> = { ok: true; value: T } | { ok: false; message: string };
+
+/** The current tab's serialized HTML and screenshot; `tab` is false when the replay has none open. */
+export type PageCapture =
+  | { tab: false }
+  | { tab: true; url: string; html: Captured<string>; screenshot: Captured<Uint8Array> };
+
 export interface ReadOptions {
   /** How long one call may take; the executor polls reads again until its own deadline. */
   timeoutMs: number;
@@ -60,4 +68,6 @@ export interface ReplayDriver {
   tabs(options: ReadOptions): Promise<TabList>;
   /** Dispatches one write; the executor calls it once per step and never again for that step. */
   act(command: DriverCommand, options: ReadOptions): Promise<ActResult>;
+  /** Captures the current tab for a snapshot; never opens a tab and never writes to the page. */
+  capture?(options: ReadOptions): Promise<PageCapture>;
 }

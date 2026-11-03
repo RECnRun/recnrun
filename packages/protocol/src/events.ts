@@ -17,6 +17,7 @@ export const EVENT_CATEGORIES = [
   "function",
   "macro",
   "step",
+  "snapshot",
 ] as const;
 
 /** How an event is tied to a command; `temporal-only` says nothing more than "it came after". */

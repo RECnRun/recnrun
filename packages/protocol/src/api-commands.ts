@@ -16,6 +16,7 @@ import { FlowManifestSchema, RevisionHashSchema } from "./flow-folder.ts";
 import { TargetSchema } from "./locators.ts";
 import { RunSummarySchema } from "./run.ts";
 import { RunComparisonSchema } from "./run-compare.ts";
+import { ArtifactRequestSchema, ArtifactSchema } from "./snapshots.ts";
 import { LeaseSchema } from "./lease.ts";
 import { PidSchema } from "./service-state.ts";
 import { FlowCatalogEntrySchema } from "./stored-files.ts";
@@ -157,8 +158,8 @@ export const SERVICE_COMMANDS = {
       nextCursor: v.optional(NonEmptyStringSchema),
     }),
   },
-  // F3 defines artifact retrieval.
-  "run.getArtifact": unspecified,
+  // A blob a run's events reference, such as a snapshot's HTML or screenshot.
+  "run.getArtifact": { params: ArtifactRequestSchema, result: ArtifactSchema },
   "run.compare": {
     params: v.strictObject({ baselineRunId: NonEmptyStringSchema, runId: NonEmptyStringSchema }),
     result: RunComparisonSchema,

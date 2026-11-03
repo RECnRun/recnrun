@@ -1,3 +1,5 @@
+import { readdir, rm, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import type { ReplayDriver } from "@recnrun/engine";
 import { ServiceMessageSchema, type Flow, type RunSummary } from "@recnrun/protocol";
 import * as v from "valibot";
@@ -57,11 +59,11 @@ function gatedDriver() {
   return { driver, release, commands };
 }
 
-async function replaying(h: Harness) {
+async function replaying(h: Harness, extra: Partial<ReplayDriver> = {}) {
   const gated = gatedDriver();
   let closed = false;
   h.browser.replayDriver = async () => ({
-    driver: gated.driver,
+    driver: { ...gated.driver, ...extra },
     close: async () => void (closed = true),
   });
   await h.flows.saveFlow(flow);
@@ -203,4 +205,52 @@ test("flows are validated, saved, imported, listed, and read back", async () => 
   expect(codeOf(await h.call("flow.get", { flowId: "nope" }))).toBe("not-found");
   const twice = { ...flow, steps: [...flow.steps, ...flow.steps] };
   expect(codeOf(await h.call("flow.save", { flow: twice }))).toBe("invalid-request");
+});
+
+test("run.getArtifact answers the blobs a run's events reference, and nothing else", async () => {
+  const h = await harness();
+  const run = await replaying(h, {
+    capture: async () => ({
+      tab: true,
+      url: "http://127.0.0.1:4600/routes/form",
+      html: { ok: true, value: "<html><body>Form</body></html>" },
+      screenshot: { ok: true, value: new Uint8Array([137, 80, 78, 71]) },
+    }),
+  });
+  run.release();
+  await Promise.all(h.deps.active);
+  type Part = { sha256: string };
+  type Page = { events: { payload: { milestone: string; dom: Part; screenshot: Part } }[] };
+  const query = { runId: run.runId, category: "snapshot" };
+  const { events } = resultOf<Page>(await h.call("run.queryEvents", query));
+  const milestones = events.map(({ payload }) => payload.milestone);
+  expect(milestones).toEqual(["before", "after", "before", "after"]);
+  const first = events[0]?.payload;
+  if (!first) throw new Error("The run journaled no snapshot.");
+  const { dom, screenshot } = first;
+  const html = await h.call("run.getArtifact", { runId: run.runId, sha256: dom.sha256 });
+  expect(resultOf(html)).toEqual({
+    sha256: dom.sha256,
+    mime: "text/html",
+    encoding: "utf8",
+    size: 30,
+    data: "<html><body>Form</body></html>",
+  });
+  const png = await h.call("run.getArtifact", { runId: run.runId, sha256: screenshot.sha256 });
+  expect(resultOf(png)).toMatchObject({ mime: "image/png", encoding: "binary", data: "iVBORw==" });
+  const unreferenced = { runId: run.runId, sha256: "0".repeat(64) };
+  expect(codeOf(await h.call("run.getArtifact", unreferenced))).toBe("not-found");
+  const malformed = { runId: run.runId, sha256: "../summary.json" };
+  expect(codeOf(await h.call("run.getArtifact", malformed))).toBe("invalid-request");
+  const unknown = { runId: "nope", sha256: dom.sha256 };
+  expect(codeOf(await h.call("run.getArtifact", unknown))).toBe("not-found");
+  const files = await readdir(h.home, { recursive: true });
+  const blob = join(h.home, files.find((file) => file.endsWith(`blobs/${dom.sha256}`)) ?? "");
+  const request = { runId: run.runId, sha256: dom.sha256 };
+  await writeFile(blob, "tampered");
+  const corrupt = await h.call("run.getArtifact", request);
+  expect(corrupt).toMatchObject({ error: { code: "internal" } });
+  expect(JSON.stringify(corrupt)).not.toContain(h.home);
+  await rm(blob);
+  expect(codeOf(await h.call("run.getArtifact", request))).toBe("not-found");
 });

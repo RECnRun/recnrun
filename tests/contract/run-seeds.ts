@@ -1,4 +1,8 @@
-import { openFlowStore, type FlowStore } from "../../packages/persistence/src/index.ts";
+import {
+  openFlowStore,
+  type BlobStore,
+  type FlowStore,
+} from "../../packages/persistence/src/index.ts";
 import type { Event, Flow, RunSummary, StepResult } from "../../packages/protocol/src/index.ts";
 
 export const SAVE = "http://127.0.0.1:4600/api/save";
@@ -25,6 +29,8 @@ export interface RunVariant {
   saveStatus?: number;
   gap?: boolean;
   statusFails?: boolean;
+  // The HTML of a failure snapshot of `status`, stored as a blob of the run.
+  snapshot?: string;
 }
 
 const FAILED_ASSERTION = { code: "assertion-failed", message: 'status: expected "Saved"' };
@@ -94,6 +100,31 @@ function stepResults(variant: RunVariant): StepResult[] {
   );
 }
 
+/** A PNG signature: enough bytes for a binary blob. */
+export const PNG = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+
+/** The replay's failure snapshot of `status`, after the six step events of `engine:replay`. */
+async function failureSnapshot(blobs: BlobStore, runId: string, html: string): Promise<Event> {
+  const dom = await blobs.put(html, { mime: "text/html", encoding: "utf8" });
+  const screenshot = await blobs.put(PNG, { mime: "image/png", encoding: "binary" });
+  return {
+    schemaVersion: 1,
+    id: "engine:replay#7",
+    runId,
+    seq: 7,
+    timestamp: "2026-11-02T10:00:59.000Z",
+    source: "engine",
+    producer: "engine:replay",
+    targetId: null,
+    frameId: null,
+    documentId: null,
+    stepId: "status",
+    category: "snapshot",
+    type: "captured",
+    payload: { milestone: "failure", url: "http://127.0.0.1:4600/routes/form", dom, screenshot },
+  };
+}
+
 async function seedRun(store: FlowStore, revision: string, runId: string, variant: RunVariant) {
   const startedAt = "2026-11-02T10:00:00.000Z";
   const run = await store.createRun({
@@ -107,6 +138,8 @@ async function seedRun(store: FlowStore, revision: string, runId: string, varian
     bindings: {},
   });
   for (const event of runEvents(runId, variant)) await run.journal.append(event);
+  if (variant.snapshot !== undefined)
+    await run.journal.append(await failureSnapshot(run.blobs, runId, variant.snapshot));
   await run.journal.close();
   const steps = stepResults(variant);
   const failed = steps.filter(({ status }) => status === "failed");

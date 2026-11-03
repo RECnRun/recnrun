@@ -1,7 +1,9 @@
 export type {
   ActResult,
+  Captured,
   DriverCommand,
   ElementState,
+  PageCapture,
   ReadOptions,
   ReplayDriver,
   TabInfo,
@@ -14,5 +16,6 @@ export {
   type ReplayOptions,
   type ReplayOutcome,
 } from "./executor.ts";
-export type { ReplayJournal, ReplayRunStore, RunProblem } from "./record.ts";
+export type { ReplayBlobs, ReplayJournal, ReplayRunStore, RunProblem } from "./record.ts";
+export { SNAPSHOT_TIMEOUT_MS } from "./snapshots.ts";
 export { POLL_INTERVAL_MS, systemClock, type Clock } from "./wait.ts";

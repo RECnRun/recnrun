@@ -19,8 +19,10 @@ import {
 } from "./flow-writes.ts";
 import { CatalogIndex, type CatalogRows, type FlowCatalog } from "./index-db.ts";
 import { readRevision } from "./revisions.ts";
+import { readBlob } from "./blobs.ts";
 import {
   readRunFolder,
+  runBlobs,
   runFolder,
   type RunHandle,
   type RunResult,
@@ -54,6 +56,8 @@ export interface FlowStore {
   createRun(manifest: RunManifest): Promise<RunHandle>;
   finishRun(result: RunResult): Promise<void>;
   getRun(flowId: string, runId: string): Promise<StoredRun>;
+  /** A blob of the run, checked against its sha256; `BlobStoreError` when it cannot be read. */
+  readRunBlob(flowId: string, runId: string, sha256: string): Promise<Buffer>;
   listRuns(flowId?: string): Promise<RunCatalogEntry[]>;
   /** Rebuilds the SQLite catalog from the flow folders. */
   rebuildIndex(): Promise<CatalogRows>;
@@ -123,6 +127,8 @@ export async function openFlowStore({
     createRun: (manifest) => exclusive(() => createRun(context, manifest)),
     finishRun: (result) => exclusive(() => finishRun(context, result)),
     getRun: (flowId, runId) => readRunFolder(runFolder(paths(flowId).folder, runId)),
+    readRunBlob: (flowId, runId, sha256) =>
+      readBlob(runBlobs(runFolder(paths(flowId).folder, runId)), sha256),
     listRuns: async (flowId) => index.runs(flowId),
     rebuildIndex: () => exclusive(rebuildIndex),
     close: () => index.close(),

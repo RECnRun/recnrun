@@ -6691,7 +6691,8 @@
                     "locator",
                     "function",
                     "macro",
-                    "step"
+                    "step",
+                    "snapshot"
                   ],
                   "type": "string"
                 },

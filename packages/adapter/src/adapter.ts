@@ -49,8 +49,8 @@ export function createCdpAdapter(deps: AdapterDependencies = {}): BrowserAdapter
     return current;
   };
   // Replay tabs belong to one connection; a new connection opens its own on the next write.
-  let driver: ReplayDriver | undefined;
-  const replay = (): ReplayDriver => {
+  let driver: Required<ReplayDriver> | undefined;
+  const replay = (): Required<ReplayDriver> => {
     driver ??= createPageDriver(async () => connected().openPage());
     return driver;
   };
@@ -88,5 +88,6 @@ export function createCdpAdapter(deps: AdapterDependencies = {}): BrowserAdapter
     readAttribute: (target, name, options) => replay().readAttribute(target, name, options),
     tabs: (options) => replay().tabs(options),
     act: (command, options) => replay().act(command, options),
+    capture: (options) => replay().capture(options),
   };
 }
