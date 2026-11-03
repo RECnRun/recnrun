@@ -1,7 +1,10 @@
 import { describe, expect, test } from "vite-plus/test";
-import { captureWith, type CaptureSession } from "../src/replay-capture.ts";
+import { capturePage, captureWith, type CaptureSession } from "../src/replay-capture.ts";
 import { createPageDriver } from "../src/replay.ts";
 import { fakePage } from "./replay-page.ts";
+import { within } from "./within.ts";
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const PNG = Buffer.from([137, 80, 78, 71]);
 const HTML = "<!DOCTYPE html><html><body>Box</body></html>";
@@ -11,8 +14,8 @@ const ANSWERS: Record<string, unknown> = {
   "Page.captureScreenshot": { data: PNG.toString("base64") },
 };
 
-/** A CDP session that answers from `answers`; a missing answer never settles. */
-function fakeSession(answers: Record<string, unknown> = ANSWERS) {
+/** A CDP session that answers from `answers`; a missing answer, or a detach when `detaches` is false, never settles. */
+function fakeSession(answers: Record<string, unknown> = ANSWERS, detaches = true) {
   const sent: string[] = [];
   let detached = 0;
   const session: CaptureSession = {
@@ -22,7 +25,7 @@ function fakeSession(answers: Record<string, unknown> = ANSWERS) {
     },
     detach: () => {
       detached += 1;
-      return Promise.resolve();
+      return detaches ? Promise.resolve() : new Promise(() => {});
     },
   };
   return { session, sent, detached: () => detached };
@@ -65,6 +68,24 @@ describe("captureWith", () => {
     });
     expect(Date.now() - started).toBeLessThan(1000);
     expect(detached()).toBe(1);
+  });
+
+  test("a detach Chrome never answers does not hold the capture past its budget", async () => {
+    const { session } = fakeSession(ANSWERS, false);
+    const capture = await within(captureWith(session, "http://127.0.0.1:4600/", 50), 1_000);
+    expect(capture).toMatchObject({ tab: true, html: { ok: true }, screenshot: { ok: true } });
+  });
+});
+
+describe("capturePage", () => {
+  test("a session that opens after the deadline is detached, not leaked", async () => {
+    const { page } = fakePage({ url: "http://127.0.0.1:4600/" });
+    const { session, detached } = fakeSession();
+    const context = { newCDPSession: () => sleep(60).then(() => session) };
+    Object.assign(page, { context: () => context });
+    await expect(capturePage(page, 20)).rejects.toThrow("No answer within 20 ms.");
+    await sleep(80);
+    expect(detached(), "the late session is detached").toBe(1);
   });
 });
 

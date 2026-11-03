@@ -1,8 +1,8 @@
 /** Fails instead of hanging when `work` never settles. */
-export const within = (work: Promise<void>, ms: number) =>
+export const within = <T>(work: Promise<T>, ms: number): Promise<T> =>
   Promise.race([
     work,
-    new Promise<void>((_, reject) =>
+    new Promise<never>((_, reject) =>
       setTimeout(() => reject(new Error(`Did not resolve within ${ms} ms.`)), ms),
     ),
   ]);

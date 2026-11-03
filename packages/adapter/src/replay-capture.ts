@@ -51,6 +51,14 @@ async function screenshotPng(send: Send): Promise<Uint8Array> {
   return Buffer.from(data, "base64");
 }
 
+const DETACH_TIMEOUT_MS = 1_000;
+
+// A detach Chrome never answers must not hold the capture; the session is gone with its tab anyway.
+const detach = (session: CaptureSession, budgetMs: number) =>
+  withDeadline(session.detach(), Math.max(1, Math.min(DETACH_TIMEOUT_MS, budgetMs))).catch(
+    () => undefined,
+  );
+
 /** Captures a tab's serialized DOM and screenshot over its own CDP session within `timeoutMs`. */
 export async function captureWith(
   session: CaptureSession,
@@ -65,12 +73,25 @@ export async function captureWith(
     const screenshot = await part(() => screenshotPng(send));
     return { tab: true, url, html, screenshot };
   } finally {
-    await session.detach().catch(() => undefined);
+    await detach(session, timeoutMs);
   }
 }
 
-/** Opens a CDP session on the replay's current tab and captures it. */
+/** Opens a CDP session on the replay's current tab and captures it, all within one `timeoutMs`. */
 export async function capturePage(page: ReplayPage, timeoutMs: number): Promise<PageCapture> {
-  const session = await withDeadline(page.context().newCDPSession(page as Page), timeoutMs);
-  return captureWith(session as CaptureSession, page.url(), timeoutMs);
+  const end = Date.now() + timeoutMs;
+  const opening = page.context().newCDPSession(page as Page) as Promise<CaptureSession>;
+  let expired = false;
+  // A session that opens past the deadline serves no capture; it is detached instead of leaked.
+  void opening.then(
+    (session) => (expired ? detach(session, DETACH_TIMEOUT_MS) : undefined),
+    () => undefined,
+  );
+  try {
+    const session = await withDeadline(opening, timeoutMs);
+    return await captureWith(session, page.url(), Math.max(1, end - Date.now()));
+  } catch (error) {
+    expired = true;
+    throw error;
+  }
 }
