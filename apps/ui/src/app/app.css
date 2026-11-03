@@ -289,3 +289,14 @@ img.viewer {
 .table .url {
   overflow-wrap: anywhere;
 }
+
+/* The step where two runs first diverge. */
+.table tr.first td {
+  border-bottom-color: var(--text);
+  font-weight: 600;
+}
+
+.divergence {
+  margin: 0;
+  font-weight: 600;
+}

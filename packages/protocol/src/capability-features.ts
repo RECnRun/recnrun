@@ -180,12 +180,15 @@ export const FEATURE_CAPABILITIES: Feature[] = [
     "Crash recovery",
     "Delivered by F3.6; tests/contract/recovery.test.ts kills the service with SIGKILL mid-replay and restarts it on the same home: the run is interrupted (exit 2), the in-flight write step indeterminate, the journal ends with a producer-restarted gap, and nothing is re-executed. A read-only step cut short is cancelled.",
   ),
-  planned(
-    "diagnostics-ui",
-    "F3.7",
-    "Diagnostics timeline",
-    "Causal confidence is labeled; correlation is not proof.",
-  ),
+  {
+    kind: "feature",
+    id: "diagnostics-ui",
+    title: "Diagnostics timeline",
+    status: "partial",
+    phase: "F3.7",
+    notes:
+      "F3.7; tests/e2e/diagnostics.spec.ts replays a fixture flow, compares a run with ?fail=api-500 against its baseline, and shows an injected gap as a collector gap, never an application failure. Causal confidence is labeled; correlation is not proof. Replays journal no network or storage events yet, so the comparison names the failed assertion that observed the 500, not the response itself.",
+  },
   implemented(
     "run-compare-query",
     "F3.8",

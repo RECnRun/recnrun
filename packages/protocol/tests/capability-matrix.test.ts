@@ -125,3 +125,9 @@ test.each([
   expect(entry?.status, id).toBe(status);
   expect(`${entry?.phase} ${entry?.notes}`, id).toContain(proof);
 });
+
+test("the F3.7 diagnostics UI is partial and names its end-to-end test", () => {
+  const entry = entries.find((candidate) => candidate.id === "diagnostics-ui");
+  expect(entry?.status).toBe("partial");
+  expect(entry?.notes).toContain("tests/e2e/diagnostics.spec.ts");
+});

@@ -1,7 +1,9 @@
 import type { RunSummary } from "@recnrun/protocol";
 import type { Api } from "@/api/api";
 import { useLoad } from "@/api/context";
+import { Compare } from "@/features/diagnostics/Compare";
 import { allEvents } from "@/features/diagnostics/filters";
+import { rememberRun } from "@/features/diagnostics/recent";
 import { Requests } from "@/features/diagnostics/Requests";
 import { StorageOperations } from "@/features/diagnostics/StorageOperations";
 import { Timeline } from "@/features/diagnostics/Timeline";
@@ -18,6 +20,7 @@ async function loadRun(api: Api, runId: string) {
     api.call("run.summary", { runId }),
     allEvents(api, { runId, types: ["step.started"] }),
   ]);
+  rememberRun(summary);
   const steps = [...new Set(started.flatMap(({ stepId }) => (stepId ? [stepId] : [])))];
   return { summary, steps };
 }
@@ -45,6 +48,9 @@ export function Diagnostics({ runId, onBack }: Props) {
       {({ summary, steps }) => (
         <>
           <RunFacts summary={summary} onBack={onBack} />
+          <Card title="Compare with a baseline">
+            <Compare runId={runId} flowId={summary.flowId} />
+          </Card>
           <Card title="Timeline">
             <Timeline runId={runId} steps={steps} />
           </Card>
