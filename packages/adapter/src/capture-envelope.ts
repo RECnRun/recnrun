@@ -24,6 +24,13 @@ export interface Draft {
   monotonicTimeMs?: number;
 }
 
+/** A mapped CDP event and the context CDP named for it: an execution context or a frame. */
+export interface Mapped {
+  draft: Draft;
+  contextId?: number;
+  frameId?: string;
+}
+
 export interface Emitter {
   emit(origin: Origin, draft: Draft): void;
   counts(): { events: number; dropped: number };

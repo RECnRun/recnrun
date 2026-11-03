@@ -90,7 +90,7 @@ export const SURFACE_CAPABILITIES: Surface[] = [
     status: "implemented",
     phase: "F1.5",
     notes:
-      "Delivered by F1.5; tests/browser/capture.spec.ts records console.error, an unhandled rejection, and an uncaught exception with their document, and log entries such as a failed resource. Remote objects are serialized as text with limits at the instant of capture.",
+      "Delivered by F1.5; tests/browser/capture.spec.ts records console.error, an unhandled rejection, and an uncaught exception with their document, and log entries such as a failed resource. Each argument is kept as text and, since F3.2, as the bounded preview Chrome takes at the call (tests/browser/console.spec.ts); later changes to the object are not seen.",
   },
   {
     kind: "surface",
@@ -98,9 +98,10 @@ export const SURFACE_CAPABILITIES: Surface[] = [
     surface: "console-errors",
     level: "deep",
     title: "Console and error stack traces",
-    status: "planned",
+    status: "implemented",
     phase: "F3.2",
-    notes: "Stack traces are recorded when Chrome provides them.",
+    notes:
+      "Delivered by F3.2; tests/browser/console.spec.ts records the synchronous stack of a console call and of an uncaught exception, at most 32 frames, flagged truncated when cut. Recorded only when Chrome provides one; async stacks need the debugger and are not recorded.",
   },
   {
     kind: "surface",

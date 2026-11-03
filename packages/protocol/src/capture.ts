@@ -1,5 +1,7 @@
 import * as v from "valibot";
 import { CountSchema, NonEmptyStringSchema } from "./common.ts";
+import { CapturedTextSchema as TextSchema } from "./captured-text.ts";
+import { ConsoleEventSchema, ErrorEventSchema } from "./console.ts";
 import { EVENT_ENVELOPE_ENTRIES, typedEvent as typed } from "./events.ts";
 import { NetworkEventSchema } from "./network.ts";
 
@@ -23,10 +25,6 @@ export const DOM_EVENT_TYPES = [
   "submit",
 ] as const;
 
-/** The hook clips every string it reports (values, keys, attributes) to this many characters. */
-export const MAX_CAPTURED_TEXT = 1024;
-
-const TextSchema = v.pipe(v.string(), v.maxLength(MAX_CAPTURED_TEXT));
 const CoordinateSchema = v.pipe(v.number(), v.integer());
 
 export const DomEventTypeSchema = v.picklist(DOM_EVENT_TYPES);
@@ -70,13 +68,6 @@ export const DomPayloadSchema = v.strictObject({
   selectedLength: v.optional(CountSchema),
 });
 
-const OptionalUrl = v.optional(v.string());
-const SourceLocation = {
-  url: OptionalUrl,
-  line: v.optional(CountSchema),
-  column: v.optional(CountSchema),
-};
-
 const domEvents = v.variant("type", [
   v.strictObject({
     ...EVENT_ENVELOPE_ENTRIES,
@@ -95,35 +86,6 @@ const domEvents = v.variant("type", [
     v.strictObject({ result: v.boolean(), userInput: v.optional(v.string()) }),
   ),
 ]);
-
-const consoleEvents = v.variant("type", [
-  typed(
-    "console",
-    "api",
-    v.strictObject({
-      level: NonEmptyStringSchema,
-      args: v.array(TextSchema),
-      ...SourceLocation,
-    }),
-  ),
-  typed(
-    "console",
-    "log",
-    v.strictObject({
-      source: NonEmptyStringSchema,
-      level: NonEmptyStringSchema,
-      text: v.string(),
-      url: OptionalUrl,
-      networkRequestId: v.optional(NonEmptyStringSchema),
-    }),
-  ),
-]);
-
-const errorEvents = typed(
-  "error",
-  "exception",
-  v.strictObject({ text: v.string(), description: v.optional(v.string()), ...SourceLocation }),
-);
 
 const navigationEvents = v.variant("type", [
   typed(
@@ -157,8 +119,8 @@ const targetEvents = v.variant("type", [
 export const CapturedEventSchema = v.variant("category", [
   domEvents,
   NetworkEventSchema,
-  consoleEvents,
-  errorEvents,
+  ConsoleEventSchema,
+  ErrorEventSchema,
   navigationEvents,
   targetEvents,
 ]);
