@@ -25,11 +25,15 @@ function markerPath(cwd, sha) {
   return join(cwd, ".artifacts/verified", sha);
 }
 
+/** The marker of a verify that passed on commit `sha`, when there is one. */
+export function commitMarker(cwd, sha) {
+  const marker = sha && markerPath(cwd, sha);
+  return marker && existsSync(marker) ? marker : undefined;
+}
+
 /** The marker of a verify that passed on HEAD, when the tree is still clean. */
 export function verifiedMarker(cwd) {
-  const head = cleanHead(cwd);
-  const marker = head && markerPath(cwd, head);
-  return marker && existsSync(marker) ? marker : undefined;
+  return commitMarker(cwd, cleanHead(cwd));
 }
 
 /** Records a passing verify when the tree was clean on the same commit before and after it. */
