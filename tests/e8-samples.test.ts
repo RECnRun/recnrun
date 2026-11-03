@@ -1,8 +1,9 @@
 import { describe, expect, test } from "vite-plus/test";
 import type { E1Browser } from "./experiments/e1-aggregate.ts";
 import { COLD_KINDS, RESTART_KINDS, SW_SCRIPT, e8Verdict } from "./experiments/e8-samples.ts";
-import { evaluateCold, evaluateOthers, evaluateRestart } from "./experiments/e8-samples.ts";
-import type { ColdSample } from "./experiments/e8-samples.ts";
+import { childDetachesOf, evaluateCold, evaluateOthers } from "./experiments/e8-samples.ts";
+import { evaluateRestart } from "./experiments/e8-samples.ts";
+import type { ColdSample, RestartSample } from "./experiments/e8-samples.ts";
 
 const CHROME: E1Browser = { chrome: "Google Chrome 156.0.8078.79", method: "managed-policy" };
 const MARKER = "e8-t5";
@@ -49,17 +50,46 @@ describe("evaluateCold", () => {
   });
 });
 
+const restart = (overrides: Partial<RestartSample> = {}): RestartSample => ({
+  marker: MARKER,
+  restarted: MARKED,
+  effects: [request(MARKER)],
+  ...overrides,
+});
+const restartKinds = (sample: RestartSample) =>
+  evaluateRestart(sample).reasons.map((reason) => reason.kind);
+
 describe("evaluateRestart", () => {
-  test("passes any page that loaded again and tallies what the worker opened", () => {
-    expect(evaluateRestart("fixture-sw")).toMatchObject({
-      reasons: [],
-      tally: { "ran:fixture-sw": 1 },
-    });
+  test("passes a restart whose first request and database carry the marker", () => {
+    expect(evaluateRestart(restart())).toMatchObject({ reasons: [], tally: { "ran:marked": 1 } });
   });
 
-  test("fails a reload that never loaded or reported nothing", () => {
-    expect(evaluateRestart("held").reasons.map((r) => r.kind)).toEqual(["held"]);
-    expect(evaluateRestart(undefined).reasons.map((r) => r.kind)).toEqual(["noReport"]);
+  test("fails a reload that never loaded, with nothing else to say about it", () => {
+    expect(restartKinds(restart({ restarted: "held", effects: [] }))).toEqual(["held"]);
+    expect(restartKinds(restart({ restarted: undefined }))).toEqual(["noReport"]);
+  });
+
+  test("fails a restart that loaded unmarked, and tallies what it opened", () => {
+    const unmarked = restart({ restarted: "fixture-sw", effects: [request()] });
+    expect(restartKinds(unmarked)).toEqual(["firstEffectBeforeMarker", "databaseUnmarked"]);
+    expect(evaluateRestart(unmarked).tally).toEqual({ "ran:fixture-sw": 1 });
+    expect(restartKinds(restart({ effects: [] }))).toEqual(["noEffect"]);
+  });
+});
+
+describe("childDetachesOf", () => {
+  test("lists each child session's detach outcome across the stop reports", () => {
+    const report = (detaches: string[]) => ({
+      targetId: "sw",
+      sessions: detaches.map((detach, i) => ({ sessionId: `s${i}`, detach })),
+    });
+    const stops = [
+      { result: [report(["ok"]), report([])] },
+      { result: [report(["ok", "No session with given id"])] },
+      { result: { error: "Not allowed" } },
+      { result: [{ targetId: "older", close: "ok" }] },
+    ];
+    expect(childDetachesOf(stops)).toEqual(["ok", "ok", "No session with given id"]);
   });
 });
 
@@ -92,7 +122,11 @@ describe("e8Verdict", () => {
   });
 
   test("fails with the counts of a held restart", () => {
-    const verdict = e8Verdict("b-restart", [evaluateRestart("held")], CHROME, RESTART_KINDS);
-    expect(verdict).toMatchObject({ verdict: "fail", counts: { held: 1, noReport: 0 } });
+    const held = evaluateRestart(restart({ restarted: "held", effects: [] }));
+    const verdict = e8Verdict("b-restart", [held], CHROME, RESTART_KINDS);
+    expect(verdict).toMatchObject({
+      verdict: "fail",
+      counts: { held: 1, noReport: 0, databaseUnmarked: 0 },
+    });
   });
 });

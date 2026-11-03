@@ -54,7 +54,7 @@ export async function visit(tab: StrictTab, url = SW_PAGE, ms = PAGE_TIMEOUT_MS)
 const reloaded = async (tab: StrictTab): Promise<unknown> => databaseOf(await visit(tab));
 
 /** What a reload answers when its page does not load: its service worker waits on a debugger. */
-export const HELD = "held";
+const HELD = "held";
 
 /** The database after a reload, or HELD, with the load stopped, when the page shows no report in 10 s. */
 export async function reloadedOrHeld(tab: StrictTab): Promise<unknown> {

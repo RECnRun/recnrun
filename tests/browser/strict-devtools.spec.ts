@@ -3,7 +3,6 @@ import { expect, test } from "./fixtures/strict-lab.ts";
 import type { LabJournal, StrictExtension } from "./fixtures/strict-lab.ts";
 import {
   APP,
-  HELD,
   armHere,
   databaseOf,
   devtoolsTargets,
@@ -100,8 +99,8 @@ test("strict: DevTools on the armed tab, docked, with no other CDP client", asyn
   expect(await nextStarts(tab)).toEqual({ restarted: "fixture-sw", registered: marked });
   await toggleDevtools(tab, false);
   expect(detached(strict)).toBeUndefined();
-  // Observed: alone, the isolator leaves the restarted worker waiting on a debugger (E8 b-restart).
-  expect(await nextStarts(tab)).toEqual({ restarted: HELD, registered: marked });
+  // Observed: alone, the isolator bootstraps and releases the restarted worker (E8 b-restart).
+  expect(await nextStarts(tab)).toEqual({ restarted: marked, registered: marked });
 });
 
 /** Inspects the app's worker on serviceworker-internals, whose registration is listed last. */
@@ -142,6 +141,6 @@ test("strict: DevTools on the worker from serviceworker-internals, with no other
   await devtoolsClosed(strict);
   await until(() => windowGone("^DevTools"), "the DevTools window to close");
   expect(detached(strict)).toBeUndefined();
-  // Observed: with DevTools gone the restart waits on a debugger, as on the armed tab.
-  expect(await nextStarts(tab)).toEqual({ restarted: HELD, registered: marked });
+  // Observed: with DevTools gone the restart is marked again, as on the armed tab.
+  expect(await nextStarts(tab)).toEqual({ restarted: marked, registered: marked });
 });

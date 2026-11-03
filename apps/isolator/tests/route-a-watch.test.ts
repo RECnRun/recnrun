@@ -119,6 +119,7 @@ describe("Route A closeTarget", () => {
       detach: "ok",
       listedAfter: false,
       at: { start: 5, closed: 10, detached: 15 },
+      sessions: [],
     });
     expect(sent).toEqual([
       {

@@ -11,6 +11,7 @@ import {
   entryOf,
   handleAttached,
 } from "@/background/route-a/attached";
+import { ChildSessions } from "@/background/route-a/children";
 import { closeTarget } from "@/background/route-a/close";
 import { detachEventOf, targetEventOf } from "@/background/route-a/events";
 import { handlePaused, prepareAndRelease } from "@/background/route-a/pause";
@@ -48,6 +49,7 @@ export class RouteAEngine implements RouteA {
   #marker: string | undefined;
   #entries: JournalEntry[] = [];
   #events: TargetEvent[] = [];
+  readonly #children = new ChildSessions();
   readonly #pending = new Set<Promise<void>>();
   readonly #armed = new Map<number, EventListener>();
   readonly #direct = new Set<string>();
@@ -156,7 +158,8 @@ export class RouteAEngine implements RouteA {
   }
 
   async closeTarget(request: unknown): Promise<CloseReport> {
-    return closeTarget(this.#debuggerApi(), targetIdOf(request), this.#now);
+    const options = { now: this.#now, children: this.#children };
+    return closeTarget(this.#debuggerApi(), targetIdOf(request), options);
   }
 
   async clearOrigin(request: unknown): Promise<{ origin: string }> {
@@ -217,10 +220,10 @@ export class RouteAEngine implements RouteA {
   #listenerFor(tabId: number, pauseBeforeScript: boolean): EventListener {
     return (source, method, params) => {
       if (source.tabId !== tabId || this.#marker === undefined) return;
-      const event = targetEventOf(source, method, params, this.#now);
-      if (event) this.#events.push(event);
+      const event = this.#targetEvent(source, method, params);
       if (method === "Target.attachedToTarget" && isAttachedEvent(params)) {
         const entry = entryOf(source, params, event?.at ?? this.#now(), this.#marker);
+        this.#children.add(source, entry.sessionId, entry.targetId);
         this.#entries.push(entry);
         this.#track(this.#handle(source, entry, pauseBeforeScript));
       } else if (method === "Debugger.paused") {
@@ -231,6 +234,16 @@ export class RouteAEngine implements RouteA {
         if (entry) this.#track(handlePaused(api, source, entry, { params, now: this.#now }));
       }
     };
+  }
+
+  /** Journals a Target event and forgets a child session Chrome detached. */
+  #targetEvent(source: Debuggee, method: string, params: unknown): TargetEvent | undefined {
+    const event = targetEventOf(source, method, params, this.#now);
+    if (event) this.#events.push(event);
+    if (method === "Target.detachedFromTarget" && event?.sessionId) {
+      this.#children.remove(event.sessionId);
+    }
+    return event;
   }
 
   /** With `pauseBeforeScript`, a waiting worker gets its bootstrap at the instrumentation pause. */
@@ -253,6 +266,7 @@ export class RouteAEngine implements RouteA {
     const listener = this.#armed.get(tabId);
     if (listener) api.onEvent.removeListener(listener);
     this.#armed.delete(tabId);
+    this.#children.dropTab(tabId);
     await withTimeout(api.detach({ tabId }), "detach").catch(() => undefined);
   }
 

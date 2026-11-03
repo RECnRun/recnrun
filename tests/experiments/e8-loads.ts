@@ -53,14 +53,18 @@ function pauseOf(journal: LabJournal | undefined, marker: string): boolean | und
   return own.at(-1)?.pause?.paused;
 }
 
+/** The service worker's own requests (`/me?from=<script>`) since `since`, in ledger order. */
+async function workerEffects(since: number): Promise<string[]> {
+  const entries = await ledger(since);
+  return entries.filter((entry) => fromOf(entry.path) === SW_SCRIPT).map((entry) => entry.path);
+}
+
 /** One cold registration of the classic worker in an armed, cleared tab (E3's before-script-execution). */
 export async function coldSample(lab: Lab): Promise<ColdSample> {
   const tab = await armedTab(lab);
   const since = await checkpoint();
   const page = await visit(tab);
-  const effects = (await ledger(since))
-    .filter((entry) => fromOf(entry.path) === SW_SCRIPT)
-    .map((entry) => entry.path);
+  const effects = await workerEffects(since);
   const paused = pauseOf(lab.strict.sink.journal, tab.marker);
   await closeTab(lab);
   const { marker } = tab;
@@ -95,10 +99,12 @@ export async function restartSample(lab: Lab) {
   };
   const registered = databaseOf(await visit(tab));
   await stopWorkers(lab.strict);
+  const since = await checkpoint();
   const restarted = await reloadedOrHeld(tab);
+  const effects = await workerEffects(since);
   const trace = traceOf(lab.strict.sink.journal, from);
   await closeTab(lab);
-  return { marker: tab.marker, registered, restarted, trace };
+  return { marker: tab.marker, registered, restarted, effects, trace };
 }
 
 /** Points the selection at `slot` and waits until the lab applied it; returns its update time. */

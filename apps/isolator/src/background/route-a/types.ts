@@ -83,6 +83,14 @@ export interface CloseReport {
   listedAfter: boolean;
   /** `performance.now()` when it started, when `Target.closeTarget` answered, and when it detached. */
   at: { start: number; closed: number; detached: number };
+  /** The armed tabs' child sessions on the target, detached once it closed so its restart reattaches. */
+  sessions: SessionDetach[];
+}
+
+/** One `Target.detachFromTarget` of a child session: `ok` or Chrome's exact error. */
+export interface SessionDetach {
+  sessionId: string;
+  detach: string;
 }
 
 /** One Target event on an armed tab's sessions, or one `chrome.debugger.onDetach` (E8 restarts). */

@@ -22,7 +22,13 @@ export const COLD_KINDS = [
   "cacheUnmarked",
   "storeUnreadable",
 ] as const;
-export const RESTART_KINDS = ["held", "noReport"] as const;
+export const RESTART_KINDS = [
+  "held",
+  "noReport",
+  "noEffect",
+  "firstEffectBeforeMarker",
+  "databaseUnmarked",
+] as const;
 export const OTHER_KINDS = ["attachedBefore"] as const;
 
 /** One cold registration on a tab the lab armed with `marker` and cleared. */
@@ -46,7 +52,16 @@ function storeReason(kind: string, names: Names, expected: string): Reason | und
   return undefined;
 }
 
-function effectReasons({ effects, marker }: ColdSample): Reason[] {
+/** A reload after the lab's closeTarget: what the page reported and the worker's own requests. */
+export interface RestartSample {
+  marker: string;
+  /** The database the restarted worker reported, or `held` when the page never loaded. */
+  restarted: unknown;
+  /** The worker's own requests since the stop, in ledger order. */
+  effects: string[];
+}
+
+function effectReasons({ effects, marker }: { effects: string[]; marker: string }): Reason[] {
   const [first] = effects;
   if (first === undefined) return [{ kind: "noEffect", text: `no request from ${SW_SCRIPT}` }];
   if (isMarked(first, marker)) return [];
@@ -72,18 +87,45 @@ export function evaluateCold(sample: ColdSample): Outcome {
   return { variant: "sw-classic", reasons, tally: {}, waited: [] };
 }
 
-/** A reload after the lab's closeTarget passes when the page loads again, marked or not (E3). */
-export function evaluateRestart(restarted: unknown): Outcome {
-  const reasons: Reason[] = [];
+function loadReason(restarted: unknown): Reason | undefined {
   if (restarted === HELD) {
     const text = "the reload never loaded: the restarted worker waits on a debugger";
-    reasons.push({ kind: "held", text });
-  } else if (typeof restarted !== "string") {
-    reasons.push({ kind: "noReport", text: `the page reported ${JSON.stringify(restarted)}` });
+    return { kind: "held", text };
   }
-  const tally =
-    typeof restarted === "string" && restarted !== HELD ? { [`ran:${restarted}`]: 1 } : {};
-  return { variant: "sw-classic", reasons, tally, waited: [] };
+  if (typeof restarted === "string") return undefined;
+  return { kind: "noReport", text: `the page reported ${JSON.stringify(restarted)}` };
+}
+
+/** A reload after the lab's closeTarget passes when the restarted worker's first request and database carry the marker. */
+export function evaluateRestart(sample: RestartSample): Outcome {
+  const outcome = (reasons: Reason[], tally: Record<string, number>): Outcome => ({
+    variant: "sw-classic",
+    reasons,
+    tally,
+    waited: [],
+  });
+  const failed = loadReason(sample.restarted);
+  if (failed) return outcome([failed], {});
+  const expected = nameOf(sample.marker, SW_STORE);
+  const reasons = effectReasons(sample);
+  if (sample.restarted !== expected) {
+    const text = `the restarted worker opened ${String(sample.restarted)}`;
+    reasons.push({ kind: "databaseUnmarked", text: text.replace(sample.marker, "<marker>") });
+  }
+  const ran = sample.restarted === expected ? "marked" : String(sample.restarted);
+  return outcome(reasons, { [`ran:${ran}`]: 1 });
+}
+
+/** The `Target.detachFromTarget` outcomes in the lab's stop results (Route A's `CloseReport.sessions`). */
+export function childDetachesOf(stops: { result: unknown }[]): string[] {
+  const reports = stops.flatMap(({ result }) =>
+    Array.isArray(result) ? (result as unknown[]) : [],
+  );
+  return reports.flatMap((report) => {
+    const { sessions } = (report ?? {}) as { sessions?: unknown };
+    if (!Array.isArray(sessions)) return [];
+    return sessions.map((session) => String((session as { detach?: unknown }).detach));
+  });
 }
 
 /** Passes when no target was attached before the isolator armed anything: no other client exists. */

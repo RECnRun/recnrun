@@ -3,15 +3,16 @@ import { expect, test } from "../browser/fixtures/strict-lab.ts";
 import type { StrictExtension } from "../browser/fixtures/strict-lab.ts";
 import { APP } from "../browser/fixtures/strict-steps.ts";
 import { findWindow } from "../browser/fixtures/x-display.ts";
+import { capabilityOf } from "./e3-samples.ts";
 import type { Outcome } from "./e5-samples.ts";
 import { SWITCH_KINDS, evaluateSwitch } from "./e6-samples.ts";
 import { browserOf, coldSample, restartSample, switchSample } from "./e8-loads.ts";
 import type { Lab } from "./e8-loads.ts";
 import { COLD_KINDS, CONDITION, OTHER_KINDS, RESTART_KINDS, e8Verdict } from "./e8-samples.ts";
-import { evaluateCold, evaluateOthers, evaluateRestart } from "./e8-samples.ts";
+import { childDetachesOf, evaluateCold, evaluateOthers, evaluateRestart } from "./e8-samples.ts";
 import { control } from "./page-loads.ts";
 import { sized } from "./samples.ts";
-import { appendVerdict } from "./verdicts.ts";
+import { appendVerdict, mergeCapabilities } from "./verdicts.ts";
 import type { Verdict } from "./verdicts.ts";
 
 // Hypotheses of the strict lab; docs/poc/namespace-sessions/experiments/E8.md reports them.
@@ -74,12 +75,20 @@ test.describe("E8: Route A and B in Chrome without CDP, the isolator installed b
       await finish(verdict, samples, COLD_SAMPLES);
     });
 
-    test("b-restart: a reload after the lab's closeTarget loads the page again", async ({
+    test("b-restart: a reload after the lab's closeTarget restarts the worker marked", async ({
       strict,
     }) => {
       const lab = await labOf(strict);
       const samples = await repeat(RESTART_SAMPLES, () => restartSample(lab));
-      const outcomes = samples.map(({ restarted }) => evaluateRestart(restarted));
+      const outcomes = samples.map(evaluateRestart);
+      const detaches = samples.flatMap(({ trace }) => childDetachesOf(trace.stops));
+      const description =
+        "Target.detachFromTarget, on the tab's session, of its child session on a closed service worker";
+      await mergeCapabilities({
+        debugger: {
+          "worker-child-session-detach": capabilityOf(description, detaches, strict.method),
+        },
+      });
       const verdict = e8Verdict("b-restart", outcomes, browserOf(strict), RESTART_KINDS);
       await finish(verdict, samples, RESTART_SAMPLES);
     });

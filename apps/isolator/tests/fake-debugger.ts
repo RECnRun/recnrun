@@ -37,6 +37,11 @@ const REPLIES: Record<string, object> = {
 
 export const noWait = async () => undefined;
 
+interface AttachedParams {
+  sessionId?: string;
+  targetInfo?: { targetId: string };
+}
+
 function listeners<T>() {
   const set = new Set<T>();
   return { set, addListener: (l: T) => set.add(l), removeListener: (l: T) => set.delete(l) };
@@ -75,9 +80,26 @@ export function fakeDebugger(options: FakeOptions = {}) {
       const key = heldKey(target, until);
       held.set(key, [...(held.get(key) ?? []), () => resolve(reply)]);
     });
+  // Auto-attached child sessions by id, with their target: Chrome keeps them across a stop (E8).
+  const children = new Map<string, { source: Debuggee; targetId: string }>();
   const emit = (source: Debuggee, method: string, params?: object) => {
+    const { sessionId, targetInfo } = (params ?? {}) as AttachedParams;
+    if (method === "Target.attachedToTarget" && sessionId && targetInfo)
+      children.set(sessionId, { source, targetId: targetInfo.targetId });
     if (!muted.includes(method))
       onEvent.set.forEach((listener) => listener(source, method, params));
+  };
+  /** Starts a stopped service worker again: Chrome holds it for a surviving session, unreported. */
+  const restart = (targetId: string, sessionId: string): boolean => {
+    const stale = [...children.values()].find((child) => child.targetId === targetId);
+    if (stale) return false;
+    const targetInfo = { targetId, type: "service_worker", url: `${URLS.serviceWorkerUrl}` };
+    emit({ tabId: 7 }, "Target.attachedToTarget", {
+      sessionId,
+      targetInfo,
+      waitingForDebugger: true,
+    });
+    return true;
   };
   const attachEvents = (source: Debuggee) => {
     for (const [type, url] of [
@@ -94,11 +116,17 @@ export function fakeDebugger(options: FakeOptions = {}) {
       });
     }
   };
-  const effects: Record<string, (target: Debuggee, params?: { targetId?: unknown }) => void> = {
+  const effects: Record<
+    string,
+    (target: Debuggee, params?: { targetId?: unknown; sessionId?: unknown }) => void
+  > = {
     "Page.reload": attachEvents,
     "Debugger.pause": (target) => emit(target, "Debugger.paused"),
     "Target.closeTarget": (_, params) => {
       if (!options.keepsClosed) closed.add(String(params?.targetId));
+    },
+    "Target.detachFromTarget": (_, params) => {
+      children.delete(String(params?.sessionId));
     },
   };
   const api: DebuggerApi = {
@@ -123,7 +151,7 @@ export function fakeDebugger(options: FakeOptions = {}) {
     onEvent,
     onDetach,
   };
-  return { api, sent, onEvent, onDetach, emit };
+  return { api, sent, onEvent, onDetach, emit, restart };
 }
 
 export function byId(results: ProbeResult[]): Record<string, ProbeResult> {
