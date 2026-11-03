@@ -29,7 +29,8 @@ paths:
 - Browser tests stay serial (`--workers=1`), coverage included.
 - The Node projects run with `isolate: false`, so files of one project share a worker: reset module state in `beforeEach` (as `fakeBrowser.reset()` does) instead of relying on a fresh module per file.
 - Pass Playwright arguments after `--`, for example `vp run test:e2e -- tests/e2e/dashboard-tab.spec.ts -g 'empty'`.
-- On failure, read `.artifacts/docker/<run-id>/` (`run.log`, `test-results`, `playwright-report`).
+- On failure, read `.artifacts/docker/<run-id>/` (`run.log`, `test-results`, `playwright-report`, `evidence`, and `versions.json` with the image's Chrome, Node, pnpm, and Playwright versions).
+
 - `vp run test:coverage` also fails when the measured file set differs from the source tree minus the configured excludes, or when any file with executable code is under the per-file floor of 80% lines, statements, and functions and 75% branches (`scripts/coverage.checks.mjs`); a new source folder outside `apps/*/src` or `packages/*/src` needs that script and `coverage.include` updated together. Lift a file under the floor with tests of its behavior, never by excluding it.
 - `:local` variants open host windows; use them only for debugging.
 

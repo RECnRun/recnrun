@@ -1,16 +1,17 @@
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { delimiter, join, resolve } from "node:path";
+import { basename, delimiter, join, resolve } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const runner = join(root, "scripts/test-container.mjs");
 const fixture = fileURLToPath(new URL("./docker-fixture.mjs", import.meta.url));
 
-function launch(context, scenario = "success", extra = []) {
+function launch(context, scenario = "success", extra = [], task = "test:e2e:local") {
   const directory = mkdtempSync(join(tmpdir(), "recnrun-container-"));
   context.after(() => rmSync(directory, { recursive: true, force: true }));
   const docker = join(directory, "docker");
@@ -18,10 +19,12 @@ function launch(context, scenario = "success", extra = []) {
     writeFileSync(docker, `#!${process.execPath}\nimport ${JSON.stringify(fixture)};\n`);
     chmodSync(docker, 0o755);
   }
-  const child = spawn(process.execPath, [runner, "test:e2e:local", ...extra], {
+  // verify sets the smoke mode in the container; the checks decide it per task themselves.
+  const { RECNRUN_EXPERIMENT_SAMPLES: _inherited, ...inherited } = process.env;
+  const child = spawn(process.execPath, [runner, task, ...extra], {
     cwd: directory,
     env: {
-      ...process.env,
+      ...inherited,
       PATH: scenario === "missing-cli" ? directory : `${directory}${delimiter}${process.env.PATH}`,
       DOCKER_FIXTURE_DIR: directory,
       DOCKER_FIXTURE_SCENARIO: scenario,
@@ -49,6 +52,24 @@ function launch(context, scenario = "success", extra = []) {
   });
 }
 
+function directoryCopies(calls) {
+  return calls.filter(([command, source]) => command === "cp" && source.endsWith("/."));
+}
+
+async function imageVersions() {
+  const run = promisify(execFile);
+  // Inside the test container the image is the current system and Docker is not available.
+  if (process.env.RECNRUN_TEST_CONTAINER === "1") {
+    const versions = JSON.parse(readFileSync("/opt/recnrun/versions.json", "utf8"));
+    return { reported: (await run("google-chrome", ["--version"])).stdout.trim(), versions };
+  }
+  // The runtime stage holds Chrome without the workspace, so the build reuses Docker's cache.
+  const build = ["build", "--quiet", "--target", "runtime", "--file", "Dockerfile.tests", "."];
+  const image = (await run("docker", build, { cwd: root, maxBuffer: 1 << 24 })).stdout.trim();
+  const version = ["run", "--rm", "--entrypoint", "google-chrome", image, "--version"];
+  return { reported: (await run("docker", version)).stdout.trim() };
+}
+
 function readCalls(directory) {
   try {
     return readFileSync(join(directory, "calls.jsonl"), "utf8")
@@ -69,6 +90,13 @@ await test("forwards arguments literally and runs the current workspace in an is
   const create = result.calls.find(([command]) => command === "create");
   assert.ok(create.includes("--init"));
   assert.ok(create.includes("--shm-size=2g"));
+  assert.ok(create.includes(`RECNRUN_RUN_ID=${basename(result.artifacts)}`));
+  assert.ok(
+    result.calls.some(
+      ([command, source]) =>
+        command === "cp" && source.endsWith(":/workspace/.artifacts/evidence/."),
+    ),
+  );
   assert.ok(!create.includes("--volume"));
   assert.ok(!create.includes("--publish"));
   assert.deepEqual(create.slice(-4), ["sha256:fixture-image", "test:e2e:local", "--grep", grep]);
@@ -79,12 +107,22 @@ await test("forwards arguments literally and runs the current workspace in an is
   assert.equal(result.calls.at(-1)[0], "rm");
 });
 
+await test("runs the experiments of verify in smoke mode and leaves the experiments task alone", async (context) => {
+  const verify = await launch(context, "success", [], "verify:local");
+  assert.equal(verify.code, 0, verify.output);
+  const verifyCreate = verify.calls.find(([command]) => command === "create");
+  assert.ok(verifyCreate.includes("RECNRUN_EXPERIMENT_SAMPLES=smoke"));
+  const experiments = await launch(context, "success", [], "test:experiments:local");
+  assert.equal(experiments.code, 0, experiments.output);
+  const create = experiments.calls.find(([command]) => command === "create");
+  assert.ok(!create.some((argument) => argument.startsWith("RECNRUN_EXPERIMENT_SAMPLES=")));
+});
+
 await test("preserves a failing test's exit code and copies evidence before removing the container", async (context) => {
   const result = await launch(context, "test-failure");
   assert.equal(result.code, 7, result.output);
-  const copies = result.calls.filter(([command]) => command === "cp");
-  assert.equal(copies.length, 3);
-  for (const artifact of ["coverage", "test-results", "playwright-report"]) {
+  assert.equal(directoryCopies(result.calls).length, 4);
+  for (const artifact of ["coverage", "test-results", "playwright-report", "evidence"]) {
     assert.equal(
       readFileSync(join(result.artifacts, artifact, "evidence.txt"), "utf8"),
       "Test evidence",
@@ -92,6 +130,28 @@ await test("preserves a failing test's exit code and copies evidence before remo
   }
   assert.equal(result.calls.at(-1)[0], "rm");
 });
+
+await test("records the image's tool versions and id in versions.json", async (context) => {
+  const result = await launch(context, "test-failure");
+  assert.equal(result.code, 7, result.output);
+  const versions = JSON.parse(readFileSync(join(result.artifacts, "versions.json"), "utf8"));
+  assert.deepEqual(Object.keys(versions).sort(), ["chrome", "image", "node", "playwright", "pnpm"]);
+  assert.equal(versions.image, "sha256:fixture-image");
+  assert.match(versions.chrome, /^Google Chrome \d+\./);
+  assert.equal(result.calls.at(-1)[0], "rm");
+});
+
+await test(
+  "the test image ships Google Chrome Stable 156 or later",
+  { timeout: 1_800_000 },
+  async () => {
+    const { reported, versions } = await imageVersions();
+    const match = /^Google Chrome (\d+)\.\d+\.\d+\.\d+$/.exec(reported);
+    assert.ok(match, `Unexpected google-chrome --version output: ${reported}`);
+    assert.ok(Number(match[1]) >= 156, `Google Chrome ${match[1]} is older than 156`);
+    if (versions) assert.equal(versions.chrome, reported);
+  },
+);
 
 await test("reports unavailable Docker without falling back to local browsers", async (context) => {
   const result = await launch(context, "unavailable");
@@ -134,7 +194,7 @@ await test("removes the container even if an artifact destination cannot be crea
   const result = await launch(context, "blocked-export");
   assert.equal(result.code, 1, result.output);
   assert.match(result.output, /artifact/i);
-  assert.equal(result.calls.filter(([command]) => command === "cp").length, 2);
+  assert.equal(directoryCopies(result.calls).length, 3);
   assert.equal(result.calls.at(-1)[0], "rm");
 });
 
@@ -145,7 +205,8 @@ await test(
     const result = await launch(context, "interrupt");
     assert.equal(result.code, 130, result.output);
     assert.ok(result.calls.some(([command]) => command === "stop"));
-    assert.equal(result.calls.filter(([command]) => command === "cp").length, 3);
+    assert.equal(directoryCopies(result.calls).length, 4);
+
     assert.equal(result.calls.at(-1)[0], "rm");
   },
 );

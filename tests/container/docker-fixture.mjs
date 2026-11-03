@@ -38,6 +38,14 @@ if (command === "wait") {
 if (command === "cp") {
   if (scenario === "copy-failure") process.exit(1);
   const destination = args.at(-1);
-  mkdirSync(destination, { recursive: true });
-  writeFileSync(join(destination, "evidence.txt"), "Test evidence");
+  if (args[1].endsWith("/versions.json")) {
+    const versions = { chrome: "Google Chrome 156.0.8078.80", node: "v24.21.0" };
+    writeFileSync(
+      destination,
+      JSON.stringify({ ...versions, pnpm: "12.14.0", playwright: "1.64.1" }),
+    );
+  } else {
+    mkdirSync(destination, { recursive: true });
+    writeFileSync(join(destination, "evidence.txt"), "Test evidence");
+  }
 }
