@@ -3,20 +3,57 @@ import type { CaptureHandle, ReplayDriver } from "./driver.ts";
 import type { Recorder, ReplayBlobs } from "./record.ts";
 import { redact } from "./scope.ts";
 
-/** A value with every secret replaced in its strings; keys and nesting are kept. */
-function redactDeep(value: unknown, secrets: readonly string[]): unknown {
-  if (typeof value === "string") return redact(value, secrets);
-  if (Array.isArray(value)) return value.map((item) => redactDeep(item, secrets));
+/**
+ * The payload fields that carry what the page did or said (URLs, header values, bodies, console
+ * and error text, storage keys and values, DOM text and values); everything under them is content.
+ * Hashes, ids, enums, encodings, and timestamps stay as captured, so the event remains valid.
+ */
+const CONTENT_KEYS: ReadonlySet<string> = new Set([
+  "url",
+  "headers",
+  "postData",
+  "body",
+  "payload",
+  "data",
+  "text",
+  "args",
+  "value",
+  "oldValue",
+  "newValue",
+  "key",
+  "name",
+  "id",
+  "testId",
+  "description",
+  "className",
+  "unserializableValue",
+  "functionName",
+  "message",
+  "userInput",
+  "errorText",
+  "errorMessage",
+  "statusText",
+  "error",
+  "title",
+]);
+
+/** A payload with every secret replaced in its content fields; structure and other fields are kept. */
+function redactContent(value: unknown, secrets: readonly string[], content: boolean): unknown {
+  if (typeof value === "string") return content ? redact(value, secrets) : value;
+  if (Array.isArray(value)) return value.map((item) => redactContent(item, secrets, content));
   if (value === null || typeof value !== "object") return value;
   return Object.fromEntries(
-    Object.entries(value).map(([key, item]) => [key, redactDeep(item, secrets)]),
+    Object.entries(value).map(([key, item]) => [
+      key,
+      redactContent(item, secrets, content || CONTENT_KEYS.has(key)),
+    ]),
   );
 }
 
 const redactEvent = (event: Event, secrets: readonly string[]): Event =>
   secrets.length === 0
     ? event
-    : ({ ...event, payload: redactDeep(event.payload, secrets) } as Event);
+    : ({ ...event, payload: redactContent(event.payload, secrets, false) } as Event);
 
 // The adapter hands text bodies over as strings, so a secret a response echoes is redacted too.
 function redactingBlobs(

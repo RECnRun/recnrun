@@ -1,4 +1,5 @@
 import {
+  CapturedEventSchema,
   coverageOf,
   type CapturedEvent,
   type Event,
@@ -145,6 +146,94 @@ test("a replay journals what its tabs did under the step that caused it, with se
   expect(evidence[0]?.payload).toMatchObject({ postData: "[redacted]" });
   expect(bodies).toEqual(['{"echo":"[redacted]"}']);
   expect(coverage()).toEqual(coverageOf("run-evidence", events));
+});
+
+/** A driver that delivers `events` when the click runs and captures nothing else. */
+function deliveringDriver(events: CapturedEvent[]) {
+  const { driver } = fakeDriver({ elements: { "fetch-json": {}, result: { text: "500" } } });
+  let sink: CaptureSink | undefined;
+  const delivering: ReplayDriver = {
+    ...driver,
+    act: async (command, options) => {
+      if (command.kind === "click") for (const event of events) sink?.event(event);
+      return driver.act(command, options);
+    },
+    onCapture: async (given) => {
+      sink = given;
+      return { drain: async () => void (sink = undefined) };
+    },
+  };
+  return delivering;
+}
+
+const SHA = "a".repeat(64);
+const BLOB = {
+  sha256: SHA,
+  mime: "application/json",
+  encoding: "utf8",
+  size: 3,
+  condition: "captured",
+};
+
+// Every structural value here contains the secret "a"; only content may change.
+const STRUCTURED: CapturedEvent[] = [
+  captured(1, "network", "response", {
+    requestId: "r1",
+    url: `${URL}?token=a`,
+    status: 200,
+    statusText: "OK",
+    mimeType: "application/json",
+    cache: "network",
+    headers: { "content-type": "application/json", "x-token": "a1" },
+  }),
+  captured(2, "network", "body", {
+    requestId: "r1",
+    url: URL,
+    condition: "captured",
+    mimeType: "application/json",
+    blob: BLOB,
+  }),
+  captured(3, "storage", "snapshot", {
+    observation: "snapshot",
+    reason: "attach",
+    area: "local",
+    storageKey: "http://127.0.0.1:4600",
+    items: [{ key: "pass", value: "a" }],
+  }),
+  captured(4, "console", "log", { source: "javascript", level: "warning", text: "got a" }),
+];
+
+test("redaction changes content fields only: hashes, ids, enums, and encodings stay valid", async () => {
+  const { store, events } = memoryStore();
+  const outcome = await replayFlow(deliveringDriver(STRUCTURED), FLOW, {
+    clock: fakeClock(),
+    secrets: { pin: PIN, letter: "a" },
+    run: { store, manifest: MANIFEST },
+  });
+  expect(outcome.status).toBe("passed");
+  const evidence = events.filter(({ category }) => category !== "step");
+  expect(evidence.map(({ type }) => type)).toEqual(["response", "body", "snapshot", "log"]);
+  for (const event of evidence) {
+    const issues = CapturedEventSchema["~standard"].validate(event);
+    expect(issues, `${event.type} is a valid captured event after redaction`).not.toHaveProperty(
+      "issues",
+    );
+  }
+  const [response, body, snapshot, log] = evidence.map(({ payload }) => payload);
+  expect(response).toMatchObject({
+    url: "http://127.0.0.1:4600/[redacted]pi/json?token=[redacted]",
+    mimeType: "application/json",
+    cache: "network",
+    headers: { "content-type": "[redacted]pplic[redacted]tion/json", "x-token": "[redacted]1" },
+  });
+  expect(body).toMatchObject({ condition: "captured", mimeType: "application/json", blob: BLOB });
+  expect(snapshot).toMatchObject({
+    observation: "snapshot",
+    reason: "attach",
+    area: "local",
+    items: [{ key: "p[redacted]ss", value: "[redacted]" }],
+  });
+  expect(log).toMatchObject({ source: "javascript", level: "warning", text: "got [redacted]" });
 });
 
 test("a run that cannot start never starts the capture", async () => {
