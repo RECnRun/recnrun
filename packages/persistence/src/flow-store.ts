@@ -1,3 +1,4 @@
+import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import {
   checkInputValues,
@@ -9,6 +10,7 @@ import {
   type RunCatalogEntry,
   type RunManifest,
 } from "@recnrun/protocol";
+import { hasCode } from "./atomic-file.ts";
 import { flowPaths, scanFlowFolders } from "./flow-folders.ts";
 import {
   createRun,
@@ -41,6 +43,13 @@ export interface StoredFlow {
   revision: string;
 }
 
+/** A dataset as listed: its values, or `problem` when the file cannot be used as it is. */
+export interface DatasetEntry {
+  name: string;
+  inputs: Record<string, unknown>;
+  problem?: string;
+}
+
 /** The flows of this user in `<home>/.recnrun/flows`, with a rebuildable SQLite catalog. */
 export interface FlowStore {
   readonly root: string;
@@ -59,6 +68,8 @@ export interface FlowStore {
   getRevision(flowId: string, revision: string): Promise<Flow>;
   saveDataset(flowId: string, name: string, dataset: Dataset): Promise<void>;
   getDataset(flowId: string, name: string): Promise<Dataset>;
+  /** Every `datasets/<name>.json` by name; one that is unreadable or no longer fits the flow carries its `problem`. */
+  listDatasets(flowId: string): Promise<DatasetEntry[]>;
   /** Creates a run of a stored revision and opens its journal; the caller closes it. */
   createRun(manifest: RunManifest): Promise<RunHandle>;
   finishRun(result: RunResult): Promise<void>;
@@ -114,6 +125,38 @@ async function readDataset(flowsRoot: string, flowId: string, name: string): Pro
   return checkedDataset(flow, path, await readStored("dataset", path));
 }
 
+/** The dataset names in a flow's `datasets/` folder, sorted; a flow saved without datasets has no folder. */
+async function datasetNames(folder: string): Promise<string[]> {
+  try {
+    const entries = await readdir(join(folder, "datasets"), { withFileTypes: true });
+    return entries
+      .filter((entry) => entry.isFile() && entry.name.endsWith(".json"))
+      .map((entry) => entry.name.slice(0, -".json".length))
+      .toSorted();
+  } catch (error) {
+    if (hasCode(error, "ENOENT")) return [];
+    throw error;
+  }
+}
+
+async function listDatasets(flowsRoot: string, flowId: string): Promise<DatasetEntry[]> {
+  const { flow } = await getFlow(flowsRoot, flowId);
+  const paths = flowPaths(flowsRoot, flowId);
+  const entries: DatasetEntry[] = [];
+  for (const name of await datasetNames(paths.folder)) {
+    try {
+      const path = paths.dataset(name);
+      const dataset = checkedDataset(flow, path, await readStored("dataset", path));
+      entries.push({ name, inputs: dataset.inputs });
+    } catch (error) {
+      // The run form shows what is wrong with the file instead of hiding it.
+      if (!(error instanceof FlowStoreError)) throw error;
+      entries.push({ name, inputs: {}, problem: error.message });
+    }
+  }
+  return entries;
+}
+
 /** Opens the flow store of the user whose home folder is `home`, rebuilding a missing index. */
 export async function openFlowStore({
   home,
@@ -150,6 +193,7 @@ export async function openFlowStore({
     saveDataset: (flowId, name, dataset) =>
       exclusive(() => writeDataset(flowsRoot, flowId, name, dataset)),
     getDataset: (flowId, name) => exclusive(() => readDataset(flowsRoot, flowId, name)),
+    listDatasets: (flowId) => exclusive(() => listDatasets(flowsRoot, flowId)),
     createRun: (manifest) => exclusive(() => createRun(context, manifest)),
     finishRun: (result) => exclusive(() => finishRun(context, result)),
     getRun: (flowId, runId) => readRunFolder(runFolder(paths(flowId).folder, runId)),

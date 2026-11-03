@@ -30,6 +30,7 @@ export {
 export { canonicalJson, canonicalize } from "./canonical.ts";
 export {
   openFlowStore,
+  type DatasetEntry,
   type FlowStore,
   type FlowStoreOptions,
   type SavedFlow,

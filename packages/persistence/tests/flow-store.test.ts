@@ -193,6 +193,35 @@ test("a dataset must fit the flow's inputs when saved and when read; no secret i
   await expect(read).rejects.not.toThrow(/1234/);
 });
 
+test("lists the flow's datasets by name, naming the problem of one that no longer fits", async () => {
+  const spike = spikeFlow();
+  await store.saveFlow(spike);
+  expect(await store.listDatasets("form-submit")).toEqual([]);
+  await store.saveDataset("form-submit", "zoe", { schemaVersion: 1, inputs: { name: "Zoe" } });
+  await store.saveDataset("form-submit", "ana", { schemaVersion: 1, inputs: { name: "Ana" } });
+  expect(await store.listDatasets("form-submit")).toEqual([
+    { name: "ana", inputs: { name: "Ana" } },
+    { name: "zoe", inputs: { name: "Zoe" } },
+  ]);
+  const stale = { schemaVersion: 1, inputs: { name: "Bo", nope: 1 } };
+  await writeFile(join(folder(), "datasets", "stale.json"), JSON.stringify(stale));
+  await writeFile(join(folder(), "datasets", "broken.json"), "{");
+  await writeFile(join(folder(), "datasets", "notes.txt"), "not a dataset");
+  const listed = await store.listDatasets("form-submit");
+  expect(listed.map(({ name }) => name)).toEqual(["ana", "broken", "stale", "zoe"]);
+  expect(listed[1]).toMatchObject({
+    name: "broken",
+    inputs: {},
+    problem: expect.stringMatching(/JSON/),
+  });
+  expect(listed[2]).toEqual({
+    name: "stale",
+    inputs: {},
+    problem: expect.stringContaining('Input "nope" is not declared in the flow'),
+  });
+  await expect(store.listDatasets("absent")).rejects.toMatchObject({ code: "not-found" });
+});
+
 test("a corrupt manifest is reported and the other flows still list", async () => {
   await store.saveFlow(spikeFlow());
   await store.saveFlow({ ...spikeFlow(), id: "other", name: "Other" });

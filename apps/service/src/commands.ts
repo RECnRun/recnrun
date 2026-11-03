@@ -1,6 +1,7 @@
 import type { FlowStore } from "@recnrun/persistence";
 import { FlowStoreError } from "@recnrun/persistence";
 import {
+  PROTOCOL_SCHEMA_VERSION,
   validateFlow,
   type FlowStoreErrorCode,
   type LeaseFence,
@@ -101,6 +102,16 @@ function flowCommands(deps: CommandDeps): CommandHandlers {
       }),
     "flow.getRevision": ({ flowId, revision }) =>
       stored(async () => ({ flow: await deps.store().getRevision(flowId, revision), revision })),
+    "dataset.list": ({ flowId }) =>
+      stored(async () => ({ datasets: await deps.store().listDatasets(flowId) })),
+    // The store refuses a secret input's value or a value of another type (`invalid`).
+    "dataset.save": ({ flowId, name, inputs }) =>
+      stored(async () => {
+        await deps
+          .store()
+          .saveDataset(flowId, name, { schemaVersion: PROTOCOL_SCHEMA_VERSION, inputs });
+        return { name };
+      }),
     "flow.replay": (params) => stored(() => startReplay(deps, params)),
     "run.summary": ({ runId }) => stored(() => runSummary(deps, runId)),
     "run.queryEvents": (query) => stored(() => queryEvents(deps, query)),
