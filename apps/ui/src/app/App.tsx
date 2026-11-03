@@ -5,6 +5,7 @@ import { type Route, hrefOf, parseHash } from "@/app/routes";
 import { Catalog } from "@/features/catalog/Catalog";
 import { Editor } from "@/features/editor/Editor";
 import { Recorder } from "@/features/recorder/Recorder";
+import { Run } from "@/features/run/Run";
 import { Setup } from "@/features/setup/Setup";
 
 const NAV: { label: string; route: Route }[] = [
@@ -48,7 +49,7 @@ function Screen({ route, navigate }: { route: Route; navigate: (route: Route) =>
         />
       );
     case "run":
-      return <p class="muted">This screen is not available yet.</p>;
+      return <Run flowId={route.flowId} />;
   }
 }
 
