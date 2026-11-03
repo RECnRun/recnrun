@@ -1,4 +1,5 @@
 import { browser } from "wxt/browser";
+import { exposeLab } from "@/background/lab/expose";
 import { exposeOriginal } from "@/background/original/expose";
 import { exposeProbes } from "@/background/probes/expose";
 import { exposeRouteA } from "@/background/route-a/expose";
@@ -55,6 +56,7 @@ export function startBackground(): void {
     }),
     browser.tabs.onCreated,
   );
+  exposeLab();
   const record = (): void => void recordLoaded();
   browser.runtime.onInstalled.addListener(record);
   browser.runtime.onStartup.addListener(record);

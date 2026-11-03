@@ -1,0 +1,38 @@
+{
+  "type": "object",
+  "properties": {
+    "lab": {
+      "type": "object",
+      "properties": {
+        "journalUrl": { "type": "string" },
+        "marker": { "type": "string" },
+        "arm": {
+          "type": "object",
+          "properties": {
+            "origin": { "type": "string" },
+            "pauseBeforeScript": { "type": "boolean" },
+            "route": { "type": "string" },
+            "clear": { "type": "boolean" },
+            "urlPattern": { "type": "string" },
+            "selection": { "type": "string" }
+          }
+        },
+        "selection": {
+          "type": "object",
+          "properties": {
+            "slot": { "type": "integer" },
+            "origins": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "stop": {
+          "type": "object",
+          "properties": {
+            "id": { "type": "string" },
+            "origin": { "type": "string" }
+          }
+        },
+        "pollMs": { "type": "integer" }
+      }
+    }
+  }
+}

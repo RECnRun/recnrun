@@ -27,6 +27,8 @@ export default defineConfig({
     // E7 adds scripting for Route C's MAIN-world page bootstrap (PLAN.md P1.6); E4 adds declarativeNetRequest to block
     // the fixture apps' service-worker scripts and close their tabs, on the loopback only (P1.3).
     permissions: ["storage", "management", "debugger", "scripting", "declarativeNetRequest"],
+    // E8's strict lab: Chrome passes a policy's `3rdparty` value to chrome.storage.managed only through a schema.
+    storage: { managed_schema: "lab-schema.json" },
     // Route C injects on the app origins, and on loopback frames and popups only when E7 names them (no SSO host here, R5).
     host_permissions: [
       "http://app.localhost:4600/*",
