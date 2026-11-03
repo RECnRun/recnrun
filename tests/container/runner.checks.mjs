@@ -1,56 +1,10 @@
 import assert from "node:assert/strict";
-import { execFile, spawn } from "node:child_process";
-import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { basename, delimiter, join, resolve } from "node:path";
+import { execFile } from "node:child_process";
+import { readFileSync } from "node:fs";
+import { basename, join } from "node:path";
 import { test } from "node:test";
-import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
-
-const root = fileURLToPath(new URL("../../", import.meta.url));
-const runner = join(root, "scripts/test-container.mjs");
-const fixture = fileURLToPath(new URL("./docker-fixture.mjs", import.meta.url));
-
-function launch(context, scenario = "success", extra = [], task = "test:e2e:local") {
-  const directory = mkdtempSync(join(tmpdir(), "recnrun-container-"));
-  context.after(() => rmSync(directory, { recursive: true, force: true }));
-  const docker = join(directory, "docker");
-  if (scenario !== "missing-cli") {
-    writeFileSync(docker, `#!${process.execPath}\nimport ${JSON.stringify(fixture)};\n`);
-    chmodSync(docker, 0o755);
-  }
-  // verify sets the smoke mode in the container; the checks decide it per task themselves.
-  const { RECNRUN_EXPERIMENT_SAMPLES: _inherited, ...inherited } = process.env;
-  const child = spawn(process.execPath, [runner, task, ...extra], {
-    cwd: directory,
-    env: {
-      ...inherited,
-      PATH: scenario === "missing-cli" ? directory : `${directory}${delimiter}${process.env.PATH}`,
-      DOCKER_FIXTURE_DIR: directory,
-      DOCKER_FIXTURE_SCENARIO: scenario,
-      RECNRUN_TEST_CONTAINER: "",
-      RECNRUN_TEST_ARTIFACTS: join(directory, "artifacts"),
-    },
-    stdio: ["ignore", "pipe", "pipe"],
-  });
-  let output = "";
-  child.stdout.on("data", (data) => {
-    output += data;
-    if (scenario === "interrupt" && output.includes("Container test output")) {
-      child.kill("SIGINT");
-    }
-  });
-  child.stderr.on("data", (data) => (output += data));
-  return new Promise((done, reject) => {
-    child.on("error", reject);
-    child.on("close", (code) => {
-      const calls = readCalls(directory);
-      const build = calls.find(([command]) => command === "build");
-      const artifacts = build && resolve(build[build.indexOf("--iidfile") + 1], "..");
-      done({ code, calls, output, artifacts });
-    });
-  });
-}
+import { launch, root } from "./launch.mjs";
 
 function directoryCopies(calls) {
   return calls.filter(([command, source]) => command === "cp" && source.endsWith("/."));
@@ -68,17 +22,6 @@ async function imageVersions() {
   const image = (await run("docker", build, { cwd: root, maxBuffer: 1 << 24 })).stdout.trim();
   const version = ["run", "--rm", "--entrypoint", "google-chrome", image, "--version"];
   return { reported: (await run("docker", version)).stdout.trim() };
-}
-
-function readCalls(directory) {
-  try {
-    return readFileSync(join(directory, "calls.jsonl"), "utf8")
-      .trim()
-      .split("\n")
-      .map((line) => JSON.parse(line));
-  } catch {
-    return [];
-  }
 }
 
 await test("forwards arguments literally and runs the current workspace in an isolated container", async (context) => {
@@ -286,7 +229,10 @@ await test("public tests route through Docker while local variants and the hooks
     readFileSync(join(root, ".vite-hooks/pre-commit"), "utf8"),
     /vp staged\nvp check\nvp run --no-cache deps\nvp run --no-cache test:unit\n/,
   );
-  assert.equal(readFileSync(join(root, ".vite-hooks/pre-push"), "utf8").trim(), "vp run verify");
+  assert.equal(
+    readFileSync(join(root, ".vite-hooks/pre-push"), "utf8").trim(),
+    "node scripts/git-hooks/pre-push.mjs",
+  );
 });
 
 await test("the Docker image runs the Node major that engines.node requires", () => {

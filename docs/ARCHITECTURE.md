@@ -159,16 +159,19 @@ Recording in the user's own applications needs more than `storage`. Whatever M1 
 
 ## Toolchain
 
-| Concern                  | Tool                                                                               |
-| ------------------------ | ---------------------------------------------------------------------------------- |
-| Package manager, tasks   | Vite+ (`vp`) with pnpm workspaces and a version catalog                            |
-| Format, lint, type check | `vp check`: Oxfmt, Oxlint (type aware, with `eslint-plugin-sonarjs`), tsgo         |
-| Architecture boundaries  | dependency-cruiser (`.dependency-cruiser.cjs`)                                     |
-| Dead code, duplication   | Knip (`knip.jsonc`), jscpd                                                         |
-| Documentation            | `scripts/check-docs.mjs` (`vp run docs:check`): relative links and anchors resolve |
-| Unit and component tests | Vitest with V8 coverage; Vitest Browser Mode with Playwright Chromium              |
-| End-to-end               | Playwright, headed Chromium with the test extension, in Docker on Xvfb             |
-| Extension build          | WXT with `@preact/preset-vite`                                                     |
+| Concern                  | Tool                                                                                                                 |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------- |
+| Package manager, tasks   | Vite+ (`vp`) with pnpm workspaces and a version catalog                                                              |
+| Format, lint, type check | `vp check`: Oxfmt, Oxlint (type aware, with `eslint-plugin-sonarjs`), tsgo                                           |
+| Architecture boundaries  | dependency-cruiser (`.dependency-cruiser.cjs`)                                                                       |
+| Dead code, duplication   | Knip (`knip.jsonc`), jscpd                                                                                           |
+| Documentation            | `scripts/check-docs.mjs` (`vp run docs:check`): relative links and anchors resolve                                   |
+| Unit and component tests | Vitest with V8 coverage; Vitest Browser Mode with Playwright Chromium                                                |
+| End-to-end               | Playwright, headed Chromium with the test extension, in Docker on Xvfb                                               |
+| Extension build          | WXT with `@preact/preset-vite`                                                                                       |
+| Git hooks                | `.vite-hooks/`: pre-commit runs the fast gates and unit tests, commit-msg the commit rules, pre-push `vp run verify` |
+
+- **Verified commits.** When `vp run verify` passes with a clean working tree before and after the run, on the same commit, `scripts/test-container.mjs` writes the run id to `.artifacts/verified/<HEAD sha>` (`scripts/verified-commit.mjs`). The pre-push hook (`scripts/git-hooks/pre-push.mjs`) skips verify and names that marker only when the tree is still clean on that commit; any other state, an untracked file included, runs verify again. A failed verify or a dirty tree never writes a marker.
 
 Findings from the bootstrap spike, kept here because they explain the configuration:
 

@@ -1,1 +1,1 @@
-vp run verify
+node scripts/git-hooks/pre-push.mjs
