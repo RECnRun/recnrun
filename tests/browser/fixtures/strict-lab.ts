@@ -89,6 +89,8 @@ export interface LabJournal {
     marker?: string;
     entries: LabEntry[];
     unattached: unknown[];
+    /** Target events and onDetach, in arrival order (apps/isolator/src/background/route-a/types.ts). */
+    events?: Record<string, unknown>[];
     tabDetached?: { reason: string; at: number };
   };
   routeB: { workers: unknown[]; paused: unknown[]; tabs: unknown[] };

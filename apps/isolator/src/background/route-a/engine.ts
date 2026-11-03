@@ -12,6 +12,7 @@ import {
   handleAttached,
 } from "@/background/route-a/attached";
 import { closeTarget } from "@/background/route-a/close";
+import { detachEventOf, targetEventOf } from "@/background/route-a/events";
 import { handlePaused, prepareAndRelease } from "@/background/route-a/pause";
 import { armRequestOf, tabIdOf, targetIdOf, watchRequestOf } from "@/background/route-a/requests";
 import { TargetWatch } from "@/background/route-a/watch";
@@ -21,6 +22,7 @@ import type {
   JournalEntry,
   RouteA,
   RouteAJournal,
+  TargetEvent,
   UnattachedTarget,
   WatchReport,
 } from "@/background/route-a/types";
@@ -45,6 +47,7 @@ export class RouteAEngine implements RouteA {
   readonly #now: () => number;
   #marker: string | undefined;
   #entries: JournalEntry[] = [];
+  #events: TargetEvent[] = [];
   readonly #pending = new Set<Promise<void>>();
   readonly #armed = new Map<number, EventListener>();
   readonly #direct = new Set<string>();
@@ -89,6 +92,7 @@ export class RouteAEngine implements RouteA {
       bootstrap: { hash: BOOTSTRAP_HASH, version: BOOTSTRAP_VERSION },
       entries: this.#entries.map((entry) => ({ ...entry })),
       unattached,
+      events: this.#events.map((event) => ({ ...event })),
       ...(this.#tabDetached === undefined ? {} : { tabDetached: { ...this.#tabDetached } }),
     };
   }
@@ -104,6 +108,7 @@ export class RouteAEngine implements RouteA {
     }
     this.#direct.clear();
     this.#entries = [];
+    this.#events = [];
     this.#tabDetached = undefined;
     return journal;
   }
@@ -151,7 +156,7 @@ export class RouteAEngine implements RouteA {
   }
 
   async closeTarget(request: unknown): Promise<CloseReport> {
-    return closeTarget(this.#debuggerApi(), targetIdOf(request));
+    return closeTarget(this.#debuggerApi(), targetIdOf(request), this.#now);
   }
 
   async clearOrigin(request: unknown): Promise<{ origin: string }> {
@@ -194,7 +199,9 @@ export class RouteAEngine implements RouteA {
   }
 
   /** Records a detach of an armed tab or a direct target; any other session is not Route A's. */
-  #detached({ tabId, targetId }: Debuggee, record: DetachRecord): void {
+  #detached(source: Debuggee, record: DetachRecord): void {
+    this.#events.push(detachEventOf(source, record));
+    const { tabId, targetId } = source;
     if (tabId !== undefined && this.#armed.has(tabId)) this.#tabDetached = record;
     if (targetId === undefined || !this.#direct.has(targetId)) return;
     for (const entry of this.#entries) {
@@ -210,8 +217,10 @@ export class RouteAEngine implements RouteA {
   #listenerFor(tabId: number, pauseBeforeScript: boolean): EventListener {
     return (source, method, params) => {
       if (source.tabId !== tabId || this.#marker === undefined) return;
+      const event = targetEventOf(source, method, params, this.#now);
+      if (event) this.#events.push(event);
       if (method === "Target.attachedToTarget" && isAttachedEvent(params)) {
-        const entry = entryOf(source, params, this.#now(), this.#marker);
+        const entry = entryOf(source, params, event?.at ?? this.#now(), this.#marker);
         this.#entries.push(entry);
         this.#track(this.#handle(source, entry, pauseBeforeScript));
       } else if (method === "Debugger.paused") {

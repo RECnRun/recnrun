@@ -75,14 +75,30 @@ export async function coldSample(lab: Lab): Promise<ColdSample> {
   };
 }
 
+/** Route A's Target events and the lab's stop reports since `from`, to say why a restart held. */
+function traceOf(journal: LabJournal | undefined, from: { events: number; commands: number }) {
+  return {
+    events: (journal?.routeA.events ?? []).slice(from.events),
+    stops: (journal?.commands ?? [])
+      .slice(from.commands)
+      .filter(({ key }) => key.startsWith("stop:")),
+  };
+}
+
 /** A marked registration, the lab's closeTarget, then a reload typed in the omnibox (E3's cold start). */
 export async function restartSample(lab: Lab) {
   const tab = await armedTab(lab);
+  const before = lab.strict.sink.journal;
+  const from = {
+    events: before?.routeA.events?.length ?? 0,
+    commands: before?.commands.length ?? 0,
+  };
   const registered = databaseOf(await visit(tab));
   await stopWorkers(lab.strict);
   const restarted = await reloadedOrHeld(tab);
+  const trace = traceOf(lab.strict.sink.journal, from);
   await closeTab(lab);
-  return { marker: tab.marker, registered, restarted };
+  return { marker: tab.marker, registered, restarted, trace };
 }
 
 /** Points the selection at `slot` and waits until the lab applied it; returns its update time. */

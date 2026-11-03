@@ -81,6 +81,25 @@ export interface CloseReport {
   detach: string;
   /** Whether `getTargets()` still listed the target right after. */
   listedAfter: boolean;
+  /** `performance.now()` when it started, when `Target.closeTarget` answered, and when it detached. */
+  at: { start: number; closed: number; detached: number };
+}
+
+/** One Target event on an armed tab's sessions, or one `chrome.debugger.onDetach` (E8 restarts). */
+export interface TargetEvent {
+  /** `performance.now()` when the extension received it. */
+  at: number;
+  /** The CDP event's method, or `onDetach`. */
+  method: string;
+  /** The child session the event arrived on; absent for the tab's own session. */
+  via?: string;
+  /** The tab whose own session `onDetach` reported. */
+  tabId?: number;
+  sessionId?: string;
+  targetId?: string;
+  waitingForDebugger?: boolean;
+  /** `attached` or `detached` from `targetInfo.attached`, or `onDetach`'s reason. */
+  detail?: string;
 }
 
 /** A worker target that existed on the tab's origin but that Route A never attached. */
@@ -95,6 +114,8 @@ export interface RouteAJournal {
   bootstrap: { hash: string; version: string };
   entries: JournalEntry[];
   unattached: UnattachedTarget[];
+  /** Every Target event and `onDetach` since the last disarm, in arrival order. */
+  events: TargetEvent[];
   /** What `chrome.debugger.onDetach` reported for an armed tab's own session. */
   tabDetached?: DetachRecord;
 }
