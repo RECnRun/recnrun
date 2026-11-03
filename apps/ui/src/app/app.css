@@ -264,3 +264,19 @@ img.viewer {
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
+/* A collector gap reads as missing evidence, never as an application failure. */
+.timeline li {
+  border-left: 2px solid var(--border);
+  padding-left: 0.5rem;
+}
+
+.timeline li.gap {
+  border-left-style: dashed;
+  border-left-color: var(--muted);
+}
+
+.event-summary {
+  margin: 0.25rem 0 0;
+  overflow-wrap: anywhere;
+}

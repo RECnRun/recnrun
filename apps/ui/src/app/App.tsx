@@ -3,6 +3,7 @@ import type { Api } from "@/api/api";
 import { ApiProvider } from "@/api/context";
 import { type Route, hrefOf, parseHash } from "@/app/routes";
 import { Catalog } from "@/features/catalog/Catalog";
+import { Diagnostics } from "@/features/diagnostics/Diagnostics";
 import { DraftAssertions } from "@/features/editor/DraftAssertions";
 import { Editor } from "@/features/editor/Editor";
 import { Recorder } from "@/features/recorder/Recorder";
@@ -63,7 +64,16 @@ function Screen({ route, navigate, active }: ScreenProps) {
         />
       );
     case "run":
-      return <Run flowId={route.flowId} />;
+      return (
+        <Run
+          flowId={route.flowId}
+          onDiagnostics={(runId) => navigate({ screen: "diagnostics", runId })}
+        />
+      );
+    case "diagnostics":
+      return (
+        <Diagnostics runId={route.runId} onBack={(flowId) => navigate({ screen: "run", flowId })} />
+      );
   }
 }
 

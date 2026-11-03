@@ -4,11 +4,13 @@ export type Route =
   | { screen: "catalog" }
   | { screen: "recorder" }
   | { screen: "editor"; flowId: string }
-  | { screen: "run"; flowId: string };
+  | { screen: "run"; flowId: string }
+  | { screen: "diagnostics"; runId: string };
 
 export function parseHash(hash: string): Route {
   const parts = hash.replace(/^#\/?/, "").split("/").map(decodeURIComponent);
   const [head, flowId, tail] = parts;
+  if (head === "runs" && flowId) return { screen: "diagnostics", runId: flowId };
   if (head === "setup") return { screen: "setup" };
   if (head === "record") return { screen: "recorder" };
   if (head === "flows" && flowId) {
@@ -29,5 +31,7 @@ export function hrefOf(route: Route): string {
       return `#/flows/${encodeURIComponent(route.flowId)}`;
     case "run":
       return `#/flows/${encodeURIComponent(route.flowId)}/run`;
+    case "diagnostics":
+      return `#/runs/${encodeURIComponent(route.runId)}`;
   }
 }

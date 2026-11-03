@@ -111,7 +111,9 @@ function InputsForm({ inputs, references, disabled, onStart }: FormProps) {
   );
 }
 
-function RunFlow({ flowId, flow }: { flowId: string; flow: Flow }) {
+type Navigation = { onDiagnostics?: ((runId: string) => void) | undefined };
+
+function RunFlow({ flowId, flow, onDiagnostics }: { flowId: string; flow: Flow } & Navigation) {
   const replay = useRun(flowId);
   return (
     <>
@@ -132,7 +134,16 @@ function RunFlow({ flowId, flow }: { flowId: string; flow: Flow }) {
         )}
       </Card>
       {replay.summary ? (
-        <Card title="Summary">
+        <Card
+          title="Summary"
+          actions={
+            onDiagnostics && (
+              <Button onClick={() => onDiagnostics(replay.summary?.runId ?? "")}>
+                Diagnostics
+              </Button>
+            )
+          }
+        >
           <Summary summary={replay.summary} />
         </Card>
       ) : null}
@@ -146,11 +157,11 @@ function RunFlow({ flowId, flow }: { flowId: string; flow: Flow }) {
 }
 
 /** Replays a flow with the inputs the user gives and follows each step until the run ends. */
-export function Run({ flowId }: { flowId: string }) {
+export function Run({ flowId, onDiagnostics }: { flowId: string } & Navigation) {
   const { loaded, reload } = useLoad((api) => api.call("flow.get", { flowId }), flowId);
   return (
     <Loadable loaded={loaded} onRetry={reload}>
-      {({ flow }) => <RunFlow flowId={flowId} flow={flow} />}
+      {({ flow }) => <RunFlow flowId={flowId} flow={flow} onDiagnostics={onDiagnostics} />}
     </Loadable>
   );
 }
