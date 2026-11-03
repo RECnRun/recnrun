@@ -86,10 +86,18 @@ const iso = (ms: number): string => new Date(ms).toISOString();
 const cutShort = ({ status, error }: StepResult): boolean =>
   status === "cancelled" || error?.code === CONNECTION_LOST;
 
+/** What ends a run: its step results, why it could not start, and whether Chrome went away. */
+interface RunEnd {
+  results: readonly StepResult[];
+  problem: RunProblem | undefined;
+  /** The connection was lost at some point, even after the last step passed. */
+  lost: boolean;
+}
+
 /** The run's status from its step results: the first step that did not pass decides it. */
-function runStatus(results: readonly StepResult[], problem?: RunProblem): RunStatus {
+function runStatus({ results, problem, lost }: RunEnd): RunStatus {
   if (problem) return "error";
-  if (results.some(cutShort)) return "interrupted";
+  if (lost || results.some(cutShort)) return "interrupted";
   const stop = results.find(({ status }) => status === "failed" || status === "indeterminate");
   if (!stop) return "passed";
   const blamesApplication =
@@ -194,13 +202,9 @@ function journalWriter(
   return { tally, write, detached, settled: () => Promise.all(pending) };
 }
 
-function summarize(
-  options: RecorderOptions,
-  startedAt: number,
-  results: readonly StepResult[],
-  problem: RunProblem | undefined,
-): RunSummary {
-  const status = runStatus(results, problem);
+function summarize(options: RecorderOptions, startedAt: number, end: RunEnd): RunSummary {
+  const { results, problem } = end;
+  const status = runStatus(end);
   return {
     schemaVersion: PROTOCOL_SCHEMA_VERSION,
     runId: options.runId,
@@ -222,6 +226,7 @@ export async function openRecorder(options: RecorderOptions): Promise<Recorder> 
   const writer = journalWriter(options, run?.journal);
   let seq = 0;
   let current: string | undefined;
+  let lost = false;
   const emit: Emit = async (stepId, type, payload, category = "step") => {
     seq += 1;
     await writer.write({ ...stepEnvelope(options, seq, stepId, category), type, payload });
@@ -235,7 +240,10 @@ export async function openRecorder(options: RecorderOptions): Promise<Recorder> 
     currentStep: () => current,
     evidence: (event) => writer.detached(event),
     snapshot: (stepId, payload) => emit(stepId, "captured", payload, "snapshot"),
-    lost: (event) => writer.detached(lostEvent(options.runId, event)),
+    lost: (event) => {
+      lost = true;
+      writer.detached(lostEvent(options.runId, event));
+    },
     async finished(result, index) {
       results.push(result);
       // A step that never started has nothing to close in the journal.
@@ -245,7 +253,7 @@ export async function openRecorder(options: RecorderOptions): Promise<Recorder> 
     },
     async finish(problem) {
       const runEntries = { schemaVersion: PROTOCOL_SCHEMA_VERSION, runId: options.runId } as const;
-      const summary = summarize(options, startedAt, results, problem);
+      const summary = summarize(options, startedAt, { results, problem, lost });
       await writer.settled();
       if (!run || !options.store) return summary;
       await run.journal.close();

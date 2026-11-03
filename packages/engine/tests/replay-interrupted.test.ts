@@ -1,4 +1,4 @@
-import type { AdapterEvent, Step } from "@recnrun/protocol";
+import type { AdapterEvent, Event, Step } from "@recnrun/protocol";
 import { expect, test } from "vite-plus/test";
 import {
   applySessionEvent,
@@ -148,4 +148,27 @@ test("a write the loss interrupts is indeterminate at once, though its answer ne
   expect(result.summary.failures).toEqual([
     { stepId: "next", message: expect.stringContaining("connection-lost") },
   ]);
+});
+
+test("a loss after the last step interrupts the run while every step keeps its pass", async () => {
+  const { driver, lose } = droppingDriver({ elements: { go: {} } }, () => false);
+  // Chrome goes away while the capture drains, after the last step passed.
+  const capturing: ReplayDriver = {
+    ...driver,
+    onCapture: async () => ({ drain: async () => lose() }),
+  };
+  const events: Event[] = [];
+  const result = await replayFlow(capturing, flowOf([NEXT, { ...NEXT, id: "after" }]), {
+    clock: fakeClock(),
+    observe: (event) => void events.push(event),
+  });
+  expect(events.filter(({ category }) => category === "gap").map(({ type }) => type)).toEqual([
+    "connection-lost",
+  ]);
+  expect(result.steps.map(({ stepId, status }) => [stepId, status])).toEqual([
+    ["next", "passed"],
+    ["after", "passed"],
+  ]);
+  expect(result.summary.counts).toMatchObject({ passed: 2, cancelled: 0 });
+  expect(result).toMatchObject({ status: "interrupted", exitCode: 2 });
 });
