@@ -25,6 +25,8 @@
     "test:container": "node --test tests/container/*.checks.mjs",
     "test:hooks": "node --test scripts/agent-hooks/*.checks.mjs scripts/git-hooks/*.checks.mjs",
     "test:scripts": "node --test scripts/*.checks.mjs",
+    "bench": "node scripts/test-container.mjs bench:local",
+    "bench:local": "node --expose-gc scripts/bench-capture.mjs",
     "deps": "depcruise packages tests --config .dependency-cruiser.cjs && depcruise apps/website --config .dependency-cruiser.cjs --ts-config apps/website/tsconfig.deps.json && depcruise apps/ui --config .dependency-cruiser.cjs --ts-config apps/ui/tsconfig.deps.json && depcruise apps/service --config .dependency-cruiser.cjs --ts-config apps/service/tsconfig.deps.json && depcruise apps/cli --config .dependency-cruiser.cjs --ts-config apps/cli/tsconfig.deps.json && depcruise apps/fixture --config .dependency-cruiser.cjs --ts-config apps/fixture/tsconfig.deps.json",
     "dead-code": "knip --include files,exports,dependencies,unlisted",
     "duplication": "jscpd --threshold 4 --fail-on-empty apps/website/src apps/ui/src apps/service/src apps/cli/src apps/fixture/src packages/protocol/src packages/engine/src packages/adapter/src packages/persistence/src packages/brand/src",

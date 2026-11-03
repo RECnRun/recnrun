@@ -22,7 +22,7 @@ Why these are manual: Chrome's permission dialog and the `chrome://inspect/#remo
 
 ## After F3
 
-- **M-F3.a 30-minute soak.** `node scripts/soak-capture.mjs --minutes 30` against the fixture on the pilot hardware; attach the report (loss, gaps, memory, trace size) to the phase pull request.
+- **M-F3.a 30-minute soak.** `node --expose-gc scripts/soak-capture.mjs --minutes 30` on the pilot hardware: it starts the fixture and a Google Chrome on a fresh temporary profile (never the default one or `~/.recnrun`), records the burst route in Normal mode (`--modes` adds others), appends a line to `.artifacts/soak/<timestamp>/progress.jsonl` every minute (`--flush-seconds`), and writes `report.json` and `summary.md` at the end. Attach the report (loss, gaps, memory, trace size, and the 1 s UI progress measurement) to the phase pull request; heap or trace growth across the progress lines that does not level off is a regression.
   Result: …
 
 ## After F4

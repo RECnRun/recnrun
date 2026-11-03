@@ -126,6 +126,12 @@ test.each([
   expect(`${entry?.phase} ${entry?.notes}`, id).toContain(proof);
 });
 
+test("the F3.9 overhead benchmark is implemented and names its smoke test", () => {
+  const entry = entries.find((candidate) => candidate.id === "overhead-benchmark");
+  expect(entry?.status).toBe("implemented");
+  expect(entry?.notes).toContain("tests/browser/bench-smoke.spec.ts");
+});
+
 test("the F3.7 diagnostics UI is partial and names its end-to-end test", () => {
   const entry = entries.find((candidate) => candidate.id === "diagnostics-ui");
   expect(entry?.status).toBe("partial");

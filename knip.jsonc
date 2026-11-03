@@ -8,6 +8,8 @@
         "scripts/agent-hooks/*.mjs",
         "scripts/git-hooks/*.mjs",
         "scripts/*.checks.mjs",
+        // Run by a person on demand (MANUAL_VALIDATION.md M-F3.a).
+        "scripts/soak-capture.mjs",
         "tests/container/*.checks.mjs",
         // Child processes the contract tests spawn.
         "tests/contract/fixtures/*.ts",

@@ -1,6 +1,6 @@
 import type { Capability } from "./capabilities.ts";
 
-import { implemented, planned } from "./capability-planned.ts";
+import { implemented } from "./capability-planned.ts";
 
 type Feature = Extract<Capability, { kind: "feature" }>;
 
@@ -195,11 +195,11 @@ export const FEATURE_CAPABILITIES: Feature[] = [
     "run.compare and run.queryEvents",
     "Delivered by F3.8; tests/contract/runs-api.test.ts pages run.queryEvents with a cursor that stays valid while the journal grows and filters it by event types, URL origin, profile binding, and time range; run.compare names a different response status as the first divergence, a failed assertion as the application's, and lost events as a collector gap, never the application.",
   ),
-  planned(
+  implemented(
     "overhead-benchmark",
     "F3.9",
     "Capture overhead benchmark",
-    "Compares no instrumentation, Normal, and Deep.",
+    "Delivered by F3.9; scripts/bench-capture.mjs (vp run bench) compares no instrumentation, Normal, and Deep on the fixture's burst route and reports latency, CPU, memory, events per second, loss, and trace size. tests/browser/bench-smoke.spec.ts runs it for 30 seconds in Docker and asserts that every lost event is accounted as a gap and that the growth of the Node heap over 50 000 captured events stays under its budget. Until the Deep level (F6.5), Deep is Normal with a larger hook buffer and faster cookie reads. The 1 s UI progress and 30-minute recording targets are measurements, not gates; the 30-minute soak (scripts/soak-capture.mjs) is manual (M-F3.a).",
   ),
   {
     kind: "feature",

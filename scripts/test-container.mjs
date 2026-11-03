@@ -18,6 +18,7 @@ const tasks = new Set([
   "test:e2e:local",
   "test:browser:local",
   "test:coverage:local",
+  "bench:local",
 ]);
 const runId = `${new Date().toISOString().replaceAll(":", "-")}-${randomUUID()}`;
 const artifacts = resolve(
@@ -105,6 +106,8 @@ async function startTests() {
   const environment = ["CI", "DEBUG", "FORCE_COLOR"].flatMap((key) =>
     process.env[key] === undefined ? [] : ["--env", `${key}=${process.env[key]}`],
   );
+  // The capture benchmark names the image in its report.
+  environment.push("--env", `RECNRUN_IMAGE_ID=${image}`);
   const result = await docker(
     [
       "create",

@@ -47,6 +47,7 @@ Vite+ (`vp`) is the only toolchain. `vp <name>` runs a built-in command and `vp 
 | `vp run docs:check`                                               | Relative Markdown links and anchors resolve                                   |
 | `vp run capabilities:generate`                                    | Regenerate `docs/CAPABILITIES.md` from the capability matrix                  |
 | `vp run schema:generate`                                          | Regenerate the committed JSON Schema of `packages/protocol`                   |
+| `vp run bench` (`-- --seconds 10`)                                | Capture overhead benchmark in Docker; report under `test-results/bench/`      |
 | `vp run test:e2e -- tests/e2e/landing.spec.ts -g ''`              | Targeted Playwright run (arguments go after `--`)                             |
 | `vp run verify`                                                   | Full gate (`vp run ready` is an alias)                                        |
 
