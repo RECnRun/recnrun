@@ -62,6 +62,7 @@ function Screen({ route, navigate, active }: ScreenProps) {
           flowId={route.flowId}
           sessionId={active[0]}
           onRun={() => navigate({ screen: "run", flowId: route.flowId })}
+          onDuplicated={(flowId) => navigate({ screen: "editor", flowId })}
         />
       );
     case "run":

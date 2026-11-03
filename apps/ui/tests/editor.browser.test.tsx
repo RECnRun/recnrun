@@ -41,7 +41,7 @@ function editor(flow: Flow = FLOW) {
     "flow.save": ({ flow: saved }) => ({ flowId: saved.id, revision: SAVED }),
   });
   const onRun = vi.fn<() => void>();
-  renderWith(fake.api, <Editor flowId="login" onRun={onRun} />);
+  renderWith(fake.api, <Editor flowId="login" onRun={onRun} onDuplicated={vi.fn()} />);
   return { ...fake, onRun };
 }
 
@@ -145,7 +145,7 @@ test("shows an empty flow and the service's errors", async () => {
   fake.handlers["flow.get"] = () => {
     throw new ApiError("flow-not-found", "No flow login.");
   };
-  renderWith(fake.api, <Editor flowId="login" onRun={fake.onRun} />);
+  renderWith(fake.api, <Editor flowId="login" onRun={fake.onRun} onDuplicated={vi.fn()} />);
   await expectTexts(page.getByRole("alert"), "No flow login.", "flow-not-found");
 });
 

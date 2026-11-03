@@ -66,7 +66,10 @@ function editor(sessionId: string | undefined, status: SessionStatus = STATUS) {
     "picker.start": ({ sessionId: id }) => ({ sessionId: id, picking: true }),
     "picker.stop": ({ sessionId: id }) => ({ sessionId: id, picking: false }),
   });
-  const root = renderWith(fake.api, <Editor flowId="form" sessionId={sessionId} onRun={vi.fn()} />);
+  const root = renderWith(
+    fake.api,
+    <Editor flowId="form" sessionId={sessionId} onRun={vi.fn()} onDuplicated={vi.fn()} />,
+  );
   return { ...fake, root };
 }
 

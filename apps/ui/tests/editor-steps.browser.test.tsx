@@ -43,7 +43,7 @@ function editor() {
     "flow.get": () => ({ flow: FLOW, manifest: MANIFEST, revision: REVISION }),
     "flow.save": ({ flow }) => ({ flowId: flow.id, revision: "b".repeat(64) }),
   });
-  renderWith(fake.api, <Editor flowId="login" onRun={vi.fn()} />);
+  renderWith(fake.api, <Editor flowId="login" onRun={vi.fn()} onDuplicated={vi.fn()} />);
   return fake;
 }
 
