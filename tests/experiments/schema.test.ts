@@ -38,6 +38,13 @@ describe("committed lab verdicts", () => {
     expect(parseVerdicts(committed("E0-lab-smoke.json"))).toHaveLength(3);
   });
 
+  test("the E1 lab and host files parse, one verdict per hypothesis", () => {
+    expect(parseVerdicts(committed("E1-lab-full.json"))).toHaveLength(8);
+    expect(parseVerdicts(committed("E1-lab-smoke.json"))).toHaveLength(8);
+    expect(parseVerdicts(committed("E1-host.json"))).toHaveLength(9);
+    expect(() => v.parse(VersionsFile, committed("E1-lab-versions.json"))).not.toThrow();
+  });
+
   test("the versions file parses", () => {
     expect(() => v.parse(VersionsFile, committed("E0-lab-versions.json"))).not.toThrow();
   });
@@ -83,6 +90,13 @@ describe("parseVerdicts", () => {
   test("puts no extra constraint on a diagnostic label", () => {
     const diagnostic = { ...valid, install: "managed-policy", externalClient: false };
     expect(parseVerdicts([diagnostic])).toHaveLength(1);
+  });
+
+  test("accepts the gestures and steps of a verdict and refuses negative gestures", () => {
+    const toggled = { ...valid, gestures: 2, steps: ["xdotool: Developer mode on"] };
+    expect(parseVerdicts([toggled])).toHaveLength(1);
+    expect(() => parseVerdicts([{ ...toggled, gestures: -1 }])).toThrow(/gestures/);
+    expect(() => parseVerdicts([{ ...toggled, steps: [1] }])).toThrow(/steps/);
   });
 
   test.each(["pass", "fail"])("refuses a %s verdict with no sample", (verdict) => {

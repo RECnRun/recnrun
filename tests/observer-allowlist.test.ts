@@ -11,9 +11,14 @@ const ALLOWED_COMMANDS: Record<string, string> = {
   "Browser.getVersion": "reads the product string",
   "Extensions.loadUnpacked": "installs the test build, the diagnostic install method",
   "Target.getTargets": "finds the extension's service worker",
-  "Target.attachToTarget": "attaches to that worker (cdp-client.ts)",
+  "Target.attachToTarget": "attaches to that worker or to a tab the harness opened (cdp-client.ts)",
   "Target.detachFromTarget": "detaches that session",
-  "Runtime.evaluate": "pings the extension's own worker (cdp-client.ts)",
+  "Target.createTarget":
+    "opens the extension's diagnostics page or chrome://extensions (cdp-client.ts)",
+  "Target.closeTarget": "closes a tab the harness opened",
+  "Runtime.evaluate": "pings the extension's own worker and reads its pages (cdp-client.ts)",
+  "Input.dispatchMouseEvent":
+    "E1's recorded fallback click on the file-access toggle where no xdotool exists (macOS host)",
 };
 
 /** Commands that pause, instrument, block, or rewrite. */

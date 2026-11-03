@@ -5,16 +5,26 @@ import type { CdpClient } from "./cdp-client.ts";
 import { launchChrome } from "./chrome.ts";
 import type { ChromeLaunchOptions, LaunchedChrome } from "./chrome.ts";
 
+/** The builds the harness installs: `test` has no `key`; the POC variants pin one (POC PLAN.md decision 6). */
+export type BuildVariant = "test" | "poc-d0" | "poc-d1" | "poc-d2";
+
+/** Where `vp run --no-cache extension#build:<variant>` writes that build. */
+export function extensionPath(variant: BuildVariant): string {
+  return fileURLToPath(
+    new URL(`../../../apps/extension/.output/chrome-mv3-${variant}`, import.meta.url),
+  );
+}
+
 /** The test build `vp run --no-cache extension#build:test` writes; its manifest has no `key`. */
-export const EXTENSION_PATH = fileURLToPath(
-  new URL("../../../apps/extension/.output/chrome-mv3-test", import.meta.url),
-);
+export const EXTENSION_PATH = extensionPath("test");
 
 /** Flag Chrome requires before it accepts `Extensions.loadUnpacked` (POC PLAN.md decision 5). */
 const UNSAFE_EXTENSION_DEBUGGING = "--enable-unsafe-extension-debugging";
 const SELF_ID = "chrome.runtime.id";
 const BACKGROUND_TIMEOUT_MS = 15_000;
 const ANSWER_RETRY_MS = 100;
+// A worker a reinstall is replacing can be attached and never answer, so each ping gives up soon.
+const PING_TIMEOUT_MS = 3_000;
 
 /** The diagnostic install: CDP is connected, so nothing it shows approves a cell. */
 export interface LoadedExtension {
@@ -51,9 +61,14 @@ export async function attachExtension(
 ): Promise<LoadedExtension> {
   const client: CdpClient = await connectWebSocket(chrome.wsEndpoint);
   const evaluateInBackground = (expression: string) =>
-    evaluateInServiceWorker(client, extensionId, expression, BACKGROUND_TIMEOUT_MS);
+    evaluateInServiceWorker(client, extensionId, expression, { find: BACKGROUND_TIMEOUT_MS });
+  const ping = (expression: string) =>
+    evaluateInServiceWorker(client, extensionId, expression, {
+      find: BACKGROUND_TIMEOUT_MS,
+      evaluate: PING_TIMEOUT_MS,
+    });
   try {
-    const answered = await firstAnswer(evaluateInBackground);
+    const answered = await firstAnswer(ping);
     if (answered !== extensionId) {
       throw new Error(`chrome.runtime.id answered ${String(answered)}, not ${extensionId}`);
     }

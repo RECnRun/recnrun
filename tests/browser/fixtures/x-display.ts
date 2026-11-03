@@ -77,3 +77,8 @@ export async function keepDisplayOnFailure(
   requireContainer();
   await exec("scrot", ["-o", testInfo.outputPath("display.png")], { timeout: COMMAND_TIMEOUT_MS });
 }
+
+/** A real pointer click at display coordinates `x`, `y`: a gesture, as a person would make it. */
+export async function clickAt(x: number, y: number): Promise<void> {
+  await xdotool("mousemove", String(Math.round(x)), String(Math.round(y)), "click", "1");
+}

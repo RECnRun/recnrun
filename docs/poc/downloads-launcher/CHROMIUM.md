@@ -124,6 +124,8 @@ Hypothesis (§5 row 7, P1.4): `fetch("file://…")` works in the extension page 
 
 Predictions: with access allowed, `fetch(file:)` works the same in the page, the offscreen document, and the service worker; without it there is no `file` factory and the fetch fails (expected as a network `TypeError` in the page). Not inventoried: directory listings and cache headers of the file loader (`content/browser/loader/file_url_loader_factory.cc`, not read); E3 measures repeated reads, and listings stay `unavailable` per the plan.
 
+Observed ([E1](experiments/E1.md)): with `isAllowedFileSchemeAccess()` true, `fetch(file:)` from an extension page fails with `TypeError: Failed to fetch` unless the manifest also declares `host_permissions: ["file:///*"]`, so the "iff `AllowFileAccess`" prediction misses a host-permission check that this group did not inventory.
+
 ## 8. `chrome.debugger` attach, detach, and worker lifetime
 
 Hypothesis (§10, P8.1, P8.2): an attach keeps the extension worker alive, detach releases it, and the debugger is otherwise independent of the transport.
@@ -150,5 +152,7 @@ Hypothesis (decision 5, P6.2/CL17): `Extensions.loadUnpacked` over CDP installs 
 | `extensions/common/extension_features.cc` [`kDisableDisableExtensionsExceptCommandLineSwitch`](https://source.chromium.org/chromium/chromium/src/+/refs/tags/156.0.8078.80:extensions/common/extension_features.cc;l=214)                                                                                                                                            | Enabled by default in branded non-ChromeOS builds, so `--disable-extensions-except` is ignored in Google Chrome too.                                                                                                                                                         |
 
 Predictions: an extension installed with `Extensions.loadUnpacked` lives only for the process that installed it; at the next launch its prefs are deleted, with or without debugging flags. P6.2's CDP mechanism (CL17) is therefore predicted to **fail** the "still installed after a full quit and relaunch" check, leaving the policy force-install as the persistent mechanism. It also starts with file access (group 1). `--load-extension` and `--disable-extensions-except` are no-ops on the installed Chrome (E0 and E10 record them as `unavailable`).
+
+Observed ([E1](experiments/E1.md)): the "lives only for the process" prediction holds for an untouched CDP install (E0), but a toggle at `chrome://extensions` reloads the build with `creation_flags` 38 instead of 32806 (the 32768 bit cleared), and that install still runs after a relaunch of the same root.
 
 **Unavailable:** the check of `--enable-unsafe-extension-debugging` itself. At this tag it is not in `extensions_handler.cc`, `chrome_devtools_session.cc`, `chrome_devtools_manager_delegate.cc`, `content/browser/devtools/devtools_pipe_handler.cc` (`AllowUnsafeOperations()` returns true for every pipe client), or `content/public/common/content_switches.cc`; `chrome/common/chrome_switches.cc` returned 404 on the mirror at the tag, and GitHub code search only finds ChromeDriver passing the switch through (`chrome/test/chromedriver/session_commands.cc`). E0 and E10 record whether `Extensions.loadUnpacked` answers with and without the flag.

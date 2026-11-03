@@ -5,8 +5,16 @@ import { test as base } from "@playwright/test";
 import type { TestInfo } from "@playwright/test";
 import { launchChrome } from "../../browser/fixtures/chrome.ts";
 import type { StrictChrome } from "../../browser/fixtures/chrome.ts";
-import { EXTENSION_PATH, loadUnpacked } from "../../browser/fixtures/extension-loaders.ts";
-import type { LoadedExtension } from "../../browser/fixtures/extension-loaders.ts";
+import {
+  EXTENSION_PATH,
+  extensionPath,
+  loadUnpacked,
+} from "../../browser/fixtures/extension-loaders.ts";
+import type {
+  BuildVariant,
+  LoadedExtension,
+  UnpackedOptions,
+} from "../../browser/fixtures/extension-loaders.ts";
 import { CHROME_BINARY, evidence, hostRunId, requireHost } from "./host-env.ts";
 import type { Evidence } from "./host-env.ts";
 import { removeHostRoot, rootFor } from "./roots.ts";
@@ -25,10 +33,21 @@ export const GESTURE_TIMEOUT_MS = Number(process.env.RECNRUN_HOST_GESTURE_TIMEOU
 /** The diagnostic method: `Extensions.loadUnpacked` over CDP on a throwaway root. */
 export interface HostExtension extends LoadedExtension {
   root: string;
+  /** The build this launch installed. */
+  path: string;
   evidence: Evidence;
+  /** Stops only the Chrome this launch spawned and keeps the root, for a relaunch on it. */
+  quit(): Promise<void>;
   /** Stops only the Chrome this launch spawned, then removes its root. */
   close(): Promise<void>;
 }
+
+/** The host's launch options on `root`: the installed Chrome, mock keychain, window offscreen. */
+export const hostUnpackedOptions = (root: string): UnpackedOptions => ({
+  executable: CHROME_BINARY,
+  userDataDir: root,
+  args: [...HOST_FLAGS, ...OFFSCREEN],
+});
 
 /** The strict method: no debugging flag; the owner installed the build with `Load unpacked`. */
 export interface HostStrict {
@@ -88,17 +107,22 @@ async function waitForGesture(chrome: StrictChrome, root: string): Promise<strin
   throw new Error(`No Load unpacked of ${EXTENSION_PATH} within ${GESTURE_TIMEOUT_MS} ms.`);
 }
 
-/** Launches the installed Chrome on a fresh root under RECNRUN_HOST_ROOTS and installs the build. */
-export async function openHostExtension(name: string): Promise<HostExtension> {
+/**
+ * Launches the installed Chrome on a fresh root under RECNRUN_HOST_ROOTS and installs a build:
+ * `path` (the test build by default, for chrome.spec.ts) or the build of `variant`.
+ */
+export async function openHostExtension(
+  name: string,
+  {
+    variant = "test",
+    path = extensionPath(variant),
+  }: { variant?: BuildVariant; path?: string } = {},
+): Promise<HostExtension> {
   const root = await newRoot(name);
   const record = evidence();
   let loaded: LoadedExtension | undefined;
   try {
-    const options = { executable: CHROME_BINARY, userDataDir: root };
-    loaded = await loadUnpacked(EXTENSION_PATH, {
-      ...options,
-      args: [...HOST_FLAGS, ...OFFSCREEN],
-    });
+    loaded = await loadUnpacked(path, hostUnpackedOptions(root));
     const { product, userAgent } = await loaded.chrome.cdp.send("Browser.getVersion");
     await record.versions({ version: loaded.chrome.version, product, userAgent });
   } catch (error) {
@@ -111,7 +135,7 @@ export async function openHostExtension(name: string): Promise<HostExtension> {
     await launched.close();
     await removeRoot(root);
   };
-  return { ...launched, root, evidence: record, close };
+  return { ...launched, root, path, evidence: record, quit: () => launched.close(), close };
 }
 
 export const test = base.extend<{ hostExtension: HostExtension; hostStrict: HostStrict }>({

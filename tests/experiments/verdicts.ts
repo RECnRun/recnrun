@@ -15,22 +15,24 @@ function evidenceDirectory(): string {
   return join(ROOT, ".artifacts/evidence", run);
 }
 
-export async function readVerdicts(): Promise<Verdict[]> {
+/** `directory` defaults to the run's lab folder; host runs pass `.artifacts/evidence/host/<run>`. */
+export async function readVerdicts(directory = evidenceDirectory()): Promise<Verdict[]> {
   try {
-    return parseVerdicts(
-      JSON.parse(await readFile(join(evidenceDirectory(), "verdicts.json"), "utf8")),
-    );
+    return parseVerdicts(JSON.parse(await readFile(join(directory, "verdicts.json"), "utf8")));
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
     throw error;
   }
 }
 
-export async function appendVerdict(verdict: Verdict): Promise<void> {
-  const verdicts = await readVerdicts();
+export async function appendVerdict(
+  verdict: Verdict,
+  directory = evidenceDirectory(),
+): Promise<void> {
+  const verdicts = await readVerdicts(directory);
   const stamped = sampleMode() === "smoke" ? { ...verdict, mode: "smoke" as const } : verdict;
   parseVerdicts([stamped]);
-  await mkdir(evidenceDirectory(), { recursive: true });
-  const file = join(evidenceDirectory(), "verdicts.json");
+  await mkdir(directory, { recursive: true });
+  const file = join(directory, "verdicts.json");
   await writeFile(file, `${JSON.stringify([...verdicts, stamped], null, 2)}\n`);
 }

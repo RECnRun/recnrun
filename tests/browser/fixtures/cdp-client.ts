@@ -28,14 +28,24 @@ export class CdpClosedError extends Error {
   }
 }
 
+/** The session's target went away (a worker replaced by a reinstall) before Chrome replied. */
+export class CdpDetachedError extends Error {
+  constructor(method: string) {
+    super(`${method}: the target detached before replying`);
+  }
+}
+
 interface Reply {
   id?: number;
   result?: unknown;
   error?: { message: string };
+  method?: string;
+  params?: { sessionId?: string };
 }
 
 interface Waiter {
   method: string;
+  sessionId?: string;
   timer: ReturnType<typeof setTimeout>;
   resolve(value: unknown): void;
   reject(error: Error): void;
@@ -60,8 +70,17 @@ function createClient(write: (message: string) => void, closeTransport: () => vo
     if (waiter) clearTimeout(waiter.timer);
     return waiter;
   };
+  // Chrome never answers a command on a session whose target is gone; only this event says so.
+  const detach = (sessionId: string | undefined): void => {
+    for (const [id, waiter] of pending) {
+      if (sessionId === undefined || waiter.sessionId !== sessionId) continue;
+      take(id);
+      waiter.reject(new CdpDetachedError(waiter.method));
+    }
+  };
   const receive = (raw: string): void => {
     const reply = JSON.parse(raw) as Reply;
+    if (reply.method === "Target.detachedFromTarget") return detach(reply.params?.sessionId);
     const waiter = reply.id === undefined ? undefined : take(reply.id);
     if (!waiter) return;
     if (reply.error) waiter.reject(new Error(`${waiter.method}: ${reply.error.message}`));
@@ -83,7 +102,8 @@ function createClient(write: (message: string) => void, closeTransport: () => vo
         take(id)?.reject(new Error(`${method}: no reply within ${timeoutMs} ms`));
       // A stranded command must not keep the test process alive on its own.
       const timer = setTimeout(expire, timeoutMs).unref();
-      pending.set(id, { method, timer, resolve: (value) => resolve(value as T), reject });
+      const resolveAs = (value: unknown) => resolve(value as T);
+      pending.set(id, { method, sessionId, timer, resolve: resolveAs, reject });
       write(JSON.stringify({ id, method, params, sessionId }));
     });
   const close = (): void => {
@@ -170,31 +190,89 @@ async function waitForServiceWorker(
 
 /**
  * Evaluates `expression` (awaiting a promise) in the extension's service worker and returns its
- * value. `timeoutMs` bounds finding and attaching to the worker; the evaluation keeps the default
- * per-command deadline, since probes can run longer.
+ * value. `find` bounds finding and attaching to the worker; `evaluate` bounds the evaluation, the
+ * default per-command deadline unless given, since probes can run longer.
  */
 export async function evaluateInServiceWorker(
   client: CdpClient,
   extensionId: string,
   expression: string,
-  timeoutMs = 10_000,
+  { find = 10_000, evaluate }: { find?: number; evaluate?: number } = {},
 ): Promise<unknown> {
-  const { targetId } = await waitForServiceWorker(client, extensionId, timeoutMs);
+  const { targetId } = await waitForServiceWorker(client, extensionId, find);
   const { sessionId } = await client.send<{ sessionId: string }>(
     "Target.attachToTarget",
     { targetId, flatten: true },
     undefined,
-    { timeoutMs },
+    { timeoutMs: find },
   );
   try {
-    const evaluation = await client.send<{
-      result: { value?: unknown };
-      exceptionDetails?: { exception?: { description?: string }; text: string };
-    }>("Runtime.evaluate", { expression, awaitPromise: true, returnByValue: true }, sessionId);
-    const failure = evaluation.exceptionDetails;
-    if (failure) throw new Error(failure.exception?.description ?? failure.text);
-    return evaluation.result.value;
+    return await evaluateIn(client, sessionId, expression, evaluate);
   } finally {
     await client.send("Target.detachFromTarget", { sessionId }).catch(() => undefined);
+  }
+}
+
+/** Evaluates `expression` in an attached session, awaiting a returned promise. */
+async function evaluateIn(
+  client: CdpClient,
+  sessionId: string,
+  expression: string,
+  timeoutMs?: number,
+) {
+  const evaluation = await client.send<{
+    result: { value?: unknown };
+    exceptionDetails?: { exception?: { description?: string }; text: string };
+  }>(
+    "Runtime.evaluate",
+    { expression, awaitPromise: true, returnByValue: true },
+    sessionId,
+    timeoutMs === undefined ? {} : { timeoutMs },
+  );
+  const failure = evaluation.exceptionDetails;
+  if (failure) throw new Error(failure.exception?.description ?? failure.text);
+  return evaluation.result.value;
+}
+
+/** A tab the harness opened and attached to, for an extension page or `chrome://extensions`. */
+export interface PageSession {
+  client: CdpClient;
+  sessionId: string;
+  /** Evaluates in the page, awaiting a returned promise. */
+  evaluate(expression: string): Promise<unknown>;
+  /** Closes the tab; a tab Chrome already closed (an extension reload) is not an error. */
+  close(): Promise<void>;
+}
+
+/**
+ * Opens `url` in a new foreground tab, attaches, and waits until the document at that address has
+ * loaded. Closes the tab again when it does not load within `timeoutMs`.
+ */
+export async function openPage(
+  client: CdpClient,
+  url: string,
+  timeoutMs = 10_000,
+): Promise<PageSession> {
+  const { targetId } = await client.send<{ targetId: string }>("Target.createTarget", { url });
+  const close = async (): Promise<void> => {
+    await client.send("Target.closeTarget", { targetId }).catch(() => undefined);
+  };
+  try {
+    const { sessionId } = await client.send<{ sessionId: string }>("Target.attachToTarget", {
+      targetId,
+      flatten: true,
+    });
+    const evaluate = (expression: string) => evaluateIn(client, sessionId, expression);
+    const loaded = "document.readyState === 'complete' ? location.href : ''";
+    const deadline = Date.now() + timeoutMs;
+    // The first evaluations can run in the initial blank document, or fail while it navigates.
+    while ((await evaluate(loaded).catch(() => "")) !== url) {
+      if (Date.now() > deadline) throw new Error(`${url} did not load within ${timeoutMs} ms`);
+      await delay(TARGET_POLL_MS);
+    }
+    return { client, sessionId, evaluate, close };
+  } catch (error) {
+    await close();
+    throw error;
   }
 }

@@ -20,6 +20,9 @@ const VerdictFields = {
   topology: Topology,
   debugger: DebuggerState,
   observations: v.optional(v.array(v.record(v.string(), v.unknown()))),
+  /** Gestures one sample needed (a toggle, a prompt answered), and what each was. */
+  gestures: v.optional(v.pipe(v.number(), v.integer(), v.minValue(0))),
+  steps: v.optional(v.array(v.string())),
   /** `smoke` when `verify` ran with one sample per hypothesis; absent means full evidence. */
   mode: v.optional(v.picklist(["smoke", "full"])),
 };
