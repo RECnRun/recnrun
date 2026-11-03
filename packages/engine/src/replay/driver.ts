@@ -57,7 +57,7 @@ export interface ReplayDriver {
   /** The attribute of the target's single match, or null when it has none; safe to repeat. */
   readAttribute(target: Target, name: string, options: ReadOptions): Promise<string | null>;
   /** The replay's tabs; safe to repeat. */
-  tabs(): Promise<TabList>;
+  tabs(options: ReadOptions): Promise<TabList>;
   /** Dispatches one write; the executor calls it once per step and never again for that step. */
   act(command: DriverCommand, options: ReadOptions): Promise<ActResult>;
 }

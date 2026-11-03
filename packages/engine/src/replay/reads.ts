@@ -38,7 +38,7 @@ async function waitForUrl(step: WaitForStep, context: StepContext): Promise<Step
   if (step.url === undefined) return passed();
   const expected = interpolate(step.url, context.scope);
   const poll = await pollUntil(
-    async () => currentUrl(await context.driver.tabs()),
+    async () => currentUrl(await context.driver.tabs(readTimeout(context.deadline))),
     (url) => urlMatches(url, expected),
     context.deadline,
   );

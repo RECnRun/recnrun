@@ -82,7 +82,7 @@ describe("inspect", () => {
     const { driver, calls } = driverOver();
     expect(await driver.inspect(BOX, READ)).toMatchObject({ count: 0 });
     expect(await driver.readAttribute(BOX, "id", READ)).toBeNull();
-    expect(await driver.tabs()).toEqual({ tabs: [], current: null });
+    expect(await driver.tabs(READ)).toEqual({ tabs: [], current: null });
     expect(calls).toEqual([]);
   });
 
@@ -243,7 +243,7 @@ describe("tabs", () => {
     await driver.act({ kind: "navigate", url: "http://127.0.0.1:4600/a" }, READ);
     page.popup(popup.page);
     await driver.act({ kind: "openTab", url: "http://127.0.0.1:4600/b" }, READ);
-    expect(await driver.tabs()).toEqual({
+    expect(await driver.tabs(READ)).toEqual({
       tabs: [
         { url: "http://127.0.0.1:4600/a", title: "First" },
         { url: "http://127.0.0.1:4600/popup", title: "Popup" },
@@ -254,7 +254,7 @@ describe("tabs", () => {
     expect(await driver.act({ kind: "selectTab", index: 1 }, READ)).toEqual({ status: "done" });
     expect(popup.calls).toEqual(["bringToFront http://127.0.0.1:4600/popup"]);
     expect(await driver.act({ kind: "closeTab" }, READ)).toEqual({ status: "done" });
-    expect(await driver.tabs()).toMatchObject({
+    expect(await driver.tabs(READ)).toMatchObject({
       current: 1,
       tabs: [{ title: "First" }, { title: "Second" }],
     });
@@ -267,7 +267,7 @@ describe("tabs", () => {
     const { driver } = driverOver({}, [second.page]);
     await driver.act({ kind: "openTab" }, READ);
     await driver.act({ kind: "openTab" }, READ);
-    expect(await driver.tabs()).toEqual({
+    expect(await driver.tabs(READ)).toEqual({
       tabs: [
         { url: "about:blank", title: "" },
         { url: "about:blank", title: "" },
@@ -276,7 +276,7 @@ describe("tabs", () => {
     });
     await driver.act({ kind: "closeTab" }, READ);
     await driver.act({ kind: "closeTab" }, READ);
-    expect(await driver.tabs()).toEqual({ tabs: [], current: null });
+    expect(await driver.tabs(READ)).toEqual({ tabs: [], current: null });
     expect(await driver.act({ kind: "closeTab" }, READ)).toEqual({ status: "done" });
   });
 });

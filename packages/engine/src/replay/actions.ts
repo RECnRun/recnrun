@@ -1,10 +1,10 @@
 import type { ActionStep, Target } from "@recnrun/protocol";
 import type { ActResult, DriverCommand } from "./driver.ts";
 import { locate, matchTab, unmet, type Readiness } from "./locate.ts";
-import { failed, passed, type StepOutcome } from "./outcome.ts";
+import { failed, passed, StepFailure, type StepOutcome } from "./outcome.ts";
 import { interpolate, interpolateTarget, type Scope } from "./scope.ts";
 import type { StepContext } from "./step-context.ts";
-import { pollUntil, remaining } from "./wait.ts";
+import { beforeDeadline, pollUntil, readTimeout, remaining } from "./wait.ts";
 
 /** A write: the command, and the element it needs ready before it is dispatched. */
 interface Write {
@@ -104,15 +104,14 @@ async function dispatch(
       `No time was left to act within ${context.deadline.timeoutMs} ms.`,
       reads,
     );
+  const acted = context.driver.act(write.command, { timeoutMs: left });
   try {
-    return fromAct(await context.driver.act(write.command, { timeoutMs: left }), reads);
+    return fromAct(await beforeDeadline(acted, context.deadline, "The write"), reads);
   } catch (error) {
+    // Dispatched, so its effect is unknown: it is never dispatched again, even once it answers.
+    const code = error instanceof StepFailure ? error.code : "adapter-error";
     const message = (error instanceof Error ? error.message : String(error)) || "Unknown error.";
-    return {
-      status: "indeterminate",
-      error: { code: "adapter-error", message },
-      ...(reads && { attempts: reads }),
-    };
+    return { status: "indeterminate", error: { code, message }, ...(reads && { attempts: reads }) };
   }
 }
 
@@ -128,7 +127,7 @@ export async function selectTab(
 ): Promise<StepOutcome> {
   const query = typeof step.tab === "number" ? step.tab : interpolate(step.tab, context.scope);
   const poll = await pollUntil(
-    () => context.driver.tabs(),
+    () => context.driver.tabs(readTimeout(context.deadline)),
     (list) => matchTab(list, query) !== undefined,
     context.deadline,
   );

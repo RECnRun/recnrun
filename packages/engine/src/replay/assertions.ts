@@ -42,7 +42,7 @@ function expectedMet(step: ElementAssertion & { expected: string }, expected: st
 
 function urlCheck(expected: string, context: StepContext): Check<string> {
   return {
-    read: async () => currentUrl(await context.driver.tabs()),
+    read: async () => currentUrl(await context.driver.tabs(readTimeout(context.deadline))),
     met: (url) => urlMatches(url, expected),
     observed: (url) => url,
     expected,

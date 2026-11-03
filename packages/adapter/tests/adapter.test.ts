@@ -85,10 +85,10 @@ test("replays in one tab per connection and needs a connection first", async () 
     message: expect.stringContaining("Not connected"),
   });
   await adapter.connect(ENDPOINT, { source: { userDataDir: "/p" } });
-  expect(await adapter.tabs()).toEqual({ tabs: [], current: null });
+  expect(await adapter.tabs({ timeoutMs: 500 })).toEqual({ tabs: [], current: null });
   expect(await navigate("http://127.0.0.1:4600/a")).toEqual({ status: "done" });
   await navigate("http://127.0.0.1:4600/b");
-  expect(await adapter.tabs()).toEqual({
+  expect(await adapter.tabs({ timeoutMs: 500 })).toEqual({
     tabs: [{ url: "http://127.0.0.1:4600/b", title: "" }],
     current: 0,
   });

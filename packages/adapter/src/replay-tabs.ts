@@ -1,5 +1,5 @@
 import type { TabList } from "@recnrun/engine";
-import type { ReplayPage } from "./replay-page.ts";
+import { within, type ReplayPage } from "./replay-page.ts";
 
 /** The replay's own tabs: the ones it opened and the popups they opened, in that order. */
 export interface ReplayTabs {
@@ -7,7 +7,8 @@ export interface ReplayTabs {
   current(): Promise<ReplayPage>;
   /** The tab replay acts on, without opening one. */
   selected(): ReplayPage | undefined;
-  list(): Promise<TabList>;
+  /** Titles that do not come within `timeoutMs` are read as "". */
+  list(timeoutMs: number): Promise<TabList>;
   /** Opens a new tab and acts on it from now on. */
   open(): Promise<ReplayPage>;
   /** False when no open tab has that index. */
@@ -16,10 +17,20 @@ export interface ReplayTabs {
   close(): Promise<void>;
 }
 
-async function describe(open: ReplayPage[], chosen: ReplayPage | undefined): Promise<TabList> {
+async function describe(
+  open: ReplayPage[],
+  chosen: ReplayPage | undefined,
+  timeoutMs: number,
+): Promise<TabList> {
   // A title cannot be read while its page navigates; the URL is enough to tell tabs apart.
+  const title = (page: ReplayPage) =>
+    within(
+      page.title().catch(() => ""),
+      timeoutMs,
+      () => "",
+    );
   const tabs = await Promise.all(
-    open.map(async (page) => ({ url: page.url(), title: await page.title().catch(() => "") })),
+    open.map(async (page) => ({ url: page.url(), title: await title(page) })),
   );
   const index = chosen ? open.indexOf(chosen) : -1;
   return { tabs, current: index === -1 ? null : index };
@@ -57,7 +68,7 @@ export function createTabs(open: () => Promise<ReplayPage>): ReplayTabs {
       return opening;
     },
     selected,
-    list: () => describe(live(), chosen),
+    list: (timeoutMs) => describe(live(), chosen, timeoutMs),
     open: openTab,
     async select(index) {
       const page = live()[index];

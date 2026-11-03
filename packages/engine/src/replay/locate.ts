@@ -1,6 +1,6 @@
 import type { Target } from "@recnrun/protocol";
 import type { ElementState, ReplayDriver, TabList } from "./driver.ts";
-import { failed, type StepOutcome } from "./outcome.ts";
+import { failed, failure, type StepOutcome } from "./outcome.ts";
 import { pollUntil, readTimeout, type Deadline, type Poll } from "./wait.ts";
 
 /** What an element must be before a step acts on it or reads it. */
@@ -28,14 +28,11 @@ export function describeState(state: ElementState): string {
   return `one element, ${traits.join(", ")}`;
 }
 
-const errorText = (error: unknown): string =>
-  (error instanceof Error ? error.message : String(error)) || "Unknown error.";
-
 /** The failure of a poll that never met its condition. */
 export function unmet<T>(poll: Poll<T>, explain: (value: T) => StepOutcome): StepOutcome {
-  // Every poll reads at least once, so without a value the reads threw.
+  // Every poll reads at least once, so without a value the reads threw or answered too late.
   return poll.value === undefined
-    ? failed("adapter-error", errorText("error" in poll ? poll.error : undefined))
+    ? failure("error" in poll ? poll.error : undefined)
     : explain(poll.value);
 }
 

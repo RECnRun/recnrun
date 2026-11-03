@@ -1,5 +1,8 @@
-// The engine compiles without DOM or Node types; every runtime it runs in has this timer.
+import { StepFailure } from "./outcome.ts";
+
+// The engine compiles without DOM or Node types; every runtime it runs in has these timers.
 declare const setTimeout: (callback: () => void, ms: number) => unknown;
+declare const clearTimeout: (handle: unknown) => void;
 
 /** Time for the executor; unit tests pass a fake one whose `sleep` advances `now` at once. */
 export interface Clock {
@@ -14,9 +17,6 @@ export const systemClock: Clock = {
 
 /** Pause between two reads of the page; condition-based, never a recorded delay. */
 export const POLL_INTERVAL_MS = 100;
-
-/** A read never waits less than this, so the last poll before a deadline can still answer. */
-const MIN_READ_MS = 50;
 
 /** One step's deadline, shared by every read and the dispatch that follow. */
 export interface Deadline {
@@ -33,8 +33,34 @@ export function remaining(deadline: Deadline): number {
   return deadline.at - deadline.clock.now();
 }
 
+/** The budget a driver call gets: what is left of the step, at least 1 ms. */
 export function readTimeout(deadline: Deadline): { timeoutMs: number } {
-  return { timeoutMs: Math.max(MIN_READ_MS, remaining(deadline)) };
+  return { timeoutMs: Math.max(1, remaining(deadline)) };
+}
+
+const lateAnswer = (deadline: Deadline, what: string): StepFailure =>
+  new StepFailure("timeout", `${what} did not answer within ${deadline.timeoutMs} ms.`);
+
+/**
+ * Settles with the call, or rejects with a `timeout` StepFailure once the deadline passes; an
+ * answer after it counts as none. Real time bounds a stalled call even under a fake clock.
+ */
+export async function beforeDeadline<T>(
+  call: Promise<T>,
+  deadline: Deadline,
+  what: string,
+): Promise<T> {
+  let handle: unknown;
+  const expired = new Promise<never>((_, reject) => {
+    handle = setTimeout(() => reject(lateAnswer(deadline, what)), Math.max(0, remaining(deadline)));
+  });
+  try {
+    const value = await Promise.race([call, expired]);
+    if (remaining(deadline) < 0) throw lateAnswer(deadline, what);
+    return value;
+  } finally {
+    clearTimeout(handle);
+  }
 }
 
 /** The last thing a poll saw: a value that did not meet the condition, or an error a read threw. */
@@ -44,7 +70,8 @@ export type Poll<T> =
 
 /**
  * Reads until `met` holds or the deadline passes. Reading never changes the page, so repeating
- * it is safe; a read that throws (a document mid-navigation) is read again.
+ * it is safe; a read that throws (a document mid-navigation) is read again, and a read that
+ * answers after the deadline is not believed.
  */
 export async function pollUntil<T>(
   read: () => Promise<T>,
@@ -54,7 +81,7 @@ export async function pollUntil<T>(
   let last: Poll<T> = { met: false, attempts: 0 };
   for (let attempts = 1; ; attempts += 1) {
     try {
-      const value = await read();
+      const value = await beforeDeadline(read(), deadline, "The page read");
       if (met(value)) return { met: true, value, attempts };
       last = { met: false, value, attempts };
     } catch (error) {

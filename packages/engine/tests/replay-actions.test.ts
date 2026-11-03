@@ -243,10 +243,10 @@ describe("tabs", () => {
     const { driver } = fakeDriver({ tabs: list });
     const tabsOnce = driver.tabs.bind(driver);
     let reads = 0;
-    driver.tabs = async () => {
+    driver.tabs = async (options) => {
       reads += 1;
       if (reads === 3) list.tabs.push(...popup);
-      return tabsOnce();
+      return tabsOnce(options);
     };
     const step: Step = { id: "t", action: "selectTab", tab: "Popup elsewhere" };
     const result = await replayFlow(driver, flowOf([step]), { clock: fakeClock() });

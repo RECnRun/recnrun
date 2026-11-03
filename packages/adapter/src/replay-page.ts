@@ -54,5 +54,18 @@ export function locate(page: ReplayPage, target: Target): Locator {
   return byShorthand(page, target);
 }
 
+/** Settles with `work`, or with `late()` once `ms` pass; for calls Playwright gives no timeout. */
+export async function within<T>(work: Promise<T>, ms: number, late: () => T): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const expired = new Promise<T>((resolve) => {
+    timer = setTimeout(() => resolve(late()), Math.max(0, ms));
+  });
+  try {
+    return await Promise.race([work, expired]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /** Playwright reads a timeout of 0 as "no timeout", so every call gets at least 1 ms. */
 export const playwrightTimeout = (ms: number): number => Math.max(1, Math.round(ms));

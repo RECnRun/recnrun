@@ -52,7 +52,7 @@ export function createPageDriver(open: () => Promise<ReplayPage>): ReplayDriver 
         if ((await locator.count()) !== 1) return null;
         return locator.getAttribute(name, { timeout: playwrightTimeout(timeoutMs) });
       }),
-    tabs: () => tabs.list(),
+    tabs: ({ timeoutMs }) => tabs.list(timeoutMs),
     act: (command, { timeoutMs }) => act(tabs, command, timeoutMs),
   };
 }

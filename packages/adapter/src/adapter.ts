@@ -86,7 +86,7 @@ export function createCdpAdapter(deps: AdapterDependencies = {}): BrowserAdapter
     describeProfile: async () => connected().describeProfile(),
     inspect: (target, options) => replay().inspect(target, options),
     readAttribute: (target, name, options) => replay().readAttribute(target, name, options),
-    tabs: () => replay().tabs(),
+    tabs: (options) => replay().tabs(options),
     act: (command, options) => replay().act(command, options),
   };
 }

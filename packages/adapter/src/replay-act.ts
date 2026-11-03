@@ -1,6 +1,6 @@
 import type { ActResult, DriverCommand } from "@recnrun/engine";
 import type { Locator } from "playwright-core";
-import { locate, playwrightTimeout } from "./replay-page.ts";
+import { locate, playwrightTimeout, within } from "./replay-page.ts";
 import type { ReplayTabs } from "./replay-tabs.ts";
 
 type Command<K extends DriverCommand["kind"]> = Extract<DriverCommand, { kind: K }>;
@@ -163,10 +163,14 @@ export async function act(
   const end = Date.now() + timeoutMs;
   const budget: Budget = { left: () => playwrightTimeout(end - Date.now()) };
   const handler = HANDLERS[command.kind] as Handler<DriverCommand["kind"]>;
-  try {
-    return await handler(tabs, command as never, budget);
-  } catch (error) {
+  const handled = handler(tabs, command as never, budget).catch(
     // Opening the tab or resolving the locator threw before the write began.
-    return notDispatched(error);
-  }
+    (error: unknown) => notDispatched(error),
+  );
+  // Opening, switching, and closing tabs and pressing a page key take no timeout of their own.
+  return within(handled, timeoutMs, () => ({
+    status: "unknown",
+    code: "timeout",
+    message: `The ${command.kind} did not answer within ${timeoutMs} ms; its effect is unknown.`,
+  }));
 }
