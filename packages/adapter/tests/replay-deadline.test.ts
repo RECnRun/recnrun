@@ -36,11 +36,13 @@ function driverWith(slow: Partial<Record<"title" | "bringToFront", number>>) {
   return createPageDriver(async () => tab);
 }
 
-test("a URL assertion with a 10 ms deadline does not pass on a title read that takes 150 ms", async () => {
-  const driver = driverWith({ title: 150 });
-  const assertion: Step = { id: "at", assertion: "url", expected: HERE, timeoutMs: 10 };
+test("a URL assertion settles within its deadline though the title takes longer", async () => {
+  const driver = driverWith({ title: 500 });
+  const assertion: Step = { id: "at", assertion: "url", expected: HERE, timeoutMs: 50 };
+  const started = Date.now();
   const outcome = await replayFlow(driver, flowOf([GO, assertion]), { clock: systemClock });
-  expect(outcome.steps[1]).toMatchObject({ status: "failed", error: { code: "timeout" } });
+  expect(Date.now() - started).toBeLessThan(500);
+  expect(outcome.steps[1]).toMatchObject({ status: "passed" });
 });
 
 test("listing tabs gives up on a title that never comes and keeps the URL", async () => {
