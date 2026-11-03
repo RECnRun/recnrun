@@ -3,58 +3,7 @@ import { describe, expect, test } from "vite-plus/test";
 import { RouteAEngine } from "@/background/route-a/engine";
 import type { TargetInfo } from "@/background/probes/types";
 import { fakeDebugger, NOT_ALLOWED } from "./fake-debugger";
-import type { FakeOptions } from "./fake-debugger";
-
-const APP = "http://app.localhost:4600";
-const TAB = 7;
-const TARGETS: TargetInfo[] = [
-  { type: "page", id: "page", url: `${APP}/workers.html?type=classic`, attached: true, tabId: TAB },
-  { type: "other", id: "dedicated", url: `${APP}/worker.js?type=classic`, attached: true },
-  { type: "worker", id: "shared", url: `${APP}/shared-worker.js?type=classic`, attached: false },
-  { type: "worker", id: "elsewhere", url: "http://idp.localhost:4602/sw.js", attached: false },
-];
-// The bootstrap's answer at a waitForDebugger pause, where Cache Storage does not exist yet (E2).
-const INSTALLED = {
-  marker: "m1",
-  installedAt: 1,
-  realmAgeMs: 2.5,
-  patches: {
-    fetch: { status: "installed", typeof: "function" },
-    indexedDB: { status: "installed", typeof: "object" },
-    caches: { status: "skipped", typeof: "undefined" },
-  },
-};
-
-function setup(options: FakeOptions = {}) {
-  const fake = fakeDebugger({
-    targets: TARGETS,
-    ...options,
-    replies: {
-      "Runtime.evaluate": { result: { type: "object", value: INSTALLED } },
-      ...options.replies,
-    },
-  });
-  let clock = 0;
-  const engine = new RouteAEngine(
-    () => fake.api,
-    () => (clock += 5),
-  );
-  engine.setMarker("m1");
-  return { ...fake, engine };
-}
-
-function attached(type: string, targetId: string, sessionId: string, waiting = true) {
-  return {
-    sessionId,
-    waitingForDebugger: waiting,
-    targetInfo: { targetId, type, url: `${APP}/${targetId}.js` },
-  };
-}
-
-/** Commands sent on one flattened session, in order. */
-function on(sent: ReturnType<typeof fakeDebugger>["sent"], sessionId: string): string[] {
-  return sent.filter((entry) => entry.target.sessionId === sessionId).map((entry) => entry.method);
-}
+import { APP, INSTALLED, TAB, TARGETS, attached, on, setup } from "./route-a-setup";
 
 describe("Route A auto-attach", () => {
   test("arms the tab with auto-attach that pauses every new target", async () => {

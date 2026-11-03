@@ -92,7 +92,12 @@ export async function handleAttached(
   await booted;
 }
 
-async function release(api: DebuggerApi, session: Debuggee, entry: JournalEntry): Promise<void> {
+/** Auto-attaches the target's own children, then releases it if it waits. */
+export async function release(
+  api: DebuggerApi,
+  session: Debuggee,
+  entry: JournalEntry,
+): Promise<void> {
   try {
     await command(api, session, "Target.setAutoAttach", AUTO_ATTACH);
     entry.autoAttach = "ok";

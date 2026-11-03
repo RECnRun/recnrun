@@ -1,7 +1,7 @@
 import type { DebuggerApi } from "@/background/probes/types";
 import { RouteAEngine } from "@/background/route-a/engine";
 
-/** What the harness reaches with `Runtime.evaluate` in this service worker (experiment E2). */
+/** What the harness reaches with `Runtime.evaluate` in this service worker (experiments E2 and E3). */
 export const ROUTE_A_GLOBAL = "recnrunRouteA";
 
 /** Installs Route A on `globalThis`; the getter defers to the moment a call runs. */

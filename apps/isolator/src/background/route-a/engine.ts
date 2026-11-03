@@ -11,12 +11,17 @@ import {
   entryOf,
   handleAttached,
 } from "@/background/route-a/attached";
-import { tabIdOf, targetIdOf } from "@/background/route-a/requests";
+import { closeTarget } from "@/background/route-a/close";
+import { handlePaused, prepareAndRelease } from "@/background/route-a/pause";
+import { armRequestOf, tabIdOf, targetIdOf, watchRequestOf } from "@/background/route-a/requests";
+import { TargetWatch } from "@/background/route-a/watch";
 import type {
+  CloseReport,
   JournalEntry,
   RouteA,
   RouteAJournal,
   UnattachedTarget,
+  WatchReport,
 } from "@/background/route-a/types";
 
 /** What `Storage.clearDataForOrigin` removes between iterations: registrations and their storage. */
@@ -42,6 +47,7 @@ export class RouteAEngine implements RouteA {
   readonly #pending = new Set<Promise<void>>();
   readonly #armed = new Map<number, EventListener>();
   readonly #direct = new Set<string>();
+  #watch: TargetWatch | undefined;
 
   constructor(debuggerApi: () => DebuggerApi, now: () => number = () => performance.now()) {
     this.#debuggerApi = debuggerApi;
@@ -54,11 +60,11 @@ export class RouteAEngine implements RouteA {
   }
 
   async arm(request: unknown): Promise<void> {
-    const tabId = tabIdOf(request);
+    const { tabId, pauseBeforeScript } = armRequestOf(request);
     this.#requireMarker();
     if (this.#armed.has(tabId)) throw new Error(`tab ${tabId} is already armed`);
     const api = this.#debuggerApi();
-    const listener = this.#listenerFor(tabId);
+    const listener = this.#listenerFor(tabId, pauseBeforeScript);
     // Listening first: auto-attach reports the targets that already exist right away.
     api.onEvent.addListener(listener);
     this.#armed.set(tabId, listener);
@@ -119,6 +125,28 @@ export class RouteAEngine implements RouteA {
     return { ...entry };
   }
 
+  async watch(request: unknown): Promise<{ intervalMs: number; staleSkipped: number }> {
+    const parsed = watchRequestOf(request);
+    if (this.#watch) throw new Error("already watching");
+    const watch = new TargetWatch(this.#debuggerApi(), parsed, this.#now);
+    this.#watch = watch;
+    return watch.start().catch((error: unknown) => {
+      this.#watch = undefined;
+      throw error;
+    });
+  }
+
+  async unwatch(): Promise<WatchReport> {
+    const watch = this.#watch;
+    if (!watch) throw new Error("not watching");
+    this.#watch = undefined;
+    return watch.stop();
+  }
+
+  async closeTarget(request: unknown): Promise<CloseReport> {
+    return closeTarget(this.#debuggerApi(), targetIdOf(request));
+  }
+
   async clearOrigin(request: unknown): Promise<{ origin: string }> {
     const tabId = tabIdOf(request);
     const api = this.#debuggerApi();
@@ -154,16 +182,35 @@ export class RouteAEngine implements RouteA {
     return this.#marker;
   }
 
-  #listenerFor(tabId: number): EventListener {
+  #listenerFor(tabId: number, pauseBeforeScript: boolean): EventListener {
     return (source, method, params) => {
-      if (method !== "Target.attachedToTarget" || source.tabId !== tabId) return;
-      if (!isAttachedEvent(params) || this.#marker === undefined) return;
-      const entry = entryOf(source, params, this.#now(), this.#marker);
-      this.#entries.push(entry);
-      const handled = handleAttached(this.#debuggerApi(), source, entry, this.#now);
-      this.#pending.add(handled);
-      void handled.finally(() => this.#pending.delete(handled));
+      if (source.tabId !== tabId || this.#marker === undefined) return;
+      if (method === "Target.attachedToTarget" && isAttachedEvent(params)) {
+        const entry = entryOf(source, params, this.#now(), this.#marker);
+        this.#entries.push(entry);
+        this.#track(this.#handle(source, entry, pauseBeforeScript));
+      } else if (method === "Debugger.paused") {
+        const entry = this.#entries.find(
+          (item) => item.pause && item.sessionId === source.sessionId,
+        );
+        const api = this.#debuggerApi();
+        if (entry) this.#track(handlePaused(api, source, entry, { params, now: this.#now }));
+      }
     };
+  }
+
+  /** With `pauseBeforeScript`, a waiting worker gets its bootstrap at the instrumentation pause. */
+  #handle(source: Debuggee, entry: JournalEntry, pauseBeforeScript: boolean): Promise<void> {
+    const api = this.#debuggerApi();
+    const pauses = pauseBeforeScript && entry.marker !== undefined && entry.waitingForDebugger;
+    return pauses
+      ? prepareAndRelease(api, source, entry)
+      : handleAttached(api, source, entry, this.#now);
+  }
+
+  #track(handled: Promise<void>): void {
+    this.#pending.add(handled);
+    void handled.finally(() => this.#pending.delete(handled));
   }
 
   /** Stops listening for the tab and detaches it; Chrome drops its flattened child sessions too. */
