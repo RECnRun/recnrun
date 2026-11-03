@@ -54,8 +54,13 @@ function fakeCaches(entries: Entries, calls: string[]) {
     },
     match(request: unknown, options?: { cacheName?: string }) {
       calls.push(`caches.match ${options?.cacheName ?? "*"}`);
-      const name = options?.cacheName ?? "";
-      return Promise.resolve(entries.get(name)?.get(String(request)));
+      // Without a cacheName, Cache Storage searches every cache in creation order.
+      const searched = options?.cacheName ? [entries.get(options.cacheName)] : entries.values();
+      for (const responses of searched) {
+        const found = responses?.get(String(request));
+        if (found !== undefined) return Promise.resolve(found);
+      }
+      return Promise.resolve(undefined);
     },
   };
 }

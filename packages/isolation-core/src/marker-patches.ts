@@ -1,20 +1,20 @@
 import { logicalName, markUrl, physicalName } from "./marker.ts";
 
-type Method = (this: unknown, ...args: unknown[]) => unknown;
+export type Method = (this: unknown, ...args: unknown[]) => unknown;
 type Constructor = new (...args: unknown[]) => unknown;
 
-function isObject(value: unknown): value is object {
+export function isObject(value: unknown): value is object {
   return (typeof value === "object" && value !== null) || typeof value === "function";
 }
 
-function method(target: unknown, name: string): Method | undefined {
+export function method(target: unknown, name: string): Method | undefined {
   if (!isObject(target)) return undefined;
   const value: unknown = Reflect.get(target, name);
   return typeof value === "function" ? (value as Method) : undefined;
 }
 
 // An own property shadows the prototype's method without touching the shared prototype.
-function replace(target: object, name: string, value: Method): void {
+export function replace(target: object, name: string, value: Method): void {
   Object.defineProperty(target, name, { value, configurable: true, writable: true });
 }
 
@@ -54,19 +54,32 @@ export function patchFetch(scope: object, marker: string): void {
   });
 }
 
-/** Rewrites the first argument of each method from a logical to a physical name. */
-function renameFirstArgument(target: object, names: string[], marker: string): void {
+/** Replaces each method of `target` in `names` with what `wrap` builds around its native. */
+export function wrapMethods(
+  target: object,
+  names: string[],
+  wrap: (native: Method, name: string) => Method,
+): void {
   for (const name of names) {
     const native = method(target, name);
-    if (!native) continue;
-    replace(target, name, function (this: unknown, ...args: unknown[]) {
-      if (args.length > 0) args[0] = physicalName(marker, String(args[0]));
-      return Reflect.apply(native, this, args);
-    });
+    if (native) replace(target, name, wrap(native, name));
   }
 }
 
-function nameOf(entry: unknown): unknown {
+/** Rewrites the first argument of each method from a logical to a physical name. */
+function renameFirstArgument(target: object, names: string[], marker: string): void {
+  wrapMethods(
+    target,
+    names,
+    (native) =>
+      function (this: unknown, ...args: unknown[]) {
+        if (args.length > 0) args[0] = physicalName(marker, String(args[0]));
+        return Reflect.apply(native, this, args);
+      },
+  );
+}
+
+export function nameOf(entry: unknown): unknown {
   return isObject(entry) ? Reflect.get(entry, "name") : entry;
 }
 
@@ -93,28 +106,33 @@ export function patchIndexedDb(scope: object, marker: string): void {
   });
 }
 
-interface CacheNatives {
+export interface CacheNatives {
   keys: Method;
   open: Method;
   match: Method;
 }
 
-async function matchOwned(
+/** Which physical caches a scope sees, and the physical name of a `cacheName` it asks for. */
+export interface CacheView {
+  owns(physical: string): boolean;
+  physical(cacheName: string): string;
+}
+
+/** `caches.match` limited to the caches `view` owns, searched in creation order like the native. */
+export async function matchOwned(
   storage: unknown,
   natives: CacheNatives,
-  marker: string,
+  view: CacheView,
   args: unknown[],
 ) {
   const [request, options] = args;
   const cacheName: unknown = isObject(options) ? Reflect.get(options, "cacheName") : undefined;
   if (typeof cacheName === "string") {
-    const physical = { ...(options as object), cacheName: physicalName(marker, cacheName) };
+    const physical = { ...(options as object), cacheName: view.physical(cacheName) };
     return Reflect.apply(natives.match, storage, [request, physical]) as unknown;
   }
   const names: unknown = await Reflect.apply(natives.keys, storage, []);
-  const own = Array.isArray(names)
-    ? names.filter((name: unknown) => String(name).startsWith(physicalName(marker, "")))
-    : [];
+  const own = Array.isArray(names) ? names.filter((name: unknown) => view.owns(String(name))) : [];
   for (const name of own) {
     const cache: unknown = await Reflect.apply(natives.open, storage, [name]);
     const found: unknown = await method(cache, "match")?.call(cache, request, options);
@@ -123,20 +141,29 @@ async function matchOwned(
   return undefined;
 }
 
+/** The natives `matchOwned` needs, read before any patch replaces them. */
+export function cacheNativesOf(storage: object): CacheNatives | undefined {
+  const [keys, open, match] = ["keys", "open", "match"].map((name) => method(storage, name));
+  return keys && open && match ? { keys, open, match } : undefined;
+}
+
 export function patchCaches(scope: object, marker: string): void {
   const storage: unknown = Reflect.get(scope, "caches");
   if (!isObject(storage)) return;
-  const keys = method(storage, "keys");
-  const open = method(storage, "open");
-  const match = method(storage, "match");
+  const natives = cacheNativesOf(storage);
   renameFirstArgument(storage, ["open", "has", "delete"], marker);
-  if (!keys || !open || !match) return;
+  if (!natives) return;
+  const { keys } = natives;
   replace(storage, "keys", function (this: unknown) {
     return Promise.resolve(Reflect.apply(keys, this, [])).then((names) =>
       ownLogical(names, marker),
     );
   });
   replace(storage, "match", function (this: unknown, ...args: unknown[]) {
-    return matchOwned(this, { keys, open, match }, marker, args);
+    const view: CacheView = {
+      owns: (name) => logicalName(marker, name) !== undefined,
+      physical: (name) => physicalName(marker, name),
+    };
+    return matchOwned(this, natives, view, args);
   });
 }

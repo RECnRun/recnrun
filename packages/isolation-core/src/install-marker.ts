@@ -10,7 +10,7 @@ export interface MarkerDiagnostics {
   readonly installedAt: number;
 }
 
-const DiagnosticsSchema = v.object({ marker: v.string(), installedAt: v.number() });
+export const MarkerDiagnosticsSchema = v.object({ marker: v.string(), installedAt: v.number() });
 
 /**
  * Patches `fetch`, `indexedDB`, and `caches` of `scope` so every request, database, and cache it
@@ -18,7 +18,7 @@ const DiagnosticsSchema = v.object({ marker: v.string(), installedAt: v.number()
  */
 export function installMarker(scope: object, options: unknown): MarkerDiagnostics {
   const existing: unknown = Reflect.get(scope, DIAGNOSTICS_KEY);
-  if (v.is(DiagnosticsSchema, existing)) return existing;
+  if (v.is(MarkerDiagnosticsSchema, existing)) return existing;
   const { marker } = v.parse(BootstrapOptionsSchema, options);
   patchFetch(scope, marker);
   patchIndexedDb(scope, marker);
