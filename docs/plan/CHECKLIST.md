@@ -15,8 +15,8 @@ Tracks [PLAN.md](PLAN.md). One line per task; the orchestrator owns `[x]`, imple
 Markers: `[ ]` not started · `[i]` implemented, awaiting the phase gate · `[x]` verified by `vp run verify` · `[!]` blocked (reason indented) · `[~]` partial (what is missing indented).
 
 **Branch:** `f0-contracts` holds F0 (closed), `f1-spike` holds F1 (closed), and `f2-vertical` holds F2 (closed), each stacked on the previous; `f3-diagnostics` holds F3 (closed); F4 starts on `f4-editor`, branched from `f3-diagnostics` (plan only on `local-engine-plan`; implementation branches are named after the phase)
-**Last commit:** e085c96 "Prove the full editor end to end and mark its capability implemented" (F4.1 on `f4-editor`)
-**Current phase:** F3 closed on 2026-11-03 (Gate F3 exit 0, pull request #28 stacked on #27; F3.10 and the doctor permission fix gated again the same day); F3.11 (one connection per Chrome) landed on `f3-diagnostics` the same day; F4 in progress on `f4-editor` (F4.1 implemented 2026-11-03, awaiting its verify line); M-F2.a and M-F3.a on macOS are pending manual checks
+**Last commit:** f97c07f "Record F4.1 in the checklist" (F4.1 on `f4-editor`)
+**Current phase:** F3 closed on 2026-11-03 (Gate F3 exit 0, pull request #28 stacked on #27; F3.10 and the doctor permission fix gated again the same day); F3.11 (one connection per Chrome) landed on `f3-diagnostics` the same day; F4 in progress on `f4-editor` (F4.1 verified 2026-11-03; next F4.2); M-F2.a and M-F3.a on macOS are pending manual checks
 
 ## F0: Contracts and skeleton
 
@@ -214,7 +214,7 @@ Markers: `[ ]` not started · `[i]` implemented, awaiting the phase gate · `[x]
 
 ## F4: Editor, parameters, multiple profiles, import/export
 
-- [i] F4.1 Full editor and revisions
+- [x] F4.1 Full editor and revisions
   - red: `vp run test:contract -- tests/contract/flow-editing.test.ts` → `capability-unavailable: Unknown command flow.duplicate`; `vp run test:components -- tests/editor-picker.browser.test.tsx` → `Cannot find element with locator: getByRole('radiogroup', { name: 'Candidates' })`; `tests/editor-steps.browser.test.tsx` against stubs keeping the F2.6 behavior → 5 failed (`Cannot find element with locator: getByRole('button', { name: 'Move step open up' })`, `expected [ 'open', 'email', 'password', …(2) ] to deeply equal [ 'w', 'open', 'email', …(2) ]`); `tests/editor-declarations.browser.test.tsx` → 4 failed (`expected '' to contain 'email'`, `Cannot find element with locator: getByText('No actors yet.')`); `tests/editor-revisions.browser.test.tsx` with a stub `compareFlows` → 4 failed (`expected +0 to be 2`, no `Duplicate` button); `vp run test:e2e -- tests/e2e/editor.spec.ts` before the editor work → `locator.selectOption: Test timeout of 240000ms exceeded. waiting for getByRole('form', { name: 'Add a step' })`; `vp run docs:check` after flipping the capability → `docs/CAPABILITIES.md: stale; run vp run capabilities:generate`
   - green: `vp run test:contract` 60 passed; `vp run test:components` 101 passed (editor files 37); `vp run test:e2e -- tests/e2e/editor.spec.ts tests/e2e/first-flow.spec.ts tests/e2e/diagnostics.spec.ts` passed; `vp run test:unit` 1434 passed; `vp run docs:check` clean after `vp run capabilities:generate`
   - commit: 4f0179e, 1350c2b, e585d6c, 295e07f, 548bfee, e085c96 (worktree 9ee48e0, c259780, 35e0466, 170d815, e15ec26, 0541c80)
@@ -224,6 +224,7 @@ Markers: `[ ]` not started · `[i]` implemented, awaiting the phase gate · `[x]
 - [ ] F4.4 Export and import with security tests
 - [ ] F4.5 Flow status and requirement coverage
 - [ ] F4.6 Initial state and scoped reset
+- F4.1: `vp run verify` → 2026-11-03, exit 0 on f97c07f (36/36 tasks; unit 1434, components 101 and website 6, contract 60, e2e 8, browser 77, desktop 1 on Google Chrome 156.0.8078.79 Linux in Docker; coverage 95.83% statements, 89.61% branches, 95.20% functions, 97.15% lines; duplication 0.39%)
 - Gate F4: `vp run verify` → (date, result)
 - Manual after gate: M-F4.a
 
