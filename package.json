@@ -15,7 +15,7 @@
     "test:components": "node scripts/test-container.mjs test:components:local",
     "test:components:local": "vp test --config apps/website/vitest.browser.config.ts && vp test --config apps/ui/vitest.browser.config.ts",
     "test:contract": "node scripts/test-container.mjs test:contract:local",
-    "test:contract:local": "vp test --config tests/contract/vitest.config.ts",
+    "test:contract:local": "vp test --project=contract",
     "test:e2e": "node scripts/test-container.mjs test:e2e:local",
     "test:e2e:local": "vp run --no-cache website#build && vp run --no-cache @recnrun/ui#build && playwright test --workers=1",
     "test:browser": "node scripts/test-container.mjs test:browser:local",

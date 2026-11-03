@@ -33,7 +33,7 @@ paths:
 - Browser tests stay serial (`--workers=1`), coverage included.
 - Pass Playwright arguments after `--`, for example `vp run test:e2e -- tests/e2e/landing.spec.ts -g 'install'`.
 - On failure, read `.artifacts/docker/<run-id>/` (`run.log`, `versions.json`, `test-results`, `playwright-report`).
-- `RECNRUN_TEST_QUIET=1` keeps the Docker build and test output out of the terminal (it still goes to `run.log`); the run ends with the artifacts path, the exit code, and the last 20 lines of `run.log`. The pre-commit hook sets it for `test:unit`; agents can set it on any public test command.
+- `RECNRUN_TEST_QUIET=1` keeps the Docker build and test output out of the terminal (it still goes to `run.log`); the run ends with the artifacts path, the exit code, and the last 20 lines of that output, without the runner's cleanup calls. The pre-commit hook sets it for `test:unit`; agents can set it on any public test command.
 - `:local` variants run on the host; use them only for debugging.
 
 ## Writing end-to-end tests

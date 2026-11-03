@@ -51,3 +51,5 @@ if (command === "cp") {
     writeFileSync(join(destination, "evidence.txt"), "Test evidence");
   }
 }
+// Docker prints the name of each container it removes.
+if (command === "rm") console.log(args.at(-1));

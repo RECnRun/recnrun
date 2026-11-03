@@ -34,26 +34,32 @@ let stopping;
 // Agents and hooks pay for streamed output in context; quiet runs keep it in run.log only.
 const quietRun = process.env.RECNRUN_TEST_QUIET === "1";
 const TAIL_LINES = 20;
+const TAIL_BYTES = 64 * 1024;
+let streamedTail = "";
 
 function message(value) {
   console.error(value);
   log?.write(`${value}\n`);
 }
 
-function docker(options, { quiet = quietRun } = {}) {
+// Quiet runs keep the end of the build and test output, never the helper calls', for the summary.
+function relay(data, stream, quiet) {
+  log?.write(data);
+  if (quiet) return;
+  if (quietRun) streamedTail = `${streamedTail}${data}`.slice(-TAIL_BYTES);
+  else stream.write(data);
+}
+
+function docker(options, { quiet = false } = {}) {
   return new Promise((done) => {
     const child = spawn("docker", options, { cwd: root, stdio: ["ignore", "pipe", "pipe"] });
     activeChild = child;
     let stdout = "";
     child.stdout.on("data", (data) => {
       stdout += data;
-      log?.write(data);
-      if (!quiet) process.stdout.write(data);
+      relay(data, process.stdout, quiet);
     });
-    child.stderr.on("data", (data) => {
-      log?.write(data);
-      if (!quiet) process.stderr.write(data);
-    });
+    child.stderr.on("data", (data) => relay(data, process.stderr, quiet));
     child.on("error", (error) => message(error.message));
     child.on("close", (code) => {
       if (activeChild === child) activeChild = undefined;
@@ -181,11 +187,10 @@ async function recordPass(before) {
   if (marker) message(`Verify passed on clean commit ${before}: ${marker}`);
 }
 
-// Vitest and Playwright print their summaries last, so the log's tail carries the result.
-async function printSummary() {
+// Vitest and Playwright print their summaries last, so the output's tail carries the result.
+function printSummary() {
   if (!quietRun) return;
-  const lines = (await readFile(join(artifacts, "run.log"), "utf8")).trimEnd().split("\n");
-  const tail = lines.slice(-TAIL_LINES).join("\n");
+  const tail = streamedTail.trimEnd().split("\n").slice(-TAIL_LINES).join("\n");
   console.log(`Artifacts: ${artifacts}\nExit code: ${process.exitCode}\n${tail}`);
 }
 
@@ -216,7 +221,7 @@ async function run() {
     process.removeListener("SIGINT", interrupt);
     process.removeListener("SIGTERM", interrupt);
     await new Promise((done) => log.end(done));
-    await printSummary();
+    printSummary();
   }
 }
 

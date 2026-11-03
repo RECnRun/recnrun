@@ -58,7 +58,6 @@ test("verify runs every gate once and every test project once", () => {
     "lint",
     "deps",
     "coverage",
-    "contract",
     "e2e",
     "browser",
     "container",
@@ -72,12 +71,14 @@ test("verify runs every gate once and every test project once", () => {
   const projects = verify.flatMap(projectsOf);
   const repeated = projects.filter((project, index) => projects.indexOf(project) !== index);
   assert.deepEqual(repeated, [], `Projects verify runs more than once: ${repeated.join(", ")}`);
+  const suite = projectsOf("vp run --no-cache test:local");
+  assert.deepEqual(projects.toSorted(byName), suite.toSorted(byName));
 });
 
-test("coverage runs exactly the unit and component projects, unfiltered", () => {
+test("coverage runs exactly the unit, component, and contract projects, unfiltered", () => {
   const coverage = projectsOf("vp run --no-cache test:coverage:local");
-  const plain = ["test:unit:local", "test:components:local"].flatMap((script) =>
-    projectsOf(`vp run --no-cache ${script}`),
+  const plain = ["test:unit:local", "test:components:local", "test:contract:local"].flatMap(
+    (script) => projectsOf(`vp run --no-cache ${script}`),
   );
   assert.deepEqual(coverage.toSorted(byName), plain.toSorted(byName));
   // A --project filter leaves Vitest's V8 report empty, which passes every threshold.

@@ -83,6 +83,7 @@ export default defineConfig({
       "packages/engine",
       "packages/adapter",
       "packages/persistence",
+      "tests/contract/vitest.config.ts",
     ],
     coverage: {
       provider: "v8",
@@ -123,9 +124,8 @@ export default defineConfig({
           "vp check",
           "vp lint --deny-warnings",
           "vp run --no-cache deps",
-          // Coverage runs the unit and component projects; running them again would double the time.
+          // Coverage runs the unit, component, and contract projects; running them again doubles the time.
           "vp run --no-cache test:coverage:local",
-          "vp run --no-cache test:contract:local",
           "vp run --no-cache test:e2e:local",
           "vp run --no-cache test:browser:local",
           "vp run --no-cache test:container",

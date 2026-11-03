@@ -50,7 +50,7 @@ Vite+ (`vp`) is the only toolchain. `vp <name>` runs a built-in command and `vp 
 | `vp run test:e2e -- tests/e2e/landing.spec.ts -g ''`              | Targeted Playwright run (arguments go after `--`)                             |
 | `vp run verify`                                                   | Full gate (`vp run ready` is an alias)                                        |
 
-Test commands and `verify` run in Docker, so start Docker Desktop first. If Docker fails, the command fails; it never falls back to host browsers. `:local` variants (`vp run test:e2e:local`) and the built-in `vp test` run on the host and are for debugging only. Logs and failure artifacts are in `.artifacts/docker/<run-id>/`. With `RECNRUN_TEST_QUIET=1` (the pre-commit hook sets it for `test:unit`), the Docker build and test output goes only to that run's `run.log`, and the command ends by printing the artifacts path, the exit code, and the last 20 lines of `run.log`, where Vitest and Playwright print their summaries.
+Test commands and `verify` run in Docker, so start Docker Desktop first. If Docker fails, the command fails; it never falls back to host browsers. `:local` variants (`vp run test:e2e:local`) and the built-in `vp test` run on the host and are for debugging only. Logs and failure artifacts are in `.artifacts/docker/<run-id>/`. With `RECNRUN_TEST_QUIET=1` (the pre-commit hook sets it for `test:unit`), the Docker build and test output goes only to that run's `run.log`, and the command ends by printing the artifacts path, the exit code, and the last 20 lines of that build and test output, where Vitest and Playwright print their summaries.
 
 ## Rules
 
@@ -73,7 +73,7 @@ Test commands and `verify` run in Docker, so start Docker Desktop first. If Dock
 - **Definition of done.** A code task is not done until `vp run verify` exits 0. It runs:
   - check, and lint with warnings as errors;
   - architecture boundaries;
-  - the unit and component tests under coverage (at least 80% lines, statements, and functions; 75% branches), then the contract, end-to-end, and browser tests, each test project once;
+  - the unit, component, and contract tests under coverage (at least 80% lines, statements, and functions; 75% branches), then the end-to-end and browser tests, each test project once;
   - container, hook, and script checks;
   - Knip and jscpd (at most 4% duplication);
   - `docs:check` (every relative Markdown link and anchor resolves);

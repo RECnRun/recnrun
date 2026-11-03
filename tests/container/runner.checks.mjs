@@ -108,15 +108,25 @@ test("forwards arguments literally and runs the current workspace in an isolated
   assert.match(result.output, /^Build step 1$/m);
 });
 
-test("quiet mode streams nothing and ends with the artifacts, exit code, and log tail", async (context) => {
+test("quiet mode streams nothing and ends with the artifacts, exit code, and test output tail", async (context) => {
   const result = await launch(context, "test-failure", [], { env: { RECNRUN_TEST_QUIET: "1" } });
   assert.equal(result.code, 7, result.output);
   assert.doesNotMatch(result.output, /^Build step 1$/m);
-  const log = readFileSync(join(result.artifacts, "run.log"), "utf8").trimEnd().split("\n");
-  assert.match(log.join("\n"), /^Build step 1$/m);
-  const tail = log.slice(-20).join("\n");
-  assert.ok(result.output.endsWith(`${tail}\n`), result.output);
-  assert.match(result.output, new RegExp(`Artifacts: ${result.artifacts}\nExit code: 7\n`));
+  assert.match(readFileSync(join(result.artifacts, "run.log"), "utf8"), /^Build step 1$/m);
+  const header = `Artifacts: ${result.artifacts}\nExit code: 7\n`;
+  assert.ok(result.output.includes(header), result.output);
+  // The tail is the build and test output only, never the cleanup calls' exit code or name.
+  const tail = result.output.slice(result.output.indexOf(header) + header.length).trimEnd();
+  const lines = tail.split("\n");
+  assert.equal(lines.length, 20, tail);
+  assert.deepEqual(
+    lines.slice(0, 18),
+    Array.from({ length: 18 }, (_, index) => `Build step ${index + 13}`),
+  );
+  assert.deepEqual(lines.slice(18).toSorted(), [
+    "Container diagnostic output",
+    "Container test output",
+  ]);
 });
 
 test("preserves a failing test's exit code and copies evidence before removing the container", async (context) => {
