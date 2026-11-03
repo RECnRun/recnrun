@@ -1,7 +1,11 @@
 import { render } from "preact";
 import { expect, test } from "vite-plus/test";
 import { App } from "@/app/App";
-import { OPEN_COMMAND, SETUP_COMMAND } from "@/features/install-guide/InstallGuide";
+import {
+  MACOS_PERMISSION_STEP,
+  OPEN_COMMAND,
+  SETUP_COMMAND,
+} from "@/features/install-guide/InstallGuide";
 
 function mount() {
   const root = document.createElement("div");
@@ -26,6 +30,13 @@ test("lists the setup and open commands in order", () => {
   expect(commands).toEqual([SETUP_COMMAND, OPEN_COMMAND]);
   expect(SETUP_COMMAND).toBe("npx @recnrun/cli setup");
   expect(OPEN_COMMAND).toBe("npx @recnrun/cli open");
+});
+
+test("tells macOS users to let the terminal read Chrome's data", () => {
+  const install = mount().querySelector(".install");
+  expect(install?.textContent).toContain(MACOS_PERMISSION_STEP);
+  expect(MACOS_PERMISSION_STEP).toContain("Full Disk Access");
+  expect(MACOS_PERMISSION_STEP).toContain("access data from other apps");
 });
 
 test("says the package is not published yet", () => {

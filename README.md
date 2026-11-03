@@ -20,6 +20,8 @@ npx @recnrun/cli open    # opens RECnRun in your browser
 
 While RECnRun is connected, Chrome shows a banner saying that the browser is being debugged.
 
+On macOS, also allow the terminal you run RECnRun from to read Chrome's data (System Settings → Privacy & Security → Full Disk Access, or accept the prompt to access data from other apps), then restart the terminal; otherwise `doctor` reports Chrome as blocked.
+
 ## Development
 
 Requirements: Node.js 22.18 or later, [Vite+](https://viteplus.dev) (`vp`), and Docker Desktop for tests.
