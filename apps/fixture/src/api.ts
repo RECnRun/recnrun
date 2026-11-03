@@ -28,6 +28,8 @@ const MAX_REDIRECT_HOPS = 10;
 const STREAM_CHUNKS = 10;
 const STREAM_INTERVAL_MS = 300;
 const SLOW_STREAM_INTERVAL_MS = 1_500;
+const MAX_LARGE_BYTES = 4 * 1024 * 1024;
+const LARGE_PATTERN = "0123456789abcdef";
 
 const failCase = (url: URL) => url.searchParams.get("fail") ?? "";
 
@@ -45,6 +47,23 @@ function stream(response: ServerResponse, url: URL): void {
   response.once("close", () => clearInterval(timer));
 }
 
+// A deterministic body of `?bytes=N` bytes, so a test can predict what a size cap keeps.
+function large(response: ServerResponse, url: URL): void {
+  const bytes = Math.min(Math.max(Number(url.searchParams.get("bytes")) || 0, 0), MAX_LARGE_BYTES);
+  const body = LARGE_PATTERN.repeat(Math.ceil(bytes / LARGE_PATTERN.length)).slice(0, bytes);
+  send(response, 200, body, { "Content-Type": "text/plain; charset=utf-8" });
+}
+
+// Sensitive values in both directions; the body only says whether credentials arrived.
+function secret(response: ServerResponse): void {
+  const authorized = typeof response.req.headers.authorization === "string";
+  send(response, 200, JSON.stringify({ ok: true, authorized }), {
+    "Content-Type": "application/json; charset=utf-8",
+    "Set-Cookie": "fixture-session=s3cr3t-cookie; Path=/; SameSite=Strict",
+    "X-Fixture-Token": "s3cr3t-reply",
+  });
+}
+
 const GET_HANDLERS: Readonly<Record<string, Handler>> = {
   "/api/config": (response, _url, { urls }) =>
     sendJson(response, 200, { origin: urls.first, secondOrigin: urls.second }),
@@ -58,6 +77,14 @@ const GET_HANDLERS: Readonly<Record<string, Handler>> = {
   "/api/cacheable": (response, _url, context) =>
     sendJson(response, 200, { serial: context.nextSerial() }),
   "/api/stream": stream,
+  "/api/large": large,
+  "/api/secret": secret,
+  "/api/cached": (response) =>
+    send(response, 200, JSON.stringify({ cached: true }), {
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": "max-age=60",
+    }),
+  "/api/abort": (response) => response.destroy(),
   "/api/download": (response) =>
     send(response, 200, "RECnRun fixture download\n", {
       "Content-Type": "text/plain; charset=utf-8",

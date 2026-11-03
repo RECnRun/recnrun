@@ -34,19 +34,73 @@ async function stream() {
   return `${chunks} chunks in ${Math.round(performance.now() - started)} ms`;
 }
 
-function websocket() {
+const LARGE_BYTES = 200_000;
+const LONG_FRAME_LENGTH = 5_000;
+
+async function large() {
+  const text = await (await fetch(`/api/large?bytes=${LARGE_BYTES}`)).text();
+  return `${text.length} bytes`;
+}
+
+async function secret() {
+  const headers = { Authorization: "Bearer s3cr3t-token" };
+  const body = await (await fetch("/api/secret", { headers })).json();
+  return body.authorized ? "authorized" : "not authorized";
+}
+
+async function cached() {
+  const body = await (await fetch("/api/cached")).json();
+  return body.cached ? "cached answer" : "unexpected answer";
+}
+
+async function abort() {
+  await fetch("/api/abort");
+  return "answered";
+}
+
+function echo(sends) {
   return new Promise((resolve, reject) => {
     const socket = new WebSocket(`${location.origin.replace(/^http/, "ws")}/ws/echo`);
-    socket.addEventListener("open", () => socket.send("hello fixture"));
+    socket.binaryType = "arraybuffer";
+    const received = [];
+    socket.addEventListener("open", () => sends.forEach((data) => socket.send(data)));
     socket.addEventListener("message", (event) => {
-      resolve(`echo: ${event.data}`);
+      received.push(event.data);
+      if (received.length < sends.length) return;
       socket.close();
+      resolve(received);
     });
     socket.addEventListener("error", () => reject(new Error("WebSocket failed")));
   });
 }
 
-const CASES = { json, binary, error, redirect, stream, websocket };
+async function frames() {
+  const echoed = await echo([
+    "hello fixture",
+    new Uint8Array([1, 2, 3]),
+    "x".repeat(LONG_FRAME_LENGTH),
+  ]);
+  return `${echoed.length} frames echoed`;
+}
+
+async function websocket() {
+  const [reply] = await echo(["hello fixture"]);
+  return `echo: ${reply}`;
+}
+
+const CASES = {
+  json,
+  binary,
+  error,
+  redirect,
+  stream,
+  websocket,
+  large,
+  secret,
+  cached,
+  abort,
+  frames,
+};
 
 async function run(name, request) {
   show(`result-${name}`, "pending");

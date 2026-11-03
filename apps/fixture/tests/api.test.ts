@@ -110,6 +110,36 @@ describe("stream and download", () => {
   });
 });
 
+describe("network evidence", () => {
+  test("answers a body of the requested size, the same bytes every time", async () => {
+    const text = await (await get("/api/large?bytes=40")).text();
+    expect(text).toHaveLength(40);
+    expect(text).toBe("0123456789abcdef0123456789abcdef01234567");
+    expect(await (await get("/api/large?bytes=40")).text()).toBe(text);
+    expect(await (await get("/api/large?bytes=-3")).text()).toBe("");
+  });
+
+  test("answers the secret route with a cookie and a token header, never echoing either", async () => {
+    const response = await get("/api/secret", { headers: { Authorization: "Bearer s3cr3t" } });
+    expect(response.headers.get("set-cookie")).toMatch(/^fixture-session=s3cr3t-cookie;/);
+    expect(response.headers.get("x-fixture-token")).toBe("s3cr3t-reply");
+    const body = await response.text();
+    expect(JSON.parse(body)).toEqual({ ok: true, authorized: true });
+    expect(body).not.toContain("s3cr3t");
+    expect(await (await get("/api/secret")).json()).toEqual({ ok: true, authorized: false });
+  });
+
+  test("lets the cached route be cached for a minute", async () => {
+    const response = await get("/api/cached");
+    expect(response.headers.get("cache-control")).toBe("max-age=60");
+    expect(await response.json()).toEqual({ cached: true });
+  });
+
+  test("drops the connection of the abort route without answering", async () => {
+    await expect(get("/api/abort")).rejects.toThrow();
+  });
+});
+
 describe("form POST", () => {
   test("answers 303 to the result page with the submitted fields", async () => {
     const response = await get("/api/submit", {

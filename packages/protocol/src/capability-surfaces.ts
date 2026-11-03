@@ -43,10 +43,10 @@ export const SURFACE_CAPABILITIES: Surface[] = [
     surface: "network",
     level: "normal",
     title: "Network bodies",
-    status: "planned",
+    status: "implemented",
     phase: "F3.1",
     notes:
-      "Stored as blobs with a condition (captured, truncated, unavailable, not-requested); streams and downloads can be incomplete.",
+      "Delivered by F3.1; tests/browser/network.spec.ts stores bodies in persistence's blob store by sha256 with MIME, encoding, size, and condition, and a 200,000-byte body above the cap is truncated with its original size. Streams and downloads can be incomplete.",
   },
   {
     kind: "surface",
@@ -54,9 +54,10 @@ export const SURFACE_CAPABILITIES: Surface[] = [
     surface: "network",
     level: "normal",
     title: "Network headers, timing, and cache state",
-    status: "planned",
+    status: "implemented",
     phase: "F3.1",
-    notes: "Sizes are capped and sensitive values are redacted before persistence.",
+    notes:
+      "Delivered by F3.1; tests/browser/network.spec.ts records request and response headers, resource timing, cache state (network, then disk or memory), and a dropped connection as failed. Authorization, cookies, and headers named by the session are redacted before an event exists, so neither the journal nor a blob holds them.",
   },
   {
     kind: "surface",
@@ -64,10 +65,10 @@ export const SURFACE_CAPABILITIES: Surface[] = [
     surface: "websocket-sse",
     level: "normal",
     title: "WebSocket frames",
-    status: "planned",
+    status: "implemented",
     phase: "F3.1",
     notes:
-      "Truncation and encoding are flagged, and a capture is evidence rather than a deterministic replay.",
+      "Delivered by F3.1; tests/browser/network.spec.ts records the handshake and text, binary, and long frames both ways with their opcode, encoding (utf8 or base64), size, and truncation. A capture is evidence rather than a deterministic replay.",
   },
   {
     kind: "surface",
