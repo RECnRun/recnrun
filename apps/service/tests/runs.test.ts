@@ -1,4 +1,4 @@
-import { readdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { ReplayDriver } from "@recnrun/engine";
 import { ServiceMessageSchema, type Flow, type RunSummary } from "@recnrun/protocol";
@@ -121,6 +121,30 @@ test("unknown flows, runs, and datasets are not found; no Chrome refuses the rep
   expect(codeOf(missing)).toBe("not-found");
   h.browser.found = { ok: false, code: "missing-file", remedy: "Open Chrome.", userDataDir: "/x" };
   expect(codeOf(await h.call("flow.replay", { flowId: flow.id }))).toBe("capability-unavailable");
+});
+
+test("inputs and datasets that do not fit the flow's inputs are refused before any run", async () => {
+  const h = await harness();
+  const pin = { type: "string", required: true, secret: true } as const;
+  const retries = { type: "number", required: false } as const;
+  await h.flows.saveFlow({ ...flow, inputs: { pin, retries } });
+  const replay = (params: Record<string, unknown>) =>
+    h.call("flow.replay", { flowId: flow.id, ...params });
+  for (const inputs of [{ pin: "1234" }, { retries: "2" }, { nope: 1 }]) {
+    const refused = await replay({ inputs });
+    expect(codeOf(refused)).toBe("invalid-request");
+    expect(JSON.stringify(refused)).not.toContain("1234");
+  }
+  const datasets = join(h.home, ".recnrun", "flows", flow.id, "datasets");
+  await mkdir(datasets, { recursive: true });
+  const leak = { schemaVersion: 1, inputs: { pin: "1234" } };
+  await writeFile(join(datasets, "leak.json"), JSON.stringify(leak));
+  const refused = await replay({ dataset: "leak" });
+  expect(codeOf(refused)).toBe("invalid-request");
+  const message = (refused as { error: { message: string } }).error.message;
+  expect(message).toContain('Input "pin" is secret');
+  expect(message).not.toContain("1234");
+  expect(h.deps.runs.size).toBe(0);
 });
 
 test("a replay that cannot reach Chrome ends as an internal error", async () => {

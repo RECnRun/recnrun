@@ -1,12 +1,13 @@
 import { join } from "node:path";
-import type {
-  Dataset,
-  Flow,
-  FlowManifest,
-  FlowStatus,
-  RevisionRecord,
-  RunCatalogEntry,
-  RunManifest,
+import {
+  checkInputValues,
+  type Dataset,
+  type Flow,
+  type FlowManifest,
+  type FlowStatus,
+  type RevisionRecord,
+  type RunCatalogEntry,
+  type RunManifest,
 } from "@recnrun/protocol";
 import { flowPaths, scanFlowFolders } from "./flow-folders.ts";
 import {
@@ -92,6 +93,27 @@ async function getFlow(flowsRoot: string, flowId: string): Promise<StoredFlow> {
   return { manifest, flow, revision: manifest.revision };
 }
 
+/** A dataset holds only values the flow's current inputs accept; a secret input's value is refused. */
+function checkedDataset(flow: Flow, path: string, dataset: Dataset): Dataset {
+  const issues = checkInputValues(flow, dataset.inputs);
+  if (issues.length === 0) return dataset;
+  const detail = issues.map(({ message }) => message.replace(/\.$/, "")).join("; ");
+  throw new FlowStoreError("invalid", path, detail);
+}
+
+async function writeDataset(flowsRoot: string, flowId: string, name: string, dataset: Dataset) {
+  const { flow } = await getFlow(flowsRoot, flowId);
+  const path = flowPaths(flowsRoot, flowId).dataset(name);
+  await writeStored("dataset", path, checkedDataset(flow, path, dataset));
+}
+
+// A dataset edited by hand is checked against the flow again when a run reads it.
+async function readDataset(flowsRoot: string, flowId: string, name: string): Promise<Dataset> {
+  const { flow } = await getFlow(flowsRoot, flowId);
+  const path = flowPaths(flowsRoot, flowId).dataset(name);
+  return checkedDataset(flow, path, await readStored("dataset", path));
+}
+
 /** Opens the flow store of the user whose home folder is `home`, rebuilding a missing index. */
 export async function openFlowStore({
   home,
@@ -126,11 +148,8 @@ export async function openFlowStore({
       (await readStored("flow-manifest", paths(flowId).manifest)).revisions,
     getRevision: (flowId, revision) => readRevision(paths(flowId).folder, revision),
     saveDataset: (flowId, name, dataset) =>
-      exclusive(async () => {
-        await readStored("flow-manifest", paths(flowId).manifest);
-        await writeStored("dataset", paths(flowId).dataset(name), dataset);
-      }),
-    getDataset: (flowId, name) => readStored("dataset", paths(flowId).dataset(name)),
+      exclusive(() => writeDataset(flowsRoot, flowId, name, dataset)),
+    getDataset: (flowId, name) => exclusive(() => readDataset(flowsRoot, flowId, name)),
     createRun: (manifest) => exclusive(() => createRun(context, manifest)),
     finishRun: (result) => exclusive(() => finishRun(context, result)),
     getRun: (flowId, runId) => readRunFolder(runFolder(paths(flowId).folder, runId)),

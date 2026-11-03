@@ -10,6 +10,7 @@ import type { FlowStore, JournalWriter } from "@recnrun/persistence";
 import {
   PROTOCOL_SCHEMA_VERSION,
   RUN_EXIT_CODES,
+  checkInputValues,
   type Event,
   type RunManifest,
   type RunSummary,
@@ -186,7 +187,12 @@ async function execute(
 /** Starts a replay of the flow's current revision and answers with its run id at once. */
 export async function startReplay(deps: RunDeps, params: ReplayParams): Promise<{ runId: string }> {
   const store = deps.store();
-  const { revision } = await store.get(params.flowId);
+  const { flow, revision } = await store.get(params.flowId);
+  // The store checks the dataset against the flow; the request's own inputs are checked here.
+  const issues = checkInputValues(flow, params.inputs ?? {});
+  if (issues.length > 0) {
+    throw new ServiceFailure("invalid-request", issues.map(({ message }) => message).join(" "));
+  }
   const dataset =
     params.dataset === undefined
       ? undefined

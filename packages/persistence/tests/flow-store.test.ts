@@ -168,6 +168,31 @@ test("datasets live in datasets/<name>.json and are validated", async () => {
   });
 });
 
+test("a dataset must fit the flow's inputs when saved and when read; no secret is written", async () => {
+  const spike = spikeFlow();
+  const pin = { type: "string", required: true, secret: true } as const;
+  const retries = { type: "number", required: false } as const;
+  await store.saveFlow({ ...spike, inputs: { ...spike.inputs, pin, retries } });
+  await store.saveDataset("form-submit", "good", {
+    schemaVersion: 1,
+    inputs: { name: "Ana", retries: 2 },
+  });
+  for (const inputs of [{ pin: "1234" }, { retries: "2" }, { nope: 1 }]) {
+    const dataset = { schemaVersion: 1 as const, inputs };
+    await expect(store.saveDataset("form-submit", "bad", dataset)).rejects.toMatchObject({
+      code: "invalid",
+      path: join(folder(), "datasets", "bad.json"),
+    });
+  }
+  expect(await filesBelow(join(folder(), "datasets"))).toEqual(["good.json"]);
+  const leak = { schemaVersion: 1, inputs: { name: "Ana", pin: "1234" } };
+  await writeFile(join(folder(), "datasets", "leak.json"), JSON.stringify(leak));
+  const read = store.getDataset("form-submit", "leak");
+  await expect(read).rejects.toMatchObject({ code: "invalid" });
+  await expect(read).rejects.toThrow(/Input "pin" is secret/);
+  await expect(read).rejects.not.toThrow(/1234/);
+});
+
 test("a corrupt manifest is reported and the other flows still list", async () => {
   await store.saveFlow(spikeFlow());
   await store.saveFlow({ ...spikeFlow(), id: "other", name: "Other" });
