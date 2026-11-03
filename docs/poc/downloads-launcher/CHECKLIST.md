@@ -59,7 +59,10 @@ Gate P0: verify · baseline counts · Chrome versions (lab, host) · review
 
 ## P1: Downloads write and `file://` read
 
-- [ ] P1.0 Lab egress guard (`--network none`, Codex P0 finding 2)
+- [i] P1.0 Lab egress guard (internal Docker network `recnrun-tests` with an on-link default route, Codex P0 finding 2)
+  red: `node --test tests/container/runner.checks.mjs` against the `--network none` runner: `test:local` had networks `[]`, not `['recnrun-tests']`, and an external `recnrun-tests` was not refused; with the network but no route step: `'create' !== 'NET_ADMIN'` and Dockerfile.tests had no `iproute2`; `no-egress.spec.ts` on the default network (scratch worktree at `cc49e99`): `dns.lookup` resolved to 172.66.147.243, TCP 1.1.1.1:443 connected, navigation "navigated with status 200", worker fetch "resolved" (4 failed, loopback control passed); `--network none` failed the mesh at "Connecting — Profile B" and 17 e2e and 8 component WebRTC tests; the internal network without a route failed `peer-link.browser.test.ts` (7 timeouts in verify; a two-peer page probe gathered no candidate, and one host candidate and `connected` once the route was added)
+  green: `vp run test:container` 20 passed; `vp run test:components` 13 files / 82 tests passed; `vp run test:browser -- tests/browser/no-egress.spec.ts` 5 passed; the mesh with Chrome's defaults and no flag; egress errors: `dns.lookup` `EAI_AGAIN`, TCP `EHOSTUNREACH` (after about 3 s, cap 10 s), navigation `net::ERR_NAME_NOT_RESOLVED`, worker fetch "Failed to fetch"; policy install unchanged (its update server is loopback)
+  commit: cherry-picked from agent/p1-egress 51af201 (Run every Docker test on an internal network with no route out); SHA recorded at the gate
 - [i] P1.1 POC build variants `poc-d0`, `poc-d1`, `poc-d2`
   red: `vp run test:extension-manifest` with the new checks before the config change: `poc-d0/d1/d2 declare their permissions...` fail, actual `[ 'storage', 'tabs' ]` vs expected `[ 'storage', 'tabs', 'offscreen', 'downloads', 'debugger' ]`
   green: `vp run test:extension-manifest` 11 passed (production + three POC builds); `origins.test.ts` 8 passed; production and test manifests byte-identical before and after (empty `diff`); negative control in a scratch worktree, production with `downloads`: 2 checks fail; pinned id `omllgeochjfpkjbkpcgjmnnbncdpiedd`

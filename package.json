@@ -23,7 +23,7 @@
     "test:host": "vp run --no-cache extension#build:test && playwright test --config playwright.host.config.ts",
     "test:coverage": "node scripts/test-container.mjs test:coverage:local",
     "test:coverage:local": "vp test --coverage && node --test scripts/coverage.checks.mjs",
-    "test:container": "node --test tests/container/runner.checks.mjs",
+    "test:container": "node --test tests/container/runner.checks.mjs tests/container/image.checks.mjs",
     "test:scripts": "node --test scripts/*.checks.mjs",
     "test:hooks": "node --test scripts/agent-hooks/*.checks.mjs scripts/git-hooks/*.checks.mjs",
     "build:poc": "vp run extension#build:poc-d0 && vp run extension#build:poc-d1 && vp run extension#build:poc-d2",

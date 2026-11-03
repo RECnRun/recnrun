@@ -18,6 +18,18 @@ if (command === "build") {
     writeFileSync(join(dirname(args[args.indexOf("--iidfile") + 1]), "coverage"), "Blocked");
   }
 }
+if (command === "network") {
+  const created = join(directory, "network-created");
+  if (args[1] === "create") writeFileSync(created, args.join(" "));
+  if (args[1] === "inspect") {
+    if (scenario === "external-network") console.log("false");
+    else if (existsSync(created)) console.log("true");
+    else {
+      console.error(`Error: No such network: ${args.at(-1)}`);
+      process.exit(1);
+    }
+  }
+}
 if (command === "create") console.log("fixture-container");
 if (command === "start") {
   console.log("Container test output");

@@ -16,8 +16,11 @@ const tasks = new Set([
   "test:e2e:local",
   "test:browser:local",
   "test:experiments:local",
+  "test:headless:local",
   "test:coverage:local",
 ]);
+// An internal bridge keeps eth0 for WebRTC host candidates and routes nothing out (POC P1.0).
+const network = "recnrun-tests";
 const runId = `${new Date().toISOString().replaceAll(":", "-")}-${randomUUID()}`;
 const artifacts = resolve(
   process.env.RECNRUN_TEST_ARTIFACTS ?? join(root, ".artifacts/docker"),
@@ -107,6 +110,30 @@ function containerEnvironment() {
   return environment;
 }
 
+async function isInternalNetwork() {
+  const inspected = await docker(["network", "inspect", "--format", "{{.Internal}}", network], {
+    quiet: true,
+  });
+  return inspected.code === 0 ? inspected.stdout === "true" : undefined;
+}
+
+/** Creates the shared network once; it stays for concurrent runs, so cleanup never removes it. */
+async function ensureNetwork() {
+  let internal = await isInternalNetwork();
+  if (internal === undefined) {
+    // A concurrent run may create it first; the second inspect settles the race.
+    await docker(["network", "create", "--internal", network], { quiet: true });
+    internal = await isInternalNetwork();
+  }
+  if (internal) return 0;
+  message(
+    internal === undefined
+      ? `Could not create the Docker network ${network}.`
+      : `The Docker network ${network} routes out; remove it with \`docker network rm ${network}\`.`,
+  );
+  return 1;
+}
+
 async function startTests() {
   const environment = containerEnvironment();
 
@@ -119,6 +146,11 @@ async function startTests() {
       container,
       "--label",
       "com.recnrun.tests=true",
+      "--network",
+      network,
+      // The image's entry adds the on-link default route WebRTC needs (test-container-entry.sh).
+      "--cap-add",
+      "NET_ADMIN",
       ...environment,
       image,
       task,
@@ -188,6 +220,8 @@ async function executeTests() {
   const built = await buildImage();
   if (built.code !== 0 || interrupted) return built.code || interrupted;
   image = built.stdout;
+  const networked = await ensureNetwork();
+  if (networked !== 0 || interrupted) return networked || interrupted;
   return startTests();
 }
 

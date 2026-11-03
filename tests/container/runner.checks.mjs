@@ -120,6 +120,48 @@ await test("runs the experiments of verify in smoke mode and leaves the experime
   assert.ok(!create.some((argument) => argument.startsWith("RECNRUN_EXPERIMENT_SAMPLES=")));
 });
 
+const TASKS = [
+  "test:local",
+  "verify:local",
+  "test:unit:local",
+  "test:components:local",
+  "test:e2e:local",
+  "test:browser:local",
+  "test:experiments:local",
+  "test:headless:local",
+  "test:coverage:local",
+];
+
+await test("runs every task on the internal recnrun-tests network, never the default or none", async (context) => {
+  for (const task of TASKS) {
+    const result = await launch(context, "success", [], task);
+    assert.equal(result.code, 0, result.output);
+    const create = result.calls.find(([command]) => command === "create");
+    const networks = create.flatMap((argument, index) =>
+      create[index - 1] === "--network" || argument.startsWith("--network=")
+        ? [argument]
+        : argument === "--net" || argument.startsWith("--net=")
+          ? [argument]
+          : [],
+    );
+    assert.deepEqual(networks, ["recnrun-tests"], task);
+    // The entry step adds the on-link default route WebRTC needs; it needs this capability.
+    assert.equal(create[create.indexOf("--cap-add") + 1], "NET_ADMIN", task);
+    const made = result.calls.filter(
+      ([command, action]) => command === "network" && action === "create",
+    );
+    assert.deepEqual(made, [["network", "create", "--internal", "recnrun-tests"]], task);
+    assert.ok(!result.calls.some(([command, action]) => command === "network" && action === "rm"));
+  }
+});
+
+await test("refuses a recnrun-tests network that routes out", async (context) => {
+  const result = await launch(context, "external-network");
+  assert.equal(result.code, 1, result.output);
+  assert.match(result.output, /recnrun-tests routes out/);
+  assert.ok(!result.calls.some(([command]) => command === "create"));
+});
+
 await test("refuses the host runner, which drives the installed Google Chrome of the Mac", async (context) => {
   for (const task of ["test:host", "test:host:local"]) {
     const result = await launch(context, "success", [], task);

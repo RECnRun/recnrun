@@ -29,6 +29,7 @@ paths:
 ## Running
 
 - Public commands run in Docker, headed Chromium (end-to-end) or Google Chrome Stable (browser) on an isolated Xvfb display. Keep `headless: false` (extensions need a headed Chromium), and never connect the container display to the host.
+- `scripts/test-container.mjs` runs every target on `recnrun-tests`, an internal Docker network it creates once and never removes: the container keeps `lo` and `eth0`, and the image's entry (`scripts/test-container-entry.sh`, run with `--cap-add NET_ADMIN`) adds an on-link default route because a page's WebRTC binds its host candidate to the default-route address; DNS and every route out still fail, as `tests/browser/no-egress.spec.ts` proves (POC PLAN.md P1.0).
 - Browser tests stay serial (`--workers=1`), coverage included.
 - The Node projects run with `isolate: false`, so files of one project share a worker: reset module state in `beforeEach` (as `fakeBrowser.reset()` does) instead of relying on a fresh module per file.
 - Pass Playwright arguments after `--`, for example `vp run test:e2e -- tests/e2e/dashboard-tab.spec.ts -g 'empty'`.
