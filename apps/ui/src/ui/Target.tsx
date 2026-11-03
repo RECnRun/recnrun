@@ -11,7 +11,7 @@ function describeLocator(entry: LocatorEntry): string {
 }
 
 /** One line per target: a CSS string, a single locator, or each alternative of a list. */
-export function describeTarget(target: Target): string {
+function describeTarget(target: Target): string {
   if (typeof target === "string") return `css=${JSON.stringify(target)}`;
   if ("locators" in target) return target.locators.map(describeLocator).join(" | ");
   return describeLocator(target);

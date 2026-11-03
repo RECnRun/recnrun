@@ -8,7 +8,7 @@ const keyOf = (result: StepResult) =>
   `${result.stepPath?.join("/") ?? result.stepId}#${result.iterationId ?? ""}`;
 
 /** One row per executed step instance, in first-seen order, holding its latest result. */
-export function latestResults(results: StepResult[]): StepResult[] {
+function latestResults(results: StepResult[]): StepResult[] {
   const rows = new Map<string, StepResult>();
   for (const result of results) rows.set(keyOf(result), result);
   return [...rows.values()];

@@ -1,10 +1,11 @@
+import type { Flow, FlowCatalogEntry, FlowManifest } from "@recnrun/protocol";
 import { render } from "preact";
 import { afterEach, expect, test } from "vite-plus/test";
 import { page } from "vite-plus/test/browser";
 import { App } from "@/app/App";
 import { hrefOf, parseHash } from "@/app/routes";
 import { mount } from "@/app/mount";
-import { fakeApi } from "./fake-api";
+import { NOW, REVISION, fakeApi } from "./fake-api";
 
 afterEach(() => {
   history.replaceState(null, "", location.pathname + location.search);
@@ -53,4 +54,43 @@ test("navigates between screens through the hash", async () => {
     .element(page.getByRole("link", { name: "Setup" }))
     .toHaveAttribute("aria-current", "page");
   expect(location.hash).toBe("#/setup");
+});
+
+test("opens a flow in the editor, then its run screen, and starts a recording", async () => {
+  const entry = {
+    id: "login",
+    name: "Log in",
+    status: "recorded",
+    revision: REVISION,
+    updatedAt: NOW,
+  };
+  const flow: Flow = {
+    schemaVersion: 1,
+    id: "login",
+    name: "Log in",
+    actors: {},
+    inputs: {},
+    requirements: [],
+    preconditions: [],
+    steps: [],
+  };
+  const manifest = { ...entry, revisions: [] } as unknown as FlowManifest;
+  const fake = fakeApi({
+    "flow.list": async () => ({ flows: [entry as FlowCatalogEntry] }),
+    "flow.get": async () => ({ flow, manifest }),
+    "profiles.list": async () => ({ profiles: [] }),
+  });
+  const root = document.createElement("div");
+  document.body.replaceChildren(root);
+  render(<App api={fake.api} />, root);
+  await page.getByRole("button", { name: "Open Log in" }).click();
+  await expect.element(page.getByRole("heading", { name: "Log in" })).toBeVisible();
+  expect(location.hash).toBe("#/flows/login");
+  await page.getByRole("button", { name: "Run" }).click();
+  await expect.element(page.getByRole("heading", { name: "Run Log in" })).toBeVisible();
+  expect(location.hash).toBe("#/flows/login/run");
+  await page.getByRole("link", { name: "Flows" }).click();
+  await page.getByRole("button", { name: "New recording" }).click();
+  await expect.element(page.getByRole("button", { name: "Start recording" })).toBeVisible();
+  expect(location.hash).toBe("#/record");
 });
