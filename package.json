@@ -46,6 +46,7 @@
     "knip": "catalog:",
     "oxfmt": "catalog:",
     "typescript": "catalog:",
+    "valibot": "catalog:",
     "vite-plus": "catalog:"
   },
   "devEngines": {
