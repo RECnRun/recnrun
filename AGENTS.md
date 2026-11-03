@@ -12,7 +12,7 @@ RECnRun is a local tool that drives the installed Google Chrome over the Chrome 
 - `packages/adapter`: `@recnrun/adapter`, that interface implemented over Playwright and CDP.
 - `packages/persistence`: `@recnrun/persistence`, flow folders, revisions, the journal, and the SQLite index.
 - `packages/brand`: `@recnrun/brand`, the Mona Sans font and the stylesheet every app imports.
-- `tests/`: Playwright end-to-end tests (`tests/e2e`), browser tests against Google Chrome over CDP (`tests/browser`), and Docker runner checks (`tests/container`).
+- `tests/`: Playwright end-to-end tests (`tests/e2e`), browser tests against Google Chrome over CDP (`tests/browser`), desktop tests that drive Chrome's own windows and dialogs with xdotool and scrot (`tests/desktop`), and Docker runner checks (`tests/container`).
 
 The workspaces are skeletons until the phases of [PLAN.md](docs/plan/PLAN.md) fill them; [ARCHITECTURE.md](docs/ARCHITECTURE.md#target-layout) has the layout and what each may import.
 
@@ -41,7 +41,8 @@ Vite+ (`vp`) is the only toolchain. `vp <name>` runs a built-in command and `vp 
 | `vp run deps`                                                     | Architecture boundaries (dependency-cruiser)                                  |
 | `vp run test:unit`, `test:components`, `test:e2e`, `test:browser` | One test layer: Node, Vitest Browser Mode, Playwright, Google Chrome over CDP |
 | `vp run test:contract`                                            | The real service over HTTP and WebSocket, on a temporary home                 |
-| `vp run test`                                                     | All five layers                                                               |
+| `vp run test:desktop`                                             | Chrome's own setup page, dialog, and tab strip, driven with xdotool and scrot |
+| `vp run test`                                                     | All six layers                                                                |
 | `vp run test:coverage`                                            | Coverage with thresholds                                                      |
 | `vp run dead-code`, `vp run duplication`                          | Knip; jscpd                                                                   |
 | `vp run docs:check`                                               | Relative Markdown links and anchors resolve                                   |

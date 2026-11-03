@@ -17,6 +17,7 @@ const tasks = new Set([
   "test:contract:local",
   "test:e2e:local",
   "test:browser:local",
+  "test:desktop:local",
   "test:coverage:local",
   "bench:local",
 ]);

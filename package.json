@@ -20,6 +20,8 @@
     "test:e2e:local": "vp run --no-cache website#build && vp run --no-cache @recnrun/ui#build && playwright test --workers=1",
     "test:browser": "node scripts/test-container.mjs test:browser:local",
     "test:browser:local": "playwright test --config playwright.browser.config.ts",
+    "test:desktop": "node scripts/test-container.mjs test:desktop:local",
+    "test:desktop:local": "node scripts/desktop-guard.mjs && vp run --no-cache @recnrun/ui#build && playwright test --config playwright.desktop.config.ts",
     "test:coverage": "node scripts/test-container.mjs test:coverage:local",
     "test:coverage:local": "vp test --coverage",
     "test:container": "node --test tests/container/*.checks.mjs",

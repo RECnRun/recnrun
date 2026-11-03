@@ -20,6 +20,11 @@ RUN curl -fsSL https://dl.google.com/linux/linux_signing_key.pub -o /etc/apt/key
     && rm -rf /var/lib/apt/lists/* \
     && google-chrome --version
 
+# tests/desktop drives Chrome's own windows and dialogs on the Xvfb display with these two.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends xdotool scrot \
+    && rm -rf /var/lib/apt/lists/*
+
 # tests/container/runner.checks.mjs builds this stage alone to check the browser.
 FROM runtime
 WORKDIR /workspace

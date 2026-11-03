@@ -60,6 +60,7 @@ test("verify runs every gate once and every test project once", () => {
     "coverage",
     "e2e",
     "browser",
+    "desktop",
     "container",
     "hooks",
     "scripts",
@@ -85,12 +86,18 @@ test("coverage runs exactly the unit, component, and contract projects, unfilter
   assert.doesNotMatch(scripts["test:coverage:local"], /--project/);
 });
 
-test("the vp run test suite keeps all five layers", () => {
+test("the vp run test suite keeps all six layers", () => {
   assert.deepEqual(tasks["test:local"].command, [
     "vp run --no-cache test:unit:local",
     "vp run --no-cache test:components:local",
     "vp run --no-cache test:contract:local",
     "vp run --no-cache test:e2e:local",
     "vp run --no-cache test:browser:local",
+    "vp run --no-cache test:desktop:local",
   ]);
+});
+
+test("the desktop layer runs only through the test container", () => {
+  assert.equal(scripts["test:desktop"], "node scripts/test-container.mjs test:desktop:local");
+  assert.match(scripts["test:desktop:local"], /^node scripts\/desktop-guard\.mjs && /);
 });

@@ -112,6 +112,7 @@ export default defineConfig({
           "vp run --no-cache test:contract:local",
           "vp run --no-cache test:e2e:local",
           "vp run --no-cache test:browser:local",
+          "vp run --no-cache test:desktop:local",
         ],
       },
       verify: {
@@ -128,6 +129,7 @@ export default defineConfig({
           "vp run --no-cache test:coverage:local",
           "vp run --no-cache test:e2e:local",
           "vp run --no-cache test:browser:local",
+          "vp run --no-cache test:desktop:local",
           "vp run --no-cache test:container",
           "vp run --no-cache test:hooks",
           "vp run --no-cache test:scripts",
