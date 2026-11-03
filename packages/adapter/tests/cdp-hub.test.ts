@@ -3,46 +3,11 @@ import { expect, test } from "vite-plus/test";
 import { cdpHub } from "../src/cdp-hub.ts";
 import type { CdpChannel, CdpEvent } from "../src/cdp-socket.ts";
 import { startPicker, startRecording } from "../src/index.ts";
-import { FakeChannel } from "./fake-channel.ts";
 import { now } from "./fake-cdp.ts";
+import { ChromeChannel } from "./fake-hub-channel.ts";
 
 const ENDPOINT = "ws://127.0.0.1:9222/devtools/browser/x";
 const PAGE = { type: "page", url: "about:blank" };
-const STATUS = { node: { localName: "output", attributes: ["data-testid", "status"] } };
-
-/** Chrome's browser endpoint: lanes are browser sessions L1, L2, …; an attach's event precedes its reply. */
-class ChromeChannel extends FakeChannel {
-  /** Methods Chrome never answers. */
-  readonly holding = new Set<string>();
-  private lanes = 0;
-
-  override send(method: string, params?: Record<string, unknown>, sessionId?: string) {
-    const reply = super.send(method, params, sessionId);
-    if (this.holding.has(method)) return new Promise<unknown>(() => undefined);
-    if (method === "Target.attachToBrowserTarget") {
-      this.lanes += 1;
-      return reply.then(() => ({ sessionId: `L${this.lanes}` }));
-    }
-    if (method === "Target.attachToTarget") {
-      const targetId = String(params?.["targetId"]);
-      const attached = `A-${targetId}`;
-      this.attachOn(sessionId, attached, targetId);
-      return reply.then(() => ({ sessionId: attached }));
-    }
-    if (method === "Target.createTarget") return reply.then(() => ({ targetId: "ROOT" }));
-    if (method === "DOM.describeNode") return reply.then(() => STATUS);
-    return reply;
-  }
-
-  /** Chrome reports a page session attached under `parent` (a lane or one of its sessions). */
-  attachOn(parent: string | undefined, sessionId: string, targetId: string, type = "page") {
-    this.emit(
-      "Target.attachedToTarget",
-      { sessionId, targetInfo: { ...PAGE, type, targetId }, waitingForDebugger: false },
-      parent,
-    );
-  }
-}
 
 function heard(channel: CdpChannel): CdpEvent[] {
   const events: CdpEvent[] = [];
@@ -61,7 +26,7 @@ async function twoLanes() {
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 test("a lane's own commands ride its browser session; child sessions are addressed directly", async () => {
-  const { root, first, second } = await twoLanes();
+  const { root, hub, first, second } = await twoLanes();
   expect(root.sent).toEqual([
     { method: "Target.attachToBrowserTarget" },
     { method: "Target.attachToBrowserTarget" },
@@ -69,10 +34,12 @@ test("a lane's own commands ride its browser session; child sessions are address
   await first.send("Target.setAutoAttach", { autoAttach: true });
   await second.send("Target.getTargets");
   await first.send("Runtime.enable", undefined, "P1");
+  await hub.send("Target.getTargets");
   expect(root.sent.slice(2)).toEqual([
     { method: "Target.setAutoAttach", params: { autoAttach: true }, sessionId: "L1" },
     { method: "Target.getTargets", sessionId: "L2" },
     { method: "Runtime.enable", sessionId: "P1" },
+    { method: "Target.getTargets" },
   ]);
 });
 

@@ -5,6 +5,8 @@ import type { CdpChannel, CdpEvent } from "./cdp-socket.ts";
 export interface CdpHub {
   /** Opens a lane: a channel over the shared socket with auto-attach and sessions of its own. */
   lane(): Promise<CdpChannel>;
+  /** A command on the browser's own session, for queries that attach to nothing. */
+  send(method: string, params?: Record<string, unknown>): Promise<unknown>;
   /** The targets the lanes hold sessions on right now. */
   held(): ReadonlySet<string>;
   /** Called once if the shared socket closes or fails without `close()`. */
@@ -150,6 +152,7 @@ export function cdpHub(root: CdpChannel): CdpHub {
       ownership.lanes.set(sessionId, lane);
       return laneChannel(lane, root, ownership);
     },
+    send: (method, params) => root.send(method, params),
     held: () => ownership.held(),
     onClose: (listener) => closeListeners.push(listener),
     close: () => {

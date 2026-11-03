@@ -1,7 +1,7 @@
 import type { Frame, Page } from "@playwright/test";
-import { startPicker } from "../../packages/adapter/src/index.ts";
-import type { DomTarget } from "../../packages/protocol/src/index.ts";
-import { counters, expect, SECOND_ORIGIN, test } from "./fixtures/fixture-app.ts";
+import { shareChrome, startPicker, startRecording } from "../../packages/adapter/src/index.ts";
+import type { CapturedEvent, DomTarget } from "../../packages/protocol/src/index.ts";
+import { counters, expect, FIXTURE_ORIGIN, SECOND_ORIGIN, test } from "./fixtures/fixture-app.ts";
 
 declare global {
   interface Window {
@@ -107,4 +107,46 @@ test("picking over a cross-site frame reaches none of its listeners", async ({ a
   // Once picking stops, the same listeners hear the frame's input again.
   await button.click();
   expect(await captured(frame)).toContain("document:click");
+});
+
+test("a recording and a picker on lanes of one socket keep their sessions apart", async ({
+  app,
+  chrome,
+}) => {
+  const shared = shareChrome();
+  const openChannel = (endpoint: string) => shared.lane(endpoint);
+  const events: CapturedEvent[] = [];
+  const opened = app.context.waitForEvent("page");
+  const recording = await startRecording(chrome.wsEndpoint, {
+    openChannel,
+    capture: { runId: "picker-lanes", onEvent: (event) => void events.push(event) },
+  });
+  try {
+    const recorded = await opened;
+    await recorded.goto(`${FIXTURE_ORIGIN}/routes/form`);
+    await recorded.waitForFunction(() => window.__fixture?.ready === true);
+    await listenAtTheTop(recorded);
+    const picked: DomTarget[] = [];
+    const picker = await startPicker(chrome.wsEndpoint, recording.targetId, {
+      openChannel,
+      onPicked: (target) => picked.push(target),
+    });
+    await clickEachButton(recorded, await recorded.getByTestId("submit").boundingBox());
+    await expect.poll(() => picked.length).toBe(3);
+    expect(await captured(recorded)).toEqual([]);
+    await picker.stop();
+    // The picker's lane left the socket; the recording's sessions on the same socket live on.
+    await recorded.getByTestId("submit").click();
+    await expect.poll(() => captured(recorded)).toContain("document:click");
+    await recording.settled();
+    const clicks = events.filter((event) => event.category === "dom" && event.type === "click");
+    expect(clicks).toHaveLength(1);
+    const attached = events.filter(
+      (event) => event.category === "target" && event.type === "attached",
+    );
+    expect(attached.map(({ targetId }) => targetId)).toEqual([recording.targetId]);
+  } finally {
+    recording.stop();
+    await shared.close();
+  }
 });
