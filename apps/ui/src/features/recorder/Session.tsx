@@ -6,7 +6,7 @@ import { Suggestions } from "@/features/recorder/Suggestions";
 import { Badge } from "@/ui/Badge";
 import { Button } from "@/ui/Button";
 import { Card } from "@/ui/Card";
-import { EmptyState, ErrorState } from "@/ui/States";
+import { ErrorState } from "@/ui/States";
 
 /** What `src/app` renders inside a running recording, such as the assertion picker. */
 export type SessionSlot = (session: { sessionId: string; lease?: LeaseFence }) => ComponentChildren;
@@ -19,7 +19,7 @@ const PAUSE_LABELS: Record<PauseMode, string> = {
 
 // Collector gaps reach the UI with F3.5's coverage accounting; F2 shows a suspended capture.
 function Coverage({ suspended }: { suspended: boolean }) {
-  if (!suspended) return <EmptyState>No coverage gaps so far.</EmptyState>;
+  if (!suspended) return <p class="muted">Capture is on for this page and the popups it opens.</p>;
   return <p>Capture is suspended: nothing is observed until you resume it.</p>;
 }
 

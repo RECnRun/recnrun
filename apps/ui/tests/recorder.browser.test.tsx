@@ -183,12 +183,13 @@ test("toggles a pause with the lease and shows a suspended capture", async () =>
   const fake = recorder();
   await page.getByRole("button", { name: "Start recording" }).click();
   const suspend = page.getByRole("button", { name: "Suspend capture" });
+  const coverage = page.getByRole("region", { name: "Coverage" });
+  await expectTexts(coverage, "Capture is on", "this page and the popups it opens");
   await suspend.click();
   await expect.element(suspend).toHaveAttribute("aria-pressed", "true");
   const pause = fake.calls.find((call) => call.command === "session.pause");
   expect(pause?.params).toEqual({ sessionId: "session-1", mode: "suspendCapture" });
   expect(pause?.options?.lease).toMatchObject({ leaseId: "lease-1", fencingToken: 3 });
-  const coverage = page.getByRole("region", { name: "Coverage" });
   await expectTexts(coverage, "Capture is suspended");
   await suspend.click();
   await expect.element(suspend).toHaveAttribute("aria-pressed", "false");
