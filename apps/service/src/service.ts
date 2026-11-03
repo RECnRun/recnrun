@@ -24,6 +24,7 @@ import { createEventHub } from "./hub.ts";
 import { claimInstance } from "./instance.ts";
 import { createJournalRegistry, type JournalRegistry } from "./journals.ts";
 import { createLogger, type Logger } from "./logger.ts";
+import { cancelReplays } from "./runs.ts";
 import { createApiServer, type ApiServer } from "./server.ts";
 import { stopAll } from "./sessions.ts";
 import { SERVICE_VERSION } from "./version.ts";
@@ -104,13 +105,14 @@ interface Parts {
   flows: FlowStore;
 }
 
-// A replay still running gets this long to finish before the store closes under it.
+// A cancelled replay gets this long to finish its step under way before its journal closes.
 const REPLAY_GRACE_MS = 5000;
 
-const settledOrLate = (work: Promise<unknown>[]) =>
+/** Whether the work settled within the grace. */
+const settledInGrace = (work: Promise<unknown>[]) =>
   Promise.race([
-    Promise.allSettled(work),
-    new Promise((resolve) => setTimeout(resolve, REPLAY_GRACE_MS).unref()),
+    Promise.allSettled(work).then(() => true),
+    new Promise<boolean>((resolve) => setTimeout(() => resolve(false), REPLAY_GRACE_MS).unref()),
   ]);
 
 async function shutdown(parts: Parts): Promise<void> {
@@ -118,10 +120,13 @@ async function shutdown(parts: Parts): Promise<void> {
   logger.info("service.stopping");
   await api.close();
   await stopAll(parts.commands);
-  await settledOrLate([...parts.commands.active]);
-  parts.flows.close();
+  cancelReplays(parts.commands);
+  const active = [...parts.commands.active];
+  if (!(await settledInGrace(active)))
+    logger.warn("service.replay-unsettled", { count: parts.commands.active.size });
   const failures = await journals.drain();
   for (const message of failures) logger.error("journal.close-failed", { message });
+  parts.flows.close();
   await store.removeState(process.pid);
   await store.removeLock(nonce);
   logger.info("service.stopped");

@@ -4,7 +4,11 @@ import { createServer, connect } from "node:net";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, test } from "vite-plus/test";
 import { EgressForbiddenError } from "../../apps/service/src/index.ts";
-import { openServiceStateStore, readJournal } from "../../packages/persistence/src/index.ts";
+import {
+  openFlowStore,
+  openServiceStateStore,
+  readJournal,
+} from "../../packages/persistence/src/index.ts";
 import { command, runNode, send, startFresh, tempHome } from "./helpers.ts";
 
 let home = "";
@@ -114,6 +118,26 @@ test("SIGTERM during journal writes drains every queued line into a readable jou
   expect(journal.events.length).toBe(count);
   expect(journal.events.every(({ seq }, index) => seq === index + 1)).toBe(true);
 });
+
+test("SIGTERM during a replay cancels its remaining steps and stores the interrupted run", async () => {
+  const steps = 40;
+  const service = runNode("tests/contract/fixtures/replay-service.ts", [home, String(steps)], home);
+  const runId = (await service.nextLine()).replace(/^run /, "");
+  expect(await service.nextLine()).toBe("replaying");
+  service.child.kill("SIGTERM");
+  expect(await service.exited).toBe(0);
+  const flows = await openFlowStore({ home });
+  try {
+    const run = await flows.getRun("many-clicks", runId);
+    expect(run.summary?.status).toBe("interrupted");
+    expect(run.journal.gap).toBeUndefined();
+    const finished = run.journal.events.filter(({ type }) => type === "step.finished");
+    expect(finished.length).toBeGreaterThan(0);
+    expect(finished.length).toBeLessThan(steps);
+  } finally {
+    flows.close();
+  }
+}, 20_000);
 
 test("RECNRUN_FORBID_EGRESS=1 makes a connection to a non-loopback host throw", async () => {
   const service = await startFresh(home);

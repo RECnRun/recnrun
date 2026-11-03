@@ -1,6 +1,12 @@
 import { randomUUID } from "node:crypto";
-import { replayFlow } from "@recnrun/engine";
-import type { FlowStore } from "@recnrun/persistence";
+import {
+  applySessionEvent,
+  createSession,
+  replayFlow,
+  type ReplayControl,
+  type ReplayRunStore,
+} from "@recnrun/engine";
+import type { FlowStore, JournalWriter } from "@recnrun/persistence";
 import {
   PROTOCOL_SCHEMA_VERSION,
   type Event,
@@ -10,6 +16,7 @@ import {
 import { endpointOf, type BrowserPort } from "./browser.ts";
 import { ServiceFailure } from "./dispatch.ts";
 import type { EventHub } from "./hub.ts";
+import type { JournalRegistry } from "./journals.ts";
 import type { Logger } from "./logger.ts";
 import { SERVICE_VERSION } from "./version.ts";
 
@@ -18,11 +25,14 @@ interface RunRecord {
   flowId: string;
   summary?: RunSummary;
   error?: string;
+  /** Lets no further step start; set while the replay runs. */
+  cancel?: () => void;
 }
 
 export interface RunDeps {
   browser: BrowserPort;
   hub: EventHub;
+  journals: JournalRegistry;
   logger: Logger;
   store: () => FlowStore;
   now: () => number;
@@ -43,6 +53,43 @@ type RunValues = Pick<ReplayParams, "inputs" | "secrets">;
 
 const DEFAULT_LIMIT = 100;
 
+/** The service tracks the run's journal, so stopping closes it even when the replay cannot. */
+function owned(
+  store: FlowStore,
+  journals: JournalRegistry,
+  opened: JournalWriter[],
+): ReplayRunStore {
+  return {
+    createRun: async (manifest) => {
+      const { journal } = await store.createRun(manifest);
+      const tracked = await journals.adopt(journal);
+      opened.push(tracked);
+      return { journal: tracked };
+    },
+    finishRun: (result) => store.finishRun(result),
+  };
+}
+
+/** A replay runs as a started session; cancelling interrupts it, so no further step starts. */
+function cancellable(record: RunRecord): ReplayControl {
+  const started = applySessionEvent(createSession(), "start");
+  if (!started.ok) throw new Error("A new session cannot start.");
+  let session = started.session;
+  let wake = () => {};
+  const changed = new Promise<void>((resolve) => (wake = resolve));
+  record.cancel = () => {
+    const interrupted = applySessionEvent(session, "interrupt");
+    if (interrupted.ok) session = interrupted.session;
+    wake();
+  };
+  return { session: () => session, changed: () => changed };
+}
+
+/** Interrupts every replay still running, for the service's shutdown. */
+export function cancelReplays(deps: RunDeps): void {
+  for (const record of deps.runs.values()) record.cancel?.();
+}
+
 async function execute(
   deps: RunDeps,
   manifest: RunManifest,
@@ -53,6 +100,8 @@ async function execute(
   const { runId, flowId } = manifest;
   const record: RunRecord = { flowId };
   deps.runs.set(runId, record);
+  const control = cancellable(record);
+  const opened: JournalWriter[] = [];
   try {
     const flow = await store.getRevision(flowId, manifest.flowRevision);
     const connection = await deps.browser.replayDriver(endpoint);
@@ -61,7 +110,8 @@ async function execute(
         runId,
         inputs,
         secrets,
-        run: { store, manifest },
+        run: { store: owned(store, deps.journals, opened), manifest },
+        control,
         observe: (event) => deps.hub.publish({ type: "run.step", runId, event }),
       });
       record.summary = outcome.summary;
@@ -72,6 +122,10 @@ async function execute(
   } catch (error) {
     record.error = error instanceof Error ? error.message : String(error);
     deps.logger.error("run.failed", { runId, message: record.error });
+  } finally {
+    delete record.cancel;
+    // A replay that failed before finishing left its journal open.
+    await Promise.allSettled(opened.map((journal) => journal.close()));
   }
 }
 

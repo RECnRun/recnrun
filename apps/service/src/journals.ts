@@ -4,6 +4,8 @@ import { openJournal, type JournalWriter } from "@recnrun/persistence";
 export interface JournalRegistry {
   /** Opens a journal through persistence and tracks it until it is closed. */
   open(path: string): Promise<JournalWriter>;
+  /** Tracks a journal another store opened, as `open` does; a stopping service closes and refuses it. */
+  adopt(writer: JournalWriter): Promise<JournalWriter>;
   /** Refuses new journals, then closes every open one; resolves with the errors of those that failed. */
   drain(): Promise<string[]>;
   readonly openCount: number;
@@ -21,26 +23,32 @@ export function createJournalRegistry(
 ): JournalRegistry {
   const writers = new Set<JournalWriter>();
   let draining = false;
+  async function track(writer: JournalWriter): Promise<JournalWriter> {
+    // Persistence's close is not idempotent, and a run's owner and the drain may both close it.
+    let closing: Promise<void> | undefined;
+    const tracked: JournalWriter = {
+      path: writer.path,
+      append: (event) => writer.append(event),
+      close: () => {
+        writers.delete(tracked);
+        closing ??= writer.close();
+        return closing;
+      },
+    };
+    writers.add(tracked);
+    // A drain that began while this one opened would otherwise leave it open.
+    if (draining) {
+      await tracked.close();
+      throw new ServiceStoppingError();
+    }
+    return tracked;
+  }
   return {
     async open(path) {
       if (draining) throw new ServiceStoppingError();
-      const writer = await open(path);
-      const tracked: JournalWriter = {
-        path: writer.path,
-        append: (event) => writer.append(event),
-        close: async () => {
-          writers.delete(tracked);
-          await writer.close();
-        },
-      };
-      writers.add(tracked);
-      // A drain that began while this one opened would otherwise leave it open.
-      if (draining) {
-        await tracked.close();
-        throw new ServiceStoppingError();
-      }
-      return tracked;
+      return track(await open(path));
     },
+    adopt: track,
     async drain() {
       draining = true;
       const results = await Promise.allSettled([...writers].map((writer) => writer.close()));

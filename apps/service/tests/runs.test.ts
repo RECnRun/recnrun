@@ -2,6 +2,7 @@ import type { ReplayDriver } from "@recnrun/engine";
 import type { Flow, RunSummary } from "@recnrun/protocol";
 import { expect, test } from "vite-plus/test";
 import { harness, type Harness } from "./fakes.ts";
+import { cancelReplays } from "@/runs";
 
 const resultOf = <T>(envelope: unknown): T => {
   expect(envelope).toMatchObject({ ok: true });
@@ -121,6 +122,47 @@ test("a replay that cannot reach Chrome ends as an internal error", async () => 
     ok: false,
     error: { code: "internal", message: "No replay in this fake." },
   });
+});
+
+test("a replay whose journal fails closes that journal and ends as an internal error", async () => {
+  const h = await harness();
+  const real = h.flows;
+  let closes = 0;
+  h.deps.store = () => ({
+    ...real,
+    createRun: async (manifest) => {
+      const handle = await real.createRun(manifest);
+      const journal = {
+        path: handle.journal.path,
+        append: () => Promise.reject(new Error("The disk is full.")),
+        close: async () => {
+          closes += 1;
+          await handle.journal.close();
+        },
+      };
+      return { ...handle, journal };
+    },
+  });
+  const run = await replaying(h);
+  run.release();
+  await Promise.all(h.deps.active);
+  expect(closes).toBe(1);
+  expect(h.deps.journals.openCount).toBe(0);
+  expect(codeOf(await h.call("run.summary", { runId: run.runId }))).toBe("internal");
+});
+
+test("a cancelled replay finishes its step under way, skips the rest, and is interrupted", async () => {
+  const h = await harness();
+  const run = await replaying(h);
+  await expect.poll(() => run.commands).toEqual(["navigate"]);
+  cancelReplays(h.deps);
+  run.release();
+  await Promise.all(h.deps.active);
+  expect(run.commands).toEqual(["navigate"]);
+  const summary = resultOf<RunSummary>(await h.call("run.summary", { runId: run.runId }));
+  expect(summary.status).toBe("interrupted");
+  expect(h.deps.journals.openCount).toBe(0);
+  cancelReplays(h.deps);
 });
 
 test("flows are validated, saved, imported, listed, and read back", async () => {
