@@ -20,6 +20,7 @@ export const REPORT_TIMEOUT_MS = 15_000;
 
 export interface LedgerEntry {
   seq: number;
+  ts: number;
   origin: string;
   path: string;
   method: string;
@@ -57,6 +58,15 @@ export const test = base.extend<{ observer: Observer }>({
 /** Evaluates `expression` in the isolator's service worker, where the routes are globals. */
 export async function evaluate<T>(extension: LoadedExtension, expression: string): Promise<T> {
   return (await extension.evaluateInBackground(expression)) as T;
+}
+
+/** `evaluate` of a method of the route's global, Route A unless `global` names another. */
+export async function call<T>(
+  extension: LoadedExtension,
+  expression: string,
+  global = "globalThis.recnrunRouteA",
+): Promise<T> {
+  return evaluate<T>(extension, `${global}.${expression}`);
 }
 
 /** `evaluate` of a member of `globalThis`, such as `recnrunRouteB.arm(...)`. */
