@@ -1,0 +1,142 @@
+[
+  {
+    "experiment": "E0",
+    "hypothesis": "E0.loadUnpacked",
+    "verdict": "pass",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "test",
+    "topology": "single-root",
+    "debugger": "none",
+    "samples": 3,
+    "observations": [
+      {
+        "extensionId": "aohedjlnhghpahbgpcccgplhbidpfdeh",
+        "idAfterRelaunch": "aohedjlnhghpahbgpcccgplhbidpfdeh",
+        "persistedAcrossRelaunch": false,
+        "dashboardAfterRelaunch": false,
+        "state": {
+          "onDisk": false,
+          "location": 4,
+          "disableReasons": []
+        }
+      },
+      {
+        "extensionId": "aohedjlnhghpahbgpcccgplhbidpfdeh",
+        "idAfterRelaunch": "aohedjlnhghpahbgpcccgplhbidpfdeh",
+        "persistedAcrossRelaunch": false,
+        "dashboardAfterRelaunch": false,
+        "state": {
+          "onDisk": false,
+          "location": 4,
+          "disableReasons": []
+        }
+      },
+      {
+        "extensionId": "aohedjlnhghpahbgpcccgplhbidpfdeh",
+        "idAfterRelaunch": "aohedjlnhghpahbgpcccgplhbidpfdeh",
+        "persistedAcrossRelaunch": false,
+        "dashboardAfterRelaunch": false,
+        "state": {
+          "onDisk": false,
+          "location": 4,
+          "disableReasons": []
+        }
+      }
+    ]
+  },
+  {
+    "experiment": "E0",
+    "hypothesis": "E0.managedPolicy",
+    "verdict": "pass",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "environment": "lab",
+    "install": "managed-policy",
+    "label": "strict",
+    "externalClient": false,
+    "variant": "test",
+    "topology": "single-root",
+    "debugger": "none",
+    "samples": 3,
+    "observations": [
+      {
+        "extensionId": "pdokeekobigepekddcjmhkicnkficloc",
+        "first": {
+          "ran": true,
+          "debuggingFlags": [],
+          "state": {
+            "onDisk": true,
+            "location": 7,
+            "disableReasons": []
+          }
+        },
+        "relaunch": {
+          "ran": true,
+          "debuggingFlags": [],
+          "state": {
+            "onDisk": true,
+            "location": 7,
+            "disableReasons": []
+          }
+        },
+        "requests": [
+          "GET /updates.xml?os=linux&arch=arm64&prod=chromecrx&prodchannel=&prodversion=156.0.8078.79&lang=en-US&acceptformat=crx3,puff&x=id%3Dpdokeekobigepekddcjmhkicnkficloc%26v%3D0.0.0.0%26installsource%3Dnotfromwebstore%26installedby%3Dpolicy%26uc",
+          "GET /extension.crx"
+        ]
+      },
+      {
+        "extensionId": "cihdpndfjhlmmibpgcblalepkoikhkbo",
+        "first": {
+          "ran": true,
+          "debuggingFlags": [],
+          "state": {
+            "onDisk": true,
+            "location": 7,
+            "disableReasons": []
+          }
+        },
+        "relaunch": {
+          "ran": true,
+          "debuggingFlags": [],
+          "state": {
+            "onDisk": true,
+            "location": 7,
+            "disableReasons": []
+          }
+        },
+        "requests": [
+          "GET /updates.xml?os=linux&arch=arm64&prod=chromecrx&prodchannel=&prodversion=156.0.8078.79&lang=en-US&acceptformat=crx3,puff&x=id%3Dcihdpndfjhlmmibpgcblalepkoikhkbo%26v%3D0.0.0.0%26installsource%3Dnotfromwebstore%26installedby%3Dpolicy%26uc",
+          "GET /extension.crx"
+        ]
+      },
+      {
+        "extensionId": "ljmndidadgkhekpjnddkbbkbmefcgjcp",
+        "first": {
+          "ran": true,
+          "debuggingFlags": [],
+          "state": {
+            "onDisk": true,
+            "location": 7,
+            "disableReasons": []
+          }
+        },
+        "relaunch": {
+          "ran": true,
+          "debuggingFlags": [],
+          "state": {
+            "onDisk": true,
+            "location": 7,
+            "disableReasons": []
+          }
+        },
+        "requests": [
+          "GET /updates.xml?os=linux&arch=arm64&prod=chromecrx&prodchannel=&prodversion=156.0.8078.79&lang=en-US&acceptformat=crx3,puff&x=id%3Dljmndidadgkhekpjnddkbbkbmefcgjcp%26v%3D0.0.0.0%26installsource%3Dnotfromwebstore%26installedby%3Dpolicy%26uc",
+          "GET /extension.crx"
+        ]
+      }
+    ]
+  }
+]
