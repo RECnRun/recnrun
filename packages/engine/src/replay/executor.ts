@@ -94,14 +94,22 @@ function preflight(flow: Flow, scope: Scope | { missing: string }): RunProblem |
   return undefined;
 }
 
-/** Waits while `pauseReplay` holds; false when the session stopped instead of resuming. */
-async function mayStart(control: ReplayControl | undefined): Promise<boolean> {
-  if (!control) return true;
+/**
+ * Waits while `pauseReplay` holds; false when the session stopped, or the connection was lost,
+ * instead of resuming. A loss ends the wait at once: no step may start without Chrome.
+ */
+async function mayStart(
+  control: ReplayControl | undefined,
+  interruption: Interruption | undefined,
+): Promise<boolean> {
   for (;;) {
+    if (interruption?.lost()) return false;
+    if (!control) return true;
     const session = control.session();
     if (mayStartNextStep(session)) return true;
     if (session.state !== "recording" && session.state !== "paused") return false;
-    await control.changed();
+    const changed = control.changed();
+    await (interruption ? Promise.race([changed, interruption.next]) : changed);
   }
 }
 
@@ -170,7 +178,7 @@ async function runAll(
 ): Promise<StepResult[]> {
   const results: StepResult[] = [];
   for (const [index, step] of steps.entries()) {
-    if (run.interruption?.lost() || !(await mayStart(control))) {
+    if (!(await mayStart(control, run.interruption))) {
       await skip(run, steps, index, "cancel");
       break;
     }
