@@ -73,9 +73,8 @@ Test commands and `verify` run in Docker, so start Docker Desktop first. If Dock
 - **Definition of done.** A code task is not done until `vp run verify` exits 0. It runs:
   - check, and lint with warnings as errors;
   - architecture boundaries;
-  - all test layers;
+  - the unit and component tests under coverage (at least 80% lines, statements, and functions; 75% branches), then the contract, end-to-end, and browser tests, each test project once;
   - container, hook, and script checks;
-  - coverage (at least 80% lines, statements, and functions; 75% branches);
   - Knip and jscpd (at most 4% duplication);
   - `docs:check` (every relative Markdown link and anchor resolves);
   - workspace builds.

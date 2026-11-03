@@ -11,6 +11,8 @@
         "tests/container/*.checks.mjs",
         // Child processes the contract tests spawn.
         "tests/contract/fixtures/*.ts",
+        // test:contract:local passes it to `vp test --config`, a command Knip does not parse.
+        "tests/contract/vitest.config.ts",
       ],
     },
     // The service's entrypoint, run directly by the contract tests.
