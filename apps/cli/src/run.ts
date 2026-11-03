@@ -1,6 +1,11 @@
-import { RUN_EXIT_CODES, type Dataset, type Flow, type RunSummary } from "@recnrun/protocol";
+import {
+  RUN_EXIT_CODES,
+  checkInputValues,
+  type Dataset,
+  type Flow,
+  type RunSummary,
+} from "@recnrun/protocol";
 import { ServiceCallError, type ServiceClient } from "@recnrun/service";
-import { datasetInputs } from "./dataset.ts";
 
 const POLL_MS = 250;
 // A run that has not finished answers run.summary with one of these.
@@ -49,12 +54,13 @@ async function waitForSummary(
 async function inputsOf(flow: Flow, options: RunOptions, deps: RunDeps) {
   if (options.dataset === undefined) return {};
   const dataset = await deps.loadDataset(options.flow, options.dataset);
-  const { inputs, secret } = datasetInputs(flow, dataset);
-  if (secret.length > 0)
-    deps.err(
-      `Dataset ${options.dataset} sets secret inputs, which were ignored: ${secret.join(", ")}.`,
-    );
-  return { inputs };
+  // A dataset never carries a secret, nor a value of another type than the flow declares.
+  const issues = checkInputValues(flow, dataset.inputs);
+  if (issues.length > 0) {
+    const messages = issues.map(({ message }) => message).join(" ");
+    throw new Error(`Dataset ${options.dataset} does not fit the flow's inputs. ${messages}`);
+  }
+  return { inputs: dataset.inputs };
 }
 
 async function replay(options: RunOptions, deps: RunDeps): Promise<number> {

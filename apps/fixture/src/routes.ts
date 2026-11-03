@@ -38,6 +38,11 @@ export const ROUTES: readonly FixtureRoute[] = [
   { name: "download", title: "Download", summary: "An attachment download" },
   { name: "dialogs", title: "Dialogs", summary: "alert and confirm" },
   { name: "storage", title: "Storage", summary: "localStorage, sessionStorage, and cookies" },
+  {
+    name: "session",
+    title: "Session",
+    summary: "An account page behind a cookie session that is signed in and expired",
+  },
   { name: "worker", title: "Worker", summary: "A dedicated worker that answers messages" },
   {
     name: "replay",

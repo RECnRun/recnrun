@@ -25,10 +25,13 @@ export const RequirementSchema = v.strictObject({
   source: v.optional(v.string()),
 });
 
-/** How a precondition is proved before any step runs: a URL, a visible element, or a function. */
+/**
+ * How a precondition is proved before any step runs: the URL the actor lands on, a visible
+ * element (on the page `url` opens, or the one already open), or a function.
+ */
 export const PreconditionCheckSchema = v.union([
   v.strictObject({ url: Text }),
-  v.strictObject({ visible: TargetSchema }),
+  v.strictObject({ visible: TargetSchema, url: v.optional(Text) }),
   FunctionCallSchema,
 ]);
 
@@ -36,6 +39,8 @@ export const PreconditionSchema = v.strictObject({
   authenticated: NameSchema,
   check: PreconditionCheckSchema,
 });
+
+export type Precondition = v.InferOutput<typeof PreconditionSchema>;
 
 /** A declarative flow (source plan §9): what to do, never the evidence of doing it. */
 export const FlowSchema = v.strictObject({

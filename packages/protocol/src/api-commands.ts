@@ -67,6 +67,15 @@ const RunSecretsSchema = v.pipe(
   v.maxEntries(MAX_SECRETS),
 );
 
+const InputValuesSchema = v.record(NameSchema, v.unknown());
+
+/** A stored dataset as the run form lists it; `problem` says why one cannot be used as it is. */
+const DatasetEntrySchema = v.strictObject({
+  name: IdSchema,
+  inputs: InputValuesSchema,
+  problem: v.optional(NonEmptyStringSchema),
+});
+
 // Shapes a later phase specifies; until then the service accepts and returns any JSON.
 const unspecified = { params: v.unknown(), result: v.unknown() };
 
@@ -128,7 +137,7 @@ export const SERVICE_COMMANDS = {
     params: v.strictObject({
       flowId: IdSchema,
       dataset: v.optional(NonEmptyStringSchema),
-      inputs: v.optional(v.record(NameSchema, v.unknown())),
+      inputs: v.optional(InputValuesSchema),
       // Secret inputs and `${secrets.*}` references read only from here.
       secrets: v.optional(RunSecretsSchema),
     }),
@@ -191,6 +200,30 @@ export const SERVICE_COMMANDS = {
   "flow.save": { params: v.strictObject({ flow: FlowSchema }), result: SavedFlowSchema },
   // A flow file from outside the store, such as `recnrun run --flow`; stored like `flow.save`.
   "flow.import": { params: v.strictObject({ flow: FlowSchema }), result: SavedFlowSchema },
+  // A draft copy of the flow's current revision under a new id; an id in use is `conflict`.
+  "flow.duplicate": {
+    params: v.strictObject({
+      flowId: IdSchema,
+      newId: IdSchema,
+      name: v.optional(NonEmptyStringSchema),
+    }),
+    result: SavedFlowSchema,
+  },
+  // One revision of the flow's history, for comparison; the current one comes with `flow.get`.
+  "flow.getRevision": {
+    params: v.strictObject({ flowId: IdSchema, revision: RevisionHashSchema }),
+    result: v.strictObject({ flow: FlowSchema, revision: RevisionHashSchema }),
+  },
+  // A flow's datasets (F4.2): named input values stored next to the flow, never secrets.
+  "dataset.list": {
+    params: v.strictObject({ flowId: IdSchema }),
+    result: v.strictObject({ datasets: v.array(DatasetEntrySchema) }),
+  },
+  // Checked against the flow's declared inputs like a run's inputs; a secret input's value is refused.
+  "dataset.save": {
+    params: v.strictObject({ flowId: IdSchema, name: IdSchema, inputs: InputValuesSchema }),
+    result: v.strictObject({ name: IdSchema }),
+  },
   "session.suggestions": { params: SessionRefSchema, result: NormalizationResultSchema },
   "picker.start": picker,
   "picker.stop": picker,

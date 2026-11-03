@@ -64,7 +64,9 @@ export async function homeWithChrome(): Promise<{ home: string; chrome: Launched
 export const removeHome = (home: string) =>
   rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 
-/** What the service stored for a flow: its revisions and each run's summary status. */
+const readJson = async <T>(path: string) => JSON.parse(await readFile(path, "utf8")) as T;
+
+/** What the service stored for a flow: its revisions and each run's status and flow revision. */
 export async function storedFlow(home: string, flowId: string) {
   const folder = join(home, ".recnrun", "flows", flowId);
   const yaml = await readFile(join(folder, "flow.yaml"), "utf8");
@@ -72,9 +74,17 @@ export async function storedFlow(home: string, flowId: string) {
   const runs = await readdir(join(folder, "runs"));
   const statuses = await Promise.all(
     runs.map(async (runId) => {
-      const summary = await readFile(join(folder, "runs", runId, "summary.json"), "utf8");
-      return (JSON.parse(summary) as { status: string }).status;
+      const summary = await readJson<{ status: string }>(
+        join(folder, "runs", runId, "summary.json"),
+      );
+      return summary.status;
     }),
   );
-  return { yaml, revisions, statuses };
+  const runRevisions = await Promise.all(
+    runs.map(async (runId) => {
+      const manifest = join(folder, "runs", runId, "manifest.json");
+      return (await readJson<{ flowRevision: string }>(manifest)).flowRevision;
+    }),
+  );
+  return { yaml, revisions, statuses, runRevisions };
 }

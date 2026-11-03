@@ -8,6 +8,7 @@ import {
   findMissingInputs,
   findUnknownStepKinds,
 } from "./flow-checks.ts";
+import { findInputDefaultIssues } from "./input-values.ts";
 import { hasKnownNamespaces, hasWellFormedReferences } from "./interpolation.ts";
 import { nthHasIndex } from "./locators.ts";
 
@@ -22,6 +23,7 @@ export const FLOW_ISSUE_CODES = [
   "duplicate-step-id",
   "missing-input",
   "cyclic-variable",
+  "input-default",
 ] as const;
 
 /** A problem `validateFlow` found, at a path of keys and indexes from the flow's root. */
@@ -96,6 +98,7 @@ export function validateFlow(input: unknown): FlowValidationResult {
     ...findDuplicateStepIds(flow),
     ...findMissingInputs(flow),
     ...findCyclicVariables(flow),
+    ...findInputDefaultIssues(flow),
   ];
   return issues.length > 0 ? { ok: false, issues } : { ok: true, flow };
 }

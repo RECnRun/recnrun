@@ -89,6 +89,34 @@ test("an edit writes a second revision and leaves the first unchanged", async ()
   expect(second.manifest.createdAt).toBe(first.manifest.createdAt);
 });
 
+test("a duplicate is a draft copy of the current revision with its own history", async () => {
+  await store.saveFlow(spikeFlow());
+  await store.saveFlow({ ...spikeFlow(), name: "Renamed" }, { status: "validated" });
+  const copy = await store.duplicateFlow("form-submit", { id: "form-copy", name: "Copy" });
+  expect(copy.manifest).toMatchObject({ id: "form-copy", name: "Copy", status: "draft" });
+  expect(copy.manifest.revisions).toHaveLength(1);
+  const stored = await store.get("form-copy");
+  expect(stored.flow).toMatchObject({ id: "form-copy", name: "Copy", steps: spikeFlow().steps });
+  expect((await store.get("form-submit")).manifest).toMatchObject({
+    name: "Renamed",
+    status: "validated",
+  });
+  expect((await store.listRevisions("form-submit")).length).toBe(2);
+  const again = await store.duplicateFlow("form-submit", { id: "form-again" });
+  expect(again.manifest.name).toBe("Renamed");
+  await expect(store.duplicateFlow("form-submit", { id: "form-copy" })).rejects.toMatchObject({
+    code: "flow-exists",
+  });
+  await expect(store.duplicateFlow("missing", { id: "x" })).rejects.toMatchObject({
+    code: "not-found",
+  });
+  expect((await store.list()).flows.map(({ id }) => id).toSorted()).toEqual([
+    "form-again",
+    "form-copy",
+    "form-submit",
+  ]);
+});
+
 test("a status change alone keeps the revision history", async () => {
   const first = await store.saveFlow(spikeFlow());
   const second = await store.saveFlow(spikeFlow(), { status: "validated" });
@@ -138,6 +166,60 @@ test("datasets live in datasets/<name>.json and are validated", async () => {
   await expect(store.saveDataset("absent", "ana", dataset)).rejects.toMatchObject({
     code: "not-found",
   });
+});
+
+test("a dataset must fit the flow's inputs when saved and when read; no secret is written", async () => {
+  const spike = spikeFlow();
+  const pin = { type: "string", required: true, secret: true } as const;
+  const retries = { type: "number", required: false } as const;
+  await store.saveFlow({ ...spike, inputs: { ...spike.inputs, pin, retries } });
+  await store.saveDataset("form-submit", "good", {
+    schemaVersion: 1,
+    inputs: { name: "Ana", retries: 2 },
+  });
+  for (const inputs of [{ pin: "1234" }, { retries: "2" }, { nope: 1 }]) {
+    const dataset = { schemaVersion: 1 as const, inputs };
+    await expect(store.saveDataset("form-submit", "bad", dataset)).rejects.toMatchObject({
+      code: "invalid",
+      path: join(folder(), "datasets", "bad.json"),
+    });
+  }
+  expect(await filesBelow(join(folder(), "datasets"))).toEqual(["good.json"]);
+  const leak = { schemaVersion: 1, inputs: { name: "Ana", pin: "1234" } };
+  await writeFile(join(folder(), "datasets", "leak.json"), JSON.stringify(leak));
+  const read = store.getDataset("form-submit", "leak");
+  await expect(read).rejects.toMatchObject({ code: "invalid" });
+  await expect(read).rejects.toThrow(/Input "pin" is secret/);
+  await expect(read).rejects.not.toThrow(/1234/);
+});
+
+test("lists the flow's datasets by name, naming the problem of one that no longer fits", async () => {
+  const spike = spikeFlow();
+  await store.saveFlow(spike);
+  expect(await store.listDatasets("form-submit")).toEqual([]);
+  await store.saveDataset("form-submit", "zoe", { schemaVersion: 1, inputs: { name: "Zoe" } });
+  await store.saveDataset("form-submit", "ana", { schemaVersion: 1, inputs: { name: "Ana" } });
+  expect(await store.listDatasets("form-submit")).toEqual([
+    { name: "ana", inputs: { name: "Ana" } },
+    { name: "zoe", inputs: { name: "Zoe" } },
+  ]);
+  const stale = { schemaVersion: 1, inputs: { name: "Bo", nope: 1 } };
+  await writeFile(join(folder(), "datasets", "stale.json"), JSON.stringify(stale));
+  await writeFile(join(folder(), "datasets", "broken.json"), "{");
+  await writeFile(join(folder(), "datasets", "notes.txt"), "not a dataset");
+  const listed = await store.listDatasets("form-submit");
+  expect(listed.map(({ name }) => name)).toEqual(["ana", "broken", "stale", "zoe"]);
+  expect(listed[1]).toMatchObject({
+    name: "broken",
+    inputs: {},
+    problem: expect.stringMatching(/JSON/),
+  });
+  expect(listed[2]).toEqual({
+    name: "stale",
+    inputs: {},
+    problem: expect.stringContaining('Input "nope" is not declared in the flow'),
+  });
+  await expect(store.listDatasets("absent")).rejects.toMatchObject({ code: "not-found" });
 });
 
 test("a corrupt manifest is reported and the other flows still list", async () => {

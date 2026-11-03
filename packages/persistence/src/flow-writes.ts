@@ -122,6 +122,23 @@ export async function saveFlow(
   return { manifest, revision, changed: true };
 }
 
+/** Stores the committed revision of `flowId` under `copy.id` as a draft with its own history. */
+export async function duplicateFlow(
+  context: WriteContext,
+  flowId: string,
+  copy: { id: string; name?: string | undefined },
+): Promise<SavedFlow> {
+  const source = flowPaths(context.flowsRoot, flowId);
+  const manifest = await readStored("flow-manifest", source.manifest);
+  const flow = await readRevision(source.folder, manifest.revision);
+  const target = flowPaths(context.flowsRoot, copy.id);
+  // A copy never adds a revision to another flow's history.
+  if ((await readStoredIfPresent("flow-manifest", target.manifest)) !== undefined) {
+    throw new FlowStoreError("flow-exists", target.manifest, "a flow with this id already exists");
+  }
+  return saveFlow(context, { ...flow, id: copy.id, name: copy.name ?? flow.name }, "draft");
+}
+
 /** Creates a run of a stored revision and opens its journal. */
 export async function createRun(context: WriteContext, input: RunManifest): Promise<RunHandle> {
   const manifest = checkStored("run-manifest", "run manifest", input);

@@ -1,40 +1,11 @@
-import type { Event, Flow, FlowManifest, RunSummary } from "@recnrun/protocol";
+import type { Event, Flow, RunSummary } from "@recnrun/protocol";
 import { expect, test } from "vite-plus/test";
 import { page } from "vite-plus/test/browser";
 import { ApiError } from "@/api/error";
 import { initialDraft, parseDraft } from "@/features/run/inputs";
 import { Run } from "@/features/run/Run";
-import { NOW, REVISION, expectTexts, fakeApi, renderWith } from "./fake-api";
-
-const SECRET = "hunter2-do-not-show";
-
-const FLOW = {
-  schemaVersion: 1,
-  id: "login",
-  name: "Log in",
-  actors: {},
-  inputs: {
-    email: { type: "string", required: true },
-    password: { type: "string", required: true, secret: true },
-    retries: { type: "number", required: false, default: 2 },
-    remember: { type: "boolean", required: false },
-    tags: { type: "array", required: false },
-  },
-  requirements: [],
-  preconditions: [],
-  steps: [{ id: "open", action: "navigate", url: "http://localhost:4600/login" }],
-} as Flow;
-
-const MANIFEST: FlowManifest = {
-  schemaVersion: 1,
-  id: "login",
-  name: "Log in",
-  revision: REVISION,
-  status: "recorded",
-  createdAt: NOW,
-  updatedAt: NOW,
-  revisions: [{ revision: REVISION, savedAt: NOW }],
-};
+import { NOW, expectTexts, renderWith } from "./fake-api";
+import { FLOW, SECRET, field, going, runScreen, start } from "./run-fixtures";
 
 const COUNTS = { total: 2, pending: 0, running: 0, passed: 1, failed: 1, blocked: 0 };
 const SUMMARY: RunSummary = {
@@ -48,24 +19,6 @@ const SUMMARY: RunSummary = {
   counts: { ...COUNTS, cancelled: 0, indeterminate: 0 },
   failures: [{ stepId: "email", message: "No element matched the label Email." }],
 };
-
-const going = () => {
-  throw new ApiError("conflict", "Run run-1 is still running.");
-};
-
-function runScreen(flow: Flow = FLOW) {
-  sessionStorage.clear();
-  const fake = fakeApi({
-    "flow.get": () => ({ flow, manifest: MANIFEST, revision: REVISION }),
-    "flow.replay": () => ({ runId: "run-1" }),
-    "run.summary": going,
-  });
-  renderWith(fake.api, <Run flowId="login" />);
-  return fake;
-}
-
-const field = (name: string) => page.getByRole("textbox", { name });
-const start = () => page.getByRole("button", { name: "Start run" }).click();
 
 test("starts a run with the inputs, sends the secret only through secrets, and clears it", async () => {
   const fake = runScreen();

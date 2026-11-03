@@ -96,8 +96,9 @@ interface RunEnd {
 
 /** The run's status from its step results: the first step that did not pass decides it. */
 function runStatus({ results, problem, lost }: RunEnd): RunStatus {
-  if (problem) return "error";
+  // A precondition cut short by the loss leaves a problem too; the loss is the reason.
   if (lost || results.some(cutShort)) return "interrupted";
+  if (problem) return "error";
   const stop = results.find(({ status }) => status === "failed" || status === "indeterminate");
   if (!stop) return "passed";
   const blamesApplication =

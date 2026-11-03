@@ -1,19 +1,19 @@
 import type { Capability } from "./capabilities.ts";
-import { planned } from "./capability-planned.ts";
+import { implemented, planned } from "./capability-planned.ts";
 
 // Editor, functions, agents, and distribution: nothing here is built before F4.
 export const ROADMAP_CAPABILITIES: Extract<Capability, { kind: "feature" }>[] = [
-  planned(
+  implemented(
     "full-editor",
     "F4.1",
     "Full flow editor",
-    "Every change creates a revision and past runs keep theirs.",
+    "Delivered by F4.1; tests/e2e/editor.spec.ts on the real service: steps are added, removed, reordered, and edited in place, assertions and waits are inserted before a chosen step, a target is picked in Chrome from a candidate list, a literal becomes an input, inputs, actors, and requirements are declared and linked, timeouts and the step's actor change, the flow is duplicated, and two revisions are compared. Component tests: apps/ui/tests/editor*.browser.test.tsx. Every save is a new revision and a run keeps the revision it replayed. Locator lists with several strategies and multi-actor runs are F4A.6 and F4.3.",
   ),
-  planned(
+  implemented(
     "inputs-datasets",
     "F4.2",
     "Inputs, datasets, and variables",
-    "Datasets never hold secrets.",
+    "Delivered by F4.2. Typed inputs: a dataset, a run's inputs, and an input's default are checked against the flow's declared inputs (packages/protocol/tests/input-values.test.ts, packages/persistence/tests/flow-store.test.ts, apps/service/tests/runs.test.ts, apps/cli/tests/run.test.ts). Datasets never hold secrets: a secret input's value is refused when a dataset is written or read, and the run form lists, picks, and saves them without secrets (tests/contract/datasets.test.ts, apps/ui/tests/run-datasets.browser.test.tsx). An `authenticated: <actor>` precondition with a URL or visible-element check runs before any step, in the actor's Chrome; an expired session ends the run as `error` with `precondition-failed` and every step blocked (packages/engine/tests/preconditions.test.ts; tests/browser/preconditions.spec.ts on Google Chrome over CDP). Variables have flow scope (`vars`, written by extraction) and block scope (`locals`); a function check and `setVariable` arrive with F4A.3 and F4A.4.",
   ),
   planned(
     "multiple-profiles-actors",

@@ -1,8 +1,8 @@
-import type { AssertionStep, Target } from "@recnrun/protocol";
+import type { AssertionStep } from "@recnrun/protocol";
 import { useState } from "preact/hooks";
 import { useAction, useApi } from "@/api/context";
 import { AssertionForm } from "@/features/editor/AssertionForm";
-import { type AssertionKind, buildAssertion } from "@/features/editor/edit";
+import { type AssertionDraft, buildAssertion } from "@/features/editor/edit";
 import type { PickerSession } from "@/features/editor/usePicker";
 import { Card } from "@/ui/Card";
 import { ErrorState } from "@/ui/States";
@@ -13,9 +13,9 @@ export function DraftAssertions({ session }: { session: PickerSession }) {
   const api = useApi();
   const { error, run } = useAction();
   const [added, setAdded] = useState<AssertionStep[]>([]);
-  const add = (target: Target, kind: AssertionKind, expected: string) =>
+  const add = (draft: AssertionDraft) =>
     run(async () => {
-      const step = buildAssertion(`assert-${added.length + 1}`, kind, target, expected);
+      const step = buildAssertion(`assert-${added.length + 1}`, draft);
       const fence = { lease: session.lease };
       await api.call("flow.addAssertion", { sessionId: session.sessionId, step }, fence);
       setAdded((list) => [...list, step]);

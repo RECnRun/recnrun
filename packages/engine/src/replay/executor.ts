@@ -24,6 +24,7 @@ import { createScope, redact, secretValues, type Scope, type ScopeOptions } from
 import { snapshotter, type Snapshotter } from "./snapshots.ts";
 import { startEvidence } from "./evidence.ts";
 import { untilLost, watchConnection, type Interruption } from "./interruption.ts";
+import { checkPreconditions, unsupportedPrecondition } from "./preconditions.ts";
 import { executeStep } from "./step.ts";
 import { deadlineIn, systemClock, type Clock } from "./wait.ts";
 
@@ -75,17 +76,26 @@ function advance(state: StepState, event: StepEvent): StepState {
 }
 
 // One driver means one browser, so a flow that needs several actors cannot run until F4.3.
-function preflight(flow: Flow, scope: Scope | { missing: string }): RunProblem | undefined {
-  const named = new Set(flow.steps.flatMap((step) => (step.actor ? [step.actor] : [])));
+function actorProblem(flow: Flow): RunProblem | undefined {
+  const named = new Set([
+    ...flow.steps.flatMap((step) => (step.actor ? [step.actor] : [])),
+    ...flow.preconditions.map(({ authenticated }) => authenticated),
+  ]);
   const undeclared = [...named].find((actor) => !Object.hasOwn(flow.actors, actor));
   if (undeclared) {
-    const message = `Step actor ${JSON.stringify(undeclared)} is not declared in the flow.`;
+    const message = `Actor ${JSON.stringify(undeclared)} is not declared in the flow.`;
     return { code: "multi-actor-unsupported", message };
   }
   if (named.size > 1) {
-    const message = `The steps use ${named.size} actors; binding-aware dispatch is F4.3.`;
+    const message = `The flow uses ${named.size} actors; binding-aware dispatch is F4.3.`;
     return { code: "multi-actor-unsupported", message };
   }
+  return undefined;
+}
+
+function preflight(flow: Flow, scope: Scope | { missing: string }): RunProblem | undefined {
+  const actors = actorProblem(flow) ?? unsupportedPrecondition(flow.preconditions);
+  if (actors) return actors;
   const block = flow.steps.find((step) => "builtin" in step);
   if (block)
     return { code: "unsupported-step", message: `Step ${block.id}: control blocks are F4A.4.` };
@@ -171,12 +181,25 @@ async function skip(run: Run, steps: readonly Step[], from: number, event: "bloc
   }
 }
 
-async function runAll(
-  run: Run,
-  steps: readonly Step[],
-  control?: ReplayControl,
-): Promise<StepResult[]> {
+/** The step results, and the precondition that kept every step from running, if one did. */
+interface Ran {
+  results: StepResult[];
+  problem?: RunProblem;
+}
+
+async function runAll(run: Run, flow: Flow, control?: ReplayControl): Promise<Ran> {
+  const { steps } = flow;
   const results: StepResult[] = [];
+  const lost = () => run.interruption?.lost() !== undefined;
+  if (!(await mayStart(control, run.interruption))) {
+    await skip(run, steps, 0, "cancel");
+    return { results };
+  }
+  const problem = await checkPreconditions(flow.preconditions, { ...run, lost });
+  if (problem) {
+    await skip(run, steps, 0, lost() ? "cancel" : "block");
+    return { results, problem };
+  }
   for (const [index, step] of steps.entries()) {
     if (!(await mayStart(control, run.interruption))) {
       await skip(run, steps, index, "cancel");
@@ -186,27 +209,27 @@ async function runAll(
     results.push(result);
     await run.recorder.finished(result, index);
     if (result.status !== "passed") {
-      await skip(run, steps, index + 1, run.interruption?.lost() ? "cancel" : "block");
+      await skip(run, steps, index + 1, lost() ? "cancel" : "block");
       break;
     }
   }
-  return results;
+  return { results };
 }
 
 /** Runs the steps while the connection's losses and the tabs' captured evidence reach the journal. */
 async function observed(
   run: Run,
-  steps: readonly Step[],
+  flow: Flow,
   control: ReplayControl | undefined,
   runId: string,
-): Promise<StepResult[]> {
+): Promise<Ran> {
   const { driver, recorder } = run;
   const connection = watchConnection(driver, (event) => recorder.lost(event));
   try {
     const evidence = await startEvidence(driver, recorder, run.secrets, runId);
     // What the last step started (a response still loading) lands before the journal closes.
     try {
-      return await runAll({ ...run, interruption: connection.interruption }, steps, control);
+      return await runAll({ ...run, interruption: connection.interruption }, flow, control);
     } finally {
       await evidence?.drain();
     }
@@ -236,7 +259,8 @@ function prepare(flow: Flow, options: ReplayOptions): { scope: Scope; problem?: 
 /**
  * Replays a flow's steps in order through the driver. Reads (locating, assertions, waits) poll
  * until the step's deadline; a write is dispatched once and never again, and one whose effect is
- * unknown leaves the step `indeterminate`. The first step that does not pass stops the run.
+ * unknown leaves the step `indeterminate`. The first step that does not pass stops the run; a
+ * precondition that does not hold, checked once the run may start, blocks every step.
  */
 export async function replayFlow(
   driver: ReplayDriver,
@@ -252,17 +276,20 @@ export async function replayFlow(
   const snapshot = snapshotter(driver, recorder, secrets);
   const run: Run = { driver, scope, secrets, clock, timeoutMs, recorder, snapshot };
   if (problem) await skip(run, flow.steps, 0, "block");
-  const steps = problem ? [] : await observed(run, flow.steps, options.control, recording.runId);
-  const summary = await recorder.finish(problem);
+  const ran = problem
+    ? { results: [] }
+    : await observed(run, flow, options.control, recording.runId);
+  const reason = problem ?? ran.problem;
+  const summary = await recorder.finish(reason);
   const vars = Object.fromEntries(
     Object.entries(scope.vars).map(([name, value]) => [name, redact(value, secrets)]),
   );
   return {
     status: summary.status,
     exitCode: summary.exitCode,
-    steps: problem ? [] : steps,
+    steps: ran.results,
     vars,
     summary,
-    ...(problem && { error: problem }),
+    ...(reason && { error: reason }),
   };
 }

@@ -195,3 +195,31 @@ describe("form POST", () => {
     expect(response.headers.get("allow")).toBe("POST");
   });
 });
+
+describe("session", () => {
+  const manual = (path: string, cookie?: string) =>
+    get(path, { redirect: "manual", ...(cookie && { headers: { Cookie: cookie } }) });
+  const COOKIE = "fixture-signed-in=yes";
+
+  test("gates the account page behind a cookie that a sign in sets and an expiry clears", async () => {
+    expect(await (await get("/api/session")).json()).toEqual({ signedIn: false });
+    const expired = await manual("/routes/session");
+    expect(expired.status).toBe(302);
+    expect(expired.headers.get("location")).toBe("/routes/session?login");
+    expect((await get("/routes/session?login")).status).toBe(200);
+
+    const signIn = await manual("/api/session?login");
+    expect(signIn.status).toBe(303);
+    expect(signIn.headers.get("set-cookie")).toBe(`${COOKIE}; Path=/; HttpOnly; SameSite=Lax`);
+    expect(signIn.headers.get("location")).toBe("/routes/session");
+    expect((await manual("/routes/session", COOKIE)).status).toBe(200);
+    expect(await (await manual("/api/session", COOKIE)).json()).toEqual({ signedIn: true });
+
+    const expire = await manual("/api/session?expire", COOKIE);
+    expect(expire.status).toBe(303);
+    expect(expire.headers.get("set-cookie")).toBe(
+      "fixture-signed-in=; Path=/; HttpOnly; Max-Age=0",
+    );
+    expect(expire.headers.get("location")).toBe("/routes/session");
+  });
+});

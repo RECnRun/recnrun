@@ -80,3 +80,42 @@ describe("ServiceMessageSchema", () => {
     expect(v.safeParse(ServiceMessageSchema, { ...message, type: "run.done" }).success).toBe(false);
   });
 });
+
+describe("the F4.1 commands", () => {
+  test("duplicates a flow under a new id and reads one of its revisions", () => {
+    const duplicate = SERVICE_COMMANDS["flow.duplicate"];
+    const copy = { flowId: "f-1", newId: "f-2", name: "Copy" };
+    expect(v.safeParse(duplicate.params, copy).success).toBe(true);
+    expect(v.safeParse(duplicate.params, { flowId: "f-1", newId: "f 2" }).success).toBe(false);
+    expect(v.safeParse(duplicate.result, { flowId: "f-2", revision: REVISION }).success).toBe(true);
+    const revision = SERVICE_COMMANDS["flow.getRevision"];
+    expect(v.safeParse(revision.params, { flowId: "f-1", revision: REVISION }).success).toBe(true);
+    expect(v.safeParse(revision.params, { flowId: "f-1", revision: "latest" }).success).toBe(false);
+    expect(v.safeParse(revision.result, { flow: FLOW, revision: REVISION }).success).toBe(true);
+    expect(v.safeParse(revision.result, { flow: {}, revision: REVISION }).success).toBe(false);
+  });
+});
+
+describe("the F4.2 commands", () => {
+  test("list a flow's datasets and save one without secrets", () => {
+    const list = SERVICE_COMMANDS["dataset.list"];
+    expect(v.safeParse(list.params, { flowId: "f-1" }).success).toBe(true);
+    expect(v.safeParse(list.params, {}).success).toBe(false);
+    const entries = {
+      datasets: [
+        { name: "ana", inputs: { name: "Ana", retries: 2 } },
+        { name: "stale", inputs: {}, problem: 'Input "nope" is not declared in the flow.' },
+      ],
+    };
+    expect(v.safeParse(list.result, entries).success).toBe(true);
+    expect(v.safeParse(list.result, { datasets: [{ name: "bad name", inputs: {} }] }).success).toBe(
+      false,
+    );
+    const save = SERVICE_COMMANDS["dataset.save"];
+    const params = { flowId: "f-1", name: "ana", inputs: { name: "Ana" } };
+    expect(v.safeParse(save.params, params).success).toBe(true);
+    expect(v.safeParse(save.params, { ...params, name: "bad name" }).success).toBe(false);
+    expect(v.safeParse(save.params, { flowId: "f-1", name: "ana" }).success).toBe(false);
+    expect(v.safeParse(save.result, { name: "ana" }).success).toBe(true);
+  });
+});

@@ -7,6 +7,7 @@ import {
   removeHome,
   startServiceChild,
 } from "./fixtures/local-service.ts";
+import { uiCommand as command } from "./fixtures/ui-command.ts";
 
 const FLOW_ID = "fetch-json";
 
@@ -25,23 +26,6 @@ const flowOf = (query: string) => ({
     { id: "result", assertion: "textContains", target: { testId: "result-json" }, expected: "200" },
   ],
 });
-
-/** Sends one command as the served UI does, with the token the service put in the page. */
-async function command(ui: Page, name: string, params: unknown) {
-  const answer = await ui.evaluate(
-    async ({ name, params }) => {
-      const meta = document.querySelector<HTMLMetaElement>('meta[name="recnrun-token"]');
-      const response = await fetch("/api", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${meta?.content}` },
-        body: JSON.stringify({ requestId: "e2e", command: name, params }),
-      });
-      return (await response.json()) as { ok: boolean; error?: { message: string } };
-    },
-    { name, params },
-  );
-  if (!answer.ok) throw new Error(`${name} failed: ${answer.error?.message}`);
-}
 
 /** Replays the flow from the Run screen and opens the finished run's diagnostics. */
 async function runAndInspect(ui: Page, base: string, exitCode: number): Promise<string> {

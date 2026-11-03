@@ -41,7 +41,7 @@ function editor(flow: Flow = FLOW) {
     "flow.save": ({ flow: saved }) => ({ flowId: saved.id, revision: SAVED }),
   });
   const onRun = vi.fn<() => void>();
-  renderWith(fake.api, <Editor flowId="login" onRun={onRun} />);
+  renderWith(fake.api, <Editor flowId="login" onRun={onRun} onDuplicated={vi.fn()} />);
   return { ...fake, onRun };
 }
 
@@ -51,8 +51,11 @@ test("shows each step with its action, target, value, and timeout", async () => 
   editor();
   await expect.element(page.getByRole("heading", { name: "Log in" })).toBeVisible();
   await expect.poll(() => steps().all().length).toBe(3);
-  await expectTexts(steps().nth(1), "fill", 'label="Email"', "${inputs.email}");
-  await expectTexts(steps().nth(2), 'css="#password"', "${secrets.pw}");
+  await expectTexts(steps().nth(1), "fill", 'label="Email"');
+  // References are shown as written; the UI never knows the value they resolve to.
+  await expect.element(steps().nth(1).getByLabelText("Value")).toHaveValue("${inputs.email}");
+  await expectTexts(steps().nth(2), 'css="#password"');
+  await expect.element(steps().nth(2).getByLabelText("Value")).toHaveValue("${secrets.pw}");
   await expect.element(page.getByLabelText("Revision")).toHaveTextContent("aaaaaaaaaaaa");
   await expect.element(steps().nth(0).getByLabelText("Timeout (ms)")).toHaveValue(null);
 });
@@ -109,13 +112,19 @@ test("offers no picker outside a recording", async () => {
 });
 
 test("builds assertions and ids the flow does not use yet", () => {
-  const flow = { ...FLOW, steps: [...FLOW.steps, buildAssertion("assert-1", "visible", "#a", "")] };
+  const visible = buildAssertion("assert-1", { kind: "visible", target: "#a", expected: "" });
+  const flow = { ...FLOW, steps: [...FLOW.steps, visible] };
   expect(nextAssertionId(flow)).toBe("assert-2");
-  expect(buildAssertion("c", "count", "#a", "3")).toEqual({
+  expect(buildAssertion("c", { kind: "count", target: "#a", expected: "3" })).toEqual({
     id: "c",
     assertion: "count",
     target: "#a",
     expected: 3,
+  });
+  expect(buildAssertion("u", { kind: "url", target: undefined, expected: "/done" })).toEqual({
+    id: "u",
+    assertion: "url",
+    expected: "/done",
   });
   const timed = setTimeoutMs(FLOW, "open", 500);
   expect(setTimeoutMs(timed, "open", undefined).steps[0]).toEqual(FLOW.steps[0]);
@@ -136,7 +145,7 @@ test("shows an empty flow and the service's errors", async () => {
   fake.handlers["flow.get"] = () => {
     throw new ApiError("flow-not-found", "No flow login.");
   };
-  renderWith(fake.api, <Editor flowId="login" onRun={fake.onRun} />);
+  renderWith(fake.api, <Editor flowId="login" onRun={fake.onRun} onDuplicated={vi.fn()} />);
   await expectTexts(page.getByRole("alert"), "No flow login.", "flow-not-found");
 });
 

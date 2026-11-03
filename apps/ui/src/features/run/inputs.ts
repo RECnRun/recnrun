@@ -100,3 +100,27 @@ export function withoutSecrets(
   for (const name of references) next[referenceKey(name)] = "";
   return next;
 }
+
+/** The form filled from a dataset: its values, the input's default where it has none; secrets stay as typed. */
+export function datasetDraft(
+  inputs: Flow["inputs"],
+  values: Record<string, unknown>,
+  draft: Draft,
+): Draft {
+  const defaults = initialDraft(inputs);
+  const next = { ...draft };
+  for (const [name, input] of Object.entries(inputs)) {
+    if (input.secret) continue;
+    const value = values[name];
+    if (value === undefined) next[name] = defaults[name] ?? "";
+    else if (typeof value === "boolean" || typeof value === "string") next[name] = value;
+    else next[name] = JSON.stringify(value);
+  }
+  return next;
+}
+
+/** The non-secret inputs as typed, for `dataset.save`: a secret never goes into a dataset. */
+export function datasetInputs(inputs: Flow["inputs"], draft: Draft): Parsed {
+  const open = Object.entries(inputs).filter(([, input]) => !input.secret);
+  return parseDraft(Object.fromEntries(open), draft);
+}

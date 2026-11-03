@@ -101,16 +101,24 @@ test("without a dataset the request sends none", async () => {
   expect(calls[1]).toEqual(["flow.replay", { flowId: "tiny" }]);
 });
 
-test("a dataset never sends the flow's secret inputs and says it ignored them", async () => {
+test("a dataset that holds a secret input is refused before the service is called", async () => {
   const { deps, calls, err } = setup({ "run.summary": () => summary("passed") });
   deps.loadDataset = async () => ({
     schemaVersion: 1,
     inputs: { user: "ada", password: "hunter2" },
   });
-  expect(await runFlow(options, deps)).toBe(0);
-  expect(calls[1]).toEqual(["flow.replay", { flowId: "tiny", inputs: { user: "ada" } }]);
-  expect(err.join("\n")).toContain("ignored: password");
+  expect(await runFlow(options, deps)).toBe(2);
+  expect(calls).toEqual([]);
+  expect(err.join("\n")).toContain('Input "password" is secret');
   expect(err.join("\n")).not.toContain("hunter2");
+});
+
+test("a dataset whose value has another type than the input is refused", async () => {
+  const { deps, calls, err } = setup({});
+  deps.loadDataset = async () => ({ schemaVersion: 1, inputs: { user: 7 } });
+  expect(await runFlow(options, deps)).toBe(2);
+  expect(calls).toEqual([]);
+  expect(err.join("\n")).toContain('Input "user" has type string');
 });
 
 test("a dataset that cannot be loaded is an error before the service is called", async () => {

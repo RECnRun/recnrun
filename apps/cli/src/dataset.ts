@@ -1,6 +1,6 @@
 import { readFile, stat } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { type Dataset, type Flow, isId, parseStored } from "@recnrun/protocol";
+import { type Dataset, isId, parseStored } from "@recnrun/protocol";
 
 /** The folder `--flow` names: the folder itself, or the one holding a flow file. */
 async function folderOf(flowPath: string): Promise<string> {
@@ -26,15 +26,4 @@ export async function loadDataset(flowPath: string, name: string): Promise<Datas
   const parsed = parseStored("dataset", value);
   if (!parsed.ok) throw new Error(`${file}: not a valid dataset (${parsed.message}).`);
   return parsed.value;
-}
-
-/** The dataset's inputs the flow does not declare secret; a dataset never carries secrets. */
-export function datasetInputs(flow: Flow, dataset: Dataset) {
-  const inputs: Record<string, unknown> = {};
-  const secret: string[] = [];
-  for (const [name, value] of Object.entries(dataset.inputs)) {
-    if (flow.inputs[name]?.secret === true) secret.push(name);
-    else inputs[name] = value;
-  }
-  return { inputs, secret };
 }
