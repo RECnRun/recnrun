@@ -1,7 +1,7 @@
 import type { StepResult } from "@recnrun/protocol";
 import { describe, expect, test } from "vite-plus/test";
 import { compareRuns } from "../src/index.ts";
-import { finished, gap, response, started, storedRun } from "./run-builders.ts";
+import { finished, gap, request, response, started, storedRun } from "./run-builders.ts";
 
 const SAVE = "http://127.0.0.1:4600/api/save";
 const passed = (...ids: string[]): StepResult[] =>
@@ -109,6 +109,30 @@ describe("compareRuns", () => {
       stepId: "submit",
       baseline: { url: `${SAVE}?v=1`, httpStatus: 200 },
       run: { url: `${SAVE}?fail=api-500`, httpStatus: 500 },
+    });
+  });
+
+  test("pairs responses through their requests, so completion order does not matter", () => {
+    const ITEMS = "http://127.0.0.1:4600/api/items";
+    const around = (...responses: ReturnType<typeof response>[]) => [
+      ...clean.slice(0, 3),
+      request("get", ITEMS, "GET"),
+      request("post", ITEMS, "POST"),
+      ...responses,
+      ...clean.slice(4),
+    ];
+    const get = (status: number) => response(ITEMS, status, "work", "get");
+    const post = (status: number) => response(ITEMS, status, "work", "post");
+    const baseline = storedRun("base", around(get(200), post(201)), passed("open", "submit"));
+    const reversed = storedRun("now", around(post(201), get(200)), passed("open", "submit"));
+    expect(compareRuns(baseline, reversed).divergence).toBeNull();
+    const failing = storedRun("now", around(post(500), get(200)), passed("open", "submit"));
+    expect(compareRuns(baseline, failing).divergence).toMatchObject({
+      kind: "application",
+      reason: "network-status",
+      stepId: "submit",
+      baseline: { url: ITEMS, httpStatus: 201 },
+      run: { url: ITEMS, httpStatus: 500 },
     });
   });
 

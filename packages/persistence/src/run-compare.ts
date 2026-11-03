@@ -53,11 +53,24 @@ function segments(events: readonly Event[]): Map<string, Event[]> {
 const gapOf = (event: Event): GapEvent | undefined =>
   event.category === "gap" ? event : undefined;
 
-function responseOf(event: Event): { url: string; httpStatus: number } | undefined {
+interface Response {
+  url: string;
+  httpStatus: number;
+  requestId?: string;
+}
+
+function responseOf(event: Event): Response | undefined {
   if (event.category !== "network" || event.type !== "response") return undefined;
-  const { url, status } = event.payload as Record<string, unknown>;
-  return typeof url === "string" && typeof status === "number"
-    ? { url, httpStatus: status }
+  const { requestId, url, status } = event.payload as Record<string, unknown>;
+  if (typeof url !== "string" || typeof status !== "number") return undefined;
+  return { url, httpStatus: status, ...(typeof requestId === "string" && { requestId }) };
+}
+
+function requestOf(event: Event): { requestId: string; url: string; method: string } | undefined {
+  if (event.category !== "network" || event.type !== "request") return undefined;
+  const { requestId, url, method } = event.payload as Record<string, unknown>;
+  return typeof requestId === "string" && typeof url === "string" && typeof method === "string"
+    ? { requestId, url, method }
     : undefined;
 }
 
@@ -93,6 +106,12 @@ function gapFinding(side: "baseline" | "run", event: GapEvent): Finding {
   };
 }
 
+const responseSide = ({ url, httpStatus }: Response, eventId: string): DivergenceSide => ({
+  url,
+  httpStatus,
+  eventId,
+});
+
 function networkFinding(baseline: Event, run: Event): Finding | undefined {
   const theirs = responseOf(baseline);
   const ours = responseOf(run);
@@ -101,13 +120,38 @@ function networkFinding(baseline: Event, run: Event): Finding | undefined {
     kind: "application",
     reason: "network-status",
     message: `${ours.url} answered ${ours.httpStatus} in this run and ${theirs.httpStatus} in the baseline.`,
-    baseline: { ...theirs, eventId: baseline.id },
-    run: { ...ours, eventId: run.id },
+    baseline: responseSide(theirs, baseline.id),
+    run: responseSide(ours, run.id),
   };
 }
 
 // A query or fragment can carry what differs between runs (a cache buster, an injected defect).
 const endpointOf = (url: string): string => url.split(/[?#]/, 1)[0] ?? url;
+
+/**
+ * Each response's pairing key: its request's method and endpoint and that request's occurrence,
+ * so the order responses complete in does not matter. A response whose request was not recorded
+ * pairs by endpoint and its own order.
+ */
+function responseKeys(events: readonly Event[]): Map<Event, string> {
+  const nth = occurrences();
+  const requests = new Map<string, string>();
+  const keys = new Map<Event, string>();
+  for (const event of events) {
+    const request = requestOf(event);
+    if (request) {
+      const key = `${request.method} ${endpointOf(request.url)}`;
+      requests.set(request.requestId, `${key} #${nth(key)}`);
+      continue;
+    }
+    const response = responseOf(event);
+    if (!response) continue;
+    const known = response.requestId === undefined ? undefined : requests.get(response.requestId);
+    const unknown = `? ${endpointOf(response.url)}`;
+    keys.set(event, known ?? `${unknown} #${nth(unknown)}`);
+  }
+  return keys;
+}
 
 /** The first event of `events` that is a gap `others` has no counterpart for. */
 function unmatchedGap(events: readonly Event[], others: readonly Event[]): GapEvent | undefined {
@@ -122,16 +166,12 @@ function unmatchedGap(events: readonly Event[], others: readonly Event[]): GapEv
 /** A gap or a different response status in one step's events, in the run's order. */
 function evidenceFinding(baseline: readonly Event[], run: readonly Event[]): Finding | undefined {
   const lostInRun = unmatchedGap(run, baseline);
-  const endpoint = (event: Event) => {
-    const url = responseOf(event)?.url;
-    return url === undefined ? undefined : endpointOf(url);
-  };
-  const responses = grouped(baseline, endpoint);
-  const nth = occurrences();
+  const theirs = new Map([...responseKeys(baseline)].map(([event, key]) => [key, event]));
+  const ours = responseKeys(run);
   for (const event of run) {
     if (event === lostInRun) return gapFinding("run", event);
-    const url = endpoint(event);
-    const counterpart = url === undefined ? undefined : responses.get(url)?.[nth(url)];
+    const key = ours.get(event);
+    const counterpart = key === undefined ? undefined : theirs.get(key);
     const found = counterpart && networkFinding(counterpart, event);
     if (found) return found;
   }

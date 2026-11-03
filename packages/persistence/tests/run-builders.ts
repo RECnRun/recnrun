@@ -24,19 +24,32 @@ export const finished = (stepId: string, status: string, code?: string): Line =>
     payload: { status, ...(code && { error: { code, message: `${code} at ${stepId}` } }) },
   }) as Line;
 
-/** A network response; `stepId` is left out so the event belongs to the step that last started. */
-export const response = (url: string, status: number, profileBinding = "work"): Line =>
+const NETWORK = {
+  targetId: "t-1",
+  frameId: "f-1",
+  documentId: "d-1",
+  source: "cdp",
+  producer: "cdp:network",
+  category: "network",
+} as const;
+
+/** A network request; `stepId` is left out so the event belongs to the step that last started. */
+export const request = (requestId: string, url: string, method: string): Line =>
   ({
-    targetId: "t-1",
-    frameId: "f-1",
-    documentId: "d-1",
-    profileBinding,
-    source: "cdp",
-    producer: "cdp:network",
-    category: "network",
-    type: "response",
-    payload: { requestId: url, url, status },
+    ...NETWORK,
+    profileBinding: "work",
+    type: "request",
+    payload: { requestId, url, method },
   }) as Line;
+
+/** A network response, to the request `requestId` when given. */
+export const response = (
+  url: string,
+  status: number,
+  profileBinding = "work",
+  requestId = url,
+): Line =>
+  ({ ...NETWORK, profileBinding, type: "response", payload: { requestId, url, status } }) as Line;
 
 export const gap = (payload: GapPayload): Line =>
   ({
