@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vite-plus/test";
+import { EVENT_LIMIT } from "@/background/route-a/events";
 import { NOT_ALLOWED } from "./fake-debugger";
 import { TAB, attached, setup } from "./route-a-setup";
 
@@ -30,6 +31,20 @@ describe("Route A target events", () => {
         detail: "attached",
       },
     ]);
+  });
+
+  test("keeps only the most recent events and counts the dropped ones until disarm", async () => {
+    const { engine, emit } = setup();
+    await engine.arm({ tabId: TAB });
+    for (let i = 0; i < EVENT_LIMIT + 5; i += 1) {
+      emit({ tabId: TAB }, "Target.detachedFromTarget", { sessionId: `s-${i}`, targetId: "sw" });
+    }
+    const journal = await engine.journal();
+    expect(journal.events).toHaveLength(EVENT_LIMIT);
+    expect(journal.events[0]?.sessionId).toBe("s-5");
+    expect(journal.eventsDropped).toBe(5);
+    await engine.disarm({ tabId: TAB });
+    expect((await engine.journal()).eventsDropped).toBeUndefined();
   });
 
   test("detaches the tab's child session on a closed worker, so its restart is bootstrapped and released", async () => {

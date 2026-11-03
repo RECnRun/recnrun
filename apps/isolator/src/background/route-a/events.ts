@@ -30,6 +30,9 @@ function fieldsOf(params: TargetParams): Partial<TargetEvent> {
   };
 }
 
+/** The lab never disarms, so the journal keeps this many recent events and counts the rest. */
+export const EVENT_LIMIT = 200;
+
 /** The journal record of a Target event, or undefined (without reading the clock) for any other. */
 export function targetEventOf(
   source: Debuggee,

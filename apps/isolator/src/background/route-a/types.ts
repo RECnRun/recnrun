@@ -122,8 +122,10 @@ export interface RouteAJournal {
   bootstrap: { hash: string; version: string };
   entries: JournalEntry[];
   unattached: UnattachedTarget[];
-  /** Every Target event and `onDetach` since the last disarm, in arrival order. */
+  /** The most recent Target events and `onDetach` since the last disarm (at most `EVENT_LIMIT`), in arrival order. */
   events: TargetEvent[];
+  /** Older events the journal no longer holds; absent when none were dropped. */
+  eventsDropped?: number;
   /** What `chrome.debugger.onDetach` reported for an armed tab's own session. */
   tabDetached?: DetachRecord;
 }

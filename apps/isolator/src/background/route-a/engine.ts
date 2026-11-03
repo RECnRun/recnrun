@@ -13,7 +13,7 @@ import {
 } from "@/background/route-a/attached";
 import { ChildSessions } from "@/background/route-a/children";
 import { closeTarget } from "@/background/route-a/close";
-import { detachEventOf, targetEventOf } from "@/background/route-a/events";
+import { EVENT_LIMIT, detachEventOf, targetEventOf } from "@/background/route-a/events";
 import { handlePaused, prepareAndRelease } from "@/background/route-a/pause";
 import { armRequestOf, tabIdOf, targetIdOf, watchRequestOf } from "@/background/route-a/requests";
 import { TargetWatch } from "@/background/route-a/watch";
@@ -49,6 +49,7 @@ export class RouteAEngine implements RouteA {
   #marker: string | undefined;
   #entries: JournalEntry[] = [];
   #events: TargetEvent[] = [];
+  #eventsDropped = 0;
   readonly #children = new ChildSessions();
   readonly #pending = new Set<Promise<void>>();
   readonly #armed = new Map<number, EventListener>();
@@ -95,6 +96,7 @@ export class RouteAEngine implements RouteA {
       entries: this.#entries.map((entry) => ({ ...entry })),
       unattached,
       events: this.#events.map((event) => ({ ...event })),
+      ...(this.#eventsDropped === 0 ? {} : { eventsDropped: this.#eventsDropped }),
       ...(this.#tabDetached === undefined ? {} : { tabDetached: { ...this.#tabDetached } }),
     };
   }
@@ -111,6 +113,7 @@ export class RouteAEngine implements RouteA {
     this.#direct.clear();
     this.#entries = [];
     this.#events = [];
+    this.#eventsDropped = 0;
     this.#tabDetached = undefined;
     return journal;
   }
@@ -203,7 +206,7 @@ export class RouteAEngine implements RouteA {
 
   /** Records a detach of an armed tab or a direct target; any other session is not Route A's. */
   #detached(source: Debuggee, record: DetachRecord): void {
-    this.#events.push(detachEventOf(source, record));
+    this.#record(detachEventOf(source, record));
     const { tabId, targetId } = source;
     if (tabId !== undefined && this.#armed.has(tabId)) this.#tabDetached = record;
     if (targetId === undefined || !this.#direct.has(targetId)) return;
@@ -236,10 +239,17 @@ export class RouteAEngine implements RouteA {
     };
   }
 
+  #record(event: TargetEvent): void {
+    this.#events.push(event);
+    if (this.#events.length <= EVENT_LIMIT) return;
+    this.#events.shift();
+    this.#eventsDropped += 1;
+  }
+
   /** Journals a Target event and forgets a child session Chrome detached. */
   #targetEvent(source: Debuggee, method: string, params: unknown): TargetEvent | undefined {
     const event = targetEventOf(source, method, params, this.#now);
-    if (event) this.#events.push(event);
+    if (event) this.#record(event);
     if (method === "Target.detachedFromTarget" && event?.sessionId) {
       this.#children.remove(event.sessionId);
     }
