@@ -101,7 +101,8 @@ test("lists the pick's candidates and adds an assertion on the chosen one", asyn
   await form().getByRole("textbox", { name: "Expected" }).fill("Ada");
   await form().getByRole("button", { name: "Add assertion" }).click();
   const added = page.getByRole("listitem", { name: "Step assert-1" });
-  await expectTexts(added, "assert value", 'css="input[name=\\"name\\"]"', "Ada");
+  await expectTexts(added, "assert value", 'css="input[name=\\"name\\"]"');
+  await expect.element(added.getByLabelText("Expected")).toHaveValue("Ada");
   expect(added.getByText("testId", { exact: false }).query()).toBeNull();
   // The form is clear for the next assertion: no candidates linger.
   await expect.poll(() => candidates().query()).toBeNull();

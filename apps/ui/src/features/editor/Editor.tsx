@@ -4,13 +4,14 @@ import { useAction, useApi, useLoad } from "@/api/context";
 import { AssertionForm } from "@/features/editor/AssertionForm";
 import { StepCard } from "@/features/editor/StepCard";
 import {
+  type ActionDraft,
   type AssertionDraft,
-  addStep,
+  buildAction,
   buildAssertion,
-  nextAssertionId,
-  removeStep,
-  setTimeoutMs,
+  insertStep,
+  nextStepId,
 } from "@/features/editor/edit";
+import { StepForm } from "@/features/editor/StepForm";
 import { useEditorSession } from "@/features/editor/useEditorSession";
 import type { PickerSession } from "@/features/editor/usePicker";
 import { Badge } from "@/ui/Badge";
@@ -18,19 +19,18 @@ import { Button } from "@/ui/Button";
 import { Card } from "@/ui/Card";
 import { EmptyState, ErrorState, Loadable } from "@/ui/States";
 
-type StepsProps = { flow: Flow; onEdit: (flow: Flow) => void };
+type StepsProps = {
+  flow: Flow;
+  session: PickerSession | undefined;
+  onEdit: (flow: Flow) => void;
+};
 
-function Steps({ flow, onEdit }: StepsProps) {
+function Steps({ flow, session, onEdit }: StepsProps) {
   if (flow.steps.length === 0) return <EmptyState>This flow has no steps yet.</EmptyState>;
   return (
     <ol class="list" aria-label="Steps">
       {flow.steps.map((step) => (
-        <StepCard
-          key={step.id}
-          step={step}
-          onDelete={() => onEdit(removeStep(flow, step.id))}
-          onTimeout={(timeoutMs) => onEdit(setTimeoutMs(flow, step.id, timeoutMs))}
-        />
+        <StepCard key={step.id} flow={flow} step={step} session={session} onEdit={onEdit} />
       ))}
     </ol>
   );
@@ -60,8 +60,12 @@ function FlowEditor({ initial, revision, session, onRun }: FlowEditorProps) {
       setSaved((await api.call("flow.save", { flow })).revision);
       setDirty(false);
     });
-  const add = (draft: AssertionDraft) =>
-    edit(addStep(flow, buildAssertion(nextAssertionId(flow), draft)));
+  const addAssertion = (draft: AssertionDraft, before: string | undefined) =>
+    edit(insertStep(flow, buildAssertion(nextStepId(flow, "assert"), draft), before));
+  const addAction = (draft: ActionDraft, before: string | undefined) => {
+    const step = buildAction(nextStepId(flow, draft.action), draft);
+    if (step) edit(insertStep(flow, step, before));
+  };
   const actions = (
     <>
       <Button variant="primary" onClick={save} disabled={busy}>
@@ -78,10 +82,13 @@ function FlowEditor({ initial, revision, session, onRun }: FlowEditorProps) {
           {dirty ? <Badge tone="danger">Unsaved changes</Badge> : null}
         </p>
         {error ? <ErrorState error={error} /> : null}
-        <Steps flow={flow} onEdit={edit} />
+        <Steps flow={flow} session={session} onEdit={edit} />
+      </Card>
+      <Card title="Add a step">
+        <StepForm steps={flow.steps} session={session} onAdd={addAction} />
       </Card>
       <Card title="Add an assertion">
-        <AssertionForm onAdd={add} session={session} />
+        <AssertionForm onAdd={addAssertion} session={session} steps={flow.steps} />
       </Card>
     </>
   );

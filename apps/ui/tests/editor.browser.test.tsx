@@ -51,8 +51,11 @@ test("shows each step with its action, target, value, and timeout", async () => 
   editor();
   await expect.element(page.getByRole("heading", { name: "Log in" })).toBeVisible();
   await expect.poll(() => steps().all().length).toBe(3);
-  await expectTexts(steps().nth(1), "fill", 'label="Email"', "${inputs.email}");
-  await expectTexts(steps().nth(2), 'css="#password"', "${secrets.pw}");
+  await expectTexts(steps().nth(1), "fill", 'label="Email"');
+  // References are shown as written; the UI never knows the value they resolve to.
+  await expect.element(steps().nth(1).getByLabelText("Value")).toHaveValue("${inputs.email}");
+  await expectTexts(steps().nth(2), 'css="#password"');
+  await expect.element(steps().nth(2).getByLabelText("Value")).toHaveValue("${secrets.pw}");
   await expect.element(page.getByLabelText("Revision")).toHaveTextContent("aaaaaaaaaaaa");
   await expect.element(steps().nth(0).getByLabelText("Timeout (ms)")).toHaveValue(null);
 });
