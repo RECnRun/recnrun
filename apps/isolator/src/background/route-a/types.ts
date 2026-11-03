@@ -25,6 +25,16 @@ export interface JournalEntry {
   attachMs?: number;
   /** The pause-before-script sequence, when the tab was armed with `pauseBeforeScript`. */
   pause?: PauseRecord;
+  /** What `chrome.debugger.onDetach` reported for a target attached directly by id. */
+  detached?: DetachRecord;
+}
+
+/** One `chrome.debugger.onDetach` event; Chrome does not report the extension's own detaches (E1). */
+export interface DetachRecord {
+  /** Chrome's `DetachReason`: `canceled_by_user`, `target_closed`, or `replaced_with_devtools`. */
+  reason: string;
+  /** `performance.now()` when the extension learned of the detach. */
+  at: number;
 }
 
 /** One command or event of the pause-before-script sequence. */
@@ -85,6 +95,8 @@ export interface RouteAJournal {
   bootstrap: { hash: string; version: string };
   entries: JournalEntry[];
   unattached: UnattachedTarget[];
+  /** What `chrome.debugger.onDetach` reported for an armed tab's own session. */
+  tabDetached?: DetachRecord;
 }
 
 /** What the harness reaches with `Runtime.evaluate` in the isolator's service worker (E2, E3). */

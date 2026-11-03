@@ -17,6 +17,7 @@ import { armRequestOf, tabIdOf, targetIdOf, watchRequestOf } from "@/background/
 import { TargetWatch } from "@/background/route-a/watch";
 import type {
   CloseReport,
+  DetachRecord,
   JournalEntry,
   RouteA,
   RouteAJournal,
@@ -48,6 +49,8 @@ export class RouteAEngine implements RouteA {
   readonly #armed = new Map<number, EventListener>();
   readonly #direct = new Set<string>();
   #watch: TargetWatch | undefined;
+  #detachListening = false;
+  #tabDetached: DetachRecord | undefined;
 
   constructor(debuggerApi: () => DebuggerApi, now: () => number = () => performance.now()) {
     this.#debuggerApi = debuggerApi;
@@ -64,6 +67,7 @@ export class RouteAEngine implements RouteA {
     this.#requireMarker();
     if (this.#armed.has(tabId)) throw new Error(`tab ${tabId} is already armed`);
     const api = this.#debuggerApi();
+    this.#listenForDetach(api);
     const listener = this.#listenerFor(tabId, pauseBeforeScript);
     // Listening first: auto-attach reports the targets that already exist right away.
     api.onEvent.addListener(listener);
@@ -85,6 +89,7 @@ export class RouteAEngine implements RouteA {
       bootstrap: { hash: BOOTSTRAP_HASH, version: BOOTSTRAP_VERSION },
       entries: this.#entries.map((entry) => ({ ...entry })),
       unattached,
+      ...(this.#tabDetached === undefined ? {} : { tabDetached: { ...this.#tabDetached } }),
     };
   }
 
@@ -99,6 +104,7 @@ export class RouteAEngine implements RouteA {
     }
     this.#direct.clear();
     this.#entries = [];
+    this.#tabDetached = undefined;
     return journal;
   }
 
@@ -106,6 +112,7 @@ export class RouteAEngine implements RouteA {
     const targetId = targetIdOf(request);
     const marker = this.#requireMarker();
     const api = this.#debuggerApi();
+    this.#listenForDetach(api);
     const target = (await api.getTargets()).find((candidate) => candidate.id === targetId);
     if (!target) throw new Error(`no target ${targetId}`);
     const entry: JournalEntry = {
@@ -175,6 +182,24 @@ export class RouteAEngine implements RouteA {
     return targets.flatMap(({ type, tabId, url }) =>
       type === "page" && tabId !== undefined ? [{ tabId, url }] : [],
     );
+  }
+
+  /** One `onDetach` listener, added at the first attach since the getter defers to call time. */
+  #listenForDetach(api: DebuggerApi): void {
+    if (this.#detachListening) return;
+    this.#detachListening = true;
+    api.onDetach.addListener((source, reason) =>
+      this.#detached(source, { reason, at: this.#now() }),
+    );
+  }
+
+  /** Records a detach of an armed tab or a direct target; any other session is not Route A's. */
+  #detached({ tabId, targetId }: Debuggee, record: DetachRecord): void {
+    if (tabId !== undefined && this.#armed.has(tabId)) this.#tabDetached = record;
+    if (targetId === undefined || !this.#direct.has(targetId)) return;
+    for (const entry of this.#entries) {
+      if (entry.targetId === targetId && entry.sessionId === "") entry.detached = { ...record };
+    }
   }
 
   #requireMarker(): string {
