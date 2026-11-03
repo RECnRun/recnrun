@@ -209,20 +209,23 @@ function notesOf({ start, marker, expect, inventory }: E7Sample): Note[] {
   return notes;
 }
 
+function openerReasons({ hypothesis, openerMessage }: E7Sample): Reason[] {
+  if (openerMessage !== false) return [];
+  const [who, message] =
+    hypothesis === "popup" ? ["opener", "fixture-login"] : ["parent", "fixture-renew"];
+  return [{ kind: "openerMessageMissing", text: `the ${who} got no ${message} message` }];
+}
+
 /** A sample passes when every request of the realm carries the expected marker and its stores the prefix. */
 export function evaluateSample(sample: E7Sample): SampleOutcome {
   const closed = isRefused(sample);
-  const opener: Reason[] =
-    sample.openerMessage === false
-      ? [{ kind: "openerMessageMissing", text: "the opener got no fixture-login message" }]
-      : [];
   const reasons = [
     ...(closed
       ? closedReasons(sample)
       : [...workerReasons(sample), ...presenceReasons(sample), ...markReasons(sample)]),
     ...storeReasons(sample, "indexedDB", closed),
     ...storeReasons(sample, "cacheStorage", closed),
-    ...opener,
+    ...openerReasons(sample),
   ];
   return {
     passed: reasons.length === 0,

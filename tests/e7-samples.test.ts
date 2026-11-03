@@ -148,9 +148,14 @@ describe("E7 sample evaluation", () => {
     ]);
   });
 
-  test("a popup whose opener got no message fails on that alone", () => {
+  test("a popup or frame whose opener got no message fails on that alone, naming the message", () => {
     const popup = page({ hypothesis: "popup", store: undefined, openerMessage: false });
-    expect(evaluateSample(popup).kinds).toEqual(["openerMessageMissing"]);
+    expect([evaluateSample(popup).kinds, evaluateSample(popup).reasons]).toEqual([
+      ["openerMessageMissing"],
+      ["the opener got no fixture-login message"],
+    ]);
+    const frame = { ...popup, hypothesis: "cross-site-iframe" };
+    expect(evaluateSample(frame).reasons).toEqual(["the parent got no fixture-renew message"]);
   });
 });
 
