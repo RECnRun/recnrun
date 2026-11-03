@@ -10,7 +10,7 @@ import { takeSnapshot } from "../browser/observer/storage.ts";
 
 export { expect };
 
-// What E2 and E7 share: one new tab per load, the fixture ledger, and the stores a load left.
+// What E2, E5, and E7 share: one new tab per load, the fixture ledger, and the stores a load left.
 export const APP = "http://app.localhost:4600";
 export const API = "http://api.localhost:4601";
 export const IDP = "http://idp.localhost:4602";
@@ -26,6 +26,7 @@ export interface LedgerEntry {
   /** `empty` for fetch(), which the bootstrap marks; documents and scripts it never marks. */
   secFetchDest: string | null;
   marker: string | null;
+  effect: string | null;
 }
 
 export interface Run {
@@ -58,7 +59,12 @@ export async function evaluate<T>(extension: LoadedExtension, expression: string
   return (await extension.evaluateInBackground(expression)) as T;
 }
 
-async function control(path: string, method = "POST"): Promise<Response> {
+/** `evaluate` of a member of `globalThis`, such as `recnrunRouteB.arm(...)`. */
+export async function isolator<T>(extension: LoadedExtension, expression: string): Promise<T> {
+  return evaluate<T>(extension, `globalThis.${expression}`);
+}
+
+export async function control(path: string, method = "POST"): Promise<Response> {
   const response = await fetch(`${CONTROL}${path}`, { method });
   expect(response.ok, `${method} ${path}`).toBe(true);
   return response;
@@ -138,6 +144,14 @@ export async function inventoryOf(run: Run, page: Page, label: string, origin = 
 function isAppSharedWorker({ type, url }: { type: string; url: string }): boolean {
   if (type !== "shared_worker") return false;
   return url.startsWith(APP) || url.startsWith(`blob:${APP}`) || url.startsWith("data:");
+}
+
+/** Targets of `type` on the app origin that Chrome still lists, with their ids. */
+export async function targetsLeft(run: Run, type: string): Promise<{ id: string; url: string }[]> {
+  const { targetInfos } = await run.extension.chrome.cdp.send("Target.getTargets");
+  return targetInfos
+    .filter((info) => info.type === type && info.url.startsWith(APP))
+    .map(({ targetId, url }) => ({ id: targetId, url: pathOf(url) }));
 }
 
 /** Shared workers still alive, which the next load would join instead of starting its own. */
