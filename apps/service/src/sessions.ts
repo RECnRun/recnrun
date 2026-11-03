@@ -51,6 +51,8 @@ export interface LiveSession {
   state: Session;
   gaps: number;
   picker?: PickerHandle | undefined;
+  /** The last picker start or stop; the next one waits for it. */
+  pickerTurn: Promise<void>;
 }
 
 export interface SessionDeps {
@@ -170,6 +172,7 @@ export async function startSession(
     writes: new Set(),
     gaps: 0,
     state: createSession(),
+    pickerTurn: Promise.resolve(),
   };
   advance(live, "start");
   deps.sessions.set(id, live);
@@ -210,11 +213,26 @@ export function resume(deps: SessionDeps, live: LiveSession, mode: PauseMode): S
   return announce(deps, live);
 }
 
+/** Runs picker starts and stops one at a time, so a slow startup cannot outlive a stop. */
+export function serialPicker<T>(live: LiveSession, work: () => Promise<T>): Promise<T> {
+  const next = live.pickerTurn.then(work);
+  live.pickerTurn = next.then(
+    () => {},
+    () => {},
+  );
+  return next;
+}
+
+export async function closePicker(live: LiveSession): Promise<void> {
+  const picker = live.picker;
+  live.picker = undefined;
+  await picker?.stop();
+}
+
 /** Ends capture: the picker and the recording stop, the journal closes, and control is released. */
 export async function stopSession(deps: SessionDeps, live: LiveSession): Promise<SessionStatus> {
   advance(live, "stop");
-  await live.picker?.stop();
-  live.picker = undefined;
+  await serialPicker(live, () => closePicker(live));
   await live.recording.settled();
   live.recording.stop();
   await Promise.all(live.writes);

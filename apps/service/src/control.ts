@@ -1,7 +1,14 @@
 import { suggestLocators, type LeaseRegistry } from "@recnrun/engine";
 import type { ControlState, LeaseFence, SessionStatus } from "@recnrun/protocol";
 import { ServiceFailure } from "./dispatch.ts";
-import { announce, PERSON, type LiveSession, type SessionDeps } from "./sessions.ts";
+import {
+  announce,
+  closePicker,
+  PERSON,
+  serialPicker,
+  type LiveSession,
+  type SessionDeps,
+} from "./sessions.ts";
 
 const isLive = (live: LiveSession) =>
   live.state.state === "recording" || live.state.state === "paused";
@@ -66,30 +73,44 @@ export function handoff(
   return announce(deps, live);
 }
 
-/** Shows the picker on the session's page; each pick is pushed with its locator candidates. */
+/**
+ * Shows the picker on the session's page; each pick is pushed with its locator candidates. Starts
+ * and stops take turns, and a picker whose session or control changed while it opened is closed.
+ */
 export async function startPicking(
   deps: SessionDeps,
   live: LiveSession,
   fence: LeaseFence | undefined,
 ): Promise<{ sessionId: string; picking: boolean }> {
-  requireLive(live);
-  requireFence(deps.leases, live.targetId, fence);
-  live.picker ??= await deps.browser.pick(live.endpoint, live.targetId, (target) =>
-    deps.hub.publish({
-      type: "picker.picked",
-      sessionId: live.id,
-      target,
-      locators: suggestLocators(target),
-    }),
-  );
+  const admit = () => {
+    requireLive(live);
+    requireFence(deps.leases, live.targetId, fence);
+  };
+  await serialPicker(live, async () => {
+    admit();
+    if (live.picker) return;
+    const picker = await deps.browser.pick(live.endpoint, live.targetId, (target) =>
+      deps.hub.publish({
+        type: "picker.picked",
+        sessionId: live.id,
+        target,
+        locators: suggestLocators(target),
+      }),
+    );
+    try {
+      admit();
+    } catch (error) {
+      await picker.stop();
+      throw error;
+    }
+    live.picker = picker;
+  });
   return { sessionId: live.id, picking: true };
 }
 
 export async function stopPicking(
   live: LiveSession,
 ): Promise<{ sessionId: string; picking: boolean }> {
-  const picker = live.picker;
-  live.picker = undefined;
-  await picker?.stop();
+  await serialPicker(live, () => closePicker(live));
   return { sessionId: live.id, picking: false };
 }

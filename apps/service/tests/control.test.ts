@@ -68,3 +68,45 @@ test("an expired fence is refused even when no lease remains, until the person t
   const stopped = await h.call("session.stop", { sessionId }, current);
   expect(resultOf<SessionStatus>(stopped).state).toBe("finalizing");
 });
+
+/** Holds every picker startup until the returned release is called. */
+function slowPicker(h: Harness): () => void {
+  const pick = h.browser.pick.bind(h.browser);
+  let release = () => {};
+  const opened = new Promise<void>((resolve) => (release = resolve));
+  h.browser.pick = async (...args) => (await opened, pick(...args));
+  return release;
+}
+
+const countOf = (h: Harness, call: string) => h.browser.calls.filter((c) => c === call).length;
+
+test("concurrent picker starts open one picker, and a stop during startup closes it", async () => {
+  const h = await harness();
+  const { sessionId, lease } = await started(h);
+  const current = { lease: fenceOf(lease) };
+  const release = slowPicker(h);
+  const starts = [
+    h.call("picker.start", { sessionId }, current),
+    h.call("picker.start", { sessionId }, current),
+  ];
+  const stopped = h.call("picker.stop", { sessionId }, current);
+  release();
+  await Promise.all([...starts, stopped]);
+  expect(countOf(h, "pick")).toBe(1);
+  expect(countOf(h, "pick.stop")).toBe(1);
+  expect(h.deps.sessions.get(sessionId)?.picker).toBeUndefined();
+});
+
+test("a picker whose session stopped during startup is closed and refused", async () => {
+  const h = await harness();
+  const { sessionId, lease } = await started(h);
+  const current = { lease: fenceOf(lease) };
+  const release = slowPicker(h);
+  const start = h.call("picker.start", { sessionId }, current);
+  const stopped = h.call("session.stop", { sessionId }, current);
+  release();
+  expect(resultOf<SessionStatus>(await stopped).state).toBe("finalizing");
+  expect(codeOf(await start)).toBe("conflict");
+  expect(countOf(h, "pick.stop")).toBe(countOf(h, "pick"));
+  expect(h.deps.sessions.get(sessionId)?.picker).toBeUndefined();
+});
