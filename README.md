@@ -40,10 +40,12 @@ The dev Chrome keeps its profile in `apps/extension/.wxt/chrome-data`, so extens
 | `vp check`                                        | Formatting, lint (complexity, size, nesting, TypeScript rules), types   |
 | `vp run deps`                                     | Architecture boundaries and import cycles                               |
 | `vp run test:unit`, `test:components`, `test:e2e` | Node tests; components in Chromium; the website with the real extension |
-| `vp run test:coverage`                            | Coverage of at least 80% lines, statements, and functions; 75% branches |
-| `vp run dead-code`, `vp run duplication`          | Unused files, exports, and dependencies; duplicated code                |
-| `vp run docs:check`                               | Relative Markdown links and anchors resolve                             |
-| `vp run verify`                                   | All of the above, plus builds and the production manifest guard         |
+| `vp run test:browser`                             | The POC lab: Google Chrome Stable with the test build installed         |
+
+| `vp run test:coverage` | Coverage of at least 80% lines, statements, and functions; 75% branches |
+| `vp run dead-code`, `vp run duplication` | Unused files, exports, and dependencies; duplicated code |
+| `vp run docs:check` | Relative Markdown links and anchors resolve |
+| `vp run verify` | All of the above, plus builds and the production manifest guard |
 
 Tests and `verify` run in Docker on a virtual display, so browser windows never open on your desktop. Results and failure artifacts are in `.artifacts/docker/<run-id>/`. Git hooks run the fast gates before each commit and `vp run verify` before each push.
 

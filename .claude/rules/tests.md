@@ -14,9 +14,10 @@ paths:
 
 | Layer      | Files                                                                    | Command                  |
 | ---------- | ------------------------------------------------------------------------ | ------------------------ |
-| Node unit  | `{apps,packages}/*/tests/*.test.ts`                                      | `vp run test:unit`       |
+| Node unit  | `{apps,packages}/*/tests/*.test.ts`, `tests/*.test.ts` (the lab harness) | `vp run test:unit`       |
 | Component  | `*.browser.test.ts(x)` in Vitest Browser Mode, Chromium                  | `vp run test:components` |
 | End-to-end | `tests/e2e/*.spec.ts`, headed Playwright, built website + test extension | `vp run test:e2e`        |
+| Browser    | `tests/browser/*.spec.ts`, Google Chrome Stable over CDP, headed on Xvfb | `vp run test:browser`    |
 | Scripts    | `scripts/*.checks.mjs` (Node)                                            | `vp run test:scripts`    |
 
 - Keep schemas, protocol handling, handlers, and view models in Node unit tests; extract pure functions when that makes a rule testable.
@@ -25,7 +26,7 @@ paths:
 
 ## Running
 
-- Public commands run in Docker, headed Chromium on an isolated Xvfb display. Keep `headless: false` (extensions need a headed Chromium), and never connect the container display to the host.
+- Public commands run in Docker, headed Chromium (end-to-end) or Google Chrome Stable (browser) on an isolated Xvfb display. Keep `headless: false` (extensions need a headed Chromium), and never connect the container display to the host.
 - Browser tests stay serial (`--workers=1`), coverage included.
 - The Node projects run with `isolate: false`, so files of one project share a worker: reset module state in `beforeEach` (as `fakeBrowser.reset()` does) instead of relying on a fresh module per file.
 - Pass Playwright arguments after `--`, for example `vp run test:e2e -- tests/e2e/dashboard-tab.spec.ts -g 'empty'`.
@@ -42,3 +43,11 @@ paths:
 - Prefer locator auto-waiting and `expect.poll` over fixed sleeps.
 - Chrome's own folder picker and File System Access prompts are driven by `tests/e2e/fixtures/native-dialogs.ts`: import its `test`, and the `native` fixture gives an empty folder on the container's disk and `dialogs(page)`, to call before the click that opens the picker (it turns Playwright's chooser interception off on that page and brings it to the front); `answerRestorePrompt` answers in a normal window. Cross-profile tests pair through the dashboard with `pair(a, b, native)` from `fixtures/folder.ts`; `allowFolder` answers whichever prompt Chrome shows and returns which, so assert it only where Chrome is consistent: the restore prompt once a kept grant ended (an unlinked dashboard first closes the offscreen document, whose handles would hold the picker's grant), the write prompt after a revoke. Never mock `showDirectoryPicker`. It runs only in the container (`xdotool` on the Xvfb display, and `fixtures/display.ts` reads pixels with `scrot` to wait for each prompt), and the grant Chrome gives ends with the extension's last top-level page, so keep one open until the test has what it needs ([TROUBLESHOOTING.md](../../docs/TROUBLESHOOTING.md)).
 - Security tests use a second origin through `context.route` (see `origin-guard.spec.ts`) and assert that forged messages get no answer.
+
+## Writing browser tests (the POC lab)
+
+- The lab runs Google Chrome Stable from the image, never Playwright's Chromium (which is Google Chrome for Testing): every run there is labelled `diagnostic` and approves nothing ([POC PLAN.md decision 2](../../docs/poc/downloads-launcher/PLAN.md#2-decisions)).
+- Import `test` and `expect` from `tests/browser/fixtures/chrome.ts`. Its `chrome` fixture launches Google Chrome Stable headed with a throwaway `--user-data-dir`, waits for `DevToolsActivePort`, connects with `chromium.connectOverCDP` on the loopback, and exposes `browser`, `cdp` (a browser-target CDP session), `version`, `userDataDir`, `pid`, and `flags`; teardown keeps `display.png` of a failed test, stops Chrome with SIGTERM (its orderly quit on Linux), and deletes the root. `launchChrome({ userDataDir })` reuses a root across launches and leaves it in place; `launchChrome({ cdp: false })` starts the strict lab's Chrome with no `--remote-debugging-*` flag and no Playwright connection, and its `StrictChrome` has no `browser`, `cdp`, or `wsEndpoint` by type.
+- Chrome 137 and later ignore `--load-extension` on branded builds, so the harness never passes it.
+- `tests/browser/fixtures/x-display.ts` reads browser UI with no CDP handle on the container's Xvfb display (window titles with xdotool, the display with scrot) and throws unless `RECNRUN_TEST_CONTAINER=1`, so it never acts on a host screen; pass xdotool no `--long` options, which the harness scan reads as Chrome flags.
+- **Calling CDP.** Send commands only as `<session>.send("Domain.method", params)` with the method as a string literal at the call site; `tests/observer-allowlist.test.ts` scans `tests/browser` and `tests/experiments` and fails on a command outside its allowlist, on `ServiceWorker.*`, `Fetch.*`, `Debugger.*`, `Emulation.*`, `Storage.clear*`, `Target.setAutoAttach`, `Page.addScriptToEvaluateOnNewDocument`, `Page.setBypassCSP`, cookie writes, header or user-agent overrides, on raw `Runtime.evaluate` outside `tests/browser/fixtures/cdp-client.ts`, on Playwright calls that rewrite or inject into the page (`route`, `addInitScript`, `addScriptTag`, `setContent`, `addCookies`, `setOffline`, and the rest of its list), and on launch flags outside its list (any `--disable-*`, and `--load-extension`). `cdp-client.ts` connects only to a `ws://` endpoint on the loopback. Adding a command means adding it to the allowlist with its reason.

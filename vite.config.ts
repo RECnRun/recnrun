@@ -109,6 +109,7 @@ export default defineConfig({
       "apps/extension",
       "packages/domain",
       "packages/bridge",
+      "tests/vitest.config.ts",
       "apps/website/vitest.browser.config.ts",
       "apps/extension/vitest.browser.config.ts",
     ],
@@ -145,6 +146,7 @@ export default defineConfig({
           "vp run --no-cache test:unit:local",
           "vp run --no-cache test:components:local",
           "vp run --no-cache test:e2e:local",
+          "vp run --no-cache test:browser:local",
         ],
       },
       verify: {
@@ -159,7 +161,9 @@ export default defineConfig({
           "vp run --no-cache deps",
           "vp run --no-cache test:coverage:local",
           "vp run --no-cache test:e2e:local",
+          "vp run --no-cache test:browser:local",
           "vp run --no-cache test:container",
+
           "vp run --no-cache test:hooks",
           "vp run --no-cache test:scripts",
           "vp run --no-cache dead-code",
