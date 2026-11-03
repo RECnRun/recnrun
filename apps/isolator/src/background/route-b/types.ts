@@ -36,6 +36,8 @@ export interface PausedEntry {
   waitedMs?: number;
   /** Chrome's exact error text for the first command that failed. */
   error?: string;
+  /** Set when the URL is outside the loopback, so Route B continued it unread (R11). */
+  refused?: string;
 }
 
 /** One target the armed tab's auto-attach reported. */
@@ -46,9 +48,9 @@ export interface WorkerEntry {
   url: string;
   waitingForDebugger: boolean;
   attachedAt: number;
-  /** `ok`, `skipped`, or Chrome's error text for `Fetch.enable` on the target's session. */
+  /** `ok`, `skipped`, `refused: not on the loopback`, or Chrome's error text for `Fetch.enable` on the target's session. */
   fetchEnable: string;
-  /** `ok`, `skipped`, or Chrome's error text for `Network.enable` on the target's session. */
+  /** `ok`, `skipped`, `refused: not on the loopback`, or Chrome's error text for `Network.enable` on the target's session. */
   networkEnable: string;
   released: boolean;
   error?: string;

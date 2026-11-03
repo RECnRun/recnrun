@@ -2,6 +2,12 @@ import { BOOTSTRAP_HASH, BOOTSTRAP_VERSION } from "@recnrun/worker-bootstrap";
 import { isAttachedEvent } from "@/background/probes/auto-attach";
 import type { AttachedEvent } from "@/background/probes/auto-attach";
 import { messageOf, PROTOCOL_VERSION, withTimeout } from "@/background/probes/helpers";
+import {
+  isLoopbackUrl,
+  loopbackPage,
+  loopbackTargetOf,
+  REFUSED,
+} from "@/background/probes/loopback";
 import type { Debuggee, DebuggerApi, EventListener } from "@/background/probes/types";
 import { AUTO_ATTACH, command } from "@/background/route-a/attached";
 import { MODULE_BOOTSTRAP_PATH } from "@/background/route-b/module-resource";
@@ -80,6 +86,7 @@ export class RouteBEngine implements RouteB {
     const { tabId } = armRequest;
     if (this.#armed.has(tabId)) throw new Error(`tab ${tabId} is already armed`);
     const api = this.#debuggerApi();
+    loopbackPage(await api.getTargets(), tabId);
     const armed: Armed = {
       request: armRequest,
       listener: this.#listenerFor(armRequest),
@@ -126,12 +133,17 @@ export class RouteBEngine implements RouteB {
   }
 
   async update(request: unknown): Promise<UpdateOutcome> {
-    return updateInPage(this.#debuggerApi(), { tabId: this.#armedTab(request) });
+    const tabId = this.#armedTab(request);
+    const api = this.#debuggerApi();
+    // The armed tab may have navigated away from the loopback since arm.
+    loopbackPage(await api.getTargets(), tabId);
+    return updateInPage(api, { tabId });
   }
 
   async stopWorker(request: unknown): Promise<{ success: boolean }> {
     const targetId = targetIdOf(request);
     const api = this.#debuggerApi();
+    loopbackTargetOf(await api.getTargets(), targetId);
     const target = { targetId };
     await withTimeout(api.attach(target, PROTOCOL_VERSION), "attach");
     try {
@@ -180,9 +192,13 @@ export class RouteBEngine implements RouteB {
     void handled.finally(() => this.#pending.delete(handled));
   }
 
-  /** Enables Fetch (and Network when asked) on a worker's session while it waits, then releases it. */
+  /**
+   * Enables Fetch (and Network when asked) on a worker's session while it waits, then releases it;
+   * a target outside the loopback (R11) is only released.
+   */
   async #onAttached(source: Debuggee, event: AttachedEvent, request: ArmRequest): Promise<void> {
     const { sessionId, waitingForDebugger, targetInfo } = event;
+    const inside = isLoopbackUrl(targetInfo.url);
     const entry: WorkerEntry = {
       sessionId,
       targetId: targetInfo.targetId,
@@ -190,14 +206,14 @@ export class RouteBEngine implements RouteB {
       url: targetInfo.url,
       waitingForDebugger,
       attachedAt: this.#now(),
-      fetchEnable: "skipped",
-      networkEnable: "skipped",
+      fetchEnable: inside ? "skipped" : REFUSED,
+      networkEnable: inside ? "skipped" : REFUSED,
       released: false,
     };
     this.#workers.push(entry);
     const api = this.#debuggerApi();
     const session = { tabId: source.tabId, sessionId };
-    const worker = WORKER_TYPES.has(entry.type);
+    const worker = inside && WORKER_TYPES.has(entry.type);
     if (worker && request.workerFetch) {
       entry.fetchEnable = await enableFetch(api, session, request);
     }

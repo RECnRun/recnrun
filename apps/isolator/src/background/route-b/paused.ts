@@ -1,5 +1,6 @@
 import * as v from "valibot";
 import { messageOf } from "@/background/probes/helpers";
+import { isLoopbackUrl, REFUSED } from "@/background/probes/loopback";
 import type { Debuggee, DebuggerApi } from "@/background/probes/types";
 import { command } from "@/background/route-a/attached";
 import type { ArmRequest } from "@/background/route-b/requests";
@@ -173,6 +174,11 @@ export async function handlePaused(
   entry: PausedEntry,
   event: PausedEvent,
 ): Promise<void> {
+  // R11: a request of a site the armed tab navigated to goes on unread.
+  if (!isLoopbackUrl(event.request.url)) {
+    entry.refused = REFUSED;
+    return letGo(context, target, entry, event.requestId);
+  }
   if (isSelectionPath(context, entry, event)) entry.role = "selection";
   else if (entry.stage === "response" && isScript(event)) {
     const main = headerOf(event.request.headers, "service-worker") === "script";
