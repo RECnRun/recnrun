@@ -13,7 +13,17 @@ const TARGETS: TargetInfo[] = [
   { type: "worker", id: "shared", url: `${APP}/shared-worker.js?type=classic`, attached: false },
   { type: "worker", id: "elsewhere", url: "http://idp.localhost:4602/sw.js", attached: false },
 ];
-const INSTALLED = { marker: "m1", installedAt: 1 };
+// The bootstrap's answer at a waitForDebugger pause, where Cache Storage does not exist yet (E2).
+const INSTALLED = {
+  marker: "m1",
+  installedAt: 1,
+  realmAgeMs: 2.5,
+  patches: {
+    fetch: { status: "installed", typeof: "function" },
+    indexedDB: { status: "installed", typeof: "object" },
+    caches: { status: "skipped", typeof: "undefined" },
+  },
+};
 
 function setup(options: FakeOptions = {}) {
   const fake = fakeDebugger({

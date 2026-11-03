@@ -122,6 +122,7 @@ describe("E2 verdicts", () => {
         notReleased: 0,
         noEffect: 0,
         storeUnreadable: 0,
+        patchSkipped: 0,
       },
       timings: { bootstrapMs: { p50: 2, p95: 4, max: 4 } },
       variants: [
@@ -129,6 +130,19 @@ describe("E2 verdicts", () => {
         { name: "module", verdict: "pass", samples: 2 },
       ],
     });
+  });
+
+  test("counts the samples whose bootstrap skipped a patch, without changing the verdict", () => {
+    const skipped = { status: "skipped", typeof: "undefined" };
+    const samples = [sample(), sample()];
+    const [first] = samples;
+    if (first?.entry) first.entry.installed = { marker: "e2-m1", patches: { caches: skipped } };
+    const verdict = summarize("service-worker-register", samples, CHROME);
+    expect([verdict.verdict, verdict.counts?.passed, verdict.counts?.patchSkipped]).toEqual([
+      "pass",
+      2,
+      1,
+    ]);
   });
 
   test("fails with the first-effect-before-marker count and every distinct reason", () => {

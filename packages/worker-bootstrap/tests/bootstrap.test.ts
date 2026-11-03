@@ -120,6 +120,23 @@ describe("BOOTSTRAP_SOURCE", () => {
     expect(effects).toEqual(["indexedDB.open fixture-sw"]);
   });
 
+  test("answers per patch what it installed and what it skipped, as a debugger reads it by value", () => {
+    const { sandbox, context } = workerRealm();
+    delete sandbox.caches;
+    const byValue = (value: unknown): unknown => JSON.parse(JSON.stringify(value));
+    const answer = byValue(vm.runInContext(withMarker("e2-m1"), context));
+    expect(answer).toMatchObject({
+      marker: "e2-m1",
+      patches: {
+        fetch: { status: "installed", typeof: "function" },
+        indexedDB: { status: "installed", typeof: "object" },
+        caches: { status: "skipped", typeof: "undefined" },
+      },
+    });
+    const again = byValue(vm.runInContext(withMarker("e2-m1"), context));
+    expect(again).toMatchObject({ patches: { fetch: { status: "already-installed" } } });
+  });
+
   test("withMarker refuses a marker that could escape the expression", () => {
     expect(() => withMarker('x"});alert(1)//')).toThrow();
     expect(() => withMarker("")).toThrow();

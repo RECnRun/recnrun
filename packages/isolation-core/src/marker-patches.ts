@@ -46,12 +46,13 @@ function markInput(input: unknown, marker: string, scope: object): unknown {
   return input;
 }
 
-export function patchFetch(scope: object, marker: string): void {
+export function patchFetch(scope: object, marker: string): boolean {
   const native = method(scope, "fetch");
-  if (!native) return;
+  if (!native) return false;
   replace(scope, "fetch", function fetch(this: unknown, input: unknown, ...rest: unknown[]) {
     return Reflect.apply(native, this, [markInput(input, marker, scope), ...rest]);
   });
+  return true;
 }
 
 /** Replaces each method of `target` in `names` with what `wrap` builds around its native. */
@@ -93,17 +94,18 @@ function ownLogical(entries: unknown, marker: string): unknown[] {
   });
 }
 
-export function patchIndexedDb(scope: object, marker: string): void {
+export function patchIndexedDb(scope: object, marker: string): boolean {
   const factory: unknown = Reflect.get(scope, "indexedDB");
-  if (!isObject(factory)) return;
+  if (!isObject(factory)) return false;
   const databases = method(factory, "databases");
   renameFirstArgument(factory, ["open", "deleteDatabase"], marker);
-  if (!databases) return;
+  if (!databases) return true;
   replace(factory, "databases", function (this: unknown) {
     return Promise.resolve(Reflect.apply(databases, this, [])).then((list) =>
       ownLogical(list, marker),
     );
   });
+  return true;
 }
 
 export interface CacheNatives {
@@ -147,12 +149,12 @@ export function cacheNativesOf(storage: object): CacheNatives | undefined {
   return keys && open && match ? { keys, open, match } : undefined;
 }
 
-export function patchCaches(scope: object, marker: string): void {
+export function patchCaches(scope: object, marker: string): boolean {
   const storage: unknown = Reflect.get(scope, "caches");
-  if (!isObject(storage)) return;
+  if (!isObject(storage)) return false;
   const natives = cacheNativesOf(storage);
   renameFirstArgument(storage, ["open", "has", "delete"], marker);
-  if (!natives) return;
+  if (!natives) return true;
   const { keys } = natives;
   replace(storage, "keys", function (this: unknown) {
     return Promise.resolve(Reflect.apply(keys, this, [])).then((names) =>
@@ -166,4 +168,5 @@ export function patchCaches(scope: object, marker: string): void {
     };
     return matchOwned(this, natives, view, args);
   });
+  return true;
 }

@@ -153,13 +153,24 @@ function failureOf(outcomes: SampleOutcome[]): string | undefined {
   return `${failed} of ${outcomes.length} samples failed: ${listed}`;
 }
 
-function countsOf(outcomes: SampleOutcome[]): Record<string, number> {
+/** Whether the bootstrap's answer lists a patch it skipped because its global was missing. */
+function skippedPatch(entry: JournalEntry | undefined): boolean {
+  const patches = (entry?.installed as { patches?: unknown } | undefined)?.patches;
+  if (typeof patches !== "object" || patches === null) return false;
+  return Object.values(patches).some(
+    (patch: unknown) => (patch as { status?: unknown } | null)?.status === "skipped",
+  );
+}
+
+function countsOf(samples: E2Sample[], outcomes: SampleOutcome[]): Record<string, number> {
   const counts: Record<string, number> = {
     passed: outcomes.filter((outcome) => outcome.passed).length,
   };
   for (const kind of KINDS) {
     counts[kind] = outcomes.filter((outcome) => outcome.kinds.includes(kind)).length;
   }
+  // Counted beside the kinds: a skipped patch shows in the stores, so it changes no verdict.
+  counts.patchSkipped = samples.filter((sample) => skippedPatch(sample.entry)).length;
   return counts;
 }
 
@@ -205,7 +216,7 @@ export function summarize(hypothesis: string, samples: E2Sample[], browser: E1Br
     chrome: browser.chrome,
     samples: samples.length,
     ...provenance(browser),
-    counts: countsOf(outcomes),
+    counts: countsOf(samples, outcomes),
     ...(timings ? { timings } : {}),
     variants: variantsOf(samples, outcomes),
   };

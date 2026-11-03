@@ -4,6 +4,15 @@ import { call, fakeScope } from "./fake-scope.ts";
 
 const API = "http://api.localhost:4601";
 
+/** The answer's `patches` for a fake scope that has `fetch`, `indexedDB`, and `caches`. */
+function patches(status = "installed") {
+  return {
+    fetch: { status, typeof: "function" },
+    indexedDB: { status, typeof: "object" },
+    caches: { status, typeof: "object" },
+  };
+}
+
 describe("installMarker: fetch", () => {
   test("marks string and URL inputs and passes init through", async () => {
     const { scope, fetched } = fakeScope();
@@ -120,11 +129,37 @@ describe("installMarker: install", () => {
     const { scope, fetched } = fakeScope();
     const first = installMarker(scope, { marker: "m1" });
     const second = installMarker(scope, { marker: "m2" });
-    expect(second).toBe(first);
-    expect(scope[DIAGNOSTICS_KEY]).toEqual({ marker: "m1", installedAt: first.installedAt });
+    expect(second).toEqual({ ...first, patches: patches("already-installed") });
+    expect(scope[DIAGNOSTICS_KEY]).toEqual(first);
     expect(Reflect.set(scope, DIAGNOSTICS_KEY, {})).toBe(false);
     await call(scope, "", "fetch", `${API}/me`);
     expect(fetched).toEqual([[`${API}/me?__rec=m1`]]);
+  });
+
+  test("answers, per patch, that it installed and the typeof it saw", () => {
+    const { scope } = fakeScope();
+    const answer = installMarker(scope, { marker: "m1" });
+    expect(answer).toEqual({ marker: "m1", installedAt: answer.installedAt, patches: patches() });
+  });
+
+  test("answers a skipped patch when its global is missing, and keeps it skipped on a re-run", async () => {
+    const { scope, calls } = fakeScope();
+    const storage = scope.caches;
+    delete scope.caches;
+    const missing = { status: "skipped", typeof: "undefined" };
+    expect(installMarker(scope, { marker: "m1" }).patches.caches).toEqual(missing);
+    scope.caches = storage;
+    const again = installMarker(scope, { marker: "m1" });
+    expect(again.patches.caches).toEqual({ status: "skipped", typeof: "object" });
+    await call(scope, "caches", "open", "fixture-sw");
+    expect(calls, "a re-run patches nothing late").toEqual(["caches.open fixture-sw"]);
+  });
+
+  test("answers how long the realm had run when a performance clock exists", () => {
+    const { scope } = fakeScope();
+    scope.performance = { now: () => 1234.5 };
+    expect(installMarker(scope, { marker: "m1" }).realmAgeMs).toBe(1234.5);
+    expect("realmAgeMs" in installMarker(fakeScope().scope, { marker: "m1" })).toBe(false);
   });
 
   test("rejects an invalid marker before patching anything", () => {
@@ -137,7 +172,11 @@ describe("installMarker: install", () => {
 
   test("skips the APIs a scope does not have", () => {
     const scope: Record<string, unknown> = { indexedDB: null };
-    expect(installMarker(scope, { marker: "m1" }).marker).toBe("m1");
+    expect(installMarker(scope, { marker: "m1" }).patches).toEqual({
+      fetch: { status: "skipped", typeof: "undefined" },
+      indexedDB: { status: "skipped", typeof: "object" },
+      caches: { status: "skipped", typeof: "undefined" },
+    });
     expect(Object.keys(scope)).toEqual(["indexedDB"]);
   });
 });
