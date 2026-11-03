@@ -16,15 +16,24 @@ function showValues() {
 const ACTIONS = {
   "local-set": () => localStorage.setItem(KEY, "fixture-local"),
   "local-remove": () => localStorage.removeItem(KEY),
+  "local-clear": () => localStorage.clear(),
   "session-set": () => sessionStorage.setItem(KEY, "fixture-session"),
   "session-remove": () => sessionStorage.removeItem(KEY),
   "cookie-set": () => (document.cookie = `${KEY}=fixture-cookie; path=/; SameSite=Lax`),
   "cookie-clear": () => (document.cookie = `${KEY}=; path=/; max-age=0`),
+  // The page cannot read an HttpOnly cookie, so it shows what the server said it did.
+  "httponly-set": () => httpOnly(""),
+  "httponly-clear": () => httpOnly("?clear=1"),
 };
 
+async function httpOnly(query) {
+  const answer = await (await fetch(`/api/cookies${query}`)).json();
+  show("httponly-value", answer.httpOnly);
+}
+
 for (const [name, action] of Object.entries(ACTIONS)) {
-  onClick(name, name, () => {
-    action();
+  onClick(name, name, async () => {
+    await action();
     showValues();
   });
 }

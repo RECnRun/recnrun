@@ -7,14 +7,15 @@ import { capturing, DOC } from "./capture-harness.ts";
 const installed = { kind: "lifecycle", type: "document.hook-installed" };
 const hook = (url: string) => ({ ...installed, payload: { url, hookVersion: HOOK_VERSION } });
 
-test("a captured page also enables the network and the log before it resumes", async () => {
-  const { channel, handle } = await capturing();
+test("a captured page also enables the network, the log, and DOM storage before it resumes", async () => {
+  const { channel, handle } = await capturing({ cookiePollMs: 0 });
   channel.attach("S1", { targetId: "T1", type: "page" });
   channel.attach("W1", { targetId: "W", type: "worker" });
   await handle.settled();
-  expect(channel.methods("S1").slice(-3)).toEqual([
+  expect(channel.methods("S1").slice(-4)).toEqual([
     "Network.enable",
     "Log.enable",
+    "DOMStorage.enable",
     "Runtime.runIfWaitingForDebugger",
   ]);
   expect(channel.methods("W1")).not.toContain("Network.enable");

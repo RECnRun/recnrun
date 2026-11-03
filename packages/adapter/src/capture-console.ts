@@ -1,5 +1,4 @@
 import {
-  MAX_CAPTURED_TEXT,
   MAX_CONSOLE_ARGS,
   MAX_STACK_FRAMES,
   MAX_VALUE_PROPERTIES,
@@ -9,6 +8,7 @@ import {
   type ValuePreview,
 } from "@recnrun/protocol";
 import * as v from "valibot";
+import { Cut } from "./capture-cut.ts";
 import type { Draft, Mapped } from "./capture-envelope.ts";
 
 const PropertyPreviewSchema = v.object({
@@ -82,26 +82,6 @@ const LogSchema = v.object({
 
 type RemoteObject = v.InferOutput<typeof RemoteObjectSchema>;
 type PropertyPreview = v.InferOutput<typeof PropertyPreviewSchema>;
-
-/** Records whether anything was clipped or dropped, and passes that on to the enclosing part. */
-class Cut {
-  any = false;
-
-  text(value: string): string {
-    if (value.length > MAX_CAPTURED_TEXT) this.any = true;
-    return value.slice(0, MAX_CAPTURED_TEXT);
-  }
-
-  list<T>(items: readonly T[], max: number): T[] {
-    if (items.length > max) this.any = true;
-    return items.slice(0, max);
-  }
-
-  flag(parent?: Cut): { truncated?: true } {
-    if (this.any && parent) parent.any = true;
-    return this.any ? { truncated: true } : {};
-  }
-}
 
 function previewHead(raw: v.InferOutput<typeof ObjectPreviewSchema>, cut: Cut) {
   if (raw.overflow) cut.any = true;

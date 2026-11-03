@@ -1,12 +1,13 @@
 import * as v from "valibot";
 import { DomEventTypeSchema, DomPayloadSchema } from "./capture.ts";
 import { CountSchema, IsoTimestampSchema, NonEmptyStringSchema } from "./common.ts";
+import { StorageOperationPayloadSchema } from "./storage.ts";
 
 /** The `Runtime.addBinding` name page instrumentation posts through. */
 export const OBSERVER_BINDING = "__recnrunObserver";
 
 /** The version of the hook injected into every document; it changes with the hook's messages. */
-export const HOOK_VERSION = 2;
+export const HOOK_VERSION = 3;
 
 /** Longer binding payloads are dropped unparsed, so a page cannot make the adapter parse megabytes. */
 export const MAX_OBSERVER_MESSAGE_LENGTH = 65_536;
@@ -51,10 +52,19 @@ export const DomMessageSchema = v.strictObject({
   payload: DomPayloadSchema,
 });
 
+/** A `localStorage` or `sessionStorage` call the hook observed through its wrapped methods. */
+export const StorageMessageSchema = v.strictObject({
+  kind: v.literal("storage"),
+  type: v.literal("storage.operation"),
+  ...observerEntries,
+  payload: StorageOperationPayloadSchema,
+});
+
 /** A message page instrumentation posts through the observer binding; untrusted until it parses. */
 export const ObserverMessageSchema = v.variant("type", [
   HookInstalledMessageSchema,
   DomMessageSchema,
+  StorageMessageSchema,
 ]);
 
 /** An observer message the adapter accepted, with what CDP itself says about where it came from. */

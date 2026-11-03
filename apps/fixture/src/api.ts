@@ -69,8 +69,19 @@ function secret(response: ServerResponse): void {
   const authorized = typeof response.req.headers.authorization === "string";
   send(response, 200, JSON.stringify({ ok: true, authorized }), {
     "Content-Type": "application/json; charset=utf-8",
-    "Set-Cookie": "fixture-session=s3cr3t-cookie; Path=/; SameSite=Strict",
+    "Set-Cookie": "fixture-session=s3cr3t-cookie; Path=/; HttpOnly; SameSite=Strict",
     "X-Fixture-Token": "s3cr3t-reply",
+  });
+}
+
+// A cookie the page cannot read, which storage capture reports without its value.
+function cookies(response: ServerResponse, url: URL): void {
+  const clear = url.searchParams.has("clear");
+  send(response, 200, JSON.stringify({ httpOnly: clear ? "cleared" : "set" }), {
+    "Content-Type": "application/json; charset=utf-8",
+    "Set-Cookie": clear
+      ? "fixture-httponly=; Path=/; HttpOnly; Max-Age=0"
+      : "fixture-httponly=s3cr3t-httponly; Path=/; HttpOnly; SameSite=Lax",
   });
 }
 
@@ -90,6 +101,7 @@ const GET_HANDLERS: Readonly<Record<string, Handler>> = {
   "/api/events": events,
   "/api/large": large,
   "/api/secret": secret,
+  "/api/cookies": cookies,
   "/api/cached": (response) =>
     send(response, 200, JSON.stringify({ cached: true }), {
       "Content-Type": "application/json; charset=utf-8",

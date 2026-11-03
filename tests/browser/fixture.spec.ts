@@ -166,13 +166,22 @@ test("console emits each level, an exception, and a rejection", async ({ app }) 
   const errors: string[] = [];
   page.on("console", (message) => levels.push(message.type()));
   page.on("pageerror", (error) => errors.push(error.message));
-  for (const name of ["console.log", "console.warn", "console.error", "Throw", "Reject"]) {
+  const buttons = ["console.log", "console.warn", "console.error", "Throw an uncaught", "Reject"];
+  for (const name of buttons) {
     await page.getByRole("button", { name }).click();
   }
   await expect.poll(() => errors.length).toBe(2);
   expect(levels).toEqual(["log", "warning", "error"]);
   expect(errors).toEqual(["Uncaught on purpose", "Rejected on purpose"]);
-  expect(await counters(page)).toEqual({ log: 1, warn: 1, error: 1, throw: 1, reject: 1 });
+  expect(await counters(page)).toEqual({
+    log: 1,
+    warn: 1,
+    error: 1,
+    throw: 1,
+    reject: 1,
+    values: 0,
+    "throw-nested": 0,
+  });
 });
 
 test("?fail=throw raises a script error after the self-test", async ({ app }) => {
@@ -197,19 +206,26 @@ test("dialogs offers alert and confirm without opening them", async ({ app }) =>
   await expect(page.getByTestId("dialog-outcome")).toHaveText("No dialog yet");
 });
 
-test("storage sets and clears local, session, and cookie values", async ({ app }) => {
+test("storage sets and clears local, session, and cookie values, HttpOnly included", async ({
+  app,
+}) => {
   const page = await app.open("storage");
   const steps = [
     ["local-set", "local-value", "fixture-local"],
     ["local-remove", "local-value", "(none)"],
+    ["local-set", "local-value", "fixture-local"],
+    ["local-clear", "local-value", "(none)"],
     ["session-set", "session-value", "fixture-session"],
     ["session-remove", "session-value", "(none)"],
     ["cookie-set", "cookie-value", "fixture-cookie"],
     ["cookie-clear", "cookie-value", "(none)"],
+    ["httponly-set", "httponly-value", "set"],
+    ["httponly-clear", "httponly-value", "cleared"],
   ] as const;
   for (const [button, output, value] of steps) {
     await page.getByTestId(button).click();
     await expect(page.getByTestId(output)).toHaveText(value);
+    expect(await page.evaluate(() => document.cookie)).not.toContain("fixture-httponly");
   }
   expect(await page.evaluate(() => [localStorage.length, sessionStorage.length])).toEqual([0, 0]);
 });

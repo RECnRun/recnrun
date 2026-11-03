@@ -17,8 +17,12 @@ export const RESUME: CdpCommand = { method: "Runtime.runIfWaitingForDebugger" };
 
 const RUNTIME: CdpCommand = { method: "Runtime.enable" };
 const BINDING: CdpCommand = { method: "Runtime.addBinding", params: { name: OBSERVER_BINDING } };
-// Raw capture adds the network and the browser log of every document target.
-const CAPTURE: CdpCommand[] = [{ method: "Network.enable" }, { method: "Log.enable" }];
+// Raw capture adds the network, the browser log, and Web Storage events of every document target.
+const CAPTURE: CdpCommand[] = [
+  { method: "Network.enable" },
+  { method: "Log.enable" },
+  { method: "DOMStorage.enable" },
+];
 
 export function isInstrumented(type: string): type is InstrumentedType {
   return (INSTRUMENTED_TARGET_TYPES as readonly string[]).includes(type);

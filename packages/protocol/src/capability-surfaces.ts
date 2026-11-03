@@ -139,9 +139,10 @@ export const SURFACE_CAPABILITIES: Surface[] = [
     surface: "web-storage",
     level: "normal",
     title: "localStorage and sessionStorage changes",
-    status: "planned",
+    status: "implemented",
     phase: "F3.4",
-    notes: "Observed through CDP storage events; reads and property access can escape.",
+    notes:
+      "F3.4: snapshots on attach and navigation, DOMStorage changes, and hooked setItem, removeItem, and clear calls (tests/browser/storage.spec.ts); reads and property access can escape.",
   },
   {
     kind: "surface",
@@ -159,9 +160,10 @@ export const SURFACE_CAPABILITIES: Surface[] = [
     surface: "cookies",
     level: "normal",
     title: "Cookie changes",
-    status: "planned",
+    status: "implemented",
     phase: "F3.4",
-    notes: "Taken from CDP and network data; internal access has no universal audit.",
+    notes:
+      "F3.4: Chrome 156 has no CDP cookie event, so the jar is read each second and after a Set-Cookie response, then compared; HttpOnly and Secure values are never kept (tests/browser/storage.spec.ts).",
   },
   {
     kind: "surface",

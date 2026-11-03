@@ -15,7 +15,7 @@
           "additionalProperties": false,
           "properties": {
             "hookVersion": {
-              "const": 2
+              "const": 3
             },
             "url": {
               "type": "string"
@@ -207,6 +207,65 @@
             "submit"
           ],
           "type": "string"
+        }
+      },
+      "required": ["kind", "type", "seq", "documentId", "ts", "targetId", "payload"],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "documentId": {
+          "pattern": "^[0-9a-f]{32}$",
+          "type": "string"
+        },
+        "kind": {
+          "const": "storage"
+        },
+        "payload": {
+          "additionalProperties": false,
+          "properties": {
+            "area": {
+              "enum": ["local", "session"],
+              "type": "string"
+            },
+            "error": {
+              "maxLength": 1024,
+              "type": "string"
+            },
+            "key": {
+              "maxLength": 1024,
+              "type": "string"
+            },
+            "operation": {
+              "enum": ["setItem", "removeItem", "clear"],
+              "type": "string"
+            },
+            "truncated": {
+              "const": true
+            },
+            "value": {
+              "maxLength": 1024,
+              "type": "string"
+            }
+          },
+          "required": ["area", "operation"],
+          "type": "object"
+        },
+        "seq": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "targetId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "ts": {
+          "minimum": 0,
+          "type": "number"
+        },
+        "type": {
+          "const": "storage.operation"
         }
       },
       "required": ["kind", "type", "seq", "documentId", "ts", "targetId", "payload"],

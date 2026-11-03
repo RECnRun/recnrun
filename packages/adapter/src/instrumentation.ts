@@ -122,6 +122,7 @@ class Instrumenter {
     const replies = commands.map(({ method, params }) =>
       this.channel.send(method, params, record.sessionId),
     );
+    this.capture?.started(record);
     const failed = (await Promise.allSettled(replies)).find((each) => each.status === "rejected");
     if (failed) record.info.error = reason(failed.reason);
   }

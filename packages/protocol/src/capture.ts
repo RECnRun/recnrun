@@ -4,6 +4,7 @@ import { CapturedTextSchema as TextSchema } from "./captured-text.ts";
 import { ConsoleEventSchema, ErrorEventSchema } from "./console.ts";
 import { EVENT_ENVELOPE_ENTRIES, typedEvent as typed } from "./events.ts";
 import { NetworkEventSchema } from "./network.ts";
+import { StorageEventSchema } from "./storage.ts";
 
 /** The DOM events the hook listens to, in the capture phase on the window. */
 export const DOM_EVENT_TYPES = [
@@ -121,6 +122,7 @@ export const CapturedEventSchema = v.variant("category", [
   NetworkEventSchema,
   ConsoleEventSchema,
   ErrorEventSchema,
+  StorageEventSchema,
   navigationEvents,
   targetEvents,
 ]);

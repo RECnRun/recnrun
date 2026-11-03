@@ -121,7 +121,7 @@ describe("CapturedEventSchema", () => {
     ],
     ["a network type in the wrong category", at("console", "request", {})],
     ["an extra payload field", at("target", "detached", { more: 1 })],
-    ["an unknown category", at("storage", "set", {})],
+    ["an unknown category", at("cache", "set", {})],
   ])("rejects %s", (_name, event) => {
     expect(v.is(CapturedEventSchema, event)).toBe(false);
   });

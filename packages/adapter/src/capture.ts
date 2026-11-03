@@ -10,10 +10,12 @@ import {
   READ_HOOK_DOCUMENT,
   withDeadline,
 } from "./capture-documents.ts";
+import type { StorageSession } from "./capture-cookies.ts";
 import { createEmitter, type Draft, type Emitter, type Origin } from "./capture-envelope.ts";
 import { NetworkCapture } from "./capture-network.ts";
 import { sensitiveHeaders, type BodySink } from "./capture-network-evidence.ts";
 import { mapPageEvent } from "./capture-page.ts";
+import { StorageCapture } from "./capture-storage.ts";
 import type { TargetRecord } from "./instrumentation-targets.ts";
 
 /** Raw capture: every event becomes a validated journal line handed to `onEvent`. */
@@ -29,9 +31,12 @@ export interface CaptureOptions {
   blobs?: BodySink;
   /** Header names recorded as `redacted` besides `SENSITIVE_HEADERS`, matched without case. */
   redactHeaders?: readonly string[];
+  /** How often a page's cookie jar is read for changes, in milliseconds; 0 reads it only after a response that sets cookies and on navigation. */
+  cookiePollMs?: number;
 }
 
 const DEFAULT_BODY_TIMEOUT_MS = 10_000;
+const DEFAULT_COOKIE_POLL_MS = 1_000;
 // How long events of a navigated context wait for its hook to name the new document.
 const DOCUMENT_READ_TIMEOUT_MS = 2_000;
 const BROWSER: Origin = {
@@ -46,6 +51,7 @@ const BROWSER: Origin = {
 export class Capture {
   private readonly emitter: Emitter;
   private readonly networks = new Map<string, NetworkCapture>();
+  private readonly storages = new Map<string, StorageCapture>();
   private readonly documents = new ContextDocuments();
   private readonly channel: CdpChannel;
   private readonly options: CaptureOptions;
@@ -75,7 +81,15 @@ export class Capture {
     );
   }
 
+  /** The target's instrumentation was sent; a target that was already running reads its storage. */
+  started(record: TargetRecord): void {
+    const storage = this.storage(record);
+    if (record.info.installMode === "late") storage?.started(record.info.url);
+  }
+
   detached(record: TargetRecord): void {
+    this.storages.get(record.sessionId)?.close();
+    this.storages.delete(record.sessionId);
     this.networks
       .get(record.sessionId)
       ?.close("The target went away before the response finished loading.");
@@ -97,27 +111,14 @@ export class Capture {
     const key = `${record.sessionId}:${contextId}`;
     this.documents.set(key, message.documentId);
     const origin = { ...this.origin(record, frameId), documentId: message.documentId };
-    const draft: Draft =
-      message.kind === "dom"
-        ? {
-            category: "dom",
-            type: message.type,
-            component: "application",
-            payload: message.payload,
-          }
-        : {
-            category: "target",
-            type: "hook-installed",
-            component: "collector",
-            payload: message.payload,
-          };
-    this.emitter.emit(origin, { ...draft, monotonicTimeMs: message.ts });
+    this.emitter.emit(origin, { ...observedDraft(message), monotonicTimeMs: message.ts });
     // An install starts a document in this context; what waited for it belongs to that document.
     if (message.type === "document.hook-installed") this.documents.release(key, message.documentId);
   }
 
   /** A CDP event of an instrumented session that is neither a context nor a binding event. */
   sessionEvent(record: TargetRecord, event: CdpEvent): void {
+    this.storage(record)?.handle(event.method, event.params);
     if (event.method.startsWith("Network.")) {
       this.network(record).handle(event.method, event.params);
       return;
@@ -141,6 +142,8 @@ export class Capture {
     for (const network of this.networks.values())
       network.close("Capture stopped before the response finished loading.");
     this.networks.clear();
+    for (const storage of this.storages.values()) storage.close();
+    this.storages.clear();
     this.documents.releaseAll();
   }
 
@@ -178,13 +181,32 @@ export class Capture {
     };
   }
 
+  private storage(record: TargetRecord): StorageCapture | undefined {
+    const { type, targetId } = record.info;
+    if (type !== "page" && type !== "iframe") return undefined;
+    let storage = this.storages.get(record.sessionId);
+    if (!storage) {
+      const pollMs =
+        type === "page" ? (this.options.cookiePollMs ?? DEFAULT_COOKIE_POLL_MS) : undefined;
+      storage = new StorageCapture(this.session(record), targetId, pollMs);
+      this.storages.set(record.sessionId, storage);
+    }
+    return storage;
+  }
+
+  private session(record: TargetRecord): StorageSession {
+    return {
+      send: (method, params) => this.channel.send(method, params, record.sessionId),
+      emit: (draft, frameId) => this.emitter.emit(this.origin(record, frameId), draft),
+      track: this.track,
+    };
+  }
+
   private network(record: TargetRecord): NetworkCapture {
     let network = this.networks.get(record.sessionId);
     if (!network) {
       network = new NetworkCapture({
-        send: (method, params) => this.channel.send(method, params, record.sessionId),
-        emit: (draft, frameId) => this.emitter.emit(this.origin(record, frameId), draft),
-        track: this.track,
+        ...this.session(record),
         bodyTimeoutMs: this.options.bodyTimeoutMs ?? DEFAULT_BODY_TIMEOUT_MS,
         // A longer inline body would fail the journal schema and be dropped instead of truncated.
         maxBodyLength: Math.min(
@@ -198,4 +220,24 @@ export class Capture {
     }
     return network;
   }
+}
+
+function observedDraft(message: ObserverMessage): Draft {
+  if (message.kind === "dom")
+    return {
+      category: "dom",
+      type: message.type,
+      component: "application",
+      payload: message.payload,
+    };
+  if (message.kind === "storage") {
+    const payload = { observation: "observed-operation", ...message.payload };
+    return { category: "storage", type: "operation", component: "application", payload };
+  }
+  return {
+    category: "target",
+    type: "hook-installed",
+    component: "collector",
+    payload: message.payload,
+  };
 }

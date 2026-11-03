@@ -121,12 +121,27 @@ describe("network evidence", () => {
 
   test("answers the secret route with a cookie and a token header, never echoing either", async () => {
     const response = await get("/api/secret", { headers: { Authorization: "Bearer s3cr3t" } });
-    expect(response.headers.get("set-cookie")).toMatch(/^fixture-session=s3cr3t-cookie;/);
+    expect(response.headers.get("set-cookie")).toMatch(
+      /^fixture-session=s3cr3t-cookie;.*; HttpOnly/,
+    );
     expect(response.headers.get("x-fixture-token")).toBe("s3cr3t-reply");
     const body = await response.text();
     expect(JSON.parse(body)).toEqual({ ok: true, authorized: true });
     expect(body).not.toContain("s3cr3t");
     expect(await (await get("/api/secret")).json()).toEqual({ ok: true, authorized: false });
+  });
+
+  test("sets an HttpOnly cookie, and expires it with ?clear=1", async () => {
+    const set = await get("/api/cookies");
+    expect(set.headers.get("set-cookie")).toBe(
+      "fixture-httponly=s3cr3t-httponly; Path=/; HttpOnly; SameSite=Lax",
+    );
+    expect(await set.json()).toEqual({ httpOnly: "set" });
+    const cleared = await get("/api/cookies?clear=1");
+    expect(cleared.headers.get("set-cookie")).toBe(
+      "fixture-httponly=; Path=/; HttpOnly; Max-Age=0",
+    );
+    expect(await cleared.json()).toEqual({ httpOnly: "cleared" });
   });
 
   test("lets the cached route be cached for a minute", async () => {

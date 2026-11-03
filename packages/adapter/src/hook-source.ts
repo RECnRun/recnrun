@@ -3,8 +3,10 @@ import {
   HOOK_VERSION,
   MAX_CAPTURED_TEXT,
   OBSERVER_BINDING,
+  STORAGE_OPERATIONS,
 } from "@recnrun/protocol";
 import { DOM_CAPTURE } from "./hook-dom.ts";
+import { STORAGE_CAPTURE } from "./hook-storage.ts";
 
 // Runs in the page's main world before any application script, so the page can detect it.
 // Chrome reuses a popup's initial about:blank window, script context included, for its first
@@ -51,6 +53,7 @@ const HOOK = `(function (config) {
   Object.defineProperty(window, "__recnrunHook", { get: () => ensure().hook });
   ensure();
   ${DOM_CAPTURE}
+  ${STORAGE_CAPTURE}
 })`;
 
 /** The script `Page.addScriptToEvaluateOnNewDocument` injects into every document of `targetId`. */
@@ -61,6 +64,7 @@ export function hookSource(targetId: string): string {
     targetId,
     events: DOM_EVENT_TYPES,
     maxText: MAX_CAPTURED_TEXT,
+    storageOperations: STORAGE_OPERATIONS,
   };
   return `${HOOK}(${JSON.stringify(config)});`;
 }

@@ -22,6 +22,7 @@ export * from "./capture.ts";
 export * from "./captured-text.ts";
 export * from "./console.ts";
 export * from "./network.ts";
+export * from "./storage.ts";
 export * from "./journal.ts";
 export * from "./function-locator.ts";
 export * from "./lease.ts";
