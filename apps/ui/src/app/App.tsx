@@ -60,6 +60,7 @@ function Screen({ route, navigate, active }: ScreenProps) {
       return (
         <Editor
           flowId={route.flowId}
+          sessionId={active[0]}
           onRun={() => navigate({ screen: "run", flowId: route.flowId })}
         />
       );

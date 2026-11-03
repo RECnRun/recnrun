@@ -1,16 +1,21 @@
-import type { AssertionStep, Flow, Step, Target } from "@recnrun/protocol";
+import {
+  ASSERTION_NAMES,
+  type AssertionStep,
+  type Flow,
+  type Step,
+  type Target,
+} from "@recnrun/protocol";
 
-/** The assertions the editor offers in F2.6; F4.1 adds the rest. */
-export const ASSERTION_KINDS = ["visible", "textEquals", "textContains", "value", "count"] as const;
+export const ASSERTION_KINDS = ASSERTION_NAMES;
 
 export type AssertionKind = (typeof ASSERTION_KINDS)[number];
 
-/** Strategies the assertion form accepts as one locator with a `value`. */
-export const FORM_STRATEGIES = ["css", "testId", "text", "label"] as const;
+const PRESENCE_KINDS: readonly AssertionKind[] = ["visible", "hidden", "enabled", "disabled"];
 
-export type FormStrategy = (typeof FORM_STRATEGIES)[number];
+export const needsExpected = (kind: AssertionKind) => !PRESENCE_KINDS.includes(kind);
 
-export const needsExpected = (kind: AssertionKind) => kind !== "visible";
+/** `url` checks the page, not an element. */
+export const needsTarget = (kind: AssertionKind) => kind !== "url";
 
 export function removeStep(flow: Flow, stepId: string): Flow {
   return { ...flow, steps: flow.steps.filter((step) => step.id !== stepId) };
@@ -34,24 +39,18 @@ export function nextAssertionId(flow: Flow): string {
   return `assert-${index}`;
 }
 
-/** The one-key locator F2.5 replay resolves; locator lists replay in F3. */
-export function locatorFrom(strategy: FormStrategy, value: string): Target {
-  if (strategy === "testId") return { testId: value };
-  if (strategy === "text") return { text: value };
-  if (strategy === "label") return { label: value };
-  return { css: value };
-}
+/** What the assertion form collects; `target` is unset for `url` and while nothing is picked. */
+export type AssertionDraft = { kind: AssertionKind; target: Target | undefined; expected: string };
 
 /** An assertion step; `count` reads its expected value as a number, the save validates it. */
-export function buildAssertion(
-  id: string,
-  kind: AssertionKind,
-  target: Target,
-  expected: string,
-): AssertionStep {
-  if (kind === "visible") return { id, assertion: kind, target };
+export function buildAssertion(id: string, draft: AssertionDraft): AssertionStep {
+  const { kind, expected } = draft;
+  if (kind === "url") return { id, assertion: kind, expected };
+  // The forms offer "Add" only once a target exists, so no step is built without one.
+  const target = draft.target ?? "";
   if (kind === "count") return { id, assertion: kind, target, expected: Number(expected) };
-  return { id, assertion: kind, target, expected };
+  if (!needsExpected(kind)) return { id, assertion: kind, target } as AssertionStep;
+  return { id, assertion: kind, target, expected } as AssertionStep;
 }
 
 export function addStep(flow: Flow, step: Step): Flow {

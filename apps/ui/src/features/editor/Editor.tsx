@@ -1,16 +1,18 @@
-import type { Flow, Target } from "@recnrun/protocol";
+import type { Flow } from "@recnrun/protocol";
 import { useState } from "preact/hooks";
 import { useAction, useApi, useLoad } from "@/api/context";
 import { AssertionForm } from "@/features/editor/AssertionForm";
 import { StepCard } from "@/features/editor/StepCard";
 import {
-  type AssertionKind,
+  type AssertionDraft,
   addStep,
   buildAssertion,
   nextAssertionId,
   removeStep,
   setTimeoutMs,
 } from "@/features/editor/edit";
+import { useEditorSession } from "@/features/editor/useEditorSession";
+import type { PickerSession } from "@/features/editor/usePicker";
 import { Badge } from "@/ui/Badge";
 import { Button } from "@/ui/Button";
 import { Card } from "@/ui/Card";
@@ -36,9 +38,14 @@ function Steps({ flow, onEdit }: StepsProps) {
 
 const short = (revision: string) => revision.slice(0, 12);
 
-type FlowEditorProps = { initial: Flow; revision: string; onRun: () => void };
+type FlowEditorProps = {
+  initial: Flow;
+  revision: string;
+  session: PickerSession | undefined;
+  onRun: () => void;
+};
 
-function FlowEditor({ initial, revision, onRun }: FlowEditorProps) {
+function FlowEditor({ initial, revision, session, onRun }: FlowEditorProps) {
   const api = useApi();
   const { error, busy, run } = useAction();
   const [flow, setFlow] = useState(initial);
@@ -53,8 +60,8 @@ function FlowEditor({ initial, revision, onRun }: FlowEditorProps) {
       setSaved((await api.call("flow.save", { flow })).revision);
       setDirty(false);
     });
-  const add = (target: Target, kind: AssertionKind, expected: string) =>
-    edit(addStep(flow, buildAssertion(nextAssertionId(flow), kind, target, expected)));
+  const add = (draft: AssertionDraft) =>
+    edit(addStep(flow, buildAssertion(nextAssertionId(flow), draft)));
   const actions = (
     <>
       <Button variant="primary" onClick={save} disabled={busy}>
@@ -74,20 +81,28 @@ function FlowEditor({ initial, revision, onRun }: FlowEditorProps) {
         <Steps flow={flow} onEdit={edit} />
       </Card>
       <Card title="Add an assertion">
-        <AssertionForm onAdd={add} />
+        <AssertionForm onAdd={add} session={session} />
       </Card>
     </>
   );
 }
 
-type EditorProps = { flowId: string; onRun: () => void };
+type EditorProps = {
+  flowId: string;
+  /** The recording this tab runs, whose page the picker uses; without one, locators are typed. */
+  sessionId?: string | undefined;
+  onRun: () => void;
+};
 
 /** Loads a flow, edits its steps and assertions locally, and saves them as a new revision. */
-export function Editor({ flowId, onRun }: EditorProps) {
+export function Editor({ flowId, sessionId, onRun }: EditorProps) {
+  const session = useEditorSession(sessionId);
   const { loaded, reload } = useLoad((api) => api.call("flow.get", { flowId }), flowId);
   return (
     <Loadable loaded={loaded} onRetry={reload}>
-      {({ flow, revision }) => <FlowEditor initial={flow} revision={revision} onRun={onRun} />}
+      {({ flow, revision }) => (
+        <FlowEditor initial={flow} revision={revision} session={session} onRun={onRun} />
+      )}
     </Loadable>
   );
 }

@@ -109,13 +109,19 @@ test("offers no picker outside a recording", async () => {
 });
 
 test("builds assertions and ids the flow does not use yet", () => {
-  const flow = { ...FLOW, steps: [...FLOW.steps, buildAssertion("assert-1", "visible", "#a", "")] };
+  const visible = buildAssertion("assert-1", { kind: "visible", target: "#a", expected: "" });
+  const flow = { ...FLOW, steps: [...FLOW.steps, visible] };
   expect(nextAssertionId(flow)).toBe("assert-2");
-  expect(buildAssertion("c", "count", "#a", "3")).toEqual({
+  expect(buildAssertion("c", { kind: "count", target: "#a", expected: "3" })).toEqual({
     id: "c",
     assertion: "count",
     target: "#a",
     expected: 3,
+  });
+  expect(buildAssertion("u", { kind: "url", target: undefined, expected: "/done" })).toEqual({
+    id: "u",
+    assertion: "url",
+    expected: "/done",
   });
   const timed = setTimeoutMs(FLOW, "open", 500);
   expect(setTimeoutMs(timed, "open", undefined).steps[0]).toEqual(FLOW.steps[0]);

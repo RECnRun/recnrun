@@ -157,10 +157,16 @@ test("picks an element on the session's page and adds the assertion to the draft
     "textEquals",
     "Submitted",
   );
+  // The chosen candidate goes into the draft in the one-key form replay resolves.
   expect(fake.paramsOf("flow.addAssertion")).toEqual([
     {
       sessionId: "session-1",
-      step: { id: "assert-1", assertion: "textEquals", target: PICKED, expected: "Submitted" },
+      step: {
+        id: "assert-1",
+        assertion: "textEquals",
+        target: { testId: "status" },
+        expected: "Submitted",
+      },
     },
   ]);
   // The service refuses session changes that do not carry the holder's fence.
