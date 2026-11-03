@@ -15,8 +15,8 @@ Tracks [PLAN.md](PLAN.md). One line per task; the orchestrator owns `[x]`, imple
 Markers: `[ ]` not started · `[i]` implemented, awaiting the phase gate · `[x]` verified by `vp run verify` · `[!]` blocked (reason indented) · `[~]` partial (what is missing indented).
 
 **Branch:** `f0-contracts` holds F0 (closed), `f1-spike` holds F1 (closed), and `f2-vertical` holds F2 (closed), each stacked on the previous; F3 starts on `f3-diagnostics`, branched from `f2-vertical` (plan only on `local-engine-plan`; implementation branches are named after the phase)
-**Last commit:** 6f05ee0 "Show captured pages in a sandboxed viewer that runs and fetches nothing" (F3.3 on `f3-diagnostics`)
-**Current phase:** F3 (F2 closed on 2026-11-03; F3.1, F3.2, F3.3, F3.4, F3.6, F3.8 implemented `[i]`; next F3.5, then F3.7 and F3.9, on branch `f3-diagnostics`)
+**Last commit:** 67e2b47 "Compare a run with a baseline in diagnostics and test it end to end" (F3.7 on `f3-diagnostics`)
+**Current phase:** F3 (F2 closed on 2026-11-03; F3.1, F3.2, F3.3, F3.4, F3.6, F3.8 implemented `[i]`, F3.7 partial `[~]`; F3.5 in progress; next replay capture follow-up for F3.7, then F3.9, on branch `f3-diagnostics`)
 
 ## F0: Contracts and skeleton
 
@@ -172,7 +172,12 @@ Markers: `[ ]` not started · `[i]` implemented, awaiting the phase gate · `[x]
   - green: same command 1 passed; `vp run test:unit` 1199 passed; `vp run test:contract` 41 passed
   - commit: 6ee7e8e, 1debad7 (worktree c4fe46e, f178c8b)
   - note: on start, before binding its port, the service closes every run the index lists as running: a `producer-restarted` gap is written, a `journal-truncated` gap when the last line was cut, the in-flight write step ends `indeterminate`, read-only and unstarted steps are `cancelled`, the run is stored as `interrupted`, and nothing is re-executed; 1debad7 keeps the recovery producer and step results private to their module (Knip)
-- [ ] F3.7 Diagnostics UI and run comparison
+- [~] F3.7 Diagnostics UI and run comparison
+  - missing: replays journal no network or storage events (`replayFlow` and `execute` in `apps/service/src/runs.ts` never connect the adapter's capture to the run journal), so `run.compare` cannot name the 500 response at step `fetch` and the Requests and Storage cards are empty on real runs; the e2e accepts the failed assertion that observed the 500 as the first divergence, and the strict version waits for the follow-up that connects replay capture (after F3.5 lands, since both touch the run journal); capability diagnostics-ui is `partial` until then. No command lists a flow's runs, so the baseline is typed or picked from the runs this tab opened (`sessionStorage`); a `run.list` command would replace that
+  - red: `vp run test:components -- apps/ui/tests/timeline.browser.test.tsx` 7 failed against stubs (run 2026-11-03T11-28-43.433Z); `apps/ui/tests/evidence.browser.test.tsx` 7 failed (run 2026-11-03T11-33-24.004Z); `apps/ui/tests/compare.browser.test.tsx` 8 failed (`expected { notes: [], rows: [] } to match object`, run 2026-11-03T11-36-37.522Z); strict `tests/e2e/diagnostics.spec.ts` (`Expected "First divergence at step fetch"; received "First divergence at step result (step 3 of 3): failed assertion"`, run 2026-11-03T11-39-09.356Z); `npx vitest run tests/capability-matrix.test.ts` (packages/protocol) `expected 'planned' to be 'partial'`
+  - green: timeline 8 passed (run 2026-11-03T11-31-28.687Z), evidence 14 passed (run 2026-11-03T11-35-19.340Z), compare 16 passed (run 2026-11-03T11-38-07.434Z), full `vp run test:components` 80 passed (run 2026-11-03T11-42-42.597Z); `vp run test:e2e -- tests/e2e/diagnostics.spec.ts` 1 passed (run 2026-11-03T11-39-51.196Z); protocol 48; `vp run test:unit` 1334 passed
+  - commit: 4d24e95, 495c350, 67e2b47 (worktree 3c17e2e, b0ce8df, 073b509)
+  - note: route `#/runs/<runId>` opens Diagnostics from the Run screen: a timeline over `run.queryEvents` (cursor paging) filtered by profile, step, origin, category, and coverage; request/response pairing and storage operations with their `snapshot`/`observed-change`/`observed-operation` state (bodies shown only as references, nothing fetched or rendered); Compare over `run.compare` points at the first divergence and renders a lost-events gap as "collector gap", never as an application failure (the e2e appends a `buffer-exhausted` gap line to a run's `events.jsonl`); screenshots `.artifacts/screens/F3.7/{timeline,compare-500,compare-gap}.png` seen
 - [i] F3.8 `run.compare`, `run.queryEvents`
   - red: at c4fe46e `tests/contract/runs-api.test.ts` 9 of 10 failed and persistence mutation tests 4 of 8 failed
   - green: `tests/contract/runs-api.test.ts` 10 passed; persistence 78, protocol 351, service 108, engine 296 passed
