@@ -22,14 +22,16 @@ export interface ArmOptions {
   workerFetch?: boolean;
   imports?: "continue" | "transform";
   network?: boolean;
+  /** E6: the selection wrapper Route B fulfills instead of the bootstrap. */
+  selection?: string;
 }
 
-interface Tab {
+export interface Tab {
   page: Page;
   tab: string;
 }
 
-interface Armed extends Tab {
+export interface Armed extends Tab {
   fetchEnable: string;
 }
 
@@ -72,7 +74,12 @@ async function tabFor(run: Run, page: Page, marker: string): Promise<Tab> {
   return { page, tab: JSON.stringify({ tabId }) };
 }
 
-async function arm(run: Run, page: Page, marker: string, options: ArmOptions): Promise<Armed> {
+export async function arm(
+  run: Run,
+  page: Page,
+  marker: string,
+  options: ArmOptions,
+): Promise<Armed> {
   const tab = await tabFor(run, page, marker);
   const request = JSON.stringify({
     ...JSON.parse(tab.tab),
@@ -92,7 +99,7 @@ async function rearm(run: Run, armed: Armed, marker: string): Promise<RouteBJour
 }
 
 /** Polls `done` until it holds or `ms` pass; false when it never held. */
-async function waitUntil(done: () => Promise<boolean>, ms: number): Promise<boolean> {
+export async function waitUntil(done: () => Promise<boolean>, ms: number): Promise<boolean> {
   for (let waited = 0; waited < ms; waited += POLL_MS) {
     if (await done()) return true;
     await new Promise((resolve) => setTimeout(resolve, POLL_MS));
@@ -100,7 +107,12 @@ async function waitUntil(done: () => Promise<boolean>, ms: number): Promise<bool
   return done();
 }
 
-async function register(run: Run, variant: string, marker: string, options: ArmOptions = {}) {
+export async function register(
+  run: Run,
+  variant: string,
+  marker: string,
+  options: ArmOptions = {},
+) {
   const page = await run.context.newPage();
   const armed = await arm(run, page, marker, options);
   const since = await checkpoint();
@@ -111,20 +123,20 @@ async function register(run: Run, variant: string, marker: string, options: ArmO
   return { armed, since, report };
 }
 
-interface Registered {
+export interface Registered {
   armed: Armed;
   since: number;
   report: unknown;
 }
 
-async function snapshot(run: Run, { armed, since, report }: Registered, marker: string) {
+export async function snapshot(run: Run, { armed, since, report }: Registered, marker: string) {
   const journal = await isolator<RouteBJournal>(run.extension, routeB(`disarm(${armed.tab})`));
   const inventory = await inventoryOf(run, armed.page, marker);
   const entries = await ledger(since);
   return { entries, journal, inventory, report, fetchEnable: armed.fetchEnable };
 }
 
-async function stopWorkers(run: Run): Promise<{ stopped: unknown[]; workersGone: boolean }> {
+export async function stopWorkers(run: Run): Promise<{ stopped: unknown[]; workersGone: boolean }> {
   const stopped: unknown[] = [];
   for (const { id } of await targetsLeft(run, "service_worker")) {
     const request = JSON.stringify({ targetId: id });
@@ -135,7 +147,7 @@ async function stopWorkers(run: Run): Promise<{ stopped: unknown[]; workersGone:
 }
 
 /** Clears the origin through Route A once Route B let the tab go, closes it, and stops workers. */
-async function reset(run: Run, tab: Tab): Promise<void> {
+export async function reset(run: Run, tab: Tab): Promise<void> {
   await isolator(run.extension, `recnrunRouteA.clearOrigin(${tab.tab})`);
   await tab.page.close();
   // An unregistered worker keeps running after its last client closes; the next load starts clean.

@@ -30,6 +30,8 @@ export interface ChromeLaunchOptions {
   executable?: string;
   /** Also open `--remote-debugging-pipe` (fds 3 and 4) next to the port, for pipe-only CDP commands. */
   pipe?: boolean;
+  /** A profile to reuse, as E6 does to restart Chrome on it; the caller owns it, so close() keeps it. */
+  userDataDir?: string;
 }
 
 export interface LaunchedChrome {
@@ -163,7 +165,9 @@ export async function launchChrome(options: ChromeLaunchOptions = {}): Promise<L
   const executable = options.executable ?? resolveChromePath();
   const run = promisify(execFile);
   const version = (await run(executable, ["--version"], { timeout: VERSION_TIMEOUT_MS })).stdout;
-  const userDataDir = await mkdtemp(join(tmpdir(), "recnrun-chrome-"));
+  const userDataDir = options.userDataDir ?? (await mkdtemp(join(tmpdir(), "recnrun-chrome-")));
+  // The previous launch's port file would be read before this Chrome writes its own.
+  await rm(join(userDataDir, "DevToolsActivePort"), { force: true });
   const chrome = watch(executable, chromeFlags(userDataDir, options.args), options.pipe === true);
   const pipe = options.pipe
     ? connectPipe(chrome.child.stdio[3] as Writable, chrome.child.stdio[4] as Readable)
@@ -173,6 +177,7 @@ export async function launchChrome(options: ChromeLaunchOptions = {}): Promise<L
     pipe?.close();
     await browser?.close().catch(() => undefined);
     await stop(chrome);
+    if (options.userDataDir !== undefined) return;
     // Chrome's helper processes can still hold files for a moment after the browser exits.
     await rm(userDataDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   };

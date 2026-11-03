@@ -85,16 +85,18 @@ export interface LoadUnpackedOptions {
   transport?: "port" | "pipe";
   /** E0's control turns the flag off to see whether Chrome still requires it. */
   unsafeDebugging?: boolean;
+  /** Loads into this existing profile instead of a new one (E6 restarts Chrome on it). */
+  userDataDir?: string;
 }
 
 /** Hypothesis (a): `Extensions.loadUnpacked` over the port, or over `--remote-debugging-pipe`. */
 export async function loadUnpackedOverCdp(
   path: string,
-  { transport = "port", unsafeDebugging = true }: LoadUnpackedOptions = {},
+  { transport = "port", unsafeDebugging = true, userDataDir }: LoadUnpackedOptions = {},
 ): Promise<LoadedExtension> {
   const pipe = transport === "pipe";
   const args = unsafeDebugging ? [UNSAFE_EXTENSION_DEBUGGING] : [];
-  const chrome = await launchChrome({ args, pipe });
+  const chrome = await launchChrome({ args, pipe, ...(userDataDir ? { userDataDir } : {}) });
   let id: string;
   try {
     const params = { path };
