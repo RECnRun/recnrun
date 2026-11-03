@@ -163,8 +163,11 @@ describe("the peer's reports", () => {
     expect(await peers.routes.request({ type: "tabs", peer: PEER })).toStrictEqual({ tabs: [] });
     await peers.receive(fromPeer("HELLO", { displayName: "Desk", extensionVersion: "0.1.0" }));
     const listed = peers.routes.request({ type: "tabs", peer: PEER });
-    await vi.waitFor(() => expect(peers.link.sentTypes().at(-1)).toBe("GET_TABS"));
-    const ask = peers.link.frames().at(-1) as unknown as { id: string };
+    // Found by type: a TABS_CHANGED report from the HELLO may follow the request (CI run 41730590018).
+    await vi.waitFor(() => expect(peers.link.sentTypes()).toContain("GET_TABS"));
+    const ask = peers.link.frames().find(({ type }) => type === "GET_TABS") as unknown as {
+      id: string;
+    };
     await peers.receive(fromPeer("TABS_SNAPSHOT", { requestId: ask.id, tabs: [TAB] }));
     expect(await listed).toStrictEqual({ tabs: [TAB] });
     expect(peers.link.notices.length).toBeGreaterThan(3);
