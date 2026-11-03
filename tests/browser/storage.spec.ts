@@ -121,7 +121,11 @@ test("a page captured late reads a snapshot of what it already stored", async ({
   await press(page, "httponly-set", "httponly-value", "set");
   const events: CapturedEvent[] = [];
   const handle = await instrument(chrome.wsEndpoint, {
-    capture: { runId: "late-storage", cookiePollMs: 0, onEvent: (event) => events.push(event) },
+    capture: {
+      runId: "late-storage",
+      cookiePollMs: 0,
+      onEvent: (event) => void events.push(event),
+    },
   });
   try {
     const snapshots = () =>

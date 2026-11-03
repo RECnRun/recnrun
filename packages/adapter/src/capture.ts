@@ -24,7 +24,8 @@ import { hookProducer, type Hole } from "./observer-delivery.ts";
 export interface CaptureOptions {
   /** The run the journal belongs to; every event carries it. */
   runId: string;
-  onEvent: (event: CapturedEvent) => void;
+  /** A sink that answers the event's durable write delays the hook's acknowledgement until it settles. */
+  onEvent: (event: CapturedEvent) => void | Promise<void>;
   /** How long a response may keep loading before its body is recorded as unavailable. */
   bodyTimeoutMs?: number;
   /** Bodies longer than this many characters are kept in part and marked truncated; at most `MAX_INLINE_BODY_LENGTH`. */
@@ -78,7 +79,7 @@ export class Capture {
     const { targetId, type, url, installMode } = info;
     const payload = { type, url, installMode, ...(openerId && { openerId }) };
     const origin = { ...BROWSER, targetId };
-    this.emitter.emit(origin, {
+    void this.emitter.emit(origin, {
       category: "target",
       type: "attached",
       component: "browser",
@@ -86,7 +87,7 @@ export class Capture {
     });
     // A worker that ran before the attach did things nothing observed; a page reloads to cover them.
     if (type === "worker" && installMode === "late")
-      this.emitter.emit(
+      void this.emitter.emit(
         origin,
         gapDraft({ reason: "target-unattached", surface: "workers-frames" }),
       );
@@ -96,7 +97,7 @@ export class Capture {
   undelivered(record: TargetRecord, { producer, fromSeq, toSeq }: Hole): void {
     const lost = toSeq - fromSeq + 1;
     const payload = { reason: "delivery-lost", producer, fromSeq, toSeq, lost };
-    this.emitter.emit(this.origin(record, null), gapDraft(payload));
+    void this.emitter.emit(this.origin(record, null), gapDraft(payload));
   }
 
   /** The target's instrumentation was sent; a target that was already running reads its storage. */
@@ -113,19 +114,19 @@ export class Capture {
       ?.close("The target went away before the response finished loading.");
     this.networks.delete(record.sessionId);
     this.documents.releaseAll(`${record.sessionId}:`);
-    this.emitter.emit(
+    void this.emitter.emit(
       { ...BROWSER, targetId: record.info.targetId },
       { category: "target", type: "detached", component: "browser", payload: {} },
     );
   }
 
-  /** An accepted hook message, from the frame and context CDP delivered it through. */
+  /** An accepted hook message, from the frame and context CDP delivered it through; answers its write. */
   observed(
     record: TargetRecord,
     message: ObserverMessage,
     frameId: string | null,
     contextId: number,
-  ): void {
+  ): Promise<void> | undefined {
     const key = `${record.sessionId}:${contextId}`;
     this.documents.set(key, message.documentId);
     const origin = {
@@ -134,9 +135,10 @@ export class Capture {
       documentId: message.documentId,
     };
     const draft = { ...observedDraft(message), monotonicTimeMs: message.ts };
-    this.emitter.emit(origin, draft, message.seq);
+    const written = this.emitter.emit(origin, draft, message.seq);
     // An install starts a document in this context; what waited for it belongs to that document.
     if (message.type === "document.hook-installed") this.documents.release(key, message.documentId);
+    return written;
   }
 
   /** A CDP event of an instrumented session that is neither a context nor a binding event. */
@@ -151,10 +153,11 @@ export class Capture {
     const contextFrame =
       mapped.contextId === undefined ? undefined : record.contexts.get(mapped.contextId);
     const origin = this.origin(record, mapped.frameId ?? contextFrame ?? null);
-    if (mapped.contextId === undefined) this.emitter.emit(origin, mapped.draft);
+    if (mapped.contextId === undefined) void this.emitter.emit(origin, mapped.draft);
     else
-      this.documents.emit(`${record.sessionId}:${mapped.contextId}`, (documentId) =>
-        this.emitter.emit({ ...origin, documentId }, mapped.draft),
+      this.documents.emit(
+        `${record.sessionId}:${mapped.contextId}`,
+        (documentId) => void this.emitter.emit({ ...origin, documentId }, mapped.draft),
       );
     if (event.method === "Page.frameNavigated" && mapped.frameId)
       this.reread(record, mapped.frameId);
@@ -220,7 +223,7 @@ export class Capture {
   private session(record: TargetRecord): StorageSession {
     return {
       send: (method, params) => this.channel.send(method, params, record.sessionId),
-      emit: (draft, frameId) => this.emitter.emit(this.origin(record, frameId), draft),
+      emit: (draft, frameId) => void this.emitter.emit(this.origin(record, frameId), draft),
       track: this.track,
     };
   }

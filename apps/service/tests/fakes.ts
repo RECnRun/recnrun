@@ -30,13 +30,15 @@ const CHROME: DiscoveryResult = {
 /** Chrome as the commands see it: events and picks are fed by the test. */
 export interface FakeBrowser extends BrowserPort {
   emit(event: CapturedEvent): void;
+  /** Delivers as the recording does and answers what the service answers: the event's journal write. */
+  deliver(event: CapturedEvent): void | Promise<void>;
   pickElement(target: DomTarget): void;
   readonly calls: string[];
   found: DiscoveryResult;
 }
 
 function fakeBrowser(): FakeBrowser {
-  let onEvent: (event: CapturedEvent) => void = () => {};
+  let onEvent: (event: CapturedEvent) => void | Promise<void> = () => {};
   let onPicked: ((target: DomTarget) => void) | undefined;
   const calls: string[] = [];
   const fake: FakeBrowser = {
@@ -56,7 +58,8 @@ function fakeBrowser(): FakeBrowser {
     replayDriver: async () => {
       throw new Error("No replay in this fake.");
     },
-    emit: (event) => onEvent(event),
+    emit: (event) => void onEvent(event),
+    deliver: (event) => onEvent(event),
     pickElement: (target) => onPicked?.(target),
   };
   return fake;

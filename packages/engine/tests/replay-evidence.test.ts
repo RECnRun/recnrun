@@ -52,7 +52,7 @@ const URL = "http://127.0.0.1:4600/api/json";
 function capturingDriver() {
   const { driver } = fakeDriver({ elements: { "fetch-json": {}, result: { text: "500" } } });
   let sink: CaptureSink | undefined;
-  const deliver = (event: CapturedEvent) => sink?.event(event);
+  const deliver = (event: CapturedEvent) => void sink?.event(event);
   let drained = false;
   const capturing: ReplayDriver = {
     ...driver,
@@ -123,6 +123,47 @@ const FLOW = flowOf(
   { inputs: { pin: { type: "string", required: true, secret: true } } },
 );
 
+test("a captured event answers its journal write, so the capture acknowledges once the line is stored", async () => {
+  const { store } = memoryStore();
+  let release = () => {};
+  const held = new Promise<void>((resolve) => (release = resolve));
+  let appended = () => {};
+  const firstAppend = new Promise<void>((resolve) => (appended = resolve));
+  // The journal holds every line until the test releases it, and says when the first one came in.
+  const slow: typeof store = {
+    ...store,
+    createRun: async () => {
+      const run = await store.createRun();
+      const append = run.journal.append;
+      const holding = (event: Event) => (appended(), held.then(() => append(event)));
+      return { ...run, journal: { ...run.journal, append: holding } };
+    },
+  };
+  const { driver } = fakeDriver();
+  let written: unknown = "never called";
+  const capturing: ReplayDriver = {
+    ...driver,
+    onCapture: async (sink) => {
+      written = sink.event(captured(1, "console", "log", { level: "log", text: "hello" }));
+      return { drain: async () => {} };
+    },
+  };
+  const flow = flowOf([{ id: "open", action: "navigate", url: "http://127.0.0.1:4600/" }]);
+  const replay = replayFlow(capturing, flow, {
+    run: { store: slow, manifest: MANIFEST },
+    clock: fakeClock(),
+  });
+  await firstAppend;
+  let settled = false;
+  void Promise.resolve(written).then(() => (settled = true));
+  await Promise.resolve();
+  await Promise.resolve();
+  expect(settled, "the write is answered, and not before the journal has it").toBe(false);
+  release();
+  await replay;
+  expect(settled).toBe(true);
+});
+
 test("a replay journals what its tabs did under the step that caused it, with secrets redacted", async () => {
   const { driver, drained } = capturingDriver();
   const { store, events, bodies, coverage } = memoryStore();
@@ -155,7 +196,7 @@ function deliveringDriver(events: CapturedEvent[]) {
   const delivering: ReplayDriver = {
     ...driver,
     act: async (command, options) => {
-      if (command.kind === "click") for (const event of events) sink?.event(event);
+      if (command.kind === "click") for (const event of events) void sink?.event(event);
       return driver.act(command, options);
     },
     onCapture: async (given) => {

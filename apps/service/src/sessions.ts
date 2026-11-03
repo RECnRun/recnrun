@@ -117,26 +117,34 @@ function settle(live: LiveSession, result: SessionResult): CaptureGap | undefine
 export const advance = (live: LiveSession, event: LifecycleEvent) =>
   settle(live, applySessionEvent(live.state, event));
 
-function track(deps: SessionDeps, live: LiveSession, event: Event): void {
+/** Journals the event and answers that write, failure included, so the recording can account for it. */
+function track(deps: SessionDeps, live: LiveSession, event: Event): Promise<void> {
   live.coverage.add(event);
-  const write = live.journal.append(event).catch((error: unknown) => {
+  const line = live.journal.append(event);
+  const write = line.catch((error: unknown) => {
     deps.logger.error("session.journal-failed", { message: String(error) });
   });
   live.writes.add(write);
   void write.finally(() => live.writes.delete(write));
+  return line;
 }
 
-function accept(deps: SessionDeps, live: LiveSession, event: CapturedEvent): void {
+function accept(
+  deps: SessionDeps,
+  live: LiveSession,
+  event: CapturedEvent,
+): Promise<void> | undefined {
   const state = live.draining ?? live.state;
-  if (!isCapturing(state)) return;
+  if (!isCapturing(state)) return undefined;
   live.events.push(event);
   // Navigations make steps too, so the pause excludes every event, not only DOM ones.
   if (!createsSuggestedSteps(state)) live.ignored.add(event.id);
-  track(deps, live, event);
+  const written = track(deps, live, event);
   deps.hub.publish({ type: "session.event", sessionId: live.id, event });
   // The person is active, so their control does not lapse while they record.
   const lease = deps.leases.current(live.targetId);
   if (lease?.holderId === PERSON) deps.leases.heartbeat(live.targetId, lease);
+  return written;
 }
 
 /** F2 records one Chrome: every actor binds to the same profile, or none names one. */
@@ -164,7 +172,8 @@ export async function startSession(
   const folder = join(deps.home, ".recnrun", "sessions", id);
   const journal = await deps.journals.open(join(folder, "events.jsonl"));
   const early: CapturedEvent[] = [];
-  let sink: (event: CapturedEvent) => void = (event) => early.push(event);
+  // An event before the session exists is kept; its write is only known once the session accepts it.
+  let sink: (event: CapturedEvent) => void | Promise<void> = (event) => void early.push(event);
   let recording: RecordingHandle;
   try {
     // Bodies go to blobs beside the journal, so the journal keeps only their references.
@@ -198,7 +207,7 @@ export async function startSession(
   deps.sessions.set(id, live);
   deps.leases.takeControl(live.targetId, PERSON);
   sink = (event) => accept(deps, live, event);
-  for (const event of early) sink(event);
+  for (const event of early) void sink(event);
   return announce(deps, live);
 }
 
@@ -233,7 +242,7 @@ export function pause(deps: SessionDeps, live: LiveSession, mode: PauseMode): Se
 
 export function resume(deps: SessionDeps, live: LiveSession, mode: PauseMode): SessionStatus {
   const gap = settle(live, resumeSession(live.state, mode, deps.now()));
-  if (gap) track(deps, live, gapEvent(deps, live, gap));
+  if (gap) void track(deps, live, gapEvent(deps, live, gap));
   return announce(deps, live);
 }
 
@@ -262,13 +271,17 @@ async function drain(deps: SessionDeps, live: LiveSession, stopping: Session): P
     await live.recording.settled();
   } catch (error) {
     deps.logger.warn("session.drain-failed", { message: String(error) });
-    track(deps, live, gapEvent(deps, live, { reason: "capture-stopped", startedAt: deps.now() }));
+    void track(
+      deps,
+      live,
+      gapEvent(deps, live, { reason: "capture-stopped", startedAt: deps.now() }),
+    );
   }
   live.recording.stop();
   live.draining = undefined;
   const suspendedAt = stopping.captureSuspendedAt;
   if (suspendedAt !== null)
-    track(
+    void track(
       deps,
       live,
       gapEvent(deps, live, { reason: "capture-suspended", startedAt: suspendedAt }),

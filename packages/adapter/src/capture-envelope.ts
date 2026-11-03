@@ -32,14 +32,17 @@ export interface Mapped {
 }
 
 export interface Emitter {
-  /** `seq` is the producer's own number when it numbers its events itself, as the hook does. */
-  emit(origin: Origin, draft: Draft, seq?: number): void;
+  /**
+   * `seq` is the producer's own number when it numbers its events itself, as the hook does.
+   * Answers the sink's write of the event, when the sink answers one, so delivery can wait for it.
+   */
+  emit(origin: Origin, draft: Draft, seq?: number): Promise<void> | undefined;
   counts(): { events: number; dropped: number };
 }
 
 export interface EmitterOptions {
   runId: string;
-  onEvent: (event: CapturedEvent) => void;
+  onEvent: (event: CapturedEvent) => void | Promise<void>;
   now: () => Date;
 }
 
@@ -66,10 +69,14 @@ export function createEmitter({ runId, onEvent, now }: EmitterOptions): Emitter 
       const parsed = v.safeParse(CapturedEventSchema, candidate);
       if (!parsed.success) {
         dropped += 1;
-        return;
+        return undefined;
       }
       events += 1;
-      onEvent(parsed.output);
+      const written = onEvent(parsed.output);
+      if (!written) return undefined;
+      // Only delivery accounts for a failed write; nobody else awaits it.
+      void written.catch(() => undefined);
+      return written;
     },
     counts: () => ({ events, dropped }),
   };

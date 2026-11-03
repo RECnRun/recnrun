@@ -24,10 +24,17 @@ export interface DriverHandle {
 export interface BrowserPort {
   /** Finds the Chrome of the default profile, or of the profile folder of a binding. */
   discover(options?: { userDataDir?: string }): Promise<DiscoveryResult>;
-  /** Opens the session's own page and captures it, the pages it opens, and their frames; bodies go to `blobs`. */
+  /**
+   * Opens the session's own page and captures it, the pages it opens, and their frames; bodies go
+   * to `blobs`. `onEvent` answers the event's journal write, so the hook is acknowledged after it.
+   */
   record(
     endpoint: string,
-    capture: { runId: string; onEvent: (event: CapturedEvent) => void; blobs?: BodySink },
+    capture: {
+      runId: string;
+      onEvent: (event: CapturedEvent) => void | Promise<void>;
+      blobs?: BodySink;
+    },
   ): Promise<RecordingHandle>;
   /** Shows the picker overlay on `targetId`; a click reports the element instead of reaching the page. */
   pick(

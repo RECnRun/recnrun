@@ -14,6 +14,8 @@ export interface Hole {
 export interface DeliveryOptions {
   /** Evaluates `expression` in the context the document lives in; failures are the caller's to ignore. */
   acknowledge(sessionId: string, contextId: number, expression: string): void;
+  /** A message the adapter accepted could not be persisted; its sequence range is lost. */
+  lost?: (hole: Hole) => void;
   /** Runs `work` soon and returns how to cancel it; defaults to a zero timeout. */
   schedule?: (work: () => void) => () => void;
 }
@@ -27,7 +29,11 @@ interface Ledger {
   ahead: [number, number][];
   // The `next` a resend was last asked for, so a hole that cannot be filled is asked about once.
   asked: number;
+  // The writes of messages not yet acknowledged; an acknowledgement waits for its batch of them.
+  writes: { seq: number; write: Promise<void> }[];
   cancel?: (() => void) | undefined;
+  inFlight: boolean;
+  closed: boolean;
 }
 
 /** The journal producer of a hooked document's messages; their sequence is the hook's own. */
@@ -63,10 +69,21 @@ function rangeOf(message: ObserverMessage): [number, number] | undefined | "inva
   return fromSeq <= toSeq && toSeq < message.seq ? [fromSeq, toSeq] : "invalid";
 }
 
+/** The sorted sequence numbers as contiguous ranges. */
+function rangesOf(seqs: number[]): [number, number][] {
+  const ranges: [number, number][] = [];
+  for (const seq of seqs.toSorted((a, b) => a - b)) {
+    const last = ranges.at(-1);
+    if (last && seq === last[1] + 1) last[1] = seq;
+    else ranges.push([seq, seq]);
+  }
+  return ranges;
+}
+
 /**
  * The adapter's side of the hook's durable delivery: it drops duplicates, acknowledges what
- * arrived so the hook can free its window, asks once for a resend of a hole, and on close
- * reports the holes left as sequence ranges.
+ * arrived once it is written, asks once for a resend of a hole, and on close reports the holes
+ * left as sequence ranges.
  */
 export class ObserverDelivery {
   duplicates = 0;
@@ -87,8 +104,14 @@ export class ObserverDelivery {
     }
     account(ledger, message.seq, message.seq);
     if (range) account(ledger, ...range);
-    ledger.cancel ??= (this.options.schedule ?? timeout)(() => this.acknowledge(ledger));
+    this.scheduleAck(ledger);
     return "new";
+  }
+
+  /** Ties a new message to its persistence: no acknowledgement covers it before `write` settles. */
+  wrote(sessionId: string, message: ObserverMessage, write: Promise<void> | undefined): void {
+    const ledger = this.ledgers.get(`${sessionId}:${message.documentId}`);
+    if (ledger && write) ledger.writes.push({ seq: message.seq, write });
   }
 
   /** Forgets the documents `matches` selects and answers the holes they leave. */
@@ -97,11 +120,11 @@ export class ObserverDelivery {
     for (const [key, ledger] of this.ledgers) {
       if (!matches(ledger.sessionId, ledger.contextId)) continue;
       ledger.cancel?.();
+      ledger.closed = true;
       this.ledgers.delete(key);
       let from = ledger.next;
       for (const [start, end] of ledger.ahead) {
-        const producer = hookProducer(ledger.documentId);
-        holes.push({ sessionId: ledger.sessionId, producer, fromSeq: from, toSeq: start - 1 });
+        holes.push(this.hole(ledger, from, start - 1));
         from = end + 1;
       }
     }
@@ -117,17 +140,57 @@ export class ObserverDelivery {
     const key = `${sessionId}:${documentId}`;
     let ledger = this.ledgers.get(key);
     if (!ledger) {
-      ledger = { sessionId, contextId, documentId, next: 1, ahead: [], asked: 0 };
+      ledger = {
+        sessionId,
+        contextId,
+        documentId,
+        next: 1,
+        ahead: [],
+        asked: 0,
+        writes: [],
+        inFlight: false,
+        closed: false,
+      };
       this.ledgers.set(key, ledger);
     }
     return ledger;
   }
 
+  private hole(ledger: Ledger, fromSeq: number, toSeq: number): Hole {
+    const producer = hookProducer(ledger.documentId);
+    return { sessionId: ledger.sessionId, producer, fromSeq, toSeq };
+  }
+
+  // One acknowledgement is pending or in flight per document; arrivals meanwhile form the next batch.
+  private scheduleAck(ledger: Ledger): void {
+    if (ledger.cancel || ledger.inFlight) return;
+    ledger.cancel = (this.options.schedule ?? timeout)(() => this.acknowledge(ledger));
+  }
+
   private acknowledge(ledger: Ledger): void {
     ledger.cancel = undefined;
+    const upTo = ledger.next - 1;
+    const batch = ledger.writes.splice(0);
+    if (batch.length === 0) {
+      this.ack(ledger, upTo);
+      return;
+    }
+    ledger.inFlight = true;
+    void Promise.allSettled(batch.map(({ write }) => write)).then((outcomes) => {
+      ledger.inFlight = false;
+      const failed = batch.filter((_, index) => outcomes[index]?.status === "rejected");
+      for (const [from, to] of rangesOf(failed.map(({ seq }) => seq)))
+        this.options.lost?.(this.hole(ledger, from, to));
+      if (ledger.closed) return;
+      this.ack(ledger, upTo);
+      if (ledger.writes.length > 0) this.scheduleAck(ledger);
+    });
+  }
+
+  private ack(ledger: Ledger, upTo: number): void {
     const resend = ledger.ahead.length > 0 && ledger.asked !== ledger.next;
     if (resend) ledger.asked = ledger.next;
-    const args = [JSON.stringify(ledger.documentId), ledger.next - 1];
+    const args = [JSON.stringify(ledger.documentId), upTo];
     if (resend) args.push(ledger.next);
     const expression = `globalThis.__recnrunHook?.ack?.(${args.join(", ")})`;
     this.options.acknowledge(ledger.sessionId, ledger.contextId, expression);

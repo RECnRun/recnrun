@@ -56,8 +56,8 @@ export interface Recorder {
   snapshot(stepId: string, payload: SnapshotPayload): Promise<void>;
   /** The step that last started; captured evidence belongs to it unless it names its own. */
   currentStep(): string | undefined;
-  /** Journals a captured event under its own producer and sequence, outside the step order. */
-  evidence(event: Event): void;
+  /** Journals a captured event under its own producer and sequence, outside the step order; answers its write. */
+  evidence(event: Event): Promise<void>;
   /** Journals the gap of a lost connection under the adapter's own producer and sequence. */
   lost(event: Extract<AdapterEvent, { type: "connection.lost" }>): void;
   /** `problem` is why the run could not start; its steps are all blocked. */
@@ -194,10 +194,13 @@ function journalWriter(
     options.observe?.(event);
     await journal?.append(event);
   };
+  // Answers the write itself, so the capture can account for a failed one; finish waits regardless.
   const detached = (event: Event) => {
-    const line = write(event).catch(() => {});
-    pending.add(line);
-    void line.finally(() => pending.delete(line));
+    const line = write(event);
+    const settled = line.catch(() => {});
+    pending.add(settled);
+    void settled.finally(() => pending.delete(settled));
+    return line;
   };
   return { tally, write, detached, settled: () => Promise.all(pending) };
 }
@@ -242,7 +245,7 @@ export async function openRecorder(options: RecorderOptions): Promise<Recorder> 
     snapshot: (stepId, payload) => emit(stepId, "captured", payload, "snapshot"),
     lost: (event) => {
       lost = true;
-      writer.detached(lostEvent(options.runId, event));
+      void writer.detached(lostEvent(options.runId, event));
     },
     async finished(result, index) {
       results.push(result);

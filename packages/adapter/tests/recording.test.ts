@@ -35,7 +35,7 @@ async function record() {
   const recording = await startRecording("ws://127.0.0.1:9222/devtools/browser/x", {
     now,
     openChannel: async () => channel,
-    capture: { runId: "session-1", onEvent: (event) => events.push(event) },
+    capture: { runId: "session-1", onEvent: (event) => void events.push(event) },
   });
   return { channel, events, recording };
 }

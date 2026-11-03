@@ -57,6 +57,17 @@ test("captured events are journaled, pushed, and suggested as steps", async () =
   expect((await journalOf(h, sessionId)).events).toHaveLength(7);
 });
 
+test("a captured event answers its journal write, so the recording acknowledges it once it is stored", async () => {
+  const h = await harness();
+  const { sessionId } = await started(h);
+  const [event] = fillAndClick(1);
+  if (!event) throw new Error("no event");
+  const written = h.browser.deliver(event);
+  expect(written, "the write is answered to the recording").toBeInstanceOf(Promise);
+  await written;
+  expect((await journalOf(h, sessionId)).events).toHaveLength(1);
+});
+
 test("the three pauses: no steps, then no capture and a gap in the journal", async () => {
   const h = await harness();
   const status = await started(h);
@@ -90,7 +101,7 @@ function drainingCapture(h: Harness, drain: () => Promise<void>, last: CapturedE
   h.browser.record = async (endpoint, capture) => {
     const handle = await record(endpoint, capture);
     const stop = () => {
-      for (const event of last) capture.onEvent(event);
+      for (const event of last) void capture.onEvent(event);
       handle.stop();
     };
     return { targetId: handle.targetId, settled: drain, stop };

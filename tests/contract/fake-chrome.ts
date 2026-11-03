@@ -46,7 +46,7 @@ function driver(gate: Promise<void>, writes: string[]): ReplayDriver {
 }
 
 export function fakeChrome(): FakeChrome {
-  let onEvent: (event: CapturedEvent) => void = () => {};
+  let onEvent: (event: CapturedEvent) => void | Promise<void> = () => {};
   let onPicked: (target: DomTarget) => void = () => {};
   let release = () => {};
   const gate = new Promise<void>((resolve) => (release = resolve));
@@ -65,7 +65,7 @@ export function fakeChrome(): FakeChrome {
   };
   return {
     adapter,
-    emit: (event) => onEvent(event),
+    emit: (event) => void onEvent(event),
     pick: (target) => onPicked(target),
     release: () => release(),
     writes,

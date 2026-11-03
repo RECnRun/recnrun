@@ -33,7 +33,7 @@ test("tabs outside the session scope produce no events", async ({ app, chrome })
   const before = await app.open("form");
   const events: CapturedEvent[] = [];
   const recording = await startRecording(chrome.wsEndpoint, {
-    capture: { runId: "scope-spec", onEvent: (event) => events.push(event) },
+    capture: { runId: "scope-spec", onEvent: (event) => void events.push(event) },
   });
   let popupId = "";
   try {

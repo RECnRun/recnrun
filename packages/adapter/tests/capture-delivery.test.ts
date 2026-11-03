@@ -1,4 +1,4 @@
-import { HOOK_VERSION } from "@recnrun/protocol";
+import { HOOK_VERSION, type CapturedEvent } from "@recnrun/protocol";
 import { setTimeout as tick } from "node:timers/promises";
 import { expect, test } from "vite-plus/test";
 import { capturing, DOC } from "./capture-harness.ts";
@@ -42,6 +42,41 @@ test("hook messages keep the hook's sequence, a resent duplicate is dropped, and
   expect(acks(channel)).toEqual([
     { sessionId: "S1", expression: `globalThis.__recnrunHook?.ack?.("${DOC}", 2)` },
   ]);
+});
+
+test("the acknowledgement follows the journal's write, and a write that fails is a delivery-lost gap", async () => {
+  const writes: { event: CapturedEvent; settle: (error?: Error) => void }[] = [];
+  const { channel } = await capturing({
+    onEvent: (event) =>
+      new Promise<void>((resolve, reject) => {
+        writes.push({ event, settle: (error) => (error ? reject(error) : resolve()) });
+      }),
+  });
+  channel.attach("S1", { targetId: "T1", type: "page" });
+  channel.context("S1", 3, "T1");
+  channel.post("S1", 3, installed);
+  channel.post("S1", 3, focus(2));
+  await tick(5);
+  expect(acks(channel), "nothing is acknowledged before the journal wrote it").toEqual([]);
+  for (const write of writes.splice(0)) write.settle();
+  await tick(5);
+  expect(acks(channel).map(({ expression }) => expression)).toEqual([
+    `globalThis.__recnrunHook?.ack?.("${DOC}", 2)`,
+  ]);
+  channel.post("S1", 3, focus(3));
+  await tick(5);
+  writes.shift()?.settle(new Error("ENOSPC: no space left on device"));
+  await tick(5);
+  expect(writes.map(({ event }) => [event.producer, event.type, event.payload])).toEqual([
+    [
+      "cdp:S1",
+      "delivery-lost",
+      { reason: "delivery-lost", producer: PRODUCER, fromSeq: 3, toSeq: 3, lost: 1 },
+    ],
+  ]);
+  expect(acks(channel).at(-1)?.expression, "a lost message is still acknowledged").toBe(
+    `globalThis.__recnrunHook?.ack?.("${DOC}", 3)`,
+  );
 });
 
 test("a buffer-exhausted message becomes a gap naming the hook's producer, range, and surface", async () => {

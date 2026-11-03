@@ -1,6 +1,6 @@
 import type { ObserverMessage } from "@recnrun/protocol";
 import { expect, test } from "vite-plus/test";
-import { ObserverDelivery } from "../src/observer-delivery.ts";
+import { ObserverDelivery, type Hole } from "../src/observer-delivery.ts";
 
 const DOC = "0123456789abcdef0123456789abcdef";
 
@@ -26,10 +26,12 @@ const exhausted = (seq: number, fromSeq: number, toSeq: number): ObserverMessage
 
 function delivery() {
   const acks: { sessionId: string; contextId: number; expression: string }[] = [];
+  const lost: Hole[] = [];
   const pending: (() => void)[] = [];
   const ledger = new ObserverDelivery({
     acknowledge: (sessionId, contextId, expression) =>
       acks.push({ sessionId, contextId, expression }),
+    lost: (hole) => lost.push(hole),
     schedule: (work) => {
       pending.push(work);
       return () => pending.splice(pending.indexOf(work), 1);
@@ -38,8 +40,21 @@ function delivery() {
   const flush = () => {
     for (const work of pending.splice(0)) work();
   };
-  return { ledger, acks, flush, pending };
+  return { ledger, acks, lost, flush, pending };
 }
+
+/** A journal write the test settles. */
+function write() {
+  let resolve = () => {};
+  let reject = (_error: Error) => {};
+  const promise = new Promise<void>((ok, fail) => {
+    resolve = ok;
+    reject = fail;
+  });
+  return { promise, resolve, reject };
+}
+
+const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 const ack = (upTo: number, resendFrom?: number) =>
   `globalThis.__recnrunHook?.ack?.(${JSON.stringify(DOC)}, ${upTo}${resendFrom === undefined ? "" : `, ${resendFrom}`})`;
@@ -104,4 +119,31 @@ test("closing a document reports what nothing accounted for, and cancels its ack
   expect(pending, "only the other document still waits to be acknowledged").toHaveLength(1);
   expect(acks).toEqual([]);
   expect(ledger.arrive("S1", 7, focus(10)), "a closed document starts over").toBe("new");
+});
+
+test("the acknowledgement follows the writes of its batch, and a failed write is a lost sequence", async () => {
+  const { ledger, acks, lost, flush, pending } = delivery();
+  const writes = [write(), write(), write(), write()];
+  for (const seq of [1, 2, 3]) {
+    ledger.arrive("S1", 7, focus(seq));
+    ledger.wrote("S1", focus(seq), writes[seq - 1]?.promise);
+  }
+  flush();
+  await tick();
+  expect(acks, "nothing is acknowledged before it is written").toEqual([]);
+  ledger.arrive("S1", 7, focus(4));
+  ledger.wrote("S1", focus(4), writes[3]?.promise);
+  expect(pending, "a batch in flight takes the arrivals of the meantime").toHaveLength(0);
+  writes[0]?.resolve();
+  writes[1]?.reject(new Error("ENOSPC"));
+  writes[2]?.resolve();
+  await tick();
+  expect(acks.map(({ expression }) => expression)).toEqual([ack(3)]);
+  expect(lost).toEqual([{ sessionId: "S1", producer: `hook:${DOC}`, fromSeq: 2, toSeq: 2 }]);
+  flush();
+  await tick();
+  expect(acks, "the next batch waits for its own write").toHaveLength(1);
+  writes[3]?.resolve();
+  await tick();
+  expect(acks.map(({ expression }) => expression)).toEqual([ack(3), ack(4)]);
 });

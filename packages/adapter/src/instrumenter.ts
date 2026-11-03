@@ -24,7 +24,7 @@ import {
   type TargetRecord,
 } from "./instrumentation-targets.ts";
 import type { TargetScope } from "./instrumentation-scope.ts";
-import { ObserverDelivery } from "./observer-delivery.ts";
+import { ObserverDelivery, type Hole } from "./observer-delivery.ts";
 
 export interface InstrumentOptions {
   onEvent?: (event: InstrumentationEvent) => void;
@@ -66,6 +66,7 @@ export class Instrumenter {
         const params = { expression, contextId, silent: true };
         void channel.send("Runtime.evaluate", params, sessionId).catch(() => undefined);
       },
+      lost: (hole) => this.undelivered(hole),
     });
     const now = options.now ?? (() => new Date());
     this.capture =
@@ -173,7 +174,13 @@ export class Instrumenter {
     );
     if (arrival === "invalid") info.droppedInvalid += 1;
     if (arrival !== "new") return;
-    this.capture?.observed(record, message, frameId, called.output.executionContextId);
+    const written = this.capture?.observed(
+      record,
+      message,
+      frameId,
+      called.output.executionContextId,
+    );
+    this.delivery.wrote(record.sessionId, message, written);
     if (message.type === "document.hook-installed") this.installed(record, message, frameId);
   }
 
@@ -208,10 +215,13 @@ export class Instrumenter {
 
   /** Journals the sequence numbers of ended documents that no message or gap accounted for. */
   closeDocuments(matches: (sessionId: string, contextId: number) => boolean): void {
-    for (const hole of this.delivery.close(matches)) {
-      const record = this.sessions.get(hole.sessionId);
-      if (record) this.capture?.undelivered(record, hole);
-    }
+    for (const hole of this.delivery.close(matches)) this.undelivered(hole);
+  }
+
+  // A hole of a session already gone has no record to journal it under.
+  private undelivered(hole: Hole): void {
+    const record = this.sessions.get(hole.sessionId);
+    if (record) this.capture?.undelivered(record, hole);
   }
 
   private contextEnded(record: TargetRecord, method: string, params: unknown): void {

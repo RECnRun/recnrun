@@ -20,7 +20,7 @@ const FLOW = {
 };
 
 function network(sink: CaptureSink, seq: number, type: string, payload: object): void {
-  sink.event({
+  void sink.event({
     schemaVersion: 1,
     id: `cdp:S1#${seq}`,
     runId: sink.runId,

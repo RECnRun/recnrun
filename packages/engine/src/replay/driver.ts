@@ -62,7 +62,8 @@ export interface ReadOptions {
 /** Where a replay's capture delivers: each event it observes, and the run's blobs for bodies. */
 export interface CaptureSink {
   runId: string;
-  event(event: CapturedEvent): void;
+  /** Answers the event's durable write; the capture acknowledges the message only once it settles. */
+  event(event: CapturedEvent): void | Promise<void>;
   /** Without it, bodies stay inline in their events. */
   blobs?: ReplayBlobs | undefined;
 }
