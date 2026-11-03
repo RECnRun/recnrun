@@ -67,7 +67,9 @@ test.describe("with a 10-message hook buffer", () => {
     const inputs = delivered.filter(({ type }) => type === "input").length;
     const lost = ranges.reduce((sum, range) => sum + range.lost, 0);
     expect(lost).toBeGreaterThan(0);
-    expect(inputs + lost, "every input is delivered or counted lost").toBe(BURST);
+    // A gap can also cover the click's own messages, so only the sequence check above is exact.
+    expect(inputs).toBeLessThanOrEqual(BURST);
+    expect(inputs + lost, "every input is delivered or counted lost").toBeGreaterThanOrEqual(BURST);
     const coverage = coverageOf("capture-spec", events);
     expect(coverage.events, "every line that is not a gap").toBe(
       events.length - gapsOf(events).length,
