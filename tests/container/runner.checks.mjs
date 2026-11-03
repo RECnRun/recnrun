@@ -282,8 +282,9 @@ test("public tests route through Docker while local variants and the hooks retai
     readFileSync(join(root, ".vite-hooks/pre-commit"), "utf8"),
     /vp staged\nvp check\nvp run --no-cache deps\nRECNRUN_TEST_QUIET=1 vp run --no-cache test:unit\n/,
   );
-  assert.equal(
-    readFileSync(join(root, ".vite-hooks/pre-push"), "utf8").trim(),
-    "node scripts/git-hooks/pre-push.mjs",
+  // One hooksPath serves every worktree, so a branch without the marker hook falls back to the gate.
+  assert.match(
+    readFileSync(join(root, ".vite-hooks/pre-push"), "utf8"),
+    /if \[ -f scripts\/git-hooks\/pre-push\.mjs \]; then node scripts\/git-hooks\/pre-push\.mjs; else vp run verify; fi/,
   );
 });
