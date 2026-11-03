@@ -22,6 +22,7 @@ import {
 } from "./record.ts";
 import { createScope, redact, secretValues, type Scope, type ScopeOptions } from "./scope.ts";
 import { snapshotter, type Snapshotter } from "./snapshots.ts";
+import { startEvidence } from "./evidence.ts";
 import { executeStep } from "./step.ts";
 import { deadlineIn, systemClock, type Clock } from "./wait.ts";
 
@@ -177,6 +178,30 @@ async function runAll(
   return results;
 }
 
+/** Runs the steps while the connection's losses and the tabs' captured evidence reach the journal. */
+async function observed(
+  run: Run,
+  steps: readonly Step[],
+  control: ReplayControl | undefined,
+  runId: string,
+): Promise<StepResult[]> {
+  const { driver, recorder } = run;
+  const stopListening = driver.onEvent?.((event) => {
+    if (event.type === "connection.lost") recorder.lost(event);
+  });
+  try {
+    const evidence = await startEvidence(driver, recorder, run.secrets, runId);
+    // What the last step started (a response still loading) lands before the journal closes.
+    try {
+      return await runAll(run, steps, control);
+    } finally {
+      await evidence?.drain();
+    }
+  } finally {
+    stopListening?.();
+  }
+}
+
 function recorderOptions(flow: Flow, options: ReplayOptions, clock: Clock): RecorderOptions {
   return {
     runId: options.run?.manifest.runId ?? options.runId ?? "replay",
@@ -206,20 +231,15 @@ export async function replayFlow(
   options: ReplayOptions = {},
 ): Promise<ReplayOutcome> {
   const clock = options.clock ?? systemClock;
-  const recorder = await openRecorder(recorderOptions(flow, options, clock));
+  const recording = recorderOptions(flow, options, clock);
+  const recorder = await openRecorder(recording);
   const { scope, problem } = prepare(flow, options);
   const secrets = secretValues(flow, scope);
   const timeoutMs = options.defaultTimeoutMs ?? DEFAULT_STEP_TIMEOUT_MS;
   const snapshot = snapshotter(driver, recorder, secrets);
   const run: Run = { driver, scope, secrets, clock, timeoutMs, recorder, snapshot };
-  const stopListening = driver.onEvent?.((event) => {
-    if (event.type === "connection.lost") recorder.lost(event);
-  });
   if (problem) await skip(run, flow.steps, 0, "block");
-  const steps = problem
-    ? []
-    : await runAll(run, flow.steps, options.control).finally(stopListening);
-  stopListening?.();
+  const steps = problem ? [] : await observed(run, flow.steps, options.control, recording.runId);
   const summary = await recorder.finish(problem);
   const vars = Object.fromEntries(
     Object.entries(scope.vars).map(([name, value]) => [name, redact(value, secrets)]),

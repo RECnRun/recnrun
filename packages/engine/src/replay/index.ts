@@ -1,6 +1,8 @@
 export type {
   ActResult,
   Captured,
+  CaptureHandle,
+  CaptureSink,
   DriverCommand,
   ElementState,
   PageCapture,

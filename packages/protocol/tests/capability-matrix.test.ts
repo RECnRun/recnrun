@@ -132,8 +132,9 @@ test("the F3.9 overhead benchmark is implemented and names its smoke test", () =
   expect(entry?.notes).toContain("tests/browser/bench-smoke.spec.ts");
 });
 
-test("the F3.7 diagnostics UI is partial and names its end-to-end test", () => {
+test("the F3.7 diagnostics UI is implemented and names its end-to-end and contract tests", () => {
   const entry = entries.find((candidate) => candidate.id === "diagnostics-ui");
-  expect(entry?.status).toBe("partial");
+  expect(entry?.status).toBe("implemented");
   expect(entry?.notes).toContain("tests/e2e/diagnostics.spec.ts");
+  expect(entry?.notes).toContain("tests/contract/run-evidence.test.ts");
 });

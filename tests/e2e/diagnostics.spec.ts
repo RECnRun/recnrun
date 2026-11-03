@@ -101,14 +101,21 @@ test("compares a failing run with its baseline and never blames the application 
 
     await command(page, "flow.save", { flow: flowOf("?fail=api-500") });
     await runAndInspect(page, service.url, 1);
+    const api = page
+      .getByRole("table", { name: "Requests" })
+      .getByRole("row")
+      .filter({ hasText: `${FIXTURE_ORIGIN}/api/json` });
+    await expect(api).toHaveCount(1);
+    await expect(api).toContainText("500");
+    await expect(api).toContainText("fetch");
+    await api.scrollIntoViewIfNeeded();
+    await shot(page, info, "requests-500");
     const failing = await compareWith(page, baseline);
     await expect(failing).toContainText("Application failure");
-    // Replays journal no network events yet, so the 500 surfaces through the assertion that observed it.
-    await expect(failing).toContainText(
-      "First divergence at step result (step 3 of 3): failed assertion",
-    );
-    await expect(failing).toContainText('observed "500 Injected failure (fail=api-500)"');
-    await expect(failing.getByRole("row", { name: /result/ })).toHaveAttribute(
+    await expect(failing).toContainText("First divergence at step fetch");
+    await expect(failing).toContainText("response status");
+    await expect(failing).toContainText(`This run: 500 ${FIXTURE_ORIGIN}/api/json`);
+    await expect(failing.getByRole("row", { name: /fetch/ })).toHaveAttribute(
       "aria-current",
       "step",
     );

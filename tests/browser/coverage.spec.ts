@@ -126,8 +126,15 @@ test("the counts in coverage.json reconcile with the run's journal", async ({ ch
   expect(coverage?.events).toBe(journal.events.length);
   const snapshots = journal.events.filter(({ category }) => category === "snapshot").length;
   expect(snapshots).toBeGreaterThan(0);
-  expect(coverage?.surfaces).toEqual([
-    expect.objectContaining({ surface: "dom-screen", status: "implemented", events: snapshots }),
-  ]);
+  // The replay journals its own tab's navigation and requests next to the step snapshots.
+  expect(coverage?.surfaces).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ surface: "dom-screen", status: "implemented", events: snapshots }),
+      expect.objectContaining({ surface: "navigation", events: expect.any(Number) }),
+      expect.objectContaining({ surface: "network", events: expect.any(Number) }),
+    ]),
+  );
+  for (const surface of coverage?.surfaces ?? [])
+    expect(surface.events, surface.surface).toBeGreaterThan(0);
   expect(coverage?.gaps ?? []).toEqual([]);
 });

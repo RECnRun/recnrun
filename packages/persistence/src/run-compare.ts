@@ -106,6 +106,9 @@ function networkFinding(baseline: Event, run: Event): Finding | undefined {
   };
 }
 
+// A query or fragment can carry what differs between runs (a cache buster, an injected defect).
+const endpointOf = (url: string): string => url.split(/[?#]/, 1)[0] ?? url;
+
 /** The first event of `events` that is a gap `others` has no counterpart for. */
 function unmatchedGap(events: readonly Event[], others: readonly Event[]): GapEvent | undefined {
   const theirs = grouped(others, (event) => gapOf(event)?.payload.reason);
@@ -119,11 +122,15 @@ function unmatchedGap(events: readonly Event[], others: readonly Event[]): GapEv
 /** A gap or a different response status in one step's events, in the run's order. */
 function evidenceFinding(baseline: readonly Event[], run: readonly Event[]): Finding | undefined {
   const lostInRun = unmatchedGap(run, baseline);
-  const responses = grouped(baseline, (event) => responseOf(event)?.url);
+  const endpoint = (event: Event) => {
+    const url = responseOf(event)?.url;
+    return url === undefined ? undefined : endpointOf(url);
+  };
+  const responses = grouped(baseline, endpoint);
   const nth = occurrences();
   for (const event of run) {
     if (event === lostInRun) return gapFinding("run", event);
-    const url = responseOf(event)?.url;
+    const url = endpoint(event);
     const counterpart = url === undefined ? undefined : responses.get(url)?.[nth(url)];
     const found = counterpart && networkFinding(counterpart, event);
     if (found) return found;

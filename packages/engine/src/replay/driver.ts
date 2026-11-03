@@ -1,4 +1,5 @@
-import type { AdapterEvent, Target } from "@recnrun/protocol";
+import type { AdapterEvent, CapturedEvent, Target } from "@recnrun/protocol";
+import type { ReplayBlobs } from "./record.ts";
 
 /** What a target matches now; the element fields describe the match only when `count` is 1. */
 export interface ElementState {
@@ -58,6 +59,19 @@ export interface ReadOptions {
   timeoutMs: number;
 }
 
+/** Where a replay's capture delivers: each event it observes, and the run's blobs for bodies. */
+export interface CaptureSink {
+  runId: string;
+  event(event: CapturedEvent): void;
+  /** Without it, bodies stay inline in their events. */
+  blobs?: ReplayBlobs | undefined;
+}
+
+export interface CaptureHandle {
+  /** Lets capture under way land in the sink, then stops it; nothing is delivered afterwards. */
+  drain(): Promise<void>;
+}
+
 /** The browser operations the replay executor needs; `BrowserAdapter` has them. */
 export interface ReplayDriver {
   /** Reads the target's state in the current tab; safe to repeat. */
@@ -72,4 +86,9 @@ export interface ReplayDriver {
   capture?(options: ReadOptions): Promise<PageCapture>;
   /** Subscribes to the connection's events; the run journals a lost connection as a gap. */
   onEvent?(listener: (event: AdapterEvent) => void): () => void;
+  /**
+   * Captures what the replay's own tabs do (network, console and errors, storage, navigation),
+   * as a recording session does at the normal level; tabs opened before the call are not captured.
+   */
+  onCapture?(sink: CaptureSink): Promise<CaptureHandle>;
 }

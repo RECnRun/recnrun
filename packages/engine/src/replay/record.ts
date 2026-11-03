@@ -54,6 +54,10 @@ export interface Recorder {
   /** The run's blob store; undefined when the run is not stored or its store keeps no blobs. */
   readonly blobs: ReplayBlobs | undefined;
   snapshot(stepId: string, payload: SnapshotPayload): Promise<void>;
+  /** The step that last started; captured evidence belongs to it unless it names its own. */
+  currentStep(): string | undefined;
+  /** Journals a captured event under its own producer and sequence, outside the step order. */
+  evidence(event: Event): void;
   /** Journals the gap of a lost connection under the adapter's own producer and sequence. */
   lost(event: Extract<AdapterEvent, { type: "connection.lost" }>): void;
   /** `problem` is why the run could not start; its steps are all blocked. */
@@ -184,6 +188,26 @@ function journalWriter(
   return { tally, write, detached, settled: () => Promise.all(pending) };
 }
 
+function summarize(
+  options: RecorderOptions,
+  startedAt: number,
+  results: readonly StepResult[],
+  problem: RunProblem | undefined,
+): RunSummary {
+  const status = runStatus(results, problem);
+  return {
+    schemaVersion: PROTOCOL_SCHEMA_VERSION,
+    runId: options.runId,
+    flowId: options.flowId,
+    status,
+    exitCode: RUN_EXIT_CODES[status],
+    startedAt: iso(startedAt),
+    endedAt: iso(options.now()),
+    counts: counts(results),
+    failures: failures(results, problem),
+  };
+}
+
 /** Opens the run in the store, when there is one, and records into it. */
 export async function openRecorder(options: RecorderOptions): Promise<Recorder> {
   const run = options.store && (await options.store.store.createRun(options.store.manifest));
@@ -191,13 +215,19 @@ export async function openRecorder(options: RecorderOptions): Promise<Recorder> 
   const results: StepResult[] = [];
   const writer = journalWriter(options, run?.journal);
   let seq = 0;
+  let current: string | undefined;
   const emit: Emit = async (stepId, type, payload, category = "step") => {
     seq += 1;
     await writer.write({ ...stepEnvelope(options, seq, stepId, category), type, payload });
   };
   return {
     blobs: run?.blobs,
-    started: (stepId, index) => emit(stepId, "step.started", { index }),
+    started: (stepId, index) => {
+      current = stepId;
+      return emit(stepId, "step.started", { index });
+    },
+    currentStep: () => current,
+    evidence: (event) => writer.detached(event),
     snapshot: (stepId, payload) => emit(stepId, "captured", payload, "snapshot"),
     lost: (event) => writer.detached(lostEvent(options.runId, event)),
     async finished(result, index) {
@@ -207,18 +237,8 @@ export async function openRecorder(options: RecorderOptions): Promise<Recorder> 
       await emit(stepId, "step.finished", { index, ...payload });
     },
     async finish(problem) {
-      const status = runStatus(results, problem);
       const runEntries = { schemaVersion: PROTOCOL_SCHEMA_VERSION, runId: options.runId } as const;
-      const summary: RunSummary = {
-        ...runEntries,
-        flowId: options.flowId,
-        status,
-        exitCode: RUN_EXIT_CODES[status],
-        startedAt: iso(startedAt),
-        endedAt: iso(options.now()),
-        counts: counts(results),
-        failures: failures(results, problem),
-      };
+      const summary = summarize(options, startedAt, results, problem);
       await writer.settled();
       if (!run || !options.store) return summary;
       await run.journal.close();

@@ -34,8 +34,8 @@ async function readState(locator: Locator, timeoutMs: number): Promise<ElementSt
   return { count, visible, enabled, editable, text: text ?? "", value };
 }
 
-/** Every driver method but `onEvent`, which the adapter answers from its connection. */
-export type PageDriver = Required<Omit<ReplayDriver, "onEvent">>;
+/** Every driver method but `onEvent` and `onCapture`, which the adapter answers from its connection. */
+export type PageDriver = Required<Omit<ReplayDriver, "onEvent" | "onCapture">>;
 
 /**
  * Drives the replay's tabs through Playwright's input methods, so Chrome dispatches trusted

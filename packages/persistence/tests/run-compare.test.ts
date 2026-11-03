@@ -68,6 +68,25 @@ describe("compareRuns", () => {
     });
   });
 
+  test("pairs responses by origin and path, so a query that differs between runs still compares", () => {
+    const withResponse = (url: string, status: number) => [
+      ...clean.slice(0, 3),
+      response(url, status),
+      ...clean.slice(4),
+    ];
+    const result = compareRuns(
+      storedRun("base", withResponse(`${SAVE}?v=1`, 200), passed("open", "submit")),
+      storedRun("now", withResponse(`${SAVE}?fail=api-500`, 500), passed("open", "submit")),
+    );
+    expect(result.divergence).toMatchObject({
+      kind: "application",
+      reason: "network-status",
+      stepId: "submit",
+      baseline: { url: `${SAVE}?v=1`, httpStatus: 200 },
+      run: { url: `${SAVE}?fail=api-500`, httpStatus: 500 },
+    });
+  });
+
   test("ignores nested results and reports a step one ended run never reached", () => {
     const nested: StepResult = { stepId: "open", stepPath: ["loop"], status: "failed" };
     const result = compareRuns(

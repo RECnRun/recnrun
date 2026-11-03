@@ -18,6 +18,11 @@ export class TargetScope {
     this.pages = new Set(roots);
   }
 
+  /** A page another connection opened (replay's Playwright), attached to explicitly. */
+  add(targetId: string): void {
+    this.pages.add(targetId);
+  }
+
   admits(site: AttachSite): boolean {
     if (site.viaInstrumented !== undefined) return site.viaInstrumented;
     if (site.type !== "page") return false;

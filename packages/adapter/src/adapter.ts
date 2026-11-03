@@ -1,10 +1,12 @@
-import type { BrowserAdapter } from "@recnrun/engine";
+import type { BrowserAdapter, CaptureHandle, CaptureSink } from "@recnrun/engine";
 import type { AdapterEvent } from "@recnrun/protocol";
 import { connect, type CdpConnection, type ConnectOptions } from "./connection.ts";
 import { discover } from "./discovery.ts";
 import { createPageDriver, type PageDriver } from "./replay.ts";
+import { observeReplay, type ObserveOptions, type ReplayObserver } from "./replay-observer.ts";
 
-export type AdapterDependencies = Pick<ConnectOptions, "transport" | "discover" | "now">;
+export type AdapterDependencies = Pick<ConnectOptions, "transport" | "discover" | "now"> &
+  Pick<ObserveOptions, "openChannel">;
 
 /** `connect()` while a connection is open; `disconnect()` first. */
 export class AlreadyConnectedError extends Error {
@@ -39,6 +41,34 @@ function fanOut() {
   };
 }
 
+/** Replay's tabs and their capture; both belong to one connection and reset with it. */
+function replaySide(connected: () => CdpConnection, deps: AdapterDependencies) {
+  let driver: PageDriver | undefined;
+  let observer: ReplayObserver | undefined;
+  const stopCapture = () => {
+    observer?.stop();
+    observer = undefined;
+  };
+  return {
+    // A new connection opens its own tab on the next write.
+    reset: () => (driver = undefined),
+    stopCapture,
+    driver: (): PageDriver => {
+      driver ??= createPageDriver(async () => {
+        const page = await connected().openPage();
+        await observer?.adopt(page);
+        return page;
+      });
+      return driver;
+    },
+    async onCapture(sink: CaptureSink): Promise<CaptureHandle> {
+      stopCapture();
+      observer = await observeReplay(connected().endpoint, sink, deps);
+      return observer;
+    },
+  };
+}
+
 /** The engine's browser adapter over CDP: one connection at a time, events fanned out. */
 export function createCdpAdapter(deps: AdapterDependencies = {}): BrowserAdapter {
   let current: CdpConnection | undefined;
@@ -48,12 +78,8 @@ export function createCdpAdapter(deps: AdapterDependencies = {}): BrowserAdapter
     if (!current) throw new Error("Not connected to Chrome; call connect() first.");
     return current;
   };
-  // Replay tabs belong to one connection; a new connection opens its own on the next write.
-  let driver: PageDriver | undefined;
-  const replay = (): PageDriver => {
-    driver ??= createPageDriver(async () => connected().openPage());
-    return driver;
-  };
+  const side = replaySide(connected, deps);
+  const replay = side.driver;
   return {
     discover: (options) => (deps.discover ?? discover)(options ?? {}),
     connect: (endpoint, options) =>
@@ -64,7 +90,7 @@ export function createCdpAdapter(deps: AdapterDependencies = {}): BrowserAdapter
           onEvent: events.emit,
           source: options?.source,
         });
-        driver = undefined;
+        side.reset();
         return current.handshake;
       }),
     listTargets: async () => connected().listTargets(),
@@ -73,16 +99,18 @@ export function createCdpAdapter(deps: AdapterDependencies = {}): BrowserAdapter
         const outcome = await connected().reconnect();
         if (!outcome.ok) return outcome;
         current = outcome.connection;
-        driver = undefined;
+        side.reset();
         return { ok: true, handshake: current.handshake };
       }),
     disconnect: () =>
       lifecycle(async () => {
+        side.stopCapture();
         await current?.disconnect();
         current = undefined;
-        driver = undefined;
+        side.reset();
       }),
     onEvent: events.subscribe,
+    onCapture: (sink) => side.onCapture(sink),
     describeProfile: async () => connected().describeProfile(),
     inspect: (target, options) => replay().inspect(target, options),
     readAttribute: (target, name, options) => replay().readAttribute(target, name, options),
