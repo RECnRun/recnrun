@@ -63,7 +63,7 @@ function pausingReplay(changed: (lose: () => void, resume: () => void) => Promis
   let session = ok(applySessionEvent(createSession(), "start"));
   const { driver, calls, lose } = droppingDriver({ elements: { go: {} } }, () => false);
   const resume = () => void (session = ok(resumeSession(session, "pauseReplay", 2)));
-  const act = driver.act;
+  const act = driver.act.bind(driver);
   driver.act = async (command, options) => {
     const result = await act(command, options);
     if (actsOf(calls).length === 1) session = ok(pauseSession(session, "pauseReplay", 1));
