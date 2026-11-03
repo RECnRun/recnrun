@@ -3,6 +3,7 @@ import {
   PROTOCOL_SCHEMA_VERSION,
   type DivergenceSide,
   type Event,
+  type GapPayload,
   type RunComparison,
   type RunDivergence,
   type StepResult,
@@ -94,13 +95,19 @@ function occurrences() {
   };
 }
 
+/** What a gap lost, as far as it says: a count, a surface, or just events. */
+function lossOf({ lost, surface }: GapPayload): string {
+  const parts = [lost, surface, lost === 1 ? "event" : "events"];
+  return parts.filter((part) => part !== undefined).join(" ");
+}
+
 function gapFinding(side: "baseline" | "run", event: GapEvent): Finding {
   const lost: DivergenceSide = { eventId: event.id, gap: event.payload };
   const who = side === "run" ? "This run" : "The baseline";
   return {
     kind: "collector-gap",
     reason: "collector-gap",
-    message: `${who} lost events (${event.payload.reason}); what it did not record is unknown, not an application difference.`,
+    message: `${who} lost ${lossOf(event.payload)} (${event.payload.reason}); what it did not record is unknown, not an application difference.`,
     baseline: side === "baseline" ? lost : {},
     run: side === "run" ? lost : {},
   };
@@ -153,13 +160,24 @@ function responseKeys(events: readonly Event[]): Map<Event, string> {
   return keys;
 }
 
-/** The first event of `events` that is a gap `others` has no counterpart for. */
+/** A gap in the terms two runs share: what it lost and where, never when or at which seq. */
+function gapKey({ reason, surface, lost, fromSeq, toSeq }: GapPayload): string {
+  const span = fromSeq !== undefined && toSeq !== undefined ? toSeq - fromSeq + 1 : undefined;
+  return `${reason} ${surface ?? "*"} ${lost ?? span ?? "?"}`;
+}
+
+/** The first event of `events` that is a gap `others` has no gap of the same loss for. */
 function unmatchedGap(events: readonly Event[], others: readonly Event[]): GapEvent | undefined {
-  const theirs = grouped(others, (event) => gapOf(event)?.payload.reason);
+  const keyOf = (event: Event) => {
+    const gap = gapOf(event);
+    return gap && gapKey(gap.payload);
+  };
+  const theirs = grouped(others, keyOf);
   const nth = occurrences();
   return events.map(gapOf).find((gap) => {
     if (gap === undefined) return false;
-    return theirs.get(gap.payload.reason)?.[nth(gap.payload.reason)] === undefined;
+    const key = gapKey(gap.payload);
+    return theirs.get(key)?.[nth(key)] === undefined;
   });
 }
 

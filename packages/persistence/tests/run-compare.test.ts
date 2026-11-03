@@ -1,4 +1,4 @@
-import type { StepResult } from "@recnrun/protocol";
+import type { GapPayload, StepResult } from "@recnrun/protocol";
 import { describe, expect, test } from "vite-plus/test";
 import { compareRuns } from "../src/index.ts";
 import { finished, gap, request, response, started, storedRun } from "./run-builders.ts";
@@ -72,6 +72,23 @@ describe("compareRuns", () => {
     expect(early?.stepId).toBeUndefined();
   });
 
+  test("gaps of one reason that lost another surface or extent are not the same loss", () => {
+    const lossy = (payload: GapPayload) => [...clean.slice(0, 3), gap(payload), ...clean.slice(3)];
+    const small: GapPayload = { reason: "buffer-exhausted", surface: "dom-events", lost: 1 };
+    const large: GapPayload = { reason: "buffer-exhausted", surface: "network", lost: 100 };
+    const baseline = storedRun("base", lossy(small), passed("open", "submit"));
+    const result = compareRuns(baseline, storedRun("now", lossy(large), passed("open", "submit")));
+    expect(result.divergence).toMatchObject({
+      kind: "collector-gap",
+      stepId: "submit",
+      baseline: {},
+      run: { gap: large },
+    });
+    expect(result.divergence?.message).toContain("lost 100 network events");
+    const same = storedRun("now", lossy({ ...small, lastSeq: 9 }), passed("open", "submit"));
+    expect(compareRuns(baseline, same).divergence).toBeNull();
+  });
+
   test("blames the replay for a code that is not the application's and the app for a timeout", () => {
     const failing = (code: string) =>
       compareRuns(
@@ -92,7 +109,9 @@ describe("compareRuns", () => {
       run: { status: "failed", error: { code: "timeout" } },
     });
   });
+});
 
+describe("compareRuns network evidence", () => {
   test("pairs responses by origin and path, so a query that differs between runs still compares", () => {
     const withResponse = (url: string, status: number) => [
       ...clean.slice(0, 3),
