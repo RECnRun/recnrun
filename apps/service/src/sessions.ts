@@ -14,7 +14,13 @@ import {
   type SessionResult,
 } from "@recnrun/engine";
 import type { BindingsStore, JournalWriter } from "@recnrun/persistence";
-import type { CapturedEvent, Event, PauseMode, SessionStatus, Step } from "@recnrun/protocol";
+import type {
+  AssertionStep,
+  CapturedEvent,
+  Event,
+  PauseMode,
+  SessionStatus,
+} from "@recnrun/protocol";
 import {
   endpointOf,
   type BrowserPort,
@@ -40,7 +46,7 @@ export interface LiveSession {
   readonly events: CapturedEvent[];
   /** DOM events captured while step creation was paused; they never become steps. */
   readonly ignored: Set<string>;
-  readonly assertions: Step[];
+  readonly assertions: AssertionStep[];
   readonly writes: Set<Promise<void>>;
   state: Session;
   gaps: number;

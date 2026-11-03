@@ -1,4 +1,4 @@
-import { normalize, toFlowSteps } from "@recnrun/engine";
+import { normalize, replayableAssertion, toFlowSteps } from "@recnrun/engine";
 import type { FlowStore } from "@recnrun/persistence";
 import {
   validateFlow,
@@ -33,7 +33,7 @@ function draftOf(live: LiveSession, now: number): Flow {
     inputs: {},
     requirements: [],
     preconditions: [],
-    steps: [...toFlowSteps(suggestions(live).steps), ...live.assertions],
+    steps: [...toFlowSteps(suggestions(live).steps), ...live.assertions.map(replayableAssertion)],
   };
 }
 

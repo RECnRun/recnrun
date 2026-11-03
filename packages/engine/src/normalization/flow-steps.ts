@@ -1,4 +1,11 @@
-import type { LocatorEntry, LocatorList, Step, SuggestedStep, Target } from "@recnrun/protocol";
+import type {
+  AssertionStep,
+  LocatorEntry,
+  LocatorList,
+  Step,
+  SuggestedStep,
+  Target,
+} from "@recnrun/protocol";
 
 /** The first candidate in the one-key form F2.5 replay resolves; locator lists replay in F3. */
 function replayTarget(list: LocatorList): Target {
@@ -47,4 +54,11 @@ function stepOf(suggestion: SuggestedStep): Step | undefined {
 /** The steps of a flow from a session's suggestions, in their order. */
 export function toFlowSteps(suggestions: SuggestedStep[]): Step[] {
   return suggestions.flatMap((suggestion) => stepOf(suggestion) ?? []);
+}
+
+/** A drafted assertion whose picked locator list is narrowed to the shorthand replay resolves. */
+export function replayableAssertion(step: AssertionStep): AssertionStep {
+  if (!("target" in step) || typeof step.target === "string" || !("locators" in step.target))
+    return step;
+  return { ...step, target: replayTarget(step.target) } as AssertionStep;
 }

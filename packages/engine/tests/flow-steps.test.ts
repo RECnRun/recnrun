@@ -1,6 +1,6 @@
 import type { SuggestedStep } from "@recnrun/protocol";
 import { describe, expect, test } from "vite-plus/test";
-import { toFlowSteps } from "../src/index.ts";
+import { replayableAssertion, toFlowSteps } from "../src/index.ts";
 
 const events = [{ id: "e-1", producer: "p", seq: 1 }];
 const list = (...locators: unknown[]) =>
@@ -63,5 +63,16 @@ describe("toFlowSteps", () => {
       { id: "scroll-3", events, action: "scroll", scrollX: 0, scrollY: 100 },
     ];
     expect(toFlowSteps(suggestions)).toEqual([]);
+  });
+});
+
+describe("replayableAssertion", () => {
+  test("narrows a picked locator list to its first candidate and keeps other targets", () => {
+    const picked = list({ strategy: "testId", value: "status" }, { strategy: "css", value: "p" });
+    expect(
+      replayableAssertion({ id: "a-1", assertion: "textEquals", target: picked, expected: "Hi" }),
+    ).toEqual({ id: "a-1", assertion: "textEquals", target: { testId: "status" }, expected: "Hi" });
+    const typed = { id: "a-2", assertion: "visible", target: { css: "#done" } } as const;
+    expect(replayableAssertion(typed)).toBe(typed);
   });
 });

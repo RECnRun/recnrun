@@ -114,7 +114,12 @@ test("finalize stores the suggested steps, then the draft assertions, once the s
   const { sessionId } = await started(h);
   for (const event of fillAndClick(1)) h.browser.emit(event);
   expect(codeOf(await h.call("flow.finalize", { sessionId }))).toBe("conflict");
-  const step = { id: "sent", assertion: "visible", target: { testId: "send" } };
+  const picked = {
+    resolution: "orderedFallback",
+    cardinality: "one",
+    locators: [{ strategy: "testId", value: "send" }],
+  };
+  const step = { id: "sent", assertion: "visible", target: picked };
   expect(resultOf(await h.call("flow.addAssertion", { sessionId, step }))).toEqual({
     stepId: "sent",
   });
@@ -130,6 +135,11 @@ test("finalize stores the suggested steps, then the draft assertions, once the s
   expect(stored.revision).toBe(saved.revision);
   expect(stored.manifest.status).toBe("recorded");
   expect(stored.flow.steps.map(({ id }) => id)).toEqual(["fill-1", "click-2", "sent"]);
+  expect(stored.flow.steps.at(-1)).toEqual({
+    id: "sent",
+    assertion: "visible",
+    target: { testId: "send" },
+  });
   expect(resultOf<SessionStatus>(await h.call("session.status", { sessionId })).state).toBe(
     "completed",
   );
