@@ -108,6 +108,7 @@ test.each([
   ["cli-local", "implemented", "tests/contract/cli.test.ts"],
   ["replay-executor", "implemented", "tests/browser/replay.spec.ts"],
   ["service-session", "implemented", "tests/browser/service-session.spec.ts"],
+  ["ui-minimal", "implemented", "tests/e2e/first-flow.spec.ts"],
 ])("the F2 deliverable %s is %s and names %s", (id, status, spec) => {
   const entry = entries.find((candidate) => candidate.id === id);
   expect(entry?.status, id).toBe(status);

@@ -150,7 +150,12 @@ export const FEATURE_CAPABILITIES: Feature[] = [
     "Replay executor",
     "Delivered by F2.5 in the engine over the CDP adapter; tests/browser/replay.spec.ts and packages/engine/tests/replay-*.test.ts. Every action, assertion, and extraction replays on the fixture into steps.json and summary.json with exit codes 0, 1, and 2; reads poll until the step's deadline (no networkidle); a write is dispatched once, and a click whose navigation times out leaves the step indeterminate while the fixture counts exactly one order; pauseReplay holds the next step until resumed; secrets are redacted from every stored file.",
   ),
-  planned("ui-minimal", "F2.6", "Minimal UI", "Setup, catalog, recorder, editor, and run screens."),
+  implemented(
+    "ui-minimal",
+    "F2.6",
+    "Minimal UI",
+    "Delivered by F2.6; tests/e2e/first-flow.spec.ts drives the UI the service serves (Setup, catalog, recorder, editor, and run screens) against Google Chrome on Linux: it records the fixture form, adds assertions with the picker, saves, restarts the service, and replays the flow to passed and to failed with observed vs expected; component tests cover each screen.",
+  ),
   implemented(
     "cli-local",
     "F2.7",
