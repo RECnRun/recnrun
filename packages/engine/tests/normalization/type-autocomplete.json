@@ -1,0 +1,283 @@
+{
+  "rule": "When the field's value is not the concatenation of the typed data, the run becomes type with the typed text.",
+  "input": [
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#1",
+      "runId": "rec-1",
+      "seq": 1,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:00.000Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "keydown",
+      "payload": {
+        "target": {
+          "tag": "input",
+          "id": "city",
+          "name": "city",
+          "inputType": "text"
+        },
+        "isTrusted": true,
+        "key": "B",
+        "code": "KeyB",
+        "repeat": false,
+        "modifiers": ["shift"]
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#2",
+      "runId": "rec-1",
+      "seq": 2,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:00.001Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "input",
+      "payload": {
+        "target": {
+          "tag": "input",
+          "id": "city",
+          "name": "city",
+          "inputType": "text"
+        },
+        "isTrusted": true,
+        "inputType": "insertText",
+        "data": "B",
+        "isComposing": false,
+        "value": "B"
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#3",
+      "runId": "rec-1",
+      "seq": 3,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:00.100Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "keydown",
+      "payload": {
+        "target": {
+          "tag": "input",
+          "id": "city",
+          "name": "city",
+          "inputType": "text"
+        },
+        "isTrusted": true,
+        "key": "e",
+        "code": "KeyE",
+        "repeat": false,
+        "modifiers": []
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#4",
+      "runId": "rec-1",
+      "seq": 4,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:00.101Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "input",
+      "payload": {
+        "target": {
+          "tag": "input",
+          "id": "city",
+          "name": "city",
+          "inputType": "text"
+        },
+        "isTrusted": true,
+        "inputType": "insertText",
+        "data": "e",
+        "isComposing": false,
+        "value": "Be"
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#5",
+      "runId": "rec-1",
+      "seq": 5,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:00.200Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "keydown",
+      "payload": {
+        "target": {
+          "tag": "input",
+          "id": "city",
+          "name": "city",
+          "inputType": "text"
+        },
+        "isTrusted": true,
+        "key": "r",
+        "code": "KeyR",
+        "repeat": false,
+        "modifiers": []
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#6",
+      "runId": "rec-1",
+      "seq": 6,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:00.201Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "input",
+      "payload": {
+        "target": {
+          "tag": "input",
+          "id": "city",
+          "name": "city",
+          "inputType": "text"
+        },
+        "isTrusted": true,
+        "inputType": "insertText",
+        "data": "r",
+        "isComposing": false,
+        "value": "Berlin"
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#7",
+      "runId": "rec-1",
+      "seq": 7,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:00.600Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "change",
+      "payload": {
+        "target": {
+          "tag": "input",
+          "id": "city",
+          "name": "city",
+          "inputType": "text"
+        },
+        "isTrusted": true,
+        "value": "Berlin"
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#8",
+      "runId": "rec-1",
+      "seq": 8,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:00.601Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "focusout",
+      "payload": {
+        "target": {
+          "tag": "input",
+          "id": "city",
+          "name": "city",
+          "inputType": "text"
+        },
+        "isTrusted": true
+      }
+    }
+  ],
+  "expected": {
+    "steps": [
+      {
+        "id": "type-1",
+        "action": "type",
+        "target": {
+          "resolution": "orderedFallback",
+          "cardinality": "one",
+          "locators": [
+            {
+              "strategy": "css",
+              "value": "#city"
+            },
+            {
+              "strategy": "css",
+              "value": "input[name=\"city\"]"
+            }
+          ]
+        },
+        "value": "Ber",
+        "events": [
+          {
+            "id": "cdp:S1#1",
+            "producer": "cdp:S1",
+            "seq": 1
+          },
+          {
+            "id": "cdp:S1#2",
+            "producer": "cdp:S1",
+            "seq": 2
+          },
+          {
+            "id": "cdp:S1#3",
+            "producer": "cdp:S1",
+            "seq": 3
+          },
+          {
+            "id": "cdp:S1#4",
+            "producer": "cdp:S1",
+            "seq": 4
+          },
+          {
+            "id": "cdp:S1#5",
+            "producer": "cdp:S1",
+            "seq": 5
+          },
+          {
+            "id": "cdp:S1#6",
+            "producer": "cdp:S1",
+            "seq": 6
+          },
+          {
+            "id": "cdp:S1#7",
+            "producer": "cdp:S1",
+            "seq": 7
+          }
+        ]
+      }
+    ],
+    "excluded": []
+  }
+}

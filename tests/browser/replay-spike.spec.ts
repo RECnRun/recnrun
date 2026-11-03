@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import type { Page } from "@playwright/test";
 import { createCdpAdapter } from "../../packages/adapter/src/index.ts";
-import { runSteps, type ReplayOutcome } from "../../packages/engine/src/index.ts";
+import { replayFlow, type ReplayOutcome } from "../../packages/engine/src/index.ts";
 import { isStepResult, validateFlow, type Flow } from "../../packages/protocol/src/index.ts";
 import { counters, expect, FIXTURE_ORIGIN, test, type FixtureApp } from "./fixtures/fixture-app.ts";
 
@@ -31,9 +31,11 @@ async function replay(app: FixtureApp, wsEndpoint: string, fail: string) {
   const adapter = createCdpAdapter();
   await adapter.connect(wsEndpoint);
   try {
-    const outcome: ReplayOutcome = await runSteps(adapter, loadFlow(), {
+    const outcome: ReplayOutcome = await replayFlow(adapter, loadFlow(), {
       env: { baseUrl: FIXTURE_ORIGIN, fail },
       inputs: { name: NAME },
+      // The failing assertion polls until its deadline; a short one keeps the test quick.
+      defaultTimeoutMs: 2_000,
     });
     const tab = await replayTab(app);
     const counted = await counters(tab);

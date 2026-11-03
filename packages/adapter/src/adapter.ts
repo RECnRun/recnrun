@@ -48,7 +48,7 @@ export function createCdpAdapter(deps: AdapterDependencies = {}): BrowserAdapter
     if (!current) throw new Error("Not connected to Chrome; call connect() first.");
     return current;
   };
-  // One replay tab per connection; a new connection opens its own on the next action.
+  // Replay tabs belong to one connection; a new connection opens its own on the next write.
   let driver: ReplayDriver | undefined;
   const replay = (): ReplayDriver => {
     driver ??= createPageDriver(async () => connected().openPage());
@@ -84,9 +84,9 @@ export function createCdpAdapter(deps: AdapterDependencies = {}): BrowserAdapter
       }),
     onEvent: events.subscribe,
     describeProfile: async () => connected().describeProfile(),
-    navigate: (url) => replay().navigate(url),
-    fill: (target, value) => replay().fill(target, value),
-    click: (target) => replay().click(target),
-    readText: (target) => replay().readText(target),
+    inspect: (target, options) => replay().inspect(target, options),
+    readAttribute: (target, name, options) => replay().readAttribute(target, name, options),
+    tabs: (options) => replay().tabs(options),
+    act: (command, options) => replay().act(command, options),
   };
 }

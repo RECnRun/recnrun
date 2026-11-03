@@ -2,6 +2,8 @@ import { describe, expect, test } from "vite-plus/test";
 import {
   CONTROL_STATES,
   CONTROL_TRANSITIONS,
+  PAUSE_STATES,
+  PAUSE_TRANSITIONS,
   SESSION_STATES,
   SESSION_TRANSITIONS,
   STEP_STATES,
@@ -47,6 +49,12 @@ const machines = [
       cancelled: "running",
       indeterminate: "running",
     } as Record<string, string>,
+  },
+  {
+    name: "pause",
+    states: PAUSE_STATES,
+    transitions: PAUSE_TRANSITIONS as Readonly<Record<string, readonly string[]>>,
+    illegal: { active: "active", paused: "paused" } as Record<string, string>,
   },
 ];
 

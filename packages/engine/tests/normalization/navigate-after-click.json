@@ -1,0 +1,229 @@
+{
+  "rule": "A navigation within the window after a click on a link or submit control is not a navigate step; a navigation with no such cause is; subframe navigations are ignored.",
+  "input": [
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#1",
+      "runId": "rec-1",
+      "seq": 1,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:00.000Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "navigation",
+      "type": "committed",
+      "payload": {
+        "url": "http://127.0.0.1:4600/routes/links"
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#2",
+      "runId": "rec-1",
+      "seq": 2,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:01.000Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "pointerdown",
+      "payload": {
+        "target": {
+          "tag": "a",
+          "testId": "next-link"
+        },
+        "isTrusted": true,
+        "x": 10,
+        "y": 20,
+        "button": 0,
+        "pointerType": "mouse",
+        "modifiers": []
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#3",
+      "runId": "rec-1",
+      "seq": 3,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:01.040Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "pointerup",
+      "payload": {
+        "target": {
+          "tag": "a",
+          "testId": "next-link"
+        },
+        "isTrusted": true,
+        "x": 10,
+        "y": 20,
+        "button": 0,
+        "pointerType": "mouse",
+        "modifiers": []
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#4",
+      "runId": "rec-1",
+      "seq": 4,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:01.041Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "click",
+      "payload": {
+        "target": {
+          "tag": "a",
+          "testId": "next-link"
+        },
+        "isTrusted": true,
+        "x": 10,
+        "y": 20,
+        "button": 0,
+        "pointerType": "mouse",
+        "modifiers": [],
+        "detail": 1
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#5",
+      "runId": "rec-1",
+      "seq": 5,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:01.300Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "navigation",
+      "type": "committed",
+      "payload": {
+        "url": "http://127.0.0.1:4600/routes/form"
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#6",
+      "runId": "rec-1",
+      "seq": 6,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:01.400Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "F2",
+      "documentId": "D1",
+      "category": "navigation",
+      "type": "committed",
+      "payload": {
+        "url": "http://127.0.0.1:4601/frame",
+        "parentFrameId": "T1"
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#7",
+      "runId": "rec-1",
+      "seq": 7,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:10.000Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "navigation",
+      "type": "committed",
+      "payload": {
+        "url": "http://127.0.0.1:4600/routes/typed"
+      }
+    }
+  ],
+  "expected": {
+    "steps": [
+      {
+        "id": "navigate-1",
+        "action": "navigate",
+        "url": "http://127.0.0.1:4600/routes/links",
+        "events": [
+          {
+            "id": "cdp:S1#1",
+            "producer": "cdp:S1",
+            "seq": 1
+          }
+        ]
+      },
+      {
+        "id": "click-2",
+        "action": "click",
+        "target": {
+          "resolution": "orderedFallback",
+          "cardinality": "one",
+          "locators": [
+            {
+              "strategy": "testId",
+              "value": "next-link"
+            }
+          ]
+        },
+        "events": [
+          {
+            "id": "cdp:S1#2",
+            "producer": "cdp:S1",
+            "seq": 2
+          },
+          {
+            "id": "cdp:S1#3",
+            "producer": "cdp:S1",
+            "seq": 3
+          },
+          {
+            "id": "cdp:S1#4",
+            "producer": "cdp:S1",
+            "seq": 4
+          }
+        ]
+      },
+      {
+        "id": "navigate-3",
+        "action": "navigate",
+        "url": "http://127.0.0.1:4600/routes/typed",
+        "events": [
+          {
+            "id": "cdp:S1#7",
+            "producer": "cdp:S1",
+            "seq": 7
+          }
+        ]
+      }
+    ],
+    "excluded": [
+      {
+        "event": {
+          "id": "cdp:S1#5",
+          "producer": "cdp:S1",
+          "seq": 5
+        },
+        "reason": "navigation-caused"
+      }
+    ]
+  }
+}

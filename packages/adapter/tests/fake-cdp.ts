@@ -114,11 +114,20 @@ export class FakeLink implements CdpLink {
   /** A replay tab that records the URLs it goes to. */
   openPage(): Promise<ReplayPage> {
     this.calls.push("browser openPage");
+    let at = "about:blank";
     const goto = (url: string) => {
       this.calls.push(`page goto ${url}`);
+      at = url;
       return Promise.resolve(null);
     };
-    return Promise.resolve({ goto } as unknown as ReplayPage);
+    const page = {
+      goto,
+      url: () => at,
+      title: async () => "",
+      isClosed: () => false,
+      on: () => page,
+    };
+    return Promise.resolve(page as unknown as ReplayPage);
   }
 }
 

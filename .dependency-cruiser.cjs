@@ -90,28 +90,42 @@ module.exports = {
     {
       name: "persistence-boundaries",
       severity: "error",
-      comment: "Persistence owns the file system and SQLite; it knows only the protocol's shapes.",
+      comment:
+        "Persistence owns the file system and SQLite; it knows only the protocol's shapes, and yaml reads and writes flow.yaml.",
       from: { path: "^packages/persistence/src/" },
       to: {
-        pathNot: ["^packages/(persistence|protocol)/src/"],
+        pathNot: ["^packages/(persistence|protocol)/src/", "/node_modules/yaml/"],
         dependencyTypesNot: ["core"],
       },
     },
     {
       name: "service-boundaries",
       severity: "error",
-      comment: "The service composes the engine, the adapter, and persistence behind its API.",
+      comment:
+        "The service composes the engine, the adapter, and persistence behind its loopback HTTP and WebSocket API; Valibot validates every request at that boundary.",
       from: { path: "^apps/service/src/" },
       to: {
-        pathNot: ["^apps/service/src/", "^packages/(engine|adapter|persistence|protocol)/src/"],
+        pathNot: [
+          "^apps/service/src/",
+          "^packages/(engine|adapter|persistence|protocol)/src/",
+          "/node_modules/valibot/",
+          "^(crypto|fs/promises|http|net|os|path|stream)$",
+        ],
       },
     },
     {
       name: "cli-only-service",
       severity: "error",
-      comment: "The CLI is a client of the service; it carries no engine of its own.",
+      comment:
+        "The CLI is a client of the service; it carries no engine of its own. It shares only protocol shapes, and uses Node built-ins to open a browser and to read the home folder for doctor.",
       from: { path: "^apps/cli/src/" },
-      to: { pathNot: ["^apps/(cli|service)/src/"] },
+      to: {
+        pathNot: [
+          "^apps/(cli|service)/src/",
+          "^packages/protocol/src/",
+          "^(child_process|fs/promises|os|path)$",
+        ],
+      },
     },
     {
       name: "ui-only-protocol",
@@ -122,6 +136,34 @@ module.exports = {
       to: {
         pathNot: ["^apps/ui/src/", "^packages/(protocol|brand)/src/", "/node_modules/preact/"],
       },
+    },
+    {
+      name: "ui-presentational",
+      severity: "error",
+      comment:
+        "apps/ui src/ui renders props only; it knows nothing about the api, features, or app.",
+      from: { path: "^apps/ui/src/ui/" },
+      to: { path: "^apps/ui/src/(api|features|app)/" },
+    },
+    {
+      name: "ui-api-headless",
+      severity: "error",
+      comment: "apps/ui src/api talks to the service and renders nothing of the screens.",
+      from: { path: "^apps/ui/src/api/" },
+      to: { path: "^apps/ui/src/(ui|features|app)/" },
+    },
+    {
+      name: "ui-features-isolated",
+      severity: "error",
+      comment: "Screens do not import each other; src/app routes between them.",
+      from: { path: "^apps/ui/src/features/([^/]+)/" },
+      to: { path: "^apps/ui/src/features/([^/]+)/", pathNot: "^apps/ui/src/features/$1/" },
+    },
+    {
+      name: "ui-app-is-top",
+      severity: "error",
+      from: { path: "^apps/ui/src/(ui|api|features)/" },
+      to: { path: "^apps/ui/src/(app/|main\\.tsx$)" },
     },
     {
       name: "fixture-isolated",

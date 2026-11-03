@@ -7,7 +7,7 @@ Why these are manual: Chrome's permission dialog and the `chrome://inspect/#remo
 ## After F1
 
 - **M-F1.a macOS, default profile.** On this machine (Chrome 156): enable remote debugging at `chrome://inspect/#remote-debugging`; run `recnrun doctor --json` and confirm `remoteDebugging: "found"` with the default `~/Library/Application Support/Google/Chrome`; connect; Chrome shows its permission dialog and, after acceptance, the "controlled by automated test software" banner; a page interaction appears in the journal. Record the dialog text and whether it repeats per session.
-  Result: …
+  Result: partial, 2026-11-02, macOS, Google Chrome 156.0.8078.76, default profile: the owner enabled remote debugging, accepted the permission dialog, and Chrome showed the "Chrome is being controlled by automated test software" banner with a "Turn off in settings" button (the connection came from an `apps/service` instance a host-side F2.1 test started, not from the CLI). Pending: `recnrun doctor --json` (F2.7), a page interaction in the journal, the dialog text, and whether it repeats per session.
 - **M-F1.b Windows, default profile.** Same as M-F1.a on a Windows machine with Chrome Stable; `%LOCALAPPDATA%\Google\Chrome\User Data`.
   Result: …
 - **M-F1.c Two profiles in one Chrome instance.** With the default profile and a second profile open in the same Chrome, confirm how targets of each profile are distinguished (`browserContextId` or otherwise), that the friendly-name binding survives a Chrome restart or asks for reconfirmation, and that no profile is picked by discovery order. Update F1.3 and the spike report with the proven strategy.

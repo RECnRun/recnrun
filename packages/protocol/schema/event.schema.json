@@ -80,7 +80,9 @@
                 "connection-lost",
                 "journal-truncated",
                 "target-unattached",
-                "producer-restarted"
+                "producer-restarted",
+                "capture-suspended",
+                "capture-stopped"
               ],
               "type": "string"
             },

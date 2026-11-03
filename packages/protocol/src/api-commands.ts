@@ -2,29 +2,62 @@ import * as v from "valibot";
 import { AssertionStepSchema } from "./actions.ts";
 import { ProfileBindingSchema } from "./bindings.ts";
 import { CapabilityMatrixSchema } from "./capabilities.ts";
-import { IdSchema, NameSchema, NonEmptyStringSchema } from "./common.ts";
+import { CountSchema, IdSchema, NameSchema, NonEmptyStringSchema } from "./common.ts";
+import { DiscoveryResultSchema } from "./discovery.ts";
 import { EventCategorySchema, EventSchema } from "./events.ts";
+import { FlowSchema } from "./flow.ts";
+import { FlowManifestSchema, RevisionHashSchema } from "./flow-folder.ts";
 import { TargetSchema } from "./locators.ts";
 import { RunSummarySchema } from "./run.ts";
-import { ControlStateSchema, SessionStateSchema } from "./states.ts";
+import { LeaseSchema } from "./lease.ts";
+import { PidSchema } from "./service-state.ts";
+import { FlowCatalogEntrySchema } from "./stored-files.ts";
+import { NormalizationResultSchema } from "./suggestions.ts";
+import {
+  ControlStateSchema,
+  PauseModeSchema,
+  SessionPausesSchema,
+  SessionStateSchema,
+} from "./states.ts";
 import { FlowValidationResultSchema } from "./validate.ts";
 import { SchemaVersionSchema } from "./version.ts";
 
 const NoParamsSchema = v.strictObject({});
 const SessionRefSchema = v.strictObject({ sessionId: NonEmptyStringSchema });
 const RunRefSchema = v.strictObject({ runId: NonEmptyStringSchema });
+const SessionPauseSchema = v.strictObject({
+  sessionId: NonEmptyStringSchema,
+  mode: PauseModeSchema,
+});
 
+/** A session's state, who controls its target, each pause, and the lease when one is held. */
 export const SessionStatusSchema = v.strictObject({
   sessionId: NonEmptyStringSchema,
   state: SessionStateSchema,
   control: ControlStateSchema,
-  leaseToken: v.optional(NonEmptyStringSchema),
+  pauses: SessionPausesSchema,
+  lease: v.optional(LeaseSchema),
 });
 
-/** The three distinct pauses of PLAN.md F2.2. */
-export const PAUSE_MODES = ["pauseStepCreation", "pauseReplay", "suspendCapture"] as const;
+export type SessionStatus = v.InferOutput<typeof SessionStatusSchema>;
 
 const session = { params: SessionRefSchema, result: SessionStatusSchema };
+
+const SavedFlowSchema = v.strictObject({ flowId: IdSchema, revision: RevisionHashSchema });
+
+const picker = {
+  params: SessionRefSchema,
+  result: v.strictObject({ sessionId: NonEmptyStringSchema, picking: v.boolean() }),
+};
+
+const MAX_SECRETS = 64;
+const MAX_SECRET_LENGTH = 4096;
+
+/** Secret values for one replay only: the service forwards them to the executor and never stores, logs, or returns them. */
+const RunSecretsSchema = v.pipe(
+  v.record(NameSchema, v.pipe(v.string(), v.maxLength(MAX_SECRET_LENGTH))),
+  v.maxEntries(MAX_SECRETS),
+);
 
 // Shapes a later phase specifies; until then the service accepts and returns any JSON.
 const unspecified = { params: v.unknown(), result: v.unknown() };
@@ -38,6 +71,10 @@ export const SERVICE_COMMANDS = {
       status: v.literal("ok"),
       serviceVersion: NonEmptyStringSchema,
       protocolVersion: SchemaVersionSchema,
+      pid: PidSchema,
+      uptimeMs: CountSchema,
+      // What `adapter.discover()` finds for the default Chrome profile right now.
+      chrome: DiscoveryResultSchema,
     }),
   },
   "profiles.list": {
@@ -58,10 +95,11 @@ export const SERVICE_COMMANDS = {
     result: SessionStatusSchema,
   },
   "session.pause": {
-    params: v.strictObject({ sessionId: NonEmptyStringSchema, mode: v.picklist(PAUSE_MODES) }),
+    params: SessionPauseSchema,
     result: SessionStatusSchema,
   },
-  "session.resume": session,
+  // Each pause resumes on its own.
+  "session.resume": { params: SessionPauseSchema, result: SessionStatusSchema },
   "session.stop": session,
   // F5.1 defines the page inspection and the agent's action shapes.
   "browser.inspect": unspecified,
@@ -83,6 +121,8 @@ export const SERVICE_COMMANDS = {
       flowId: IdSchema,
       dataset: v.optional(NonEmptyStringSchema),
       inputs: v.optional(v.record(NameSchema, v.unknown())),
+      // Secret inputs and `${secrets.*}` references read only from here.
+      secrets: v.optional(RunSecretsSchema),
     }),
     result: RunRefSchema,
   },
@@ -115,6 +155,32 @@ export const SERVICE_COMMANDS = {
   "functions.call": unspecified,
   "functions.proposeBuiltin": unspecified,
   "macros.extract": unspecified,
+  "flow.list": {
+    params: NoParamsSchema,
+    result: v.strictObject({ flows: v.array(FlowCatalogEntrySchema) }),
+  },
+  "flow.get": {
+    params: v.strictObject({ flowId: IdSchema }),
+    result: v.strictObject({
+      flow: FlowSchema,
+      manifest: FlowManifestSchema,
+      revision: RevisionHashSchema,
+    }),
+  },
+  "flow.save": { params: v.strictObject({ flow: FlowSchema }), result: SavedFlowSchema },
+  // A flow file from outside the store, such as `recnrun run --flow`; stored like `flow.save`.
+  "flow.import": { params: v.strictObject({ flow: FlowSchema }), result: SavedFlowSchema },
+  "session.suggestions": { params: SessionRefSchema, result: NormalizationResultSchema },
+  "picker.start": picker,
+  "picker.stop": picker,
+  // WebSocket only: the channel then receives every ServiceMessage of that session or run.
+  "events.subscribe": {
+    params: v.strictObject({
+      sessionId: v.optional(NonEmptyStringSchema),
+      runId: v.optional(NonEmptyStringSchema),
+    }),
+    result: v.strictObject({ subscriptionId: NonEmptyStringSchema }),
+  },
 } as const;
 
 export type CommandName = keyof typeof SERVICE_COMMANDS;

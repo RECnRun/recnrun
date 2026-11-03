@@ -63,9 +63,9 @@ Text follows [GitHub's brand typography](https://brand.github.com/foundations/ty
 
 ## Tokens
 
-Each app stylesheet (today `apps/website/src/app/app.css`) opens with a `:root` block in two layers:
+Each app stylesheet (`apps/website/src/app/app.css` and `apps/ui/src/app/app.css`) opens with a `:root` block in two layers:
 
 1. **Palette:** `--brand-*` and `--gray-*`. The only place a hex color is written.
-2. **Semantic:** `--surface`, `--card`, `--border`, `--text`, `--muted`, `--accent`, `--accent-text`, `--link`. Each points to a palette token, and the `prefers-color-scheme: dark` block repoints them.
+2. **Semantic:** `--surface`, `--card`, `--border`, `--text`, `--muted`, `--accent`, `--accent-text`, `--link`, and in the UI `--success` and `--danger` for status badges and errors. Each points to a palette token, and the `prefers-color-scheme: dark` block repoints them.
 
 Rules use semantic tokens only: never write a hex color in a property, and never reference a palette token outside the `:root` blocks. A new color is a new palette token plus a semantic token for its role. Apps share no stylesheet code, so each file repeats the palette tokens it uses; keep their values identical to this table.

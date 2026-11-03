@@ -9,12 +9,12 @@ import {
 } from "../src/index.ts";
 
 describe("RequestEnvelopeSchema", () => {
-  test("accepts a mutation with its lease token", () => {
+  test("accepts a mutation with its lease fence", () => {
     const request = {
       requestId: "req-1",
       command: "session.handoff",
       params: { sessionId: "s-1", to: "manual" },
-      leaseToken: "lease-7",
+      lease: { leaseId: "target-1/7", fencingToken: 7 },
     };
     expect(v.parse(RequestEnvelopeSchema, request)).toEqual(request);
   });
@@ -22,7 +22,10 @@ describe("RequestEnvelopeSchema", () => {
   test.each([
     ["an unknown command", { requestId: "r", command: "shell.exec", params: {} }],
     ["an empty request id", { requestId: "", command: "health", params: {} }],
-    ["an empty lease token", { requestId: "r", command: "health", params: {}, leaseToken: "" }],
+    [
+      "an empty lease id",
+      { requestId: "r", command: "health", params: {}, lease: { leaseId: "", fencingToken: 1 } },
+    ],
   ])("rejects %s", (_name, request) => {
     expect(v.safeParse(RequestEnvelopeSchema, request).success).toBe(false);
   });
@@ -54,6 +57,20 @@ describe("the command table", () => {
     const { params } = SERVICE_COMMANDS["session.handoff"];
     expect(v.safeParse(params, { sessionId: "s-1", to: "agent" }).success).toBe(true);
     expect(v.safeParse(params, { sessionId: "s-1", to: "robot" }).success).toBe(false);
+  });
+
+  test("accepts a replay's transient secrets and bounds them", () => {
+    const { params } = SERVICE_COMMANDS["flow.replay"];
+    const ok = { flowId: "login", inputs: { email: "a@b.c" }, secrets: { pin: "1234" } };
+    expect(v.safeParse(params, ok).success).toBe(true);
+    const tooMany = Object.fromEntries(Array.from({ length: 65 }, (_, i) => [`s${i}`, "x"]));
+    for (const secrets of [
+      { pin: 1234 },
+      { "not a name": "x" },
+      { pin: "x".repeat(4097) },
+      tooMany,
+    ])
+      expect(v.safeParse(params, { flowId: "login", secrets }).success).toBe(false);
   });
 
   test("validates the result of run.queryEvents as a page of events", () => {

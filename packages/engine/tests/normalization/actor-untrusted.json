@@ -1,0 +1,415 @@
+{
+  "rule": "A step's actor comes from the session or binding of its producer, never from isTrusted or the envelope; untrusted events are excluded but kept as evidence.",
+  "options": {
+    "actors": {
+      "producers": {
+        "cdp:S1": "solicitante"
+      },
+      "bindings": {
+        "work": "aprovador"
+      }
+    }
+  },
+  "input": [
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#1",
+      "runId": "rec-1",
+      "seq": 1,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:00.000Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "pointerdown",
+      "payload": {
+        "target": {
+          "tag": "button",
+          "testId": "save",
+          "inputType": "button"
+        },
+        "isTrusted": true,
+        "x": 10,
+        "y": 20,
+        "button": 0,
+        "pointerType": "mouse",
+        "modifiers": []
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#2",
+      "runId": "rec-1",
+      "seq": 2,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:00.040Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "pointerup",
+      "payload": {
+        "target": {
+          "tag": "button",
+          "testId": "save",
+          "inputType": "button"
+        },
+        "isTrusted": true,
+        "x": 10,
+        "y": 20,
+        "button": 0,
+        "pointerType": "mouse",
+        "modifiers": []
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#3",
+      "runId": "rec-1",
+      "seq": 3,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:00.041Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "click",
+      "payload": {
+        "target": {
+          "tag": "button",
+          "testId": "save",
+          "inputType": "button"
+        },
+        "isTrusted": true,
+        "x": 10,
+        "y": 20,
+        "button": 0,
+        "pointerType": "mouse",
+        "modifiers": [],
+        "detail": 1
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#4",
+      "runId": "rec-1",
+      "seq": 4,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:00.500Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "actor": "human",
+      "category": "dom",
+      "type": "click",
+      "payload": {
+        "target": {
+          "tag": "button",
+          "testId": "save",
+          "inputType": "button"
+        },
+        "isTrusted": false,
+        "x": 10,
+        "y": 20,
+        "button": 0,
+        "pointerType": "mouse",
+        "modifiers": [],
+        "detail": 1
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S2#1",
+      "runId": "rec-1",
+      "seq": 1,
+      "source": "S2",
+      "producer": "cdp:S2",
+      "timestamp": "2026-11-02T10:00:01.000Z",
+      "component": "application",
+      "targetId": "T2",
+      "frameId": "T2",
+      "documentId": "D2",
+      "profileBinding": "work",
+      "category": "dom",
+      "type": "pointerdown",
+      "payload": {
+        "target": {
+          "tag": "button",
+          "testId": "save",
+          "inputType": "button"
+        },
+        "isTrusted": true,
+        "x": 10,
+        "y": 20,
+        "button": 0,
+        "pointerType": "mouse",
+        "modifiers": []
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S2#2",
+      "runId": "rec-1",
+      "seq": 2,
+      "source": "S2",
+      "producer": "cdp:S2",
+      "timestamp": "2026-11-02T10:00:01.040Z",
+      "component": "application",
+      "targetId": "T2",
+      "frameId": "T2",
+      "documentId": "D2",
+      "profileBinding": "work",
+      "category": "dom",
+      "type": "pointerup",
+      "payload": {
+        "target": {
+          "tag": "button",
+          "testId": "save",
+          "inputType": "button"
+        },
+        "isTrusted": true,
+        "x": 10,
+        "y": 20,
+        "button": 0,
+        "pointerType": "mouse",
+        "modifiers": []
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S2#3",
+      "runId": "rec-1",
+      "seq": 3,
+      "source": "S2",
+      "producer": "cdp:S2",
+      "timestamp": "2026-11-02T10:00:01.041Z",
+      "component": "application",
+      "targetId": "T2",
+      "frameId": "T2",
+      "documentId": "D2",
+      "profileBinding": "work",
+      "category": "dom",
+      "type": "click",
+      "payload": {
+        "target": {
+          "tag": "button",
+          "testId": "save",
+          "inputType": "button"
+        },
+        "isTrusted": true,
+        "x": 10,
+        "y": 20,
+        "button": 0,
+        "pointerType": "mouse",
+        "modifiers": [],
+        "detail": 1
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S3#1",
+      "runId": "rec-1",
+      "seq": 1,
+      "source": "S3",
+      "producer": "cdp:S3",
+      "timestamp": "2026-11-02T10:00:02.000Z",
+      "component": "application",
+      "targetId": "T3",
+      "frameId": "T3",
+      "documentId": "D3",
+      "actor": "human",
+      "category": "dom",
+      "type": "pointerdown",
+      "payload": {
+        "target": {
+          "tag": "button",
+          "testId": "save",
+          "inputType": "button"
+        },
+        "isTrusted": true,
+        "x": 10,
+        "y": 20,
+        "button": 0,
+        "pointerType": "mouse",
+        "modifiers": []
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S3#2",
+      "runId": "rec-1",
+      "seq": 2,
+      "source": "S3",
+      "producer": "cdp:S3",
+      "timestamp": "2026-11-02T10:00:02.040Z",
+      "component": "application",
+      "targetId": "T3",
+      "frameId": "T3",
+      "documentId": "D3",
+      "actor": "human",
+      "category": "dom",
+      "type": "pointerup",
+      "payload": {
+        "target": {
+          "tag": "button",
+          "testId": "save",
+          "inputType": "button"
+        },
+        "isTrusted": true,
+        "x": 10,
+        "y": 20,
+        "button": 0,
+        "pointerType": "mouse",
+        "modifiers": []
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S3#3",
+      "runId": "rec-1",
+      "seq": 3,
+      "source": "S3",
+      "producer": "cdp:S3",
+      "timestamp": "2026-11-02T10:00:02.041Z",
+      "component": "application",
+      "targetId": "T3",
+      "frameId": "T3",
+      "documentId": "D3",
+      "actor": "human",
+      "category": "dom",
+      "type": "click",
+      "payload": {
+        "target": {
+          "tag": "button",
+          "testId": "save",
+          "inputType": "button"
+        },
+        "isTrusted": true,
+        "x": 10,
+        "y": 20,
+        "button": 0,
+        "pointerType": "mouse",
+        "modifiers": [],
+        "detail": 1
+      }
+    }
+  ],
+  "expected": {
+    "steps": [
+      {
+        "id": "click-1",
+        "action": "click",
+        "actor": "solicitante",
+        "target": {
+          "resolution": "orderedFallback",
+          "cardinality": "one",
+          "locators": [
+            {
+              "strategy": "testId",
+              "value": "save"
+            }
+          ]
+        },
+        "events": [
+          {
+            "id": "cdp:S1#1",
+            "producer": "cdp:S1",
+            "seq": 1
+          },
+          {
+            "id": "cdp:S1#2",
+            "producer": "cdp:S1",
+            "seq": 2
+          },
+          {
+            "id": "cdp:S1#3",
+            "producer": "cdp:S1",
+            "seq": 3
+          }
+        ]
+      },
+      {
+        "id": "click-2",
+        "action": "click",
+        "actor": "aprovador",
+        "target": {
+          "resolution": "orderedFallback",
+          "cardinality": "one",
+          "locators": [
+            {
+              "strategy": "testId",
+              "value": "save"
+            }
+          ]
+        },
+        "events": [
+          {
+            "id": "cdp:S2#1",
+            "producer": "cdp:S2",
+            "seq": 1
+          },
+          {
+            "id": "cdp:S2#2",
+            "producer": "cdp:S2",
+            "seq": 2
+          },
+          {
+            "id": "cdp:S2#3",
+            "producer": "cdp:S2",
+            "seq": 3
+          }
+        ]
+      },
+      {
+        "id": "click-3",
+        "action": "click",
+        "target": {
+          "resolution": "orderedFallback",
+          "cardinality": "one",
+          "locators": [
+            {
+              "strategy": "testId",
+              "value": "save"
+            }
+          ]
+        },
+        "events": [
+          {
+            "id": "cdp:S3#1",
+            "producer": "cdp:S3",
+            "seq": 1
+          },
+          {
+            "id": "cdp:S3#2",
+            "producer": "cdp:S3",
+            "seq": 2
+          },
+          {
+            "id": "cdp:S3#3",
+            "producer": "cdp:S3",
+            "seq": 3
+          }
+        ]
+      }
+    ],
+    "excluded": [
+      {
+        "event": {
+          "id": "cdp:S1#4",
+          "producer": "cdp:S1",
+          "seq": 4
+        },
+        "reason": "untrusted"
+      }
+    ]
+  }
+}

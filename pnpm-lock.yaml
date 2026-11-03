@@ -265,6 +265,9 @@ importers:
 
   apps/cli:
     dependencies:
+      '@recnrun/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
       '@recnrun/service':
         specifier: workspace:*
         version: link:../service
@@ -302,6 +305,12 @@ importers:
       '@recnrun/persistence':
         specifier: workspace:*
         version: link:../../packages/persistence
+      '@recnrun/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
+      valibot:
+        specifier: 'catalog:'
+        version: 1.5.0(typescript@7.0.2)
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -411,6 +420,9 @@ importers:
       '@recnrun/protocol':
         specifier: workspace:*
         version: link:../protocol
+      yaml:
+        specifier: 'catalog:'
+        version: 2.9.1
     devDependencies:
       '@types/node':
         specifier: 'catalog:'

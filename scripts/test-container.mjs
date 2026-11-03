@@ -13,6 +13,7 @@ const tasks = new Set([
   "verify:local",
   "test:unit:local",
   "test:components:local",
+  "test:contract:local",
   "test:e2e:local",
   "test:browser:local",
   "test:coverage:local",

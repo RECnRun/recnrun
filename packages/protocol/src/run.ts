@@ -7,6 +7,7 @@ import {
   NameSchema,
   NonEmptyStringSchema,
 } from "./common.ts";
+import { RevisionHashSchema } from "./flow-folder.ts";
 import { StepStateSchema } from "./states.ts";
 import { SchemaVersionSchema } from "./version.ts";
 
@@ -30,7 +31,7 @@ const EvidenceSchema = v.array(NonEmptyStringSchema);
 export const RunManifestSchema = v.strictObject({
   ...runEntries,
   flowId: IdSchema,
-  flowRevision: v.pipe(v.string(), v.regex(/^[0-9a-f]{64}$/, "A revision is a sha256 hex digest.")),
+  flowRevision: RevisionHashSchema,
   startedAt: IsoTimestampSchema,
   captureLevel: v.picklist(["normal", "deep"]),
   dataset: v.optional(NonEmptyStringSchema),
@@ -54,6 +55,8 @@ export const StepResultSchema = v.strictObject({
   startedAt: v.optional(IsoTimestampSchema),
   endedAt: v.optional(IsoTimestampSchema),
   durationMs: v.optional(v.pipe(v.number(), v.minValue(0))),
+  // Reads of the page before acting or deciding; a write action is dispatched at most once.
+  attempts: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1))),
   error: v.optional(v.strictObject({ code: NonEmptyStringSchema, message: NonEmptyStringSchema })),
   evidence: v.optional(EvidenceSchema),
 });

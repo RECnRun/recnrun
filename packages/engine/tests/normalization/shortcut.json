@@ -1,0 +1,127 @@
+{
+  "rule": "A modifier held with a key becomes keyPress with the combo; a lone modifier is not a step, and the page body is no target.",
+  "input": [
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#1",
+      "runId": "rec-1",
+      "seq": 1,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:00.000Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "keydown",
+      "payload": {
+        "target": {
+          "tag": "body"
+        },
+        "isTrusted": true,
+        "key": "Control",
+        "code": "ControlLeft",
+        "repeat": false,
+        "modifiers": ["ctrl"]
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#2",
+      "runId": "rec-1",
+      "seq": 2,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:00.100Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "keydown",
+      "payload": {
+        "target": {
+          "tag": "body"
+        },
+        "isTrusted": true,
+        "key": "k",
+        "code": "KeyK",
+        "repeat": false,
+        "modifiers": ["ctrl"]
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#3",
+      "runId": "rec-1",
+      "seq": 3,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:00.180Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "keyup",
+      "payload": {
+        "target": {
+          "tag": "body"
+        },
+        "isTrusted": true,
+        "key": "k",
+        "code": "KeyK",
+        "repeat": false,
+        "modifiers": ["ctrl"]
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#4",
+      "runId": "rec-1",
+      "seq": 4,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:00.250Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "keyup",
+      "payload": {
+        "target": {
+          "tag": "body"
+        },
+        "isTrusted": true,
+        "key": "Control",
+        "code": "ControlLeft",
+        "repeat": false,
+        "modifiers": []
+      }
+    }
+  ],
+  "expected": {
+    "steps": [
+      {
+        "id": "keyPress-1",
+        "action": "keyPress",
+        "key": "Control+k",
+        "events": [
+          {
+            "id": "cdp:S1#2",
+            "producer": "cdp:S1",
+            "seq": 2
+          },
+          {
+            "id": "cdp:S1#3",
+            "producer": "cdp:S1",
+            "seq": 3
+          }
+        ]
+      }
+    ],
+    "excluded": []
+  }
+}

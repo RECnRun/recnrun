@@ -120,37 +120,53 @@ export const FEATURE_CAPABILITIES: Feature[] = [
     "Custom locator function path",
     "Delivered by F1.7; tests/browser/function-locator.spec.ts on Linux in Docker. The function runs in an isolated world, its elements become references qualified by target, frame, and loader id, and cardinality picks from them. A synchronous infinite loop is cut with Runtime.terminateExecution on the same session, and the tab answered Runtime.evaluate afterwards without being closed; the result records blocked, terminated, and tabResponsive.",
   ),
-  planned(
+  implemented(
     "service",
     "F2.1",
     "Local service",
-    "Loopback only, bearer token, one instance per user.",
+    "Delivered by F2.1; tests/contract/service-auth.test.ts and tests/contract/service-lifecycle.test.ts. Binds 127.0.0.1 only; every HTTP request and WebSocket needs the bearer token from ~/.recnrun/service.json (0600), a foreign Origin or Host gets 403, a WebSocket without the token closes 4401. One instance per user with stale-lock recovery; SIGTERM drains open journals before exit. Implements capabilities.get and health.",
   ),
-  planned(
+  implemented(
     "sessions-control-leases",
     "F2.2",
     "Sessions, control, and leases",
-    "Exclusive control per target with fencing tokens.",
+    "Delivered by F2.2 in the engine: session, control, step, and pause transition tables, every state and event checked (packages/engine/tests/session.test.ts); a lease per target with heartbeat, expiry, and a fencing token that turns a delayed command from a previous lease into stale-lease (packages/engine/tests/lease.test.ts); the three pauses resume independently (packages/engine/tests/pause.test.ts).",
   ),
-  planned(
+  implemented(
     "normalization",
     "F2.3",
     "Event normalization into steps",
-    "Suggested steps keep references to their raw events.",
+    "Delivered by F2.3; packages/engine/tests/normalization.test.ts runs one golden pair per rule over schema-valid captured events: fill grouping, redacted fill, type for special keys and transformed values, no navigate after a link or submit click, scroll policy, dblclick, drag, shortcuts, composition, overlay exclusion, replay-caused exclusion, and actor by producer or binding with untrusted events excluded. Suggested steps keep references to their raw events. dblclick and drag have no flow action yet, and role locators need an accessible name the hook does not capture yet.",
   ),
-  planned(
+  implemented(
     "flow-persistence",
     "F2.4",
     "Flow folders and immutable revisions",
-    "The SQLite index can always be rebuilt from the folders.",
+    "Delivered by F2.4; packages/persistence/tests/flow-store.test.ts, flow-runs.test.ts, and flow-yaml.test.ts. flow.yaml round-trips byte for byte, every change writes an immutable revision named by the sha256 of its canonical JSON, runs reference that hash, metadata writes are atomic, a truncated events.jsonl reads with a gap, and the node:sqlite index rebuilt from the folders lists the same catalog; a corrupt manifest is reported and skipped.",
   ),
-  planned("replay-executor", "F2.5", "Replay executor", "Write actions are never retried blindly."),
-  planned("ui-minimal", "F2.6", "Minimal UI", "Setup, catalog, recorder, editor, and run screens."),
-  planned(
+  implemented(
+    "replay-executor",
+    "F2.5",
+    "Replay executor",
+    "Delivered by F2.5 in the engine over the CDP adapter; tests/browser/replay.spec.ts and packages/engine/tests/replay-*.test.ts. Every action, assertion, and extraction replays on the fixture into steps.json and summary.json with exit codes 0, 1, and 2; reads poll until the step's deadline (no networkidle); a write is dispatched once, and a click whose navigation times out leaves the step indeterminate while the fixture counts exactly one order; pauseReplay holds the next step until resumed; secrets are redacted from every stored file.",
+  ),
+  implemented(
+    "ui-minimal",
+    "F2.6",
+    "Minimal UI",
+    "Delivered by F2.6; tests/e2e/first-flow.spec.ts drives the UI the service serves (Setup, catalog, recorder, editor, and run screens) against Google Chrome on Linux: it records the fixture form, adds assertions with the picker, saves, restarts the service, and replays the flow to passed and to failed with observed vs expected; component tests cover each screen.",
+  ),
+  implemented(
     "cli-local",
     "F2.7",
     "CLI: open, run, doctor",
-    "Exit codes 0, 1, and 2 for passed, failed, and error.",
+    "Delivered by F2.7; tests/contract/cli.test.ts runs the real recnrun binary on a temporary home: open starts or reuses the service and prints the UI URL, doctor --json reports Chrome, DevToolsActivePort, bindings, disk, and versions (exit 1 without Chrome), and run prints one JSON summary with exit 0, 1, or 2 for passed, failed, and error. The replay itself is F2.5.",
+  ),
+  implemented(
+    "service-session",
+    "F2.6",
+    "Service sessions, flows, runs, and picker",
+    "Delivered by F2.6a; tests/browser/service-session.spec.ts records the fixture form through the service in Google Chrome, finalizes a flow with fill and click, replays it to passed, and picks the submit button without clicking it; tests/contract/service-session.test.ts covers the commands, the event pushes, and the UI's token meta and CSP over a fake Chrome.",
   ),
   planned(
     "coverage-loss-accounting",

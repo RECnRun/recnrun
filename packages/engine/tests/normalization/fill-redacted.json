@@ -1,0 +1,461 @@
+{
+  "rule": "A redacted field becomes a fill whose value is a secrets placeholder, never the typed value.",
+  "input": [
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#1",
+      "runId": "rec-1",
+      "seq": 1,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:00.000Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "pointerdown",
+      "payload": {
+        "target": {
+          "tag": "input",
+          "id": "password",
+          "name": "password",
+          "inputType": "password"
+        },
+        "isTrusted": true,
+        "x": 10,
+        "y": 20,
+        "button": 0,
+        "pointerType": "mouse",
+        "modifiers": []
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#2",
+      "runId": "rec-1",
+      "seq": 2,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:00.040Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "pointerup",
+      "payload": {
+        "target": {
+          "tag": "input",
+          "id": "password",
+          "name": "password",
+          "inputType": "password"
+        },
+        "isTrusted": true,
+        "x": 10,
+        "y": 20,
+        "button": 0,
+        "pointerType": "mouse",
+        "modifiers": []
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#3",
+      "runId": "rec-1",
+      "seq": 3,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:00.041Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "click",
+      "payload": {
+        "target": {
+          "tag": "input",
+          "id": "password",
+          "name": "password",
+          "inputType": "password"
+        },
+        "isTrusted": true,
+        "x": 10,
+        "y": 20,
+        "button": 0,
+        "pointerType": "mouse",
+        "modifiers": [],
+        "detail": 1
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#4",
+      "runId": "rec-1",
+      "seq": 4,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:00.200Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "keydown",
+      "payload": {
+        "target": {
+          "tag": "input",
+          "id": "password",
+          "name": "password",
+          "inputType": "password"
+        },
+        "isTrusted": true,
+        "redacted": true,
+        "modifiers": []
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#5",
+      "runId": "rec-1",
+      "seq": 5,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:00.201Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "input",
+      "payload": {
+        "target": {
+          "tag": "input",
+          "id": "password",
+          "name": "password",
+          "inputType": "password"
+        },
+        "isTrusted": true,
+        "inputType": "insertText",
+        "isComposing": false,
+        "redacted": true
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#6",
+      "runId": "rec-1",
+      "seq": 6,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:00.250Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "keyup",
+      "payload": {
+        "target": {
+          "tag": "input",
+          "id": "password",
+          "name": "password",
+          "inputType": "password"
+        },
+        "isTrusted": true,
+        "redacted": true,
+        "modifiers": []
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#7",
+      "runId": "rec-1",
+      "seq": 7,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:00.300Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "keydown",
+      "payload": {
+        "target": {
+          "tag": "input",
+          "id": "password",
+          "name": "password",
+          "inputType": "password"
+        },
+        "isTrusted": true,
+        "redacted": true,
+        "modifiers": []
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#8",
+      "runId": "rec-1",
+      "seq": 8,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:00.301Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "input",
+      "payload": {
+        "target": {
+          "tag": "input",
+          "id": "password",
+          "name": "password",
+          "inputType": "password"
+        },
+        "isTrusted": true,
+        "inputType": "insertText",
+        "isComposing": false,
+        "redacted": true
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#9",
+      "runId": "rec-1",
+      "seq": 9,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:00.350Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "keyup",
+      "payload": {
+        "target": {
+          "tag": "input",
+          "id": "password",
+          "name": "password",
+          "inputType": "password"
+        },
+        "isTrusted": true,
+        "redacted": true,
+        "modifiers": []
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#10",
+      "runId": "rec-1",
+      "seq": 10,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:00.400Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "keydown",
+      "payload": {
+        "target": {
+          "tag": "input",
+          "id": "password",
+          "name": "password",
+          "inputType": "password"
+        },
+        "isTrusted": true,
+        "redacted": true,
+        "modifiers": []
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#11",
+      "runId": "rec-1",
+      "seq": 11,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:00.401Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "input",
+      "payload": {
+        "target": {
+          "tag": "input",
+          "id": "password",
+          "name": "password",
+          "inputType": "password"
+        },
+        "isTrusted": true,
+        "inputType": "insertText",
+        "isComposing": false,
+        "redacted": true
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#12",
+      "runId": "rec-1",
+      "seq": 12,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:00.450Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "keyup",
+      "payload": {
+        "target": {
+          "tag": "input",
+          "id": "password",
+          "name": "password",
+          "inputType": "password"
+        },
+        "isTrusted": true,
+        "redacted": true,
+        "modifiers": []
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#13",
+      "runId": "rec-1",
+      "seq": 13,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:00.900Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "focusout",
+      "payload": {
+        "target": {
+          "tag": "input",
+          "id": "password",
+          "name": "password",
+          "inputType": "password"
+        },
+        "isTrusted": true
+      }
+    }
+  ],
+  "expected": {
+    "steps": [
+      {
+        "id": "click-1",
+        "action": "click",
+        "target": {
+          "resolution": "orderedFallback",
+          "cardinality": "one",
+          "locators": [
+            {
+              "strategy": "css",
+              "value": "#password"
+            },
+            {
+              "strategy": "css",
+              "value": "input[name=\"password\"]"
+            }
+          ]
+        },
+        "events": [
+          {
+            "id": "cdp:S1#1",
+            "producer": "cdp:S1",
+            "seq": 1
+          },
+          {
+            "id": "cdp:S1#2",
+            "producer": "cdp:S1",
+            "seq": 2
+          },
+          {
+            "id": "cdp:S1#3",
+            "producer": "cdp:S1",
+            "seq": 3
+          }
+        ]
+      },
+      {
+        "id": "fill-2",
+        "action": "fill",
+        "target": {
+          "resolution": "orderedFallback",
+          "cardinality": "one",
+          "locators": [
+            {
+              "strategy": "css",
+              "value": "#password"
+            },
+            {
+              "strategy": "css",
+              "value": "input[name=\"password\"]"
+            }
+          ]
+        },
+        "value": "${secrets.password}",
+        "redacted": true,
+        "events": [
+          {
+            "id": "cdp:S1#4",
+            "producer": "cdp:S1",
+            "seq": 4
+          },
+          {
+            "id": "cdp:S1#5",
+            "producer": "cdp:S1",
+            "seq": 5
+          },
+          {
+            "id": "cdp:S1#6",
+            "producer": "cdp:S1",
+            "seq": 6
+          },
+          {
+            "id": "cdp:S1#7",
+            "producer": "cdp:S1",
+            "seq": 7
+          },
+          {
+            "id": "cdp:S1#8",
+            "producer": "cdp:S1",
+            "seq": 8
+          },
+          {
+            "id": "cdp:S1#9",
+            "producer": "cdp:S1",
+            "seq": 9
+          },
+          {
+            "id": "cdp:S1#10",
+            "producer": "cdp:S1",
+            "seq": 10
+          },
+          {
+            "id": "cdp:S1#11",
+            "producer": "cdp:S1",
+            "seq": 11
+          },
+          {
+            "id": "cdp:S1#12",
+            "producer": "cdp:S1",
+            "seq": 12
+          }
+        ]
+      }
+    ],
+    "excluded": []
+  }
+}

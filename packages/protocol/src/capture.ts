@@ -47,6 +47,8 @@ export const DomTargetSchema = v.strictObject({
   inputType: v.optional(TextSchema),
 });
 
+export type DomTarget = v.InferOutput<typeof DomTargetSchema>;
+
 /** One DOM event as the hook saw it; password fields report `redacted` instead of keys and values. */
 export const DomPayloadSchema = v.strictObject({
   target: DomTargetSchema,

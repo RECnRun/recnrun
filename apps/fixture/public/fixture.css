@@ -95,3 +95,8 @@ iframe {
   padding: 0 0.5rem;
   box-sizing: border-box;
 }
+
+/* Tall enough that the replay route scrolls by any amount a flow asks for. */
+.replay-spacer {
+  height: 300vh;
+}

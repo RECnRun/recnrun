@@ -13,6 +13,10 @@
       "items": {
         "additionalProperties": false,
         "properties": {
+          "attempts": {
+            "minimum": 1,
+            "type": "integer"
+          },
           "durationMs": {
             "minimum": 0,
             "type": "number"

@@ -7,12 +7,16 @@ import {
   BrowserHandshakeSchema,
   CapabilityMatrixSchema,
   CapturedEventSchema,
+  DatasetSchema,
   DiscoveryResultSchema,
+  DoctorReportSchema,
   EventSchema,
+  FlowManifestSchema,
   FlowSchema,
   InstrumentationEventSchema,
   InstrumentationReportSchema,
   LocatorEntrySchema,
+  NormalizationResultSchema,
   ObserverMessageSchema,
   RequestEnvelopeSchema,
   ResponseEnvelopeSchema,
@@ -24,6 +28,9 @@ import {
   TargetSchema,
 } from "../src/index.ts";
 import { FunctionLocatorRequestSchema, FunctionLocatorResultSchema } from "../src/index.ts";
+import { LeaseSchema, SessionStatusSchema } from "../src/index.ts";
+import { ServiceLockSchema, ServiceStateSchema } from "../src/index.ts";
+import { ServiceMessageSchema } from "../src/index.ts";
 
 type AnySchema = v.GenericSchema;
 
@@ -33,9 +40,11 @@ const DOCUMENTS: Record<string, AnySchema> = {
   "bindings-file": BindingsFileSchema,
   "browser-handshake": BrowserHandshakeSchema,
   "capability-matrix": CapabilityMatrixSchema,
+  dataset: DatasetSchema,
   "discovery-result": DiscoveryResultSchema,
   event: EventSchema,
   flow: FlowSchema,
+  "flow-manifest": FlowManifestSchema,
   "instrumentation-event": InstrumentationEventSchema,
   "instrumentation-report": InstrumentationReportSchema,
   "observer-message": ObserverMessageSchema,
@@ -48,6 +57,13 @@ const DOCUMENTS: Record<string, AnySchema> = {
   "captured-event": CapturedEventSchema,
   "function-locator-request": FunctionLocatorRequestSchema,
   "function-locator-result": FunctionLocatorResultSchema,
+  lease: LeaseSchema,
+  "session-status": SessionStatusSchema,
+  "normalization-result": NormalizationResultSchema,
+  "service-state": ServiceStateSchema,
+  "service-lock": ServiceLockSchema,
+  "doctor-report": DoctorReportSchema,
+  "service-message": ServiceMessageSchema,
 };
 
 // Named definitions give the flow's recursive schemas stable $ref names instead of generated ones.

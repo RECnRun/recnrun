@@ -35,6 +35,10 @@ export const GAP_REASONS = [
   "journal-truncated",
   "target-unattached",
   "producer-restarted",
+  // The person or agent suspended capture (`suspendCapture`).
+  "capture-suspended",
+  // Stopping capture lost results it was still waiting for.
+  "capture-stopped",
 ] as const;
 
 const PageIdSchema = v.nullable(NonEmptyStringSchema);

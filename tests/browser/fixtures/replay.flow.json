@@ -1,0 +1,130 @@
+{
+  "schemaVersion": 1,
+  "id": "replay-tour",
+  "name": "Every replay action on the fixture",
+  "description": "Runs each action, assertion, and extraction of F2.5 once against /routes/replay.",
+  "actors": {},
+  "inputs": {
+    "query": { "type": "string", "required": true },
+    "note": { "type": "string", "required": false, "default": "Hello" },
+    "pin": { "type": "string", "required": true, "secret": true }
+  },
+  "requirements": [],
+  "preconditions": [],
+  "steps": [
+    { "id": "open", "action": "navigate", "url": "${env.base}/routes/replay" },
+    { "id": "url", "assertion": "url", "expected": "${env.base}/routes/replay" },
+    { "id": "intro", "assertion": "visible", "target": { "testId": "intro" } },
+    { "id": "fill", "action": "fill", "target": { "label": "Search" }, "value": "${inputs.query}" },
+    { "id": "enter", "action": "keyPress", "key": "Enter", "target": { "testId": "search" } },
+    {
+      "id": "searched",
+      "assertion": "textEquals",
+      "target": { "testId": "search-status" },
+      "expected": "Searched ${inputs.query}"
+    },
+    { "id": "type", "action": "type", "target": { "testId": "note" }, "value": "${inputs.note}" },
+    {
+      "id": "typed",
+      "assertion": "value",
+      "target": { "testId": "note" },
+      "expected": "${inputs.note}"
+    },
+    { "id": "pin", "action": "fill", "target": { "testId": "search" }, "value": "${inputs.pin}" },
+    {
+      "id": "pinned",
+      "assertion": "value",
+      "target": { "testId": "search" },
+      "expected": "${inputs.pin}"
+    },
+    { "id": "select", "action": "select", "target": { "label": "Color" }, "value": "Green" },
+    {
+      "id": "selected",
+      "assertion": "value",
+      "target": { "testId": "color" },
+      "expected": "green"
+    },
+    { "id": "locked", "assertion": "disabled", "target": { "role": "button", "name": "Continue" } },
+    { "id": "check", "action": "check", "target": { "label": "Accept the terms" } },
+    {
+      "id": "unlocked",
+      "assertion": "enabled",
+      "target": { "role": "button", "name": "Continue" }
+    },
+    { "id": "uncheck", "action": "uncheck", "target": { "testId": "terms" } },
+    { "id": "relocked", "assertion": "disabled", "target": { "testId": "continue" } },
+    { "id": "recheck", "action": "check", "target": { "testId": "terms" } },
+    { "id": "continue", "action": "click", "target": { "role": "button", "name": "Continue" } },
+    { "id": "done", "assertion": "visible", "target": { "testId": "done-panel" } },
+    { "id": "intro-gone", "assertion": "hidden", "target": { "testId": "intro" } },
+    { "id": "items", "assertion": "count", "target": { "testId": "item" }, "expected": 3 },
+    { "id": "price", "action": "extractText", "target": { "testId": "price" }, "saveAs": "price" },
+    {
+      "id": "priced",
+      "assertion": "textContains",
+      "target": { "testId": "price" },
+      "expected": "12.50"
+    },
+    {
+      "id": "sku",
+      "action": "extractAttribute",
+      "target": { "testId": "product" },
+      "attribute": "data-sku",
+      "saveAs": "sku"
+    },
+    {
+      "id": "fill-sku",
+      "action": "fill",
+      "target": { "testId": "search" },
+      "value": "${vars.sku}"
+    },
+    { "id": "enter-sku", "action": "keyPress", "key": "Enter" },
+    {
+      "id": "sku-searched",
+      "assertion": "textEquals",
+      "target": { "testId": "search-status" },
+      "expected": "Searched P-42"
+    },
+    { "id": "scroll", "action": "scroll", "deltaY": 600 },
+    {
+      "id": "scrolled",
+      "assertion": "textEquals",
+      "target": { "testId": "scroll-y" },
+      "expected": "Scrolled 600"
+    },
+    { "id": "scroll-to", "action": "scroll", "target": { "testId": "bottom" } },
+    { "id": "late", "action": "waitFor", "target": { "testId": "late" }, "state": "attached" },
+    {
+      "id": "click-late",
+      "action": "click",
+      "target": { "role": "button", "name": "Late button" }
+    },
+    {
+      "id": "late-once",
+      "assertion": "textEquals",
+      "target": { "testId": "late-status" },
+      "expected": "Late clicked 1"
+    },
+    { "id": "popup", "action": "click", "target": { "testId": "open-popup" } },
+    { "id": "to-popup", "action": "selectTab", "tab": "Submit result" },
+    { "id": "popup-url", "action": "waitFor", "url": "*/routes/submit-result?name=Popup" },
+    {
+      "id": "popup-text",
+      "assertion": "textEquals",
+      "target": { "testId": "result" },
+      "expected": "Received Popup"
+    },
+    { "id": "close-popup", "action": "closeTab" },
+    { "id": "new-tab", "action": "openTab", "url": "${env.base}/routes/form" },
+    { "id": "form-url", "assertion": "url", "expected": "*/routes/form" },
+    { "id": "back", "action": "selectTab", "tab": 0 },
+    { "id": "reload", "action": "reload" },
+    {
+      "id": "reset",
+      "assertion": "textEquals",
+      "target": { "testId": "late-status" },
+      "expected": ""
+    },
+    { "id": "gone", "action": "waitFor", "target": { "testId": "done-panel" }, "state": "hidden" }
+  ]
+}

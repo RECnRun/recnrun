@@ -40,7 +40,8 @@ Vite+ (`vp`) is the only toolchain. `vp <name>` runs a built-in command and `vp 
 | `vp check` (`--fix` to format)                                    | Format (Oxfmt), lint (Oxlint), and type check while editing                   |
 | `vp run deps`                                                     | Architecture boundaries (dependency-cruiser)                                  |
 | `vp run test:unit`, `test:components`, `test:e2e`, `test:browser` | One test layer: Node, Vitest Browser Mode, Playwright, Google Chrome over CDP |
-| `vp run test`                                                     | All four layers                                                               |
+| `vp run test:contract`                                            | The real service over HTTP and WebSocket, on a temporary home                 |
+| `vp run test`                                                     | All five layers                                                               |
 | `vp run test:coverage`                                            | Coverage with thresholds                                                      |
 | `vp run dead-code`, `vp run duplication`                          | Knip; jscpd                                                                   |
 | `vp run docs:check`                                               | Relative Markdown links and anchors resolve                                   |
@@ -82,7 +83,7 @@ Test commands and `verify` run in Docker, so start Docker Desktop first. If Dock
 - An architecture change (a new layer, package, or allowed dependency) updates `docs/ARCHITECTURE.md` and `.dependency-cruiser.cjs` in the same change, with the reason.
 - Never bypass Git hooks: no `--no-verify`/`-n`, `VP_GIT_HOOKS=0`, `HUSKY=0`, `core.hooksPath` changes, or `vp hooks disable`. Agent hooks in `scripts/agent-hooks/` deny these and run `vp check` and `vp run deps` when you stop (after three consecutive failures they let you stop with a warning; Git hooks still gate the commit).
 - Keep TypeScript strict and prefer `unknown` with narrowing over `any`. Lint caps `complexity` at 10, `sonarjs/cognitive-complexity` at 15, nesting depth at 3, functions at 50 lines, files at 300 lines, and parameters at 4, and requires `vite-plus` imports over `vite`/`vitest`.
-- In app source and tests, import from `src` through the `@/` alias, never with `../` paths (lint rejects them). `./` imports are fine.
+- In app source and tests, import from `src` through the `@/` alias, never with `../` paths (lint rejects them). `./` imports are fine. `apps/service/src` is the exception: it imports itself with `./` only, because the CLI and `tests/contract` compile it under their own `@/`.
 - Validate every request, message, and stored value with the `packages/protocol` schemas at the boundary where it enters (the service API, page instrumentation, files read from disk).
 - Never open a network connection to a host other than loopback from the service, the CLI, or the MCP server; tests enforce it with `RECNRUN_FORBID_EGRESS=1`.
 - Write code, comments, docs, UI copy, and diagnostics in English.

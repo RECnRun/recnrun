@@ -1,0 +1,44 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "properties": {
+    "acquiredAt": {
+      "minimum": 0,
+      "type": "integer"
+    },
+    "expiresAt": {
+      "minimum": 0,
+      "type": "integer"
+    },
+    "fencingToken": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "holderId": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "kind": {
+      "enum": ["manual", "agent", "replay"],
+      "type": "string"
+    },
+    "leaseId": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "targetId": {
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "leaseId",
+    "fencingToken",
+    "targetId",
+    "holderId",
+    "kind",
+    "acquiredAt",
+    "expiresAt"
+  ],
+  "type": "object"
+}

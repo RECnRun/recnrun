@@ -1,9 +1,19 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { methodNotAllowed, redirect, send, sendJson, sendText, startStream } from "./http.ts";
+import {
+  methodNotAllowed,
+  readBody,
+  redirect,
+  send,
+  sendJson,
+  sendText,
+  startStream,
+} from "./http.ts";
+import { handleOrders, type OrderCounts } from "./orders.ts";
 
 export interface ApiContext {
   readonly urls: { readonly first: string; readonly second: string };
   nextSerial(): number;
+  readonly orders: OrderCounts;
 }
 
 type Handler = (response: ServerResponse, url: URL, context: ApiContext) => void;
@@ -55,22 +65,6 @@ const GET_HANDLERS: Readonly<Record<string, Handler>> = {
     }),
 };
 
-/** Reads a request body, or returns undefined once it passes the limit. */
-function readBody(request: IncomingMessage, limit: number): Promise<string | undefined> {
-  return new Promise((resolve, reject) => {
-    const chunks: Buffer[] = [];
-    let size = 0;
-    request.on("data", (chunk: Buffer) => {
-      size += chunk.length;
-      if (size <= limit) chunks.push(chunk);
-    });
-    request.once("end", () =>
-      resolve(size > limit ? undefined : Buffer.concat(chunks).toString("utf8")),
-    );
-    request.once("error", reject);
-  });
-}
-
 async function submit(request: IncomingMessage, response: ServerResponse): Promise<void> {
   if (request.method !== "POST") {
     methodNotAllowed(response, "POST");
@@ -99,6 +93,7 @@ export async function handleApi(
   context: ApiContext,
 ): Promise<void> {
   if (url.pathname === "/api/submit") return submit(request, response);
+  if (url.pathname === "/api/orders") return handleOrders(request, response, url, context.orders);
   const hops = /^\/api\/redirect\/(\d+)$/.exec(url.pathname)?.[1];
   if (hops !== undefined) return redirectHop(response, Number(hops));
   const handler = GET_HANDLERS[url.pathname];

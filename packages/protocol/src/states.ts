@@ -70,3 +70,33 @@ export function isLegalTransition<S extends string>(
 ): boolean {
   return transitions[from].includes(to);
 }
+
+/**
+ * The three distinct pauses of source plan §6: `pauseStepCreation` keeps capturing but suggests no
+ * steps, `pauseReplay` stops the executor before its next step, and `suspendCapture` stops the
+ * observers, which opens a coverage gap.
+ */
+export const PAUSE_MODES = ["pauseStepCreation", "pauseReplay", "suspendCapture"] as const;
+
+/** Each pause is its own two-state machine, so pausing one never touches the others. */
+export const PAUSE_STATES = ["active", "paused"] as const;
+
+export const PauseModeSchema = v.picklist(PAUSE_MODES);
+export const PauseStateSchema = v.picklist(PAUSE_STATES);
+
+export type PauseMode = v.InferOutput<typeof PauseModeSchema>;
+export type PauseState = v.InferOutput<typeof PauseStateSchema>;
+
+export const PAUSE_TRANSITIONS: Transitions<PauseState> = {
+  active: ["paused"],
+  paused: ["active"],
+};
+
+/** The state of each pause of a session. */
+export const SessionPausesSchema = v.strictObject({
+  pauseStepCreation: PauseStateSchema,
+  pauseReplay: PauseStateSchema,
+  suspendCapture: PauseStateSchema,
+});
+
+export type SessionPauses = v.InferOutput<typeof SessionPausesSchema>;

@@ -18,3 +18,22 @@ export {
   type JournalContents,
   type JournalWriter,
 } from "./journal.ts";
+export { canonicalJson, canonicalize } from "./canonical.ts";
+export {
+  openFlowStore,
+  type FlowStore,
+  type FlowStoreOptions,
+  type SavedFlow,
+  type StoredFlow,
+} from "./flow-store.ts";
+export { flowToYaml, parseFlowYaml } from "./flow-yaml.ts";
+export type { CatalogRows, FlowCatalog } from "./index-db.ts";
+export { revisionOf } from "./revisions.ts";
+export type { RunHandle, RunResult, StoredRun } from "./runs.ts";
+export { FlowStoreError } from "./store-files.ts";
+export {
+  openServiceStateStore,
+  type LockReading,
+  type ServiceStateStore,
+} from "./service-state-store.ts";
+export { openRotatingLog, type RotatingLog, type RotatingLogOptions } from "./rotating-log.ts";

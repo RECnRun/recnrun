@@ -79,13 +79,22 @@ test("a failed reconnection reports the endpoint as gone", async () => {
 
 test("replays in one tab per connection and needs a connection first", async () => {
   const { adapter, links } = setup();
-  await expect(adapter.navigate("http://127.0.0.1:4600/")).rejects.toThrow("Not connected");
+  const navigate = (url: string) => adapter.act({ kind: "navigate", url }, { timeoutMs: 1000 });
+  expect(await navigate("http://127.0.0.1:4600/")).toMatchObject({
+    status: "not-dispatched",
+    message: expect.stringContaining("Not connected"),
+  });
   await adapter.connect(ENDPOINT, { source: { userDataDir: "/p" } });
-  await adapter.navigate("http://127.0.0.1:4600/a");
-  await adapter.navigate("http://127.0.0.1:4600/b");
+  expect(await adapter.tabs({ timeoutMs: 500 })).toEqual({ tabs: [], current: null });
+  expect(await navigate("http://127.0.0.1:4600/a")).toEqual({ status: "done" });
+  await navigate("http://127.0.0.1:4600/b");
+  expect(await adapter.tabs({ timeoutMs: 500 })).toEqual({
+    tabs: [{ url: "http://127.0.0.1:4600/b", title: "" }],
+    current: 0,
+  });
   links[0]?.drop();
   await adapter.reconnect();
-  await adapter.navigate("http://127.0.0.1:4600/c");
+  await navigate("http://127.0.0.1:4600/c");
   const replayCalls = (index: number) =>
     links[index]?.calls.filter((call) => /openPage|goto/.test(call));
   expect(replayCalls(0)).toEqual([

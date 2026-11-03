@@ -32,13 +32,32 @@
         "functions.test",
         "functions.call",
         "functions.proposeBuiltin",
-        "macros.extract"
+        "macros.extract",
+        "flow.list",
+        "flow.get",
+        "flow.save",
+        "flow.import",
+        "session.suggestions",
+        "picker.start",
+        "picker.stop",
+        "events.subscribe"
       ],
       "type": "string"
     },
-    "leaseToken": {
-      "minLength": 1,
-      "type": "string"
+    "lease": {
+      "additionalProperties": false,
+      "properties": {
+        "fencingToken": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "leaseId": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": ["leaseId", "fencingToken"],
+      "type": "object"
     },
     "params": {},
     "requestId": {

@@ -10,7 +10,8 @@
     "build": "tsc"
   },
   "dependencies": {
-    "@recnrun/protocol": "workspace:*"
+    "@recnrun/protocol": "workspace:*",
+    "yaml": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",

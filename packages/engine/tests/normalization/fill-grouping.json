@@ -1,0 +1,1078 @@
+{
+  "rule": "A run of input events on one field becomes one fill with the final value; a late change joins it, a select becomes select, and checkbox events join their click.",
+  "input": [
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#1",
+      "runId": "rec-1",
+      "seq": 1,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:00.000Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "pointerdown",
+      "payload": {
+        "target": {
+          "tag": "input",
+          "id": "name",
+          "testId": "name",
+          "name": "name",
+          "inputType": "text"
+        },
+        "isTrusted": true,
+        "x": 10,
+        "y": 20,
+        "button": 0,
+        "pointerType": "mouse",
+        "modifiers": []
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#2",
+      "runId": "rec-1",
+      "seq": 2,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:00.001Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "focusin",
+      "payload": {
+        "target": {
+          "tag": "input",
+          "id": "name",
+          "testId": "name",
+          "name": "name",
+          "inputType": "text"
+        },
+        "isTrusted": true
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#3",
+      "runId": "rec-1",
+      "seq": 3,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:00.040Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "pointerup",
+      "payload": {
+        "target": {
+          "tag": "input",
+          "id": "name",
+          "testId": "name",
+          "name": "name",
+          "inputType": "text"
+        },
+        "isTrusted": true,
+        "x": 10,
+        "y": 20,
+        "button": 0,
+        "pointerType": "mouse",
+        "modifiers": []
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#4",
+      "runId": "rec-1",
+      "seq": 4,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:00.041Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "click",
+      "payload": {
+        "target": {
+          "tag": "input",
+          "id": "name",
+          "testId": "name",
+          "name": "name",
+          "inputType": "text"
+        },
+        "isTrusted": true,
+        "x": 10,
+        "y": 20,
+        "button": 0,
+        "pointerType": "mouse",
+        "modifiers": [],
+        "detail": 1
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#5",
+      "runId": "rec-1",
+      "seq": 5,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:00.200Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "keydown",
+      "payload": {
+        "target": {
+          "tag": "input",
+          "id": "name",
+          "testId": "name",
+          "name": "name",
+          "inputType": "text"
+        },
+        "isTrusted": true,
+        "key": "A",
+        "code": "KeyA",
+        "repeat": false,
+        "modifiers": []
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#6",
+      "runId": "rec-1",
+      "seq": 6,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:00.201Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "input",
+      "payload": {
+        "target": {
+          "tag": "input",
+          "id": "name",
+          "testId": "name",
+          "name": "name",
+          "inputType": "text"
+        },
+        "isTrusted": true,
+        "inputType": "insertText",
+        "data": "A",
+        "isComposing": false,
+        "value": "A"
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#7",
+      "runId": "rec-1",
+      "seq": 7,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:00.260Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "keyup",
+      "payload": {
+        "target": {
+          "tag": "input",
+          "id": "name",
+          "testId": "name",
+          "name": "name",
+          "inputType": "text"
+        },
+        "isTrusted": true,
+        "key": "A",
+        "code": "KeyA",
+        "repeat": false,
+        "modifiers": []
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#8",
+      "runId": "rec-1",
+      "seq": 8,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:00.350Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "keydown",
+      "payload": {
+        "target": {
+          "tag": "input",
+          "id": "name",
+          "testId": "name",
+          "name": "name",
+          "inputType": "text"
+        },
+        "isTrusted": true,
+        "key": "d",
+        "code": "KeyD",
+        "repeat": false,
+        "modifiers": []
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#9",
+      "runId": "rec-1",
+      "seq": 9,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:00.351Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "input",
+      "payload": {
+        "target": {
+          "tag": "input",
+          "id": "name",
+          "testId": "name",
+          "name": "name",
+          "inputType": "text"
+        },
+        "isTrusted": true,
+        "inputType": "insertText",
+        "data": "d",
+        "isComposing": false,
+        "value": "Ad"
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#10",
+      "runId": "rec-1",
+      "seq": 10,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:00.410Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "keyup",
+      "payload": {
+        "target": {
+          "tag": "input",
+          "id": "name",
+          "testId": "name",
+          "name": "name",
+          "inputType": "text"
+        },
+        "isTrusted": true,
+        "key": "d",
+        "code": "KeyD",
+        "repeat": false,
+        "modifiers": []
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#11",
+      "runId": "rec-1",
+      "seq": 11,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:00.500Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "keydown",
+      "payload": {
+        "target": {
+          "tag": "input",
+          "id": "name",
+          "testId": "name",
+          "name": "name",
+          "inputType": "text"
+        },
+        "isTrusted": true,
+        "key": "a",
+        "code": "KeyA",
+        "repeat": false,
+        "modifiers": []
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#12",
+      "runId": "rec-1",
+      "seq": 12,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:00.501Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "input",
+      "payload": {
+        "target": {
+          "tag": "input",
+          "id": "name",
+          "testId": "name",
+          "name": "name",
+          "inputType": "text"
+        },
+        "isTrusted": true,
+        "inputType": "insertText",
+        "data": "a",
+        "isComposing": false,
+        "value": "Ada"
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#13",
+      "runId": "rec-1",
+      "seq": 13,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:00.560Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "keyup",
+      "payload": {
+        "target": {
+          "tag": "input",
+          "id": "name",
+          "testId": "name",
+          "name": "name",
+          "inputType": "text"
+        },
+        "isTrusted": true,
+        "key": "a",
+        "code": "KeyA",
+        "repeat": false,
+        "modifiers": []
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#14",
+      "runId": "rec-1",
+      "seq": 14,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:00.900Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "input",
+      "payload": {
+        "target": {
+          "tag": "select",
+          "id": "plan",
+          "testId": "plan",
+          "name": "plan"
+        },
+        "isTrusted": true,
+        "inputType": "",
+        "isComposing": false,
+        "value": "pro"
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#15",
+      "runId": "rec-1",
+      "seq": 15,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:00.901Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "change",
+      "payload": {
+        "target": {
+          "tag": "select",
+          "id": "plan",
+          "testId": "plan",
+          "name": "plan"
+        },
+        "isTrusted": true,
+        "value": "pro"
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#16",
+      "runId": "rec-1",
+      "seq": 16,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:01.500Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "pointerdown",
+      "payload": {
+        "target": {
+          "tag": "input",
+          "id": "terms",
+          "testId": "terms",
+          "name": "terms",
+          "inputType": "checkbox"
+        },
+        "isTrusted": true,
+        "x": 10,
+        "y": 20,
+        "button": 0,
+        "pointerType": "mouse",
+        "modifiers": []
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#17",
+      "runId": "rec-1",
+      "seq": 17,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:01.501Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "change",
+      "payload": {
+        "target": {
+          "tag": "input",
+          "id": "name",
+          "testId": "name",
+          "name": "name",
+          "inputType": "text"
+        },
+        "isTrusted": true,
+        "value": "Ada"
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#18",
+      "runId": "rec-1",
+      "seq": 18,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:01.502Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "focusout",
+      "payload": {
+        "target": {
+          "tag": "input",
+          "id": "name",
+          "testId": "name",
+          "name": "name",
+          "inputType": "text"
+        },
+        "isTrusted": true
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#19",
+      "runId": "rec-1",
+      "seq": 19,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:01.503Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "focusin",
+      "payload": {
+        "target": {
+          "tag": "input",
+          "id": "terms",
+          "testId": "terms",
+          "name": "terms",
+          "inputType": "checkbox"
+        },
+        "isTrusted": true
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#20",
+      "runId": "rec-1",
+      "seq": 20,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:01.540Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "pointerup",
+      "payload": {
+        "target": {
+          "tag": "input",
+          "id": "terms",
+          "testId": "terms",
+          "name": "terms",
+          "inputType": "checkbox"
+        },
+        "isTrusted": true,
+        "x": 10,
+        "y": 20,
+        "button": 0,
+        "pointerType": "mouse",
+        "modifiers": []
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#21",
+      "runId": "rec-1",
+      "seq": 21,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:01.541Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "click",
+      "payload": {
+        "target": {
+          "tag": "input",
+          "id": "terms",
+          "testId": "terms",
+          "name": "terms",
+          "inputType": "checkbox"
+        },
+        "isTrusted": true,
+        "x": 10,
+        "y": 20,
+        "button": 0,
+        "pointerType": "mouse",
+        "modifiers": [],
+        "detail": 1
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#22",
+      "runId": "rec-1",
+      "seq": 22,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:01.542Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "input",
+      "payload": {
+        "target": {
+          "tag": "input",
+          "id": "terms",
+          "testId": "terms",
+          "name": "terms",
+          "inputType": "checkbox"
+        },
+        "isTrusted": true,
+        "inputType": "",
+        "isComposing": false,
+        "checked": true,
+        "value": "on"
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#23",
+      "runId": "rec-1",
+      "seq": 23,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:01.543Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "change",
+      "payload": {
+        "target": {
+          "tag": "input",
+          "id": "terms",
+          "testId": "terms",
+          "name": "terms",
+          "inputType": "checkbox"
+        },
+        "isTrusted": true,
+        "checked": true,
+        "value": "on"
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#24",
+      "runId": "rec-1",
+      "seq": 24,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:02.000Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "pointerdown",
+      "payload": {
+        "target": {
+          "tag": "button",
+          "testId": "submit",
+          "inputType": "submit"
+        },
+        "isTrusted": true,
+        "x": 10,
+        "y": 20,
+        "button": 0,
+        "pointerType": "mouse",
+        "modifiers": []
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#25",
+      "runId": "rec-1",
+      "seq": 25,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:02.001Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "focusout",
+      "payload": {
+        "target": {
+          "tag": "input",
+          "id": "terms",
+          "testId": "terms",
+          "name": "terms",
+          "inputType": "checkbox"
+        },
+        "isTrusted": true
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#26",
+      "runId": "rec-1",
+      "seq": 26,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:02.002Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "focusin",
+      "payload": {
+        "target": {
+          "tag": "button",
+          "testId": "submit",
+          "inputType": "submit"
+        },
+        "isTrusted": true
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#27",
+      "runId": "rec-1",
+      "seq": 27,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:02.040Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "pointerup",
+      "payload": {
+        "target": {
+          "tag": "button",
+          "testId": "submit",
+          "inputType": "submit"
+        },
+        "isTrusted": true,
+        "x": 10,
+        "y": 20,
+        "button": 0,
+        "pointerType": "mouse",
+        "modifiers": []
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#28",
+      "runId": "rec-1",
+      "seq": 28,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:02.041Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "click",
+      "payload": {
+        "target": {
+          "tag": "button",
+          "testId": "submit",
+          "inputType": "submit"
+        },
+        "isTrusted": true,
+        "x": 10,
+        "y": 20,
+        "button": 0,
+        "pointerType": "mouse",
+        "modifiers": [],
+        "detail": 1
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#29",
+      "runId": "rec-1",
+      "seq": 29,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:02.042Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "dom",
+      "type": "submit",
+      "payload": {
+        "target": {
+          "tag": "form",
+          "testId": "signup"
+        },
+        "isTrusted": true
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "cdp:S1#30",
+      "runId": "rec-1",
+      "seq": 30,
+      "source": "S1",
+      "producer": "cdp:S1",
+      "timestamp": "2026-11-02T10:00:02.300Z",
+      "component": "application",
+      "targetId": "T1",
+      "frameId": "T1",
+      "documentId": "D1",
+      "category": "navigation",
+      "type": "committed",
+      "payload": {
+        "url": "http://127.0.0.1:4600/routes/form?sent=1"
+      }
+    }
+  ],
+  "expected": {
+    "steps": [
+      {
+        "id": "click-1",
+        "action": "click",
+        "target": {
+          "resolution": "orderedFallback",
+          "cardinality": "one",
+          "locators": [
+            {
+              "strategy": "testId",
+              "value": "name"
+            },
+            {
+              "strategy": "css",
+              "value": "#name"
+            },
+            {
+              "strategy": "css",
+              "value": "input[name=\"name\"]"
+            }
+          ]
+        },
+        "events": [
+          {
+            "id": "cdp:S1#1",
+            "producer": "cdp:S1",
+            "seq": 1
+          },
+          {
+            "id": "cdp:S1#3",
+            "producer": "cdp:S1",
+            "seq": 3
+          },
+          {
+            "id": "cdp:S1#4",
+            "producer": "cdp:S1",
+            "seq": 4
+          }
+        ]
+      },
+      {
+        "id": "fill-2",
+        "action": "fill",
+        "target": {
+          "resolution": "orderedFallback",
+          "cardinality": "one",
+          "locators": [
+            {
+              "strategy": "testId",
+              "value": "name"
+            },
+            {
+              "strategy": "css",
+              "value": "#name"
+            },
+            {
+              "strategy": "css",
+              "value": "input[name=\"name\"]"
+            }
+          ]
+        },
+        "value": "Ada",
+        "events": [
+          {
+            "id": "cdp:S1#5",
+            "producer": "cdp:S1",
+            "seq": 5
+          },
+          {
+            "id": "cdp:S1#6",
+            "producer": "cdp:S1",
+            "seq": 6
+          },
+          {
+            "id": "cdp:S1#7",
+            "producer": "cdp:S1",
+            "seq": 7
+          },
+          {
+            "id": "cdp:S1#8",
+            "producer": "cdp:S1",
+            "seq": 8
+          },
+          {
+            "id": "cdp:S1#9",
+            "producer": "cdp:S1",
+            "seq": 9
+          },
+          {
+            "id": "cdp:S1#10",
+            "producer": "cdp:S1",
+            "seq": 10
+          },
+          {
+            "id": "cdp:S1#11",
+            "producer": "cdp:S1",
+            "seq": 11
+          },
+          {
+            "id": "cdp:S1#12",
+            "producer": "cdp:S1",
+            "seq": 12
+          },
+          {
+            "id": "cdp:S1#13",
+            "producer": "cdp:S1",
+            "seq": 13
+          },
+          {
+            "id": "cdp:S1#17",
+            "producer": "cdp:S1",
+            "seq": 17
+          }
+        ]
+      },
+      {
+        "id": "select-3",
+        "action": "select",
+        "target": {
+          "resolution": "orderedFallback",
+          "cardinality": "one",
+          "locators": [
+            {
+              "strategy": "testId",
+              "value": "plan"
+            },
+            {
+              "strategy": "css",
+              "value": "#plan"
+            },
+            {
+              "strategy": "css",
+              "value": "select[name=\"plan\"]"
+            }
+          ]
+        },
+        "value": "pro",
+        "events": [
+          {
+            "id": "cdp:S1#14",
+            "producer": "cdp:S1",
+            "seq": 14
+          },
+          {
+            "id": "cdp:S1#15",
+            "producer": "cdp:S1",
+            "seq": 15
+          }
+        ]
+      },
+      {
+        "id": "click-4",
+        "action": "click",
+        "target": {
+          "resolution": "orderedFallback",
+          "cardinality": "one",
+          "locators": [
+            {
+              "strategy": "testId",
+              "value": "terms"
+            },
+            {
+              "strategy": "css",
+              "value": "#terms"
+            },
+            {
+              "strategy": "css",
+              "value": "input[name=\"terms\"]"
+            }
+          ]
+        },
+        "events": [
+          {
+            "id": "cdp:S1#16",
+            "producer": "cdp:S1",
+            "seq": 16
+          },
+          {
+            "id": "cdp:S1#20",
+            "producer": "cdp:S1",
+            "seq": 20
+          },
+          {
+            "id": "cdp:S1#21",
+            "producer": "cdp:S1",
+            "seq": 21
+          },
+          {
+            "id": "cdp:S1#22",
+            "producer": "cdp:S1",
+            "seq": 22
+          },
+          {
+            "id": "cdp:S1#23",
+            "producer": "cdp:S1",
+            "seq": 23
+          }
+        ]
+      },
+      {
+        "id": "click-5",
+        "action": "click",
+        "target": {
+          "resolution": "orderedFallback",
+          "cardinality": "one",
+          "locators": [
+            {
+              "strategy": "testId",
+              "value": "submit"
+            }
+          ]
+        },
+        "events": [
+          {
+            "id": "cdp:S1#24",
+            "producer": "cdp:S1",
+            "seq": 24
+          },
+          {
+            "id": "cdp:S1#27",
+            "producer": "cdp:S1",
+            "seq": 27
+          },
+          {
+            "id": "cdp:S1#28",
+            "producer": "cdp:S1",
+            "seq": 28
+          },
+          {
+            "id": "cdp:S1#29",
+            "producer": "cdp:S1",
+            "seq": 29
+          }
+        ]
+      }
+    ],
+    "excluded": [
+      {
+        "event": {
+          "id": "cdp:S1#30",
+          "producer": "cdp:S1",
+          "seq": 30
+        },
+        "reason": "navigation-caused"
+      }
+    ]
+  }
+}
