@@ -1,4 +1,8 @@
 import { defineConfig } from "wxt";
+import {
+  MODULE_BOOTSTRAP_PATH,
+  renderModuleResource,
+} from "./src/background/route-b/module-resource.ts";
 
 export default defineConfig({
   srcDir: "src",
@@ -7,6 +11,14 @@ export default defineConfig({
   webExt: {
     // A persistent profile keeps extension storage between dev runs; `vp run clean` resets it.
     chromiumArgs: ["--user-data-dir=./.wxt/chrome-data"],
+  },
+  hooks: {
+    // Route B (E5) imports the bootstrap as a module; dist/ exists at build time, not at prepare.
+    "build:publicAssets": async (_wxt, files) => {
+      const { BOOTSTRAP_SOURCE } = await import("@recnrun/worker-bootstrap");
+      const contents = renderModuleResource(BOOTSTRAP_SOURCE);
+      files.push({ relativeDest: MODULE_BOOTSTRAP_PATH, contents });
+    },
   },
   manifest: {
     name: "RECnRun Isolator (POC)",
@@ -20,11 +32,16 @@ export default defineConfig({
       "http://app.localhost:4603/*",
       "http://*.localhost/*",
     ],
-    // Route C's worker wrappers import the slot and the bootstrap from the app origins.
     web_accessible_resources: [
+      // Route C's worker wrappers import the slot and the bootstrap from the app origins.
       {
         resources: ["route-c.js", "ns/*.js"],
         matches: ["http://app.localhost:4600/*", "http://app.localhost:4603/*"],
+      },
+      // Route B (E5): a module service worker on a loopback origin imports the bootstrap from here.
+      {
+        resources: [MODULE_BOOTSTRAP_PATH],
+        matches: ["http://*.localhost/*", "http://localhost/*", "http://127.0.0.1/*"],
       },
     ],
   },

@@ -109,9 +109,10 @@ describe("Route C manifest and slot files", () => {
     const { permissions, host_permissions, web_accessible_resources } = config.default.manifest;
     expect(permissions).toContain("scripting");
     expect(host_permissions).toEqual(expect.arrayContaining(APP_MATCHES));
-    expect(web_accessible_resources).toEqual([
-      { resources: ["route-c.js", "ns/*.js"], matches: APP_MATCHES },
-    ]);
+    expect(web_accessible_resources).toContainEqual({
+      resources: ["route-c.js", "ns/*.js"],
+      matches: APP_MATCHES,
+    });
   });
 
   test("each slot file sets only its own marker, and each strategy file only its name", async () => {
