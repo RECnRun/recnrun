@@ -6,7 +6,10 @@ export type Handler<T extends PushType> = (message: PushMessage<T>) => void;
 
 export type Subscribe = <T extends PushType>(type: T, handler: Handler<T>) => () => void;
 
-export type EventBus = { on: Subscribe; close: () => void };
+/** Calls `handler` each time the socket opens and subscribes; answers how to stop. */
+export type OnOpen = (handler: () => void) => () => void;
+
+export type EventBus = { on: Subscribe; onOpen: OnOpen; close: () => void };
 
 type Socket = Pick<WebSocket, "send" | "close"> & {
   onopen: ((event: Event) => void) | null;
@@ -37,6 +40,7 @@ function parse(data: unknown): PushMessage<PushType> | undefined {
 /** Listens to the service's WebSocket and reconnects with backoff until closed. */
 export function createEventBus(options: BusOptions): EventBus {
   const handlers = new Map<PushType, Set<(message: unknown) => void>>();
+  const opened = new Set<() => void>();
   const connect = options.connect ?? ((url: string) => new WebSocket(url));
   const retryMs = options.retryMs ?? 500;
   let delay = retryMs;
@@ -51,6 +55,8 @@ export function createEventBus(options: BusOptions): EventBus {
       delay = retryMs;
       const subscribe = { requestId: crypto.randomUUID(), command: "events.subscribe", params: {} };
       current.send(JSON.stringify(subscribe));
+      // Pushes sent while the socket was down are lost, so listeners recover what they missed.
+      opened.forEach((handler) => handler());
     };
     current.onmessage = (event) => {
       const message = parse(event.data);
@@ -71,6 +77,10 @@ export function createEventBus(options: BusOptions): EventBus {
       const entry = handler as (message: unknown) => void;
       set.add(entry);
       return () => set.delete(entry);
+    },
+    onOpen: (handler) => {
+      opened.add(handler);
+      return () => opened.delete(handler);
     },
     close: () => {
       closed = true;

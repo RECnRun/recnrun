@@ -1,7 +1,9 @@
 import type { RunSummary, StepResult } from "@recnrun/protocol";
 import { useEffect, useState } from "preact/hooks";
 import { useAction, useApi } from "@/api/context";
+import type { ApiError } from "@/api/error";
 import type { RunValues } from "@/features/run/inputs";
+import { useReconcile } from "@/features/run/reconcile";
 import { stepResultOf } from "@/features/run/steps";
 
 type Pushed = { runId: string; result: StepResult };
@@ -16,13 +18,33 @@ function latestResults(results: StepResult[]): StepResult[] {
   return [...rows.values()];
 }
 
-/** Starts a replay and follows its pushed step events until the service pushes its summary. */
+const storageKey = (flowId: string) => `recnrun.run.${flowId}`;
+
+/** The run this tab last started for the flow; storage may be unavailable, which only loses it. */
+function storedRun(flowId: string): string | undefined {
+  try {
+    return sessionStorage.getItem(storageKey(flowId)) ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function storeRun(flowId: string, runId: string) {
+  try {
+    sessionStorage.setItem(storageKey(flowId), runId);
+  } catch {
+    // Without storage, a remount simply starts from an empty screen.
+  }
+}
+
+/** Starts a replay and follows its pushed step events until its summary or failure is known. */
 export function useRun(flowId: string) {
   const api = useApi();
   const { error, busy, run } = useAction();
-  const [runId, setRunId] = useState<string>();
+  const [runId, setRunId] = useState(() => storedRun(flowId));
   const [pushed, setPushed] = useState<Pushed[]>([]);
   const [summaries, setSummaries] = useState<RunSummary[]>([]);
+  const [failure, setFailure] = useState<ApiError>();
   // Subscribed before the replay starts, since events can arrive before its answer does.
   useEffect(() => {
     const offStep = api.on("run.step", ({ runId: id, event }) => {
@@ -38,15 +60,24 @@ export function useRun(flowId: string) {
     };
   }, [api]);
   const summary = summaries.find((entry) => entry.runId === runId);
+  const settled = summary !== undefined || failure !== undefined;
+  useReconcile(runId, settled, {
+    summary: (found) => setSummaries((list) => [...list, found]),
+    failure: setFailure,
+  });
   const start = ({ inputs, secrets }: RunValues) =>
     run(async () => {
       setRunId(undefined);
+      setFailure(undefined);
       // Secrets go only in their own transient field, and only when there are any.
       const params =
         Object.keys(secrets).length > 0 ? { flowId, inputs, secrets } : { flowId, inputs };
-      setRunId((await api.call("flow.replay", params)).runId);
+      const started = (await api.call("flow.replay", params)).runId;
+      storeRun(flowId, started);
+      setRunId(started);
     });
   const own = pushed.filter((message) => message.runId === runId).map(({ result }) => result);
-  const running = runId !== undefined && summary === undefined;
-  return { runId, steps: latestResults(own), summary, running, error, busy, start };
+  const running = runId !== undefined && !settled;
+  const shown = error ?? failure;
+  return { runId, steps: latestResults(own), summary, running, error: shown, busy, start };
 }

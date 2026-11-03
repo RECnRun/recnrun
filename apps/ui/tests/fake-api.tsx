@@ -17,6 +17,7 @@ type Recorded = { command: UiCommand; params: unknown; options?: CallOptions | u
 export function fakeApi(handlers: Handlers) {
   const calls: Recorded[] = [];
   const listeners = new Map<PushType, Set<(message: unknown) => void>>();
+  const opened = new Set<() => void>();
   const api: Api = {
     call: async (command, params, options) => {
       calls.push({ command, params, options });
@@ -30,12 +31,17 @@ export function fakeApi(handlers: Handlers) {
       set.add(handler as (message: unknown) => void);
       return () => set.delete(handler as (message: unknown) => void);
     },
+    onOpen: (handler) => {
+      opened.add(handler);
+      return () => opened.delete(handler);
+    },
   };
   const emit = <T extends PushType>(type: T, message: PushMessage<T>) =>
     listeners.get(type)?.forEach((listener) => listener(message));
+  const reconnect = () => opened.forEach((handler) => handler());
   const paramsOf = (command: UiCommand) =>
     calls.filter((call) => call.command === command).map((call) => call.params);
-  return { api, calls, emit, paramsOf, handlers };
+  return { api, calls, emit, reconnect, paramsOf, handlers };
 }
 
 /** Renders `ui` alone in the document with `api` provided. */

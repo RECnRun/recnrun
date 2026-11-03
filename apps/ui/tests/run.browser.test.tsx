@@ -49,10 +49,16 @@ const SUMMARY: RunSummary = {
   failures: [{ stepId: "email", message: "No element matched the label Email." }],
 };
 
+const going = () => {
+  throw new ApiError("conflict", "Run run-1 is still running.");
+};
+
 function runScreen(flow: Flow = FLOW) {
+  sessionStorage.clear();
   const fake = fakeApi({
     "flow.get": () => ({ flow, manifest: MANIFEST, revision: REVISION }),
     "flow.replay": () => ({ runId: "run-1" }),
+    "run.summary": going,
   });
   renderWith(fake.api, <Run flowId="login" />);
   return fake;
@@ -166,7 +172,56 @@ test("shows live step results of its own run, then the pushed summary", async ()
   fake.emit("run.finished", { type: "run.finished", runId: "run-1", summary: SUMMARY });
   const summary = page.getByRole("region", { name: "Run summary" });
   await expectTexts(summary, "failed", "Exit code 1", "passed1", "failed1", "email", error.message);
-  expect(fake.paramsOf("run.summary")).toEqual([]);
+  await expect.element(page.getByRole("button", { name: "Start run" })).toBeEnabled();
+  expect(fake.paramsOf("run.summary")[0]).toEqual({ runId: "run-1" });
+});
+
+const startButton = () => page.getByRole("button", { name: "Start run" });
+
+test("recovers the summary through run.summary when the push never arrives", async () => {
+  const fake = runScreen({ ...FLOW, inputs: {} });
+  let asked = 0;
+  fake.handlers["run.summary"] = () => {
+    asked += 1;
+    return asked < 2 ? going() : SUMMARY;
+  };
+  await start();
+  await expect.element(startButton()).toBeDisabled();
+  const summary = page.getByRole("region", { name: "Run summary" });
+  await expectTexts(summary, "failed", "Exit code 1");
+  await expect.element(startButton()).toBeEnabled();
+});
+
+test("asks for the summary again as soon as the event socket reconnects", async () => {
+  const fake = runScreen({ ...FLOW, inputs: {} });
+  await start();
+  await expect.poll(() => fake.paramsOf("run.summary").length).toBe(2);
+  fake.handlers["run.summary"] = () => SUMMARY;
+  fake.reconnect();
+  // The next poll is a second away, so only the reconnect can ask this soon.
+  await expect.poll(() => fake.paramsOf("run.summary").length, { timeout: 400 }).toBe(3);
+  await expectTexts(page.getByRole("region", { name: "Run summary" }), "Exit code 1");
+});
+
+test("surfaces a replay that failed before it could write a summary", async () => {
+  const fake = runScreen({ ...FLOW, inputs: {} });
+  fake.handlers["run.summary"] = () => {
+    throw new ApiError("internal", "Chrome closed the CDP connection.");
+  };
+  await start();
+  await expectTexts(page.getByRole("alert"), "Chrome closed the CDP connection.", "internal");
+  await expect.element(startButton()).toBeEnabled();
+});
+
+test("returning to the Run screen restores the run it started", async () => {
+  const fake = runScreen({ ...FLOW, inputs: {} });
+  await start();
+  await expect.poll(() => fake.paramsOf("run.summary").length).toBeGreaterThan(0);
+  renderWith(fake.api, <p>Elsewhere</p>);
+  fake.handlers["run.summary"] = () => SUMMARY;
+  renderWith(fake.api, <Run flowId="login" />);
+  await expectTexts(page.getByRole("region", { name: "Run summary" }), "failed", "Exit code 1");
+  expect(fake.paramsOf("flow.replay")).toHaveLength(1);
 });
 
 test("rejects inputs that do not parse before calling the service", async () => {

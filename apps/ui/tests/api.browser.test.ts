@@ -159,9 +159,12 @@ test("delivers valid push messages, drops others, subscribes, and reconnects", a
   FakeSocket.all = [];
   const bus = createEventBus({ url: "ws://x/ws", connect: () => new FakeSocket(), retryMs: 1 });
   const seen: unknown[] = [];
+  let opened = 0;
   bus.on("run.finished", (message) => seen.push(message));
+  bus.onOpen(() => (opened += 1));
   const first = socket(0);
   first.onopen?.(new Event("open"));
+  expect(opened).toBe(1);
   expect(JSON.parse(first.sent[0] ?? "{}")).toMatchObject({ command: "events.subscribe" });
   first.push(finished("run-1"));
   first.push({ type: "run.finished", runId: "run-x" });
@@ -169,6 +172,8 @@ test("delivers valid push messages, drops others, subscribes, and reconnects", a
   expect(seen).toEqual([finished("run-1")]);
   first.onclose?.(new CloseEvent("close"));
   await vi.waitFor(() => expect(FakeSocket.all).toHaveLength(2));
+  socket(1).onopen?.(new Event("open"));
+  expect(opened).toBe(2);
   socket(1).push(finished("run-2"));
   expect(seen).toEqual([finished("run-1"), finished("run-2")]);
   bus.close();

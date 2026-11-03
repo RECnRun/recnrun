@@ -1,8 +1,8 @@
 import { type Call, createCall } from "@/api/http";
-import { type Subscribe, createEventBus } from "@/api/events";
+import { type OnOpen, type Subscribe, createEventBus } from "@/api/events";
 
 /** What screens use: commands to the service and the messages it pushes. Tests pass a fake. */
-export type Api = { call: Call; on: Subscribe };
+export type Api = { call: Call; on: Subscribe; onOpen: OnOpen };
 
 /** The token the service injects into the page it serves; never stored or logged. */
 export function readToken(doc: Document): string | undefined {
@@ -16,5 +16,5 @@ export function createServiceApi(token: string, location: Location): Api {
   const bus = createEventBus({
     url: `${scheme}://${location.host}/ws?token=${encodeURIComponent(token)}`,
   });
-  return { call: createCall({ token }), on: bus.on };
+  return { call: createCall({ token }), on: bus.on, onOpen: bus.onOpen };
 }
