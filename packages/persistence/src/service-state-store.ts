@@ -1,5 +1,5 @@
-import { randomUUID } from "node:crypto";
-import { chmod, link, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { createHash, randomUUID } from "node:crypto";
+import { chmod, link, mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
   parseServiceLock,
@@ -78,11 +78,56 @@ async function stage<T>(
 
 type LockFile = Pick<ServiceStateStore, "createLock" | "readLock" | "removeLock">;
 
+// A removal claim lives for a read and a rename; one this old belongs to a remover that died.
+const CLAIM_STALE_MS = 10_000;
+
+const claimKey = (nonce: string | undefined) =>
+  nonce === undefined ? "invalid" : createHash("sha256").update(nonce).digest("hex").slice(0, 32);
+
+const holds = (reading: LockReading, nonce: string | undefined) =>
+  reading.kind === "invalid"
+    ? nonce === undefined
+    : reading.kind === "held" && reading.lock.nonce === nonce;
+
+/** Takes the sole right to remove the lock holding `key`; undefined while a live remover has it. */
+async function claimRemoval(folder: string, key: string): Promise<string[] | undefined> {
+  const attempts: string[] = [];
+  for (let attempt = 1; ; attempt += 1) {
+    const path = join(folder, `.service.lock.${key}.${attempt}.claim`);
+    attempts.push(path);
+    try {
+      await writeFile(path, "", { mode: 0o600, flag: "wx" });
+      return attempts;
+    } catch (error) {
+      if (errorCode(error) !== "EEXIST") throw error;
+    }
+    const held = await stat(path).catch(() => undefined);
+    if (held === undefined || Date.now() - held.mtimeMs < CLAIM_STALE_MS) return undefined;
+  }
+}
+
 function openLockFile(folder: string, lockPath: string): LockFile {
-  const readLock = async (): Promise<LockReading> => {
-    const parsed = await readJson(lockPath, parseServiceLock);
+  const readLockAt = async (path: string): Promise<LockReading> => {
+    const parsed = await readJson(path, parseServiceLock);
     if (parsed === undefined) return { kind: "absent" };
     return parsed.ok ? { kind: "held", lock: parsed.value } : { kind: "invalid" };
+  };
+  const readLock = () => readLockAt(lockPath);
+  // Moved aside before the check, so the lock checked is the lock removed, never a newer one.
+  const displace = async (nonce: string | undefined): Promise<boolean> => {
+    if (!holds(await readLock(), nonce)) return false;
+    const moved = join(folder, `.service.lock.${randomUUID()}.removed`);
+    try {
+      await rename(lockPath, moved);
+    } catch (error) {
+      if (errorCode(error) === "ENOENT") return false;
+      throw error;
+    }
+    const removed = holds(await readLockAt(moved), nonce);
+    // A remover that outlived its claim moved a newer owner's lock: put it back.
+    if (!removed) await link(moved, lockPath).catch(() => undefined);
+    await rm(moved, { force: true });
+    return removed;
   };
   return {
     async createLock(lock) {
@@ -100,13 +145,13 @@ function openLockFile(folder: string, lockPath: string): LockFile {
     },
     readLock,
     async removeLock(nonce) {
-      const reading = await readLock();
-      if (reading.kind === "absent") return false;
-      const matches =
-        reading.kind === "invalid" ? nonce === undefined : reading.lock.nonce === nonce;
-      if (!matches) return false;
-      await rm(lockPath, { force: true });
-      return true;
+      const claim = await claimRemoval(folder, claimKey(nonce));
+      if (claim === undefined) return false;
+      try {
+        return await displace(nonce);
+      } finally {
+        await Promise.all(claim.map((path) => rm(path, { force: true })));
+      }
     },
   };
 }
