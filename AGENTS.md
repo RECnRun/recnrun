@@ -36,6 +36,7 @@ Vite+ (`vp`) is the only toolchain. `vp <name>` runs a built-in command and `vp 
 | `vp run test:unit`, `test:components`, `test:e2e` | One test layer: Node, Vitest Browser Mode, Playwright with extension |
 | `vp run test:browser`                             | Google Chrome Stable in Docker: install methods, the mesh            |
 | `vp run test:experiments`                         | POC hypotheses that write verdicts under `.artifacts/evidence/`      |
+| `vp run test:host -- <spec>`                      | Host only: the Mac's Google Chrome; needs `RECNRUN_HOST_ROOTS`       |
 | `vp run test`                                     | All five layers                                                      |
 
 | `vp run test:coverage` | Coverage with thresholds |

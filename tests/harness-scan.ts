@@ -121,9 +121,9 @@ async function sourceFiles(directory: string): Promise<string[]> {
     .sort();
 }
 
-/** Scans the lab harness: `tests/browser` and `tests/experiments`, relative paths from `root`. */
+/** Scans the harness: `tests/browser`, `tests/experiments`, and `tests/host`, relative to `root`. */
 export async function scanHarness(root: string): Promise<Site[]> {
-  const directories = ["tests/browser", "tests/experiments"].map((directory) =>
+  const directories = ["tests/browser", "tests/experiments", "tests/host"].map((directory) =>
     join(root, directory),
   );
   const files = (await Promise.all(directories.map(sourceFiles))).flat();

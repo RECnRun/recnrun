@@ -118,6 +118,18 @@ await test("runs the experiments of verify in smoke mode and leaves the experime
   assert.ok(!create.some((argument) => argument.startsWith("RECNRUN_EXPERIMENT_SAMPLES=")));
 });
 
+await test("refuses the host runner, which drives the installed Google Chrome of the Mac", async (context) => {
+  for (const task of ["test:host", "test:host:local"]) {
+    const result = await launch(context, "success", [], task);
+    assert.equal(result.code, 1, result.output);
+    assert.match(
+      result.output,
+      /test:host runs Google Chrome on the macOS host and never in Docker/,
+    );
+    assert.deepEqual(result.calls, []);
+  }
+});
+
 await test("preserves a failing test's exit code and copies evidence before removing the container", async (context) => {
   const result = await launch(context, "test-failure");
   assert.equal(result.code, 7, result.output);

@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 import { CdpClosedError, connectWebSocket, evaluateInServiceWorker } from "./cdp-client.ts";
 import type { CdpClient } from "./cdp-client.ts";
 import { launchChrome } from "./chrome.ts";
-import type { LaunchedChrome } from "./chrome.ts";
+import type { ChromeLaunchOptions, LaunchedChrome } from "./chrome.ts";
 
 /** The test build `vp run --no-cache extension#build:test` writes; its manifest has no `key`. */
 export const EXTENSION_PATH = fileURLToPath(
@@ -75,19 +75,22 @@ export async function attachExtension(
   };
 }
 
-export interface UnpackedOptions {
+export interface UnpackedOptions extends Pick<ChromeLaunchOptions, "executable" | "userDataDir"> {
   transport?: "port" | "pipe";
-  /** A root to reuse across launches; it outlives `close()`. */
-  userDataDir?: string;
+  /** Flags after `--enable-unsafe-extension-debugging`. */
+  args?: readonly string[];
 }
 
 /** Google Chrome Stable started so that it accepts `Extensions.loadUnpacked`. */
-export function launchForUnpacked({ transport = "port", userDataDir }: UnpackedOptions = {}) {
-  const profile = userDataDir === undefined ? {} : { userDataDir };
+export function launchForUnpacked({
+  transport = "port",
+  args = [],
+  ...rest
+}: UnpackedOptions = {}) {
   return launchChrome({
-    args: [UNSAFE_EXTENSION_DEBUGGING],
+    ...rest,
+    args: [UNSAFE_EXTENSION_DEBUGGING, ...args],
     pipe: transport === "pipe",
-    ...profile,
   });
 }
 

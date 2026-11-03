@@ -6,6 +6,6 @@ export default defineConfig({
   root: fileURLToPath(new URL(".", import.meta.url)),
   test: {
     name: "harness",
-    include: ["*.test.ts", "experiments/*.test.ts"],
+    include: ["*.test.ts", "experiments/*.test.ts", "host/*.test.ts"],
   },
 });

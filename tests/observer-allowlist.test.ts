@@ -4,8 +4,8 @@ import { scanHarness, scanSource } from "./harness-scan.ts";
 import type { Site } from "./harness-scan.ts";
 
 /**
- * POC PLAN.md decisions 5 and 7: the lab harness observes and never provides capability. Every
- * CDP command a file under tests/browser or tests/experiments sends is listed here with its reason.
+ * POC PLAN.md decisions 5 and 7: the harness observes and never provides capability. Every CDP
+ * command a file under tests/browser, tests/experiments, or tests/host sends is listed here with its reason.
  */
 const ALLOWED_COMMANDS: Record<string, string> = {
   "Browser.getVersion": "reads the product string",
@@ -44,6 +44,10 @@ const ALLOWED_FLAGS: Record<string, string> = {
   "--silent-debugger-extension-api": "hides the debugging infobar",
   "--enable-unsafe-extension-debugging": "Extensions.loadUnpacked",
   "--version": "a version query, not a browser launch",
+  "--no-default-browser-check": "no default-browser prompt on the host",
+  "--use-mock-keychain": "the host never reads the owner's Chrome Safe Storage key",
+  "--window-position": "keeps host windows off the owner's screen",
+  "--window-size": "keeps host windows small",
 };
 
 function commandViolation(site: Site): string | undefined {

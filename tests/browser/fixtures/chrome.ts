@@ -32,6 +32,8 @@ export interface ChromeLaunchOptions {
   userDataDir?: string;
   /** `false` leaves out `--silent-debugger-extension-api`. */
   silentDebugger?: boolean;
+  /** A Google Chrome executable to use instead of `resolveChromePath()`, as the host runner does. */
+  executable?: string;
 }
 
 /** The strict lab: no `--remote-debugging-*` flag, so no CDP client can exist at all. */
@@ -197,7 +199,7 @@ interface Started {
 
 async function start(options: ChromeLaunchOptions, cdp: boolean): Promise<Started> {
   requireDisplay();
-  const executable = resolveChromePath();
+  const executable = options.executable ?? resolveChromePath();
   const run = promisify(execFile);
   const version = (await run(executable, ["--version"], { timeout: VERSION_TIMEOUT_MS })).stdout;
   const userDataDir = options.userDataDir ?? (await mkdtemp(join(tmpdir(), "recnrun-chrome-")));

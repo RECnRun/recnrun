@@ -203,7 +203,15 @@ async function finish(code) {
   await new Promise((done) => log.end(done));
 }
 
+// POC PLAN.md P0.5: the host layer drives the installed Google Chrome of the Mac on purpose.
+const hostTasks = new Set(["test:host", "test:host:local"]);
+
 async function run() {
+  if (hostTasks.has(task)) {
+    throw new Error(
+      "test:host runs Google Chrome on the macOS host and never in Docker; run `vp run test:host` with RECNRUN_HOST_ROOTS set.",
+    );
+  }
   if (!tasks.has(task)) throw new Error(`Unknown container test task: ${task}`);
   if (process.env.RECNRUN_TEST_CONTAINER === "1") {
     throw new Error("Use the :local test tasks inside the test container.");
