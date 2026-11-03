@@ -34,6 +34,7 @@ const STORE_CODES: Record<FlowStoreErrorCode, ServiceError["code"]> = {
   "revision-mismatch": "conflict",
   "revision-conflict": "conflict",
   "run-exists": "conflict",
+  "flow-exists": "conflict",
 };
 
 /** A flow store error answers with the code a client can act on. */
@@ -93,6 +94,13 @@ function flowCommands(deps: CommandDeps): CommandHandlers {
       }),
     "flow.save": ({ flow }) => saveChecked(deps.store(), flow),
     "flow.import": ({ flow }) => saveChecked(deps.store(), flow),
+    "flow.duplicate": ({ flowId, newId, name }) =>
+      stored(async () => {
+        const saved = await deps.store().duplicateFlow(flowId, { id: newId, name });
+        return { flowId: newId, revision: saved.revision };
+      }),
+    "flow.getRevision": ({ flowId, revision }) =>
+      stored(async () => ({ flow: await deps.store().getRevision(flowId, revision), revision })),
     "flow.replay": (params) => stored(() => startReplay(deps, params)),
     "run.summary": ({ runId }) => stored(() => runSummary(deps, runId)),
     "run.queryEvents": (query) => stored(() => queryEvents(deps, query)),

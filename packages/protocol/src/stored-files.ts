@@ -24,6 +24,7 @@ export const FLOW_STORE_ERROR_CODES = [
   "revision-mismatch",
   "revision-conflict",
   "run-exists",
+  "flow-exists",
 ] as const;
 
 export type FlowStoreErrorCode = (typeof FLOW_STORE_ERROR_CODES)[number];

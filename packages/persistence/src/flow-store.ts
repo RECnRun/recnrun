@@ -11,6 +11,7 @@ import type {
 import { flowPaths, scanFlowFolders } from "./flow-folders.ts";
 import {
   createRun,
+  duplicateFlow,
   finishRun,
   repairFlowFiles,
   saveFlow,
@@ -47,6 +48,11 @@ export interface FlowStore {
   get(flowId: string): Promise<StoredFlow>;
   /** Validates and stores the flow; a change writes a new immutable revision. */
   saveFlow(flow: unknown, options?: { status?: FlowStatus }): Promise<SavedFlow>;
+  /** Stores the flow's current revision under a new id as a draft; an existing id is refused. */
+  duplicateFlow(
+    flowId: string,
+    copy: { id: string; name?: string | undefined },
+  ): Promise<SavedFlow>;
   /** The revisions the flow went through, oldest first. */
   listRevisions(flowId: string): Promise<RevisionRecord[]>;
   getRevision(flowId: string, revision: string): Promise<Flow>;
@@ -115,6 +121,7 @@ export async function openFlowStore({
     // Reads join the write queue, so a read never sees a save half done.
     get: (flowId) => exclusive(() => getFlow(flowsRoot, flowId)),
     saveFlow: (flow, options) => exclusive(() => saveFlow(context, flow, options?.status)),
+    duplicateFlow: (flowId, copy) => exclusive(() => duplicateFlow(context, flowId, copy)),
     listRevisions: async (flowId) =>
       (await readStored("flow-manifest", paths(flowId).manifest)).revisions,
     getRevision: (flowId, revision) => readRevision(paths(flowId).folder, revision),

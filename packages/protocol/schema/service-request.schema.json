@@ -37,6 +37,8 @@
         "flow.get",
         "flow.save",
         "flow.import",
+        "flow.duplicate",
+        "flow.getRevision",
         "session.suggestions",
         "picker.start",
         "picker.stop",

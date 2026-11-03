@@ -89,6 +89,34 @@ test("an edit writes a second revision and leaves the first unchanged", async ()
   expect(second.manifest.createdAt).toBe(first.manifest.createdAt);
 });
 
+test("a duplicate is a draft copy of the current revision with its own history", async () => {
+  await store.saveFlow(spikeFlow());
+  await store.saveFlow({ ...spikeFlow(), name: "Renamed" }, { status: "validated" });
+  const copy = await store.duplicateFlow("form-submit", { id: "form-copy", name: "Copy" });
+  expect(copy.manifest).toMatchObject({ id: "form-copy", name: "Copy", status: "draft" });
+  expect(copy.manifest.revisions).toHaveLength(1);
+  const stored = await store.get("form-copy");
+  expect(stored.flow).toMatchObject({ id: "form-copy", name: "Copy", steps: spikeFlow().steps });
+  expect((await store.get("form-submit")).manifest).toMatchObject({
+    name: "Renamed",
+    status: "validated",
+  });
+  expect((await store.listRevisions("form-submit")).length).toBe(2);
+  const again = await store.duplicateFlow("form-submit", { id: "form-again" });
+  expect(again.manifest.name).toBe("Renamed");
+  await expect(store.duplicateFlow("form-submit", { id: "form-copy" })).rejects.toMatchObject({
+    code: "flow-exists",
+  });
+  await expect(store.duplicateFlow("missing", { id: "x" })).rejects.toMatchObject({
+    code: "not-found",
+  });
+  expect((await store.list()).flows.map(({ id }) => id).toSorted()).toEqual([
+    "form-again",
+    "form-copy",
+    "form-submit",
+  ]);
+});
+
 test("a status change alone keeps the revision history", async () => {
   const first = await store.saveFlow(spikeFlow());
   const second = await store.saveFlow(spikeFlow(), { status: "validated" });

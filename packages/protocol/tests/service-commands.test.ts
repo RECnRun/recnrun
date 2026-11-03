@@ -80,3 +80,18 @@ describe("ServiceMessageSchema", () => {
     expect(v.safeParse(ServiceMessageSchema, { ...message, type: "run.done" }).success).toBe(false);
   });
 });
+
+describe("the F4.1 commands", () => {
+  test("duplicates a flow under a new id and reads one of its revisions", () => {
+    const duplicate = SERVICE_COMMANDS["flow.duplicate"];
+    const copy = { flowId: "f-1", newId: "f-2", name: "Copy" };
+    expect(v.safeParse(duplicate.params, copy).success).toBe(true);
+    expect(v.safeParse(duplicate.params, { flowId: "f-1", newId: "f 2" }).success).toBe(false);
+    expect(v.safeParse(duplicate.result, { flowId: "f-2", revision: REVISION }).success).toBe(true);
+    const revision = SERVICE_COMMANDS["flow.getRevision"];
+    expect(v.safeParse(revision.params, { flowId: "f-1", revision: REVISION }).success).toBe(true);
+    expect(v.safeParse(revision.params, { flowId: "f-1", revision: "latest" }).success).toBe(false);
+    expect(v.safeParse(revision.result, { flow: FLOW, revision: REVISION }).success).toBe(true);
+    expect(v.safeParse(revision.result, { flow: {}, revision: REVISION }).success).toBe(false);
+  });
+});

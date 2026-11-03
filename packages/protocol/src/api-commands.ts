@@ -191,6 +191,20 @@ export const SERVICE_COMMANDS = {
   "flow.save": { params: v.strictObject({ flow: FlowSchema }), result: SavedFlowSchema },
   // A flow file from outside the store, such as `recnrun run --flow`; stored like `flow.save`.
   "flow.import": { params: v.strictObject({ flow: FlowSchema }), result: SavedFlowSchema },
+  // A draft copy of the flow's current revision under a new id; an id in use is `conflict`.
+  "flow.duplicate": {
+    params: v.strictObject({
+      flowId: IdSchema,
+      newId: IdSchema,
+      name: v.optional(NonEmptyStringSchema),
+    }),
+    result: SavedFlowSchema,
+  },
+  // One revision of the flow's history, for comparison; the current one comes with `flow.get`.
+  "flow.getRevision": {
+    params: v.strictObject({ flowId: IdSchema, revision: RevisionHashSchema }),
+    result: v.strictObject({ flow: FlowSchema, revision: RevisionHashSchema }),
+  },
   "session.suggestions": { params: SessionRefSchema, result: NormalizationResultSchema },
   "picker.start": picker,
   "picker.stop": picker,
