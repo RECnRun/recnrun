@@ -2,12 +2,7 @@ import { parseMarker } from "@recnrun/isolation-core";
 import { BOOTSTRAP_HASH, BOOTSTRAP_VERSION } from "@recnrun/worker-bootstrap";
 import { isAttachedEvent } from "@/background/probes/auto-attach";
 import { PROTOCOL_VERSION, withTimeout } from "@/background/probes/helpers";
-import {
-  isLoopbackUrl,
-  loopbackPage,
-  loopbackTargetOf,
-  pageOf,
-} from "@/background/probes/loopback";
+import { isLoopbackUrl, armablePage, loopbackTargetOf, pageOf } from "@/background/probes/loopback";
 import type { Debuggee, DebuggerApi, EventListener } from "@/background/probes/types";
 import {
   AUTO_ATTACH,
@@ -68,7 +63,7 @@ export class RouteAEngine implements RouteA {
     this.#requireMarker();
     if (this.#armed.has(tabId)) throw new Error(`tab ${tabId} is already armed`);
     const api = this.#debuggerApi();
-    loopbackPage(await api.getTargets(), tabId);
+    armablePage(await api.getTargets(), tabId);
     this.#listenForDetach(api);
     const listener = this.#listenerFor(tabId, pauseBeforeScript);
     // Listening first: auto-attach reports the targets that already exist right away.

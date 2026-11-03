@@ -4,6 +4,7 @@ import type { AttachedEvent } from "@/background/probes/auto-attach";
 import { messageOf, PROTOCOL_VERSION, withTimeout } from "@/background/probes/helpers";
 import {
   isLoopbackUrl,
+  armablePage,
   loopbackPage,
   loopbackTargetOf,
   REFUSED,
@@ -86,7 +87,7 @@ export class RouteBEngine implements RouteB {
     const { tabId } = armRequest;
     if (this.#armed.has(tabId)) throw new Error(`tab ${tabId} is already armed`);
     const api = this.#debuggerApi();
-    loopbackPage(await api.getTargets(), tabId);
+    armablePage(await api.getTargets(), tabId);
     const armed: Armed = {
       request: armRequest,
       listener: this.#listenerFor(armRequest),

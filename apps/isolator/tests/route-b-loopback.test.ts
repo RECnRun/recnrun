@@ -37,6 +37,12 @@ describe("Route B refuses targets outside the loopback (R11)", () => {
     expect(calls).toEqual(["getTargets"]);
   });
 
+  test("arm accepts a tab still at about:blank, which has no origin yet", async () => {
+    const { engine, calls } = setup(loopbackTab(TAB, "about:blank#recnrun-e5"));
+    await engine.arm({ tabId: TAB, ...ARM });
+    expect(calls.slice(0, 2)).toEqual(["getTargets", "attach"]);
+  });
+
   test("stopWorker refuses a worker outside the loopback before it attaches", async () => {
     const { engine, calls } = setup();
     await expect(engine.stopWorker({ targetId: "outside-sw" })).rejects.toThrow(

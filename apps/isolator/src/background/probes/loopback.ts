@@ -46,6 +46,18 @@ export function loopbackPage(targets: TargetInfo[], tabId: number): TargetInfo {
   return page;
 }
 
+/** A tab with no document origin yet: `about:blank`, with or without a fragment. */
+function isBlankUrl(value: string): boolean {
+  return URL.canParse(value) && new URL(value).href.split("#")[0] === "about:blank";
+}
+
+/** The page to arm: arming precedes the navigation that starts a worker, so a blank tab passes too. */
+export function armablePage(targets: TargetInfo[], tabId: number): TargetInfo {
+  const page = pageOf(targets, tabId);
+  if (!isBlankUrl(page.url)) requireLoopback(`tab ${tabId}`, page.url);
+  return page;
+}
+
 /** The target `targetId`, refused when it is gone or outside the loopback. */
 export function loopbackTargetOf(targets: TargetInfo[], targetId: string): TargetInfo {
   const target = targetOf(targets, targetId);
