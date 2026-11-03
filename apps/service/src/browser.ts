@@ -1,4 +1,10 @@
-import { createCdpAdapter, startPicker, startRecording, type BodySink } from "@recnrun/adapter";
+import {
+  createCdpAdapter,
+  shareChrome,
+  startPicker,
+  startRecording,
+  type BodySink,
+} from "@recnrun/adapter";
 import type { ReplayDriver } from "@recnrun/engine";
 import type { CapturedEvent, DiscoveryResult, DomTarget } from "@recnrun/protocol";
 import { ServiceFailure } from "./dispatch.ts";
@@ -15,7 +21,7 @@ export interface PickerHandle {
   stop(): Promise<void>;
 }
 
-/** A replay's own connection to Chrome. */
+/** A replay's own driver over the service's connection to Chrome. */
 export interface DriverHandle {
   readonly driver: ReplayDriver;
   close(): Promise<void>;
@@ -43,20 +49,28 @@ export interface BrowserPort {
     targetId: string,
     onPicked: (target: DomTarget) => void,
   ): Promise<PickerHandle>;
-  /** Connects a replay driver of its own. */
+  /** Connects a replay driver with tabs of its own. */
   replayDriver(endpoint: string): Promise<DriverHandle>;
+  /** Closes every connection to Chrome, once sessions and replays have ended. */
+  close(): Promise<void>;
 }
 
+/** One socket and one Playwright connection per Chrome, shared by every command (F3.11). */
 export function createBrowserPort(): BrowserPort {
+  const shared = shareChrome();
+  const openChannel = (endpoint: string) => shared.lane(endpoint);
   return {
     discover: (options) => createCdpAdapter().discover(options),
-    record: (endpoint, capture) => startRecording(endpoint, { capture }),
-    pick: (endpoint, targetId, onPicked) => startPicker(endpoint, targetId, { onPicked }),
+    record: (endpoint, capture) => startRecording(endpoint, { capture, openChannel }),
+    pick: (endpoint, targetId, onPicked) =>
+      startPicker(endpoint, targetId, { onPicked, openChannel }),
     async replayDriver(endpoint) {
-      const adapter = createCdpAdapter();
+      // An adapter per run keeps each run's tabs its own over the shared connection.
+      const adapter = createCdpAdapter({ transport: shared.transport, openChannel });
       await adapter.connect(endpoint);
       return { driver: adapter, close: () => adapter.disconnect() };
     },
+    close: () => shared.close(),
   };
 }
 

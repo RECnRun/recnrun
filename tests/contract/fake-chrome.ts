@@ -23,6 +23,8 @@ export interface FakeChrome {
   /** Lets the replay's writes through; until then each one waits. */
   release(): void;
   readonly writes: string[];
+  /** What the service ended, in order: `record.stop`, `replay.close`, and `close`. */
+  readonly calls: string[];
 }
 
 function driver(gate: Promise<void>, writes: string[]): ReplayDriver {
@@ -51,17 +53,26 @@ export function fakeChrome(): FakeChrome {
   let release = () => {};
   const gate = new Promise<void>((resolve) => (release = resolve));
   const writes: string[] = [];
+  const calls: string[] = [];
   const adapter: BrowserPort = {
     discover: async () => FOUND,
     record: async (_endpoint, capture) => {
       onEvent = capture.onEvent;
-      return { targetId: "page-1", drain: async () => {}, stop: () => {} };
+      return {
+        targetId: "page-1",
+        drain: async () => {},
+        stop: () => void calls.push("record.stop"),
+      };
     },
     pick: async (_endpoint, _targetId, picked) => {
       onPicked = picked;
       return { stop: async () => {} };
     },
-    replayDriver: async () => ({ driver: driver(gate, writes), close: async () => {} }),
+    replayDriver: async () => ({
+      driver: driver(gate, writes),
+      close: async () => void calls.push("replay.close"),
+    }),
+    close: async () => void calls.push("close"),
   };
   return {
     adapter,
@@ -69,6 +80,7 @@ export function fakeChrome(): FakeChrome {
     pick: (target) => onPicked(target),
     release: () => release(),
     writes,
+    calls,
   };
 }
 

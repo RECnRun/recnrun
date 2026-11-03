@@ -3,12 +3,13 @@ import { readFile, rm, stat } from "node:fs/promises";
 import { createServer, connect } from "node:net";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, test } from "vite-plus/test";
-import { EgressForbiddenError } from "../../apps/service/src/index.ts";
+import { EgressForbiddenError, startService } from "../../apps/service/src/index.ts";
 import {
   openFlowStore,
   openServiceStateStore,
   readJournal,
 } from "../../packages/persistence/src/index.ts";
+import { fakeChrome } from "./fake-chrome.ts";
 import { command, runNode, send, startFresh, tempHome } from "./helpers.ts";
 
 let home = "";
@@ -151,4 +152,16 @@ test("RECNRUN_FORBID_EGRESS=1 makes a connection to a non-loopback host throw", 
   } finally {
     await service.stop();
   }
+});
+
+test("stopping the service closes its connections to Chrome after the recording ends", async () => {
+  const chrome = fakeChrome();
+  const started = await startService({ home, adapter: chrome.adapter });
+  if (started.reused) throw new Error(`A service already runs for ${home}.`);
+  const { service } = started;
+  const envelope = await command(service, { requestId: "s", command: "session.start", params: {} });
+  expect(envelope.json).toMatchObject({ ok: true });
+  await service.stop();
+  // The shared socket and the Playwright connection go last, once no session uses them.
+  expect(chrome.calls).toEqual(["record.stop", "close"]);
 });

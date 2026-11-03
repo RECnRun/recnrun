@@ -125,6 +125,10 @@ async function shutdown(parts: Parts): Promise<void> {
   const active = [...parts.commands.active];
   if (!(await settledInGrace(active)))
     logger.warn("service.replay-unsettled", { count: parts.commands.active.size });
+  await parts.commands.browser.close().catch((error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error);
+    logger.warn("service.browser-close-failed", { message });
+  });
   const failures = await journals.drain();
   for (const message of failures) logger.error("journal.close-failed", { message });
   parts.flows.close();

@@ -58,6 +58,7 @@ function fakeBrowser(): FakeBrowser {
     replayDriver: async () => {
       throw new Error("No replay in this fake.");
     },
+    close: async () => void calls.push("close"),
     emit: (event) => void onEvent(event),
     deliver: (event) => onEvent(event),
     pickElement: (target) => onPicked?.(target),
