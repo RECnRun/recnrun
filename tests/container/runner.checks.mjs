@@ -105,6 +105,18 @@ test("forwards arguments literally and runs the current workspace in an isolated
     /Container diagnostic output/,
   );
   assert.equal(result.calls.at(-1)[0], "rm");
+  assert.match(result.output, /^Build step 1$/m);
+});
+
+test("quiet mode streams nothing and ends with the artifacts, exit code, and log tail", async (context) => {
+  const result = await launch(context, "test-failure", [], { env: { RECNRUN_TEST_QUIET: "1" } });
+  assert.equal(result.code, 7, result.output);
+  assert.doesNotMatch(result.output, /^Build step 1$/m);
+  const log = readFileSync(join(result.artifacts, "run.log"), "utf8").trimEnd().split("\n");
+  assert.match(log.join("\n"), /^Build step 1$/m);
+  const tail = log.slice(-20).join("\n");
+  assert.ok(result.output.endsWith(`${tail}\n`), result.output);
+  assert.match(result.output, new RegExp(`Artifacts: ${result.artifacts}\nExit code: 7\n`));
 });
 
 test("preserves a failing test's exit code and copies evidence before removing the container", async (context) => {
@@ -258,7 +270,7 @@ test("public tests route through Docker while local variants and the hooks retai
   assert.equal(manifest.scripts.ready, "vp run verify");
   assert.match(
     readFileSync(join(root, ".vite-hooks/pre-commit"), "utf8"),
-    /vp staged\nvp check\nvp run --no-cache deps\nvp run --no-cache test:unit\n/,
+    /vp staged\nvp check\nvp run --no-cache deps\nRECNRUN_TEST_QUIET=1 vp run --no-cache test:unit\n/,
   );
   assert.equal(
     readFileSync(join(root, ".vite-hooks/pre-push"), "utf8").trim(),

@@ -12,6 +12,7 @@ if (command === "info" && scenario === "unavailable") {
   process.exit(1);
 }
 if (command === "build") {
+  for (let step = 1; step <= 30; step++) console.error(`Build step ${step}`);
   if (scenario === "build-failure") process.exit(3);
   writeFileSync(args[args.indexOf("--iidfile") + 1], "sha256:fixture-image\n");
   if (scenario === "blocked-export") {

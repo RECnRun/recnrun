@@ -1,4 +1,4 @@
 vp staged
 vp check
 vp run --no-cache deps
-vp run --no-cache test:unit
+RECNRUN_TEST_QUIET=1 vp run --no-cache test:unit

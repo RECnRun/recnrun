@@ -31,13 +31,16 @@ let activeChild;
 let created = false;
 let interrupted = 0;
 let stopping;
+// Agents and hooks pay for streamed output in context; quiet runs keep it in run.log only.
+const quietRun = process.env.RECNRUN_TEST_QUIET === "1";
+const TAIL_LINES = 20;
 
 function message(value) {
   console.error(value);
   log?.write(`${value}\n`);
 }
 
-function docker(options, { quiet = false } = {}) {
+function docker(options, { quiet = quietRun } = {}) {
   return new Promise((done) => {
     const child = spawn("docker", options, { cwd: root, stdio: ["ignore", "pipe", "pipe"] });
     activeChild = child;
@@ -178,6 +181,14 @@ async function recordPass(before) {
   if (marker) message(`Verify passed on clean commit ${before}: ${marker}`);
 }
 
+// Vitest and Playwright print their summaries last, so the log's tail carries the result.
+async function printSummary() {
+  if (!quietRun) return;
+  const lines = (await readFile(join(artifacts, "run.log"), "utf8")).trimEnd().split("\n");
+  const tail = lines.slice(-TAIL_LINES).join("\n");
+  console.log(`Artifacts: ${artifacts}\nExit code: ${process.exitCode}\n${tail}`);
+}
+
 async function run() {
   if (!tasks.has(task)) throw new Error(`Unknown container test task: ${task}`);
   const before = task === "verify:local" ? cleanHead(root) : undefined;
@@ -205,6 +216,7 @@ async function run() {
     process.removeListener("SIGINT", interrupt);
     process.removeListener("SIGTERM", interrupt);
     await new Promise((done) => log.end(done));
+    await printSummary();
   }
 }
 
