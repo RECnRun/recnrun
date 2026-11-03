@@ -157,7 +157,7 @@ test.describe("E6: Route B selects the session without baking it into the script
       activated.length > 0
         ? { ...update, timings: { ...update.timings, activatedMs: percentiles(activated) } }
         : update,
-      e6Verdict("a-offline", offlineSamples.map(evaluateKept), [], context),
+      e6Verdict("a-offline", offlineSamples.map(evaluateSwitch), [], context),
       reached
         ? e6Verdict("suspend", suspended.outcomes, [], context)
         : unavailableVerdict("suspend", firstError ?? "the background never stopped", context),
