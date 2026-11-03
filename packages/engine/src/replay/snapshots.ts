@@ -7,7 +7,7 @@ import {
 } from "@recnrun/protocol";
 import type { Captured, PageCapture, ReplayDriver } from "./driver.ts";
 import type { Recorder, ReplayBlobs } from "./record.ts";
-import { redact } from "./scope.ts";
+import { redact, redactHtml } from "./scope.ts";
 
 /** How long one capture may take before its parts are unavailable. */
 export const SNAPSHOT_TIMEOUT_MS = 5000;
@@ -28,7 +28,7 @@ function domPart(
   secrets: readonly string[],
 ): Promise<SnapshotPart> | SnapshotPart {
   if (!html.ok) return unavailable("capture-failed");
-  const text = redact(html.value, secrets);
+  const text = redactHtml(html.value, secrets);
   return blobs.put(text, {
     mime: "text/html",
     encoding: "utf8",

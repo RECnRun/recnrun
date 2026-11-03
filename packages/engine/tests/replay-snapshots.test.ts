@@ -97,12 +97,17 @@ const snapshots = (events: readonly Event[]) =>
     (event): event is Exclude<Event, { category: "gap" }> => event.category === "snapshot",
   );
 
-async function replay(driver: ReplayDriver, steps: Step[], withBlobs = true) {
+async function replay(
+  driver: ReplayDriver,
+  steps: Step[],
+  withBlobs = true,
+  secrets: Record<string, string> = { pin: PIN },
+) {
   const { store, events, puts } = fakeStore(withBlobs);
   const outcome = await replayFlow(driver, flowOf(steps), {
     clock: fakeClock(),
     run: { store, manifest: MANIFEST },
-    secrets: { pin: PIN },
+    secrets,
   });
   return { outcome, events, puts };
 }
@@ -154,6 +159,23 @@ describe("snapshots at milestones", () => {
     const html = String(puts[0]?.content);
     expect(html).not.toContain(PIN);
     expect(html).toContain("redacted");
+  });
+
+  test("a secret with HTML metacharacters is redacted in its escaped forms too", async () => {
+    const secret = `p&<ss">`;
+    // How DOM.getOuterHTML serializes the secret in an attribute, in text, and fully escaped.
+    const attribute = `p&amp;<ss&quot;>`;
+    const text = `p&amp;&lt;ss"&gt;`;
+    const full = `p&amp;&lt;ss&quot;&gt;`;
+    const html = `<input value="${attribute}"><p>${text}</p><i title="${full}">${secret}</i>`;
+    const { driver } = capturing(() => page(html));
+    const { puts, events } = await replay(driver, [GO], true, { pin: PIN, pass: secret });
+    const stored = String(puts[0]?.content);
+    for (const form of [secret, attribute, text, full]) expect(stored).not.toContain(form);
+    expect(stored).toBe(
+      `<input value="[redacted]"><p>[redacted]</p><i title="[redacted]">[redacted]</i>`,
+    );
+    expect(JSON.stringify(events)).not.toContain("p&amp;");
   });
 });
 

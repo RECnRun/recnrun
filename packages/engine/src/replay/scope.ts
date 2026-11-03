@@ -57,6 +57,38 @@ export function redact(text: string, secrets: readonly string[]): string {
   return secrets.reduce((redacted, secret) => redacted.split(secret).join(REDACTED), text);
 }
 
+type Escapes = readonly (readonly [string, string])[];
+
+// A literal no-break space would be invisible in this source.
+const NBSP = String.fromCharCode(0xa0);
+
+// What an HTML serializer escapes in text nodes, in attribute values, and when it escapes everything.
+const TEXT_ESCAPES: Escapes = [
+  ["&", "&amp;"],
+  ["<", "&lt;"],
+  [">", "&gt;"],
+  [NBSP, "&nbsp;"],
+];
+const ATTRIBUTE_ESCAPES: Escapes = [
+  ["&", "&amp;"],
+  ['"', "&quot;"],
+  [NBSP, "&nbsp;"],
+];
+const ALL_ESCAPES: Escapes = [...TEXT_ESCAPES, ['"', "&quot;"], ["'", "&#39;"]];
+
+const escape = (text: string, escapes: Escapes): string =>
+  escapes.reduce((escaped, [raw, entity]) => escaped.split(raw).join(entity), text);
+
+/** Replaces every secret value in serialized HTML, in each form the serializer may have escaped it. */
+export function redactHtml(html: string, secrets: readonly string[]): string {
+  const forms = secrets.flatMap((secret) =>
+    [TEXT_ESCAPES, ATTRIBUTE_ESCAPES, ALL_ESCAPES].map((escapes) => escape(secret, escapes)),
+  );
+  // Longest first, so an escaped form is replaced whole before the raw secret it contains.
+  const all = [...new Set([...secrets, ...forms])].toSorted((a, b) => b.length - a.length);
+  return redact(html, all);
+}
+
 function lookup(scope: Scope, namespace: string, path: string[]): string | undefined {
   if (!(NAMESPACES as readonly string[]).includes(namespace)) return undefined;
   const values = scope[namespace as (typeof NAMESPACES)[number]];
