@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test, vi } from "vite-plus/test";
-import { MARKER_GLOBAL, STRATEGY_GLOBAL } from "@/content/route-c/names";
+import { MARKER_GLOBAL, ORIGINAL_GLOBAL, STRATEGY_GLOBAL } from "@/content/route-c/names";
 import { extensionBaseOf, startRouteC, takeStrategy } from "@/content/route-c/start";
 import { wrapConstructor, wrapperSource } from "@/content/route-c/wrap-workers";
 import type { WorkerContext } from "@/content/route-c/wrap-workers";
@@ -207,6 +207,24 @@ describe("Route C page start", () => {
     expect(worker.made).toEqual([[`blob:${APP}/fake-1`]]);
     expect(await blobs[0]?.text()).toBe(
       wrapperSource("classic", IMPORTS, `${APP}/worker.js?type=classic`),
+    );
+  });
+
+  test("the original slot installs the original-session filter, and workers import that slot", async () => {
+    const { scope, worker, blobs } = fakeWindow({
+      [STRATEGY_GLOBAL]: "blob",
+      [ORIGINAL_GLOBAL]: true,
+    });
+    Reflect.deleteProperty(scope, MARKER_GLOBAL);
+    startRouteC(scope, STACK);
+    expect(Reflect.get(scope, "__recnrun")).toMatchObject({ original: true });
+    expect(ORIGINAL_GLOBAL in scope).toBe(false);
+    const Worker = Reflect.get(scope, "Worker") as new (url: string) => unknown;
+    new Worker("/worker.js?type=classic");
+    expect(worker.made).toEqual([[`blob:${APP}/fake-1`]]);
+    const imports = [`${BASE}ns/original.js`, ...IMPORTS.slice(1)];
+    expect(await blobs[0]?.text()).toBe(
+      wrapperSource("classic", imports, `${APP}/worker.js?type=classic`),
     );
   });
 

@@ -91,6 +91,24 @@ describe("Route C registration", () => {
     expect(calls).toEqual([]);
   });
 
+  test("setOriginal points the registration at the original slot until the next setMarker", async () => {
+    const { engine, registered } = setup();
+    await engine.install({ marker: "m", workers: "blob" });
+    expect(await engine.setOriginal()).toBe("original");
+    expect(registered.get(ROUTE_C_SCRIPT_ID)?.js).toEqual([
+      "ns/original.js",
+      "ns/workers-blob.js",
+      "route-c.js",
+    ]);
+    expect(await engine.setMarker({ marker: "m" })).toBe("slot-1");
+  });
+
+  test("setOriginal before install is refused", async () => {
+    const { engine, calls } = setup();
+    await expect(engine.setOriginal()).rejects.toThrow("Route C is not installed");
+    expect(calls).toEqual([]);
+  });
+
   test("uninstall removes the registration, and a later setMarker is refused", async () => {
     const { engine, registered } = setup();
     await engine.install({ marker: "m" });
@@ -121,6 +139,9 @@ describe("Route C manifest and slot files", () => {
         `globalThis.__recnrunMarker = "slot-${slot}";\n`,
       );
     }
+    expect(await readFile(`${ISOLATOR}public/ns/original.js`, "utf8")).toBe(
+      "globalThis.__recnrunOriginal = true;\n",
+    );
     for (const strategy of ["blob", "data"]) {
       expect(await readFile(`${ISOLATOR}public/ns/workers-${strategy}.js`, "utf8")).toBe(
         `globalThis.__recnrunWorkers = "${strategy}";\n`,

@@ -1,4 +1,5 @@
 import { browser } from "wxt/browser";
+import { exposeOriginal } from "@/background/original/expose";
 import { exposeProbes } from "@/background/probes/expose";
 import { exposeRouteA } from "@/background/route-a/expose";
 import { exposeRouteB } from "@/background/route-b/expose";
@@ -43,6 +44,7 @@ export function startBackground(): void {
     dnr: browser.declarativeNetRequest,
     tabs: browser.tabs,
   }));
+  exposeOriginal(() => browser.scripting);
   const record = (): void => void recordLoaded();
   browser.runtime.onInstalled.addListener(record);
   browser.runtime.onStartup.addListener(record);

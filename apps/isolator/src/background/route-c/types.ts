@@ -24,6 +24,8 @@ export interface RouteC {
   install(request: unknown): Promise<string>;
   /** Points the registration at the next slot for `{ marker }`; returns that slot's marker. */
   setMarker(request: unknown): Promise<string>;
+  /** Points the registration at the original slot, so later loads are the user's own session; returns `"original"`. */
+  setOriginal(): Promise<string>;
   /** Removes the registration. */
   uninstall(): Promise<void>;
   /** The registration as Chrome reports it. */

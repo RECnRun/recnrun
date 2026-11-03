@@ -6,6 +6,12 @@ export const MARKER_GLOBAL = "__recnrunMarker";
 /** The global a strategy file sets; the bootstrap reads it once and deletes it. */
 export const STRATEGY_GLOBAL = "__recnrunWorkers";
 
+/** The global the original slot file sets: this load belongs to the user's own session (P1.7). */
+export const ORIGINAL_GLOBAL = "__recnrunOriginal";
+
+/** The slot whose file sets ORIGINAL_GLOBAL instead of a marker. */
+export const ORIGINAL_SLOT = "original";
+
 /** Prebuilt slot files `ns/slot-0.js` to `ns/slot-9.js`, one marker each. */
 export const SLOT_COUNT = 10;
 

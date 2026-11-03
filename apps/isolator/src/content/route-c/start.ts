@@ -1,5 +1,11 @@
-import { installMarker } from "@recnrun/isolation-core";
-import { MARKER_GLOBAL, STRATEGY_GLOBAL, WORKER_STRATEGIES } from "@/content/route-c/names";
+import { installBootstrap } from "@recnrun/isolation-core";
+import {
+  MARKER_GLOBAL,
+  ORIGINAL_GLOBAL,
+  ORIGINAL_SLOT,
+  STRATEGY_GLOBAL,
+  WORKER_STRATEGIES,
+} from "@/content/route-c/names";
 import type { WorkerStrategy } from "@/content/route-c/names";
 import { wrapConstructor } from "@/content/route-c/wrap-workers";
 import type { WorkerContext, WorkerKind } from "@/content/route-c/wrap-workers";
@@ -32,10 +38,17 @@ export function takeStrategy(scope: object): WorkerStrategy {
   return WORKER_STRATEGIES.find((strategy) => strategy === value) ?? "fail-closed";
 }
 
-/** Installs the marker; returns why workers must be refused when it could not. */
+/** Whether the original slot file ran, removed from the page like the strategy. */
+function takeOriginal(scope: object): boolean {
+  const value: unknown = Reflect.get(scope, ORIGINAL_GLOBAL);
+  Reflect.deleteProperty(scope, ORIGINAL_GLOBAL);
+  return value === true;
+}
+
+/** Installs the marker, or the original session's filter; returns why workers must be refused when it could not. */
 function bootstrap(scope: object, marker: unknown): string | undefined {
   try {
-    installMarker(scope, { marker });
+    installBootstrap(scope, marker === ORIGINAL_SLOT ? { original: true } : { marker });
     return undefined;
   } catch (error) {
     const refusal = `bootstrap failed: ${messageOf(error)}`;
@@ -83,7 +96,7 @@ function wrap(scope: object, kind: WorkerKind, context: WorkerContext): void {
 export function startRouteC(scope: object, stack: string | undefined = new Error().stack): void {
   try {
     const strategy = takeStrategy(scope);
-    const marker: unknown = Reflect.get(scope, MARKER_GLOBAL);
+    const marker: unknown = takeOriginal(scope) ? ORIGINAL_SLOT : Reflect.get(scope, MARKER_GLOBAL);
     const refusal = bootstrap(scope, marker);
     const context: WorkerContext = {
       strategy,

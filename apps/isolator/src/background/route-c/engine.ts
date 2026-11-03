@@ -2,6 +2,7 @@ import { parseInstall, parseSetMarker } from "@/background/route-c/requests";
 import type { ContentScript, RouteC, ScriptingApi } from "@/background/route-c/types";
 import {
   BOOTSTRAP_FILE,
+  ORIGINAL_SLOT,
   SLOT_COUNT,
   slotFile,
   slotMarker,
@@ -58,13 +59,20 @@ export class RouteCEngine implements RouteC {
 
   async setMarker(request: unknown): Promise<string> {
     parseSetMarker(request);
-    const strategy = this.#strategy;
-    if (strategy === undefined) throw new Error("Route C is not installed; call install() first");
+    const strategy = this.#requireStrategy();
     const slot = this.#takeSlot();
     await this.#scripting().updateContentScripts([
       { id: ROUTE_C_SCRIPT_ID, js: filesOf(slot, strategy) },
     ]);
     return slot;
+  }
+
+  async setOriginal(): Promise<string> {
+    const strategy = this.#requireStrategy();
+    await this.#scripting().updateContentScripts([
+      { id: ROUTE_C_SCRIPT_ID, js: filesOf(ORIGINAL_SLOT, strategy) },
+    ]);
+    return ORIGINAL_SLOT;
   }
 
   async uninstall(): Promise<void> {
@@ -76,6 +84,12 @@ export class RouteCEngine implements RouteC {
 
   registered(): Promise<ContentScript[]> {
     return this.#scripting().getRegisteredContentScripts(BY_ID);
+  }
+
+  #requireStrategy(): WorkerStrategy {
+    if (this.#strategy === undefined)
+      throw new Error("Route C is not installed; call install() first");
+    return this.#strategy;
   }
 
   // Round robin: consecutive markers never share a slot, so a stale injection shows in the ledger.
