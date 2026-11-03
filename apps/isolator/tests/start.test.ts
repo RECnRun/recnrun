@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, test, vi } from "vite-plus/test";
 import { fakeBrowser } from "wxt/testing/fake-browser";
 import { RouteAEngine } from "@/background/route-a/engine";
 import { ROUTE_A_GLOBAL } from "@/background/route-a/expose";
+import { RouteCEngine } from "@/background/route-c/engine";
+import { ROUTE_C_GLOBAL } from "@/background/route-c/expose";
 import { GET_SELF, LOADED_KEY, startBackground } from "@/background/start";
 
 const self = {
@@ -66,5 +68,9 @@ describe("startBackground", () => {
 
   test("exposes Route A to the harness", () => {
     expect(Reflect.get(globalThis, ROUTE_A_GLOBAL)).toBeInstanceOf(RouteAEngine);
+  });
+
+  test("exposes Route C to the harness", () => {
+    expect(Reflect.get(globalThis, ROUTE_C_GLOBAL)).toBeInstanceOf(RouteCEngine);
   });
 });

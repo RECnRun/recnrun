@@ -1,6 +1,7 @@
 import { browser } from "wxt/browser";
 import { exposeProbes } from "@/background/probes/expose";
 import { exposeRouteA } from "@/background/route-a/expose";
+import { exposeRouteC } from "@/background/route-c/expose";
 
 /** `chrome.storage.session` key the harness reads to see that the background ran. */
 export const LOADED_KEY = "isolatorLoaded";
@@ -30,6 +31,7 @@ export function startBackground(): void {
     async (tabId) => (await browser.tabs.get(tabId)).height,
   );
   exposeRouteA(() => browser.debugger);
+  exposeRouteC(() => browser.scripting);
   const record = (): void => void recordLoaded();
   browser.runtime.onInstalled.addListener(record);
   browser.runtime.onStartup.addListener(record);

@@ -30,7 +30,8 @@
       "entry": ["src/entrypoints/**/*.{ts,tsx}", "scripts/*.checks.mjs"],
     },
     "apps/isolator": {
-      "entry": ["src/entrypoints/**/*.{ts,tsx}"],
+      // Route C's slot and strategy files are loaded by URL (chrome.scripting, importScripts).
+      "entry": ["src/entrypoints/**/*.{ts,tsx}", "public/**/*.js"],
     },
   },
 }

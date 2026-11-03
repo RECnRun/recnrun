@@ -12,7 +12,8 @@
   },
   "dependencies": {
     "@recnrun/isolation-core": "workspace:*",
-    "@recnrun/worker-bootstrap": "workspace:*"
+    "@recnrun/worker-bootstrap": "workspace:*",
+    "valibot": "catalog:"
   },
   "devDependencies": {
     "typescript": "catalog:",
