@@ -69,18 +69,37 @@ describe("evaluateSwitch", () => {
     ]);
   });
 
-  test("an early switch the first start already took is tallied apart", () => {
+  test("an early switch the first start already took passes only on the worker's own requests", () => {
     const early = sample({
       timing: "early",
       first: [AFTER],
       second: [AFTER],
       beforeActivated: true,
     });
-    expect(evaluateSwitch(early).tally).toEqual({
+    expect(evaluateSwitch({ ...early, running: ["slot-5"] }).tally).toEqual({
       fresh: 1,
       firstTookAfter: 1,
       switchedBeforeActivated: 1,
     });
+    // The database was there before the switch, so it says nothing about the second start.
+    const unproven = evaluateSwitch(early);
+    expect(unproven.reasons).toEqual([
+      {
+        kind: "notObserved",
+        text: `the first start had already opened ${AFTER}; no request carried slot-5 after the switch to slot-5: [${AFTER}]`,
+      },
+    ]);
+    expect(unproven.tally).toEqual({ notFresh: 1, firstTookAfter: 1, switchedBeforeActivated: 1 });
+  });
+
+  test("a database already present never outranks a failed, stalled, or stale second start", () => {
+    const present = { first: [AFTER], second: [AFTER] };
+    expect(
+      kinds(sample({ ...present, started: false, stalled: true, running: ["slot-4"] })),
+    ).toEqual(["stale"]);
+    expect(kinds(sample({ ...present, stalled: true }))).toEqual(["stalled"]);
+    expect(kinds(sample({ ...present, started: false }))).toEqual(["notRestarted"]);
+    expect(kinds(sample({ second: [AFTER, STORE] }))).toEqual(["unmarked"]);
   });
 
   test("a soft update before the restart and an unsettled registration are tallied", () => {

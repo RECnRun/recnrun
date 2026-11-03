@@ -76,20 +76,37 @@ function firstReason(sample: SwitchSample): Reason | undefined {
   };
 }
 
-/** Why the start after the switch did not open the new slot's database, or `undefined` when it did. */
+/** Why the start after the switch did not run as the new slot, or `undefined` when it did. */
 function secondReason(sample: SwitchSample): Reason | undefined {
-  const { second, store } = sample;
+  const { second, before, after } = sample;
   const running = sample.running ?? [];
   if (!Array.isArray(second)) return { kind: "storeUnreadable", text: second.error };
-  if (has(second, nameOf(sample.after, store)) || running.includes(sample.after)) return undefined;
-  const opened = `after the switch to ${sample.after}: ${namesText(second)}`;
+  const opened = `after the switch to ${after}: ${namesText(second)}`;
   // The worker's own requests outrank the stores, which a later unmarked version can add to.
-  if (running.includes(sample.before))
-    return { kind: "stale", text: `ran as ${sample.before} ${opened}` };
+  if (running.includes(before) && !running.includes(after))
+    return { kind: "stale", text: `ran as ${before} ${opened}` };
+  if (running.includes(after)) return undefined;
+  return startReason(sample, opened) ?? storeReason(sample, opened);
+}
+
+function startReason(sample: SwitchSample, opened: string): Reason | undefined {
   if (sample.stalled === true) return stalledReason(sample);
   if (!sample.started) return { kind: "notRestarted", text: "no worker started after the switch" };
-  if (has(second, store)) return { kind: "unmarked", text: `unprefixed ${store} ${opened}` };
-  if (has(second, nameOf(sample.before, store))) return { kind: "stale", text: `stale ${opened}` };
+  if (has(sample.second, sample.store))
+    return { kind: "unmarked", text: `unprefixed ${sample.store} ${opened}` };
+  return undefined;
+}
+
+/** With no request naming a slot, the new slot's database proves the start only if it was not there before. */
+function storeReason(sample: SwitchSample, opened: string): Reason | undefined {
+  const { second, store, before, after } = sample;
+  const target = nameOf(after, store);
+  if (has(second, target)) {
+    if (!has(sample.first, target)) return undefined;
+    const text = `the first start had already opened ${target}; no request carried ${after} ${opened}`;
+    return { kind: "notObserved", text };
+  }
+  if (has(second, nameOf(before, store))) return { kind: "stale", text: `stale ${opened}` };
   return { kind: "noStore", text: `no ${store} database ${opened}` };
 }
 
