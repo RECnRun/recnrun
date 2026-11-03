@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { readJournal } from "@recnrun/persistence";
-import type { Lease, ServiceMessage, SessionStatus } from "@recnrun/protocol";
+import type { CapturedEvent, Lease, ServiceMessage, SessionStatus } from "@recnrun/protocol";
 import { expect, test } from "vite-plus/test";
 import { fillAndClick, harness, navigated, SEND_BUTTON, type Harness } from "./fakes.ts";
 
@@ -74,6 +74,56 @@ test("the three pauses: no steps, then no capture and a gap in the journal", asy
     "gap",
   ]);
   expect(events.at(-1)?.payload).toMatchObject({ reason: "capture-suspended" });
+});
+
+/** Capture that still delivers on stop: `drain` runs while it settles, `last` when it stops. */
+function drainingCapture(h: Harness, drain: () => Promise<void>, last: CapturedEvent[]): void {
+  const record = h.browser.record.bind(h.browser);
+  h.browser.record = async (endpoint, capture) => {
+    const handle = await record(endpoint, capture);
+    const stop = () => {
+      for (const event of last) capture.onEvent(event);
+      handle.stop();
+    };
+    return { targetId: handle.targetId, settled: drain, stop };
+  };
+}
+
+const categoriesOf = async (h: Harness, sessionId: string) =>
+  (await journalOf(h, sessionId)).events.map(({ category, payload }) =>
+    category === "gap" ? `gap:${String((payload as { reason: string }).reason)}` : category,
+  );
+
+test("stop keeps what capture delivers while it drains, and a failed drain is a gap", async () => {
+  const h = await harness();
+  const links = navigated(8, "http://127.0.0.1:4600/routes/links");
+  drainingCapture(h, async () => fillAndClick(1).forEach((event) => h.browser.emit(event)), [
+    links,
+  ]);
+  const status = await started(h);
+  resultOf(await h.call("session.stop", { sessionId: status.sessionId }, fenced(status)));
+  expect(await categoriesOf(h, status.sessionId)).toEqual([...Array(7).fill("dom"), "navigation"]);
+  const suggested = await h.call("session.suggestions", { sessionId: status.sessionId });
+  expect(resultOf<{ steps: { action: string }[] }>(suggested).steps.map((s) => s.action)).toEqual([
+    "fill",
+    "click",
+  ]);
+  const lost = await harness();
+  drainingCapture(lost, () => Promise.reject(new Error("The socket closed.")), [links]);
+  const failed = await started(lost);
+  resultOf(await lost.call("session.stop", { sessionId: failed.sessionId }, fenced(failed)));
+  expect(await categoriesOf(lost, failed.sessionId)).toEqual(["gap:capture-stopped", "navigation"]);
+});
+
+test("a session stopped while capture is suspended journals that gap", async () => {
+  const h = await harness();
+  const status = await started(h);
+  const { sessionId } = status;
+  const mode = "suspendCapture";
+  resultOf(await h.call("session.pause", { sessionId, mode }, fenced(status)));
+  for (const event of fillAndClick(1)) h.browser.emit(event);
+  resultOf(await h.call("session.stop", { sessionId }, fenced(status)));
+  expect(await categoriesOf(h, sessionId)).toEqual(["gap:capture-suspended"]);
 });
 
 test("handing control away needs the holder's fence; a person takes it back at once", async () => {

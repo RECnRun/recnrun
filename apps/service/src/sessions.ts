@@ -18,6 +18,7 @@ import type {
   AssertionStep,
   CapturedEvent,
   Event,
+  GapPayload,
   PauseMode,
   SessionStatus,
 } from "@recnrun/protocol";
@@ -51,6 +52,8 @@ export interface LiveSession {
   state: Session;
   gaps: number;
   picker?: PickerHandle | undefined;
+  /** The state at stop, while capture already under way still lands as the session was then. */
+  draining?: Session | undefined;
   /** The last picker start or stop; the next one waits for it. */
   pickerTurn: Promise<void>;
 }
@@ -114,10 +117,11 @@ function track(deps: SessionDeps, live: LiveSession, event: Event): void {
 }
 
 function accept(deps: SessionDeps, live: LiveSession, event: CapturedEvent): void {
-  if (!isCapturing(live.state)) return;
+  const state = live.draining ?? live.state;
+  if (!isCapturing(state)) return;
   live.events.push(event);
   // Navigations make steps too, so the pause excludes every event, not only DOM ones.
-  if (!createsSuggestedSteps(live.state)) live.ignored.add(event.id);
+  if (!createsSuggestedSteps(state)) live.ignored.add(event.id);
   track(deps, live, event);
   deps.hub.publish({ type: "session.event", sessionId: live.id, event });
   // The person is active, so their control does not lapse while they record.
@@ -183,7 +187,11 @@ export async function startSession(
 }
 
 /** The journal line of a capture suspension, written once capture resumes. */
-function gapEvent(deps: SessionDeps, live: LiveSession, gap: CaptureGap): Event {
+function gapEvent(
+  deps: SessionDeps,
+  live: LiveSession,
+  gap: { reason: GapPayload["reason"]; startedAt: number },
+): Event {
   live.gaps += 1;
   return {
     schemaVersion: 1,
@@ -229,12 +237,35 @@ export async function closePicker(live: LiveSession): Promise<void> {
   await picker?.stop();
 }
 
+/**
+ * Lets capture under way at stop land as the session was, then stops the recording; results it
+ * could not deliver, and a suspension still open, are journaled as gaps.
+ */
+async function drain(deps: SessionDeps, live: LiveSession, stopping: Session): Promise<void> {
+  try {
+    await live.recording.settled();
+  } catch (error) {
+    deps.logger.warn("session.drain-failed", { message: String(error) });
+    track(deps, live, gapEvent(deps, live, { reason: "capture-stopped", startedAt: deps.now() }));
+  }
+  live.recording.stop();
+  live.draining = undefined;
+  const suspendedAt = stopping.captureSuspendedAt;
+  if (suspendedAt !== null)
+    track(
+      deps,
+      live,
+      gapEvent(deps, live, { reason: "capture-suspended", startedAt: suspendedAt }),
+    );
+}
+
 /** Ends capture: the picker and the recording stop, the journal closes, and control is released. */
 export async function stopSession(deps: SessionDeps, live: LiveSession): Promise<SessionStatus> {
+  const stopping = live.state;
   advance(live, "stop");
+  live.draining = stopping;
   await serialPicker(live, () => closePicker(live));
-  await live.recording.settled();
-  live.recording.stop();
+  await drain(deps, live, stopping);
   await Promise.all(live.writes);
   await live.journal.close();
   const lease = deps.leases.current(live.targetId);

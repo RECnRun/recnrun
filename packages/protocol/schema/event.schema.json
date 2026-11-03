@@ -81,7 +81,8 @@
                 "journal-truncated",
                 "target-unattached",
                 "producer-restarted",
-                "capture-suspended"
+                "capture-suspended",
+                "capture-stopped"
               ],
               "type": "string"
             },
