@@ -1,4 +1,5 @@
 import { messageOf, PROTOCOL_VERSION, withTimeout } from "@/background/probes/helpers";
+import { loopbackTargetOf } from "@/background/probes/loopback";
 import type { DebuggerApi } from "@/background/probes/types";
 import { command } from "@/background/route-a/attached";
 import type { ChildSessions } from "@/background/route-a/children";
@@ -14,7 +15,8 @@ async function outcome(action: Promise<unknown>): Promise<string> {
 }
 
 /**
- * Stops a worker without the harness touching it (E3 cold start): attaches by id, sends
+ * Stops a worker without the harness touching it (E3 cold start): refuses one outside the
+ * loopback, attaches by id, sends
  * `Target.closeTarget` on the target's own session, detaches the armed tabs' child sessions on
  * it, detaches, and says whether it is still listed.
  */
@@ -23,6 +25,7 @@ export async function closeTarget(
   targetId: string,
   { now, children }: { now: () => number; children: ChildSessions },
 ): Promise<CloseReport> {
+  loopbackTargetOf(await api.getTargets(), targetId);
   const target = { targetId };
   const start = now();
   const attach = await outcome(withTimeout(api.attach(target, PROTOCOL_VERSION), "attach"));

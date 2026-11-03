@@ -72,6 +72,8 @@ export function fakeDebugger(options: FakeOptions = {}) {
   const onEvent = listeners<EventListener>();
   const onDetach = listeners<DetachListener>();
   const sent: { target: Debuggee; method: string; params?: object }[] = [];
+  // Every chrome.debugger call in order: getTargets, attach, detach, and each command's method.
+  const calls: string[] = [];
   const closed = new Set<string>();
   const held = new Map<string, (() => void)[]>();
   const heldKey = (target: Debuggee, method: string) => `${target.sessionId ?? ""} ${method}`;
@@ -130,13 +132,20 @@ export function fakeDebugger(options: FakeOptions = {}) {
     },
   };
   const api: DebuggerApi = {
-    getTargets: async () => (options.targets ?? TARGETS).filter((target) => !closed.has(target.id)),
-    attach: async () => undefined,
+    getTargets: async () => {
+      calls.push("getTargets");
+      return (options.targets ?? TARGETS).filter((target) => !closed.has(target.id));
+    },
+    attach: async () => {
+      calls.push("attach");
+    },
     detach: async (target) => {
+      calls.push("detach");
       if (options.detachError) throw new Error(options.detachError);
       onDetach.set.forEach((listener) => listener(target, "canceled_by_user"));
     },
     sendCommand: async (target, method, params) => {
+      calls.push(method);
       sent.push({ target, method, params });
       const error = refused[method];
       if (error) throw new Error(error);
@@ -151,7 +160,7 @@ export function fakeDebugger(options: FakeOptions = {}) {
     onEvent,
     onDetach,
   };
-  return { api, sent, onEvent, onDetach, emit, restart };
+  return { api, sent, calls, onEvent, onDetach, emit, restart };
 }
 
 export function byId(results: ProbeResult[]): Record<string, ProbeResult> {

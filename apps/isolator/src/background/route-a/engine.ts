@@ -2,20 +2,27 @@ import { parseMarker } from "@recnrun/isolation-core";
 import { BOOTSTRAP_HASH, BOOTSTRAP_VERSION } from "@recnrun/worker-bootstrap";
 import { isAttachedEvent } from "@/background/probes/auto-attach";
 import { PROTOCOL_VERSION, withTimeout } from "@/background/probes/helpers";
-import { isLoopbackUrl } from "@/background/probes/loopback";
-import type { Debuggee, DebuggerApi, EventListener, TargetInfo } from "@/background/probes/types";
+import {
+  isLoopbackUrl,
+  loopbackPage,
+  loopbackTargetOf,
+  pageOf,
+} from "@/background/probes/loopback";
+import type { Debuggee, DebuggerApi, EventListener } from "@/background/probes/types";
 import {
   AUTO_ATTACH,
   bootstrap,
   command,
   entryOf,
   handleAttached,
+  releaseRefused,
 } from "@/background/route-a/attached";
 import { ChildSessions } from "@/background/route-a/children";
 import { closeTarget } from "@/background/route-a/close";
 import { EVENT_LIMIT, detachEventOf, targetEventOf } from "@/background/route-a/events";
 import { handlePaused, prepareAndRelease } from "@/background/route-a/pause";
 import { armRequestOf, tabIdOf, targetIdOf, watchRequestOf } from "@/background/route-a/requests";
+import { originOf, unattachedOf } from "@/background/route-a/targets";
 import { TargetWatch } from "@/background/route-a/watch";
 import type {
   CloseReport,
@@ -24,23 +31,11 @@ import type {
   RouteA,
   RouteAJournal,
   TargetEvent,
-  UnattachedTarget,
   WatchReport,
 } from "@/background/route-a/types";
 
 /** What `Storage.clearDataForOrigin` removes between iterations: registrations and their storage. */
 const CLEARED_STORAGE = "service_workers,indexeddb,cache_storage";
-
-function originOf(url: string): string | undefined {
-  const origin = URL.canParse(url) ? new URL(url).origin : "null";
-  return origin === "null" ? undefined : origin;
-}
-
-function pageOf(targets: TargetInfo[], tabId: number): TargetInfo {
-  const page = targets.find((target) => target.type === "page" && target.tabId === tabId);
-  if (!page) throw new Error(`no tab ${tabId}`);
-  return page;
-}
 
 /** Route A (POC PLAN.md P1.1): the tab's debugger session auto-attaches workers paused. */
 export class RouteAEngine implements RouteA {
@@ -73,6 +68,7 @@ export class RouteAEngine implements RouteA {
     this.#requireMarker();
     if (this.#armed.has(tabId)) throw new Error(`tab ${tabId} is already armed`);
     const api = this.#debuggerApi();
+    loopbackPage(await api.getTargets(), tabId);
     this.#listenForDetach(api);
     const listener = this.#listenerFor(tabId, pauseBeforeScript);
     // Listening first: auto-attach reports the targets that already exist right away.
@@ -89,7 +85,9 @@ export class RouteAEngine implements RouteA {
 
   async journal(): Promise<RouteAJournal> {
     await Promise.allSettled(this.#pending);
-    const unattached = await this.#unattached([...this.#armed.keys()]);
+    const tabIds = [...this.#armed.keys()];
+    const targets = tabIds.length === 0 ? [] : await this.#debuggerApi().getTargets();
+    const unattached = unattachedOf(targets, tabIds, this.#entries);
     return {
       ...(this.#marker === undefined ? {} : { marker: this.#marker }),
       bootstrap: { hash: BOOTSTRAP_HASH, version: BOOTSTRAP_VERSION },
@@ -123,8 +121,7 @@ export class RouteAEngine implements RouteA {
     const marker = this.#requireMarker();
     const api = this.#debuggerApi();
     this.#listenForDetach(api);
-    const target = (await api.getTargets()).find((candidate) => candidate.id === targetId);
-    if (!target) throw new Error(`no target ${targetId}`);
+    const target = loopbackTargetOf(await api.getTargets(), targetId);
     const entry: JournalEntry = {
       sessionId: "",
       targetId,
@@ -259,6 +256,8 @@ export class RouteAEngine implements RouteA {
   /** With `pauseBeforeScript`, a waiting worker gets its bootstrap at the instrumentation pause. */
   #handle(source: Debuggee, entry: JournalEntry, pauseBeforeScript: boolean): Promise<void> {
     const api = this.#debuggerApi();
+    // R11: a worker or frame of a site the armed tab navigated to runs untouched.
+    if (!isLoopbackUrl(entry.url)) return releaseRefused(api, source, entry);
     const pauses = pauseBeforeScript && entry.marker !== undefined && entry.waitingForDebugger;
     return pauses
       ? prepareAndRelease(api, source, entry)
@@ -278,21 +277,5 @@ export class RouteAEngine implements RouteA {
     this.#armed.delete(tabId);
     this.#children.dropTab(tabId);
     await withTimeout(api.detach({ tabId }), "detach").catch(() => undefined);
-  }
-
-  /** Worker targets on an armed tab's origin that no auto-attach or direct attach reached. */
-  async #unattached(tabIds: number[]): Promise<UnattachedTarget[]> {
-    if (tabIds.length === 0) return [];
-    const targets = await this.#debuggerApi().getTargets();
-    const pages = targets.filter((target) => target.type === "page");
-    const origins = new Set(
-      pages.filter((page) => tabIds.includes(page.tabId ?? -1)).map((page) => originOf(page.url)),
-    );
-    origins.delete(undefined);
-    const seen = new Set(this.#entries.map((entry) => entry.targetId));
-    return targets
-      .filter((target) => target.type !== "page" && !seen.has(target.id))
-      .filter((target) => origins.has(originOf(target.url)))
-      .map(({ id, type, url }) => ({ targetId: id, type, url }));
   }
 }

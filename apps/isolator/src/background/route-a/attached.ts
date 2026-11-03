@@ -1,6 +1,7 @@
 import { withMarker } from "@recnrun/worker-bootstrap";
 import type { AttachedEvent } from "@/background/probes/auto-attach";
 import { messageOf, withTimeout } from "@/background/probes/helpers";
+import { REFUSED } from "@/background/probes/loopback";
 import type { Debuggee, DebuggerApi } from "@/background/probes/types";
 import type { JournalEntry } from "@/background/route-a/types";
 
@@ -104,6 +105,10 @@ export async function release(
   } catch (error) {
     entry.autoAttach = messageOf(error);
   }
+  await runIfWaiting(api, session, entry);
+}
+
+async function runIfWaiting(api: DebuggerApi, session: Debuggee, entry: JournalEntry) {
   if (!entry.waitingForDebugger) return;
   try {
     await command(api, session, "Runtime.runIfWaitingForDebugger");
@@ -111,4 +116,15 @@ export async function release(
   } catch (error) {
     fail(entry, error);
   }
+}
+
+/** R11: a child outside the loopback gets no bootstrap and no auto-attach, only its release. */
+export async function releaseRefused(
+  api: DebuggerApi,
+  source: Debuggee,
+  entry: JournalEntry,
+): Promise<void> {
+  delete entry.marker;
+  entry.error = REFUSED;
+  await runIfWaiting(api, { tabId: source.tabId, sessionId: entry.sessionId }, entry);
 }

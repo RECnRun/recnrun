@@ -1,7 +1,17 @@
 import { describe, expect, test } from "vite-plus/test";
 import { EVENT_LIMIT } from "@/background/route-a/events";
 import { NOT_ALLOWED } from "./fake-debugger";
-import { TAB, attached, setup } from "./route-a-setup";
+import type { FakeOptions } from "./fake-debugger";
+import { APP, TAB, TARGETS, attached, setup } from "./route-a-setup";
+
+/** closeTarget looks its target up first, so the workers these tests close are listed. */
+function listing(options: FakeOptions = {}) {
+  const workers = [
+    { type: "service_worker", id: "sw", url: `${APP}/sw.js`, attached: true },
+    { type: "worker", id: "w", url: `${APP}/w.js`, attached: true },
+  ];
+  return setup({ ...options, targets: [...TARGETS, ...workers] });
+}
 
 describe("Route A target events", () => {
   test("journals each Target event on the tab and its child sessions, in arrival order", async () => {
@@ -48,7 +58,7 @@ describe("Route A target events", () => {
   });
 
   test("detaches the tab's child session on a closed worker, so its restart is bootstrapped and released", async () => {
-    const { engine, emit, restart, sent } = setup();
+    const { engine, emit, restart, sent } = listing();
     await engine.arm({ tabId: TAB, pauseBeforeScript: true });
     emit({ tabId: TAB }, "Target.attachedToTarget", attached("service_worker", "sw", "s-sw"));
     await engine.journal();
@@ -66,20 +76,20 @@ describe("Route A target events", () => {
 
   test("keeps Chrome's error when a child session will not detach, and skips it after a failed close", async () => {
     const error = '{"code":-32602,"message":"No session with given id"}';
-    const refused = setup({ refused: { "Target.detachFromTarget": error } });
+    const refused = listing({ refused: { "Target.detachFromTarget": error } });
     await refused.engine.arm({ tabId: TAB });
     refused.emit({ tabId: TAB }, "Target.attachedToTarget", attached("service_worker", "sw", "s"));
     expect((await refused.engine.closeTarget({ targetId: "sw" })).sessions).toEqual([
       { sessionId: "s", detach: error },
     ]);
-    const kept = setup({ refused: { "Target.closeTarget": NOT_ALLOWED } });
+    const kept = listing({ refused: { "Target.closeTarget": NOT_ALLOWED } });
     await kept.engine.arm({ tabId: TAB });
     kept.emit({ tabId: TAB }, "Target.attachedToTarget", attached("service_worker", "sw", "s"));
     expect((await kept.engine.closeTarget({ targetId: "sw" })).sessions).toEqual([]);
   });
 
   test("forgets a child session Chrome detached or a disarmed tab dropped", async () => {
-    const { engine, emit, sent } = setup();
+    const { engine, emit, sent } = listing();
     await engine.arm({ tabId: TAB });
     emit({ tabId: TAB }, "Target.attachedToTarget", attached("service_worker", "sw", "s-sw"));
     emit({ tabId: TAB }, "Target.attachedToTarget", attached("worker", "w", "s-w"));

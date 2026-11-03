@@ -1,12 +1,6 @@
-import { isLoopbackUrl } from "@/background/probes/loopback";
+import { loopbackPage, loopbackTargetOf, requireLoopback } from "@/background/probes/loopback";
 import type { TargetInfo } from "@/background/probes/types";
 import type { Recorder } from "@/background/stop/recorder";
-
-/** R11 (POC PLAN.md §1): the isolator stops or evaluates nothing outside the loopback. */
-function requireLoopback(what: string, url: string): void {
-  if (!isLoopbackUrl(url))
-    throw new Error(`refuses ${what} at ${url}, which is not on the loopback`);
-}
 
 async function targets(recorder: Recorder): Promise<TargetInfo[]> {
   const listed = await recorder.record({ api: "debugger", method: "getTargets" }, async () => {
@@ -25,19 +19,12 @@ async function targets(recorder: Recorder): Promise<TargetInfo[]> {
 
 /** The worker target `targetId`, refused when it is gone or outside the loopback. */
 export async function loopbackTarget(recorder: Recorder, targetId: string): Promise<TargetInfo> {
-  const target = (await targets(recorder)).find((candidate) => candidate.id === targetId);
-  if (!target) throw new Error(`no target ${targetId}`);
-  requireLoopback(`target ${targetId}`, target.url);
-  return target;
+  return loopbackTargetOf(await targets(recorder), targetId);
 }
 
 /** The page of tab `tabId`, refused when it is gone or outside the loopback. */
 export async function loopbackTab(recorder: Recorder, tabId: number): Promise<TargetInfo> {
-  const all = await targets(recorder);
-  const page = all.find((target) => target.type === "page" && target.tabId === tabId);
-  if (!page) throw new Error(`no tab ${tabId}`);
-  requireLoopback(`tab ${tabId}`, page.url);
-  return page;
+  return loopbackPage(await targets(recorder), tabId);
 }
 
 export function requireLoopbackOrigin(origin: string): void {
