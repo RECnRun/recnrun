@@ -3,17 +3,24 @@ import { readFileSync } from "node:fs";
 import vm from "node:vm";
 import { describe, expect, test } from "vite-plus/test";
 import { renderArtifact, renderModule } from "../src/artifact.ts";
-import { BOOTSTRAP_HASH, BOOTSTRAP_SOURCE, BOOTSTRAP_VERSION, withMarker } from "../src/index.ts";
+import {
+  BOOTSTRAP_HASH,
+  BOOTSTRAP_SOURCE,
+  BOOTSTRAP_VERSION,
+  withMarker,
+  withOriginal,
+} from "../src/index.ts";
 
 const SCRIPT = "http://app.localhost:4600/sw-main.js?variant=classic";
 const ME = "http://api.localhost:4601/me?from=%2Fsw-main.js%3Fvariant%3Dclassic";
 
 /** A worker-like global in its own realm: only JavaScript builtins plus these fakes. */
-function workerRealm() {
+function workerRealm(stores: string[] = []) {
   const effects: string[] = [];
   const sandbox: Record<string, unknown> = {
     URL,
     Request,
+    DOMException,
     location: { href: SCRIPT },
     fetch(input: unknown) {
       effects.push(`fetch ${input instanceof Request ? input.url : String(input)}`);
@@ -22,13 +29,13 @@ function workerRealm() {
     indexedDB: {
       open: (name: string) => effects.push(`indexedDB.open ${name}`),
       deleteDatabase: (name: string) => effects.push(`indexedDB.deleteDatabase ${name}`),
-      databases: () => Promise.resolve([]),
+      databases: () => Promise.resolve(stores.map((name) => ({ name }))),
     },
     caches: {
       open: (name: string) => effects.push(`caches.open ${name}`),
       has: () => Promise.resolve(false),
       delete: () => Promise.resolve(false),
-      keys: () => Promise.resolve([]),
+      keys: () => Promise.resolve(stores),
       match: () => Promise.resolve(undefined),
     },
   };
@@ -81,6 +88,38 @@ describe("BOOTSTRAP_SOURCE", () => {
     expect(effects).toEqual([`fetch ${ME}&__rec=e2-m1`]);
   });
 
+  test("in original mode leaves the first effects unmarked and hides and refuses reserved names", async () => {
+    const { sandbox, context, effects } = workerRealm(["__rec:e2-m1:fixture-sw", "fixture-sw"]);
+    const keys = Object.keys(sandbox);
+    const installed = diagnostics(vm.runInContext(withOriginal(), context));
+    expect(installed.marker).toBeUndefined();
+    expect(Reflect.get(vm.runInContext("globalThis.__recnrun", context), "original")).toBe(true);
+    vm.runInContext(FIRST_STATEMENTS, context);
+    expect(effects).toEqual([`fetch ${ME}`, "indexedDB.open fixture-sw", "caches.open fixture-sw"]);
+    const listed: unknown = await vm.runInContext(
+      "Promise.all([indexedDB.databases(), caches.keys()])",
+      context,
+    );
+    expect(JSON.stringify(listed)).toBe('[[{"name":"fixture-sw"}],["fixture-sw"]]');
+    const refused: unknown = vm.runInContext(
+      'try { indexedDB.open("__rec:x"); "opened" } catch (error) { error.name + ": " + error.message }',
+      context,
+    );
+    expect(refused).toBe(
+      'SecurityError: RECnRun refused indexedDB.open("__rec:x"): names that start with "__rec:" are reserved',
+    );
+    expect(effects).toHaveLength(3);
+    expect(Object.keys(sandbox), "the bundle leaks no global").toEqual(keys);
+  });
+
+  test("a realm in either mode ignores a later bootstrap of the other mode", () => {
+    const { context, effects } = workerRealm();
+    const original = diagnostics(vm.runInContext(withOriginal(), context));
+    expect(diagnostics(vm.runInContext(withMarker("e2-m1"), context))).toEqual(original);
+    vm.runInContext('indexedDB.open("fixture-sw")', context);
+    expect(effects).toEqual(["indexedDB.open fixture-sw"]);
+  });
+
   test("withMarker refuses a marker that could escape the expression", () => {
     expect(() => withMarker('x"});alert(1)//')).toThrow();
     expect(() => withMarker("")).toThrow();
@@ -88,9 +127,9 @@ describe("BOOTSTRAP_SOURCE", () => {
 });
 
 describe("renderArtifact", () => {
-  test("wraps the bundle in a function that calls installMarker on its global", () => {
+  test("wraps the bundle in a function that calls installBootstrap on its global", () => {
     const bundle =
-      "var recnrunBootstrap = { installMarker: (scope, options) => [typeof scope, options.marker] };";
+      "var recnrunBootstrap = { installBootstrap: (scope, options) => [typeof scope, options.marker] };";
     const artifact = renderArtifact(`${bundle}\n`, "9.9.9");
     const result = vm.runInNewContext(`${artifact.source}({ marker: "m" })`) as unknown[];
     expect([...result]).toEqual(["object", "m"]);

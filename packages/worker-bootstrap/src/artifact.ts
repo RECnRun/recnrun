@@ -19,10 +19,10 @@ export const MODULE_TYPES = [
 
 /**
  * Wraps the IIFE bundle in one function expression, valid as a classic script, that installs the
- * marker on the global it runs in when called with `{ marker }`.
+ * marker (`{ marker }`) or the original session's filter (`{ original: true }`) on the global it runs in.
  */
 export function renderArtifact(bundle: string, version: string): BootstrapArtifact {
-  const source = `(function (options) {\n${bundle.trim()}\nreturn ${BUNDLE_NAME}.installMarker(globalThis, options);\n})`;
+  const source = `(function (options) {\n${bundle.trim()}\nreturn ${BUNDLE_NAME}.installBootstrap(globalThis, options);\n})`;
   return { source, hash: createHash("sha256").update(source).digest("hex"), version };
 }
 

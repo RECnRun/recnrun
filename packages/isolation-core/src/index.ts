@@ -17,3 +17,4 @@ export {
   type BootstrapDiagnostics,
   type OriginalDiagnostics,
 } from "./install-original.ts";
+export { installBootstrap } from "./install-bootstrap.ts";

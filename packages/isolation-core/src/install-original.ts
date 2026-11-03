@@ -17,7 +17,7 @@ const OriginalDiagnosticsSchema = v.object({
 });
 
 /** The diagnostics a bootstrap already left on `scope`, in either mode. */
-function installedDiagnostics(scope: object): BootstrapDiagnostics | undefined {
+export function installedDiagnostics(scope: object): BootstrapDiagnostics | undefined {
   const existing: unknown = Reflect.get(scope, DIAGNOSTICS_KEY);
   if (v.is(MarkerDiagnosticsSchema, existing)) return existing;
   return v.is(OriginalDiagnosticsSchema, existing) ? existing : undefined;
