@@ -2,6 +2,7 @@ import type { Flow } from "@recnrun/protocol";
 import { useState } from "preact/hooks";
 import { useAction, useApi, useLoad } from "@/api/context";
 import { AssertionForm } from "@/features/editor/AssertionForm";
+import { Declarations } from "@/features/editor/Declarations";
 import { StepCard } from "@/features/editor/StepCard";
 import {
   type ActionDraft,
@@ -90,6 +91,7 @@ function FlowEditor({ initial, revision, session, onRun }: FlowEditorProps) {
       <Card title="Add an assertion">
         <AssertionForm onAdd={addAssertion} session={session} steps={flow.steps} />
       </Card>
+      <Declarations flow={flow} onEdit={edit} />
     </>
   );
 }

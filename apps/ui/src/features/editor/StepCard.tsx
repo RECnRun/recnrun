@@ -1,6 +1,7 @@
 import type { Flow, Step, Target } from "@recnrun/protocol";
 import { useState } from "preact/hooks";
 import { moveStep, removeStep, setStepField } from "@/features/editor/edit";
+import { StepDeclarations } from "@/features/editor/StepDeclarations";
 import { StepFields } from "@/features/editor/StepFields";
 import { TargetPicker } from "@/features/editor/TargetPicker";
 import type { PickerSession } from "@/features/editor/usePicker";
@@ -101,6 +102,7 @@ export function StepCard({ flow, step, session, onEdit }: StepCardProps) {
       </div>
       <StepTarget step={step} session={session} onChange={(target) => set("target", target)} />
       <StepFields step={step} onSet={set} />
+      <StepDeclarations flow={flow} step={step} onEdit={onEdit} />
     </li>
   );
 }

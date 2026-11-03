@@ -2,16 +2,14 @@ import * as v from "valibot";
 import { StringWithInterpolationSchema } from "./interpolation.ts";
 
 /** Ids of flows, steps, requirements, and locators: readable slugs such as `obter-id` or `CA-01`. */
-export const IdSchema = v.pipe(
-  v.string(),
-  v.regex(/^[A-Za-z0-9][\w.-]*$/, "An id starts with a letter or digit and has no spaces."),
-);
+export const ID_PATTERN = /^[A-Za-z0-9][\w.-]*$/;
+export const ID_PROBLEM = "An id starts with a letter or digit and has no spaces.";
+export const IdSchema = v.pipe(v.string(), v.regex(ID_PATTERN, ID_PROBLEM));
 
 /** Names of actors, inputs, variables, and locals: identifiers that interpolation can read. */
-export const NameSchema = v.pipe(
-  v.string(),
-  v.regex(/^[A-Za-z_]\w*$/, "A name is an identifier (letters, digits, underscore)."),
-);
+export const NAME_PATTERN = /^[A-Za-z_]\w*$/;
+export const NAME_PROBLEM = "A name is an identifier (letters, digits, underscore).";
+export const NameSchema = v.pipe(v.string(), v.regex(NAME_PATTERN, NAME_PROBLEM));
 
 /** A registered function pinned to an exact version, such as `team.canApprove@1.0.0`. */
 export const FunctionRefSchema = v.pipe(
