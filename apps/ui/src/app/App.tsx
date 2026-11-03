@@ -6,6 +6,7 @@ import { Catalog } from "@/features/catalog/Catalog";
 import { DraftAssertions } from "@/features/editor/DraftAssertions";
 import { Editor } from "@/features/editor/Editor";
 import { Recorder } from "@/features/recorder/Recorder";
+import { useActiveSession } from "@/features/recorder/activeSession";
 import { Run } from "@/features/run/Run";
 import { Setup } from "@/features/setup/Setup";
 
@@ -29,7 +30,13 @@ function useRoute(): [Route, (route: Route) => void] {
   return [route, navigate];
 }
 
-function Screen({ route, navigate }: { route: Route; navigate: (route: Route) => void }) {
+type ScreenProps = {
+  route: Route;
+  navigate: (route: Route) => void;
+  active: ReturnType<typeof useActiveSession>;
+};
+
+function Screen({ route, navigate, active }: ScreenProps) {
   switch (route.screen) {
     case "setup":
       return <Setup />;
@@ -44,6 +51,7 @@ function Screen({ route, navigate }: { route: Route; navigate: (route: Route) =>
       return (
         <Recorder
           onFinalized={(flowId) => navigate({ screen: "editor", flowId })}
+          active={active}
           slot={(session) => <DraftAssertions session={session} />}
         />
       );
@@ -81,11 +89,13 @@ export function Header({ current }: { current?: Route["screen"] }) {
 /** The whole UI: navigation and the screen the hash names, all talking to `api`. */
 export function App({ api }: { api: Api }) {
   const [route, navigate] = useRoute();
+  // A recording outlives its screen: leaving Record must not lose its stop and save controls.
+  const active = useActiveSession();
   return (
     <ApiProvider api={api}>
       <Header current={route.screen} />
       <main>
-        <Screen route={route} navigate={navigate} />
+        <Screen route={route} navigate={navigate} active={active} />
       </main>
     </ApiProvider>
   );

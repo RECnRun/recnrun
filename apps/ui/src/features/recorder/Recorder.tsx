@@ -1,5 +1,5 @@
 import type { ProfileBinding, SessionStatus } from "@recnrun/protocol";
-import { useState } from "preact/hooks";
+import { useEffect, useState } from "preact/hooks";
 import { useAction, useApi, useLoad } from "@/api/context";
 import { Session, type SessionSlot } from "@/features/recorder/Session";
 import { Button } from "@/ui/Button";
@@ -51,23 +51,65 @@ function StartForm({ profiles, onStarted }: StartProps) {
   );
 }
 
+type ResumeProps = {
+  sessionId: string;
+  onResumed: (status: SessionStatus) => void;
+  onGone: () => void;
+};
+
+/** Reads a session this tab started before, then shows it again unless it is gone or saved. */
+function Resume({ sessionId, onResumed, onGone }: ResumeProps) {
+  const { loaded, reload } = useLoad((api) => api.call("session.status", { sessionId }), sessionId);
+  useEffect(() => {
+    if (loaded.state === "ready") {
+      if (loaded.value.state === "completed") onGone();
+      else onResumed(loaded.value);
+    } else if (loaded.state === "error" && loaded.error.code === "not-found") onGone();
+  }, [loaded]);
+  return (
+    <Card title="Resuming recording">
+      <Loadable loaded={loaded} onRetry={reload}>
+        {() => null}
+      </Loadable>
+    </Card>
+  );
+}
+
+type ActiveSession = [string | undefined, (sessionId: string | undefined) => void];
+
 type RecorderProps = {
   onFinalized: (flowId: string) => void;
   pollMs?: number;
   /** Rendered inside the running session; `src/app` passes the assertion picker. */
   slot?: SessionSlot;
+  /** The session this tab runs, which `src/app` keeps above routing; without it, the Recorder keeps it. */
+  active?: ActiveSession;
 };
 
 /** Starts a recording session, then follows it until it is stopped and saved as a flow. */
-export function Recorder({ onFinalized, pollMs, slot }: RecorderProps) {
+export function Recorder({ onFinalized, pollMs, slot, active }: RecorderProps) {
+  const local = useState<string>();
+  const [sessionId, setSessionId] = active ?? local;
   const [status, setStatus] = useState<SessionStatus>();
   const { loaded, reload } = useLoad((api) => api.call("profiles.list", {}), "profiles");
+  const started = (next: SessionStatus) => {
+    setSessionId(next.sessionId);
+    setStatus(next);
+  };
+  const finalized = (flowId: string) => {
+    setSessionId(undefined);
+    onFinalized(flowId);
+  };
   if (status)
-    return <Session initial={status} onFinalized={onFinalized} pollMs={pollMs} slot={slot} />;
+    return <Session initial={status} onFinalized={finalized} pollMs={pollMs} slot={slot} />;
+  if (sessionId)
+    return (
+      <Resume sessionId={sessionId} onResumed={setStatus} onGone={() => setSessionId(undefined)} />
+    );
   return (
     <Card title="New recording">
       <Loadable loaded={loaded} onRetry={reload}>
-        {({ profiles }) => <StartForm profiles={profiles} onStarted={setStatus} />}
+        {({ profiles }) => <StartForm profiles={profiles} onStarted={started} />}
       </Loadable>
     </Card>
   );
