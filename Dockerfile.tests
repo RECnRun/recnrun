@@ -12,11 +12,12 @@ RUN curl -fsSL https://vite.plus -o /tmp/install-vp.sh \
     && vp env install node@24.21.0 pnpm@12.14.0
 
 # Google Chrome Stable from Google's apt repository, not Chromium or Chrome for Testing (POC plan decision 3).
+# xdotool and scrot drive Chrome's infobar and DevTools windows on Xvfb (tests/browser/fixtures/x-display.ts).
 RUN curl -fsSL https://dl.google.com/linux/linux_signing_key.pub -o /etc/apt/keyrings/google-chrome.asc \
     && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/google-chrome.asc] https://dl.google.com/linux/chrome/deb/ stable main" \
         > /etc/apt/sources.list.d/google-chrome.list \
     && apt-get update \
-    && apt-get install -y --no-install-recommends google-chrome-stable \
+    && apt-get install -y --no-install-recommends google-chrome-stable xdotool scrot \
     && rm -rf /var/lib/apt/lists/* \
     && google-chrome --version
 
