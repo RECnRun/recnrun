@@ -7,7 +7,7 @@ RECnRun records and replays browser sessions for developers. The extension store
 - `packages/domain`: `@recnrun/domain`, Valibot schemas and types for Recording and the stored Snapshot.
 - `packages/bridge`: `@recnrun/bridge`, the versioned `window.postMessage` protocol between the website and the extension's content script.
 - `packages/brand`: `@recnrun/brand`, the Mona Sans font and the stylesheets both apps import.
-- `tests/`: Playwright end-to-end tests (`tests/e2e`), the POC lab on Google Chrome Stable (`tests/browser`, with its harness unit tests in `tests/*.test.ts`), and Docker runner checks (`tests/container`).
+- `tests/`: Playwright end-to-end tests (`tests/e2e`), the POC lab on Google Chrome Stable (`tests/browser`, its experiments in `tests/experiments`, and their harness unit tests in `tests/*.test.ts`), and Docker runner checks (`tests/container`).
 
 Durable decisions live in `docs/`:
 
@@ -35,7 +35,8 @@ Vite+ (`vp`) is the only toolchain. `vp <name>` runs a built-in command and `vp 
 | `vp run deps`                                     | Architecture boundaries (dependency-cruiser)                         |
 | `vp run test:unit`, `test:components`, `test:e2e` | One test layer: Node, Vitest Browser Mode, Playwright with extension |
 | `vp run test:browser`                             | Google Chrome Stable in Docker: install methods, the mesh            |
-| `vp run test`                                     | All four layers                                                      |
+| `vp run test:experiments`                         | POC hypotheses that write verdicts under `.artifacts/evidence/`      |
+| `vp run test`                                     | All five layers                                                      |
 
 | `vp run test:coverage` | Coverage with thresholds |
 | `vp run dead-code`, `vp run duplication` | Knip; jscpd |

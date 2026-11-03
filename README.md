@@ -41,6 +41,7 @@ The dev Chrome keeps its profile in `apps/extension/.wxt/chrome-data`, so extens
 | `vp run deps`                                     | Architecture boundaries and import cycles                               |
 | `vp run test:unit`, `test:components`, `test:e2e` | Node tests; components in Chromium; the website with the real extension |
 | `vp run test:browser`                             | The POC lab: Google Chrome Stable with the test build installed         |
+| `vp run test:experiments`                         | POC hypotheses on that lab, each writing a verdict                      |
 
 | `vp run test:coverage` | Coverage of at least 80% lines, statements, and functions; 75% branches |
 | `vp run dead-code`, `vp run duplication` | Unused files, exports, and dependencies; duplicated code |

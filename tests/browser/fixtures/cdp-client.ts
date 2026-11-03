@@ -96,7 +96,7 @@ function createClient(write: (message: string) => void, closeTransport: () => vo
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]"]);
 
 /** Refuses any endpoint off the loopback: the harness never reaches another host's browser. */
-export function requireLoopback(url: string): void {
+function requireLoopback(url: string): void {
   const { protocol, hostname } = new URL(url);
   if (protocol !== "ws:" || !LOOPBACK_HOSTS.has(hostname)) {
     throw new Error(`CDP endpoint ${url} is not a ws:// address on the loopback`);

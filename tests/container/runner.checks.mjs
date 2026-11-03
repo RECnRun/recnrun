@@ -213,7 +213,7 @@ await test(
 
 await test("public tests route through Docker while local variants and the hooks retain every gate", () => {
   const manifest = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
-  for (const layer of ["unit", "components", "e2e", "browser", "coverage"]) {
+  for (const layer of ["unit", "components", "e2e", "browser", "experiments", "coverage"]) {
     assert.equal(
       manifest.scripts[`test:${layer}`],
       `node scripts/test-container.mjs test:${layer}:local`,
@@ -253,11 +253,17 @@ await test("verify runs Vitest once, under coverage, and keeps test:local for vp
   const config = readFileSync(join(root, "vite.config.ts"), "utf8");
   const task = (name) => config.match(new RegExp(`"${name}": \\{[^}]*command: \\[([^\\]]*)\\]`))[1];
   const verifyRuns = task("verify:local").match(/test:(?:[a-z0-9]+:)?local/g);
-  assert.deepEqual(verifyRuns, ["test:coverage:local", "test:e2e:local", "test:browser:local"]);
+  assert.deepEqual(verifyRuns, [
+    "test:coverage:local",
+    "test:e2e:local",
+    "test:browser:local",
+    "test:experiments:local",
+  ]);
   assert.deepEqual(task("test:local").match(/test:(?:[a-z0-9]+:)?local/g), [
     "test:unit:local",
     "test:components:local",
     "test:e2e:local",
     "test:browser:local",
+    "test:experiments:local",
   ]);
 });

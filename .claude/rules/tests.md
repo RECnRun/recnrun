@@ -12,13 +12,14 @@ paths:
 
 ## Layers
 
-| Layer      | Files                                                                    | Command                  |
-| ---------- | ------------------------------------------------------------------------ | ------------------------ |
-| Node unit  | `{apps,packages}/*/tests/*.test.ts`, `tests/*.test.ts` (the lab harness) | `vp run test:unit`       |
-| Component  | `*.browser.test.ts(x)` in Vitest Browser Mode, Chromium                  | `vp run test:components` |
-| End-to-end | `tests/e2e/*.spec.ts`, headed Playwright, built website + test extension | `vp run test:e2e`        |
-| Browser    | `tests/browser/*.spec.ts`, Google Chrome Stable over CDP, headed on Xvfb | `vp run test:browser`    |
-| Scripts    | `scripts/*.checks.mjs` (Node)                                            | `vp run test:scripts`    |
+| Layer       | Files                                                                    | Command                   |
+| ----------- | ------------------------------------------------------------------------ | ------------------------- |
+| Node unit   | `{apps,packages}/*/tests/*.test.ts`, `tests/*.test.ts` (the lab harness) | `vp run test:unit`        |
+| Component   | `*.browser.test.ts(x)` in Vitest Browser Mode, Chromium                  | `vp run test:components`  |
+| End-to-end  | `tests/e2e/*.spec.ts`, headed Playwright, built website + test extension | `vp run test:e2e`         |
+| Browser     | `tests/browser/*.spec.ts`, Google Chrome Stable over CDP, headed on Xvfb | `vp run test:browser`     |
+| Experiments | `tests/experiments/*.spec.ts`, POC hypotheses on the browser fixtures    | `vp run test:experiments` |
+| Scripts     | `scripts/*.checks.mjs` (Node)                                            | `vp run test:scripts`     |
 
 - Keep schemas, protocol handling, handlers, and view models in Node unit tests; extract pure functions when that makes a rule testable.
 - Both apps' `vitest.browser.config.ts` call `browserProject(name, dir)` from the root `vitest.browser.shared.ts`; change the Browser Mode setup there, once.
@@ -48,6 +49,9 @@ paths:
 
 - The lab runs Google Chrome Stable from the image, never Playwright's Chromium (which is Google Chrome for Testing): every run there is labelled `diagnostic` and approves nothing ([POC PLAN.md decision 2](../../docs/poc/downloads-launcher/PLAN.md#2-decisions)).
 - Import `test` and `expect` from `tests/browser/fixtures/chrome.ts`. Its `chrome` fixture launches Google Chrome Stable headed with a throwaway `--user-data-dir`, waits for `DevToolsActivePort`, connects with `chromium.connectOverCDP` on the loopback, and exposes `browser`, `cdp` (a browser-target CDP session), `version`, `userDataDir`, `pid`, and `flags`; teardown keeps `display.png` of a failed test, stops Chrome with SIGTERM (its orderly quit on Linux), and deletes the root. `launchChrome({ userDataDir })` reuses a root across launches and leaves it in place; `launchChrome({ cdp: false })` starts the strict lab's Chrome with no `--remote-debugging-*` flag and no Playwright connection, and its `StrictChrome` has no `browser`, `cdp`, or `wsEndpoint` by type.
-- Chrome 137 and later ignore `--load-extension` on branded builds, so the harness never passes it.
+- Chrome 137 and later ignore `--load-extension` on branded builds, so the harness never passes it. `tests/browser/fixtures/extension-loaders.ts` installs `apps/extension/.output/chrome-mv3-test` (built by `test:browser:local` and `test:experiments:local`) with `Extensions.loadUnpacked` over CDP, Chrome started with `--enable-unsafe-extension-debugging` (label `diagnostic`), and `attachExtension` pings its service worker through `cdp-client.ts`. `tests/browser/fixtures/policy-install.ts` is the strict install (label `strict`): it packs the build as a CRX3 signed with a fresh key (`crx3.ts`; the test build has no `key`), serves it from an update server on `127.0.0.1`, writes `ExtensionInstallForcelist` to `/etc/opt/chrome/policies/managed/recnrun.json` (root, Linux only, else `UnavailableError`), and `launchStrict` starts Chrome with no CDP client; `installedState` reads the root's `Extensions/` folder and preferences after Chrome quits, and the dashboard window RECnRun opens on install and startup shows the extension ran.
+- Experiments record each hypothesis with `appendVerdict` (`tests/experiments/verdicts.ts`) in `.artifacts/evidence/<RECNRUN_RUN_ID>/verdicts.json`, with `chrome`, `environment`, `install`, `label`, `variant`, `topology`, `debugger`, `externalClient`, `samples`, and each sample's observations. A hypothesis that fails is a verdict, not a test failure; the spec fails when a hypothesis left none. Docker runs set `RECNRUN_RUN_ID` to the run id and export the folder to `.artifacts/docker/<run-id>/evidence/`. `playwright.experiments.config.ts` never retries, since a retry would append a second verdict.
+- **Sample counts** come from `sized(full, few = 1)` in `tests/experiments/samples.ts`, never from a literal. `vp run verify` sets `RECNRUN_EXPERIMENT_SAMPLES=smoke`, so every experiment runs once per hypothesis and `appendVerdict` stamps `mode: "smoke"`; `vp run test:experiments` runs the full counts and writes the evidence reports cite. A verdict with `mode: "smoke"` is never evidence.
+
 - `tests/browser/fixtures/x-display.ts` reads browser UI with no CDP handle on the container's Xvfb display (window titles with xdotool, the display with scrot) and throws unless `RECNRUN_TEST_CONTAINER=1`, so it never acts on a host screen; pass xdotool no `--long` options, which the harness scan reads as Chrome flags.
 - **Calling CDP.** Send commands only as `<session>.send("Domain.method", params)` with the method as a string literal at the call site; `tests/observer-allowlist.test.ts` scans `tests/browser` and `tests/experiments` and fails on a command outside its allowlist, on `ServiceWorker.*`, `Fetch.*`, `Debugger.*`, `Emulation.*`, `Storage.clear*`, `Target.setAutoAttach`, `Page.addScriptToEvaluateOnNewDocument`, `Page.setBypassCSP`, cookie writes, header or user-agent overrides, on raw `Runtime.evaluate` outside `tests/browser/fixtures/cdp-client.ts`, on Playwright calls that rewrite or inject into the page (`route`, `addInitScript`, `addScriptTag`, `setContent`, `addCookies`, `setOffline`, and the rest of its list), and on launch flags outside its list (any `--disable-*`, and `--load-extension`). `cdp-client.ts` connects only to a `ws://` endpoint on the loopback. Adding a command means adding it to the allowlist with its reason.
