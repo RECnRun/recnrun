@@ -87,7 +87,7 @@ export function formatReport(report: DoctorReport): string[] {
   const { node, chrome, remoteDebugging: debugging, bindings, disk, versions } = report;
   const rows: [string, string][] = [
     ["Node", `${node.version} (needs ${node.required}): ${node.satisfies ? "ok" : "too old"}`],
-    ["Chrome", chrome.ok ? `found at ${chrome.wsEndpoint}` : `not found (${chrome.code})`],
+    ["Chrome", chromeLine(chrome)],
     ["Remote debugging", `${debugging.state}${debugging.path ? ` (${debugging.path})` : ""}`],
     ["Bindings", bindingsLine(bindings)],
     ["Disk", `${mebibytes(disk.freeBytes)} free of ${mebibytes(disk.totalBytes)} (${disk.path})`],
@@ -96,6 +96,12 @@ export function formatReport(report: DoctorReport): string[] {
   if (!chrome.ok) rows.push(["Fix", chrome.remedy]);
   const width = Math.max(...rows.map(([label]) => label.length));
   return rows.map(([label, value]) => `${`${label}:`.padEnd(width + 1)} ${value}`);
+}
+
+function chromeLine(chrome: DiscoveryResult): string {
+  if (chrome.ok) return `found at ${chrome.wsEndpoint}`;
+  // A blocked read says nothing about whether Chrome runs, so it is not "not found".
+  return `${chrome.code === "unreadable-file" ? "blocked" : "not found"} (${chrome.code})`;
 }
 
 function bindingsLine({ count, stale, error, path }: DoctorReport["bindings"]): string {

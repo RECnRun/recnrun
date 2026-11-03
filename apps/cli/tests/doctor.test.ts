@@ -144,3 +144,17 @@ test("the human report is aligned lines naming each check and the remedy", async
   expect(columns.size).toBe(1);
   expect(lines.join("\n")).toContain("chrome://inspect/#remote-debugging");
 });
+
+test("the human report shows a blocked DevToolsActivePort with the permission guidance", async () => {
+  const remedy =
+    "The operating system refused to read /Users/ana/Library/Application Support/Google/Chrome/DevToolsActivePort: allow Full Disk Access.";
+  const blocked: HealthProbe["chrome"] = { ...missing, code: "unreadable-file", remedy };
+  const report = await assembleReport(
+    probes({ health: async () => ({ serviceVersion: "0.0.0", chrome: blocked }) }),
+  );
+  const lines = formatReport(report);
+  expect(lines.find((line) => line.startsWith("Chrome:"))).toMatch(/blocked \(unreadable-file\)/);
+  expect(lines.find((line) => line.startsWith("Remote debugging:"))).toContain("unreadable");
+  expect(lines.join("\n")).toContain(remedy);
+  expect(doctorExitCode(report)).toBe(1);
+});
