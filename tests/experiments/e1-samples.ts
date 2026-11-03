@@ -32,7 +32,7 @@ export interface Installed {
   quit(): Promise<void>;
 }
 
-export interface Fresh {
+interface Fresh {
   root: string;
   first: Installed;
   /** Launches the same root with the same flags and installs the same path again. */

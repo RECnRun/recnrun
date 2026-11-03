@@ -12,8 +12,8 @@ import type { CdpClient } from "../browser/fixtures/cdp-client.ts";
 
 /** The id `apps/extension/scripts/poc-key.mjs` pins for every POC build. */
 export const POC_EXTENSION_ID = "omllgeochjfpkjbkpcgjmnnbncdpiedd";
-export const PROBE_FILE = "e1-probe.txt";
-export const PROBE_TEXT = "RECnRun E1 probe: read through file:// by the extension\n";
+const PROBE_FILE = "e1-probe.txt";
+const PROBE_TEXT = "RECnRun E1 probe: read through file:// by the extension\n";
 
 const POLL_MS = 250;
 const RENDER_TIMEOUT_MS = 5_000;

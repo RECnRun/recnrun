@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { POC_PUBLIC_KEY } from "./poc-key.mjs";
+import { POC_EXTENSION_ID, POC_PUBLIC_KEY } from "./poc-key.mjs";
 
 const BASE = ["storage", "tabs", "offscreen", "downloads"];
 const VARIANTS = {
@@ -10,6 +11,13 @@ const VARIANTS = {
   "poc-d1": [...BASE, "debugger"],
   "poc-d2": [...BASE, "debugger"],
 };
+
+/** Chrome's id of a `key`: the first 16 bytes of the SHA-256 of the DER key, each nibble as a-p. */
+function extensionIdOf(key) {
+  const digest = createHash("sha256").update(Buffer.from(key, "base64")).digest("hex");
+  const letter = (nibble) => String.fromCharCode(97 + parseInt(nibble, 16));
+  return Array.from(digest.slice(0, 32), letter).join("");
+}
 
 function outputDir(mode) {
   return fileURLToPath(new URL(`../.output/chrome-mv3-${mode}/`, import.meta.url));
@@ -26,6 +34,7 @@ for (const [mode, permissions] of Object.entries(VARIANTS)) {
     const manifest = pocManifest(mode);
     assert.deepEqual(manifest.permissions, permissions);
     assert.equal(manifest.key, POC_PUBLIC_KEY);
+    assert.equal(extensionIdOf(manifest.key), POC_EXTENSION_ID);
     // MV3 reads file:// from an extension page only with this host permission and the toggle (E1).
     assert.deepEqual(manifest.host_permissions, ["file:///*"]);
     for (const page of ["diagnostics.html", "offscreen.html"]) {
