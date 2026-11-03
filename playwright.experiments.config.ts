@@ -5,6 +5,8 @@ process.env.RECNRUN_RUN_ID ??= new Date().toISOString().replaceAll(":", "-");
 
 export default defineConfig({
   testDir: "./tests/experiments",
+  // The Vitest schema tests live beside the specs; Playwright runs only the E* specs.
+  testMatch: /E\d+-.*\.spec\.ts$/,
   outputDir: "test-results/experiments",
   fullyParallel: false,
   workers: 1,
