@@ -12,6 +12,7 @@ import {
 } from "./capture-documents.ts";
 import { createEmitter, type Draft, type Emitter, type Origin } from "./capture-envelope.ts";
 import { NetworkCapture } from "./capture-network.ts";
+import { sensitiveHeaders, type BodySink } from "./capture-network-evidence.ts";
 import { mapPageEvent } from "./capture-page.ts";
 import type { TargetRecord } from "./instrumentation-targets.ts";
 
@@ -24,6 +25,10 @@ export interface CaptureOptions {
   bodyTimeoutMs?: number;
   /** Bodies longer than this many characters are kept in part and marked truncated; at most `MAX_INLINE_BODY_LENGTH`. */
   maxBodyLength?: number;
+  /** Stores response bodies by digest; without it bodies stay inline in the journal. */
+  blobs?: BodySink;
+  /** Header names recorded as `redacted` besides `SENSITIVE_HEADERS`, matched without case. */
+  redactHeaders?: readonly string[];
 }
 
 const DEFAULT_BODY_TIMEOUT_MS = 10_000;
@@ -186,6 +191,8 @@ export class Capture {
           this.options.maxBodyLength ?? MAX_INLINE_BODY_LENGTH,
           MAX_INLINE_BODY_LENGTH,
         ),
+        sensitive: sensitiveHeaders(this.options.redactHeaders),
+        ...(this.options.blobs && { blobs: this.options.blobs }),
       });
       this.networks.set(record.sessionId, network);
     }

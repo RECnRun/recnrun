@@ -16,6 +16,7 @@ export {
 } from "./instrumentation.ts";
 export type { CdpChannel, CdpEvent } from "./cdp-socket.ts";
 export type { CaptureOptions } from "./capture.ts";
+export type { BodySink } from "./capture-network-evidence.ts";
 export {
   resolveFunctionLocator,
   type FunctionLocatorOptions,

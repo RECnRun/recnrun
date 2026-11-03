@@ -1,6 +1,23 @@
 import type { BodyPayload } from "@recnrun/protocol";
 import * as v from "valibot";
 import type { Draft } from "./capture-envelope.ts";
+import {
+  BodySchema,
+  FailedSchema,
+  FinishedSchema,
+  network,
+  RequestIdSchema,
+  RequestSchema,
+  ResponseSchema,
+} from "./capture-network-cdp.ts";
+import {
+  bodyBytes,
+  cacheOf,
+  headerEntries,
+  timingOf,
+  type BodySink,
+} from "./capture-network-evidence.ts";
+import { webSocketDraft } from "./capture-websocket.ts";
 
 /** What one session's network capture needs from the capture around it. */
 export interface NetworkSession {
@@ -10,6 +27,10 @@ export interface NetworkSession {
   track(work: Promise<void>): void;
   bodyTimeoutMs: number;
   maxBodyLength: number;
+  /** Lowercase names of the headers recorded as `redacted`. */
+  sensitive: ReadonlySet<string>;
+  /** Where bodies are stored; without one they are kept inline, capped at `maxBodyLength`. */
+  blobs?: BodySink;
 }
 
 type Hop = { url: string; method: string; status: number };
@@ -22,6 +43,8 @@ interface Request {
   resourceType?: string;
   chain: Hop[];
   mimeType?: string;
+  // Chrome reports a memory cache hit before the response, which carries no flag for it.
+  fromMemory?: boolean;
   // `open` until the body is settled one way or another; a body is recorded at most once.
   body: "none" | "open" | "reading" | "done";
   timer?: ReturnType<typeof setTimeout>;
@@ -31,45 +54,6 @@ interface Request {
 
 // Bodies the page itself asked for; images, scripts, styles, and fonts are not requested.
 const BODY_TYPES = new Set(["Document", "XHR", "Fetch"]);
-
-const RequestSchema = v.object({
-  requestId: v.string(),
-  request: v.object({ url: v.string(), method: v.string() }),
-  type: v.optional(v.string()),
-  frameId: v.optional(v.string()),
-  redirectResponse: v.optional(v.object({ url: v.string(), status: v.number() })),
-});
-
-const ResponseSchema = v.object({
-  requestId: v.string(),
-  type: v.optional(v.string()),
-  frameId: v.optional(v.string()),
-  response: v.object({
-    url: v.string(),
-    status: v.number(),
-    statusText: v.string(),
-    mimeType: v.string(),
-    fromDiskCache: v.optional(v.boolean()),
-  }),
-});
-
-const FinishedSchema = v.object({ requestId: v.string(), encodedDataLength: v.number() });
-
-const FailedSchema = v.object({
-  requestId: v.string(),
-  errorText: v.string(),
-  canceled: v.optional(v.boolean()),
-  blockedReason: v.optional(v.string()),
-});
-
-const BodySchema = v.object({ body: v.string(), base64Encoded: v.boolean() });
-
-const network = (type: string, payload: Record<string, unknown>): Draft => ({
-  category: "network",
-  type,
-  component: "application",
-  payload,
-});
 
 const reason = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
@@ -87,6 +71,11 @@ export class NetworkCapture {
     else if (method === "Network.responseReceived") this.response(params);
     else if (method === "Network.loadingFinished") this.finished(params);
     else if (method === "Network.loadingFailed") this.failed(params);
+    else if (method === "Network.requestServedFromCache") this.servedFromCache(params);
+    else {
+      const draft = webSocketDraft(method, params, this.session.sensitive);
+      if (draft) this.session.emit(draft, null);
+    }
   }
 
   /** Settles every body still open, as when the capture stops or the target goes away. */
@@ -127,8 +116,15 @@ export class NetworkCapture {
       method: request.method,
       ...(type && { resourceType: type }),
       ...(chain.length > 0 && { redirectChain: [...chain] }),
+      ...headerEntries(request.headers, this.session.sensitive),
     };
     this.session.emit(network("request", payload), entry.frameId);
+  }
+
+  private servedFromCache(params: unknown): void {
+    const parsed = v.safeParse(RequestIdSchema, params);
+    const entry = parsed.success ? this.requests.get(parsed.output.requestId) : undefined;
+    if (entry) entry.fromMemory = true;
   }
 
   private response(params: unknown): void {
@@ -147,14 +143,19 @@ export class NetworkCapture {
     entry.mimeType = response.mimeType;
     entry.body = "open";
     this.requests.set(requestId, entry);
-    const { url, status, statusText, mimeType, fromDiskCache } = response;
+    const { url, status, statusText, mimeType, headers } = response;
+    const cache = cacheOf(response, entry.fromMemory === true);
+    const timing = timingOf(response.timing);
     const payload = {
       requestId,
       url,
       status,
       statusText,
       mimeType,
-      ...(fromDiskCache && { fromCache: true }),
+      cache,
+      ...(cache !== "network" && { fromCache: true }),
+      ...(timing && { timing }),
+      ...headerEntries(headers, this.session.sensitive),
     };
     this.session.emit(network("response", payload), entry.frameId);
     const ms = this.session.bodyTimeoutMs;
@@ -213,7 +214,7 @@ export class NetworkCapture {
     const reply = this.session
       .send("Network.getResponseBody", { requestId })
       .then(
-        (result) => this.bodyFrom(result),
+        (result) => this.bodyFrom(result, entry),
         (error: unknown) => ({ condition: "unavailable" as const, reason: reason(error) }),
       )
       .then((body) => {
@@ -223,14 +224,33 @@ export class NetworkCapture {
     this.session.track(work);
   }
 
-  private bodyFrom(result: unknown): Partial<BodyPayload> {
+  private async bodyFrom(result: unknown, entry: Request): Promise<Partial<BodyPayload>> {
     const parsed = v.safeParse(BodySchema, result);
     if (!parsed.success)
       return { condition: "unavailable", reason: "Chrome answered without a body." };
     const { body, base64Encoded } = parsed.output;
+    const { blobs } = this.session;
+    if (blobs && entry.body === "reading") return this.store(blobs, entry, body, base64Encoded);
     const max = this.session.maxBodyLength;
     const condition = body.length > max ? "truncated" : "captured";
     return { condition, size: body.length, base64Encoded, body: body.slice(0, max) };
+  }
+
+  private async store(
+    blobs: BodySink,
+    entry: Request,
+    body: string,
+    base64Encoded: boolean,
+  ): Promise<Partial<BodyPayload>> {
+    // Chrome answered; the read deadline no longer applies to writing the blob.
+    clearTimeout(entry.timer);
+    const { content, encoding } = bodyBytes(body, base64Encoded);
+    try {
+      const blob = await blobs.put(content, { mime: entry.mimeType ?? "", encoding });
+      return { condition: blob.condition, blob };
+    } catch (error) {
+      return { condition: "unavailable", reason: `The body could not be stored: ${reason(error)}` };
+    }
   }
 
   private wanted(entry: Request): boolean {
