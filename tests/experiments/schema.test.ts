@@ -73,6 +73,18 @@ describe("parseVerdicts", () => {
     expect(() => parseVerdicts([blank])).toThrow(/error/);
   });
 
+  test("refuses a strict label with an external client or a loadUnpacked install", () => {
+    const strict = { ...valid, label: "strict", install: "managed-policy", externalClient: false };
+    expect(parseVerdicts([strict])).toHaveLength(1);
+    expect(() => parseVerdicts([{ ...strict, externalClient: true }])).toThrow(/strict/);
+    expect(() => parseVerdicts([{ ...strict, install: "loadUnpacked" }])).toThrow(/strict/);
+  });
+
+  test("puts no extra constraint on a diagnostic label", () => {
+    const diagnostic = { ...valid, install: "managed-policy", externalClient: false };
+    expect(parseVerdicts([diagnostic])).toHaveLength(1);
+  });
+
   test.each(["pass", "fail"])("refuses a %s verdict with no sample", (verdict) => {
     expect(() => parseVerdicts([{ ...valid, verdict, samples: 0 }])).toThrow(/samples/);
   });

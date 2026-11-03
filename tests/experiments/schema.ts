@@ -25,7 +25,7 @@ const VerdictFields = {
 };
 
 /** One hypothesis outcome (POC PLAN.md decision 8); `unavailable` may have no sample but names why. */
-export const Verdict = v.variant("verdict", [
+const Outcome = v.variant("verdict", [
   v.strictObject({
     ...VerdictFields,
     verdict: v.picklist(["pass", "fail"]),
@@ -39,6 +39,16 @@ export const Verdict = v.variant("verdict", [
     samples: v.pipe(v.number(), v.integer(), v.minValue(0)),
   }),
 ]);
+
+/** `strict` approves only a run no CDP client could reach (POC PLAN.md decision 2). */
+export const Verdict = v.pipe(
+  Outcome,
+  v.check(
+    ({ label, externalClient, install }) =>
+      label !== "strict" || (!externalClient && install !== "loadUnpacked"),
+    "A strict verdict needs externalClient false and an install other than loadUnpacked.",
+  ),
+);
 export type Verdict = v.InferOutput<typeof Verdict>;
 
 export const Gestures = v.strictObject({
