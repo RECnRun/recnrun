@@ -1,4 +1,4 @@
-import { mkdir, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, expect, test } from "vite-plus/test";
@@ -13,6 +13,7 @@ import {
   type RunStatus,
   type RunSummary,
 } from "../../packages/protocol/src/index.ts";
+import { fakeChrome } from "./fake-chrome.ts";
 import { NO_CHROME, runCli, runNode, tempHome } from "./helpers.ts";
 
 const FLOW = fileURLToPath(new URL("../browser/fixtures/replay-spike.flow.json", import.meta.url));
@@ -47,11 +48,27 @@ const summaryOf = (status: RunStatus): RunSummary => ({
   failures: status === "failed" ? [{ stepId: "open", message: "The status never appeared." }] : [],
 });
 
-// The dataset names the status the canned replay ends with.
+// The dataset's `name` input names the status the canned replay ends with.
 const canned: CommandHandlers = {
-  "flow.replay": async ({ dataset }) => ({ runId: `run-${dataset ?? "passed"}` }),
+  "flow.replay": async ({ inputs }) => {
+    const status = inputs?.["name"];
+    return { runId: `run-${typeof status === "string" ? status : "passed"}` };
+  },
   "run.summary": async ({ runId }) => summaryOf(runId.replace("run-", "") as RunStatus),
 };
+
+/** A flow folder outside the store: `flow.yaml` (JSON is YAML) and `datasets/<name>.json`. */
+async function flowFolder(flow: unknown, datasets: Record<string, Record<string, unknown>>) {
+  const folder = join(home, "flow-folder");
+  await mkdir(join(folder, "datasets"), { recursive: true });
+  await writeFile(join(folder, "flow.yaml"), JSON.stringify(flow));
+  for (const [name, inputs] of Object.entries(datasets))
+    await writeFile(
+      join(folder, "datasets", `${name}.json`),
+      JSON.stringify({ schemaVersion: 1, inputs }),
+    );
+  return folder;
+}
 
 async function withService<T>(handlers: CommandHandlers, work: () => Promise<T>): Promise<T> {
   const started = await startService({ home, discover: async () => NO_CHROME, handlers });
@@ -129,9 +146,11 @@ test("doctor prints aligned lines and the remedy, and reuses a running service",
 test.each(["passed", "failed", "error"] as const)(
   "run of a %s replay exits with its status code and prints exactly one JSON summary",
   async (status) => {
+    const flow: unknown = JSON.parse(await readFile(FLOW, "utf8"));
+    const folder = await flowFolder(flow, { [status]: { name: status } });
     await withService(canned, async () => {
       const result = await runCli(
-        ["run", "--flow", FLOW, "--dataset", status, "--json", "--home", home],
+        ["run", "--flow", folder, "--dataset", status, "--json", "--home", home],
         home,
       );
       expect(result.code).toBe(RUN_EXIT_CODES[status]);
@@ -142,6 +161,39 @@ test.each(["passed", "failed", "error"] as const)(
     });
   },
 );
+
+test("run --dataset replays with the inputs of the flow folder's own dataset", async () => {
+  const flow = {
+    schemaVersion: 1,
+    id: "greet",
+    name: "Greet",
+    inputs: { name: { type: "string", required: true } },
+    steps: [{ id: "name", action: "fill", target: { testId: "name" }, value: "${inputs.name}" }],
+  };
+  const folder = await flowFolder(flow, { default: { name: "Ada" } });
+  const chrome = fakeChrome();
+  chrome.release();
+  const started = await startService({ home, adapter: chrome.adapter });
+  if (started.reused) throw new Error("A service already runs for this home.");
+  try {
+    const result = await runCli(
+      ["run", "--flow", folder, "--dataset", "default", "--home", home],
+      home,
+    );
+    expect(result.stderr).not.toContain("failed");
+    expect(result.code).toBe(0);
+    expect(JSON.parse(result.stdout)).toMatchObject({ flowId: "greet", status: "passed" });
+    expect(chrome.writes).toEqual(["fill"]);
+    const missing = await runCli(
+      ["run", "--flow", folder, "--dataset", "nightly", "--home", home],
+      home,
+    );
+    expect(missing.code).toBe(2);
+    expect(missing.stderr).toContain("datasets/nightly.json");
+  } finally {
+    await started.service.stop();
+  }
+});
 
 test("run of an invalid flow exits 2 with the validation message on stderr", async () => {
   const folder = join(home, "bad-flow");

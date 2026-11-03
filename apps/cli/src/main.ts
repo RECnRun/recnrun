@@ -2,6 +2,7 @@ import { homedir } from "node:os";
 import { loadFlowFile } from "@recnrun/service";
 import { parseArgs, USAGE, type Command } from "./args.ts";
 import { connect, type Connection } from "./connect.ts";
+import { loadDataset } from "./dataset.ts";
 import { assembleReport, doctorExitCode, formatReport } from "./doctor.ts";
 import { machineProbes, openUrl } from "./probes.ts";
 import { runFlow } from "./run.ts";
@@ -71,6 +72,7 @@ async function dispatch(command: Command, io: Io, deps: Deps): Promise<number> {
       const home = command.home ?? io.home;
       return runFlow(command, {
         load: loadFlowFile,
+        loadDataset,
         connect: () => deps.connect(home),
         out: (line) => io.out(line),
         err: (line) => io.err(line),

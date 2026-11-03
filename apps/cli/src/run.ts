@@ -1,5 +1,6 @@
-import { RUN_EXIT_CODES, type Flow, type RunSummary } from "@recnrun/protocol";
+import { RUN_EXIT_CODES, type Dataset, type Flow, type RunSummary } from "@recnrun/protocol";
 import { ServiceCallError, type ServiceClient } from "@recnrun/service";
+import { datasetInputs } from "./dataset.ts";
 
 const POLL_MS = 250;
 // A run that has not finished answers run.summary with one of these.
@@ -13,6 +14,7 @@ export interface RunOptions {
 
 export interface RunDeps {
   load(path: string): Promise<Flow>;
+  loadDataset(flowPath: string, name: string): Promise<Dataset>;
   connect(): Promise<{ client: Pick<ServiceClient, "call">; close(): Promise<void> }>;
   out(line: string): void;
   err(line: string): void;
@@ -43,13 +45,25 @@ async function waitForSummary(
   }
 }
 
+/** The inputs of `--dataset`, read from the flow's own folder rather than the store's copy. */
+async function inputsOf(flow: Flow, options: RunOptions, deps: RunDeps) {
+  if (options.dataset === undefined) return {};
+  const dataset = await deps.loadDataset(options.flow, options.dataset);
+  const { inputs, secret } = datasetInputs(flow, dataset);
+  if (secret.length > 0)
+    deps.err(
+      `Dataset ${options.dataset} sets secret inputs, which were ignored: ${secret.join(", ")}.`,
+    );
+  return { inputs };
+}
+
 async function replay(options: RunOptions, deps: RunDeps): Promise<number> {
   const flow = await deps.load(options.flow);
+  const params = await inputsOf(flow, options, deps);
   const connection = await deps.connect();
   try {
     // The file is the source of truth for this run, so the store gets its content first.
     await connection.client.call("flow.import", { flow });
-    const params = options.dataset === undefined ? {} : { dataset: options.dataset };
     const { runId } = await connection.client.call("flow.replay", { flowId: flow.id, ...params });
     deps.err(`Run ${runId} of flow ${flow.id} started.`);
     const summary = await waitForSummary(connection.client, runId, options, deps);

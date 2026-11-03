@@ -30,7 +30,10 @@ const tiny = {
   id: "tiny",
   name: "tiny",
   actors: {},
-  inputs: {},
+  inputs: {
+    user: { type: "string", required: false, secret: false },
+    password: { type: "string", required: false, secret: true },
+  },
   requirements: [],
   preconditions: [],
   steps: [],
@@ -45,6 +48,7 @@ function setup(answers: Partial<Record<"flow.replay" | "run.summary", Answer>>) 
   let clock = 0;
   const deps: RunDeps = {
     load: async () => tiny,
+    loadDataset: async () => ({ schemaVersion: 1, inputs: { user: "ada" } }),
     connect: async () => ({
       client: {
         call: (async (command: string, params: unknown) => {
@@ -77,11 +81,17 @@ test.each(["passed", "failed", "error", "interrupted"] as const)(
   },
 );
 
-test("the flow file is imported, then the replay names the flow and the dataset", async () => {
+test("the flow file is imported, then the replay sends the local dataset's inputs", async () => {
   const { deps, calls } = setup({ "run.summary": () => summary("passed") });
+  const asked: string[] = [];
+  deps.loadDataset = async (flowPath, name) => {
+    asked.push(flowPath, name);
+    return { schemaVersion: 1, inputs: { user: "ada" } };
+  };
   await runFlow(options, deps);
+  expect(asked).toEqual(["f", "default"]);
   expect(calls[0]).toEqual(["flow.import", { flow: tiny }]);
-  expect(calls[1]).toEqual(["flow.replay", { flowId: "tiny", dataset: "default" }]);
+  expect(calls[1]).toEqual(["flow.replay", { flowId: "tiny", inputs: { user: "ada" } }]);
   expect(calls[2]).toEqual(["run.summary", { runId: "run-1" }]);
 });
 
@@ -89,6 +99,28 @@ test("without a dataset the request sends none", async () => {
   const { deps, calls } = setup({ "run.summary": () => summary("passed") });
   await runFlow({ ...options, dataset: undefined }, deps);
   expect(calls[1]).toEqual(["flow.replay", { flowId: "tiny" }]);
+});
+
+test("a dataset never sends the flow's secret inputs and says it ignored them", async () => {
+  const { deps, calls, err } = setup({ "run.summary": () => summary("passed") });
+  deps.loadDataset = async () => ({
+    schemaVersion: 1,
+    inputs: { user: "ada", password: "hunter2" },
+  });
+  expect(await runFlow(options, deps)).toBe(0);
+  expect(calls[1]).toEqual(["flow.replay", { flowId: "tiny", inputs: { user: "ada" } }]);
+  expect(err.join("\n")).toContain("ignored: password");
+  expect(err.join("\n")).not.toContain("hunter2");
+});
+
+test("a dataset that cannot be loaded is an error before the service is called", async () => {
+  const { deps, calls, err } = setup({});
+  deps.loadDataset = async () => {
+    throw new Error("f/datasets/nightly.json: the dataset cannot be read.");
+  };
+  expect(await runFlow({ ...options, dataset: "nightly" }, deps)).toBe(2);
+  expect(calls).toEqual([]);
+  expect(err.join("\n")).toContain("datasets/nightly.json");
 });
 
 test("run.summary is polled while the run is unfinished", async () => {
