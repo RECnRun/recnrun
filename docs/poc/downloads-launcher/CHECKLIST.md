@@ -17,37 +17,49 @@ Tracks [PLAN.md](PLAN.md). One line per task; the orchestrator owns `[x]`, imple
 Markers: `[ ]` not started · `[i]` implemented, awaiting the phase gate · `[x]` verified by `vp run verify` · `[!]` blocked (reason indented) · `[~]` partial (what is missing indented).
 
 **Branch:** `poc-downloads-launcher` (from `60989d6`, head of PR #19 `poc/multi-profile-mesh`)
-**Last commit:** the commit whose subject is "Record P0.2 to P0.4 in the checklist" (after `7fcc30e`)
-**Current phase:** P0 (P0.1–P0.4 implemented; P0.5 on `agent/p0-host`, P0.6 and `experiments/E0.md` on `agent/p0-schema` in flight)
-**Paused:** 2026-11-03, plan committed, nothing in flight. Owner decisions recorded in PLAN.md decisions 1, 3, 4, 9 (host Chrome allowed including the personal Default; packed not executed; §13 order; PR against `poc/multi-profile-mesh`).
+**Last commit:** the commit whose subject is "Close Gate P0 with the Codex review and the egress task" (after `70c5325`)
+**Current phase:** P1 (start with P1.0)
+**Paused:** 2026-11-03 at Gate P0 closed: nothing in flight, no agent worktrees. Owner decisions recorded in PLAN.md decisions 1, 3, 4, 9 (host Chrome allowed including the personal Default; packed not executed; §13 order; PR against `poc/multi-profile-mesh`). Owner clarified on 2026-11-03 that the debugger axis means headed and headless, with and without `chrome.debugger`, infobar recorded (PLAN.md P8.2).
 
 ## P0: Base, lab, baseline, and Chromium inventory
 
-- [i] P0.1 Plan documents and `docs:check`
-  red: `node <scratch>/scripts/check-docs.mjs <scratch>` with `MANUAL_VALIDATION.md#nope` in a scratch copy of PLAN.md exits 1: `broken anchor MANUAL_VALIDATION.md#nope`
-  green: `node --test scripts/check-docs.checks.mjs` 8 passed; `vp run docs:check` exits 0; `vp check` clean
-  commit: `0bf18cc` Port the Markdown link checker and register the POC in the docs (cherry-picks of `049a482` and `226b406`, adapted)
-- [i] P0.2 Baseline of the base (verify counts, Google Chrome Stable in Docker, mesh regressions)
-  baseline: `vp run verify` on `60989d6` (detached scratch worktree, 2026-11-03) exit 0 · 64 files / 450 unit+component tests · 66 E2E passed (4.2 min, mesh specs included) · coverage 99.10 stmts / 97.42 branches / 97.98 funcs / 99.55 lines · Vite+ 1.4.0, Node 24.21.0, pnpm 12.14.0, Playwright 1.64.1 in the image
-  red: `vp run test:container` before the Dockerfile change failed 7 of 16 (`target stage "runtime" could not be found`, no versions.json, no evidence copy, unknown `test:experiments:local`)
-  green: `vp run test:container` 16 passed; the image reports Google Chrome 156.0.8078.79
-  commit: `9037c6b` Run Google Chrome Stable in the Docker test image
-- [i] P0.3 Browser and experiments layers on branded Chrome, E0 install methods, report `experiments/E0.md`
-  red: `chrome.spec.ts` against Playwright's Chromium: `Not Google Chrome: Google Chrome for Testing 156.0.8078.4`; `--load-extension` added to `chrome.ts`: `--load-extension is forbidden on Google Chrome`; E0 with a missing build path and no policy file: both verdicts `fail`, spec still passes; E0 with `E0.managedPolicy` not run: spec fails on "every hypothesis ran"; mesh with profile B on another folder: stays `Not paired` after 30 s
-  green: `vp run test:browser` 3 passed (both roots `Connected` through Chrome's own picker and write prompt in 8 s); `vp run test:experiments` 3 passed, 3 samples per hypothesis; smoke mode writes 1 sample
-  verdict: E0.loadUnpacked pass (lab, diagnostic, externalClient true; observation: not running after a relaunch of the same root, prefs location 4, 3 of 3) · E0.managedPolicy pass (lab, strict, no CDP; survives SIGTERM quit and relaunch, location 7) · Google Chrome 156.0.8078.79 on Linux in Docker · files `experiments/verdicts/E0-lab-{full,smoke,versions}.json`
-  commit: `9a58739` browser layer and CDP allowlist · `a2cd795` E0 verdicts · `f33275a` mesh over the folder in the lab · `7fcc30e` committed verdicts · report `experiments/E0.md` pending (P0.6 agent)
-- [i] P0.4 Chromium inventory `CHROMIUM.md`
-  green: 9 groups pinned at `refs/tags/156.0.8078.80` (mirror `chrome/VERSION` MAJOR=156 PATCH=80); only the `--enable-unsafe-extension-debugging` gate is `unavailable`; orchestrator spot-checked `ExtensionPrefs::CleanUpCdpInstalledExtensions` (extension_prefs.cc:2213, 2611) and `Manifest::ShouldAlwaysAllowFileAccess` (manifest.h:98) against the mirror; `vp run docs:check` exit 0
-  commit: `2717ba3` Add the Chromium source inventory for the POC hypotheses
-- [ ] P0.5 Host runner `vp run test:host`
-- [ ] P0.6 Namespace and evidence schema
+- [x] P0.1 Plan documents and `docs:check`
+      red: `node <scratch>/scripts/check-docs.mjs <scratch>` with `MANUAL_VALIDATION.md#nope` in a scratch copy of PLAN.md exits 1: `broken anchor MANUAL_VALIDATION.md#nope`
+      green: `node --test scripts/check-docs.checks.mjs` 8 passed; `vp run docs:check` exits 0; `vp check` clean
+      commit: `0bf18cc` Port the Markdown link checker and register the POC in the docs (cherry-picks of `049a482` and `226b406`, adapted)
+- [x] P0.2 Baseline of the base (verify counts, Google Chrome Stable in Docker, mesh regressions)
+      baseline: `vp run verify` on `60989d6` (detached scratch worktree, 2026-11-03) exit 0 · 64 files / 450 unit+component tests · 66 E2E passed (4.2 min, mesh specs included) · coverage 99.10 stmts / 97.42 branches / 97.98 funcs / 99.55 lines · Vite+ 1.4.0, Node 24.21.0, pnpm 12.14.0, Playwright 1.64.1 in the image
+      red: `vp run test:container` before the Dockerfile change failed 7 of 16 (`target stage "runtime" could not be found`, no versions.json, no evidence copy, unknown `test:experiments:local`)
+      green: `vp run test:container` 16 passed; the image reports Google Chrome 156.0.8078.79
+      commit: `9037c6b` Run Google Chrome Stable in the Docker test image
+- [x] P0.3 Browser and experiments layers on branded Chrome, E0 install methods, report `experiments/E0.md`
+      red: `chrome.spec.ts` against Playwright's Chromium: `Not Google Chrome: Google Chrome for Testing 156.0.8078.4`; `--load-extension` added to `chrome.ts`: `--load-extension is forbidden on Google Chrome`; E0 with a missing build path and no policy file: both verdicts `fail`, spec still passes; E0 with `E0.managedPolicy` not run: spec fails on "every hypothesis ran"; mesh with profile B on another folder: stays `Not paired` after 30 s
+      green: `vp run test:browser` 3 passed (both roots `Connected` through Chrome's own picker and write prompt in 8 s); `vp run test:experiments` 3 passed, 3 samples per hypothesis; smoke mode writes 1 sample
+      verdict: E0.loadUnpacked pass (lab, diagnostic, externalClient true: installs over CDP, worker answers, same id on reinstall) · E0.loadUnpacked.persists fail (after a quit and relaunch of the same root with the same flags the prefs entry is gone, `{ onDisk: false }`, no worker, no dashboard, 3 of 3; agrees with CHROMIUM.md group 9 `CleanUpCdpInstalledExtensions`) · E0.managedPolicy pass (lab, strict, no CDP; location 7, survives SIGTERM quit and relaunch) · Google Chrome 156.0.8078.79 on Linux in Docker · files `experiments/verdicts/E0-lab-{full,smoke,versions}.json` regenerated in `70c5325`
+      commit: `9a58739` browser layer and CDP allowlist · `a2cd795` E0 verdicts · `f33275a` mesh over the folder in the lab · `7fcc30e` committed verdicts · report `experiments/E0.md` pending (P0.6 agent)
+- [x] P0.4 Chromium inventory `CHROMIUM.md`
+      green: 9 groups pinned at `refs/tags/156.0.8078.80` (mirror `chrome/VERSION` MAJOR=156 PATCH=80); only the `--enable-unsafe-extension-debugging` gate is `unavailable`; orchestrator spot-checked `ExtensionPrefs::CleanUpCdpInstalledExtensions` (extension_prefs.cc:2213, 2611) and `Manifest::ShouldAlwaysAllowFileAccess` (manifest.h:98) against the mirror; `vp run docs:check` exit 0
+      commit: `2717ba3` Add the Chromium source inventory for the POC hypotheses
+- [x] P0.5 Host runner `vp run test:host`
+      red: `roots.test.ts` against a guard that accepted everything: 7 of 9 failed; first `rootFor` wrote through a symlinked `roots` folder (1 failed); `env -u RECNRUN_HOST_ROOTS vp run test:host` refused: `RECNRUN_HOST_ROOTS is not set`; runner accepted `test:host` as a Docker target
+      green: `roots.test.ts` 9 passed (host and Docker); `vp run test:container` 17 passed; lab `chrome.spec.ts` 2 passed and `mesh-two-profiles.spec.ts` 1 passed after the fixture refactor
+      host: `RECNRUN_HOST_ROOTS=~/Documents/RECnRun/poc-downloads-launcher vp run test:host tests/host/chrome.spec.ts` 3 passed, 1 skipped (strict `Load unpacked` needs `RECNRUN_HOST_GESTURE=1`); orchestrator run `host-2026-11-03T21-49-21.082Z`: `Chrome/156.0.8078.80`, macOS 27.0.1 (26A434) arm64, roots removed, 0 gestures; agent run `host-2026-11-03T21-40-21.549Z` same result
+      commit: `0c67d57` Add the host runner for the installed Google Chrome on macOS
+- [x] P0.6 Namespace and evidence schema
+      red: `vp run test:unit` with a permissive stub `schema.ts`: `experiments/schema.test.ts (8 tests | 6 failed)`, `expected [Function] to throw an error`
+      green: `vp run test:unit` 376 passed, `schema.test.ts` 9 passed (refuses a verdict without `environment` or `install`, an unknown `verdict`, an extra key, negative gestures, an unknown `templateState`; both committed E0 files parse)
+      commit: `0b40a1e` Validate the experiment evidence with Valibot schemas · `4f40b4f` Report experiment E0 on the two lab install methods · `70acce2` Run only the E* specs under the experiments Playwright config (fix for the verify failure `Cannot read properties of undefined (reading 'config')` at `schema.test.ts:35`)
 
 Gate P0: verify · baseline counts · Chrome versions (lab, host) · review
-host: macOS 27.0.1 (26A434) arm64 · Google Chrome 156.0.8078.80 (`/Applications/Google Chrome.app`) · Docker 28.5.1 · host `vp` 1.0.0-rc.0 on Node v22.22.2 (the image runs Vite+ 1.4.0 on Node 24.21.0, pnpm 12.14.0)
+
+- verify: `vp run verify` on `70c5325` exit 0 (2026-11-03, 30 of 30 tasks): 70 files / 499 unit+component · 66 E2E · browser 3 · experiments 4 in smoke mode · coverage 99.10 / 97.42 / 97.98 / 99.55 (earlier run on `0c67d57`, before the review fixes: 68 / 477, also exit 0)
+- chrome: lab Google Chrome 156.0.8078.79 on Linux (Ubuntu noble) in Docker · host Google Chrome 156.0.8078.80 on macOS 27.0.1
+- host: macOS 27.0.1 (26A434) arm64 · Google Chrome 156.0.8078.80 (`/Applications/Google Chrome.app`) · Docker 28.5.1 · host `vp` 1.0.0-rc.0 on Node v22.22.2 (the image runs Vite+ 1.4.0 on Node 24.21.0, pnpm 12.14.0)
+- review: Codex `gpt-6.1-sol` high, 2026-11-03, commits `60989d6..0c67d57`, 8 findings ([reviews/P0.md](reviews/P0.md)). Applied with red/green, one commit each: 1 host roots that alias the approved folder or already exist are refused, marker-guarded teardown (`90b07e4`); 6 `unavailable` verdicts carry a reason with no sample (`a5e7c71`); 7 strict verdicts refuse an external client or `loadUnpacked` (`5ff8b45`); 5 managed policy written only inside the container, exclusive create, own-file cleanup (`7761378`); 3 E0 records the relaunch state before reinstalling, new hypothesis `E0.loadUnpacked.persists` fail, evidence regenerated (`70c5325`). Rejected: 2 egress guard, pertinent but a new task, scheduled as P1.0 before any Downloads cell (PLAN.md §4 container row and P1.0); 4 `evaluate` bypass of the observer scan: `evaluate` runs only in `diagnostic` cells and strict cells have no CDP client at all, so the guard is the absence of the client, revisited when an approval cell gets an observer (P3); 8 Chrome package pin: Google's apt repository serves only the current stable, a pin breaks the image at every release, and the version is recorded per run in `versions.json` and in every verdict, which is the reproducibility §11.1 asks for.
 
 ## P1: Downloads write and `file://` read
 
+- [ ] P1.0 Lab egress guard (`--network none`, Codex P0 finding 2)
 - [ ] P1.1 POC build variants `poc-d0`, `poc-d1`, `poc-d2`
 - [ ] P1.2 Clean install and the file-scheme state, E1 (lab, host)
 - [ ] P1.3 Probe write and real path, E2 (lab, host)
