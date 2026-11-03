@@ -83,7 +83,7 @@ async function dispatch(command: Command, io: Io, deps: Deps): Promise<number> {
   }
 }
 
-/** Runs the CLI and returns the process exit code: 0 ok, 1 not ok (failed run, no Chrome), 2 error. */
+/** Runs the CLI and returns its exit code: 0 ok, 1 not ok (failed run, no Chrome), 2 error; signals exit 130 or 143. */
 export async function main(
   argv: readonly string[],
   io: Io = realIo(),

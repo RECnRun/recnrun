@@ -4,6 +4,7 @@ import {
   stopOnSignals,
   type ServiceClient,
 } from "@recnrun/service";
+import { guardSignals } from "./signals.ts";
 
 export interface Connection {
   client: ServiceClient;
@@ -16,9 +17,16 @@ export interface Connection {
   close(): Promise<void>;
 }
 
+export interface ConnectOptions {
+  start?: typeof startService;
+  guard?: typeof guardSignals;
+  keep?: typeof stopOnSignals;
+}
+
 /** Reuses the service that runs for `home`, or starts one in this process. */
-export async function connect(home: string): Promise<Connection> {
-  const started = await startService({ home });
+export async function connect(home: string, options: ConnectOptions = {}): Promise<Connection> {
+  const { start = startService, guard = guardSignals, keep = stopOnSignals } = options;
+  const started = await start({ home });
   if (started.reused) {
     const { port, token } = started.state;
     return {
@@ -30,11 +38,21 @@ export async function connect(home: string): Promise<Connection> {
     };
   }
   const { service } = started;
+  let stopping: Promise<void> | undefined;
+  const stop = () => (stopping ??= service.stop());
+  // A command that ends on a signal still stops the service it started (exit 130 or 143).
+  const signals = guard(stop);
   return {
     client: createServiceClient(service),
     reused: false,
     url: `${service.url}/`,
-    stopOnSignals: () => stopOnSignals(service),
-    close: () => service.stop(),
+    stopOnSignals: () => {
+      signals.release();
+      keep(service);
+    },
+    close: async () => {
+      await stop();
+      signals.release();
+    },
   };
 }

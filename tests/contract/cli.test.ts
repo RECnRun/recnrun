@@ -1,4 +1,5 @@
-import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { createServer, type Socket } from "node:net";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, expect, test } from "vite-plus/test";
@@ -214,3 +215,43 @@ test("run with no Chrome to replay in exits 2 naming capability-unavailable", as
   expect(result.stdout).toBe("");
   expect(result.stderr).toContain("capability-unavailable");
 });
+
+/** A DevToolsActivePort whose port accepts and never answers, so a replay stays connecting. */
+async function silentChrome() {
+  const sockets: Socket[] = [];
+  const server = createServer((socket) => void sockets.push(socket));
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  if (typeof address !== "object" || address === null) throw new Error("No port.");
+  const profile = join(home, ".config", "google-chrome");
+  await mkdir(profile, { recursive: true });
+  await writeFile(join(profile, "DevToolsActivePort"), `${address.port}\n/devtools/browser/x\n`);
+  return () => {
+    sockets.forEach((socket) => socket.destroy());
+    server.close();
+  };
+}
+
+test.each([
+  ["SIGINT", 130],
+  ["SIGTERM", 143],
+] as const)(
+  "%s during run stops the service the CLI started and exits %i",
+  async (signal, code) => {
+    const close = await silentChrome();
+    try {
+      const cli = runNode(BIN, ["run", "--flow", FLOW, "--home", home], home);
+      // The flow is imported once the CLI's own service answers; the replay then hangs on Chrome.
+      const flows = join(home, ".recnrun", "flows");
+      await expect
+        .poll(() => readdir(flows).catch(() => []), { timeout: 10_000 })
+        .toContain("form-submit");
+      await stat(join(home, ".recnrun", "service.json"));
+      cli.child.kill(signal);
+      expect(await cli.exited).toBe(code);
+      await expect(stat(join(home, ".recnrun", "service.json"))).rejects.toThrow(/ENOENT/);
+    } finally {
+      close();
+    }
+  },
+);
