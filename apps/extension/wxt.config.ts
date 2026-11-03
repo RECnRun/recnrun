@@ -1,12 +1,23 @@
 import { fileURLToPath } from "node:url";
 import preact from "@preact/preset-vite";
 import { defineConfig } from "wxt";
-import { peersEnabled } from "./src/config/origins.ts";
+import { POC_PUBLIC_KEY } from "./scripts/poc-key.mjs";
+import { debuggerDeclared, peersEnabled, pocEnabled } from "./src/config/origins.ts";
 
 /** The cross-profile POC's page, left out of every build that has no cross-profile link. */
 const PEER_ENTRYPOINTS = new Set(["offscreen"]);
 
+/** The downloads-launcher POC pages, left out of every build but the POC variants. */
+const POC_ENTRYPOINTS = new Set(["diagnostics"]);
+
 const chromiumProfile = fileURLToPath(new URL("./.wxt/chrome-data", import.meta.url));
+
+function permissions(mode: string): string[] {
+  if (!peersEnabled(mode)) return ["storage", "tabs"];
+  if (!pocEnabled(mode)) return ["storage", "tabs", "offscreen"];
+  const base = ["storage", "tabs", "offscreen", "downloads"];
+  return debuggerDeclared(mode) ? [...base, "debugger"] : base;
+}
 
 export default defineConfig({
   srcDir: "src",
@@ -26,17 +37,22 @@ export default defineConfig({
       await prepareDevChrome(chromiumProfile);
     },
     "entrypoints:resolved": (wxt, entrypoints) => {
-      if (peersEnabled(wxt.config.mode)) return;
-      const kept = entrypoints.filter((entrypoint) => !PEER_ENTRYPOINTS.has(entrypoint.name));
+      const { mode } = wxt.config;
+      const kept = entrypoints.filter(
+        (entrypoint) =>
+          (peersEnabled(mode) || !PEER_ENTRYPOINTS.has(entrypoint.name)) &&
+          (pocEnabled(mode) || !POC_ENTRYPOINTS.has(entrypoint.name)),
+      );
       entrypoints.splice(0, entrypoints.length, ...kept);
     },
   },
   manifest: ({ mode }) => ({
+    ...(pocEnabled(mode) ? { key: POC_PUBLIC_KEY } : {}),
     name: "RECnRun",
     description: "Records and replays browser sessions for developers.",
     // tabs lets the dashboard list every tab, with its title and address, to record one.
     // offscreen hosts the cross-profile POC's WebRTC link, in development and test builds only.
-    permissions: peersEnabled(mode) ? ["storage", "tabs", "offscreen"] : ["storage", "tabs"],
+    permissions: permissions(mode),
     // One extension context spans normal and incognito windows, so the dashboard and the PiP
     // window see incognito tabs once the user turns on "Allow in Incognito".
     incognito: "spanning",

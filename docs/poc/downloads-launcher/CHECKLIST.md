@@ -60,7 +60,10 @@ Gate P0: verify · baseline counts · Chrome versions (lab, host) · review
 ## P1: Downloads write and `file://` read
 
 - [ ] P1.0 Lab egress guard (`--network none`, Codex P0 finding 2)
-- [ ] P1.1 POC build variants `poc-d0`, `poc-d1`, `poc-d2`
+- [i] P1.1 POC build variants `poc-d0`, `poc-d1`, `poc-d2`
+  red: `vp run test:extension-manifest` with the new checks before the config change: `poc-d0/d1/d2 declare their permissions...` fail, actual `[ 'storage', 'tabs' ]` vs expected `[ 'storage', 'tabs', 'offscreen', 'downloads', 'debugger' ]`
+  green: `vp run test:extension-manifest` 11 passed (production + three POC builds); `origins.test.ts` 8 passed; production and test manifests byte-identical before and after (empty `diff`); negative control in a scratch worktree, production with `downloads`: 2 checks fail; pinned id `omllgeochjfpkjbkpcgjmnnbncdpiedd`
+  commit: cherry-picked from agent/p1-variants 45da8e7 (Add the POC build variants with a pinned extension id); SHA recorded at the gate
 - [ ] P1.2 Clean install and the file-scheme state, E1 (lab, host)
 - [ ] P1.3 Probe write and real path, E2 (lab, host)
 - [ ] P1.4 Read in page and offscreen, E3

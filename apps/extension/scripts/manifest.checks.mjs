@@ -60,3 +60,15 @@ await test("the production build leaves out the cross-profile POC", () => {
   const background = readFileSync(new URL("../.output/chrome-mv3/background.js", import.meta.url));
   assert.doesNotMatch(String(background), /createDocument|RTCPeerConnection/);
 });
+
+await test("the production build leaves out every POC-only permission and page", () => {
+  const manifest = productionManifest();
+  assert.equal(manifest.key, undefined);
+  for (const permission of ["downloads", "debugger", "offscreen"]) {
+    assert.ok(!manifest.permissions.includes(permission), permission);
+  }
+  assert.equal(
+    existsSync(new URL("../.output/chrome-mv3/diagnostics.html", import.meta.url)),
+    false,
+  );
+});
