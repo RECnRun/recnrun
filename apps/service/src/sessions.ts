@@ -13,7 +13,7 @@ import {
   type Session,
   type SessionResult,
 } from "@recnrun/engine";
-import type { BindingsStore, JournalWriter } from "@recnrun/persistence";
+import { openBlobStore, type BindingsStore, type JournalWriter } from "@recnrun/persistence";
 import type {
   AssertionStep,
   CapturedEvent,
@@ -151,14 +151,19 @@ export async function startSession(
 ): Promise<SessionStatus> {
   const endpoint = await endpointOf(deps.browser, await profileFolder(deps, params.actors));
   const id = `session-${randomUUID()}`;
-  const journal = await deps.journals.open(
-    join(deps.home, ".recnrun", "sessions", id, "events.jsonl"),
-  );
+  const folder = join(deps.home, ".recnrun", "sessions", id);
+  const journal = await deps.journals.open(join(folder, "events.jsonl"));
   const early: CapturedEvent[] = [];
   let sink: (event: CapturedEvent) => void = (event) => early.push(event);
   let recording: RecordingHandle;
   try {
-    recording = await deps.browser.record(endpoint, { runId: id, onEvent: (event) => sink(event) });
+    // Bodies go to blobs beside the journal, so the journal keeps only their references.
+    const blobs = await openBlobStore({ folder: join(folder, "blobs") });
+    recording = await deps.browser.record(endpoint, {
+      runId: id,
+      onEvent: (event) => sink(event),
+      blobs,
+    });
   } catch (error) {
     await journal.close();
     throw error;

@@ -1,5 +1,6 @@
 import { join } from "node:path";
-import { readJournal } from "@recnrun/persistence";
+import type { BodySink } from "@recnrun/adapter";
+import { openBlobStore, readJournal } from "@recnrun/persistence";
 import type { CapturedEvent, Lease, ServiceMessage, SessionStatus } from "@recnrun/protocol";
 import { expect, test } from "vite-plus/test";
 import { fillAndClick, harness, navigated, SEND_BUTTON, type Harness } from "./fakes.ts";
@@ -113,6 +114,24 @@ test("stop keeps what capture delivers while it drains, and a failed drain is a 
   const failed = await started(lost);
   resultOf(await lost.call("session.stop", { sessionId: failed.sessionId }, fenced(failed)));
   expect(await categoriesOf(lost, failed.sessionId)).toEqual(["gap:capture-stopped", "navigation"]);
+});
+
+test("a session hands capture a blob store beside its journal for response bodies", async () => {
+  const h = await harness();
+  let blobs: BodySink | undefined;
+  const record = h.browser.record.bind(h.browser);
+  h.browser.record = async (endpoint, capture) => (
+    (blobs = capture.blobs),
+    record(endpoint, capture)
+  );
+  const { sessionId } = await started(h);
+  if (!blobs) throw new Error("The session recorded without a blob store.");
+  const meta = { mime: "application/json", encoding: "utf8" } as const;
+  const ref = await blobs.put(new TextEncoder().encode('{"ok":true}'), meta);
+  expect(ref).toMatchObject({ ...meta, size: 11, condition: "captured" });
+  const folder = join(h.home, ".recnrun", "sessions", sessionId, "blobs");
+  const stored = await (await openBlobStore({ folder })).read(ref.sha256);
+  expect(stored.toString("utf8")).toBe('{"ok":true}');
 });
 
 test("a session stopped while capture is suspended journals that gap", async () => {

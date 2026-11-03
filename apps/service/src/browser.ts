@@ -1,4 +1,4 @@
-import { createCdpAdapter, startPicker, startRecording } from "@recnrun/adapter";
+import { createCdpAdapter, startPicker, startRecording, type BodySink } from "@recnrun/adapter";
 import type { ReplayDriver } from "@recnrun/engine";
 import type { CapturedEvent, DiscoveryResult, DomTarget } from "@recnrun/protocol";
 import { ServiceFailure } from "./dispatch.ts";
@@ -24,10 +24,10 @@ export interface DriverHandle {
 export interface BrowserPort {
   /** Finds the Chrome of the default profile, or of the profile folder of a binding. */
   discover(options?: { userDataDir?: string }): Promise<DiscoveryResult>;
-  /** Opens the session's own page and captures it, the pages it opens, and their frames. */
+  /** Opens the session's own page and captures it, the pages it opens, and their frames; bodies go to `blobs`. */
   record(
     endpoint: string,
-    capture: { runId: string; onEvent: (event: CapturedEvent) => void },
+    capture: { runId: string; onEvent: (event: CapturedEvent) => void; blobs?: BodySink },
   ): Promise<RecordingHandle>;
   /** Shows the picker overlay on `targetId`; a click reports the element instead of reaching the page. */
   pick(
