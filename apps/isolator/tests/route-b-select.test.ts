@@ -152,6 +152,17 @@ describe("Route B selection", () => {
     expect(sent.filter((entry) => entry.method === "Fetch.fulfillRequest")).toHaveLength(1);
   });
 
+  test("sync-xhr wraps a worker's script that Chrome pauses on the page's session", async () => {
+    const { engine, sent, emit } = setup();
+    await arm(engine, "sync-xhr", "*/*worker.js*");
+    // Chrome 156 fetches a dedicated or shared worker's script for the page, as resource type Other.
+    const script = paused(`${APP}/shared-worker.js?type=classic`, { main: false });
+    emit({ tabId: TAB }, "Fetch.requestPaused", { ...script, resourceType: "Other" });
+    const [entry] = (await engine.journal()).paused;
+    expect(entry).toMatchObject({ session: "tab", role: "imported", wrapper: "sync-xhr" });
+    expect(sent.at(-1)?.method).toBe("Fetch.fulfillRequest");
+  });
+
   test("refuses a selection it does not know", async () => {
     const { engine } = setup();
     await expect(arm(engine, "dns")).rejects.toThrow(/expected \{ tabId, marker, urlPattern \}/);

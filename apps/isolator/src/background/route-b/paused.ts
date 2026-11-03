@@ -79,12 +79,18 @@ function isScript(event: PausedEvent): boolean {
   );
 }
 
-/** Main scripts always; imported scripts on a worker's session when asked, or every one for sync-xhr. */
+/** Main scripts always; imported scripts on a worker's session when asked; worker scripts for sync-xhr. */
 function shouldTransform(entry: PausedEntry, request: ArmRequest): boolean {
   if (entry.role === "main") return true;
-  if (entry.role !== "imported" || entry.session !== "worker") return false;
+  if (entry.role !== "imported") return false;
   // A dedicated or shared worker's own script carries no Service-Worker header.
-  return request.imports === "transform" || request.selection === "sync-xhr";
+  if (request.selection === "sync-xhr") return isWorkerScript(entry);
+  return entry.session === "worker" && request.imports === "transform";
+}
+
+/** Chrome fetches a dedicated or shared worker's script for the page, as type Other, not Script. */
+function isWorkerScript(entry: PausedEntry): boolean {
+  return entry.session === "worker" || entry.resourceType === "Other";
 }
 
 function wrapperOf(context: PausedContext, original: string) {
