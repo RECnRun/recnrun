@@ -92,7 +92,18 @@ Markers: `[ ]` not started · `[i]` implemented, awaiting the phase gate · `[x]
 - [ ] P1.3 Stop and restart control (E4)
 - [ ] P1.4 Route B: script response transformation through `Fetch` (E5)
 - [ ] P1.5 Route B: namespace selection without baking it into the script (E6) `@order-critical`
-- [ ] P1.6 Route C: composition for pages and non-service workers (E7)
+- [i] P1.6 Route C: composition for pages and non-service workers (E7)
+  - red: `vp test --project=@recnrun/isolator` before Route C -> 31 failed (`expected 'constructed' to be 'SecurityError: RECnRun Route C refuse…'`, `expected [ 'storage', 'management', 'debugger' ] to include 'scripting'`, `ENOENT ... public/ns/slot-0.js`, `expected undefined to be an instance of RouteCEngine`); `vp test --project=harness tests/e7-samples.test.ts` against a stub evaluation -> 17 failed (`expected [] to deeply equal [ 'unpatched', …(2) ]`); the `data:` attribution case, the `noReport` and `storeMissing` texts, and the frame's message text -> 1 failed each; `vp run test:experiments -- tests/experiments/E7-route-c-pages-workers.spec.ts` with `summarize()` returning no counts, in a scratch worktree -> `Error: page`, `Expected: "number" Received: "undefined"` (run `2026-11-03T08-05-27.215Z-06ee6f75`)
+  - green: `vp test --project=@recnrun/isolator` 81 passed; `vp test --project=harness` 59 passed; `vp run test:experiments -- tests/experiments/E7-route-c-pages-workers.spec.ts` 1 passed in run A `2026-11-03T07-52-10.527Z-35435d5b` (4.4 min); `vp run test:experiments` 8 passed, E2 unchanged after the shared `page-loads.ts` (run B `2026-11-03T07-59-15.543Z-d4158286`)
+  - verdict: Google Chrome 156.0.8078.79 on Linux in Docker, `cdp-load-unpacked`, runs A and B with the same counts; report [experiments/E7.md](experiments/E7.md)
+  - verdict: `page` pass: 40 of 40 (`/`, `/storage.html`), the marker before the first script 40 of 40
+  - verdict: `cross-site-iframe` pass: 10 of 10; registered for the app only, unmarked 5 of 5; registered with the IdP, marked before the first script 5 of 5
+  - verdict: `popup` pass: 10 of 10, the opener's message 10 of 10; registered with the IdP, marked 5 of 5
+  - verdict: `dedicated-worker` and `shared-worker` fail, 60 of 60 each: `fail-closed` failed closed 20 of 20 (`SecurityError: RECnRun Route C refused new Worker(/worker.js?type=classic): no wrapper keeps the worker's own self.location, baseURI, and relative imports`); `blob` bootstrapped first but `self.location is a blob: URL` 20 of 20; `data` bootstrapped first in an opaque origin (`Origin: null`), `the page got no report` and no store on the app origin 20 of 20; `unpatched` 0
+  - verdict: `shared-worker-identity` fail: one instance per two-tab pair with native constructors 3 of 3 and `data` 3 of 3, two instances with `blob` 3 of 3
+  - verdict: `same-origin-iframe`, `about-blank-child`, `sandboxed-frame` unavailable: `the frozen fixture (apps/fixture/public) has no …` (so `matchOriginAsFallback` is registered but not exercised)
+  - commit: "Add Route C, a MAIN-world page bootstrap, to the isolator" 35be78e; "Record experiment E7 on Route C for pages, frames, and workers" 430cb0e; "Name the renew message when E7's iframe parent gets none" 9d18ec7
+  - note: the owner decides whether any worker wrapper is acceptable; the default refuses workers, which keeps the invariant but leaves no worker usable under Route C
 - [ ] P1.7 Original-session filter and prefix collision
 - [ ] P1.8 P1 report and decision point
 - Gate P1: `vp run verify` → (date, result); `vp run test:stress` (E3, E6) → (date, iterations, late attaches); `review:` Codex `gpt-6.1-sol` high → (date, findings, applied, rejected)
