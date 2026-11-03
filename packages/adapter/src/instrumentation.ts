@@ -45,6 +45,8 @@ export interface Instrumentation {
   report(): InstrumentationReport;
   /** Resolves once every install and body read started so far has finished. */
   settled(): Promise<void>;
+  /** Evaluates `expression` in every hooked document still open; a failure is ignored. */
+  evaluateInDocuments(expression: string): Promise<void>;
   /** Records bodies still loading as unavailable and closes the socket. */
   stop(): void;
 }
@@ -273,6 +275,14 @@ export async function instrumentChannel(
     report: () => instrumenter.report(),
     settled: async () => {
       while (instrumenter.pending.size > 0) await Promise.all(instrumenter.pending);
+    },
+    evaluateInDocuments: async (expression) => {
+      const sends = instrumenter.delivery
+        .documents()
+        .map(({ sessionId, contextId }) =>
+          channel.send("Runtime.evaluate", { expression, contextId, silent: true }, sessionId),
+        );
+      await Promise.allSettled(sends);
     },
     stop,
   };

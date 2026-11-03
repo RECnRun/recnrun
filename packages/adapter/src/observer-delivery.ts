@@ -108,6 +108,11 @@ export class ObserverDelivery {
     return holes;
   }
 
+  /** The contexts of the hooked documents still open, where the hook can be reached. */
+  documents(): { sessionId: string; contextId: number }[] {
+    return [...this.ledgers.values()].map(({ sessionId, contextId }) => ({ sessionId, contextId }));
+  }
+
   private ledger(sessionId: string, contextId: number, documentId: string): Ledger {
     const key = `${sessionId}:${documentId}`;
     let ledger = this.ledgers.get(key);

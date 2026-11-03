@@ -5,7 +5,7 @@ import { withDeadline } from "./capture-documents.ts";
 import { createEmitter, type Origin } from "./capture-envelope.ts";
 import type { BodySink } from "./capture-network-evidence.ts";
 import { openCdpChannel, type CdpChannel } from "./cdp-socket.ts";
-import { instrumentChannel } from "./instrumentation.ts";
+import { instrumentChannel, type Instrumentation } from "./instrumentation.ts";
 import { TargetScope } from "./instrumentation-scope.ts";
 import { assertLoopbackEndpoint } from "./loopback.ts";
 import type { CaptureSession } from "./replay-capture.ts";
@@ -15,6 +15,8 @@ import type { ReplayPage } from "./replay-page.ts";
 export interface ReplayObserver extends CaptureHandle {
   /** Captures a tab replay opened, before it navigates; a failure is journaled as a gap. */
   adopt(page: ReplayPage): Promise<void>;
+  /** Runs `work` with the hooks of the replay's documents muted for at most `ms` (see `hook-source.ts`). */
+  muted<T>(work: () => Promise<T>, ms: number): Promise<T>;
   stop(): void;
 }
 
@@ -53,6 +55,22 @@ function textBodies(blobs: ReplayBlobs): BodySink {
     put: (content, meta) =>
       blobs.put(meta.encoding === "utf8" ? decoder.decode(content) : content, meta),
   };
+}
+
+// Chrome runs each evaluate before input sent after its reply, so the mute spans the work exactly.
+async function mutedIn<T>(
+  instrumentation: Instrumentation,
+  work: () => Promise<T>,
+  ms: number,
+): Promise<T> {
+  const mute = (value: number) =>
+    instrumentation.evaluateInDocuments(`globalThis.__recnrunHook?.mute?.(${value})`);
+  await mute(ms);
+  try {
+    return await work();
+  } finally {
+    await mute(0);
+  }
 }
 
 /** Instruments the tabs `adopt` names and the popups and frames they open, into `sink`. */
@@ -98,6 +116,7 @@ export async function observeReplay(
       if (stopped) return;
       await withDeadline(attach(page), ADOPT_TIMEOUT_MS).catch(() => lose("target-unattached"));
     },
+    muted: async (work, ms) => mutedIn(instrumentation, work, ms),
     async drain() {
       await instrumentation.settled().catch(() => lose("capture-stopped"));
       stop();

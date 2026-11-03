@@ -1,6 +1,6 @@
 import type { ElementState, PageCapture, ReplayDriver } from "@recnrun/engine";
 import type { Locator } from "playwright-core";
-import { act } from "./replay-act.ts";
+import { act, type Unobserved } from "./replay-act.ts";
 import { capturePage } from "./replay-capture.ts";
 import { locate, playwrightTimeout, type ReplayPage } from "./replay-page.ts";
 import { createTabs } from "./replay-tabs.ts";
@@ -41,7 +41,10 @@ export type PageDriver = Required<Omit<ReplayDriver, "onEvent" | "onCapture">>;
  * Drives the replay's tabs through Playwright's input methods, so Chrome dispatches trusted
  * events. Reads never open a tab; the first write opens one in the default browser context.
  */
-export function createPageDriver(open: () => Promise<ReplayPage>): PageDriver {
+export function createPageDriver(
+  open: () => Promise<ReplayPage>,
+  unobserved?: Unobserved,
+): PageDriver {
   const tabs = createTabs(open);
   const onPage = <T>(absent: T, read: (page: ReplayPage) => Promise<T>): Promise<T> => {
     const page = tabs.selected();
@@ -57,7 +60,7 @@ export function createPageDriver(open: () => Promise<ReplayPage>): PageDriver {
         return locator.getAttribute(name, { timeout: playwrightTimeout(timeoutMs) });
       }),
     tabs: ({ timeoutMs }) => tabs.list(timeoutMs),
-    act: (command, { timeoutMs }) => act(tabs, command, timeoutMs),
+    act: (command, { timeoutMs }) => act(tabs, command, timeoutMs, unobserved),
     capture: ({ timeoutMs }) =>
       onPage<PageCapture>({ tab: false }, (page) => capturePage(page, timeoutMs)),
   };

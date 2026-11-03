@@ -1,4 +1,5 @@
-// The hook's DOM capture, spliced into its body: it uses `config`, `ensure`, and `send` from there.
+// The hook's DOM capture, spliced into its body: it uses `config`, `ensure`, `send`, `now`, and
+// `mutedUntil` from there.
 // Listeners sit on the window in the capture phase, so they see every event of the document
 // (including ones the page stops) and survive the popup case where Chrome reuses the window.
 // Scroll is debounced per scrolled node: one event with the final position after 100 ms of quiet.
@@ -62,7 +63,9 @@ export const DOM_CAPTURE = `
     compositionstart: composition, compositionupdate: composition, compositionend: composition,
     selectionchange: selection, scroll: (event) => scrolled(event.target),
   };
+  const MUTABLE = new Set(["pointerdown", "pointerup", "click", "dblclick"]);
   const post = (event) => {
+    if (event.isTrusted && MUTABLE.has(event.type) && now() < mutedUntil) return;
     ensure();
     const details = DETAILS[event.type];
     send("dom", event.type, { target: describe(event.target), isTrusted: event.isTrusted, ...(details ? details(event) : {}) });

@@ -5,9 +5,13 @@ import type { ReplayTabs } from "./replay-tabs.ts";
 
 type Command<K extends DriverCommand["kind"]> = Extract<DriverCommand, { kind: K }>;
 
+/** Runs a trial whose input the replay's capture must not journal, for at most `ms`. */
+export type Unobserved = <T>(work: () => Promise<T>, ms: number) => Promise<T>;
+
 /** One write's budget: every Playwright call in it shares the same end. */
 interface Budget {
   left(): number;
+  unobserved: Unobserved;
 }
 
 type Handler<K extends DriverCommand["kind"]> = (
@@ -55,10 +59,15 @@ async function attempt(work: () => Promise<unknown>): Promise<ActResult> {
   }
 }
 
-/** Checks actionability with a trial first, so a refusal is known not to have reached the page. */
+/**
+ * Checks actionability with a trial first, so a refusal is known not to have reached the page.
+ * The trial dispatches real input that Playwright's hit-target interceptor stops before the page
+ * handles it, so the capture is muted while it runs.
+ */
 async function press(locator: Locator, kind: "click" | "check" | "uncheck", budget: Budget) {
   try {
-    await locator[kind]({ trial: true, timeout: budget.left() });
+    const timeout = budget.left();
+    await budget.unobserved(() => locator[kind]({ trial: true, timeout }), timeout);
   } catch (error) {
     return notDispatched(error);
   }
@@ -159,9 +168,10 @@ export async function act(
   tabs: ReplayTabs,
   command: DriverCommand,
   timeoutMs: number,
+  unobserved: Unobserved = async (work) => work(),
 ): Promise<ActResult> {
   const end = Date.now() + timeoutMs;
-  const budget: Budget = { left: () => playwrightTimeout(end - Date.now()) };
+  const budget: Budget = { left: () => playwrightTimeout(end - Date.now()), unobserved };
   const handler = HANDLERS[command.kind] as Handler<DriverCommand["kind"]>;
   const handled = handler(tabs, command as never, budget).catch(
     // Opening the tab or resolving the locator threw before the write began.

@@ -18,6 +18,7 @@ import { STORAGE_CAPTURE } from "./hook-storage.ts";
 // Every message stays in the document's bounded window until the adapter acknowledges it through
 // `__recnrunHook.ack`, which can also ask for a resend; a full window drops new messages and
 // reports their sequence range in one `buffer.exhausted` message once there is room again.
+// `__recnrunHook.mute(ms)` skips trusted pointer and click events for `ms`; `mute(0)` ends it.
 const HOOK = `(function (config) {
   "use strict";
   if (Object.prototype.hasOwnProperty.call(window, "__recnrunHook")) return;
@@ -36,6 +37,8 @@ const HOOK = `(function (config) {
     });
   }
   let current;
+  // Replay mutes a click's trial: real input that Playwright's hit-target check keeps from the page.
+  let mutedUntil = 0;
   const transmit = (message) => {
     if (typeof binding === "function") binding(message);
     else queue.push(message);
@@ -74,7 +77,8 @@ const HOOK = `(function (config) {
     const bytes = crypto.getRandomValues(new Uint8Array(16));
     const documentId = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
     const state = { document, documentId, seq: 0, unacked: [], loss: undefined };
-    state.hook = Object.freeze({ version: config.version, installedAt: now(), documentId, ack: acknowledge(state) });
+    const mute = (ms) => void (mutedUntil = now() + ms);
+    state.hook = Object.freeze({ version: config.version, installedAt: now(), documentId, ack: acknowledge(state), mute });
     current = state;
     send("lifecycle", "document.hook-installed", { url: location.href, hookVersion: config.version });
   };

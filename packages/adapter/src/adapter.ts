@@ -54,11 +54,14 @@ function replaySide(connected: () => CdpConnection, deps: AdapterDependencies) {
     reset: () => (driver = undefined),
     stopCapture,
     driver: (): PageDriver => {
-      driver ??= createPageDriver(async () => {
-        const page = await connected().openPage();
-        await observer?.adopt(page);
-        return page;
-      });
+      driver ??= createPageDriver(
+        async () => {
+          const page = await connected().openPage();
+          await observer?.adopt(page);
+          return page;
+        },
+        async (work, ms) => (observer ? observer.muted(work, ms) : work()),
+      );
       return driver;
     },
     async onCapture(sink: CaptureSink): Promise<CaptureHandle> {

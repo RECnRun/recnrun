@@ -1,5 +1,5 @@
 import type { CaptureSink, ReplayBlobs } from "@recnrun/engine";
-import { CapturedEventSchema, type CapturedEvent } from "@recnrun/protocol";
+import { CapturedEventSchema, HOOK_VERSION, type CapturedEvent } from "@recnrun/protocol";
 import * as v from "valibot";
 import { expect, test } from "vite-plus/test";
 import { observeReplay } from "../src/replay-observer.ts";
@@ -113,4 +113,28 @@ test("a tab that cannot be adopted is a target-unattached gap, never a failed st
   observer.stop();
   await observer.adopt(pageOf("LATER"));
   expect(events).toHaveLength(1);
+});
+
+test("a muted trial mutes every hooked replay document before it runs and after it ends", async () => {
+  const { channel, observer } = await observe();
+  await observer.adopt(pageOf("REPLAY"));
+  channel.context("S-REPLAY", 7, "REPLAY");
+  const payload = { url: API, hookVersion: HOOK_VERSION };
+  const install = { kind: "lifecycle", type: "document.hook-installed", targetId: "REPLAY" };
+  channel.post("S-REPLAY", 7, { ...install, payload });
+  const mutes = () =>
+    channel.sent
+      .filter(({ params }) => String(params?.["expression"]).includes("mute"))
+      .map(({ sessionId, params }) => [sessionId, params?.["contextId"], params?.["expression"]]);
+  expect(await observer.muted(async () => mutes().length, 900), "muted before the work").toBe(1);
+  expect(mutes()).toEqual([
+    ["S-REPLAY", 7, "globalThis.__recnrunHook?.mute?.(900)"],
+    ["S-REPLAY", 7, "globalThis.__recnrunHook?.mute?.(0)"],
+  ]);
+  const failing = observer.muted(async () => Promise.reject(new Error("Trial failed.")), 900);
+  await expect(failing).rejects.toThrow("Trial failed.");
+  expect(mutes().at(-1)?.[2], "a failed trial unmutes too").toBe(
+    "globalThis.__recnrunHook?.mute?.(0)",
+  );
+  observer.stop();
 });

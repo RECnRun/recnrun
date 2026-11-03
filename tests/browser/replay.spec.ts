@@ -126,6 +126,26 @@ test("a late element is found by polling and clicked once", async ({ app, chrome
   expect(outcome.steps[1]?.attempts).toBeGreaterThan(1);
 });
 
+test("a replayed click journals only the pointer sequence the page received", async ({
+  app,
+  chrome,
+}) => {
+  const flow = flowOf("replay-click-evidence", [
+    OPEN,
+    { id: "late", action: "click", target: { testId: "late" } },
+  ]);
+  const { outcome, stored } = await replayStored(chrome.wsEndpoint, flow, {}, async () => {
+    const tab = tabAt(app, REPLAY);
+    expect(await tab?.evaluate(() => window.__fixture?.counters.lateClicks)).toBe(1);
+  });
+  expect(outcome.status).toBe("passed");
+  const dom = stored.journal.events
+    .filter((event) => event.category === "dom" && event.stepId === "late")
+    .map(({ type }) => type)
+    .filter((type) => ["pointerdown", "focusin", "pointerup", "click"].includes(type));
+  expect(dom).toEqual(["pointerdown", "focusin", "pointerup", "click"]);
+});
+
 test("pauseReplay holds the next step until the session resumes", async ({ chrome }) => {
   const flow = flowOf("replay-pause", [
     OPEN,

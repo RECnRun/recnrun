@@ -71,3 +71,29 @@ test("a page that goes away reports its open gap even when the buffer is still f
     payload: { fromSeq: 3, toSeq: 5, lost: 3 },
   });
 });
+
+test("a muted hook skips trusted pointer and click events without numbering them", () => {
+  const target = page("http://127.0.0.1:4600/routes/replay");
+  target.run();
+  const press = (isTrusted = true) => {
+    for (const type of ["pointerdown", "pointerup", "click"])
+      target.dispatch({ type, target: { nodeType: 9 }, isTrusted });
+  };
+  const mute = (ms: number) => runInContext(`window.__recnrunHook.mute(${ms})`, target.window);
+  const types = () => target.posted.map((message) => (message as { type: string }).type);
+  mute(60_000);
+  press();
+  focus(target);
+  press(false);
+  expect(types(), "focus and untrusted events still count").toEqual([
+    "document.hook-installed",
+    "focusin",
+    "pointerdown",
+    "pointerup",
+    "click",
+  ]);
+  mute(0);
+  press();
+  expect(types().slice(5)).toEqual(["pointerdown", "pointerup", "click"]);
+  expect(seqs(target)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+});
