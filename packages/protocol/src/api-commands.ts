@@ -50,6 +50,15 @@ const picker = {
   result: v.strictObject({ sessionId: NonEmptyStringSchema, picking: v.boolean() }),
 };
 
+const MAX_SECRETS = 64;
+const MAX_SECRET_LENGTH = 4096;
+
+/** Secret values for one replay only: the service forwards them to the executor and never stores, logs, or returns them. */
+const RunSecretsSchema = v.pipe(
+  v.record(NameSchema, v.pipe(v.string(), v.maxLength(MAX_SECRET_LENGTH))),
+  v.maxEntries(MAX_SECRETS),
+);
+
 // Shapes a later phase specifies; until then the service accepts and returns any JSON.
 const unspecified = { params: v.unknown(), result: v.unknown() };
 
@@ -112,6 +121,8 @@ export const SERVICE_COMMANDS = {
       flowId: IdSchema,
       dataset: v.optional(NonEmptyStringSchema),
       inputs: v.optional(v.record(NameSchema, v.unknown())),
+      // Secret inputs and `${secrets.*}` references read only from here.
+      secrets: v.optional(RunSecretsSchema),
     }),
     result: RunRefSchema,
   },

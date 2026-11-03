@@ -35,7 +35,11 @@ export interface ReplayParams {
   flowId: string;
   dataset?: string | undefined;
   inputs?: Record<string, unknown> | undefined;
+  /** Transient: forwarded only to the executor, never stored or logged. */
+  secrets?: Record<string, string> | undefined;
 }
+
+type RunValues = Pick<ReplayParams, "inputs" | "secrets">;
 
 const DEFAULT_LIMIT = 100;
 
@@ -43,7 +47,7 @@ async function execute(
   deps: RunDeps,
   manifest: RunManifest,
   endpoint: string,
-  inputs: Record<string, unknown>,
+  { inputs, secrets }: RunValues,
 ) {
   const store = deps.store();
   const { runId, flowId } = manifest;
@@ -56,6 +60,7 @@ async function execute(
       const outcome = await replayFlow(connection.driver, flow, {
         runId,
         inputs,
+        secrets,
         run: { store, manifest },
         observe: (event) => deps.hub.publish({ type: "run.step", runId, event }),
       });
@@ -93,7 +98,7 @@ export async function startReplay(deps: RunDeps, params: ReplayParams): Promise<
     versions: { engine: SERVICE_VERSION, protocol: PROTOCOL_SCHEMA_VERSION, node: process.version },
     bindings: {},
   };
-  const done = execute(deps, manifest, endpoint, inputs);
+  const done = execute(deps, manifest, endpoint, { inputs, secrets: params.secrets });
   deps.active.add(done);
   void done.finally(() => deps.active.delete(done));
   return { runId };

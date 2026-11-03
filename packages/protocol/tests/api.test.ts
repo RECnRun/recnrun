@@ -59,6 +59,20 @@ describe("the command table", () => {
     expect(v.safeParse(params, { sessionId: "s-1", to: "robot" }).success).toBe(false);
   });
 
+  test("accepts a replay's transient secrets and bounds them", () => {
+    const { params } = SERVICE_COMMANDS["flow.replay"];
+    const ok = { flowId: "login", inputs: { email: "a@b.c" }, secrets: { pin: "1234" } };
+    expect(v.safeParse(params, ok).success).toBe(true);
+    const tooMany = Object.fromEntries(Array.from({ length: 65 }, (_, i) => [`s${i}`, "x"]));
+    for (const secrets of [
+      { pin: 1234 },
+      { "not a name": "x" },
+      { pin: "x".repeat(4097) },
+      tooMany,
+    ])
+      expect(v.safeParse(params, { flowId: "login", secrets }).success).toBe(false);
+  });
+
   test("validates the result of run.queryEvents as a page of events", () => {
     const { result } = SERVICE_COMMANDS["run.queryEvents"];
     expect(v.safeParse(result, { events: [], nextCursor: "c-2" }).success).toBe(true);

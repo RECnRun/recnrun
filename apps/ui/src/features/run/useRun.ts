@@ -1,6 +1,7 @@
 import type { RunSummary, StepResult } from "@recnrun/protocol";
 import { useEffect, useState } from "preact/hooks";
 import { useAction, useApi } from "@/api/context";
+import type { RunValues } from "@/features/run/inputs";
 import { stepResultOf } from "@/features/run/steps";
 
 type Pushed = { runId: string; result: StepResult };
@@ -37,10 +38,13 @@ export function useRun(flowId: string) {
     };
   }, [api]);
   const summary = summaries.find((entry) => entry.runId === runId);
-  const start = (inputs: Record<string, unknown>) =>
+  const start = ({ inputs, secrets }: RunValues) =>
     run(async () => {
       setRunId(undefined);
-      setRunId((await api.call("flow.replay", { flowId, inputs })).runId);
+      // Secrets go only in their own transient field, and only when there are any.
+      const params =
+        Object.keys(secrets).length > 0 ? { flowId, inputs, secrets } : { flowId, inputs };
+      setRunId((await api.call("flow.replay", params)).runId);
     });
   const own = pushed.filter((message) => message.runId === runId).map(({ result }) => result);
   const running = runId !== undefined && summary === undefined;

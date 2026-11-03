@@ -4,8 +4,11 @@ import { useLoad } from "@/api/context";
 import {
   type Draft,
   type Input,
+  type RunValues,
   initialDraft,
   parseDraft,
+  referenceKey,
+  secretReferences,
   withoutSecrets,
 } from "@/features/run/inputs";
 import { StepResults, Summary } from "@/features/run/Results";
@@ -60,30 +63,37 @@ function InputField({ name, input, value, onChange }: InputProps) {
 
 type FormProps = {
   inputs: Flow["inputs"];
+  references: string[];
   disabled: boolean;
-  onStart: (inputs: Record<string, unknown>) => void;
+  onStart: (values: RunValues) => void;
 };
 
-function InputsForm({ inputs, disabled, onStart }: FormProps) {
-  const [draft, setDraft] = useState<Draft>(() => initialDraft(inputs));
+// A recorded `${secrets.<name>}` reference must be typed for every run.
+const REFERENCE: Input = { type: "string", required: true, secret: true };
+
+function InputsForm({ inputs, references, disabled, onStart }: FormProps) {
+  const [draft, setDraft] = useState<Draft>(() => initialDraft(inputs, references));
   const [problem, setProblem] = useState<string>();
   const submit = (event: Event) => {
     event.preventDefault();
-    const parsed = parseDraft(inputs, draft);
+    const parsed = parseDraft(inputs, draft, references);
     if (!parsed.ok) return setProblem(parsed.message);
     setProblem(undefined);
-    setDraft(withoutSecrets(inputs, draft));
-    onStart(parsed.inputs);
+    setDraft(withoutSecrets(inputs, draft, references));
+    onStart({ inputs: parsed.inputs, secrets: parsed.secrets });
   };
-  const names = Object.keys(inputs);
+  const fields: [string, Input][] = [
+    ...Object.entries(inputs),
+    ...references.map((name): [string, Input] => [referenceKey(name), REFERENCE]),
+  ];
   return (
     <form class="stack" aria-label="Inputs" onSubmit={submit}>
-      {names.length === 0 ? <p class="muted">This flow declares no inputs.</p> : null}
-      {names.map((name) => (
+      {fields.length === 0 ? <p class="muted">This flow declares no inputs.</p> : null}
+      {fields.map(([name, input]) => (
         <InputField
           key={name}
           name={name}
-          input={inputs[name] as Input}
+          input={input}
           value={draft[name] ?? ""}
           onChange={(value) => setDraft({ ...draft, [name]: value })}
         />
@@ -107,6 +117,7 @@ function RunFlow({ flowId, flow }: { flowId: string; flow: Flow }) {
       <Card title={`Run ${flow.name}`}>
         <InputsForm
           inputs={flow.inputs}
+          references={secretReferences(flow)}
           disabled={replay.busy || replay.running}
           onStart={replay.start}
         />

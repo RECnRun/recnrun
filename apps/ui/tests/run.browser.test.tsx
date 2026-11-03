@@ -61,7 +61,7 @@ function runScreen(flow: Flow = FLOW) {
 const field = (name: string) => page.getByRole("textbox", { name });
 const start = () => page.getByRole("button", { name: "Start run" }).click();
 
-test("starts a run with the inputs and never shows the secret again", async () => {
+test("starts a run with the inputs, sends the secret only through secrets, and clears it", async () => {
   const fake = runScreen();
   await field("email (required)").fill("ana@example.com");
   await page.getByLabelText("password (required)").fill(SECRET);
@@ -73,18 +73,36 @@ test("starts a run with the inputs and never shows the secret again", async () =
     .toEqual([
       {
         flowId: "login",
-        inputs: {
-          email: "ana@example.com",
-          password: SECRET,
-          retries: 2,
-          remember: true,
-          tags: ["smoke"],
-        },
+        inputs: { email: "ana@example.com", retries: 2, remember: true, tags: ["smoke"] },
+        secrets: { password: SECRET },
       },
     ]);
   await expect.element(page.getByLabelText("password (required)")).toHaveValue("");
   expect(document.body.innerHTML).not.toContain(SECRET);
   await expect.element(page.getByRole("button", { name: "Stop" })).toBeDisabled();
+});
+
+test("asks for the flow's recorded secret references and sends them only through secrets", async () => {
+  const steps = [
+    { id: "key", action: "fill", target: { testId: "key" }, value: "${secrets.apiKey}" },
+    {
+      id: "pin",
+      action: "type",
+      target: { testId: "pin" },
+      value: "${secrets.apiKey}-${secrets.pin}",
+    },
+  ];
+  const fake = runScreen({ ...FLOW, inputs: {}, steps } as Flow);
+  await start();
+  await expectTexts(page.getByRole("alert"), "secrets.apiKey is required.");
+  await page.getByLabelText("secrets.apiKey (required)").fill(SECRET);
+  await page.getByLabelText("secrets.pin (required)").fill("4321");
+  await start();
+  await expect
+    .poll(() => fake.paramsOf("flow.replay"))
+    .toEqual([{ flowId: "login", inputs: {}, secrets: { apiKey: SECRET, pin: "4321" } }]);
+  await expect.element(page.getByLabelText("secrets.apiKey (required)")).toHaveValue("");
+  expect(document.body.innerHTML).not.toContain(SECRET);
 });
 
 let seq = 0;
@@ -174,7 +192,11 @@ test("fills defaults but never a secret's", () => {
     token: { type: "string", required: false, secret: true, default: "x" },
   } as Flow["inputs"];
   expect(initialDraft(inputs)).toEqual({ note: "hi", list: "[1]", token: "" });
-  expect(parseDraft(inputs, { note: "", list: "", token: "" })).toEqual({ ok: true, inputs: {} });
+  expect(parseDraft(inputs, { note: "", list: "", token: "" })).toEqual({
+    ok: true,
+    inputs: {},
+    secrets: {},
+  });
 });
 
 test("shows the service's errors", async () => {
