@@ -124,7 +124,7 @@ Hypothesis (§5 row 7, P1.4): `fetch("file://…")` works in the extension page 
 
 Predictions: with access allowed, `fetch(file:)` works the same in the page, the offscreen document, and the service worker; without it there is no `file` factory and the fetch fails (expected as a network `TypeError` in the page). Not inventoried: directory listings and cache headers of the file loader (`content/browser/loader/file_url_loader_factory.cc`, not read); E3 measures repeated reads, and listings stay `unavailable` per the plan.
 
-Observed ([E1](experiments/E1.md)): with `isAllowedFileSchemeAccess()` true, `fetch(file:)` from an extension page fails with `TypeError: Failed to fetch` unless the manifest also declares `host_permissions: ["file:///*"]`, so the "iff `AllowFileAccess`" prediction misses a host-permission check that this group did not inventory.
+Observed ([E1](experiments/E1.md)): with `isAllowedFileSchemeAccess()` true, `fetch(file:)` from an extension page fails with `TypeError: Failed to fetch` unless the manifest also declares `host_permissions: ["file:///*"]`; with both, the read follows the toggle. The "iff `AllowFileAccess`" prediction misses a host-permission check that this group did not inventory.
 
 ## 8. `chrome.debugger` attach, detach, and worker lifetime
 

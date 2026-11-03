@@ -14,7 +14,7 @@ import {
 import { windowShows } from "../browser/fixtures/x-display.ts";
 import {
   defaultSample,
-  hostPermissionSample,
+  noHostPermissionSample,
   noDeveloperModeSample,
   observe,
   reinstallSample,
@@ -37,7 +37,7 @@ const HYPOTHESES = [
   "E1.unpacked.toggleOff",
   "E1.unpacked.toggleOn",
   "E1.unpacked.reinstall",
-  "E1.unpacked.hostPermission",
+  "E1.unpacked.noHostPermission",
   "E1.unpacked.noDeveloperMode",
   "E1.policy.default",
   "E1.packed",
@@ -163,9 +163,9 @@ test.describe("E1: file-scheme state of the poc-d0 build in Google Chrome Stable
     );
   });
 
-  test("E1.unpacked.hostPermission: with file:///* host access the toggle alone decides the read", async () => {
-    await recordHypothesis(await cell("E1.unpacked.hostPermission", unpacked), () =>
-      hostPermissionSample(labCells),
+  test("E1.unpacked.noHostPermission: without file:///* the read fails although access is on", async () => {
+    await recordHypothesis(await cell("E1.unpacked.noHostPermission", unpacked), () =>
+      noHostPermissionSample(labCells),
     );
   });
 

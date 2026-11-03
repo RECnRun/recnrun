@@ -11,7 +11,7 @@ import {
   fileAccessPref,
   POC_EXTENSION_ID,
   readFromExtension,
-  withFileHostPermission,
+  withoutHostPermissions,
   writeProbe,
 } from "./file-access.ts";
 import type { FileRead } from "./file-access.ts";
@@ -230,39 +230,28 @@ export const reinstallSample = (cells: E1Cells): Promise<Sample> =>
   });
 
 /**
- * The control: the same build with `host_permissions: ["file:///*"]`. Default, off, and on are
- * read in one install, so the toggle alone decides the read.
+ * The control: the same build with no `host_permissions`. Access is on from the install, so a
+ * failed read is the missing `file:///*` alone, with no gesture.
  */
-export async function hostPermissionSample(cells: E1Cells): Promise<Sample> {
+export async function noHostPermissionSample(cells: E1Cells): Promise<Sample> {
   const directory = await mkdtemp(join(tmpdir(), "recnrun-e1-build-"));
   try {
-    const build = await withFileHostPermission(cells.build, directory);
+    const build = await withoutHostPermissions(cells.build, directory);
     return await withFresh(
       cells,
       async ({ first }, probe) => {
         const { extensionId } = first;
-        const progress = newProgress(probe);
-        const initial = await readFromExtension(first.client, extensionId, probe);
-        const off = await setAccess(first, cells, false, progress);
-        const on = await setAccess(first, cells, true, progress);
-        const { steps, methods } = progress;
-        const patch = { host_permissions: ["file:///*"] };
-        const observation = {
-          extensionId,
-          patch,
-          initial,
-          off,
-          on,
-          methods,
-          gestures: steps.length,
-          steps,
+        const read = await readFromExtension(first.client, extensionId, probe);
+        const removed = { host_permissions: "removed from the manifest" };
+        const observation = { extensionId, removed, ...read, gestures: 0 };
+        const ok = read.fileSchemeAccess === true && !read.fetch.ok;
+        if (ok) return { ok, observation, steps: [] };
+        return {
+          ok,
+          error: `without host_permissions, ${describeRead(read)}`,
+          observation,
+          steps: [],
         };
-        const reads = (read: FileRead) => read.fetch.ok && read.fetch.matches;
-        const ok =
-          reads(initial) === (initial.fileSchemeAccess === true) && !reads(off) && reads(on);
-        if (ok) return { ok, observation, steps };
-        const error = `default ${describeRead(initial)}; off ${describeRead(off)}; on ${describeRead(on)}`;
-        return { ok, error, observation, steps };
       },
       build,
     );

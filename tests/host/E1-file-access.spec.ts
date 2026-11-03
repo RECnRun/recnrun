@@ -1,7 +1,7 @@
 import { extensionPath, loadUnpacked } from "../browser/fixtures/extension-loaders.ts";
 import {
   defaultSample,
-  hostPermissionSample,
+  noHostPermissionSample,
   noDeveloperModeSample,
   observe,
   reinstallSample,
@@ -30,7 +30,7 @@ const HYPOTHESES = [
   "E1.unpacked.toggleOff",
   "E1.unpacked.toggleOn",
   "E1.unpacked.reinstall",
-  "E1.unpacked.hostPermission",
+  "E1.unpacked.noHostPermission",
   "E1.unpacked.noDeveloperMode",
   "E1.policy.default",
   "E1.packed",
@@ -96,8 +96,8 @@ test.describe("E1 on the host: file-scheme state of the poc-d0 build", () => {
     await record("E1.unpacked.reinstall", () => reinstallSample(hostCells));
   });
 
-  test("E1.unpacked.hostPermission: with file:///* host access the toggle alone decides the read", async () => {
-    await record("E1.unpacked.hostPermission", () => hostPermissionSample(hostCells));
+  test("E1.unpacked.noHostPermission: without file:///* the read fails although access is on", async () => {
+    await record("E1.unpacked.noHostPermission", () => noHostPermissionSample(hostCells));
   });
 
   test("E1.unpacked.noDeveloperMode: without Developer mode the toggle disables the build", async () => {

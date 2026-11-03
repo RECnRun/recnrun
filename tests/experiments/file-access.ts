@@ -43,15 +43,17 @@ export async function requireBuild(path: string, variant: string): Promise<void>
 }
 
 /**
- * Copies the build at `source` into `directory` with `host_permissions: ["file:///*"]` added, the
- * control that separates the toggle from the manifest's own file access.
+ * Copies the build at `source` into `directory` without its `host_permissions`, the control that
+ * separates the toggle from the manifest's own file host permission.
  */
-export async function withFileHostPermission(source: string, directory: string): Promise<string> {
+export async function withoutHostPermissions(source: string, directory: string): Promise<string> {
   const build = join(directory, "build");
   await cp(source, build, { recursive: true });
   const file = join(build, "manifest.json");
-  const manifest = JSON.parse(await readFile(file, "utf8")) as Record<string, unknown>;
-  await writeFile(file, JSON.stringify({ ...manifest, host_permissions: ["file:///*"] }));
+  const { host_permissions: _dropped, ...manifest } = JSON.parse(
+    await readFile(file, "utf8"),
+  ) as Record<string, unknown>;
+  await writeFile(file, JSON.stringify(manifest));
   return build;
 }
 
