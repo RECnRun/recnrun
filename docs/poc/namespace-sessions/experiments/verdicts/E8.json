@@ -50,22 +50,24 @@
   {
     "experiment": "E8",
     "hypothesis": "b-restart",
-    "verdict": "fail",
-    "error": "10 of 10 samples failed: the reload never loaded: the restarted worker waits on a debugger (10)",
+    "verdict": "pass",
     "chrome": "Google Chrome 156.0.8078.79",
     "samples": 10,
     "method": "managed-policy",
     "counts": {
       "samples": 10,
-      "passed": 0,
-      "held": 10,
-      "noReport": 0
+      "passed": 10,
+      "held": 0,
+      "noReport": 0,
+      "noEffect": 0,
+      "firstEffectBeforeMarker": 0,
+      "databaseUnmarked": 0,
+      "ran:marked": 10
     },
     "variants": [
       {
         "name": "sw-classic",
-        "verdict": "fail",
-        "error": "10 of 10 samples failed: the reload never loaded: the restarted worker waits on a debugger (10)",
+        "verdict": "pass",
         "samples": 10
       }
     ],

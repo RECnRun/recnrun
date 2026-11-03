@@ -73,7 +73,7 @@ const BY_ROUTE = {
       ["E4/debugger-pause", "a pause holds the worker without stopping it"],
       ["E4/dnr-block-evict", "a DNR block does not evict a running worker"],
       ["E4/unregister", "unregister() leaves the target listed"],
-      ["E8/b-restart", "without CDP a reload after closeTarget must still load"],
+      ["E8/b-restart", "without CDP a reload after closeTarget restarts the worker marked"],
     ],
     [`${SW}.wake`]: [
       ["E3/wake-without-tab", "a worker woken with no tab open is attached by watch"],

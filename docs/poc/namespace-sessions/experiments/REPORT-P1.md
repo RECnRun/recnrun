@@ -38,7 +38,7 @@ Chrome: Google Chrome 156.0.8078.79 (73 verdicts); Google Chrome for Testing 156
 | shared                | fail (1)                              | pass (3)               | fail (2)                      |
 | serviceWorker.first   | mixed (2 pass, 2 fail)                | mixed (1 pass, 2 fail) | not tested                    |
 | serviceWorker.update  | not tested                            | fail (2)               | not tested                    |
-| serviceWorker.cold    | mixed (1 pass, 7 fail)                | pass (1)               | not tested                    |
+| serviceWorker.cold    | mixed (2 pass, 6 fail)                | pass (1)               | not tested                    |
 | serviceWorker.offline | not tested                            | fail (2)               | not tested                    |
 | serviceWorker.wake    | unavailable (1)                       | not tested             | not tested                    |
 
@@ -70,7 +70,7 @@ Chrome: Google Chrome 156.0.8078.79 (73 verdicts); Google Chrome for Testing 156
 | serviceWorker.cold    | A     | E4 debugger-pause                        | pass              | tests/experiments/E4-stop-restart.spec.ts          | a pause holds the worker without stopping it                            |
 | serviceWorker.cold    | A     | E4 dnr-block-evict                       | fail              | tests/experiments/E4-stop-restart.spec.ts          | a DNR block does not evict a running worker                             |
 | serviceWorker.cold    | A     | E4 unregister                            | fail              | tests/experiments/E4-stop-restart.spec.ts          | unregister() leaves the target listed                                   |
-| serviceWorker.cold    | A     | E8 b-restart                             | fail              | tests/experiments/E8-strict.spec.ts                | without CDP a reload after closeTarget must still load                  |
+| serviceWorker.cold    | A     | E8 b-restart                             | pass              | tests/experiments/E8-strict.spec.ts                | without CDP a reload after closeTarget restarts the worker marked       |
 | serviceWorker.wake    | A     | E3 wake-without-tab                      | unavailable       | tests/experiments/E3-route-a-cold.spec.ts          | a worker woken with no tab open is attached by watch                    |
 | serviceWorker.first   | B     | E5 first                                 | fail              | tests/experiments/E5-route-b-fetch.spec.ts         | the main script is fulfilled with the wrapper on the first registration |
 | serviceWorker.first   | B     | E5 imports                               | pass              | tests/experiments/E5-route-b-fetch.spec.ts         | importScripts and static imports pause on the worker session            |
