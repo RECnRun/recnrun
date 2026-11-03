@@ -101,10 +101,32 @@ describe("discover with a user-data dir", () => {
     expect(probed).toEqual([9222]);
   });
 
-  test("rethrows a read error other than a missing file", async () => {
+  test("rethrows a read error other than a missing or blocked file", async () => {
     await mkdir(join(userDataDir, "DevToolsActivePort"));
     await expect(discover({ userDataDir })).rejects.toThrow(/EISDIR/);
   });
+
+  test.each(["EPERM", "EACCES"])(
+    "reports a file the operating system refuses to let it read (%s)",
+    async (code) => {
+      const file = join(userDataDir, "DevToolsActivePort");
+      const fs: DiscoveryFileSystem = {
+        readFile: () =>
+          Promise.reject(
+            Object.assign(new Error(`${code}: operation not permitted, open '${file}'`), { code }),
+          ),
+      };
+      const result = await discover({ userDataDir, fs });
+      expect(result).toMatchObject({ ok: false, code: "unreadable-file", userDataDir });
+      const remedy = result.ok ? "" : result.remedy;
+      expect(remedy).toContain(file);
+      expect(remedy).toMatch(/macOS blocks .* from reading Google Chrome's data/);
+      expect(remedy).toContain("System Settings → Privacy & Security → Full Disk Access");
+      expect(remedy).toContain("access data from other apps");
+      expect(remedy).toMatch(/restart/);
+      expect(remedy).not.toContain("chrome://inspect");
+    },
+  );
 });
 
 function recordingFs(): { fs: DiscoveryFileSystem; read: string[] } {

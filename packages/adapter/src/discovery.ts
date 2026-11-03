@@ -91,14 +91,26 @@ function parseActivePort(content: string): { port: number; path: string } | unde
   return { port, path };
 }
 
-async function readActivePort(fs: DiscoveryFileSystem, file: string): Promise<string | undefined> {
+type ActivePortRead = { content: string } | { missing: true } | { blocked: true };
+
+async function readActivePort(fs: DiscoveryFileSystem, file: string): Promise<ActivePortRead> {
   try {
-    return await fs.readFile(file);
+    return { content: await fs.readFile(file) };
   } catch (error) {
     const code = (error as { code?: unknown }).code;
-    if (code === "ENOENT" || code === "ENOTDIR") return undefined;
+    if (code === "ENOENT" || code === "ENOTDIR") return { missing: true };
+    // macOS app-data protection answers EPERM for other apps' data; the file itself may be fine.
+    if (code === "EPERM" || code === "EACCES") return { blocked: true };
     throw error;
   }
+}
+
+function blocked(userDataDir: string, file: string): DiscoveryResult {
+  const remedy =
+    `The operating system refused to read ${file}: macOS blocks the terminal or app that runs RECnRun from reading Google Chrome's data. ` +
+    'Allow it in System Settings → Privacy & Security → Full Disk Access (or answer the "access data from other apps" prompt) ' +
+    "for the application that runs RECnRun, then restart that application.";
+  return { ok: false, code: "unreadable-file", remedy, userDataDir };
 }
 
 function locate(options: DiscoverOptions): { userDataDir: string; file: string } {
@@ -116,11 +128,12 @@ function locate(options: DiscoverOptions): { userDataDir: string; file: string }
 /** Finds the CDP endpoint of a running Chrome through `<userDataDir>/DevToolsActivePort`. */
 export async function discover(options: DiscoverOptions = {}): Promise<DiscoveryResult> {
   const { userDataDir, file } = locate(options);
-  const content = await readActivePort(options.fs ?? nodeFileSystem, file);
-  if (content === undefined) {
+  const read = await readActivePort(options.fs ?? nodeFileSystem, file);
+  if ("blocked" in read) return blocked(userDataDir, file);
+  if ("missing" in read) {
     return failure("missing-file", userDataDir, `Chrome has not written ${file}.`);
   }
-  const parsed = parseActivePort(content);
+  const parsed = parseActivePort(read.content);
   if (!parsed) {
     return failure("malformed-file", userDataDir, `${file} is not a port and a browser path.`);
   }
