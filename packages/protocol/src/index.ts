@@ -19,6 +19,7 @@ export * from "./version.ts";
 export * from "./bindings.ts";
 export * from "./instrumentation.ts";
 export * from "./capture.ts";
+export * from "./network.ts";
 export * from "./journal.ts";
 export * from "./function-locator.ts";
 export * from "./lease.ts";

@@ -1,9 +1,7 @@
 import * as v from "valibot";
 import { CountSchema, NonEmptyStringSchema } from "./common.ts";
-import { EVENT_ENVELOPE_ENTRIES } from "./events.ts";
-
-/** What became of a response body: kept whole, kept in part, lost, or never asked for. */
-export const BODY_CONDITIONS = ["captured", "truncated", "unavailable", "not-requested"] as const;
+import { EVENT_ENVELOPE_ENTRIES, typedEvent as typed } from "./events.ts";
+import { NetworkEventSchema } from "./network.ts";
 
 /** The DOM events the hook listens to, in the capture phase on the window. */
 export const DOM_EVENT_TYPES = [
@@ -28,14 +26,10 @@ export const DOM_EVENT_TYPES = [
 /** The hook clips every string it reports (values, keys, attributes) to this many characters. */
 export const MAX_CAPTURED_TEXT = 1024;
 
-/** Response bodies longer than this many characters are kept in part and marked `truncated`. */
-export const MAX_INLINE_BODY_LENGTH = 65_536;
-
 const TextSchema = v.pipe(v.string(), v.maxLength(MAX_CAPTURED_TEXT));
 const CoordinateSchema = v.pipe(v.number(), v.integer());
 
 export const DomEventTypeSchema = v.picklist(DOM_EVENT_TYPES);
-export const BodyConditionSchema = v.picklist(BODY_CONDITIONS);
 
 /** The element an event reached, by the attributes a locator can use later. */
 export const DomTargetSchema = v.strictObject({
@@ -83,38 +77,6 @@ const SourceLocation = {
   column: v.optional(CountSchema),
 };
 
-/** A hop of a redirect chain: the URL that answered with a redirect status. */
-export const RedirectHopSchema = v.strictObject({
-  url: v.string(),
-  method: NonEmptyStringSchema,
-  status: v.pipe(v.number(), v.integer()),
-});
-
-/** A response body with its condition; `reason` says why it is not `captured`. */
-export const BodyPayloadSchema = v.strictObject({
-  requestId: NonEmptyStringSchema,
-  url: v.string(),
-  condition: BodyConditionSchema,
-  mimeType: v.optional(v.string()),
-  // The length of the whole body in characters (base64 characters when `base64Encoded`).
-  size: v.optional(CountSchema),
-  base64Encoded: v.optional(v.boolean()),
-  body: v.optional(v.pipe(v.string(), v.maxLength(MAX_INLINE_BODY_LENGTH))),
-  reason: v.optional(NonEmptyStringSchema),
-});
-
-const typed = <const C extends string, const T extends string, P extends v.GenericSchema>(
-  category: C,
-  type: T,
-  payload: P,
-) =>
-  v.strictObject({
-    ...EVENT_ENVELOPE_ENTRIES,
-    category: v.literal(category),
-    type: v.literal(type),
-    payload,
-  });
-
 const domEvents = v.variant("type", [
   v.strictObject({
     ...EVENT_ENVELOPE_ENTRIES,
@@ -132,48 +94,6 @@ const domEvents = v.variant("type", [
     "dialog-closed",
     v.strictObject({ result: v.boolean(), userInput: v.optional(v.string()) }),
   ),
-]);
-
-const networkEvents = v.variant("type", [
-  typed(
-    "network",
-    "request",
-    v.strictObject({
-      requestId: NonEmptyStringSchema,
-      url: v.string(),
-      method: NonEmptyStringSchema,
-      resourceType: v.optional(NonEmptyStringSchema),
-      redirectChain: v.optional(v.array(RedirectHopSchema)),
-    }),
-  ),
-  typed(
-    "network",
-    "response",
-    v.strictObject({
-      requestId: NonEmptyStringSchema,
-      url: v.string(),
-      status: v.pipe(v.number(), v.integer()),
-      statusText: v.string(),
-      mimeType: v.string(),
-      fromCache: v.optional(v.boolean()),
-    }),
-  ),
-  typed(
-    "network",
-    "finished",
-    v.strictObject({ requestId: NonEmptyStringSchema, encodedDataLength: v.number() }),
-  ),
-  typed(
-    "network",
-    "failed",
-    v.strictObject({
-      requestId: NonEmptyStringSchema,
-      errorText: v.string(),
-      canceled: v.boolean(),
-      blockedReason: v.optional(v.string()),
-    }),
-  ),
-  typed("network", "body", BodyPayloadSchema),
 ]);
 
 const consoleEvents = v.variant("type", [
@@ -236,15 +156,13 @@ const targetEvents = v.variant("type", [
 /** One raw event the adapter captured, as a journal line: the §11 envelope with a typed payload. */
 export const CapturedEventSchema = v.variant("category", [
   domEvents,
-  networkEvents,
+  NetworkEventSchema,
   consoleEvents,
   errorEvents,
   navigationEvents,
   targetEvents,
 ]);
 
-export type BodyCondition = v.InferOutput<typeof BodyConditionSchema>;
-export type BodyPayload = v.InferOutput<typeof BodyPayloadSchema>;
 export type DomEventType = v.InferOutput<typeof DomEventTypeSchema>;
 export type DomPayload = v.InferOutput<typeof DomPayloadSchema>;
 export type CapturedEvent = v.InferOutput<typeof CapturedEventSchema>;

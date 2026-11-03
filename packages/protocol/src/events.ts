@@ -72,6 +72,23 @@ const envelopeEntries = {
 /** The §11 envelope fields, for schemas that type an event's category, type, and payload. */
 export const EVENT_ENVELOPE_ENTRIES = envelopeEntries;
 
+/** An event schema of one category and type: the §11 envelope with that type's payload. */
+export const typedEvent = <
+  const C extends string,
+  const T extends string,
+  P extends v.GenericSchema,
+>(
+  category: C,
+  type: T,
+  payload: P,
+) =>
+  v.strictObject({
+    ...envelopeEntries,
+    category: v.literal(category),
+    type: v.literal(type),
+    payload,
+  });
+
 export const GapPayloadSchema = v.strictObject({
   reason: v.picklist(GAP_REASONS),
   surface: v.optional(CaptureSurfaceSchema),
