@@ -1,4 +1,4 @@
-import type { Flow, FlowManifest, RunSummary } from "@recnrun/protocol";
+import type { Event, Flow, FlowManifest, RunSummary } from "@recnrun/protocol";
 import { expect, test } from "vite-plus/test";
 import { page } from "vite-plus/test/browser";
 import { ApiError } from "@/api/error";
@@ -51,9 +51,8 @@ const SUMMARY: RunSummary = {
 
 function runScreen(flow: Flow = FLOW) {
   const fake = fakeApi({
-    "flow.get": () => ({ flow, manifest: MANIFEST }),
+    "flow.get": () => ({ flow, manifest: MANIFEST, revision: REVISION }),
     "flow.replay": () => ({ runId: "run-1" }),
-    "run.summary": () => SUMMARY,
   });
   renderWith(fake.api, <Run flowId="login" />);
   return fake;
@@ -88,31 +87,68 @@ test("starts a run with the inputs and never shows the secret again", async () =
   await expect.element(page.getByRole("button", { name: "Stop" })).toBeDisabled();
 });
 
-test("shows live step results of its own run, then the summary", async () => {
+let seq = 0;
+
+/** A replay journal event of `stepId`, as the service pushes it in `run.step`. */
+function stepEvent(runId: string, stepId: string, type: string, payload: Record<string, unknown>) {
+  seq += 1;
+  const event = {
+    schemaVersion: 1,
+    id: `engine:replay#${seq}`,
+    runId,
+    seq,
+    source: "engine",
+    producer: "engine:replay",
+    timestamp: NOW,
+    targetId: null,
+    frameId: null,
+    documentId: null,
+    stepId,
+    category: "step",
+    type,
+    payload,
+  } as Event;
+  return { type: "run.step" as const, runId, event };
+}
+
+test("shows live step results of its own run, then the pushed summary", async () => {
   const fake = runScreen({ ...FLOW, inputs: {} });
   await expect.element(page.getByText("This flow declares no inputs.")).toBeVisible();
   await start();
   await expect.element(page.getByText("No step has run yet.")).toBeVisible();
-  fake.emit("run.step", { runId: "other", result: { stepId: "ghost", status: "passed" } });
-  fake.emit("run.step", { runId: "run-1", result: { stepId: "open", status: "running" } });
-  fake.emit("run.step", {
-    runId: "run-1",
-    result: { stepId: "open", status: "passed", attempts: 1 },
-  });
+  fake.emit("run.step", stepEvent("other", "ghost", "step.finished", { status: "passed" }));
+  fake.emit("run.step", stepEvent("run-1", "open", "step.started", { index: 0 }));
+  fake.emit(
+    "run.step",
+    stepEvent("run-1", "open", "step.finished", { index: 0, status: "passed", attempts: 1 }),
+  );
   const error = { code: "locator-not-found", message: "No element matched the label Email." };
-  fake.emit("run.step", {
-    runId: "run-1",
-    result: { stepId: "email", status: "failed", attempts: 2, error },
-  });
+  fake.emit("run.step", stepEvent("run-1", "email", "step.started", { index: 1 }));
   const rows = page.getByRole("list", { name: "Step results" }).getByRole("listitem");
   await expect.poll(() => rows.all().length).toBe(2);
+  await expectTexts(rows.nth(1), "email", "running");
+  fake.emit(
+    "run.step",
+    stepEvent("run-1", "email", "step.finished", {
+      index: 1,
+      status: "failed",
+      attempts: 2,
+      error,
+    }),
+  );
+  fake.emit("run.step", stepEvent("run-1", "email", "step.note", { index: 1 }));
   await expectTexts(rows.nth(0), "open", "passed", "1 attempt");
   await expectTexts(rows.nth(1), "email", "failed", "2 attempts", error.message, error.code);
-  expect(fake.paramsOf("run.summary")).toEqual([]);
-  fake.emit("run.finished", { runId: "run-1" });
+  expect(page.getByRole("region", { name: "Run summary" }).query()).toBeNull();
+  fake.emit("run.finished", {
+    type: "run.finished",
+    runId: "other",
+    summary: { ...SUMMARY, runId: "other" },
+  });
+  fake.emit("run.finished", { type: "run.finished", runId: "run-1", summary: SUMMARY });
   const summary = page.getByRole("region", { name: "Run summary" });
   await expectTexts(summary, "failed", "Exit code 1", "passed1", "failed1", "email", error.message);
-  expect(fake.paramsOf("run.summary")).toEqual([{ runId: "run-1" }]);
+  expect(fake.paramsOf("run.summary")).toEqual([]);
 });
 
 test("rejects inputs that do not parse before calling the service", async () => {

@@ -37,10 +37,8 @@ const MANIFEST: FlowManifest = {
 
 function editor(flow: Flow = FLOW) {
   const fake = fakeApi({
-    "flow.get": () => ({ flow, manifest: MANIFEST }),
-    "flow.save": ({ flowId }) => ({ flowId, revision: SAVED }),
-    "picker.start": () => ({ pickerId: "picker-1" }),
-    "picker.stop": () => ({}),
+    "flow.get": () => ({ flow, manifest: MANIFEST, revision: REVISION }),
+    "flow.save": ({ flow: saved }) => ({ flowId: saved.id, revision: SAVED }),
   });
   const onRun = vi.fn<() => void>();
   renderWith(fake.api, <Editor flowId="login" onRun={onRun} />);
@@ -76,27 +74,19 @@ test("deletes a step, sets a timeout, and saves the edited flow", async () => {
   expect(saved?.flow.steps[0]?.timeoutMs).toBe(900);
 });
 
-test("adds an assertion on the element picked in Chrome", async () => {
+test("adds an assertion from the form and saves the flow alone", async () => {
   const fake = editor();
-  await page.getByRole("button", { name: "Pick in Chrome" }).click();
-  await expect.element(page.getByRole("button", { name: "Cancel picking" })).toBeVisible();
-  fake.emit("picker.picked", { pickerId: "other", target: { css: "#wrong" } });
-  fake.emit("picker.picked", { pickerId: "picker-1", target: { testId: "welcome" } });
-  await expect.element(page.getByText('testId="welcome"', { exact: false })).toBeVisible();
-  expect(fake.paramsOf("picker.stop")).toEqual([{ pickerId: "picker-1" }]);
+  await expect.element(page.getByRole("button", { name: "Add assertion" })).toBeDisabled();
+  await page.getByRole("combobox", { name: "Strategy" }).selectOptions("testId");
+  await page.getByRole("textbox", { name: "Locator" }).fill("welcome");
   await page.getByRole("combobox", { name: "Kind" }).selectOptions("textContains");
   await page.getByRole("textbox", { name: "Expected" }).fill("Welcome");
   await page.getByRole("button", { name: "Add assertion" }).click();
-  await expectTexts(
-    steps().nth(3),
-    "assert textContains",
-    "assert-1",
-    'testId="welcome"',
-    "Welcome",
-  );
+  await expectTexts(steps().nth(3), "assert textContains", "assert-1", 'testId="welcome"');
   await page.getByRole("button", { name: "Save" }).click();
   await expect.poll(() => fake.paramsOf("flow.save").length).toBe(1);
   const [saved] = fake.paramsOf("flow.save") as { flow: Flow }[];
+  expect(Object.keys(saved ?? {})).toEqual(["flow"]);
   expect(saved?.flow.steps.at(-1)).toEqual({
     id: "assert-1",
     assertion: "textContains",
@@ -105,16 +95,17 @@ test("adds an assertion on the element picked in Chrome", async () => {
   });
 });
 
-test("adds an assertion from the form and cancels a pick", async () => {
+test("offers no picker outside a recording", async () => {
   const fake = editor();
-  await page.getByRole("button", { name: "Pick in Chrome" }).click();
-  await page.getByRole("button", { name: "Cancel picking" }).click();
-  await expect.poll(() => fake.paramsOf("picker.stop")).toEqual([{ pickerId: "picker-1" }]);
-  await expect.element(page.getByRole("button", { name: "Add assertion" })).toBeDisabled();
+  await expect
+    .element(page.getByText("Pick elements in Chrome while recording; here, type a locator."))
+    .toBeVisible();
+  expect(page.getByRole("button", { name: "Pick in Chrome" }).query()).toBeNull();
   await page.getByRole("combobox", { name: "Strategy" }).selectOptions("text");
   await page.getByRole("textbox", { name: "Locator" }).fill("Signed in");
   await page.getByRole("button", { name: "Add assertion" }).click();
-  await expectTexts(steps().nth(3), "assert visible", 'text value="Signed in"');
+  await expectTexts(steps().nth(3), "assert visible", 'text="Signed in"');
+  expect(fake.calls.map(({ command }) => command)).toEqual(["flow.get"]);
 });
 
 test("builds assertions and ids the flow does not use yet", () => {

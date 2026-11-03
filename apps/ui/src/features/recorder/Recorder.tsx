@@ -1,7 +1,7 @@
 import type { ProfileBinding, SessionStatus } from "@recnrun/protocol";
 import { useState } from "preact/hooks";
 import { useAction, useApi, useLoad } from "@/api/context";
-import { Session } from "@/features/recorder/Session";
+import { Session, type SessionSlot } from "@/features/recorder/Session";
 import { Button } from "@/ui/Button";
 import { Card } from "@/ui/Card";
 import { Field } from "@/ui/Field";
@@ -51,13 +51,19 @@ function StartForm({ profiles, onStarted }: StartProps) {
   );
 }
 
-type RecorderProps = { onFinalized: (flowId: string) => void; pollMs?: number };
+type RecorderProps = {
+  onFinalized: (flowId: string) => void;
+  pollMs?: number;
+  /** Rendered inside the running session; `src/app` passes the assertion picker. */
+  slot?: SessionSlot;
+};
 
 /** Starts a recording session, then follows it until it is stopped and saved as a flow. */
-export function Recorder({ onFinalized, pollMs }: RecorderProps) {
+export function Recorder({ onFinalized, pollMs, slot }: RecorderProps) {
   const [status, setStatus] = useState<SessionStatus>();
   const { loaded, reload } = useLoad((api) => api.call("profiles.list", {}), "profiles");
-  if (status) return <Session initial={status} onFinalized={onFinalized} pollMs={pollMs} />;
+  if (status)
+    return <Session initial={status} onFinalized={onFinalized} pollMs={pollMs} slot={slot} />;
   return (
     <Card title="New recording">
       <Loadable loaded={loaded} onRetry={reload}>

@@ -77,7 +77,7 @@ test("opens a flow in the editor, then its run screen, and starts a recording", 
   const manifest = { ...entry, revisions: [] } as unknown as FlowManifest;
   const fake = fakeApi({
     "flow.list": async () => ({ flows: [entry as FlowCatalogEntry] }),
-    "flow.get": async () => ({ flow, manifest }),
+    "flow.get": async () => ({ flow, manifest, revision: REVISION }),
     "profiles.list": async () => ({ profiles: [] }),
   });
   const root = document.createElement("div");

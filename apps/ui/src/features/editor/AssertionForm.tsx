@@ -8,7 +8,7 @@ import {
   locatorFrom,
   needsExpected,
 } from "@/features/editor/edit";
-import { usePicker } from "@/features/editor/usePicker";
+import { type PickerSession, usePicker } from "@/features/editor/usePicker";
 import { Button } from "@/ui/Button";
 import { Field } from "@/ui/Field";
 import { ErrorState } from "@/ui/States";
@@ -90,15 +90,32 @@ function CheckFields({ kind, onKind, expected, onExpected }: CheckProps) {
   );
 }
 
-type FormProps = { onAdd: (target: Target, kind: AssertionKind, expected: string) => void };
+type Picker = ReturnType<typeof usePicker>;
+
+function PickerControls({ picker }: { picker: Picker }) {
+  if (!picker.available)
+    return <p class="muted">Pick elements in Chrome while recording; here, type a locator.</p>;
+  if (picker.picking) return <Button onClick={picker.cancel}>Cancel picking</Button>;
+  return (
+    <Button onClick={picker.start} disabled={picker.busy}>
+      Pick in Chrome
+    </Button>
+  );
+}
+
+type FormProps = {
+  onAdd: (target: Target, kind: AssertionKind, expected: string) => void;
+  /** The recording to pick elements on; without one the form takes a typed locator only. */
+  session?: PickerSession | undefined;
+};
 
 /** Adds an assertion on an element picked in Chrome or described by one locator. */
-export function AssertionForm({ onAdd }: FormProps) {
+export function AssertionForm({ onAdd, session }: FormProps) {
   const [locator, setLocator] = useState<Locator>({ strategy: "css", value: "" });
   const [picked, setPicked] = useState<Target>();
   const [kind, setKind] = useState<AssertionKind>("visible");
   const [expected, setExpected] = useState("");
-  const picker = usePicker(setPicked);
+  const picker = usePicker(session, setPicked);
   const typed = locator.value ? locatorFrom(locator.strategy, locator.value) : undefined;
   const target = picked ?? typed;
   const submit = (event: Event) => {
@@ -119,13 +136,7 @@ export function AssertionForm({ onAdd }: FormProps) {
       />
       <CheckFields kind={kind} onKind={setKind} expected={expected} onExpected={setExpected} />
       <div class="row">
-        {picker.picking ? (
-          <Button onClick={picker.cancel}>Cancel picking</Button>
-        ) : (
-          <Button onClick={picker.start} disabled={picker.busy}>
-            Pick in Chrome
-          </Button>
-        )}
+        <PickerControls picker={picker} />
         <Button type="submit" variant="primary" disabled={!target}>
           Add assertion
         </Button>

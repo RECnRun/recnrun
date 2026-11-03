@@ -1,4 +1,4 @@
-import type { AssertionStep, Flow, LocatorList, Step, Target } from "@recnrun/protocol";
+import type { AssertionStep, Flow, Step, Target } from "@recnrun/protocol";
 
 /** The assertions the editor offers in F2.6; F4.1 adds the rest. */
 export const ASSERTION_KINDS = ["visible", "textEquals", "textContains", "value", "count"] as const;
@@ -34,8 +34,12 @@ export function nextAssertionId(flow: Flow): string {
   return `assert-${index}`;
 }
 
-export function locatorFrom(strategy: FormStrategy, value: string): LocatorList {
-  return { resolution: "orderedFallback", cardinality: "one", locators: [{ strategy, value }] };
+/** The one-key locator F2.5 replay resolves; locator lists replay in F3. */
+export function locatorFrom(strategy: FormStrategy, value: string): Target {
+  if (strategy === "testId") return { testId: value };
+  if (strategy === "text") return { text: value };
+  if (strategy === "label") return { label: value };
+  return { css: value };
 }
 
 /** An assertion step; `count` reads its expected value as a number, the save validates it. */

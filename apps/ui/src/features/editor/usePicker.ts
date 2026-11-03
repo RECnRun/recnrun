@@ -1,42 +1,59 @@
-import type { Target } from "@recnrun/protocol";
+import type { LeaseFence, LocatorList } from "@recnrun/protocol";
 import { useEffect, useRef, useState } from "preact/hooks";
 import { useAction, useApi } from "@/api/context";
 
-/** Asks the service to pick an element in Chrome and hands over the target the user picked. */
-export function usePicker(onPicked: (target: Target) => void) {
+/** The recording session whose page the picker runs on, and the lease that controls it. */
+export type PickerSession = { sessionId: string; lease?: LeaseFence | undefined };
+
+/** Shows the picker on the session's page and hands over the pick's locators; no session, no picker. */
+export function usePicker(
+  session: PickerSession | undefined,
+  onPicked: (target: LocatorList) => void,
+) {
   const api = useApi();
   const { error, busy, run } = useAction();
-  const [pickerId, setPickerId] = useState<string>();
-  const active = useRef<string | undefined>(undefined);
-  active.current = pickerId;
+  const [picking, setPicking] = useState(false);
+  const active = useRef(false);
+  active.current = picking;
+  const sessionId = session?.sessionId;
   const stop = (id: string) => {
-    setPickerId(undefined);
+    setPicking(false);
     run(async () => {
-      await api.call("picker.stop", { pickerId: id });
+      await api.call("picker.stop", { sessionId: id });
     });
   };
   useEffect(() => {
-    if (!pickerId) return undefined;
+    if (!picking || !sessionId) return undefined;
     return api.on("picker.picked", (message) => {
-      if (message.pickerId !== pickerId) return;
-      onPicked(message.target);
-      stop(pickerId);
+      if (message.sessionId !== sessionId) return;
+      onPicked(message.locators);
+      stop(sessionId);
     });
     // `onPicked` and `stop` are new closures every render; the subscription follows the picker.
-  }, [api, pickerId]);
+  }, [api, picking, sessionId]);
   // Leaving the screen mid-pick must not leave the picker running in Chrome.
   useEffect(
     () => () => {
-      if (active.current) api.call("picker.stop", { pickerId: active.current }).catch(() => {});
+      if (active.current && sessionId)
+        api.call("picker.stop", { sessionId }).catch(() => undefined);
     },
-    [api],
+    [api, sessionId],
   );
-  const start = () =>
+  const start = (id: string) =>
     run(async () => {
-      setPickerId((await api.call("picker.start", {})).pickerId);
+      await api.call("picker.start", { sessionId: id }, { lease: session?.lease });
+      setPicking(true);
     });
-  const cancel = () => {
-    if (pickerId) stop(pickerId);
+  return {
+    available: sessionId !== undefined,
+    picking,
+    start: () => {
+      if (sessionId) start(sessionId);
+    },
+    cancel: () => {
+      if (picking && sessionId) stop(sessionId);
+    },
+    error,
+    busy,
   };
-  return { picking: pickerId !== undefined, start, cancel, error, busy };
 }

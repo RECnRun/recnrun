@@ -36,9 +36,9 @@ function Steps({ flow, onEdit }: StepsProps) {
 
 const short = (revision: string) => revision.slice(0, 12);
 
-type FlowEditorProps = { flowId: string; initial: Flow; revision: string; onRun: () => void };
+type FlowEditorProps = { initial: Flow; revision: string; onRun: () => void };
 
-function FlowEditor({ flowId, initial, revision, onRun }: FlowEditorProps) {
+function FlowEditor({ initial, revision, onRun }: FlowEditorProps) {
   const api = useApi();
   const { error, busy, run } = useAction();
   const [flow, setFlow] = useState(initial);
@@ -50,7 +50,7 @@ function FlowEditor({ flowId, initial, revision, onRun }: FlowEditorProps) {
   };
   const save = () =>
     run(async () => {
-      setSaved((await api.call("flow.save", { flowId, flow })).revision);
+      setSaved((await api.call("flow.save", { flow })).revision);
       setDirty(false);
     });
   const add = (target: Target, kind: AssertionKind, expected: string) =>
@@ -87,9 +87,7 @@ export function Editor({ flowId, onRun }: EditorProps) {
   const { loaded, reload } = useLoad((api) => api.call("flow.get", { flowId }), flowId);
   return (
     <Loadable loaded={loaded} onRetry={reload}>
-      {({ flow, manifest }) => (
-        <FlowEditor flowId={flowId} initial={flow} revision={manifest.revision} onRun={onRun} />
-      )}
+      {({ flow, revision }) => <FlowEditor initial={flow} revision={revision} onRun={onRun} />}
     </Loadable>
   );
 }

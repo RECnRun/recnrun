@@ -3,6 +3,7 @@ import type { Api } from "@/api/api";
 import { ApiProvider } from "@/api/context";
 import { type Route, hrefOf, parseHash } from "@/app/routes";
 import { Catalog } from "@/features/catalog/Catalog";
+import { DraftAssertions } from "@/features/editor/DraftAssertions";
 import { Editor } from "@/features/editor/Editor";
 import { Recorder } from "@/features/recorder/Recorder";
 import { Run } from "@/features/run/Run";
@@ -40,7 +41,12 @@ function Screen({ route, navigate }: { route: Route; navigate: (route: Route) =>
         />
       );
     case "recorder":
-      return <Recorder onFinalized={(flowId) => navigate({ screen: "editor", flowId })} />;
+      return (
+        <Recorder
+          onFinalized={(flowId) => navigate({ screen: "editor", flowId })}
+          slot={(session) => <DraftAssertions session={session} />}
+        />
+      );
     case "editor":
       return (
         <Editor

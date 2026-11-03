@@ -1,5 +1,6 @@
-import { PUSH_MESSAGES, type PushMessage, type PushType } from "@/api/commands";
-import { type Schema, check } from "@/api/schema";
+import { ServiceMessageSchema } from "@recnrun/protocol";
+import type { PushMessage, PushType } from "@/api/commands";
+import { check } from "@/api/schema";
 
 export type Handler<T extends PushType> = (message: PushMessage<T>) => void;
 
@@ -20,11 +21,8 @@ type BusOptions = {
   maxRetryMs?: number;
 };
 
-const isPushType = (value: unknown): value is PushType =>
-  typeof value === "string" && Object.hasOwn(PUSH_MESSAGES, value);
-
 /** Parses one frame; anything that is not a valid push message (such as a response envelope) is dropped. */
-function parse(data: unknown): { type: PushType; message: unknown } | undefined {
+function parse(data: unknown): PushMessage<PushType> | undefined {
   if (typeof data !== "string") return undefined;
   let value: unknown;
   try {
@@ -32,11 +30,8 @@ function parse(data: unknown): { type: PushType; message: unknown } | undefined 
   } catch {
     return undefined;
   }
-  const type = (value as { type?: unknown } | null)?.type;
-  if (!isPushType(type)) return undefined;
-  const schema: Schema<unknown> = PUSH_MESSAGES[type];
-  const checked = check(schema, value);
-  return checked.ok ? { type, message: checked.value } : undefined;
+  const checked = check(ServiceMessageSchema, value);
+  return checked.ok ? checked.value : undefined;
 }
 
 /** Listens to the service's WebSocket and reconnects with backoff until closed. */
@@ -58,8 +53,8 @@ export function createEventBus(options: BusOptions): EventBus {
       current.send(JSON.stringify(subscribe));
     };
     current.onmessage = (event) => {
-      const parsed = parse(event.data);
-      if (parsed) handlers.get(parsed.type)?.forEach((handler) => handler(parsed.message));
+      const message = parse(event.data);
+      if (message) handlers.get(message.type)?.forEach((handler) => handler(message));
     };
     current.onclose = () => {
       if (closed) return;

@@ -1,6 +1,7 @@
 import type { RunSummary, StepResult } from "@recnrun/protocol";
 import { useEffect, useState } from "preact/hooks";
 import { useAction, useApi } from "@/api/context";
+import { stepResultOf } from "@/features/run/steps";
 
 type Pushed = { runId: string; result: StepResult };
 
@@ -14,35 +15,34 @@ function latestResults(results: StepResult[]): StepResult[] {
   return [...rows.values()];
 }
 
-/** Starts a replay and follows its pushed step results until the service reports it finished. */
+/** Starts a replay and follows its pushed step events until the service pushes its summary. */
 export function useRun(flowId: string) {
   const api = useApi();
   const { error, busy, run } = useAction();
   const [runId, setRunId] = useState<string>();
   const [pushed, setPushed] = useState<Pushed[]>([]);
-  const [finished, setFinished] = useState<string[]>([]);
-  const [summary, setSummary] = useState<RunSummary>();
-  // Subscribed before the replay starts, since results can arrive before its answer does.
+  const [summaries, setSummaries] = useState<RunSummary[]>([]);
+  // Subscribed before the replay starts, since events can arrive before its answer does.
   useEffect(() => {
-    const offStep = api.on("run.step", (message) => setPushed((list) => [...list, message]));
-    const offDone = api.on("run.finished", ({ runId: id }) => setFinished((list) => [...list, id]));
+    const offStep = api.on("run.step", ({ runId: id, event }) => {
+      const result = stepResultOf(event);
+      if (result) setPushed((list) => [...list, { runId: id, result }]);
+    });
+    const offDone = api.on("run.finished", ({ summary }) =>
+      setSummaries((list) => [...list, summary]),
+    );
     return () => {
       offStep();
       offDone();
     };
   }, [api]);
-  const done = runId !== undefined && finished.includes(runId);
-  useEffect(() => {
-    if (!runId || !done) return;
-    run(async () => setSummary(await api.call("run.summary", { runId })));
-    // `run` is a new closure every render; the summary is read once per finished run.
-  }, [api, runId, done]);
+  const summary = summaries.find((entry) => entry.runId === runId);
   const start = (inputs: Record<string, unknown>) =>
     run(async () => {
-      setSummary(undefined);
+      setRunId(undefined);
       setRunId((await api.call("flow.replay", { flowId, inputs })).runId);
     });
   const own = pushed.filter((message) => message.runId === runId).map(({ result }) => result);
-  const running = runId !== undefined && !done;
+  const running = runId !== undefined && summary === undefined;
   return { runId, steps: latestResults(own), summary, running, error, busy, start };
 }

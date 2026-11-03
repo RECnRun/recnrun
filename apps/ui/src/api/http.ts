@@ -25,7 +25,11 @@ async function post(options: HttpOptions, body: unknown): Promise<unknown> {
   } catch (error) {
     throw new ApiError("unreachable", `The service did not answer: ${String(error)}`);
   }
-  return response.json().catch(() => undefined);
+  // Anything but JSON (a 404 page, an empty body) means this service is not the one answering.
+  const answer: unknown = await response.json().catch(() => undefined);
+  if (answer === undefined)
+    throw new ApiError("unreachable", `No service answered at /api (HTTP ${response.status}).`);
+  return answer;
 }
 
 function invalid(command: string, message: string): ApiError {

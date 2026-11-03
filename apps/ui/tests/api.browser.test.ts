@@ -67,6 +67,36 @@ test("reports an unreachable service", async () => {
   await expect(call("health", {})).rejects.toMatchObject({ code: "unreachable" });
 });
 
+test("reports a 404 or an empty body from /api as an unreachable service", async () => {
+  for (const response of [new Response("Not found.", { status: 404 }), new Response(null)]) {
+    const fetch = vi.fn<typeof globalThis.fetch>(async () => response);
+    const call = createCall({ token: "t", fetch });
+    await expect(call("health", {})).rejects.toMatchObject({ code: "unreachable" });
+  }
+});
+
+test("sends the protocol's params and the lease fence in the envelope", async () => {
+  const picking = { sessionId: "session-1", picking: true };
+  const { fetch, call } = answering({ requestId: "r", ok: true, result: picking });
+  const lease = {
+    leaseId: "lease-1",
+    fencingToken: 3,
+    targetId: "tab-1",
+    holderId: "person",
+    kind: "manual" as const,
+    acquiredAt: 1,
+    expiresAt: 2,
+  };
+  await expect(call("picker.start", { sessionId: "session-1" }, { lease })).resolves.toEqual(
+    picking,
+  );
+  expect(JSON.parse(fetch.mock.calls[0]?.[1]?.body as string)).toMatchObject({
+    command: "picker.start",
+    params: { sessionId: "session-1" },
+    lease: { leaseId: "lease-1", fencingToken: 3 },
+  });
+});
+
 test("reads the token from the page's meta tag", () => {
   const doc = document.implementation.createHTMLDocument("x");
   expect(readToken(doc)).toBeUndefined();
@@ -98,6 +128,33 @@ function socket(index: number): FakeSocket {
   return found;
 }
 
+const SUMMARY = {
+  schemaVersion: 1,
+  runId: "run-1",
+  flowId: "login",
+  status: "passed",
+  exitCode: 0,
+  startedAt: "2026-11-02T10:00:00.000Z",
+  endedAt: "2026-11-02T10:00:01.000Z",
+  counts: {
+    total: 1,
+    pending: 0,
+    running: 0,
+    passed: 1,
+    failed: 0,
+    blocked: 0,
+    cancelled: 0,
+    indeterminate: 0,
+  },
+  failures: [],
+};
+
+const finished = (runId: string) => ({
+  type: "run.finished",
+  runId,
+  summary: { ...SUMMARY, runId },
+});
+
 test("delivers valid push messages, drops others, subscribes, and reconnects", async () => {
   FakeSocket.all = [];
   const bus = createEventBus({ url: "ws://x/ws", connect: () => new FakeSocket(), retryMs: 1 });
@@ -106,13 +163,13 @@ test("delivers valid push messages, drops others, subscribes, and reconnects", a
   const first = socket(0);
   first.onopen?.(new Event("open"));
   expect(JSON.parse(first.sent[0] ?? "{}")).toMatchObject({ command: "events.subscribe" });
-  first.push({ type: "run.finished", runId: "run-1" });
-  first.push({ type: "run.finished" });
-  first.push({ requestId: "r", ok: true, result: {} });
-  expect(seen).toEqual([{ runId: "run-1" }]);
+  first.push(finished("run-1"));
+  first.push({ type: "run.finished", runId: "run-x" });
+  first.push({ requestId: "r", ok: true, result: { subscriptionId: "subscription-1" } });
+  expect(seen).toEqual([finished("run-1")]);
   first.onclose?.(new CloseEvent("close"));
   await vi.waitFor(() => expect(FakeSocket.all).toHaveLength(2));
-  socket(1).push({ type: "run.finished", runId: "run-2" });
-  expect(seen).toEqual([{ runId: "run-1" }, { runId: "run-2" }]);
+  socket(1).push(finished("run-2"));
+  expect(seen).toEqual([finished("run-1"), finished("run-2")]);
   bus.close();
 });

@@ -1,4 +1,6 @@
 import type {
+  CapturedEvent,
+  LocatorList,
   NormalizationResult,
   PauseMode,
   SessionStatus,
@@ -6,7 +8,9 @@ import type {
 } from "@recnrun/protocol";
 import { expect, test, vi } from "vite-plus/test";
 import { page } from "vite-plus/test/browser";
+import { DraftAssertions } from "@/features/editor/DraftAssertions";
 import { Recorder } from "@/features/recorder/Recorder";
+import { ApiError } from "@/api/error";
 import { NOW, expectTexts, fakeApi, renderWith } from "./fake-api";
 
 const LEASE = {
@@ -50,7 +54,16 @@ const DRAG: SuggestedStep = {
   events: [{ ...EVENT, seq: 2 }],
 };
 
-function recorder() {
+// The UI reads suggestions on each captured event; the event's own fields do not matter to it.
+const CAPTURED = { id: "e1", category: "dom", type: "input" } as unknown as CapturedEvent;
+
+const PICKED: LocatorList = {
+  resolution: "orderedFallback",
+  cardinality: "one",
+  locators: [{ strategy: "testId", value: "status" }],
+};
+
+function recorder(pollMs = 50) {
   let suggestions: NormalizationResult = { steps: [], excluded: [] };
   const fake = fakeApi({
     "profiles.list": () => ({ profiles: [] }),
@@ -61,29 +74,112 @@ function recorder() {
     "session.handoff": () => ({ ...status(), control: "manual" }),
     "session.stop": () => ({ ...status(), state: "completed" }),
     "flow.finalize": () => ({ flowId: "recorded-flow", revision: "r1" }),
+    "picker.start": ({ sessionId }) => ({ sessionId, picking: true }),
+    "picker.stop": ({ sessionId }) => ({ sessionId, picking: false }),
+    "flow.addAssertion": ({ step }) => ({ stepId: step.id }),
   });
   const onFinalized = vi.fn<(flowId: string) => void>();
-  renderWith(fake.api, <Recorder onFinalized={onFinalized} pollMs={50} />);
+  renderWith(
+    fake.api,
+    <Recorder
+      onFinalized={onFinalized}
+      pollMs={pollMs}
+      slot={(session) => <DraftAssertions session={session} />}
+    />,
+  );
   const setSuggestions = (next: NormalizationResult) => {
     suggestions = next;
-    fake.emit("session.event", { sessionId: "session-1", suggestions: next });
+    fake.emit("session.event", { type: "session.event", sessionId: "session-1", event: CAPTURED });
   };
   return { ...fake, onFinalized, setSuggestions };
 }
 
-test("starts a session and shows a suggested fill pushed by the service", async () => {
-  const fake = recorder();
+test("starts a session and reads suggestions again when an event is captured", async () => {
+  const fake = recorder(60_000);
   await page.getByRole("button", { name: "Start recording" }).click();
   await expect.element(page.getByText("No suggested steps yet.", { exact: false })).toBeVisible();
   expect(fake.paramsOf("session.start")).toEqual([{}]);
+  // Preact runs effects after paint, so wait for the subscription before pushing.
+  await expect.poll(() => fake.paramsOf("session.suggestions").length).toBe(1);
   fake.setSuggestions({ steps: [FILL, DRAG], excluded: [] });
   const steps = page.getByRole("list", { name: "Suggested steps" }).getByRole("listitem");
   await expectTexts(steps.nth(0), "fill", 'label="Email"', "ana@example.com");
   await expectTexts(steps.nth(1), "drag", "Not replayable yet");
-  await expect.poll(() => fake.paramsOf("session.suggestions").length).toBeGreaterThan(1);
+  expect(fake.paramsOf("session.suggestions")).toEqual([
+    { sessionId: "session-1" },
+    { sessionId: "session-1" },
+  ]);
 });
 
-test("toggles a pause with the lease and shows the capture gap", async () => {
+test("polls suggestions and follows the status the service pushes", async () => {
+  const fake = recorder();
+  await page.getByRole("button", { name: "Start recording" }).click();
+  await expect.poll(() => fake.paramsOf("session.suggestions").length).toBeGreaterThan(1);
+  const other = { ...status(), sessionId: "session-2", state: "paused" as const };
+  fake.emit("session.status", { type: "session.status", sessionId: "session-2", status: other });
+  fake.emit("session.status", {
+    type: "session.status",
+    sessionId: "session-1",
+    status: { ...status(), control: "agent" },
+  });
+  await expectTexts(page.getByRole("region", { name: "Recording" }), "recording", "agent");
+});
+
+test("picks an element on the session's page and adds the assertion to the draft", async () => {
+  const fake = recorder();
+  await page.getByRole("button", { name: "Start recording" }).click();
+  await page.getByRole("button", { name: "Pick in Chrome" }).click();
+  await expect.element(page.getByRole("button", { name: "Cancel picking" })).toBeVisible();
+  const start = fake.calls.find((call) => call.command === "picker.start");
+  expect(start?.params).toEqual({ sessionId: "session-1" });
+  expect(start?.options?.lease).toMatchObject({ leaseId: "lease-1", fencingToken: 3 });
+  const target = { tag: "p", testId: "status" };
+  fake.emit("picker.picked", {
+    type: "picker.picked",
+    sessionId: "other",
+    target,
+    locators: PICKED,
+  });
+  expect(fake.paramsOf("picker.stop")).toEqual([]);
+  fake.emit("picker.picked", {
+    type: "picker.picked",
+    sessionId: "session-1",
+    target,
+    locators: PICKED,
+  });
+  await expect.element(page.getByText('testId value="status"', { exact: false })).toBeVisible();
+  expect(fake.paramsOf("picker.stop")).toEqual([{ sessionId: "session-1" }]);
+  await page.getByRole("combobox", { name: "Kind" }).selectOptions("textEquals");
+  await page.getByRole("textbox", { name: "Expected" }).fill("Submitted");
+  await page.getByRole("button", { name: "Add assertion" }).click();
+  await expectTexts(
+    page.getByRole("list", { name: "Draft assertions" }),
+    "textEquals",
+    "Submitted",
+  );
+  expect(fake.paramsOf("flow.addAssertion")).toEqual([
+    {
+      sessionId: "session-1",
+      step: { id: "assert-1", assertion: "textEquals", target: PICKED, expected: "Submitted" },
+    },
+  ]);
+});
+
+test("cancels a pick and shows a refused assertion", async () => {
+  const fake = recorder();
+  fake.handlers["flow.addAssertion"] = () => {
+    throw new ApiError("conflict", "The session is completed.");
+  };
+  await page.getByRole("button", { name: "Start recording" }).click();
+  await page.getByRole("button", { name: "Pick in Chrome" }).click();
+  await page.getByRole("button", { name: "Cancel picking" }).click();
+  await expect.poll(() => fake.paramsOf("picker.stop")).toEqual([{ sessionId: "session-1" }]);
+  await page.getByRole("textbox", { name: "Locator" }).fill("#done");
+  await page.getByRole("button", { name: "Add assertion" }).click();
+  await expectTexts(page.getByRole("alert"), "The session is completed.", "conflict");
+});
+
+test("toggles a pause with the lease and shows a suspended capture", async () => {
   const fake = recorder();
   await page.getByRole("button", { name: "Start recording" }).click();
   const suspend = page.getByRole("button", { name: "Suspend capture" });
@@ -94,11 +190,6 @@ test("toggles a pause with the lease and shows the capture gap", async () => {
   expect(pause?.options?.lease).toMatchObject({ leaseId: "lease-1", fencingToken: 3 });
   const coverage = page.getByRole("region", { name: "Coverage" });
   await expectTexts(coverage, "Capture is suspended");
-  fake.emit("session.event", {
-    sessionId: "session-1",
-    gap: { reason: "capture-suspended", lost: 4, startedAt: NOW },
-  });
-  await expectTexts(coverage, "capture-suspended", "4 events lost");
   await suspend.click();
   await expect.element(suspend).toHaveAttribute("aria-pressed", "false");
   expect(fake.paramsOf("session.resume")).toEqual([
