@@ -40,3 +40,22 @@ export function useLoad<T>(load: (api: Api) => Promise<T>, key: string) {
   const reload = useCallback(() => setRound((value) => value + 1), []);
   return { loaded, setLoaded, reload };
 }
+
+/** Runs one command at a time for a screen, keeping whether it is busy and its last error. */
+export function useAction() {
+  const [error, setError] = useState<ApiError>();
+  const [busy, setBusy] = useState(false);
+  const execute = async (action: () => Promise<void>) => {
+    setBusy(true);
+    setError(undefined);
+    try {
+      await action();
+    } catch (caught) {
+      setError(toApiError(caught));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const run = (action: () => Promise<void>) => void execute(action);
+  return { error, busy, run };
+}

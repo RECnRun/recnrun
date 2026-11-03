@@ -3,6 +3,7 @@ import type { Api } from "@/api/api";
 import { ApiProvider } from "@/api/context";
 import { type Route, hrefOf, parseHash } from "@/app/routes";
 import { Catalog } from "@/features/catalog/Catalog";
+import { Recorder } from "@/features/recorder/Recorder";
 import { Setup } from "@/features/setup/Setup";
 
 const NAV: { label: string; route: Route }[] = [
@@ -37,6 +38,7 @@ function Screen({ route, navigate }: { route: Route; navigate: (route: Route) =>
         />
       );
     case "recorder":
+      return <Recorder onFinalized={(flowId) => navigate({ screen: "editor", flowId })} />;
     case "editor":
     case "run":
       return <p class="muted">This screen is not available yet.</p>;

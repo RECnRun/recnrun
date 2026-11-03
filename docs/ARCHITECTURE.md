@@ -183,6 +183,7 @@ Screens:
 
 - **Setup** (`#/setup`): `health`, `profiles.list`, and `capabilities.get`; whether Chrome is reachable, with the remedy and the guidance to enable remote debugging at `chrome://inspect/#remote-debugging`; each binding, stale when its endpoint differs from the Chrome found now; the service, protocol, and UI versions.
 - **Catalog** (`#/flows`, the default): `flow.list` rows (name, status, revision, update time); opens a flow in the editor or starts a new recording.
+- **Recorder** (`#/record`): `session.start`, optionally binding an actor to a profile; suggested steps from `session.suggestions` every second and from `session.event` pushes, with `dblclick` and `drag` marked not replayable yet; the three pauses as separate toggles (`session.pause`/`session.resume`); "Take control" (`session.handoff` to `manual`); coverage gaps from `session.event`; "Stop and save" runs `session.stop` then `flow.finalize` and opens the editor. Commands that act on the session carry the lease fence of its last status.
 
 ## Fixture application
 
