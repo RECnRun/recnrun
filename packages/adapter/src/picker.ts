@@ -2,11 +2,6 @@ import { DomTargetSchema, MAX_CAPTURED_TEXT, type DomTarget } from "@recnrun/pro
 import * as v from "valibot";
 import { openCdpChannel, type CdpChannel, type CdpEvent } from "./cdp-socket.ts";
 import { assertLoopbackEndpoint } from "./loopback.ts";
-import { PICKER_STOP, pickerSource as source } from "./picker-source.ts";
-
-/** The isolated world the picker draws in, and the binding only that world receives. */
-export const PICKER_WORLD = "recnrun-picker";
-export const PICKER_BINDING = "__recnrunPick";
 
 export interface PickerOptions {
   onPicked: (target: DomTarget) => void;
@@ -14,40 +9,63 @@ export interface PickerOptions {
 }
 
 export interface Picker {
-  /** Removes the overlay and closes the picker's socket. */
+  /** Ends inspect mode and closes the picker's socket. */
   stop(): Promise<void>;
 }
 
-export const pickerSource = (): string => source(PICKER_BINDING, MAX_CAPTURED_TEXT);
+const BLUE = { r: 28, g: 126, b: 214 };
 
-const AttachedSchema = v.object({ sessionId: v.pipe(v.string(), v.nonEmpty()) });
-const WorldSchema = v.object({ executionContextId: v.number() });
-const CalledSchema = v.object({
-  name: v.literal(PICKER_BINDING),
-  payload: v.string(),
-  executionContextId: v.number(),
-});
+/** Chrome's own inspect mode, which outlines the element under the pointer in the brand's blue. */
+export const INSPECT_MODE = {
+  mode: "searchForNode",
+  highlightConfig: {
+    showInfo: true,
+    contentColor: { ...BLUE, a: 0.15 },
+    borderColor: { ...BLUE, a: 1 },
+  },
+};
+const NO_INSPECT = { mode: "none", highlightConfig: {} };
 
-const parseJson = (text: string): unknown => {
-  try {
-    return JSON.parse(text);
-  } catch {
-    return undefined;
-  }
+const ATTRIBUTES: Record<string, keyof Omit<DomTarget, "tag">> = {
+  id: "id",
+  "data-testid": "testId",
+  name: "name",
+  role: "role",
+  type: "inputType",
 };
 
-/** A picked element, only from the picker's own world; the page cannot reach that binding. */
-function pickedOf(event: CdpEvent, sessionId: string, contextId: number): DomTarget | undefined {
-  if (event.sessionId !== sessionId || event.method !== "Runtime.bindingCalled") return undefined;
-  const called = v.safeParse(CalledSchema, event.params);
-  if (!called.success || called.output.executionContextId !== contextId) return undefined;
-  const target = v.safeParse(DomTargetSchema, parseJson(called.output.payload));
-  return target.success ? target.output : undefined;
+const AttachedSchema = v.object({ sessionId: v.pipe(v.string(), v.nonEmpty()) });
+const RequestedSchema = v.object({ backendNodeId: v.number() });
+const DescribedSchema = v.object({
+  node: v.object({ localName: v.string(), attributes: v.optional(v.array(v.string()), []) }),
+});
+
+/** The element DOM.describeNode answered, as a DomTarget; Chrome reports it, so the page cannot forge it. */
+export function targetOf(reply: unknown): DomTarget | undefined {
+  const described = v.safeParse(DescribedSchema, reply);
+  if (!described.success) return undefined;
+  const { localName, attributes } = described.output.node;
+  const target: Record<string, string> = { tag: localName };
+  for (let at = 0; at + 1 < attributes.length; at += 2) {
+    const key = ATTRIBUTES[attributes[at] ?? ""];
+    const value = attributes[at + 1];
+    if (key && value) target[key] = value.slice(0, MAX_CAPTURED_TEXT);
+  }
+  const parsed = v.safeParse(DomTargetSchema, target);
+  return parsed.success ? parsed.output : undefined;
+}
+
+/** A node Chrome's inspect mode picked on the picker's own session. */
+function pickedNode(event: CdpEvent, sessionId: string): number | undefined {
+  if (event.sessionId !== sessionId || event.method !== "Overlay.inspectNodeRequested")
+    return undefined;
+  const requested = v.safeParse(RequestedSchema, event.params);
+  return requested.success ? requested.output.backendNodeId : undefined;
 }
 
 /**
- * Lets a person pick an element of the page `targetId`: an overlay in an isolated world outlines
- * the element under the pointer and swallows the click, so the application's handlers never run.
+ * Lets a person pick an element of the page `targetId` through Chrome's inspect mode: the renderer
+ * takes the input before dispatching it, so no application listener, capture ones included, runs.
  */
 export async function startPicker(
   endpoint: string,
@@ -60,21 +78,20 @@ export async function startPicker(
   try {
     const attach = await channel.send("Target.attachToTarget", { targetId, flatten: true });
     const { sessionId } = v.parse(AttachedSchema, attach);
-    await channel.send("Runtime.enable", undefined, sessionId);
-    const binding = { name: PICKER_BINDING, executionContextName: PICKER_WORLD };
-    await channel.send("Runtime.addBinding", binding, sessionId);
-    const world = { frameId: targetId, worldName: PICKER_WORLD };
-    const created = await channel.send("Page.createIsolatedWorld", world, sessionId);
-    const contextId = v.parse(WorldSchema, created).executionContextId;
+    const report = async (backendNodeId: number) => {
+      const target = targetOf(await channel.send("DOM.describeNode", { backendNodeId }, sessionId));
+      if (target) options.onPicked(target);
+    };
     channel.onEvent((event) => {
-      const picked = pickedOf(event, sessionId, contextId);
-      if (picked) options.onPicked(picked);
+      const node = pickedNode(event, sessionId);
+      if (node !== undefined) void report(node).catch(() => undefined);
     });
-    await channel.send("Runtime.evaluate", { expression: pickerSource(), contextId }, sessionId);
-    const evaluate = { expression: PICKER_STOP, contextId };
+    await channel.send("DOM.enable", undefined, sessionId);
+    await channel.send("Overlay.enable", undefined, sessionId);
+    await channel.send("Overlay.setInspectMode", INSPECT_MODE, sessionId);
     return {
       stop: async () => {
-        await channel.send("Runtime.evaluate", evaluate, sessionId).catch(() => undefined);
+        await channel.send("Overlay.setInspectMode", NO_INSPECT, sessionId).catch(() => undefined);
         channel.close();
       },
     };
