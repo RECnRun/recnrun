@@ -104,12 +104,16 @@ test("a person records and replays through Chrome's own setup and dialog", async
     await ui.getByRole("link", { name: "Flows" }).click();
     const recorded = await startRecording(ui, context);
     notes.push(`dialogs after the recording started: ${dialogs.count}`);
+    // The test's own connection and the service's one socket per Chrome (F3.11).
+    expect(dialogs.count).toBe(2);
     await useForm(recorded);
     await expect(ui.getByRole("list", { name: "Suggested steps" })).toContainText("click");
     expect(await bannerShown(setup.chrome)).toBe(true);
     await shot(info, "03-banner");
     await pickStatusAssertion(ui, recorded);
     notes.push(`dialogs after the picker: ${dialogs.count}`);
+    // The picker is a lane of the recording's socket, so Chrome asks nothing new.
+    expect(dialogs.count).toBe(2);
     await shot(info, "04-assertion-picked");
     const flowId = await stopAndSave(ui);
 
@@ -133,12 +137,15 @@ test("a person records and replays through Chrome's own setup and dialog", async
     notes.push(`tab ${tabs} of ${tabs} clicked at ${clickedAt}; the run ended at ${endedAt}`);
     expect(clickedAt < endedAt).toBe(true);
     await dialogs.stop();
-    expect(dialogs.count).toBeGreaterThanOrEqual(2);
+    // The restarted service adds its socket and the replay's one Playwright connection.
+    expect(dialogs.count).toBe(4);
     await ui.goto("about:blank");
 
     const words = await chromeStrings(DIALOG_WORDS);
     const report = [
       `Chrome asked "Allow remote debugging?" ${dialogs.count} times; see dialog-*.png.`,
+      "Expected 4: the test's own connection, one socket per service process (the recording",
+      "and the picker share the first), and the replay's Playwright connection (F3.11).",
       "Its words, from /opt/google/chrome/locales/en-US.pak:",
       ...words.map((line) => `  ${line}`),
       ...notes,
