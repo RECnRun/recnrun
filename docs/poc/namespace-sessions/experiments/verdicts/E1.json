@@ -1,0 +1,686 @@
+[
+  {
+    "experiment": "E1",
+    "hypothesis": "get-targets",
+    "verdict": "pass",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "samples": 3,
+    "method": "cdp-load-unpacked",
+    "variants": [
+      {
+        "name": "sample 1",
+        "verdict": "pass"
+      },
+      {
+        "name": "sample 2",
+        "verdict": "pass"
+      },
+      {
+        "name": "sample 3",
+        "verdict": "pass"
+      }
+    ]
+  },
+  {
+    "experiment": "E1",
+    "hypothesis": "get-targets-service-worker",
+    "verdict": "pass",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "samples": 3,
+    "method": "cdp-load-unpacked",
+    "variants": [
+      {
+        "name": "sample 1",
+        "verdict": "pass"
+      },
+      {
+        "name": "sample 2",
+        "verdict": "pass"
+      },
+      {
+        "name": "sample 3",
+        "verdict": "pass"
+      }
+    ]
+  },
+  {
+    "experiment": "E1",
+    "hypothesis": "get-targets-shared-worker",
+    "verdict": "pass",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "samples": 3,
+    "method": "cdp-load-unpacked",
+    "variants": [
+      {
+        "name": "sample 1",
+        "verdict": "pass"
+      },
+      {
+        "name": "sample 2",
+        "verdict": "pass"
+      },
+      {
+        "name": "sample 3",
+        "verdict": "pass"
+      }
+    ]
+  },
+  {
+    "experiment": "E1",
+    "hypothesis": "get-targets-dedicated-worker",
+    "verdict": "pass",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "samples": 3,
+    "method": "cdp-load-unpacked",
+    "variants": [
+      {
+        "name": "sample 1",
+        "verdict": "pass"
+      },
+      {
+        "name": "sample 2",
+        "verdict": "pass"
+      },
+      {
+        "name": "sample 3",
+        "verdict": "pass"
+      }
+    ]
+  },
+  {
+    "experiment": "E1",
+    "hypothesis": "attach-service-worker",
+    "verdict": "pass",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "samples": 3,
+    "method": "cdp-load-unpacked",
+    "variants": [
+      {
+        "name": "sample 1",
+        "verdict": "pass"
+      },
+      {
+        "name": "sample 2",
+        "verdict": "pass"
+      },
+      {
+        "name": "sample 3",
+        "verdict": "pass"
+      }
+    ]
+  },
+  {
+    "experiment": "E1",
+    "hypothesis": "attach-shared-worker",
+    "verdict": "pass",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "samples": 3,
+    "method": "cdp-load-unpacked",
+    "variants": [
+      {
+        "name": "sample 1",
+        "verdict": "pass"
+      },
+      {
+        "name": "sample 2",
+        "verdict": "pass"
+      },
+      {
+        "name": "sample 3",
+        "verdict": "pass"
+      }
+    ]
+  },
+  {
+    "experiment": "E1",
+    "hypothesis": "tab-attach",
+    "verdict": "pass",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "samples": 3,
+    "method": "cdp-load-unpacked",
+    "variants": [
+      {
+        "name": "sample 1",
+        "verdict": "pass"
+      },
+      {
+        "name": "sample 2",
+        "verdict": "pass"
+      },
+      {
+        "name": "sample 3",
+        "verdict": "pass"
+      }
+    ]
+  },
+  {
+    "experiment": "E1",
+    "hypothesis": "auto-attach",
+    "verdict": "pass",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "samples": 3,
+    "method": "cdp-load-unpacked",
+    "variants": [
+      {
+        "name": "sample 1",
+        "verdict": "pass"
+      },
+      {
+        "name": "sample 2",
+        "verdict": "pass"
+      },
+      {
+        "name": "sample 3",
+        "verdict": "pass"
+      }
+    ]
+  },
+  {
+    "experiment": "E1",
+    "hypothesis": "auto-attach-dedicated-worker",
+    "verdict": "pass",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "samples": 3,
+    "method": "cdp-load-unpacked",
+    "variants": [
+      {
+        "name": "sample 1",
+        "verdict": "pass"
+      },
+      {
+        "name": "sample 2",
+        "verdict": "pass"
+      },
+      {
+        "name": "sample 3",
+        "verdict": "pass"
+      }
+    ]
+  },
+  {
+    "experiment": "E1",
+    "hypothesis": "auto-attach-shared-worker",
+    "verdict": "fail",
+    "error": "no Target.attachedToTarget for the shared-worker",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "samples": 3,
+    "method": "cdp-load-unpacked",
+    "variants": [
+      {
+        "name": "sample 1",
+        "verdict": "fail",
+        "error": "no Target.attachedToTarget for the shared-worker"
+      },
+      {
+        "name": "sample 2",
+        "verdict": "fail",
+        "error": "no Target.attachedToTarget for the shared-worker"
+      },
+      {
+        "name": "sample 3",
+        "verdict": "fail",
+        "error": "no Target.attachedToTarget for the shared-worker"
+      }
+    ]
+  },
+  {
+    "experiment": "E1",
+    "hypothesis": "auto-attach-service-worker",
+    "verdict": "pass",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "samples": 3,
+    "method": "cdp-load-unpacked",
+    "variants": [
+      {
+        "name": "sample 1",
+        "verdict": "pass"
+      },
+      {
+        "name": "sample 2",
+        "verdict": "pass"
+      },
+      {
+        "name": "sample 3",
+        "verdict": "pass"
+      }
+    ]
+  },
+  {
+    "experiment": "E1",
+    "hypothesis": "auto-attach-iframe",
+    "verdict": "pass",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "samples": 3,
+    "method": "cdp-load-unpacked",
+    "variants": [
+      {
+        "name": "sample 1",
+        "verdict": "pass"
+      },
+      {
+        "name": "sample 2",
+        "verdict": "pass"
+      },
+      {
+        "name": "sample 3",
+        "verdict": "pass"
+      }
+    ]
+  },
+  {
+    "experiment": "E1",
+    "hypothesis": "run-if-waiting-for-debugger",
+    "verdict": "pass",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "samples": 3,
+    "method": "cdp-load-unpacked",
+    "variants": [
+      {
+        "name": "sample 1",
+        "verdict": "pass"
+      },
+      {
+        "name": "sample 2",
+        "verdict": "pass"
+      },
+      {
+        "name": "sample 3",
+        "verdict": "pass"
+      }
+    ]
+  },
+  {
+    "experiment": "E1",
+    "hypothesis": "attach-dedicated-worker",
+    "verdict": "pass",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "samples": 3,
+    "method": "cdp-load-unpacked",
+    "variants": [
+      {
+        "name": "sample 1",
+        "verdict": "pass"
+      },
+      {
+        "name": "sample 2",
+        "verdict": "pass"
+      },
+      {
+        "name": "sample 3",
+        "verdict": "pass"
+      }
+    ]
+  },
+  {
+    "experiment": "E1",
+    "hypothesis": "tab-target-get-targets",
+    "verdict": "fail",
+    "error": "{\"code\":-32000,\"message\":\"Not allowed\"}",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "samples": 3,
+    "method": "cdp-load-unpacked",
+    "variants": [
+      {
+        "name": "sample 1",
+        "verdict": "fail",
+        "error": "{\"code\":-32000,\"message\":\"Not allowed\"}"
+      },
+      {
+        "name": "sample 2",
+        "verdict": "fail",
+        "error": "{\"code\":-32000,\"message\":\"Not allowed\"}"
+      },
+      {
+        "name": "sample 3",
+        "verdict": "fail",
+        "error": "{\"code\":-32000,\"message\":\"Not allowed\"}"
+      }
+    ]
+  },
+  {
+    "experiment": "E1",
+    "hypothesis": "tab-attach-to-service-worker",
+    "verdict": "fail",
+    "error": "{\"code\":-32000,\"message\":\"Not allowed\"}",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "samples": 3,
+    "method": "cdp-load-unpacked",
+    "variants": [
+      {
+        "name": "sample 1",
+        "verdict": "fail",
+        "error": "{\"code\":-32000,\"message\":\"Not allowed\"}"
+      },
+      {
+        "name": "sample 2",
+        "verdict": "fail",
+        "error": "{\"code\":-32000,\"message\":\"Not allowed\"}"
+      },
+      {
+        "name": "sample 3",
+        "verdict": "fail",
+        "error": "{\"code\":-32000,\"message\":\"Not allowed\"}"
+      }
+    ]
+  },
+  {
+    "experiment": "E1",
+    "hypothesis": "service-worker-enable",
+    "verdict": "fail",
+    "error": "{\"code\":-32601,\"message\":\"'ServiceWorker.enable' wasn't found\"}",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "samples": 3,
+    "method": "cdp-load-unpacked",
+    "variants": [
+      {
+        "name": "sample 1",
+        "verdict": "fail",
+        "error": "{\"code\":-32601,\"message\":\"'ServiceWorker.enable' wasn't found\"}"
+      },
+      {
+        "name": "sample 2",
+        "verdict": "fail",
+        "error": "{\"code\":-32601,\"message\":\"'ServiceWorker.enable' wasn't found\"}"
+      },
+      {
+        "name": "sample 3",
+        "verdict": "fail",
+        "error": "{\"code\":-32601,\"message\":\"'ServiceWorker.enable' wasn't found\"}"
+      }
+    ]
+  },
+  {
+    "experiment": "E1",
+    "hypothesis": "fetch-enable-worker-scripts",
+    "verdict": "pass",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "samples": 3,
+    "method": "cdp-load-unpacked",
+    "variants": [
+      {
+        "name": "sample 1",
+        "verdict": "pass"
+      },
+      {
+        "name": "sample 2",
+        "verdict": "pass"
+      },
+      {
+        "name": "sample 3",
+        "verdict": "pass"
+      }
+    ]
+  },
+  {
+    "experiment": "E1",
+    "hypothesis": "storage-get-cookies",
+    "verdict": "pass",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "samples": 3,
+    "method": "cdp-load-unpacked",
+    "variants": [
+      {
+        "name": "sample 1",
+        "verdict": "pass"
+      },
+      {
+        "name": "sample 2",
+        "verdict": "pass"
+      },
+      {
+        "name": "sample 3",
+        "verdict": "pass"
+      }
+    ]
+  },
+  {
+    "experiment": "E1",
+    "hypothesis": "network-set-cookie",
+    "verdict": "pass",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "samples": 3,
+    "method": "cdp-load-unpacked",
+    "variants": [
+      {
+        "name": "sample 1",
+        "verdict": "pass"
+      },
+      {
+        "name": "sample 2",
+        "verdict": "pass"
+      },
+      {
+        "name": "sample 3",
+        "verdict": "pass"
+      }
+    ]
+  },
+  {
+    "experiment": "E1",
+    "hypothesis": "network-enable",
+    "verdict": "pass",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "samples": 3,
+    "method": "cdp-load-unpacked",
+    "variants": [
+      {
+        "name": "sample 1",
+        "verdict": "pass"
+      },
+      {
+        "name": "sample 2",
+        "verdict": "pass"
+      },
+      {
+        "name": "sample 3",
+        "verdict": "pass"
+      }
+    ]
+  },
+  {
+    "experiment": "E1",
+    "hypothesis": "page-add-script-on-new-document",
+    "verdict": "pass",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "samples": 3,
+    "method": "cdp-load-unpacked",
+    "variants": [
+      {
+        "name": "sample 1",
+        "verdict": "pass"
+      },
+      {
+        "name": "sample 2",
+        "verdict": "pass"
+      },
+      {
+        "name": "sample 3",
+        "verdict": "pass"
+      }
+    ]
+  },
+  {
+    "experiment": "E1",
+    "hypothesis": "worker-runtime-evaluate",
+    "verdict": "pass",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "samples": 3,
+    "method": "cdp-load-unpacked",
+    "variants": [
+      {
+        "name": "sample 1",
+        "verdict": "pass"
+      },
+      {
+        "name": "sample 2",
+        "verdict": "pass"
+      },
+      {
+        "name": "sample 3",
+        "verdict": "pass"
+      }
+    ]
+  },
+  {
+    "experiment": "E1",
+    "hypothesis": "worker-fetch-enable",
+    "verdict": "pass",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "samples": 3,
+    "method": "cdp-load-unpacked",
+    "variants": [
+      {
+        "name": "sample 1",
+        "verdict": "pass"
+      },
+      {
+        "name": "sample 2",
+        "verdict": "pass"
+      },
+      {
+        "name": "sample 3",
+        "verdict": "pass"
+      }
+    ]
+  },
+  {
+    "experiment": "E1",
+    "hypothesis": "worker-service-worker-enable",
+    "verdict": "fail",
+    "error": "{\"code\":-32601,\"message\":\"'ServiceWorker.enable' wasn't found\"}",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "samples": 3,
+    "method": "cdp-load-unpacked",
+    "variants": [
+      {
+        "name": "sample 1",
+        "verdict": "fail",
+        "error": "{\"code\":-32601,\"message\":\"'ServiceWorker.enable' wasn't found\"}"
+      },
+      {
+        "name": "sample 2",
+        "verdict": "fail",
+        "error": "{\"code\":-32601,\"message\":\"'ServiceWorker.enable' wasn't found\"}"
+      },
+      {
+        "name": "sample 3",
+        "verdict": "fail",
+        "error": "{\"code\":-32601,\"message\":\"'ServiceWorker.enable' wasn't found\"}"
+      }
+    ]
+  },
+  {
+    "experiment": "E1",
+    "hypothesis": "worker-debugger-pause",
+    "verdict": "pass",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "samples": 3,
+    "method": "cdp-load-unpacked",
+    "variants": [
+      {
+        "name": "sample 1",
+        "verdict": "pass"
+      },
+      {
+        "name": "sample 2",
+        "verdict": "pass"
+      },
+      {
+        "name": "sample 3",
+        "verdict": "pass"
+      }
+    ]
+  },
+  {
+    "experiment": "E1",
+    "hypothesis": "worker-terminate-execution",
+    "verdict": "fail",
+    "error": "{\"code\":-32000,\"message\":\"Runtime.terminateExecution is not allowed for untrusted clients\"}",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "samples": 3,
+    "method": "cdp-load-unpacked",
+    "variants": [
+      {
+        "name": "sample 1",
+        "verdict": "fail",
+        "error": "{\"code\":-32000,\"message\":\"Runtime.terminateExecution is not allowed for untrusted clients\"}"
+      },
+      {
+        "name": "sample 2",
+        "verdict": "fail",
+        "error": "{\"code\":-32000,\"message\":\"Runtime.terminateExecution is not allowed for untrusted clients\"}"
+      },
+      {
+        "name": "sample 3",
+        "verdict": "fail",
+        "error": "{\"code\":-32000,\"message\":\"Runtime.terminateExecution is not allowed for untrusted clients\"}"
+      }
+    ]
+  },
+  {
+    "experiment": "E1",
+    "hypothesis": "worker-close-target",
+    "verdict": "pass",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "samples": 3,
+    "method": "cdp-load-unpacked",
+    "variants": [
+      {
+        "name": "sample 1",
+        "verdict": "pass"
+      },
+      {
+        "name": "sample 2",
+        "verdict": "pass"
+      },
+      {
+        "name": "sample 3",
+        "verdict": "pass"
+      }
+    ]
+  },
+  {
+    "experiment": "E1",
+    "hypothesis": "cleanup",
+    "verdict": "pass",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "samples": 3,
+    "method": "cdp-load-unpacked",
+    "variants": [
+      {
+        "name": "sample 1",
+        "verdict": "pass"
+      },
+      {
+        "name": "sample 2",
+        "verdict": "pass"
+      },
+      {
+        "name": "sample 3",
+        "verdict": "pass"
+      }
+    ]
+  },
+  {
+    "experiment": "E1",
+    "hypothesis": "infobar-hidden",
+    "verdict": "pass",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "samples": 3,
+    "method": "cdp-load-unpacked",
+    "variants": [
+      {
+        "name": "sample 1",
+        "verdict": "pass"
+      },
+      {
+        "name": "sample 2",
+        "verdict": "pass"
+      },
+      {
+        "name": "sample 3",
+        "verdict": "pass"
+      }
+    ]
+  }
+]

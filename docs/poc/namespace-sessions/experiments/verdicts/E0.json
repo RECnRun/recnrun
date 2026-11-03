@@ -1,0 +1,65 @@
+[
+  {
+    "experiment": "E0",
+    "hypothesis": "a",
+    "verdict": "pass",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "samples": 2,
+    "variants": [
+      {
+        "name": "port",
+        "verdict": "pass"
+      },
+      {
+        "name": "pipe+port",
+        "verdict": "pass"
+      }
+    ]
+  },
+  {
+    "experiment": "E0",
+    "hypothesis": "a-control",
+    "verdict": "pass",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "samples": 1,
+    "label": "control",
+    "variants": [
+      {
+        "name": "port, no flag",
+        "verdict": "pass"
+      }
+    ]
+  },
+  {
+    "experiment": "E0",
+    "hypothesis": "b",
+    "verdict": "pass",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "samples": 2,
+    "variants": [
+      {
+        "name": "DeveloperToolsAvailability default",
+        "verdict": "fail",
+        "error": "Target.attachToTarget: Not allowed"
+      },
+      {
+        "name": "DeveloperToolsAvailability 1",
+        "verdict": "pass"
+      }
+    ]
+  },
+  {
+    "experiment": "E0",
+    "hypothesis": "c",
+    "verdict": "pass",
+    "chrome": "Google Chrome for Testing 156.0.8078.4",
+    "samples": 1,
+    "label": "diagnostic",
+    "variants": [
+      {
+        "name": "chromium",
+        "verdict": "pass"
+      }
+    ]
+  }
+]

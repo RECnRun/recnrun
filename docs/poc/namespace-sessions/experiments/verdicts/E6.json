@@ -1,0 +1,271 @@
+[
+  {
+    "experiment": "E6",
+    "hypothesis": "a-switch",
+    "verdict": "fail",
+    "error": "6 of 6 samples failed: first start opened []: error: TypeError: Failed to register a ServiceWorker for scope ('http://app.localhost:4600/') with script ('http://app.localhost:4600/sw-main.js?variant=classic'): ServiceWorker script evaluation failed (4); the navigation that restarts the worker had not committed after 20012 ms (1); the navigation that restarts the worker had not committed after 20006 ms (1)",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "samples": 6,
+    "method": "cdp-load-unpacked",
+    "counts": {
+      "samples": 6,
+      "passed": 0,
+      "firstNotSelected": 4,
+      "notRestarted": 0,
+      "unmarked": 0,
+      "stale": 0,
+      "noStore": 0,
+      "notObserved": 0,
+      "storeUnreadable": 0,
+      "notSuspended": 0,
+      "rulesLost": 0,
+      "stalled": 2,
+      "notFresh": 6,
+      "unprefixedAfter": 2
+    },
+    "variants": [
+      {
+        "name": "service:extension-import",
+        "verdict": "fail",
+        "error": "2 of 2 samples failed: first start opened []: error: TypeError: Failed to register a ServiceWorker for scope ('http://app.localhost:4600/') with script ('http://app.localhost:4600/sw-main.js?variant=classic'): ServiceWorker script evaluation failed (2)",
+        "samples": 2
+      },
+      {
+        "name": "service:app-import",
+        "verdict": "fail",
+        "error": "2 of 2 samples failed: first start opened []: error: TypeError: Failed to register a ServiceWorker for scope ('http://app.localhost:4600/') with script ('http://app.localhost:4600/sw-main.js?variant=classic'): ServiceWorker script evaluation failed (2)",
+        "samples": 2
+      },
+      {
+        "name": "service:fetch-import",
+        "verdict": "fail",
+        "error": "2 of 2 samples failed: the navigation that restarts the worker had not committed after 20012 ms (1); the navigation that restarts the worker had not committed after 20006 ms (1)",
+        "samples": 2
+      }
+    ],
+    "condition": "baseline",
+    "lateAttaches": 0,
+    "timings": {
+      "switchMs": {
+        "p50": 0.4,
+        "p95": 0.6,
+        "max": 0.6
+      },
+      "restartMs": {
+        "p50": 21,
+        "p95": 20012,
+        "max": 20012
+      }
+    }
+  },
+  {
+    "experiment": "E6",
+    "hypothesis": "c-workers",
+    "verdict": "pass",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "samples": 100,
+    "method": "cdp-load-unpacked",
+    "counts": {
+      "samples": 100,
+      "passed": 100,
+      "firstNotSelected": 0,
+      "notRestarted": 0,
+      "unmarked": 0,
+      "stale": 0,
+      "noStore": 0,
+      "notObserved": 0,
+      "storeUnreadable": 0,
+      "notSuspended": 0,
+      "rulesLost": 0,
+      "stalled": 0,
+      "fresh": 100
+    },
+    "variants": [
+      {
+        "name": "dedicated:sync-xhr",
+        "verdict": "pass",
+        "samples": 50
+      },
+      {
+        "name": "shared:sync-xhr",
+        "verdict": "pass",
+        "samples": 50
+      }
+    ],
+    "condition": "baseline",
+    "lateAttaches": 0,
+    "timings": {
+      "switchMs": {
+        "p50": 0.3,
+        "p95": 0.5,
+        "max": 1
+      }
+    }
+  },
+  {
+    "experiment": "E6",
+    "hypothesis": "b-update",
+    "verdict": "fail",
+    "error": "5 of 5 samples failed: unprefixed fixture-sw after the switch to slot-5: [__rec:slot-4:fixture-sw, fixture-sw] (5)",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "samples": 5,
+    "method": "cdp-load-unpacked",
+    "counts": {
+      "samples": 5,
+      "passed": 0,
+      "firstNotSelected": 0,
+      "notRestarted": 0,
+      "unmarked": 5,
+      "stale": 0,
+      "noStore": 0,
+      "notObserved": 0,
+      "storeUnreadable": 0,
+      "notSuspended": 0,
+      "rulesLost": 0,
+      "stalled": 0,
+      "notFresh": 5,
+      "unprefixedAfter": 5
+    },
+    "variants": [
+      {
+        "name": "service:fetch-import",
+        "verdict": "fail",
+        "error": "5 of 5 samples failed: unprefixed fixture-sw after the switch to slot-5: [__rec:slot-4:fixture-sw, fixture-sw] (5)",
+        "samples": 5
+      }
+    ],
+    "condition": "baseline",
+    "lateAttaches": 0,
+    "timings": {
+      "switchMs": {
+        "p50": 0.4,
+        "p95": 0.5,
+        "max": 0.5
+      },
+      "activatedMs": {
+        "p50": 535,
+        "p95": 2489,
+        "max": 2489
+      }
+    }
+  },
+  {
+    "experiment": "E6",
+    "hypothesis": "a-offline",
+    "verdict": "fail",
+    "error": "5 of 5 samples failed: stale after the switch to slot-5: [__rec:slot-4:fixture-sw] (5)",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "samples": 5,
+    "method": "cdp-load-unpacked",
+    "counts": {
+      "samples": 5,
+      "passed": 0,
+      "firstNotSelected": 0,
+      "notRestarted": 0,
+      "unmarked": 0,
+      "stale": 5,
+      "noStore": 0,
+      "notObserved": 0,
+      "storeUnreadable": 0,
+      "notSuspended": 0,
+      "rulesLost": 0,
+      "stalled": 0,
+      "notFresh": 5
+    },
+    "variants": [
+      {
+        "name": "service:fetch-import",
+        "verdict": "fail",
+        "error": "5 of 5 samples failed: stale after the switch to slot-5: [__rec:slot-4:fixture-sw] (5)",
+        "samples": 5
+      }
+    ],
+    "condition": "baseline",
+    "lateAttaches": 5
+  },
+  {
+    "experiment": "E6",
+    "hypothesis": "suspend",
+    "verdict": "pass",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "samples": 6,
+    "method": "cdp-load-unpacked",
+    "counts": {
+      "samples": 6,
+      "passed": 6,
+      "firstNotSelected": 0,
+      "notRestarted": 0,
+      "unmarked": 0,
+      "stale": 0,
+      "noStore": 0,
+      "notObserved": 0,
+      "storeUnreadable": 0,
+      "notSuspended": 0,
+      "rulesLost": 0,
+      "stalled": 0,
+      "fresh": 6,
+      "suspended": 6,
+      "resumed": 6
+    },
+    "variants": [
+      {
+        "name": "dedicated:sync-xhr",
+        "verdict": "pass",
+        "samples": 3
+      },
+      {
+        "name": "shared:sync-xhr",
+        "verdict": "pass",
+        "samples": 3
+      }
+    ],
+    "condition": "baseline",
+    "lateAttaches": 0
+  },
+  {
+    "experiment": "E6",
+    "hypothesis": "restart",
+    "verdict": "pass",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "samples": 1,
+    "method": "cdp-load-unpacked",
+    "counts": {
+      "samples": 1,
+      "passed": 1,
+      "firstNotSelected": 0,
+      "notRestarted": 0,
+      "unmarked": 0,
+      "stale": 0,
+      "noStore": 0,
+      "notObserved": 0,
+      "storeUnreadable": 0,
+      "notSuspended": 0,
+      "rulesLost": 0,
+      "stalled": 0,
+      "kept": 1,
+      "ran:slot-4": 1,
+      "rulesAfterRestart": 0
+    },
+    "variants": [
+      {
+        "name": "service:fetch-import",
+        "verdict": "pass",
+        "samples": 1
+      }
+    ],
+    "condition": "baseline",
+    "lateAttaches": 0,
+    "timings": {
+      "switchMs": {
+        "p50": 0.4,
+        "p95": 0.4,
+        "max": 0.4
+      },
+      "restartMs": {
+        "p50": 30,
+        "p95": 30,
+        "max": 30
+      }
+    }
+  }
+]

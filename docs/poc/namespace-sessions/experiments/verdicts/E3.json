@@ -1,0 +1,326 @@
+[
+  {
+    "experiment": "E3",
+    "hypothesis": "before-script-execution",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "method": "cdp-load-unpacked",
+    "condition": "baseline",
+    "verdict": "pass",
+    "samples": 120,
+    "lateAttaches": 0,
+    "counts": {
+      "samples": 120,
+      "passed": 120,
+      "lateAttaches": 0,
+      "firstEffectBeforeMarker": 0,
+      "lateAttach": 0,
+      "unmarkedEffect": 0,
+      "notStopped": 0,
+      "notAttached": 0,
+      "breakpointRefused": 0,
+      "notPaused": 0,
+      "notReleased": 0,
+      "bootstrapFailed": 0,
+      "noEffect": 0,
+      "storeUnreadable": 0,
+      "patchSkipped": 0,
+      "cachesMissingAtPause": 0,
+      "installedLate": 0
+    },
+    "timings": {
+      "attachToBootstrapMs": {
+        "p50": 14.6,
+        "p95": 20.4,
+        "max": 43
+      },
+      "pausedMs": {
+        "p50": 11.1,
+        "p95": 16.5,
+        "max": 36.7
+      },
+      "realmAgeMs": {
+        "p50": 6.9,
+        "p95": 10.3,
+        "max": 24.1
+      }
+    },
+    "variants": [
+      {
+        "name": "sw-classic",
+        "verdict": "pass",
+        "samples": 20
+      },
+      {
+        "name": "sw-module",
+        "verdict": "pass",
+        "samples": 20
+      },
+      {
+        "name": "sw-imports",
+        "verdict": "pass",
+        "samples": 20
+      },
+      {
+        "name": "sw-static",
+        "verdict": "pass",
+        "samples": 20
+      },
+      {
+        "name": "sw-dynamic",
+        "verdict": "pass",
+        "samples": 20
+      },
+      {
+        "name": "dedicated-classic",
+        "verdict": "pass",
+        "samples": 10
+      },
+      {
+        "name": "dedicated-module",
+        "verdict": "pass",
+        "samples": 10
+      }
+    ]
+  },
+  {
+    "experiment": "E3",
+    "hypothesis": "direct-attach-race",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "method": "cdp-load-unpacked",
+    "condition": "baseline",
+    "verdict": "fail",
+    "error": "119 of 120 samples failed: first effect without the marker: /me?from=%2Fsw-main.js%3Fvariant%3Dclassic (1); IndexedDB holds fixture-sw without the prefix (4); IndexedDB has no fixture-sw under this marker (4); Cache Storage holds fixture-sw without the prefix (99); Cache Storage has no fixture-sw under this marker (99); first effect without the marker: /me?from=%2Fsw-imports.js%3Fvariant%3Dimports (2); first effect without the marker: /me?from=%2Fsw-main.js%3Fvariant%3Dmodule (1); first effect without the marker: /me?from=%2Fworker.js%3Ftype%3Dclassic (8); IndexedDB holds fixture-dedicated without the prefix (16); IndexedDB has no fixture-dedicated under this marker (16); Cache Storage holds fixture-dedicated without the prefix (20); Cache Storage has no fixture-dedicated under this marker (20); first effect without the marker: /me?from=%2Fworker.js%3Ftype%3Dmodule (8)",
+    "samples": 120,
+    "lateAttaches": 119,
+    "counts": {
+      "samples": 120,
+      "passed": 1,
+      "lateAttaches": 119,
+      "firstEffectBeforeMarker": 119,
+      "lateAttach": 0,
+      "unmarkedEffect": 0,
+      "notStopped": 0,
+      "notAttached": 0,
+      "breakpointRefused": 0,
+      "notPaused": 0,
+      "notReleased": 0,
+      "bootstrapFailed": 0,
+      "noEffect": 119,
+      "storeUnreadable": 0,
+      "patchSkipped": 99,
+      "cachesMissingAtPause": 0,
+      "installedLate": 119
+    },
+    "timings": {
+      "sightToBootstrapMs": {
+        "p50": 7.7,
+        "p95": 9.7,
+        "max": 10.9
+      },
+      "attachMs": {
+        "p50": 0.2,
+        "p95": 1.6,
+        "max": 2
+      },
+      "realmAgeMs": {
+        "p50": 2.7,
+        "p95": 12.2,
+        "max": 12.5
+      }
+    },
+    "variants": [
+      {
+        "name": "sw-classic",
+        "verdict": "fail",
+        "error": "20 of 20 samples failed: first effect without the marker: /me?from=%2Fsw-main.js%3Fvariant%3Dclassic (1); IndexedDB holds fixture-sw without the prefix (1); IndexedDB has no fixture-sw under this marker (1); Cache Storage holds fixture-sw without the prefix (20); Cache Storage has no fixture-sw under this marker (20)",
+        "samples": 20
+      },
+      {
+        "name": "sw-module",
+        "verdict": "fail",
+        "error": "20 of 20 samples failed: Cache Storage holds fixture-sw without the prefix (20); Cache Storage has no fixture-sw under this marker (20); first effect without the marker: /me?from=%2Fsw-main.js%3Fvariant%3Dmodule (1); IndexedDB holds fixture-sw without the prefix (1); IndexedDB has no fixture-sw under this marker (1)",
+        "samples": 20
+      },
+      {
+        "name": "sw-imports",
+        "verdict": "fail",
+        "error": "20 of 20 samples failed: Cache Storage holds fixture-sw without the prefix (20); Cache Storage has no fixture-sw under this marker (20); first effect without the marker: /me?from=%2Fsw-imports.js%3Fvariant%3Dimports (2); IndexedDB holds fixture-sw without the prefix (2); IndexedDB has no fixture-sw under this marker (2)",
+        "samples": 20
+      },
+      {
+        "name": "sw-static",
+        "verdict": "fail",
+        "error": "20 of 20 samples failed: Cache Storage holds fixture-sw without the prefix (20); Cache Storage has no fixture-sw under this marker (20)",
+        "samples": 20
+      },
+      {
+        "name": "sw-dynamic",
+        "verdict": "fail",
+        "error": "19 of 20 samples failed: Cache Storage holds fixture-sw without the prefix (19); Cache Storage has no fixture-sw under this marker (19)",
+        "samples": 20
+      },
+      {
+        "name": "dedicated-classic",
+        "verdict": "fail",
+        "error": "10 of 10 samples failed: first effect without the marker: /me?from=%2Fworker.js%3Ftype%3Dclassic (8); IndexedDB holds fixture-dedicated without the prefix (8); IndexedDB has no fixture-dedicated under this marker (8); Cache Storage holds fixture-dedicated without the prefix (10); Cache Storage has no fixture-dedicated under this marker (10)",
+        "samples": 10
+      },
+      {
+        "name": "dedicated-module",
+        "verdict": "fail",
+        "error": "10 of 10 samples failed: first effect without the marker: /me?from=%2Fworker.js%3Ftype%3Dmodule (8); IndexedDB holds fixture-dedicated without the prefix (8); IndexedDB has no fixture-dedicated under this marker (8); Cache Storage holds fixture-dedicated without the prefix (10); Cache Storage has no fixture-dedicated under this marker (10)",
+        "samples": 10
+      }
+    ]
+  },
+  {
+    "experiment": "E3",
+    "hypothesis": "cold-start-navigation",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "method": "cdp-load-unpacked",
+    "condition": "baseline",
+    "verdict": "fail",
+    "error": "200 of 200 samples failed: attached while running, not waiting for the debugger (100); first effect without the marker: /me?from=%2Fsw-main.js%3Fvariant%3Dclassic (40); IndexedDB has no fixture-sw under this marker (199); Cache Storage has no fixture-sw under this marker (200); first effect without the marker: /me?from=%2Fsw-main.js%3Fvariant%3Dmodule (40); first effect without the marker: /me?from=%2Fsw-imports.js%3Fvariant%3Dimports (39); first effect without the marker: /me?from=%2Fsw-static.js%3Fvariant%3Dstatic (40); first effect without the marker: /me?from=%2Fsw-dynamic.js%3Fvariant%3Ddynamic (40); effect without the marker: /__marker?name=sw:dynamic-import:TypeError (40)",
+    "samples": 200,
+    "lateAttaches": 199,
+    "counts": {
+      "samples": 200,
+      "passed": 0,
+      "lateAttaches": 199,
+      "firstEffectBeforeMarker": 199,
+      "lateAttach": 100,
+      "unmarkedEffect": 40,
+      "notStopped": 0,
+      "notAttached": 0,
+      "breakpointRefused": 0,
+      "notPaused": 0,
+      "notReleased": 0,
+      "bootstrapFailed": 0,
+      "noEffect": 200,
+      "storeUnreadable": 0,
+      "patchSkipped": 1,
+      "cachesMissingAtPause": 0,
+      "installedLate": 199
+    },
+    "timings": {
+      "attachToBootstrapMs": {
+        "p50": 4.7,
+        "p95": 5.5,
+        "max": 6.6
+      },
+      "sightToBootstrapMs": {
+        "p50": 5.8,
+        "p95": 8,
+        "max": 10.4
+      },
+      "attachMs": {
+        "p50": 0.5,
+        "p95": 3.7,
+        "max": 4.2
+      },
+      "realmAgeMs": {
+        "p50": 11.9,
+        "p95": 14.5,
+        "max": 28.7
+      },
+      "stopMs": {
+        "p50": 5.1,
+        "p95": 9.2,
+        "max": 28.7
+      }
+    },
+    "variants": [
+      {
+        "name": "pause",
+        "verdict": "fail",
+        "error": "100 of 100 samples failed: attached while running, not waiting for the debugger (100); first effect without the marker: /me?from=%2Fsw-main.js%3Fvariant%3Dclassic (20); IndexedDB has no fixture-sw under this marker (100); Cache Storage has no fixture-sw under this marker (100); first effect without the marker: /me?from=%2Fsw-main.js%3Fvariant%3Dmodule (20); first effect without the marker: /me?from=%2Fsw-imports.js%3Fvariant%3Dimports (20); first effect without the marker: /me?from=%2Fsw-static.js%3Fvariant%3Dstatic (20); first effect without the marker: /me?from=%2Fsw-dynamic.js%3Fvariant%3Ddynamic (20); effect without the marker: /__marker?name=sw:dynamic-import:TypeError (20)",
+        "samples": 100
+      },
+      {
+        "name": "watch",
+        "verdict": "fail",
+        "error": "100 of 100 samples failed: first effect without the marker: /me?from=%2Fsw-main.js%3Fvariant%3Dclassic (20); IndexedDB has no fixture-sw under this marker (99); Cache Storage has no fixture-sw under this marker (100); first effect without the marker: /me?from=%2Fsw-main.js%3Fvariant%3Dmodule (20); first effect without the marker: /me?from=%2Fsw-imports.js%3Fvariant%3Dimports (19); first effect without the marker: /me?from=%2Fsw-static.js%3Fvariant%3Dstatic (20); first effect without the marker: /me?from=%2Fsw-dynamic.js%3Fvariant%3Ddynamic (20); effect without the marker: /__marker?name=sw:dynamic-import:TypeError (20)",
+        "samples": 100
+      }
+    ]
+  },
+  {
+    "experiment": "E3",
+    "hypothesis": "pre-existing-running",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "method": "cdp-load-unpacked",
+    "condition": "baseline",
+    "verdict": "fail",
+    "error": "10 of 10 samples failed: attached while running, not waiting for the debugger (5); first effect without the marker: /me?from=%2Fsw-main.js%3Fvariant%3Dclassic (2); effect without the marker: /__marker?name=sw%3Async%3Afixture-sync (10); IndexedDB holds fixture-sw without the prefix (10); IndexedDB has no fixture-sw under this marker (10); Cache Storage holds fixture-sw without the prefix (10); Cache Storage has no fixture-sw under this marker (10); first effect without the marker: /me?from=%2Fsw-main.js%3Fvariant%3Dmodule (2); first effect without the marker: /me?from=%2Fsw-imports.js%3Fvariant%3Dimports (2); first effect without the marker: /me?from=%2Fsw-static.js%3Fvariant%3Dstatic (2); first effect without the marker: /me?from=%2Fsw-dynamic.js%3Fvariant%3Ddynamic (2); effect without the marker: /__marker?name=sw:dynamic-import:TypeError (2)",
+    "samples": 10,
+    "lateAttaches": 10,
+    "counts": {
+      "samples": 10,
+      "passed": 0,
+      "lateAttaches": 10,
+      "firstEffectBeforeMarker": 10,
+      "lateAttach": 5,
+      "unmarkedEffect": 10,
+      "notStopped": 0,
+      "notAttached": 0,
+      "breakpointRefused": 0,
+      "notPaused": 0,
+      "notReleased": 0,
+      "bootstrapFailed": 0,
+      "noEffect": 10,
+      "storeUnreadable": 0,
+      "patchSkipped": 0,
+      "cachesMissingAtPause": 0,
+      "installedLate": 10
+    },
+    "timings": {
+      "attachToBootstrapMs": {
+        "p50": 2.3,
+        "p95": 2.5,
+        "max": 2.5
+      },
+      "sightToBootstrapMs": {
+        "p50": 2.2,
+        "p95": 2.6,
+        "max": 2.6
+      },
+      "realmAgeMs": {
+        "p50": 61.6,
+        "p95": 129.5,
+        "max": 129.5
+      }
+    },
+    "variants": [
+      {
+        "name": "armed",
+        "verdict": "fail",
+        "error": "5 of 5 samples failed: attached while running, not waiting for the debugger (5); first effect without the marker: /me?from=%2Fsw-main.js%3Fvariant%3Dclassic (1); effect without the marker: /__marker?name=sw%3Async%3Afixture-sync (5); IndexedDB holds fixture-sw without the prefix (5); IndexedDB has no fixture-sw under this marker (5); Cache Storage holds fixture-sw without the prefix (5); Cache Storage has no fixture-sw under this marker (5); first effect without the marker: /me?from=%2Fsw-main.js%3Fvariant%3Dmodule (1); first effect without the marker: /me?from=%2Fsw-imports.js%3Fvariant%3Dimports (1); first effect without the marker: /me?from=%2Fsw-static.js%3Fvariant%3Dstatic (1); first effect without the marker: /me?from=%2Fsw-dynamic.js%3Fvariant%3Ddynamic (1); effect without the marker: /__marker?name=sw:dynamic-import:TypeError (1)",
+        "samples": 5
+      },
+      {
+        "name": "direct",
+        "verdict": "fail",
+        "error": "5 of 5 samples failed: first effect without the marker: /me?from=%2Fsw-main.js%3Fvariant%3Dclassic (1); effect without the marker: /__marker?name=sw%3Async%3Afixture-sync (5); IndexedDB holds fixture-sw without the prefix (5); IndexedDB has no fixture-sw under this marker (5); Cache Storage holds fixture-sw without the prefix (5); Cache Storage has no fixture-sw under this marker (5); first effect without the marker: /me?from=%2Fsw-main.js%3Fvariant%3Dmodule (1); first effect without the marker: /me?from=%2Fsw-imports.js%3Fvariant%3Dimports (1); first effect without the marker: /me?from=%2Fsw-static.js%3Fvariant%3Dstatic (1); first effect without the marker: /me?from=%2Fsw-dynamic.js%3Fvariant%3Ddynamic (1); effect without the marker: /__marker?name=sw:dynamic-import:TypeError (1)",
+        "samples": 5
+      }
+    ]
+  },
+  {
+    "experiment": "E3",
+    "hypothesis": "wake-without-tab",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "method": "cdp-load-unpacked",
+    "condition": "baseline",
+    "verdict": "unavailable",
+    "error": "no worker woke within 10000 ms of /__network offline then online, in 5 of 5 tries; fixture-sync had already fired while the registering page was open in 5 of 5, and the harness cannot take the browser offline (context.setOffline and Network.emulateNetworkConditions are outside its allowlist), so no sync stays pending; push is out of reach: the harness may only deny the notification permission, so pushManager.subscribe() fails with NotAllowedError",
+    "samples": 5,
+    "lateAttaches": 0,
+    "counts": {
+      "samples": 5,
+      "woke": 0,
+      "syncAtRegistration": 5,
+      "stopped": 5,
+      "lateAttaches": 0
+    }
+  }
+]

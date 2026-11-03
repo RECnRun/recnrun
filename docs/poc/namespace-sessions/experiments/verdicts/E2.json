@@ -1,0 +1,148 @@
+[
+  {
+    "experiment": "E2",
+    "hypothesis": "service-worker-register",
+    "verdict": "fail",
+    "error": "100 of 100 samples failed: Cache Storage holds fixture-sw without the prefix (100)",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "samples": 100,
+    "method": "cdp-load-unpacked",
+    "counts": {
+      "passed": 0,
+      "firstEffectBeforeMarker": 100,
+      "unmarkedEffect": 0,
+      "notAttached": 0,
+      "notPaused": 0,
+      "bootstrapFailed": 0,
+      "notReleased": 0,
+      "noEffect": 0,
+      "storeUnreadable": 0,
+      "patchSkipped": 100
+    },
+    "timings": {
+      "bootstrapMs": {
+        "p50": 6.3,
+        "p95": 8.6,
+        "max": 27
+      }
+    },
+    "variants": [
+      {
+        "name": "classic",
+        "verdict": "fail",
+        "error": "20 of 20 samples failed: Cache Storage holds fixture-sw without the prefix (20)",
+        "samples": 20
+      },
+      {
+        "name": "module",
+        "verdict": "fail",
+        "error": "20 of 20 samples failed: Cache Storage holds fixture-sw without the prefix (20)",
+        "samples": 20
+      },
+      {
+        "name": "imports",
+        "verdict": "fail",
+        "error": "20 of 20 samples failed: Cache Storage holds fixture-sw without the prefix (20)",
+        "samples": 20
+      },
+      {
+        "name": "static",
+        "verdict": "fail",
+        "error": "20 of 20 samples failed: Cache Storage holds fixture-sw without the prefix (20)",
+        "samples": 20
+      },
+      {
+        "name": "dynamic",
+        "verdict": "fail",
+        "error": "20 of 20 samples failed: Cache Storage holds fixture-sw without the prefix (20)",
+        "samples": 20
+      }
+    ]
+  },
+  {
+    "experiment": "E2",
+    "hypothesis": "dedicated-worker",
+    "verdict": "fail",
+    "error": "10 of 10 samples failed: Cache Storage holds fixture-dedicated without the prefix (10)",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "samples": 10,
+    "method": "cdp-load-unpacked",
+    "counts": {
+      "passed": 0,
+      "firstEffectBeforeMarker": 10,
+      "unmarkedEffect": 0,
+      "notAttached": 0,
+      "notPaused": 0,
+      "bootstrapFailed": 0,
+      "notReleased": 0,
+      "noEffect": 0,
+      "storeUnreadable": 0,
+      "patchSkipped": 10
+    },
+    "timings": {
+      "bootstrapMs": {
+        "p50": 2.2,
+        "p95": 2.7,
+        "max": 2.7
+      }
+    },
+    "variants": [
+      {
+        "name": "classic",
+        "verdict": "fail",
+        "error": "5 of 5 samples failed: Cache Storage holds fixture-dedicated without the prefix (5)",
+        "samples": 5
+      },
+      {
+        "name": "module",
+        "verdict": "fail",
+        "error": "5 of 5 samples failed: Cache Storage holds fixture-dedicated without the prefix (5)",
+        "samples": 5
+      }
+    ]
+  },
+  {
+    "experiment": "E2",
+    "hypothesis": "shared-worker",
+    "verdict": "fail",
+    "error": "10 of 10 samples failed: no Target.attachedToTarget for /shared-worker.js?type=classic (5); first effect without the marker: /me?from=%2Fshared-worker.js%3Ftype%3Dclassic (5); IndexedDB holds fixture-shared without the prefix (10); Cache Storage holds fixture-shared without the prefix (10); no Target.attachedToTarget for /shared-worker.js?type=module (5); first effect without the marker: /me?from=%2Fshared-worker.js%3Ftype%3Dmodule (5)",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "samples": 10,
+    "method": "cdp-load-unpacked",
+    "counts": {
+      "passed": 0,
+      "firstEffectBeforeMarker": 10,
+      "unmarkedEffect": 0,
+      "notAttached": 10,
+      "notPaused": 0,
+      "bootstrapFailed": 0,
+      "notReleased": 0,
+      "noEffect": 0,
+      "storeUnreadable": 0,
+      "patchSkipped": 0
+    },
+    "variants": [
+      {
+        "name": "classic",
+        "verdict": "fail",
+        "error": "5 of 5 samples failed: no Target.attachedToTarget for /shared-worker.js?type=classic (5); first effect without the marker: /me?from=%2Fshared-worker.js%3Ftype%3Dclassic (5); IndexedDB holds fixture-shared without the prefix (5); Cache Storage holds fixture-shared without the prefix (5)",
+        "samples": 5
+      },
+      {
+        "name": "module",
+        "verdict": "fail",
+        "error": "5 of 5 samples failed: no Target.attachedToTarget for /shared-worker.js?type=module (5); first effect without the marker: /me?from=%2Fshared-worker.js%3Ftype%3Dmodule (5); IndexedDB holds fixture-shared without the prefix (5); Cache Storage holds fixture-shared without the prefix (5)",
+        "samples": 5
+      }
+    ]
+  },
+  {
+    "experiment": "E2",
+    "hypothesis": "nested-worker",
+    "verdict": "unavailable",
+    "error": "the frozen fixture starts no worker from a worker (apps/fixture/public/app/worker.js, shared-worker.js)",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "samples": 0,
+    "method": "cdp-load-unpacked"
+  }
+]

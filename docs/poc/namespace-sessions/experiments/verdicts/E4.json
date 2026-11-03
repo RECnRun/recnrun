@@ -1,0 +1,277 @@
+[
+  {
+    "experiment": "E4",
+    "hypothesis": "close-target",
+    "verdict": "fail",
+    "error": "25 of 29 samples failed: the restarted worker's first request lacks the restart marker (25); the restart attached while running (6); the restarted worker was never released (6); the extension never saw the restart (10)",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "samples": 29,
+    "method": "cdp-load-unpacked",
+    "counts": {
+      "samples": 29,
+      "stops": 29,
+      "restartsUnsolicited": 0,
+      "restarts": 29,
+      "restartObservedBeforeFirstStatement": 4,
+      "registrationKept": 29,
+      "precacheKept": 29,
+      "scriptFetchedAfterStop": 0,
+      "navigationsHeld": 0
+    },
+    "timings": {
+      "stopCommandMs": {
+        "p50": 1,
+        "p95": 2,
+        "max": 2
+      },
+      "unlistedMs": {
+        "p50": 5,
+        "p95": 7,
+        "max": 7
+      },
+      "restartMs": {
+        "p50": 10,
+        "p95": 13,
+        "max": 14
+      }
+    },
+    "variants": [
+      {
+        "name": "classic/navigation",
+        "verdict": "fail",
+        "error": "4 of 4 samples failed: the restarted worker's first request lacks the restart marker (4); the restart attached while running (4); the restarted worker was never released (4)",
+        "samples": 4
+      },
+      {
+        "name": "classic/post-message",
+        "verdict": "fail",
+        "error": "3 of 3 samples failed: the restarted worker's first request lacks the restart marker (3); the extension never saw the restart (3)",
+        "samples": 3
+      },
+      {
+        "name": "classic/sync",
+        "verdict": "fail",
+        "error": "3 of 3 samples failed: the restarted worker's first request lacks the restart marker (3); the extension never saw the restart (3)",
+        "samples": 3
+      },
+      {
+        "name": "module/navigation",
+        "verdict": "fail",
+        "error": "1 of 1 samples failed: the restarted worker's first request lacks the restart marker (1); the restart attached while running (1); the restarted worker was never released (1)",
+        "samples": 1
+      },
+      {
+        "name": "module/post-message",
+        "verdict": "fail",
+        "error": "1 of 1 samples failed: the restarted worker's first request lacks the restart marker (1); the extension never saw the restart (1)",
+        "samples": 1
+      },
+      {
+        "name": "module/sync",
+        "verdict": "fail",
+        "error": "1 of 1 samples failed: the restarted worker's first request lacks the restart marker (1); the extension never saw the restart (1)",
+        "samples": 1
+      },
+      {
+        "name": "tab-session/navigation",
+        "verdict": "fail",
+        "error": "1 of 1 samples failed: the restarted worker's first request lacks the restart marker (1); the restart attached while running (1); the restarted worker was never released (1)",
+        "samples": 1
+      },
+      {
+        "name": "tab-session/post-message",
+        "verdict": "fail",
+        "error": "1 of 1 samples failed: the restarted worker's first request lacks the restart marker (1); the extension never saw the restart (1)",
+        "samples": 1
+      },
+      {
+        "name": "tab-session/sync",
+        "verdict": "fail",
+        "error": "1 of 1 samples failed: the restarted worker's first request lacks the restart marker (1); the extension never saw the restart (1)",
+        "samples": 1
+      },
+      {
+        "name": "held/navigation",
+        "verdict": "fail",
+        "error": "2 of 4 samples failed: the restarted worker's first request lacks the restart marker (2)",
+        "samples": 4
+      },
+      {
+        "name": "held/post-message",
+        "verdict": "fail",
+        "error": "3 of 3 samples failed: the restarted worker's first request lacks the restart marker (3)",
+        "samples": 3
+      },
+      {
+        "name": "held/sync",
+        "verdict": "fail",
+        "error": "3 of 3 samples failed: the restarted worker's first request lacks the restart marker (3)",
+        "samples": 3
+      },
+      {
+        "name": "held-module/navigation",
+        "verdict": "fail",
+        "error": "1 of 1 samples failed: the restarted worker's first request lacks the restart marker (1)",
+        "samples": 1
+      },
+      {
+        "name": "held-module/post-message",
+        "verdict": "pass",
+        "samples": 1
+      },
+      {
+        "name": "held-module/sync",
+        "verdict": "pass",
+        "samples": 1
+      }
+    ]
+  },
+  {
+    "experiment": "E4",
+    "hypothesis": "terminate-execution",
+    "verdict": "fail",
+    "error": "3 of 3 samples failed: stop refused: {\"code\":-32000,\"message\":\"Runtime.terminateExecution is not allowed for untrusted clients\"} (3)",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "samples": 3,
+    "method": "cdp-load-unpacked",
+    "counts": {
+      "samples": 3,
+      "stops": 0,
+      "restartsUnsolicited": 0,
+      "restarts": 0,
+      "restartObservedBeforeFirstStatement": 0,
+      "registrationKept": 3,
+      "precacheKept": 3,
+      "scriptFetchedAfterStop": 0,
+      "navigationsHeld": 0
+    },
+    "timings": {
+      "stopCommandMs": {
+        "p50": 1,
+        "p95": 1,
+        "max": 1
+      }
+    },
+    "variants": [
+      {
+        "name": "classic/none",
+        "verdict": "fail",
+        "error": "3 of 3 samples failed: stop refused: {\"code\":-32000,\"message\":\"Runtime.terminateExecution is not allowed for untrusted clients\"} (3)",
+        "samples": 3
+      }
+    ]
+  },
+  {
+    "experiment": "E4",
+    "hypothesis": "debugger-pause",
+    "verdict": "pass",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "samples": 10,
+    "method": "cdp-load-unpacked",
+    "counts": {
+      "samples": 10,
+      "stops": 10,
+      "restartsUnsolicited": 0,
+      "restarts": 0,
+      "restartObservedBeforeFirstStatement": 0,
+      "registrationKept": 10,
+      "precacheKept": 10,
+      "scriptFetchedAfterStop": 4,
+      "navigationsHeld": 4
+    },
+    "timings": {
+      "stopCommandMs": {
+        "p50": 3,
+        "p95": 6,
+        "max": 6
+      }
+    },
+    "variants": [
+      {
+        "name": "classic/navigation",
+        "verdict": "pass",
+        "samples": 4
+      },
+      {
+        "name": "classic/post-message",
+        "verdict": "pass",
+        "samples": 3
+      },
+      {
+        "name": "classic/sync",
+        "verdict": "pass",
+        "samples": 3
+      }
+    ]
+  },
+  {
+    "experiment": "E4",
+    "hypothesis": "dnr-block-evict",
+    "verdict": "fail",
+    "error": "10 of 10 samples failed: the target stayed listed (10)",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "samples": 10,
+    "method": "cdp-load-unpacked",
+    "counts": {
+      "samples": 10,
+      "stops": 0,
+      "restartsUnsolicited": 0,
+      "restarts": 0,
+      "restartObservedBeforeFirstStatement": 0,
+      "registrationKept": 10,
+      "precacheKept": 10,
+      "scriptFetchedAfterStop": 0,
+      "navigationsHeld": 0
+    },
+    "timings": {
+      "stopCommandMs": {
+        "p50": 6,
+        "p95": 8,
+        "max": 8
+      }
+    },
+    "variants": [
+      {
+        "name": "classic/navigation",
+        "verdict": "fail",
+        "error": "10 of 10 samples failed: the target stayed listed (10)",
+        "samples": 10
+      }
+    ]
+  },
+  {
+    "experiment": "E4",
+    "hypothesis": "unregister",
+    "verdict": "fail",
+    "error": "10 of 10 samples failed: the target stayed listed (10)",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "samples": 10,
+    "method": "cdp-load-unpacked",
+    "counts": {
+      "samples": 10,
+      "stops": 0,
+      "restartsUnsolicited": 0,
+      "restarts": 0,
+      "restartObservedBeforeFirstStatement": 0,
+      "registrationKept": 0,
+      "precacheKept": 10,
+      "scriptFetchedAfterStop": 0,
+      "navigationsHeld": 0
+    },
+    "timings": {
+      "stopCommandMs": {
+        "p50": 2,
+        "p95": 2,
+        "max": 2
+      }
+    },
+    "variants": [
+      {
+        "name": "classic/navigation",
+        "verdict": "fail",
+        "error": "10 of 10 samples failed: the target stayed listed (10)",
+        "samples": 10
+      }
+    ]
+  }
+]
