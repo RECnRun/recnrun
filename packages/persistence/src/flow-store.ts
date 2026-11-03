@@ -12,13 +12,13 @@ import { flowPaths, scanFlowFolders } from "./flow-folders.ts";
 import {
   createRun,
   finishRun,
+  repairFlowFiles,
   saveFlow,
   type SavedFlow,
   type WriteContext,
 } from "./flow-writes.ts";
-import { parseFlowYaml } from "./flow-yaml.ts";
 import { CatalogIndex, type CatalogRows, type FlowCatalog } from "./index-db.ts";
-import { readRevision, revisionOf } from "./revisions.ts";
+import { readRevision } from "./revisions.ts";
 import {
   readRunFolder,
   runFolder,
@@ -26,11 +26,11 @@ import {
   type RunResult,
   type StoredRun,
 } from "./runs.ts";
-import { readStored, readText, writeStored } from "./store-files.ts";
+import { FlowStoreError, readStored, writeStored } from "./store-files.ts";
 
 export type { SavedFlow } from "./flow-writes.ts";
 
-/** A flow as flow.yaml holds it now, with its manifest; `revision` is the hash of that flow. */
+/** The flow revision the manifest commits, with that manifest; `revision` is `manifest.revision`. */
 export interface StoredFlow {
   manifest: FlowManifest;
   flow: Flow;
@@ -66,11 +66,20 @@ export interface FlowStoreOptions {
   now?: () => Date;
 }
 
+/** Reads the committed revision, never flow.yaml, so a save cut short cannot mix two versions. */
 async function getFlow(flowsRoot: string, flowId: string): Promise<StoredFlow> {
   const paths = flowPaths(flowsRoot, flowId);
   const manifest = await readStored("flow-manifest", paths.manifest);
-  const flow = parseFlowYaml(paths.flow, await readText(paths.flow));
-  return { manifest, flow, revision: revisionOf(flow) };
+  const flow = await readRevision(paths.folder, manifest.revision);
+  if (manifest.id !== flowId || flow.id !== flowId) {
+    throw new FlowStoreError(
+      "invalid",
+      paths.manifest,
+      `it does not commit a revision of ${flowId}`,
+    );
+  }
+  await repairFlowFiles(paths, flow, manifest.revision);
+  return { manifest, flow, revision: manifest.revision };
 }
 
 /** Opens the flow store of the user whose home folder is `home`, rebuilding a missing index. */
@@ -99,7 +108,8 @@ export async function openFlowStore({
   return {
     root,
     list: async () => index.flows(),
-    get: (flowId) => getFlow(flowsRoot, flowId),
+    // Reads join the write queue, so a read never sees a save half done.
+    get: (flowId) => exclusive(() => getFlow(flowsRoot, flowId)),
     saveFlow: (flow, options) => exclusive(() => saveFlow(context, flow, options?.status)),
     listRevisions: async (flowId) =>
       (await readStored("flow-manifest", paths(flowId).manifest)).revisions,

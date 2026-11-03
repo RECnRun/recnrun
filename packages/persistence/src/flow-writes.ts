@@ -8,9 +8,9 @@ import {
 } from "@recnrun/protocol";
 import { writeAtomic } from "./atomic-file.ts";
 import { flowEntry, flowPaths, renderRequirements } from "./flow-folders.ts";
-import { checkFlow, flowToYaml } from "./flow-yaml.ts";
+import { checkFlow, flowToYaml, parseFlowYaml } from "./flow-yaml.ts";
 import type { CatalogIndex } from "./index-db.ts";
-import { readRevision, writeRevision } from "./revisions.ts";
+import { readRevision, revisionOf, writeRevision } from "./revisions.ts";
 import {
   createRunFolder,
   runEntry,
@@ -24,8 +24,11 @@ import {
   checkStored,
   readStored,
   readStoredIfPresent,
+  readText,
   writeStored,
 } from "./store-files.ts";
+
+type FlowPaths = ReturnType<typeof flowPaths>;
 
 /** What the store's writes share: where flows live, the index they keep in sync, and the clock. */
 export interface WriteContext {
@@ -62,6 +65,38 @@ function nextManifest(
   };
 }
 
+async function writeFlowFiles(paths: FlowPaths, flow: Flow): Promise<void> {
+  await writeAtomic(paths.flow, flowToYaml(flow));
+  await writeAtomic(paths.requirements, renderRequirements(flow));
+}
+
+/** The revision flow.yaml holds now, "missing" without one, or undefined when it does not parse. */
+async function yamlRevision(path: string): Promise<string | undefined> {
+  try {
+    return revisionOf(parseFlowYaml(path, await readText(path)));
+  } catch (error) {
+    return error instanceof FlowStoreError && error.code === "not-found" ? "missing" : undefined;
+  }
+}
+
+/** Puts flow.yaml and requirements.md back to the committed flow when a save stopped before its manifest. */
+export async function repairFlowFiles(
+  paths: FlowPaths,
+  flow: Flow,
+  revision: string,
+): Promise<void> {
+  const current = await yamlRevision(paths.flow);
+  if (current === undefined || current === revision) return;
+  // Only a revision a save already stored is the store's own leftover; any other text is a person's edit.
+  const leftover =
+    current === "missing" ||
+    (await readRevision(paths.folder, current).then(
+      () => true,
+      () => false,
+    ));
+  if (leftover) await writeFlowFiles(paths, flow);
+}
+
 /** Validates and stores a flow; a change writes a new immutable revision, then the manifest. */
 export async function saveFlow(
   context: WriteContext,
@@ -74,11 +109,11 @@ export async function saveFlow(
   const revision = await writeRevision(paths.folder, flow);
   const nextStatus = status ?? previous?.status ?? "draft";
   if (previous?.revision === revision && previous.status === nextStatus) {
+    await repairFlowFiles(paths, flow, revision);
     return { manifest: previous, revision, changed: false };
   }
   const update = { revision, status: nextStatus, at: context.now().toISOString() };
-  await writeAtomic(paths.flow, flowToYaml(flow));
-  await writeAtomic(paths.requirements, renderRequirements(flow));
+  await writeFlowFiles(paths, flow);
   // The manifest goes last: it is what makes the new revision current.
   const next = nextManifest(flow, previous, update);
   const manifest = await writeStored("flow-manifest", paths.manifest, next);
