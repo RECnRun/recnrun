@@ -27,13 +27,16 @@ import { join } from "node:path";
 test("records the stress condition @order-critical", () => {
   const condition = process.env.RECNRUN_STRESS_CONDITION;
   if (process.env.STRESS_CHECK_THROW === condition) throw new Error("the spec broke");
+  if (process.env.STRESS_CHECK_SILENT === condition) return;
   const verdict = process.env.STRESS_CHECK_FAIL === condition ? "fail" : "pass";
   const directory = join(process.cwd(), ".artifacts/evidence", process.env.RECNRUN_RUN_ID);
   mkdirSync(directory, { recursive: true });
   const common = { experiment: "S1", condition, runId: process.env.RECNRUN_RUN_ID };
-  const order = { ...common, hypothesis: "order", verdict, lateAttaches: verdict === "fail" ? 2 : 0 };
+  const late = verdict === "fail" ? 2 : process.env.STRESS_CHECK_LATE === condition ? 1 : 0;
+  const order = { ...common, hypothesis: "order", verdict, lateAttaches: late };
   order.cpuThreads = process.env.RECNRUN_STRESS_CPU_THREADS ?? null;
-  const marker = { ...common, hypothesis: "marker", verdict: "unavailable", firstEffectBeforeMarker: 1 };
+  const counts = { firstEffectBeforeMarker: 1 };
+  const marker = { ...common, hypothesis: "marker", verdict: "unavailable", counts };
   writeFileSync(join(directory, "verdicts.json"), JSON.stringify([order, marker]));
 });
 
@@ -140,6 +143,45 @@ test("exits non-zero and names the iteration when a hypothesis records a fail", 
       condition: "net-delay",
       runId: `${result.run}/stress/2-net-delay`,
       failures: ["S1/order: fail"],
+    },
+  ]);
+});
+
+test("fails a passing hypothesis that still counted a late attach", async (context) => {
+  const tagged = project(context, taggedSpec);
+  const env = { RECNRUN_STRESS_ITERATIONS: "2", STRESS_CHECK_LATE: "net-delay" };
+  const result = await stress(context, ["--config", tagged], env);
+  assert.equal(result.code, 1, result.output);
+  const summary = readJson(join(result.directory, "stress.json"));
+  assert.deepEqual(summary.perHypothesis["S1/order"], {
+    pass: 2,
+    fail: 0,
+    unavailable: 0,
+    lateAttaches: 1,
+  });
+  assert.deepEqual(summary.failedIterations, [
+    {
+      iteration: 2,
+      condition: "net-delay",
+      runId: `${result.run}/stress/2-net-delay`,
+      failures: ["S1/order: pass with 1 late attach"],
+    },
+  ]);
+});
+
+test("fails an iteration whose tagged tests wrote no verdict", async (context) => {
+  const tagged = project(context, taggedSpec);
+  const env = { RECNRUN_STRESS_ITERATIONS: "2", STRESS_CHECK_SILENT: "net-delay" };
+  const result = await stress(context, ["--config", tagged], env);
+  assert.equal(result.code, 1, result.output);
+  const summary = readJson(join(result.directory, "stress.json"));
+  assert.equal(summary.perHypothesis["S1/order"].pass, 1);
+  assert.deepEqual(summary.failedIterations, [
+    {
+      iteration: 2,
+      condition: "net-delay",
+      runId: `${result.run}/stress/2-net-delay`,
+      failures: ["no verdicts.json: the tagged tests recorded nothing"],
     },
   ]);
 });

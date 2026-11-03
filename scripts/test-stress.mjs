@@ -90,7 +90,9 @@ async function readVerdicts(directory) {
     const verdicts = JSON.parse(await readFile(join(directory, "verdicts.json"), "utf8"));
     return Array.isArray(verdicts) ? { verdicts } : { verdicts: [], error: "not an array" };
   } catch (error) {
-    if (error.code === "ENOENT") return { verdicts: [] };
+    // Tagged tests that recorded nothing are not a pass; the gate needs evidence from every iteration.
+    if (error.code === "ENOENT")
+      return { verdicts: [], error: "the tagged tests recorded nothing" };
     return { verdicts: [], error: error.message };
   }
 }
@@ -119,12 +121,18 @@ async function runIteration(plan, index) {
     await Promise.all(load.map((worker) => worker.terminate()));
   }
   const { verdicts, error } = await readVerdicts(directory);
-  if (error) failures.push(`verdicts.json unreadable: ${error}`);
+  if (error) failures.push(`no verdicts.json: ${error}`);
   return { index, condition, runId, failures, verdicts };
 }
 
+// A leak count sits at the top level (E3, E6) or under counts (E8); either name means a late attach.
 function lateCount(verdict) {
-  const value = verdict.lateAttaches ?? verdict.firstEffectBeforeMarker;
+  const counts = verdict.counts ?? {};
+  const value =
+    verdict.lateAttaches ??
+    verdict.firstEffectBeforeMarker ??
+    counts.lateAttaches ??
+    counts.firstEffectBeforeMarker;
   return Number.isFinite(value) ? value : 0;
 }
 
@@ -134,8 +142,12 @@ function tally(perHypothesis, verdict, failures) {
   const entry = perHypothesis[key];
   if (["pass", "fail", "unavailable"].includes(verdict.verdict)) entry[verdict.verdict] += 1;
   else failures.push(`${key}: unknown verdict ${JSON.stringify(verdict.verdict)}`);
-  entry.lateAttaches += lateCount(verdict);
+  const late = lateCount(verdict);
+  entry.lateAttaches += late;
   if (verdict.verdict === "fail") failures.push(`${key}: fail`);
+  else if (verdict.verdict === "pass" && late > 0) {
+    failures.push(`${key}: pass with ${late} late attach${late === 1 ? "" : "es"}`);
+  }
 }
 
 function aggregate(plan, results) {
