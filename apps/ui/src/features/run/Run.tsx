@@ -5,12 +5,14 @@ import {
   type Draft,
   type Input,
   type RunValues,
+  datasetDraft,
   initialDraft,
   parseDraft,
   referenceKey,
   secretReferences,
   withoutSecrets,
 } from "@/features/run/inputs";
+import { Datasets } from "@/features/run/Datasets";
 import { Gaps } from "@/features/run/Gaps";
 import { StepResults, Summary } from "@/features/run/Results";
 import { Snapshots } from "@/features/run/Snapshots";
@@ -64,6 +66,7 @@ function InputField({ name, input, value, onChange }: InputProps) {
 }
 
 type FormProps = {
+  flowId: string;
   inputs: Flow["inputs"];
   references: string[];
   disabled: boolean;
@@ -73,7 +76,7 @@ type FormProps = {
 // A recorded `${secrets.<name>}` reference must be typed for every run.
 const REFERENCE: Input = { type: "string", required: true, secret: true };
 
-function InputsForm({ inputs, references, disabled, onStart }: FormProps) {
+function InputsForm({ flowId, inputs, references, disabled, onStart }: FormProps) {
   const [draft, setDraft] = useState<Draft>(() => initialDraft(inputs, references));
   const [problem, setProblem] = useState<string>();
   const submit = (event: Event) => {
@@ -91,6 +94,14 @@ function InputsForm({ inputs, references, disabled, onStart }: FormProps) {
   return (
     <form class="stack" aria-label="Inputs" onSubmit={submit}>
       {fields.length === 0 ? <p class="muted">This flow declares no inputs.</p> : null}
+      {Object.keys(inputs).length > 0 ? (
+        <Datasets
+          flowId={flowId}
+          inputs={inputs}
+          draft={draft}
+          onPick={(values) => setDraft(datasetDraft(inputs, values, draft))}
+        />
+      ) : null}
       {fields.map(([name, input]) => (
         <InputField
           key={name}
@@ -120,6 +131,7 @@ function RunFlow({ flowId, flow, onDiagnostics }: { flowId: string; flow: Flow }
     <>
       <Card title={`Run ${flow.name}`}>
         <InputsForm
+          flowId={flowId}
           inputs={flow.inputs}
           references={secretReferences(flow)}
           disabled={replay.busy || replay.running}
