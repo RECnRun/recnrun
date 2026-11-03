@@ -177,7 +177,8 @@ export function evaluateAddress(sample: AddressSample): Outcome {
     if (space !== LOOPBACK) spaces.add(space);
   }
   const blocked = sample.network.filter(blockedBy);
-  if (blocked.length > 0) tally.blocked = blocked.length;
+  // Named apart from the `blocked` kind, whose verdict count is the samples that had one.
+  if (blocked.length > 0) tally.blockedRequests = blocked.length;
   const reasons = [
     ...[...spaces].map((space) => ({
       kind: "addressSpace",

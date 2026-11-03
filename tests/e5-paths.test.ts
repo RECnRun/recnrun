@@ -172,7 +172,7 @@ describe("E5 diagnostics", () => {
         { kind: "blocked", text: `Chrome blocked ${FROM} (net::ERR_FAILED, X)` },
         { kind: "blocked", text: "Chrome blocked a request without a URL (net::ERR_FAILED, X)" },
       ],
-      tally: { "space:Unknown": 1, blocked: 2 },
+      tally: { "space:Unknown": 1, blockedRequests: 2 },
       waited: [],
     });
   });
