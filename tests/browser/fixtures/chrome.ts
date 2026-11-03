@@ -1,7 +1,7 @@
 import { execFile, spawn } from "node:child_process";
 import type { ChildProcess } from "node:child_process";
 import { accessSync, constants } from "node:fs";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
@@ -153,12 +153,16 @@ async function stop(chrome: WatchedProcess): Promise<void> {
   await chrome.exit;
 }
 
-export async function launchChrome(): Promise<LaunchedChrome> {
+/** Starts Chrome on `userDataDir`, or on a new temporary folder; `close()` deletes the folder. */
+export async function launchChrome(
+  options: { userDataDir?: string } = {},
+): Promise<LaunchedChrome> {
   requireDisplay();
   const binary = resolveChromePath();
   const run = promisify(execFile);
   const version = (await run(binary, ["--version"], { timeout: VERSION_TIMEOUT_MS })).stdout.trim();
-  const userDataDir = await mkdtemp(join(tmpdir(), "recnrun-chrome-"));
+  const userDataDir = options.userDataDir ?? (await mkdtemp(join(tmpdir(), "recnrun-chrome-")));
+  await mkdir(userDataDir, { recursive: true });
   let current: WatchedProcess | undefined;
   const close = async (): Promise<void> => {
     if (current) await stop(current);

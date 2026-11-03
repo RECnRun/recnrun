@@ -17,10 +17,19 @@ export default defineConfig({
     video: "retain-on-failure",
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
-  webServer: {
-    command: "vp run website#preview -- --port 5190 --strictPort --host localhost",
-    url: baseURL,
-    reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
-  },
+  webServer: [
+    {
+      command: "vp run website#preview -- --port 5190 --strictPort --host localhost",
+      url: baseURL,
+      reuseExistingServer: !process.env.CI,
+      timeout: 120_000,
+    },
+    {
+      // first-flow.spec.ts records and replays this application on port 4600.
+      command: "vp run @recnrun/fixture#start",
+      url: "http://127.0.0.1:4600/",
+      reuseExistingServer: !process.env.CI,
+      timeout: 60_000,
+    },
+  ],
 });
