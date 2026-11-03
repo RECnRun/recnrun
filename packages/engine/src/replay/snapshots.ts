@@ -56,7 +56,7 @@ async function tryCapture(capture: Capture): Promise<PageCapture | undefined> {
 }
 
 /** The DOM and screenshot of the current tab, stored as blobs; a capture never fails the step. */
-export async function snapshotOf(
+async function snapshotOf(
   capture: Capture,
   blobs: ReplayBlobs,
   milestone: SnapshotMilestone,

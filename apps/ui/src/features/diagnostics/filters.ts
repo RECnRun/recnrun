@@ -21,7 +21,7 @@ export const NO_FILTERS: Filters = {
   coverage: "all",
 };
 
-export const PAGE_SIZE = 100;
+const PAGE_SIZE = 100;
 
 type Query = Params<"run.queryEvents">;
 type Category = NonNullable<Query["category"]>;
