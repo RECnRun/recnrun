@@ -106,6 +106,8 @@ async function closeSelf(apis: SelectionApis, record: SuspendRecord): Promise<vo
   const target = { targetId: record.targetId };
   const store = (outcome: Partial<SuspendRecord>) =>
     apis.storage.set({ [SUSPEND_KEY]: { ...record, ...outcome } });
+  // Chrome keeps the extension attached after a previous suspension, since the worker's target outlives its stop.
+  await apis.debugger.detach(target).catch(() => undefined);
   try {
     await withTimeout(apis.debugger.attach(target, PROTOCOL_VERSION), "attach");
   } catch (error) {

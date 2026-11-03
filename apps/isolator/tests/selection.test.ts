@@ -6,6 +6,7 @@ import type { SelectionApis, SessionRule } from "@/background/selection/types";
 import { fakeDebugger, NOT_ALLOWED } from "./fake-debugger";
 
 // E6 (POC PLAN.md P1.5): session rules point the selection URLs at a slot; the background can stop itself.
+const ALREADY = "Another debugger is already attached to the target with id: ";
 const EXTENSION = "chrome-extension://isolator/";
 const APP = "http://app.localhost:4600";
 const STAGING = "http://app.localhost:4603";
@@ -22,20 +23,32 @@ const APP_WORKER: TargetInfo = {
   attached: false,
 };
 
-function setup(
-  options: { targets?: TargetInfo[]; attachError?: string; rules?: SessionRule[] } = {},
-) {
+interface SetupOptions {
+  targets?: TargetInfo[];
+  attachError?: string;
+  rules?: SessionRule[];
+  /** A previous instance of the background is still attached to its own target. */
+  stale?: boolean;
+}
+
+function setup(options: SetupOptions = {}) {
   const fake = fakeDebugger({ targets: options.targets ?? [APP_WORKER, SELF] });
   const rules = new Map<number, SessionRule>((options.rules ?? []).map((rule) => [rule.id, rule]));
   const updates: object[] = [];
   const stored: Record<string, unknown> = {};
   const scheduled: (() => Promise<void>)[] = [];
+  let stale = options.stale ?? false;
   const apis: SelectionApis = {
     debugger: {
       ...fake.api,
       attach: async (target, version) => {
         if (options.attachError) throw new Error(options.attachError);
+        if (stale) throw new Error(`${ALREADY}${target.targetId}.`);
         await fake.api.attach(target, version);
+      },
+      detach: async (target) => {
+        stale = false;
+        await fake.api.detach(target);
       },
     },
     dnr: {
@@ -177,6 +190,14 @@ describe("SelectionEngine.suspend and status", () => {
     await scheduled[0]?.();
     expect(sent).toEqual([]);
     expect(stored.e6Suspend).toMatchObject({ attach: NOT_ALLOWED });
+  });
+
+  test("detaches the session a previous instance left on its target before attaching", async () => {
+    const { engine, sent, stored, scheduled } = setup({ stale: true });
+    await engine.suspend();
+    await scheduled[0]?.();
+    expect(stored.e6Suspend).toMatchObject({ attach: "ok" });
+    expect(sent.map(({ method }) => method)).toEqual(["Target.closeTarget"]);
   });
 
   test("fails when Chrome lists no worker of the extension", async () => {
