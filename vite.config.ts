@@ -6,11 +6,12 @@ export default defineConfig({
   staged: {
     "*": "vp check --fix",
   },
+  // The vendored SplitSession files must stay byte-identical to upstream (vendor.test.ts hashes them).
   fmt: {
-    ignorePatterns: ["**/.output/**", "**/.wxt/**"],
+    ignorePatterns: ["**/.output/**", "**/.wxt/**", "packages/isolation-core/vendor/**"],
   },
   lint: {
-    ignorePatterns: ["**/.output/**", "**/.wxt/**"],
+    ignorePatterns: ["**/.output/**", "**/.wxt/**", "packages/isolation-core/vendor/**"],
     jsPlugins: [
       { name: "vite-plus", specifier: "vite-plus/oxlint-plugin" },
       { name: "sonarjs", specifier: "eslint-plugin-sonarjs" },
@@ -80,6 +81,11 @@ export default defineConfig({
       "apps/extension",
       "packages/domain",
       "packages/bridge",
+      "packages/isolation-core",
+      "packages/worker-bootstrap",
+      "apps/fixture",
+      "apps/isolator",
+      "tests/vitest.config.ts",
       "apps/website/vitest.browser.config.ts",
       "apps/extension/vitest.browser.config.ts",
     ],
@@ -108,6 +114,8 @@ export default defineConfig({
           "vp run --no-cache test:unit:local",
           "vp run --no-cache test:components:local",
           "vp run --no-cache test:e2e:local",
+          "vp run --no-cache test:browser:local",
+          "vp run --no-cache test:experiments:local",
         ],
       },
       verify: {
@@ -123,9 +131,11 @@ export default defineConfig({
           "vp run --no-cache test:local",
           "vp run --no-cache test:container",
           "vp run --no-cache test:hooks",
+          "vp run --no-cache test:scripts",
           "vp run --no-cache test:coverage:local",
           "vp run --no-cache dead-code",
           "vp run --no-cache duplication",
+          "vp run --no-cache docs:check",
           "vp run -r --no-cache build",
           "vp run --no-cache test:extension-manifest",
         ],

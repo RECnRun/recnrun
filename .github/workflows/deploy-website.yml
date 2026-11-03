@@ -15,7 +15,8 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # verify runs every experiment in Docker; the experiments alone take about 27 minutes here.
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v6
       - uses: voidzero-dev/setup-vp@v1.21.1
@@ -29,7 +30,7 @@ jobs:
         run: vp run verify
       - name: Upload verification artifacts
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: verification
           path: .artifacts/docker/
@@ -38,7 +39,7 @@ jobs:
       # verify builds inside its container; this build is the one that ships.
       - name: Build website
         run: vp run website#build
-      - uses: actions/upload-pages-artifact@v4
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: apps/website/dist
 
@@ -53,4 +54,4 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5

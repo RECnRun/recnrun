@@ -1,0 +1,23 @@
+{
+  "name": "@recnrun/isolator",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Namespaced sessions POC extension (docs/poc/namespace-sessions/PLAN.md).",
+  "type": "module",
+  "scripts": {
+    "dev": "wxt",
+    "build": "vp run @recnrun/worker-bootstrap#build && tsc --noEmit && wxt build",
+    "build:test": "vp run @recnrun/worker-bootstrap#build && wxt build --mode test",
+    "wxt:prepare": "wxt prepare"
+  },
+  "dependencies": {
+    "@recnrun/isolation-core": "workspace:*",
+    "@recnrun/worker-bootstrap": "workspace:*",
+    "valibot": "catalog:"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "vite-plus": "catalog:",
+    "wxt": "catalog:"
+  }
+}

@@ -1,0 +1,804 @@
+{
+  "chrome": {
+    "version": "Google Chrome 156.0.8078.79"
+  },
+  "extensionLoad": {
+    "method": "cdp-load-unpacked"
+  },
+  "debuggerProbe": {
+    "date": "2026-11-02",
+    "samples": 3,
+    "method": "cdp-load-unpacked",
+    "permissions": ["storage", "management", "debugger"],
+    "hostPermissions": []
+  },
+  "debugger": {
+    "get-targets": {
+      "description": "chrome.debugger.getTargets() answers; the whole list with types and URLs",
+      "status": "allowed",
+      "statuses": ["allowed", "allowed", "allowed"],
+      "method": "cdp-load-unpacked",
+      "details": [
+        [
+          {
+            "type": "worker",
+            "url": "http://app.localhost:4600/shared-worker.js?type=classic",
+            "attached": false
+          },
+          {
+            "type": "worker",
+            "url": "http://app.localhost:4600/sw-main.js?variant=classic",
+            "attached": true
+          },
+          {
+            "type": "worker",
+            "url": "chrome-extension://fignfifoniblkonapihmkfakmlgkbkcf/service_worker.js",
+            "attached": true
+          },
+          {
+            "type": "worker",
+            "url": "chrome-extension://cnnlgpifiipneindfidichojchgggmfo/background.js",
+            "attached": true
+          },
+          {
+            "type": "other",
+            "url": "http://app.localhost:4600/worker.js?type=classic",
+            "attached": true
+          },
+          {
+            "type": "other",
+            "url": "chrome://omnibox-popup.top-chrome/",
+            "attached": false
+          },
+          {
+            "type": "other",
+            "url": "chrome://omnibox-popup.top-chrome/omnibox_popup_aim.html",
+            "attached": false
+          },
+          {
+            "type": "page",
+            "url": "http://app.localhost:4600/workers.html?type=classic",
+            "attached": true,
+            "tabId": 1769689903
+          },
+          {
+            "type": "page",
+            "url": "http://app.localhost:4600/sw.html?sw=classic",
+            "attached": true,
+            "tabId": 1769689902
+          },
+          {
+            "type": "background_page",
+            "url": "chrome-extension://nkeimhogjdpnpccoofpliimaahmaaome/background.html",
+            "attached": false
+          }
+        ],
+        [
+          {
+            "type": "worker",
+            "url": "http://app.localhost:4600/shared-worker.js?type=classic",
+            "attached": false
+          },
+          {
+            "type": "worker",
+            "url": "http://app.localhost:4600/sw-main.js?variant=classic",
+            "attached": true
+          },
+          {
+            "type": "worker",
+            "url": "chrome-extension://fignfifoniblkonapihmkfakmlgkbkcf/service_worker.js",
+            "attached": true
+          },
+          {
+            "type": "worker",
+            "url": "chrome-extension://cnnlgpifiipneindfidichojchgggmfo/background.js",
+            "attached": true
+          },
+          {
+            "type": "worker",
+            "url": "chrome-extension://ghbmnnjooekpmoecnnnilnnbdlolhkhi/service_worker_bin_prod.js",
+            "attached": true
+          },
+          {
+            "type": "other",
+            "url": "http://app.localhost:4600/worker.js?type=classic",
+            "attached": true
+          },
+          {
+            "type": "other",
+            "url": "chrome://omnibox-popup.top-chrome/",
+            "attached": false
+          },
+          {
+            "type": "background_page",
+            "url": "chrome-extension://nmmhkkegccagdldgiimedpiccmgmieda/_generated_background_page.html",
+            "attached": false
+          },
+          {
+            "type": "page",
+            "url": "http://app.localhost:4600/workers.html?type=classic",
+            "attached": true,
+            "tabId": 1769689903
+          },
+          {
+            "type": "other",
+            "url": "chrome://omnibox-popup.top-chrome/omnibox_popup_aim.html",
+            "attached": false
+          },
+          {
+            "type": "page",
+            "url": "http://app.localhost:4600/sw.html?sw=classic",
+            "attached": true,
+            "tabId": 1769689902
+          },
+          {
+            "type": "background_page",
+            "url": "chrome-extension://nkeimhogjdpnpccoofpliimaahmaaome/background.html",
+            "attached": false
+          }
+        ],
+        [
+          {
+            "type": "worker",
+            "url": "http://app.localhost:4600/shared-worker.js?type=classic",
+            "attached": false
+          },
+          {
+            "type": "worker",
+            "url": "http://app.localhost:4600/sw-main.js?variant=classic",
+            "attached": true
+          },
+          {
+            "type": "worker",
+            "url": "chrome-extension://fignfifoniblkonapihmkfakmlgkbkcf/service_worker.js",
+            "attached": true
+          },
+          {
+            "type": "worker",
+            "url": "chrome-extension://cnnlgpifiipneindfidichojchgggmfo/background.js",
+            "attached": true
+          },
+          {
+            "type": "worker",
+            "url": "chrome-extension://ghbmnnjooekpmoecnnnilnnbdlolhkhi/service_worker_bin_prod.js",
+            "attached": true
+          },
+          {
+            "type": "other",
+            "url": "http://app.localhost:4600/worker.js?type=classic",
+            "attached": true
+          },
+          {
+            "type": "other",
+            "url": "chrome://omnibox-popup.top-chrome/",
+            "attached": false
+          },
+          {
+            "type": "page",
+            "url": "http://app.localhost:4600/workers.html?type=classic",
+            "attached": true,
+            "tabId": 1769689903
+          },
+          {
+            "type": "other",
+            "url": "chrome://omnibox-popup.top-chrome/omnibox_popup_aim.html",
+            "attached": false
+          },
+          {
+            "type": "page",
+            "url": "http://app.localhost:4600/sw.html?sw=classic",
+            "attached": true,
+            "tabId": 1769689902
+          }
+        ]
+      ]
+    },
+    "get-targets-service-worker": {
+      "description": "getTargets() lists the fixture's service-worker, with its type string",
+      "status": "allowed",
+      "statuses": ["allowed", "allowed", "allowed"],
+      "method": "cdp-load-unpacked",
+      "details": [
+        {
+          "type": "worker",
+          "url": "http://app.localhost:4600/sw-main.js?variant=classic"
+        },
+        {
+          "type": "worker",
+          "url": "http://app.localhost:4600/sw-main.js?variant=classic"
+        },
+        {
+          "type": "worker",
+          "url": "http://app.localhost:4600/sw-main.js?variant=classic"
+        }
+      ]
+    },
+    "get-targets-shared-worker": {
+      "description": "getTargets() lists the fixture's shared-worker, with its type string",
+      "status": "allowed",
+      "statuses": ["allowed", "allowed", "allowed"],
+      "method": "cdp-load-unpacked",
+      "details": [
+        {
+          "type": "worker",
+          "url": "http://app.localhost:4600/shared-worker.js?type=classic"
+        },
+        {
+          "type": "worker",
+          "url": "http://app.localhost:4600/shared-worker.js?type=classic"
+        },
+        {
+          "type": "worker",
+          "url": "http://app.localhost:4600/shared-worker.js?type=classic"
+        }
+      ]
+    },
+    "get-targets-dedicated-worker": {
+      "description": "getTargets() lists the fixture's dedicated-worker, with its type string",
+      "status": "allowed",
+      "statuses": ["allowed", "allowed", "allowed"],
+      "method": "cdp-load-unpacked",
+      "details": [
+        {
+          "type": "other",
+          "url": "http://app.localhost:4600/worker.js?type=classic"
+        },
+        {
+          "type": "other",
+          "url": "http://app.localhost:4600/worker.js?type=classic"
+        },
+        {
+          "type": "other",
+          "url": "http://app.localhost:4600/worker.js?type=classic"
+        }
+      ]
+    },
+    "attach-service-worker": {
+      "description": "attach({ targetId }) to the fixture's service-worker, then detach",
+      "status": "allowed",
+      "statuses": ["allowed", "allowed", "allowed"],
+      "method": "cdp-load-unpacked",
+      "details": [
+        {
+          "targetId": "4E61EE9BB074E4C964F5B9068D7175DA"
+        },
+        {
+          "targetId": "4E61EE9BB074E4C964F5B9068D7175DA"
+        },
+        {
+          "targetId": "4E61EE9BB074E4C964F5B9068D7175DA"
+        }
+      ]
+    },
+    "attach-shared-worker": {
+      "description": "attach({ targetId }) to the fixture's shared-worker, then detach",
+      "status": "allowed",
+      "statuses": ["allowed", "allowed", "allowed"],
+      "method": "cdp-load-unpacked",
+      "details": [
+        {
+          "targetId": "23036F4970B7DA6913AC77FC658CD359"
+        },
+        {
+          "targetId": "A43527DC377EB1D1DE3DCCEC39A27057"
+        },
+        {
+          "targetId": "BA0BE18E6C67F85FA13BF377FE729E5D"
+        }
+      ]
+    },
+    "tab-attach": {
+      "description": "attach({ tabId }) to the fixture page's tab",
+      "status": "allowed",
+      "statuses": ["allowed", "allowed", "allowed"],
+      "method": "cdp-load-unpacked",
+      "details": [
+        {
+          "tabId": 1769689903
+        },
+        {
+          "tabId": 1769689903
+        },
+        {
+          "tabId": 1769689903
+        }
+      ]
+    },
+    "auto-attach": {
+      "description": "Target.setAutoAttach({ autoAttach, waitForDebuggerOnStart, flatten }) on the tab, then a reload and a cross-site iframe; every Target.attachedToTarget",
+      "status": "allowed",
+      "statuses": ["allowed", "allowed", "allowed"],
+      "method": "cdp-load-unpacked",
+      "details": [
+        [
+          {
+            "type": "service_worker",
+            "url": "http://app.localhost:4600/sw-main.js?variant=classic",
+            "waitingForDebugger": false,
+            "phase": "existing"
+          },
+          {
+            "type": "worker",
+            "url": "http://app.localhost:4600/worker.js?type=classic",
+            "waitingForDebugger": false,
+            "phase": "existing"
+          },
+          {
+            "type": "worker",
+            "url": "http://app.localhost:4600/worker.js?type=classic",
+            "waitingForDebugger": true,
+            "phase": "after-reload"
+          },
+          {
+            "type": "iframe",
+            "url": "",
+            "waitingForDebugger": true,
+            "phase": "after-reload"
+          }
+        ],
+        [
+          {
+            "type": "service_worker",
+            "url": "http://app.localhost:4600/sw-main.js?variant=classic",
+            "waitingForDebugger": false,
+            "phase": "existing"
+          },
+          {
+            "type": "worker",
+            "url": "http://app.localhost:4600/worker.js?type=classic",
+            "waitingForDebugger": false,
+            "phase": "existing"
+          },
+          {
+            "type": "worker",
+            "url": "http://app.localhost:4600/worker.js?type=classic",
+            "waitingForDebugger": true,
+            "phase": "after-reload"
+          },
+          {
+            "type": "iframe",
+            "url": "",
+            "waitingForDebugger": true,
+            "phase": "after-reload"
+          }
+        ],
+        [
+          {
+            "type": "service_worker",
+            "url": "http://app.localhost:4600/sw-main.js?variant=classic",
+            "waitingForDebugger": false,
+            "phase": "existing"
+          },
+          {
+            "type": "worker",
+            "url": "http://app.localhost:4600/worker.js?type=classic",
+            "waitingForDebugger": false,
+            "phase": "existing"
+          },
+          {
+            "type": "worker",
+            "url": "http://app.localhost:4600/worker.js?type=classic",
+            "waitingForDebugger": true,
+            "phase": "after-reload"
+          },
+          {
+            "type": "iframe",
+            "url": "",
+            "waitingForDebugger": true,
+            "phase": "after-reload"
+          }
+        ]
+      ]
+    },
+    "auto-attach-dedicated-worker": {
+      "description": "auto-attach reports the dedicated-worker (Target.attachedToTarget)",
+      "status": "allowed",
+      "statuses": ["allowed", "allowed", "allowed"],
+      "method": "cdp-load-unpacked",
+      "details": [
+        [
+          {
+            "type": "worker",
+            "waitingForDebugger": false,
+            "phase": "existing"
+          },
+          {
+            "type": "worker",
+            "waitingForDebugger": true,
+            "phase": "after-reload"
+          }
+        ],
+        [
+          {
+            "type": "worker",
+            "waitingForDebugger": false,
+            "phase": "existing"
+          },
+          {
+            "type": "worker",
+            "waitingForDebugger": true,
+            "phase": "after-reload"
+          }
+        ],
+        [
+          {
+            "type": "worker",
+            "waitingForDebugger": false,
+            "phase": "existing"
+          },
+          {
+            "type": "worker",
+            "waitingForDebugger": true,
+            "phase": "after-reload"
+          }
+        ]
+      ]
+    },
+    "auto-attach-shared-worker": {
+      "description": "auto-attach reports the shared-worker (Target.attachedToTarget)",
+      "status": "rejected",
+      "statuses": ["rejected", "rejected", "rejected"],
+      "error": "no Target.attachedToTarget for the shared-worker",
+      "method": "cdp-load-unpacked",
+      "details": [null, null, null]
+    },
+    "auto-attach-service-worker": {
+      "description": "auto-attach reports the service-worker (Target.attachedToTarget)",
+      "status": "allowed",
+      "statuses": ["allowed", "allowed", "allowed"],
+      "method": "cdp-load-unpacked",
+      "details": [
+        [
+          {
+            "type": "service_worker",
+            "waitingForDebugger": false,
+            "phase": "existing"
+          }
+        ],
+        [
+          {
+            "type": "service_worker",
+            "waitingForDebugger": false,
+            "phase": "existing"
+          }
+        ],
+        [
+          {
+            "type": "service_worker",
+            "waitingForDebugger": false,
+            "phase": "existing"
+          }
+        ]
+      ]
+    },
+    "auto-attach-iframe": {
+      "description": "auto-attach reports the iframe (Target.attachedToTarget)",
+      "status": "allowed",
+      "statuses": ["allowed", "allowed", "allowed"],
+      "method": "cdp-load-unpacked",
+      "details": [
+        [
+          {
+            "type": "iframe",
+            "waitingForDebugger": true,
+            "phase": "after-reload"
+          }
+        ],
+        [
+          {
+            "type": "iframe",
+            "waitingForDebugger": true,
+            "phase": "after-reload"
+          }
+        ],
+        [
+          {
+            "type": "iframe",
+            "waitingForDebugger": true,
+            "phase": "after-reload"
+          }
+        ]
+      ]
+    },
+    "run-if-waiting-for-debugger": {
+      "description": "Runtime.runIfWaitingForDebugger releases every auto-attached target that waited",
+      "status": "allowed",
+      "statuses": ["allowed", "allowed", "allowed"],
+      "method": "cdp-load-unpacked",
+      "details": [
+        [
+          {
+            "type": "worker",
+            "released": "ok"
+          },
+          {
+            "type": "iframe",
+            "released": "ok"
+          }
+        ],
+        [
+          {
+            "type": "worker",
+            "released": "ok"
+          },
+          {
+            "type": "iframe",
+            "released": "ok"
+          }
+        ],
+        [
+          {
+            "type": "worker",
+            "released": "ok"
+          },
+          {
+            "type": "iframe",
+            "released": "ok"
+          }
+        ]
+      ]
+    },
+    "attach-dedicated-worker": {
+      "description": "attach({ targetId }) to the fixture's dedicated-worker, then detach",
+      "status": "allowed",
+      "statuses": ["allowed", "allowed", "allowed"],
+      "method": "cdp-load-unpacked",
+      "details": [
+        {
+          "targetId": "92E4AB35E8CAB2361E0275EA6866E28B"
+        },
+        {
+          "targetId": "A2495FE74F8B9E5112812B192CC106FA"
+        },
+        {
+          "targetId": "8E346F56BC470B1290DF3902127AE0EB"
+        }
+      ]
+    },
+    "tab-target-get-targets": {
+      "description": "Target.getTargets sent on the tab session: does it list browser-wide targets?",
+      "status": "rejected",
+      "statuses": ["rejected", "rejected", "rejected"],
+      "error": "{\"code\":-32000,\"message\":\"Not allowed\"}",
+      "method": "cdp-load-unpacked",
+      "details": [null, null, null]
+    },
+    "tab-attach-to-service-worker": {
+      "description": "Target.attachToTarget({ flatten: true }) to the service worker, from the tab session",
+      "status": "rejected",
+      "statuses": ["rejected", "rejected", "rejected"],
+      "error": "{\"code\":-32000,\"message\":\"Not allowed\"}",
+      "method": "cdp-load-unpacked",
+      "details": [null, null, null]
+    },
+    "service-worker-enable": {
+      "description": "ServiceWorker.enable on the tab session",
+      "status": "rejected",
+      "statuses": ["rejected", "rejected", "rejected"],
+      "error": "{\"code\":-32601,\"message\":\"'ServiceWorker.enable' wasn't found\"}",
+      "method": "cdp-load-unpacked",
+      "details": [null, null, null]
+    },
+    "fetch-enable-worker-scripts": {
+      "description": "Fetch.enable with patterns on the worker scripts, on the tab session",
+      "status": "allowed",
+      "statuses": ["allowed", "allowed", "allowed"],
+      "method": "cdp-load-unpacked",
+      "details": [
+        {
+          "patterns": 3
+        },
+        {
+          "patterns": 3
+        },
+        {
+          "patterns": 3
+        }
+      ]
+    },
+    "storage-get-cookies": {
+      "description": "Storage.getCookies on the tab session (count only; values are never recorded)",
+      "status": "allowed",
+      "statuses": ["allowed", "allowed", "allowed"],
+      "method": "cdp-load-unpacked",
+      "details": [
+        {
+          "count": 0
+        },
+        {
+          "count": 0
+        },
+        {
+          "count": 0
+        }
+      ]
+    },
+    "network-set-cookie": {
+      "description": "Network.setCookie on the fixture origin, then Network.deleteCookies",
+      "status": "allowed",
+      "statuses": ["allowed", "allowed", "allowed"],
+      "method": "cdp-load-unpacked",
+      "details": [
+        {
+          "success": true
+        },
+        {
+          "success": true
+        },
+        {
+          "success": true
+        }
+      ]
+    },
+    "network-enable": {
+      "description": "Network.enable on the tab session",
+      "status": "allowed",
+      "statuses": ["allowed", "allowed", "allowed"],
+      "method": "cdp-load-unpacked",
+      "details": [null, null, null]
+    },
+    "page-add-script-on-new-document": {
+      "description": "Page.addScriptToEvaluateOnNewDocument on the tab session, then removed",
+      "status": "allowed",
+      "statuses": ["allowed", "allowed", "allowed"],
+      "method": "cdp-load-unpacked",
+      "details": [null, null, null]
+    },
+    "worker-runtime-evaluate": {
+      "description": "Runtime.evaluate on the service worker session (attach by targetId)",
+      "status": "allowed",
+      "statuses": ["allowed", "allowed", "allowed"],
+      "method": "cdp-load-unpacked",
+      "details": [
+        {
+          "value": "/sw-main.js"
+        },
+        {
+          "value": "/sw-main.js"
+        },
+        {
+          "value": "/sw-main.js"
+        }
+      ]
+    },
+    "worker-fetch-enable": {
+      "description": "Fetch.enable with worker-script patterns on the service worker session",
+      "status": "allowed",
+      "statuses": ["allowed", "allowed", "allowed"],
+      "method": "cdp-load-unpacked",
+      "details": [null, null, null]
+    },
+    "worker-service-worker-enable": {
+      "description": "ServiceWorker.enable on the service worker session",
+      "status": "rejected",
+      "statuses": ["rejected", "rejected", "rejected"],
+      "error": "{\"code\":-32601,\"message\":\"'ServiceWorker.enable' wasn't found\"}",
+      "method": "cdp-load-unpacked",
+      "details": [null, null, null]
+    },
+    "worker-debugger-pause": {
+      "description": "Debugger.pause then Debugger.resume on the service worker session",
+      "status": "allowed",
+      "statuses": ["allowed", "allowed", "allowed"],
+      "method": "cdp-load-unpacked",
+      "details": [
+        {
+          "pausedEventArrived": true
+        },
+        {
+          "pausedEventArrived": true
+        },
+        {
+          "pausedEventArrived": true
+        }
+      ]
+    },
+    "worker-terminate-execution": {
+      "description": "Runtime.terminateExecution on the dedicated worker (attach by targetId)",
+      "status": "rejected",
+      "statuses": ["rejected", "rejected", "rejected"],
+      "error": "{\"code\":-32000,\"message\":\"Runtime.terminateExecution is not allowed for untrusted clients\"}",
+      "method": "cdp-load-unpacked",
+      "details": [null, null, null]
+    },
+    "worker-close-target": {
+      "description": "Target.closeTarget on the service worker, sent on its own session",
+      "status": "allowed",
+      "statuses": ["allowed", "allowed", "allowed"],
+      "method": "cdp-load-unpacked",
+      "details": [
+        {
+          "success": true,
+          "listedAfter": false
+        },
+        {
+          "success": true,
+          "listedAfter": false
+        },
+        {
+          "success": true,
+          "listedAfter": false
+        }
+      ]
+    },
+    "cleanup": {
+      "description": "detach every remaining session; chrome.debugger.onDetach reasons",
+      "status": "allowed",
+      "statuses": ["allowed", "allowed", "allowed"],
+      "method": "cdp-load-unpacked",
+      "details": [
+        {
+          "detached": ["ok", "ok", "ok"],
+          "onDetach": []
+        },
+        {
+          "detached": ["ok", "ok", "ok"],
+          "onDetach": []
+        },
+        {
+          "detached": ["ok", "ok", "ok"],
+          "onDetach": []
+        }
+      ]
+    },
+    "infobar-hidden": {
+      "description": "the debugger infobar stays hidden with --silent-debugger-extension-api",
+      "status": "allowed",
+      "statuses": ["allowed", "allowed", "allowed"],
+      "method": "cdp-load-unpacked",
+      "details": [
+        {
+          "evidence": "chrome.tabs height",
+          "before": {
+            "tabHeight": 1333,
+            "chromeTargets": [
+              "browser_ui chrome://omnibox-popup.top-chrome/",
+              "browser_ui chrome://omnibox-popup.top-chrome/omnibox_popup_aim.html"
+            ]
+          },
+          "during": {
+            "tabHeight": 1333,
+            "chromeTargets": [
+              "browser_ui chrome://omnibox-popup.top-chrome/",
+              "browser_ui chrome://omnibox-popup.top-chrome/omnibox_popup_aim.html"
+            ]
+          }
+        },
+        {
+          "evidence": "chrome.tabs height",
+          "before": {
+            "tabHeight": 1333,
+            "chromeTargets": [
+              "browser_ui chrome://omnibox-popup.top-chrome/",
+              "browser_ui chrome://omnibox-popup.top-chrome/omnibox_popup_aim.html"
+            ]
+          },
+          "during": {
+            "tabHeight": 1333,
+            "chromeTargets": [
+              "browser_ui chrome://omnibox-popup.top-chrome/",
+              "browser_ui chrome://omnibox-popup.top-chrome/omnibox_popup_aim.html"
+            ]
+          }
+        },
+        {
+          "evidence": "chrome.tabs height",
+          "before": {
+            "tabHeight": 1333,
+            "chromeTargets": [
+              "browser_ui chrome://omnibox-popup.top-chrome/",
+              "browser_ui chrome://omnibox-popup.top-chrome/omnibox_popup_aim.html"
+            ]
+          },
+          "during": {
+            "tabHeight": 1333,
+            "chromeTargets": [
+              "browser_ui chrome://omnibox-popup.top-chrome/",
+              "browser_ui chrome://omnibox-popup.top-chrome/omnibox_popup_aim.html"
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

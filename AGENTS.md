@@ -4,10 +4,11 @@ RECnRun records and replays browser sessions for developers. The extension store
 
 - `apps/extension`: WXT Chromium (MV3) extension with a Preact popup. It owns the data.
 - `apps/website`: Preact SPA at recnrun.com, deployed to GitHub Pages. It is also the extension's UI.
+- `apps/isolator`: WXT MV3 extension of the namespaced-sessions POC (branch `poc-namespace-sessions`); independent of the recording product.
 - `packages/domain`: `@recnrun/domain`, Valibot schemas and types for Recording and the stored Snapshot.
 - `packages/bridge`: `@recnrun/bridge`, the versioned `window.postMessage` protocol between the website and the extension's content script.
 - `packages/brand`: `@recnrun/brand`, the Mona Sans font and the stylesheet both apps import.
-- `tests/`: Playwright end-to-end tests (`tests/e2e`) and Docker runner checks (`tests/container`).
+- `tests/`: Playwright end-to-end tests (`tests/e2e`), browser tests and experiments on Google Chrome Stable over CDP (`tests/browser`, `tests/experiments`), and Docker runner checks (`tests/container`).
 
 Durable decisions live in `docs/`:
 
@@ -15,6 +16,7 @@ Durable decisions live in `docs/`:
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md): packages, layers, the bridge protocol, the security model, and the toolchain.
 - [MILESTONES.md](docs/MILESTONES.md): delivery and acceptance.
 - [BRAND.md](docs/BRAND.md): logo, palette, contrast, typography, and CSS tokens.
+- [poc/namespace-sessions/PLAN.md](docs/poc/namespace-sessions/PLAN.md): the plan of the namespaced-sessions POC on branch `poc-namespace-sessions`, with [CHECKLIST.md](docs/poc/namespace-sessions/CHECKLIST.md) (progress and resume protocol) and [MANUAL_VALIDATION.md](docs/poc/namespace-sessions/MANUAL_VALIDATION.md) (checks that need a person).
 
 Update the relevant doc when a change alters what it describes.
 
@@ -27,15 +29,19 @@ Vite+ (`vp`) is the only toolchain. `vp <name>` runs a built-in command and `vp 
 | `vp install`                                          | After pulling, before starting work                                  |
 | `vp run dev`                                          | Website (port 5173) and extension dev build in Chrome, together      |
 | `vp run dev:website`, `vp run dev:extension`          | One of them alone; the extension's Chrome keeps a persistent profile |
+| `vp run dev:isolator`                                 | Build the POC isolator in watch mode; load it by hand                |
 | `vp run clean`                                        | Delete builds, artifacts, caches, and the dev Chrome profile         |
 | `vp check` (`--fix` to format)                        | Format (Oxfmt), lint (Oxlint), and type check while editing          |
 | `vp run deps`                                         | Architecture boundaries (dependency-cruiser)                         |
 | `vp run test:unit`, `test:components`, `test:e2e`     | One test layer: Node, Vitest Browser Mode, Playwright with extension |
-| `vp run test`                                         | All three layers                                                     |
+| `vp run test:browser`, `test:experiments`             | Google Chrome Stable over CDP: browser specs; POC hypotheses         |
+| `vp run test:stress` (`-- --iterations N`)            | `@order-critical` specs 100 times, varied conditions; not in verify  |
+| `vp run test`                                         | All five layers                                                      |
 | `vp run test:coverage`                                | Coverage with thresholds                                             |
 | `vp run dead-code`, `vp run duplication`              | Knip; jscpd                                                          |
+| `vp run docs:check`                                   | Markdown links resolve; `CAPABILITIES.md`, `REPORT-P1.md` current    |
 | `vp run test:e2e -- tests/e2e/explorer.spec.ts -g ''` | Targeted Playwright run (arguments go after `--`)                    |
-| `vp run verify`                                       | Full gate (`vp run ready` is an alias)                               |
+| `vp run verify`                                       | Full gate (`vp run ready` is an alias); experiments in smoke mode    |
 
 Test commands and `verify` run in Docker, so start Docker Desktop first. If Docker fails, the command fails; it never falls back to host browsers. `:local` variants (`vp run test:e2e:local`) and the built-in `vp test` run on the host and are for debugging only. Logs and failure artifacts are in `.artifacts/docker/<run-id>/`.
 
@@ -61,9 +67,10 @@ Test commands and `verify` run in Docker, so start Docker Desktop first. If Dock
   - check, and lint with warnings as errors;
   - architecture boundaries;
   - all test layers;
-  - container and hook checks;
+  - container, hook, and script checks;
   - coverage (at least 80% lines, statements, and functions; 75% branches);
   - Knip and jscpd (at most 4% duplication);
+  - `docs:check` (every relative Markdown link and anchor resolves, the POC's `CAPABILITIES.md` matches its `capabilities.json`, and `REPORT-P1.md` embeds a fresh run of `scripts/decide.mjs`);
   - workspace builds and the production manifest guard.
 - When a gate fails, fix the cause. Never lower thresholds, delete or skip tests, exclude code from analysis, add `@ts-ignore`/`@ts-nocheck`, disable lint rules, or loosen `.dependency-cruiser.cjs` to pass.
 - An architecture change (a new layer, package, or allowed dependency) updates `docs/ARCHITECTURE.md` and `.dependency-cruiser.cjs` in the same change, with the reason.
@@ -87,12 +94,12 @@ Add a body only when the reason is not obvious from the subject. For behavior ch
 
 Claude Code loads these automatically. Codex must read the matching file before editing these paths.
 
-| Rule                         | Paths                                                                                                                        | Covers                                           |
-| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
-| `.claude/rules/extension.md` | `apps/extension/**`                                                                                                          | Entrypoints, allowed origins, messaging, storage |
-| `.claude/rules/website.md`   | `apps/website/**`                                                                                                            | `ui`/`features`/`services`/`app` layers, CSP     |
-| `.claude/rules/domain.md`    | `packages/**`                                                                                                                | Domain purity, schemas, protocol versioning      |
-| `.claude/rules/tests.md`     | `tests/**`, `**/tests/**`, `playwright*.config.ts`, `**/vitest*.config.ts`, `scripts/test-container.mjs`, `Dockerfile.tests` | Test layers, extension fixture, Docker runs      |
+| Rule                         | Paths                                                                                                                                                   | Covers                                           |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| `.claude/rules/extension.md` | `apps/extension/**`                                                                                                                                     | Entrypoints, allowed origins, messaging, storage |
+| `.claude/rules/website.md`   | `apps/website/**`                                                                                                                                       | `ui`/`features`/`services`/`app` layers, CSP     |
+| `.claude/rules/domain.md`    | `packages/**`                                                                                                                                           | Domain purity, schemas, protocol versioning      |
+| `.claude/rules/tests.md`     | `tests/**`, `**/tests/**`, `playwright*.config.ts`, `**/vitest*.config.ts`, `scripts/test-container.mjs`, `scripts/test-stress.mjs`, `Dockerfile.tests` | Test layers, extension fixture, Docker runs      |
 
 ## Skills
 

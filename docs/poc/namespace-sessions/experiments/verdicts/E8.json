@@ -1,0 +1,112 @@
+[
+  {
+    "experiment": "E8",
+    "hypothesis": "d-other-clients",
+    "verdict": "pass",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "samples": 1,
+    "method": "managed-policy",
+    "counts": {
+      "samples": 1,
+      "passed": 1,
+      "attachedBefore": 0,
+      "targets": 8
+    },
+    "variants": [
+      {
+        "name": "targets",
+        "verdict": "pass",
+        "samples": 1
+      }
+    ],
+    "condition": "strict"
+  },
+  {
+    "experiment": "E8",
+    "hypothesis": "a-cold-start",
+    "verdict": "pass",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "samples": 20,
+    "method": "managed-policy",
+    "counts": {
+      "samples": 20,
+      "passed": 20,
+      "notPaused": 0,
+      "noEffect": 0,
+      "firstEffectBeforeMarker": 0,
+      "databaseUnmarked": 0,
+      "cacheUnmarked": 0,
+      "storeUnreadable": 0
+    },
+    "variants": [
+      {
+        "name": "sw-classic",
+        "verdict": "pass",
+        "samples": 20
+      }
+    ],
+    "condition": "strict"
+  },
+  {
+    "experiment": "E8",
+    "hypothesis": "b-restart",
+    "verdict": "pass",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "samples": 10,
+    "method": "managed-policy",
+    "counts": {
+      "samples": 10,
+      "passed": 10,
+      "held": 0,
+      "noReport": 0,
+      "noEffect": 0,
+      "firstEffectBeforeMarker": 0,
+      "databaseUnmarked": 0,
+      "ran:marked": 10
+    },
+    "variants": [
+      {
+        "name": "sw-classic",
+        "verdict": "pass",
+        "samples": 10
+      }
+    ],
+    "condition": "strict"
+  },
+  {
+    "experiment": "E8",
+    "hypothesis": "c-selection-workers",
+    "verdict": "pass",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "samples": 20,
+    "method": "managed-policy",
+    "counts": {
+      "samples": 20,
+      "passed": 20,
+      "firstNotSelected": 0,
+      "notRestarted": 0,
+      "unmarked": 0,
+      "stale": 0,
+      "noStore": 0,
+      "notObserved": 0,
+      "storeUnreadable": 0,
+      "notSuspended": 0,
+      "rulesLost": 0,
+      "stalled": 0,
+      "fresh": 20
+    },
+    "variants": [
+      {
+        "name": "dedicated:sync-xhr",
+        "verdict": "pass",
+        "samples": 10
+      },
+      {
+        "name": "shared:sync-xhr",
+        "verdict": "pass",
+        "samples": 10
+      }
+    ],
+    "condition": "strict"
+  }
+]

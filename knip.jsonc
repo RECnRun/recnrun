@@ -7,12 +7,31 @@
       "entry": [
         "scripts/agent-hooks/*.mjs",
         "scripts/git-hooks/*.mjs",
+        "scripts/*.checks.mjs",
         "tests/container/*.checks.mjs",
       ],
+    },
+    "packages/isolation-core": {
+      // Vendored reference modules until P2 imports them from src/.
+      "entry": ["vendor/splitsession/src/**/*.ts"],
+      // cookie-capture.ts names upstream's runtime framework; P3 adapts it inside apps/isolator.
+      "ignoreDependencies": ["wxt"],
+    },
+    "packages/worker-bootstrap": {
+      // vite.config.ts names the bundle's entry by path.
+      "entry": ["src/entrypoints/*.ts"],
+    },
+    "apps/fixture": {
+      // Browsers load the public files by URL.
+      "entry": ["public/**/*.js"],
     },
     "apps/extension": {
       // Knip's WXT plugin looks for entrypoints/ at the root; this app uses srcDir: "src".
       "entry": ["src/entrypoints/**/*.{ts,tsx}", "scripts/*.checks.mjs"],
+    },
+    "apps/isolator": {
+      // Route C's slot and strategy files are loaded by URL (chrome.scripting, importScripts).
+      "entry": ["src/entrypoints/**/*.{ts,tsx}", "public/**/*.js"],
     },
   },
 }

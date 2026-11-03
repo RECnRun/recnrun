@@ -1,0 +1,326 @@
+[
+  {
+    "experiment": "E7",
+    "hypothesis": "page",
+    "verdict": "pass",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "method": "cdp-load-unpacked",
+    "samples": 40,
+    "counts": {
+      "samples": 40,
+      "passed": 40,
+      "failClosed": 0,
+      "unpatched": 0,
+      "firstEffectBeforeMarker": 0,
+      "unmarkedEffect": 0,
+      "staleMarker": 0,
+      "injectedUnregistered": 0,
+      "noEffect": 0,
+      "noReport": 0,
+      "workerError": 0,
+      "locationChanged": 0,
+      "unprefixedIndexedDB": 0,
+      "unprefixedCacheStorage": 0,
+      "storeMissing": 0,
+      "storeUnreadable": 0,
+      "openerMessageMissing": 0,
+      "beforeFirstScript": 40,
+      "unprefixedLocalStorage": 39,
+      "unprefixedSessionStorage": 20
+    },
+    "variants": [
+      {
+        "name": "/",
+        "verdict": "pass",
+        "samples": 20
+      },
+      {
+        "name": "/storage.html",
+        "verdict": "pass",
+        "samples": 20
+      }
+    ]
+  },
+  {
+    "experiment": "E7",
+    "hypothesis": "cross-site-iframe",
+    "verdict": "pass",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "method": "cdp-load-unpacked",
+    "samples": 10,
+    "counts": {
+      "samples": 10,
+      "passed": 10,
+      "failClosed": 0,
+      "unpatched": 0,
+      "firstEffectBeforeMarker": 0,
+      "unmarkedEffect": 0,
+      "staleMarker": 0,
+      "injectedUnregistered": 0,
+      "noEffect": 0,
+      "noReport": 0,
+      "workerError": 0,
+      "locationChanged": 0,
+      "unprefixedIndexedDB": 0,
+      "unprefixedCacheStorage": 0,
+      "storeMissing": 0,
+      "storeUnreadable": 0,
+      "openerMessageMissing": 0,
+      "beforeFirstScript": 5,
+      "unprefixedLocalStorage": 0,
+      "unprefixedSessionStorage": 0
+    },
+    "variants": [
+      {
+        "name": "app-only",
+        "verdict": "pass",
+        "samples": 5
+      },
+      {
+        "name": "with-idp",
+        "verdict": "pass",
+        "samples": 5
+      }
+    ]
+  },
+  {
+    "experiment": "E7",
+    "hypothesis": "popup",
+    "verdict": "pass",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "method": "cdp-load-unpacked",
+    "samples": 10,
+    "counts": {
+      "samples": 10,
+      "passed": 10,
+      "failClosed": 0,
+      "unpatched": 0,
+      "firstEffectBeforeMarker": 0,
+      "unmarkedEffect": 0,
+      "staleMarker": 0,
+      "injectedUnregistered": 0,
+      "noEffect": 0,
+      "noReport": 0,
+      "workerError": 0,
+      "locationChanged": 0,
+      "unprefixedIndexedDB": 0,
+      "unprefixedCacheStorage": 0,
+      "storeMissing": 0,
+      "storeUnreadable": 0,
+      "openerMessageMissing": 0,
+      "beforeFirstScript": 5,
+      "unprefixedLocalStorage": 0,
+      "unprefixedSessionStorage": 0
+    },
+    "variants": [
+      {
+        "name": "app-only",
+        "verdict": "pass",
+        "samples": 5
+      },
+      {
+        "name": "with-idp",
+        "verdict": "pass",
+        "samples": 5
+      }
+    ]
+  },
+  {
+    "experiment": "E7",
+    "hypothesis": "dedicated-worker",
+    "verdict": "fail",
+    "error": "60 of 60 samples failed: failed closed: error: SecurityError: RECnRun Route C refused new Worker(/worker.js?type=classic): no wrapper keeps the worker's own self.location, baseURI, and relative imports (10); failed closed: error: SecurityError: RECnRun Route C refused new Worker(/worker.js?type=module): no wrapper keeps the worker's own self.location, baseURI, and relative imports (10); self.location is a blob: URL, not /worker.js?type=classic (10); self.location is a blob: URL, not /worker.js?type=module (10); the page got no report: error: Error: worker failed to start (20); IndexedDB has no fixture-dedicated under the load's marker (20); Cache Storage has no fixture-dedicated under the load's marker (20)",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "method": "cdp-load-unpacked",
+    "samples": 60,
+    "counts": {
+      "samples": 60,
+      "passed": 0,
+      "failClosed": 20,
+      "unpatched": 0,
+      "firstEffectBeforeMarker": 0,
+      "unmarkedEffect": 0,
+      "staleMarker": 0,
+      "injectedUnregistered": 0,
+      "noEffect": 0,
+      "noReport": 20,
+      "workerError": 0,
+      "locationChanged": 20,
+      "unprefixedIndexedDB": 0,
+      "unprefixedCacheStorage": 0,
+      "storeMissing": 20,
+      "storeUnreadable": 0,
+      "openerMessageMissing": 0,
+      "beforeFirstScript": 0,
+      "unprefixedLocalStorage": 60,
+      "unprefixedSessionStorage": 0
+    },
+    "variants": [
+      {
+        "name": "fail-closed/classic",
+        "verdict": "fail",
+        "error": "10 of 10 samples failed: failed closed: error: SecurityError: RECnRun Route C refused new Worker(/worker.js?type=classic): no wrapper keeps the worker's own self.location, baseURI, and relative imports (10)",
+        "samples": 10
+      },
+      {
+        "name": "fail-closed/module",
+        "verdict": "fail",
+        "error": "10 of 10 samples failed: failed closed: error: SecurityError: RECnRun Route C refused new Worker(/worker.js?type=module): no wrapper keeps the worker's own self.location, baseURI, and relative imports (10)",
+        "samples": 10
+      },
+      {
+        "name": "blob/classic",
+        "verdict": "fail",
+        "error": "10 of 10 samples failed: self.location is a blob: URL, not /worker.js?type=classic (10)",
+        "samples": 10
+      },
+      {
+        "name": "blob/module",
+        "verdict": "fail",
+        "error": "10 of 10 samples failed: self.location is a blob: URL, not /worker.js?type=module (10)",
+        "samples": 10
+      },
+      {
+        "name": "data/classic",
+        "verdict": "fail",
+        "error": "10 of 10 samples failed: the page got no report: error: Error: worker failed to start (10); IndexedDB has no fixture-dedicated under the load's marker (10); Cache Storage has no fixture-dedicated under the load's marker (10)",
+        "samples": 10
+      },
+      {
+        "name": "data/module",
+        "verdict": "fail",
+        "error": "10 of 10 samples failed: the page got no report: error: Error: worker failed to start (10); IndexedDB has no fixture-dedicated under the load's marker (10); Cache Storage has no fixture-dedicated under the load's marker (10)",
+        "samples": 10
+      }
+    ]
+  },
+  {
+    "experiment": "E7",
+    "hypothesis": "shared-worker",
+    "verdict": "fail",
+    "error": "60 of 60 samples failed: failed closed: error: SecurityError: RECnRun Route C refused new SharedWorker(/shared-worker.js?type=classic): no wrapper keeps the worker's own self.location, baseURI, and relative imports (10); failed closed: error: SecurityError: RECnRun Route C refused new SharedWorker(/shared-worker.js?type=module): no wrapper keeps the worker's own self.location, baseURI, and relative imports (10); self.location is a blob: URL, not /shared-worker.js?type=classic (10); self.location is a blob: URL, not /shared-worker.js?type=module (10); the page got no report: error: Error: no report within 10 s (20); IndexedDB has no fixture-shared under the load's marker (20); Cache Storage has no fixture-shared under the load's marker (20)",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "method": "cdp-load-unpacked",
+    "samples": 60,
+    "counts": {
+      "samples": 60,
+      "passed": 0,
+      "failClosed": 20,
+      "unpatched": 0,
+      "firstEffectBeforeMarker": 0,
+      "unmarkedEffect": 0,
+      "staleMarker": 0,
+      "injectedUnregistered": 0,
+      "noEffect": 0,
+      "noReport": 20,
+      "workerError": 0,
+      "locationChanged": 20,
+      "unprefixedIndexedDB": 0,
+      "unprefixedCacheStorage": 0,
+      "storeMissing": 20,
+      "storeUnreadable": 0,
+      "openerMessageMissing": 0,
+      "beforeFirstScript": 0,
+      "unprefixedLocalStorage": 60,
+      "unprefixedSessionStorage": 0
+    },
+    "variants": [
+      {
+        "name": "fail-closed/classic",
+        "verdict": "fail",
+        "error": "10 of 10 samples failed: failed closed: error: SecurityError: RECnRun Route C refused new SharedWorker(/shared-worker.js?type=classic): no wrapper keeps the worker's own self.location, baseURI, and relative imports (10)",
+        "samples": 10
+      },
+      {
+        "name": "fail-closed/module",
+        "verdict": "fail",
+        "error": "10 of 10 samples failed: failed closed: error: SecurityError: RECnRun Route C refused new SharedWorker(/shared-worker.js?type=module): no wrapper keeps the worker's own self.location, baseURI, and relative imports (10)",
+        "samples": 10
+      },
+      {
+        "name": "blob/classic",
+        "verdict": "fail",
+        "error": "10 of 10 samples failed: self.location is a blob: URL, not /shared-worker.js?type=classic (10)",
+        "samples": 10
+      },
+      {
+        "name": "blob/module",
+        "verdict": "fail",
+        "error": "10 of 10 samples failed: self.location is a blob: URL, not /shared-worker.js?type=module (10)",
+        "samples": 10
+      },
+      {
+        "name": "data/classic",
+        "verdict": "fail",
+        "error": "10 of 10 samples failed: the page got no report: error: Error: no report within 10 s (10); IndexedDB has no fixture-shared under the load's marker (10); Cache Storage has no fixture-shared under the load's marker (10)",
+        "samples": 10
+      },
+      {
+        "name": "data/module",
+        "verdict": "fail",
+        "error": "10 of 10 samples failed: the page got no report: error: Error: no report within 10 s (10); IndexedDB has no fixture-shared under the load's marker (10); Cache Storage has no fixture-shared under the load's marker (10)",
+        "samples": 10
+      }
+    ]
+  },
+  {
+    "experiment": "E7",
+    "hypothesis": "shared-worker-identity",
+    "verdict": "fail",
+    "error": "3 of 9 pairs ran separate instances: blob (3)",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "method": "cdp-load-unpacked",
+    "samples": 9,
+    "counts": {
+      "samples": 9,
+      "singleInstance": 6,
+      "separateInstances": 3,
+      "noInstance": 0
+    },
+    "variants": [
+      {
+        "name": "control-native",
+        "verdict": "pass",
+        "samples": 3
+      },
+      {
+        "name": "blob",
+        "verdict": "fail",
+        "error": "3 of 3 pairs ran separate instances: blob (3)",
+        "samples": 3
+      },
+      {
+        "name": "data",
+        "verdict": "pass",
+        "samples": 3
+      }
+    ]
+  },
+  {
+    "experiment": "E7",
+    "hypothesis": "same-origin-iframe",
+    "verdict": "unavailable",
+    "error": "the frozen fixture (apps/fixture/public) has no same-origin iframe",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "samples": 0,
+    "method": "cdp-load-unpacked"
+  },
+  {
+    "experiment": "E7",
+    "hypothesis": "about-blank-child",
+    "verdict": "unavailable",
+    "error": "the frozen fixture (apps/fixture/public) has no about:blank or srcdoc child frame",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "samples": 0,
+    "method": "cdp-load-unpacked"
+  },
+  {
+    "experiment": "E7",
+    "hypothesis": "sandboxed-frame",
+    "verdict": "unavailable",
+    "error": "the frozen fixture (apps/fixture/public) has no sandboxed frame",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "samples": 0,
+    "method": "cdp-load-unpacked"
+  }
+]

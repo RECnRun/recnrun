@@ -31,7 +31,9 @@ module.exports = {
     {
       name: "not-to-unresolvable",
       severity: "error",
-      from: {},
+      comment:
+        "Vendored SplitSession files are unmodified partial copies, so their imports of non-vendored siblings cannot resolve.",
+      from: { pathNot: "^packages/isolation-core/vendor/" },
       to: { couldNotResolve: true },
     },
     {
@@ -72,6 +74,47 @@ module.exports = {
       to: { path: "^apps/website/" },
     },
     {
+      name: "fixture-isolated",
+      severity: "error",
+      comment:
+        "The fixture is the application under test (docs/poc/namespace-sessions/PLAN.md §5): it must not share code with RECnRun.",
+      from: { path: "^apps/fixture/" },
+      to: { path: "^(apps/(website|extension|isolator)|packages)/" },
+    },
+    {
+      name: "only-tests-start-the-fixture",
+      severity: "error",
+      comment: "Only test harnesses start the fixture; product code never depends on it.",
+      from: { pathNot: ["^apps/fixture/", "^tests/"] },
+      to: { path: "^apps/fixture/" },
+    },
+    {
+      name: "isolator-not-to-recording-apps",
+      severity: "error",
+      comment:
+        "The namespaced-sessions POC is independent of the recording product (POC PLAN.md §2).",
+      from: { path: "^apps/isolator/" },
+      to: { path: "^apps/(extension|website)/" },
+    },
+    {
+      name: "isolator-only-poc-packages",
+      severity: "error",
+      comment:
+        "The isolator builds on the POC packages and the brand only (POC PLAN.md §5); from npm it adds valibot for E4's request schemas.",
+      from: { path: "^apps/isolator/" },
+      to: {
+        path: "^packages/",
+        pathNot: "^packages/(isolation-core|worker-bootstrap|brand)/",
+      },
+    },
+    {
+      name: "nothing-to-isolator",
+      severity: "error",
+      comment: "The isolator is a runtime; tests load its build output, never its modules.",
+      from: { pathNot: "^apps/isolator/" },
+      to: { path: "^apps/isolator/" },
+    },
+    {
       name: "domain-pure",
       severity: "error",
       comment: "The domain is plain data and schemas: no UI, browser, or protocol code.",
@@ -86,6 +129,27 @@ module.exports = {
       from: { path: "^packages/bridge/src/" },
       to: {
         pathNot: ["^packages/bridge/src/", "^packages/domain/src/", "/node_modules/valibot/"],
+      },
+    },
+    {
+      name: "isolation-core-pure",
+      severity: "error",
+      comment:
+        "The isolation core is browser-agnostic logic: its own src and valibot only. It does not import vendor/ (vendored SplitSession files are reference copies; adapt them into src before use).",
+      from: { path: "^packages/isolation-core/src/" },
+      to: {
+        pathNot: ["^packages/isolation-core/src/", "/node_modules/valibot/"],
+      },
+    },
+    {
+      name: "worker-bootstrap-only-core",
+      severity: "error",
+      comment:
+        "The worker bootstrap bundles isolation-core into one script and nothing else; its build helpers may use Node built-ins (POC PLAN.md §5).",
+      from: { path: "^packages/worker-bootstrap/src/" },
+      to: {
+        pathNot: ["^packages/worker-bootstrap/src/", "^packages/isolation-core/src/"],
+        dependencyTypesNot: ["core"],
       },
     },
     {
@@ -150,7 +214,7 @@ module.exports = {
       severity: "error",
       comment: "Entrypoints are thin wiring; nothing imports them.",
       from: {},
-      to: { path: "^apps/extension/src/entrypoints/|^apps/website/src/main\\.tsx$" },
+      to: { path: "^apps/(extension|isolator)/src/entrypoints/|^apps/website/src/main\\.tsx$" },
     },
   ],
   options: {

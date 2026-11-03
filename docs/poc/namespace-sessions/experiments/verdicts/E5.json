@@ -1,0 +1,267 @@
+[
+  {
+    "experiment": "E5",
+    "hypothesis": "first",
+    "verdict": "fail",
+    "error": "100 of 100 samples failed: no request from /sw-main.js?variant=classic reached the fixture; the worker reported TypeError: Failed to fetch (20); no request from /sw-main.js?variant=module reached the fixture; the worker reported TypeError: Failed to fetch (20); no request from /sw-imports.js?variant=imports reached the fixture; the worker reported TypeError: Failed to fetch (20); no request from /sw-static.js?variant=static reached the fixture; the worker reported TypeError: Failed to fetch (20); no request from /sw-dynamic.js?variant=dynamic reached the fixture; the worker reported TypeError: Failed to fetch (20)",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "samples": 100,
+    "method": "cdp-load-unpacked",
+    "counts": {
+      "samples": 100,
+      "passed": 0,
+      "notIntercepted": 0,
+      "notTransformed": 0,
+      "notReleased": 0,
+      "noEffect": 100,
+      "firstEffectBeforeMarker": 0,
+      "unmarkedEffect": 0,
+      "storeUnprefixed:IndexedDB": 0,
+      "storeUnprefixed:CacheStorage": 0,
+      "storeMissing": 0,
+      "storeUnreadable": 0,
+      "transformed": 100,
+      "main:worker:Other": 100
+    },
+    "timings": {
+      "pausedMs": {
+        "p50": 1.8,
+        "p95": 3,
+        "max": 3.6
+      }
+    },
+    "variants": [
+      {
+        "name": "classic",
+        "verdict": "fail",
+        "error": "20 of 20 samples failed: no request from /sw-main.js?variant=classic reached the fixture; the worker reported TypeError: Failed to fetch (20)",
+        "samples": 20
+      },
+      {
+        "name": "module",
+        "verdict": "fail",
+        "error": "20 of 20 samples failed: no request from /sw-main.js?variant=module reached the fixture; the worker reported TypeError: Failed to fetch (20)",
+        "samples": 20
+      },
+      {
+        "name": "imports",
+        "verdict": "fail",
+        "error": "20 of 20 samples failed: no request from /sw-imports.js?variant=imports reached the fixture; the worker reported TypeError: Failed to fetch (20)",
+        "samples": 20
+      },
+      {
+        "name": "static",
+        "verdict": "fail",
+        "error": "20 of 20 samples failed: no request from /sw-static.js?variant=static reached the fixture; the worker reported TypeError: Failed to fetch (20)",
+        "samples": 20
+      },
+      {
+        "name": "dynamic",
+        "verdict": "fail",
+        "error": "20 of 20 samples failed: no request from /sw-dynamic.js?variant=dynamic reached the fixture; the worker reported TypeError: Failed to fetch (20)",
+        "samples": 20
+      }
+    ]
+  },
+  {
+    "experiment": "E5",
+    "hypothesis": "imports",
+    "verdict": "pass",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "samples": 40,
+    "method": "cdp-load-unpacked",
+    "counts": {
+      "samples": 40,
+      "passed": 40,
+      "importNotIntercepted": 0,
+      "imports": 60,
+      "intercepted:worker": 60,
+      "import:worker:Script": 40,
+      "import:worker:Other": 20
+    },
+    "variants": [
+      {
+        "name": "imports",
+        "verdict": "pass",
+        "samples": 20
+      },
+      {
+        "name": "static",
+        "verdict": "pass",
+        "samples": 20
+      }
+    ]
+  },
+  {
+    "experiment": "E5",
+    "hypothesis": "update",
+    "verdict": "fail",
+    "error": "20 of 20 samples failed: update() installed a new version for unchanged app bytes (10); no Fetch.requestPaused for /sw-main.js?variant=classic on the tab or worker session (20); the new version's request without the marker: /me?from=%2Fsw-main.js%3Fvariant%3Dclassic (20)",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "samples": 20,
+    "method": "cdp-load-unpacked",
+    "counts": {
+      "samples": 20,
+      "passed": 0,
+      "updateFailed": 0,
+      "newVersionInstalled": 10,
+      "noNewVersion": 0,
+      "notIntercepted": 20,
+      "notTransformed": 0,
+      "installed": 20
+    },
+    "variants": [
+      {
+        "name": "same-marker",
+        "verdict": "fail",
+        "error": "10 of 10 samples failed: update() installed a new version for unchanged app bytes (10); no Fetch.requestPaused for /sw-main.js?variant=classic on the tab or worker session (10); the new version's request without the marker: /me?from=%2Fsw-main.js%3Fvariant%3Dclassic (10)",
+        "samples": 10
+      },
+      {
+        "name": "new-marker",
+        "verdict": "fail",
+        "error": "10 of 10 samples failed: no Fetch.requestPaused for /sw-main.js?variant=classic on the tab or worker session (10); the new version's request without the marker: /me?from=%2Fsw-main.js%3Fvariant%3Dclassic (10)",
+        "samples": 10
+      }
+    ]
+  },
+  {
+    "experiment": "E5",
+    "hypothesis": "offline",
+    "verdict": "fail",
+    "error": "10 of 10 samples failed: no request from the restarted worker reached the fixture; Chrome blocked a request without a URL (net::ERR_FAILED, LocalNetworkAccessPermissionDenied) (10)",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "samples": 10,
+    "method": "cdp-load-unpacked",
+    "counts": {
+      "samples": 10,
+      "passed": 0,
+      "notStopped": 0,
+      "notTransformed": 0,
+      "notServedOffline": 0,
+      "noEffect": 10,
+      "firstEffectBeforeMarker": 0,
+      "unmarkedEffect": 0,
+      "storeUnprefixed:IndexedDB": 0,
+      "storeUnprefixed:CacheStorage": 0,
+      "storeMissing": 0,
+      "storeUnreadable": 0,
+      "servedOffline": 10,
+      "markedInNetwork": 0
+    },
+    "variants": [
+      {
+        "name": "classic",
+        "verdict": "fail",
+        "error": "10 of 10 samples failed: no request from the restarted worker reached the fixture; Chrome blocked a request without a URL (net::ERR_FAILED, LocalNetworkAccessPermissionDenied) (10)",
+        "samples": 10
+      }
+    ]
+  },
+  {
+    "experiment": "E5",
+    "hypothesis": "imports-transform",
+    "verdict": "pass",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "samples": 10,
+    "label": "diagnostic",
+    "method": "cdp-load-unpacked",
+    "counts": {
+      "samples": 10,
+      "passed": 10,
+      "importNotIntercepted": 0,
+      "importNotTransformed": 0,
+      "imports": 15,
+      "intercepted:worker": 15,
+      "import:worker:Script": 10,
+      "transformed": 15,
+      "import:worker:Other": 5
+    },
+    "timings": {
+      "pausedMs": {
+        "p50": 1.8,
+        "p95": 2.7,
+        "max": 2.7
+      }
+    },
+    "variants": [
+      {
+        "name": "imports",
+        "verdict": "pass",
+        "samples": 5
+      },
+      {
+        "name": "static",
+        "verdict": "pass",
+        "samples": 5
+      }
+    ]
+  },
+  {
+    "experiment": "E5",
+    "hypothesis": "tab-session-main-script",
+    "verdict": "fail",
+    "error": "105 of 105 samples failed: /sw-main.js?variant=classic never paused on the tab session; Chrome paused it on the worker session as Other (25); /sw-main.js?variant=module never paused on the tab session; Chrome paused it on the worker session as Other (20); /sw-imports.js?variant=imports never paused on the tab session; Chrome paused it on the worker session as Other (20); /sw-static.js?variant=static never paused on the tab session; Chrome paused it on the worker session as Other (20); /sw-dynamic.js?variant=dynamic never paused on the tab session; Chrome paused it on the worker session as Other (20)",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "samples": 105,
+    "label": "diagnostic",
+    "method": "cdp-load-unpacked",
+    "counts": {
+      "samples": 105,
+      "passed": 0,
+      "notOnTabSession": 105,
+      "tab:Script": 110,
+      "worker:Other": 145,
+      "worker:Script": 40,
+      "tab:Document": 5,
+      "tab:XHR": 5,
+      "worker:XHR": 35
+    },
+    "variants": [
+      {
+        "name": "*/sw-*.js*",
+        "verdict": "fail",
+        "error": "100 of 100 samples failed: /sw-main.js?variant=classic never paused on the tab session; Chrome paused it on the worker session as Other (20); /sw-main.js?variant=module never paused on the tab session; Chrome paused it on the worker session as Other (20); /sw-imports.js?variant=imports never paused on the tab session; Chrome paused it on the worker session as Other (20); /sw-static.js?variant=static never paused on the tab session; Chrome paused it on the worker session as Other (20); /sw-dynamic.js?variant=dynamic never paused on the tab session; Chrome paused it on the worker session as Other (20)",
+        "samples": 100
+      },
+      {
+        "name": "*",
+        "verdict": "fail",
+        "error": "5 of 5 samples failed: /sw-main.js?variant=classic never paused on the tab session; Chrome paused it on the worker session as Other (5)",
+        "samples": 5
+      }
+    ]
+  },
+  {
+    "experiment": "E5",
+    "hypothesis": "fulfilled-worker-address-space",
+    "verdict": "fail",
+    "error": "5 of 10 samples failed: the worker's requests left from address space Unknown (5); Chrome blocked /me?from=%2Fsw-main.js%3Fvariant%3Dclassic (net::ERR_FAILED, InsecureLocalNetwork) (5); Chrome blocked /__marker?name=sw%3Async%3Afixture-sync (net::ERR_FAILED, InsecureLocalNetwork) (5)",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "samples": 10,
+    "label": "diagnostic",
+    "method": "cdp-load-unpacked",
+    "counts": {
+      "samples": 10,
+      "passed": 5,
+      "addressSpace": 5,
+      "blocked": 5,
+      "space:Unknown": 25,
+      "blockedRequests": 10,
+      "space:Loopback": 35
+    },
+    "variants": [
+      {
+        "name": "fulfilled",
+        "verdict": "fail",
+        "error": "5 of 5 samples failed: the worker's requests left from address space Unknown (5); Chrome blocked /me?from=%2Fsw-main.js%3Fvariant%3Dclassic (net::ERR_FAILED, InsecureLocalNetwork) (5); Chrome blocked /__marker?name=sw%3Async%3Afixture-sync (net::ERR_FAILED, InsecureLocalNetwork) (5)",
+        "samples": 5
+      },
+      {
+        "name": "control",
+        "verdict": "pass",
+        "samples": 5
+      }
+    ]
+  }
+]
