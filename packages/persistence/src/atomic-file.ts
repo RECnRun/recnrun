@@ -6,12 +6,16 @@ export const hasCode = (error: unknown, code: string): boolean =>
   error instanceof Error && "code" in error && error.code === code;
 
 // A temporary file beside the target, so a rename or link never crosses file systems.
-async function writeTemporary(path: string, text: string): Promise<string> {
+async function writeTemporary(
+  path: string,
+  content: string | Uint8Array,
+  mode?: number,
+): Promise<string> {
   const folder = dirname(path);
   await mkdir(folder, { recursive: true });
   const temporary = join(folder, `.${basename(path)}.${randomUUID()}.tmp`);
   try {
-    await writeFile(temporary, text, { flag: "wx" });
+    await writeFile(temporary, content, { flag: "wx", ...(mode !== undefined && { mode }) });
   } catch (error) {
     await rm(temporary, { force: true });
     throw error;
@@ -30,16 +34,20 @@ export async function writeAtomic(path: string, text: string): Promise<void> {
   }
 }
 
-/** Writes a file that never changes once written: true when it holds `text`, false when it differs. */
-export async function writeOnce(path: string, text: string): Promise<boolean> {
-  const temporary = await writeTemporary(path, text);
+/** Writes a file that never changes once written: true when it holds `content`, false when it differs. */
+export async function writeOnce(
+  path: string,
+  content: string | Uint8Array,
+  mode?: number,
+): Promise<boolean> {
+  const temporary = await writeTemporary(path, content, mode);
   try {
     // link() fails when the target exists, so an existing file is never replaced.
     await link(temporary, path);
     return true;
   } catch (error) {
     if (!hasCode(error, "EEXIST")) throw error;
-    return (await readFile(path, "utf8")) === text;
+    return (await readFile(path)).equals(Buffer.from(content));
   } finally {
     await rm(temporary, { force: true });
   }

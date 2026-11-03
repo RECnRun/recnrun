@@ -10,6 +10,14 @@ export const flowFolderLayout = {
 
 export type FlowFolderLayout = typeof flowFolderLayout;
 
+export {
+  BlobStoreError,
+  openBlobStore,
+  type BlobMeta,
+  type BlobStore,
+  type BlobStoreErrorCode,
+  type BlobStoreOptions,
+} from "./blobs.ts";
 export { BindingsFileError, openBindingsStore, type BindingsStore } from "./bindings-store.ts";
 export {
   JournalFileError,
