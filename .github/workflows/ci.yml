@@ -8,14 +8,16 @@ on:
 permissions:
   contents: read
 
+# A push and its pull request share one group, so one commit runs CI once.
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.event.pull_request.head.ref || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # verify runs every experiment in Docker; the experiments alone take about 27 minutes here.
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v6
       - uses: voidzero-dev/setup-vp@v1.21.1
