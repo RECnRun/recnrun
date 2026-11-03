@@ -48,6 +48,7 @@ export function fakeStop(options: StopOptions = {}) {
         for (const rule of update.addRules ?? []) rules.set(rule.id, rule);
         for (const id of update.removeRuleIds ?? []) rules.delete(id);
       },
+      getSessionRules: async () => [...rules.values()],
     },
     tabs: {
       query: async ({ url }) => openTabs.filter((tab) => matches(url, tab.url)),
@@ -58,7 +59,7 @@ export function fakeStop(options: StopOptions = {}) {
   };
   let clock = 0;
   const engine = new StopEngine(() => apis, { now: () => (clock += 1), timeOrigin: 1_000 });
-  return { ...fake, engine, rules, dnrCalls, removedTabs };
+  return { ...fake, apis, engine, rules, dnrCalls, removedTabs };
 }
 
 /** `api.method` of every call in the journal, in order. */

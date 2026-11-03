@@ -29,8 +29,6 @@ export class StopEngine implements Stop {
   readonly #apis: () => StopApis;
   readonly #clock: Clock;
   readonly #holds = new Map<string, Promise<Outcome<Record<string, unknown>>>>();
-  readonly #rules = new Set<number>();
-  #nextRule = 1;
   #watching: Watching | undefined;
 
   constructor(apis: () => StopApis, clock: Clock = PERFORMANCE) {
@@ -71,18 +69,12 @@ export class StopEngine implements Stop {
   async blockScope(request: unknown): Promise<StopJournal> {
     const { origin } = parse(OriginRequest, request);
     const recorder = this.#recorder();
-    const ruleId = this.#nextRule;
-    this.#nextRule += 1;
-    const outcome = await blockScope(recorder, origin, ruleId);
-    if (outcome.ruleAdded) this.#rules.add(ruleId);
-    return recorder.journal("dnr-block-evict", outcome);
+    return recorder.journal("dnr-block-evict", await blockScope(recorder, origin));
   }
 
   async unblock(): Promise<StopJournal> {
     const recorder = this.#recorder();
-    const outcome = await unblock(recorder, [...this.#rules]);
-    for (const id of outcome.removed) this.#rules.delete(id);
-    return recorder.journal("unblock", outcome);
+    return recorder.journal("unblock", await unblock(recorder));
   }
 
   async unregister(request: unknown): Promise<StopJournal> {

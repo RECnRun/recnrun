@@ -7,6 +7,24 @@ import type { BlockRule } from "@/background/stop/types";
 
 // A client evaluation can wait on the worker's reply, which the page bounds at 5 s.
 const EVALUATION_MS = 10_000;
+// Session rules outlive a suspended background, so ownership is this id range, not memory (E6 owns 6100-6199).
+const FIRST_RULE = 6200;
+const LAST_RULE = 6299;
+const DNR = { api: "declarativeNetRequest" as const };
+
+/** The ids of the stop rules Chrome still holds, read back so a restarted background owns them too. */
+async function ownedRuleIds(recorder: Recorder): Promise<number[]> {
+  const listed = await recorder.record({ ...DNR, method: "getSessionRules" }, () =>
+    recorder.apis.dnr.getSessionRules(),
+  );
+  if (listed.error !== undefined) throw new Error(listed.error);
+  return listed.value.map(({ id }) => id).filter((id) => id >= FIRST_RULE && id <= LAST_RULE);
+}
+
+function freeRuleId(owned: number[]): number {
+  for (let id = FIRST_RULE; id <= LAST_RULE; id += 1) if (!owned.includes(id)) return id;
+  throw new Error(`no free stop rule id between ${FIRST_RULE} and ${LAST_RULE}`);
+}
 
 function valueOf(reply: Outcome<Record<string, unknown>>): { value?: unknown; error?: string } {
   if (reply.error !== undefined) return { error: reply.error };
@@ -60,15 +78,16 @@ function evictedBy(workers: { clients: unknown }[], closedTabs: number[]): strin
  * A session rule that blocks the origin's `/sw-*.js` scripts, then eviction of the workers' window
  * clients: `client.navigate()` evaluated in each worker, and the tabs still on the origin closed.
  */
-export async function blockScope(recorder: Recorder, origin: string, ruleId: number) {
+export async function blockScope(recorder: Recorder, origin: string) {
   requireLoopbackOrigin(origin);
+  const ruleId = freeRuleId(await ownedRuleIds(recorder));
   const rule: BlockRule = {
     id: ruleId,
     priority: 1,
     action: { type: "block" },
     condition: { regexFilter: `^${escapeRegex(origin)}/sw-[^/?#]*\\.js` },
   };
-  const call = { api: "declarativeNetRequest" as const, method: "updateSessionRules" };
+  const call = { ...DNR, method: "updateSessionRules" };
   const added = await recorder.record({ ...call, params: { addRules: [rule] } }, () =>
     recorder.apis.dnr.updateSessionRules({ addRules: [rule] }),
   );
@@ -87,9 +106,11 @@ export async function blockScope(recorder: Recorder, origin: string, ruleId: num
   };
 }
 
-export async function unblock(recorder: Recorder, ruleIds: number[]) {
+/** Removes every stop rule Chrome holds, whichever background instance added it. */
+export async function unblock(recorder: Recorder) {
+  const ruleIds = await ownedRuleIds(recorder);
   if (ruleIds.length === 0) return { removed: [] };
-  const call = { api: "declarativeNetRequest" as const, method: "updateSessionRules" };
+  const call = { ...DNR, method: "updateSessionRules" };
   const removed = await recorder.record({ ...call, params: { removeRuleIds: ruleIds } }, () =>
     recorder.apis.dnr.updateSessionRules({ removeRuleIds: ruleIds }),
   );

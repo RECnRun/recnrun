@@ -1,5 +1,6 @@
 import { withMarker } from "@recnrun/worker-bootstrap";
 import { describe, expect, test } from "vite-plus/test";
+import { StopEngine } from "@/background/stop/engine";
 import { APP, fakeStop, methods, TAB } from "./fake-stop";
 
 const ALREADY_ATTACHED = "Another debugger is already attached to the tab with id: 7.";
@@ -35,6 +36,7 @@ describe("DNR block and client eviction", () => {
     expect(expressionOf(sent)).toContain('navigate("about:blank")');
     expect(removedTabs).toEqual([TAB]);
     expect(methods(journal)).toEqual([
+      "declarativeNetRequest.getSessionRules",
       "declarativeNetRequest.updateSessionRules",
       "debugger.getTargets",
       "debugger.attach",
@@ -65,8 +67,21 @@ describe("DNR block and client eviction", () => {
     await engine.blockScope({ origin: APP });
     const journal = await engine.unblock();
     expect(rules.size).toBe(0);
-    expect(journal.outcome).toEqual({ removed: [1] });
+    expect(journal.outcome).toEqual({ removed: [6200] });
     expect((await engine.unblock()).outcome).toEqual({ removed: [] });
+  });
+
+  test("a new engine over the same session rules removes what an earlier one added", async () => {
+    const first = fakeStop(evaluateReply([]));
+    await first.engine.blockScope({ origin: APP });
+    await first.engine.blockScope({ origin: APP });
+    expect([...first.rules.keys()]).toEqual([6200, 6201]);
+    // The background restarts: a fresh engine must still own the session rules, which outlive it.
+    const second = new StopEngine(() => first.apis, { now: () => 1, timeOrigin: 1_000 });
+    expect((await second.blockScope({ origin: APP })).outcome).toMatchObject({ ruleId: 6202 });
+    const journal = await second.unblock();
+    expect(journal.outcome).toEqual({ removed: [6200, 6201, 6202] });
+    expect(first.rules.size).toBe(0);
   });
 });
 

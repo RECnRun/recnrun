@@ -183,6 +183,7 @@ describe("isolator egress", () => {
   test("the stop mechanisms reach no host outside the loopback", async () => {
     const { sent, emit } = probeEntrypoint();
     vi.spyOn(fakeBrowser.declarativeNetRequest, "updateSessionRules").mockResolvedValue();
+    vi.spyOn(fakeBrowser.declarativeNetRequest, "getSessionRules").mockResolvedValue([] as never);
     vi.spyOn(fakeBrowser.tabs, "query").mockResolvedValue([] as never);
     const stop = (globalThis as Record<string, unknown>)[STOP_GLOBAL] as Stop;
     stop.watch({ marker: "egress" });

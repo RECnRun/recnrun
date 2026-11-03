@@ -51,6 +51,7 @@ export interface BlockRule {
 /** The part of `chrome.declarativeNetRequest` the stop mechanisms use; unit tests pass a fake. */
 export interface DnrApi {
   updateSessionRules(options: { addRules?: BlockRule[]; removeRuleIds?: number[] }): Promise<void>;
+  getSessionRules(): Promise<{ id: number }[]>;
 }
 
 /** The part of `chrome.tabs` the eviction uses. */
