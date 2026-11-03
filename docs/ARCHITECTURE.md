@@ -264,17 +264,20 @@ RECnRun reads the user's real Chrome profile, including request bodies and stora
 
 ## Toolchain
 
-| Concern                  | Tool                                                                                                                |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------- |
-| Package manager, tasks   | Vite+ (`vp`) with pnpm workspaces and a version catalog                                                             |
-| Format, lint, type check | `vp check`: Oxfmt, Oxlint (type aware, with `eslint-plugin-sonarjs`), tsgo                                          |
-| Architecture boundaries  | dependency-cruiser (`.dependency-cruiser.cjs`)                                                                      |
-| Dead code, duplication   | Knip (`knip.jsonc`), jscpd                                                                                          |
-| Documentation            | `scripts/check-docs.mjs` (`vp run docs:check`): relative links and anchors resolve                                  |
-| Unit and component tests | Vitest with V8 coverage; Vitest Browser Mode with Playwright Chromium                                               |
-| End-to-end               | Playwright against the built website, in Docker                                                                     |
-| Browser layer            | `vp run test:browser`: Google Chrome Stable for Linux, headed on Xvfb in Docker, found through `DevToolsActivePort` |
-| Contract layer           | `vp run test:contract`: Vitest over the real service on a temporary home, with `RECNRUN_FORBID_EGRESS=1`, in Docker |
+| Concern                  | Tool                                                                                                                 |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------- |
+| Package manager, tasks   | Vite+ (`vp`) with pnpm workspaces and a version catalog                                                              |
+| Format, lint, type check | `vp check`: Oxfmt, Oxlint (type aware, with `eslint-plugin-sonarjs`), tsgo                                           |
+| Architecture boundaries  | dependency-cruiser (`.dependency-cruiser.cjs`)                                                                       |
+| Dead code, duplication   | Knip (`knip.jsonc`), jscpd                                                                                           |
+| Documentation            | `scripts/check-docs.mjs` (`vp run docs:check`): relative links and anchors resolve                                   |
+| Unit and component tests | Vitest with V8 coverage; Vitest Browser Mode with Playwright Chromium                                                |
+| End-to-end               | Playwright against the built website, in Docker                                                                      |
+| Browser layer            | `vp run test:browser`: Google Chrome Stable for Linux, headed on Xvfb in Docker, found through `DevToolsActivePort`  |
+| Contract layer           | `vp run test:contract`: Vitest over the real service on a temporary home, with `RECNRUN_FORBID_EGRESS=1`, in Docker  |
+| Git hooks                | `.vite-hooks/`: pre-commit runs the fast gates and unit tests, commit-msg the commit rules, pre-push `vp run verify` |
+
+- **Verified commits.** When `vp run verify` passes with a clean working tree before and after the run, on the same commit, `scripts/test-container.mjs` writes the run id to `.artifacts/verified/<HEAD sha>` (`scripts/verified-commit.mjs`). The pre-push hook (`scripts/git-hooks/pre-push.mjs`) skips verify and names that marker only when the tree is still clean on that commit; any other state, an untracked file included, runs verify again. A failed verify or a dirty tree never writes a marker.
 
 Findings from the bootstrap spike, kept here because they explain the configuration:
 

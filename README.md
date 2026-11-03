@@ -42,7 +42,7 @@ vp run clean            # delete builds, test artifacts, and caches
 | `vp run docs:check`                               | Relative Markdown links and anchors resolve                             |
 | `vp run verify`                                   | All of the above, plus builds                                           |
 
-Tests and `verify` run in Docker on a virtual display, so browser windows never open on your desktop. Results and failure artifacts are in `.artifacts/docker/<run-id>/`. Git hooks run the fast gates before each commit and `vp run verify` before each push.
+Tests and `verify` run in Docker on a virtual display, so browser windows never open on your desktop. Results and failure artifacts are in `.artifacts/docker/<run-id>/`. Git hooks run the fast gates before each commit and `vp run verify` before each push, unless verify already passed on that exact commit with a clean working tree.
 
 ## Deployment
 

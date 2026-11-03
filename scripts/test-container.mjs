@@ -4,6 +4,7 @@ import { createWriteStream } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { cleanHead, recordVerified } from "./verified-commit.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url)).replace(/\/$/, "");
 const [task, ...forwarded] = process.argv.slice(2);
@@ -170,8 +171,16 @@ async function executeTests() {
   return startTests();
 }
 
+// The pre-push hook skips verify for a commit whose full, unmodified verify passed on a clean tree.
+async function recordPass(before) {
+  if (process.exitCode !== 0 || task !== "verify:local" || args.length) return;
+  const marker = await recordVerified(root, before, runId);
+  if (marker) message(`Verify passed on clean commit ${before}: ${marker}`);
+}
+
 async function run() {
   if (!tasks.has(task)) throw new Error(`Unknown container test task: ${task}`);
+  const before = task === "verify:local" ? cleanHead(root) : undefined;
   if (process.env.RECNRUN_TEST_CONTAINER === "1") {
     throw new Error("Use the :local test tasks inside the test container.");
   }
@@ -192,6 +201,7 @@ async function run() {
       code ||= exported || removed.code;
     }
     process.exitCode = interrupted || code;
+    await recordPass(before);
     process.removeListener("SIGINT", interrupt);
     process.removeListener("SIGTERM", interrupt);
     await new Promise((done) => log.end(done));

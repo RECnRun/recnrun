@@ -22,6 +22,7 @@ if (command === "create") console.log("fixture-container");
 if (command === "start") {
   console.log("Container test output");
   console.error("Container diagnostic output");
+  if (scenario === "dirty-during") writeFileSync(process.env.DOCKER_FIXTURE_TOUCH, "Changed");
   if (scenario === "interrupt") {
     const timer = setInterval(() => {
       if (existsSync(join(directory, "stopped"))) {

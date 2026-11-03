@@ -1,8 +1,17 @@
 import assert from "node:assert/strict";
-import { execFile, spawn } from "node:child_process";
-import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { execFile, execFileSync, spawn } from "node:child_process";
+import {
+  chmodSync,
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
-import { delimiter, join, resolve } from "node:path";
+import { basename, delimiter, join, resolve } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
@@ -11,7 +20,8 @@ const root = fileURLToPath(new URL("../../", import.meta.url));
 const runner = join(root, "scripts/test-container.mjs");
 const fixture = fileURLToPath(new URL("./docker-fixture.mjs", import.meta.url));
 
-function launch(context, scenario = "success", extra = []) {
+function launch(context, scenario = "success", extra = [], options = {}) {
+  const { task = "test:e2e:local", script = runner, env = {} } = options;
   const directory = mkdtempSync(join(tmpdir(), "recnrun-container-"));
   context.after(() => rmSync(directory, { recursive: true, force: true }));
   const docker = join(directory, "docker");
@@ -19,7 +29,7 @@ function launch(context, scenario = "success", extra = []) {
     writeFileSync(docker, `#!${process.execPath}\nimport ${JSON.stringify(fixture)};\n`);
     chmodSync(docker, 0o755);
   }
-  const child = spawn(process.execPath, [runner, "test:e2e:local", ...extra], {
+  const child = spawn(process.execPath, [script, task, ...extra], {
     cwd: directory,
     env: {
       ...process.env,
@@ -28,6 +38,7 @@ function launch(context, scenario = "success", extra = []) {
       DOCKER_FIXTURE_SCENARIO: scenario,
       RECNRUN_TEST_CONTAINER: "",
       RECNRUN_TEST_ARTIFACTS: join(directory, "artifacts"),
+      ...env,
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -119,6 +130,57 @@ test("records the image's tool versions and id in versions.json", async (context
   assert.equal(result.calls.at(-1)[0], "rm");
 });
 
+// A clean Git checkout holding the runner, so verify:local can record its marker there.
+function checkout(context) {
+  const repo = mkdtempSync(join(tmpdir(), "recnrun-checkout-"));
+  context.after(() => rmSync(repo, { recursive: true, force: true }));
+  mkdirSync(join(repo, "scripts"));
+  for (const file of ["test-container.mjs", "verified-commit.mjs"]) {
+    copyFileSync(join(root, "scripts", file), join(repo, "scripts", file));
+  }
+  writeFileSync(join(repo, ".gitignore"), ".artifacts/\n");
+  const git = (...args) => execFileSync("git", ["-C", repo, ...args], { encoding: "utf8" }).trim();
+  git("init", "-q");
+  git("add", ".");
+  git(
+    "-c",
+    "user.name=Checks",
+    "-c",
+    "user.email=checks@recnrun.invalid",
+    "commit",
+    "-qm",
+    "Start",
+  );
+  return { repo, head: git("rev-parse", "HEAD"), script: join(repo, "scripts/test-container.mjs") };
+}
+
+test("a passing verify on a clean checkout records its run id for the commit", async (context) => {
+  const { repo, head, script } = checkout(context);
+  const env = { RECNRUN_TEST_ARTIFACTS: join(repo, ".artifacts/docker") };
+  const result = await launch(context, "success", [], { task: "verify:local", script, env });
+  assert.equal(result.code, 0, result.output);
+  const marker = readFileSync(join(repo, ".artifacts/verified", head), "utf8").trim();
+  assert.equal(marker, basename(result.artifacts));
+});
+
+test("a failing, dirty, or dirtied verify records no marker", async (context) => {
+  for (const [scenario, dirty] of [
+    ["test-failure", false],
+    ["success", true],
+    ["dirty-during", false],
+  ]) {
+    const { repo, script } = checkout(context);
+    if (dirty) writeFileSync(join(repo, "notes.txt"), "Uncommitted");
+    const env = { DOCKER_FIXTURE_TOUCH: join(repo, "touched.txt") };
+    const result = await launch(context, scenario, [], { task: "verify:local", script, env });
+    assert.ok(
+      result.calls.some(([command]) => command === "start"),
+      scenario,
+    );
+    assert.equal(existsSync(join(repo, ".artifacts/verified")), false, scenario);
+  }
+});
+
 test("the test image ships Google Chrome Stable 144 or later", { timeout: 900_000 }, async () => {
   const version = await chromeVersion();
   const match = /^Google Chrome (\d+)\.\d+\.\d+\.\d+$/.exec(version);
@@ -198,5 +260,8 @@ test("public tests route through Docker while local variants and the hooks retai
     readFileSync(join(root, ".vite-hooks/pre-commit"), "utf8"),
     /vp staged\nvp check\nvp run --no-cache deps\nvp run --no-cache test:unit\n/,
   );
-  assert.equal(readFileSync(join(root, ".vite-hooks/pre-push"), "utf8").trim(), "vp run verify");
+  assert.equal(
+    readFileSync(join(root, ".vite-hooks/pre-push"), "utf8").trim(),
+    "node scripts/git-hooks/pre-push.mjs",
+  );
 });
