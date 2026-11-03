@@ -17,13 +17,16 @@ Tracks [PLAN.md](PLAN.md). One line per task; the orchestrator owns `[x]`, imple
 Markers: `[ ]` not started · `[i]` implemented, awaiting the phase gate · `[x]` verified by `vp run verify` · `[!]` blocked (reason indented) · `[~]` partial (what is missing indented).
 
 **Branch:** `poc-downloads-launcher` (from `60989d6`, head of PR #19 `poc/multi-profile-mesh`)
-**Last commit:** the commit whose subject is "Plan the Downloads, launcher, headless, and cloning POC" (no hash: the commit cannot name itself)
-**Current phase:** P0 (start with P0.1)
+**Last commit:** the commit whose subject is "Record P0.1 and the host tool versions" (its hash is the next one after `0bf18cc`)
+**Current phase:** P0 (P0.1 implemented; P0.2 baseline verify and P0.3/P0.4 in flight)
 **Paused:** 2026-11-03, plan committed, nothing in flight. Owner decisions recorded in PLAN.md decisions 1, 3, 4, 9 (host Chrome allowed including the personal Default; packed not executed; §13 order; PR against `poc/multi-profile-mesh`).
 
 ## P0: Base, lab, baseline, and Chromium inventory
 
-- [ ] P0.1 Plan documents and `docs:check`
+- [i] P0.1 Plan documents and `docs:check`
+  red: `node <scratch>/scripts/check-docs.mjs <scratch>` with `MANUAL_VALIDATION.md#nope` in a scratch copy of PLAN.md exits 1: `broken anchor MANUAL_VALIDATION.md#nope`
+  green: `node --test scripts/check-docs.checks.mjs` 8 passed; `vp run docs:check` exits 0; `vp check` clean
+  commit: `0bf18cc` Port the Markdown link checker and register the POC in the docs (cherry-picks of `049a482` and `226b406`, adapted)
 - [ ] P0.2 Baseline of the base (verify counts, Google Chrome Stable in Docker, mesh regressions)
 - [ ] P0.3 Browser and experiments layers on branded Chrome, E0 install methods, report `experiments/E0.md`
 - [ ] P0.4 Chromium inventory `CHROMIUM.md`
@@ -31,6 +34,7 @@ Markers: `[ ]` not started · `[i]` implemented, awaiting the phase gate · `[x]
 - [ ] P0.6 Namespace and evidence schema
 
 Gate P0: verify · baseline counts · Chrome versions (lab, host) · review
+host: macOS 27.0.1 (26A434) arm64 · Google Chrome 156.0.8078.80 (`/Applications/Google Chrome.app`) · Docker 28.5.1 · host `vp` 1.0.0-rc.0 on Node v22.22.2 (the image runs Vite+ 1.4.0 on Node 24.21.0, pnpm 12.14.0)
 
 ## P1: Downloads write and `file://` read
 
