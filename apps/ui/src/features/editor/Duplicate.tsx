@@ -25,7 +25,7 @@ export function Duplicate({ flowId, name, onDuplicated }: Props) {
   return (
     <Card title="Duplicate flow">
       <form class="stack" aria-label="Duplicate flow" onSubmit={submit}>
-        <p class="muted">Copies the flow as last saved; unsaved changes stay here.</p>
+        <p class="muted">Copies the flow as last saved; edits not yet saved stay here.</p>
         <div class="row">
           <Field label="New id">
             <input value={newId} onInput={(event) => setNewId(event.currentTarget.value)} />

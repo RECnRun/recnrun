@@ -1,13 +1,13 @@
 import type { Capability } from "./capabilities.ts";
-import { planned } from "./capability-planned.ts";
+import { implemented, planned } from "./capability-planned.ts";
 
 // Editor, functions, agents, and distribution: nothing here is built before F4.
 export const ROADMAP_CAPABILITIES: Extract<Capability, { kind: "feature" }>[] = [
-  planned(
+  implemented(
     "full-editor",
     "F4.1",
     "Full flow editor",
-    "Every change creates a revision and past runs keep theirs.",
+    "Delivered by F4.1; tests/e2e/editor.spec.ts on the real service: steps are added, removed, reordered, and edited in place, assertions and waits are inserted before a chosen step, a target is picked in Chrome from a candidate list, a literal becomes an input, inputs, actors, and requirements are declared and linked, timeouts and the step's actor change, the flow is duplicated, and two revisions are compared. Component tests: apps/ui/tests/editor*.browser.test.tsx. Every save is a new revision and a run keeps the revision it replayed. Locator lists with several strategies, datasets, preconditions, and multi-actor runs are F4A.6, F4.2, and F4.3.",
   ),
   planned(
     "inputs-datasets",
