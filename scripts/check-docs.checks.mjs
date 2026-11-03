@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { checkDocs, checks, slug } from "./check-docs.mjs";
+import { decide, END, REPORT, START } from "./decide.mjs";
 
 const script = fileURLToPath(new URL("./check-docs.mjs", import.meta.url));
 const target = "# Target\n\n## Section one\n\n## Section one\n\n## `vp run` and F0.1: why?\n";
@@ -109,4 +110,44 @@ test("reports a CAPABILITIES.md that no longer matches its capabilities.json", (
 test("keeps an extension point for later documentation checks", () => {
   assert.ok(checks.length >= 1);
   assert.ok(checks.every((check) => typeof check === "function"));
+});
+
+const repository = fileURLToPath(new URL("..", import.meta.url));
+const verdictsPath = "docs/poc/namespace-sessions/experiments/verdicts";
+
+function decisionTree(context, block) {
+  const files = { [REPORT]: `# Report\n\nIntro.\n\n${START}\n${block}\n${END}\n` };
+  for (const name of readdirSync(join(repository, verdictsPath))) {
+    files[`${verdictsPath}/${name}`] = readFileSync(join(repository, verdictsPath, name), "utf8");
+  }
+  return tree(context, files);
+}
+
+test("accepts a REPORT-P1.md whose block equals a fresh run of decide.mjs", (context) => {
+  const root = decisionTree(context, decide(repository));
+  assert.deepEqual(run(root), { code: 0, errors: [] });
+});
+
+test("reports a REPORT-P1.md whose embedded decision output is stale", (context) => {
+  const root = decisionTree(context, "Edited by hand.");
+  assert.deepEqual(run(root), {
+    code: 1,
+    errors: [`${REPORT}:5: stale; run \`node scripts/decide.mjs --write\``],
+  });
+});
+
+test("reports a REPORT-P1.md without the decide markers", (context) => {
+  const root = tree(context, { [REPORT]: "# Report\n\nNo block.\n" });
+  assert.deepEqual(run(root), {
+    code: 1,
+    errors: [`${REPORT}:1: needs ${START} and ${END} around the output of scripts/decide.mjs`],
+  });
+});
+
+test("reports a REPORT-P1.md whose verdicts cannot be read", (context) => {
+  const root = tree(context, { [REPORT]: `${START}\nx\n${END}\n` });
+  assert.deepEqual(run(root), {
+    code: 1,
+    errors: [`${REPORT}:1: ${verdictsPath}: no such directory`],
+  });
 });

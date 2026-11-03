@@ -2,6 +2,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { decide, END, REPORT, START } from "./decide.mjs";
 import { checkCapabilities } from "./generate-capabilities.mjs";
 
 const SKIPPED_DIRECTORIES = new Set([
@@ -117,8 +118,28 @@ function checkLinks({ root, files }) {
   );
 }
 
+/** Reports a P1 report whose embedded decision output differs from a fresh run of decide.mjs. */
+function checkDecision({ root }) {
+  const file = join(root, REPORT);
+  if (!existsSync(file)) return [];
+  const text = readFileSync(file, "utf8");
+  const start = text.indexOf(START);
+  const end = text.indexOf(END);
+  if (start < 0 || end < start) {
+    return [`${REPORT}:1: needs ${START} and ${END} around the output of scripts/decide.mjs`];
+  }
+  const line = text.slice(0, start).split("\n").length;
+  try {
+    const fresh = decide(root).trim();
+    if (text.slice(start + START.length, end).trim() === fresh) return [];
+  } catch (error) {
+    return [`${REPORT}:${line}: ${error.message}`];
+  }
+  return [`${REPORT}:${line}: stale; run \`node scripts/decide.mjs --write\``];
+}
+
 // Extension point: each check gets { root, files } and returns "file:line: message" strings.
-export const checks = [checkLinks, checkCapabilities];
+export const checks = [checkLinks, checkCapabilities, checkDecision];
 
 /** Runs every check against the Markdown under root and returns the failures. */
 export function checkDocs(root) {

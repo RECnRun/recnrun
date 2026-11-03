@@ -73,7 +73,7 @@ Measured on Playwright Chromium or Chrome for Testing 156 (never branded Chrome)
 | Docs        | `scripts/check-docs.mjs`: links and anchors resolve, generated tables current                                                                       | `vp run docs:check`                     | P0.1     |
 
 - Coverage thresholds (80/80/80/75), Knip, jscpd (4%), lint caps, and the architecture rules apply to every new workspace. Vendored SplitSession files are tested through the modules that import them; they are not excluded from analysis.
-- `docs/poc/namespace-sessions/CAPABILITIES.md` is generated from `capabilities.json` (what `chrome.debugger` and the installed Chrome allowed) and `REPORT.md` embeds the output of `scripts/decide.mjs`; `docs:check` fails when either is stale.
+- `docs/poc/namespace-sessions/CAPABILITIES.md` is generated from `capabilities.json` (what `chrome.debugger` and the installed Chrome allowed) and `experiments/REPORT-P1.md` embeds the output of `scripts/decide.mjs` run on the committed `experiments/verdicts/`; `docs:check` fails when either is stale.
 
 ## 5. Target layout
 
