@@ -136,8 +136,9 @@ test("pauseReplay holds the next step until the session resumes", async ({ chrom
   let resume: () => void = () => undefined;
   let paused: () => void = () => undefined;
   const held = new Promise<void>((resolve) => (paused = resolve));
+  // `observe` sees every journal line, snapshots included; the order of steps is what is held.
   const observe = (event: Event) => {
-    seen.push(`${event.type} ${event.stepId}`);
+    if (event.category === "step") seen.push(`${event.type} ${event.stepId}`);
     if (event.type === "step.finished" && event.stepId === "open") {
       session = ok(pauseSession(session, "pauseReplay", Date.now()));
     }

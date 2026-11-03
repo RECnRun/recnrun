@@ -41,6 +41,7 @@ export interface ReplayOptions extends ScopeOptions {
   /** Stores the run: the manifest is written first, steps.json and summary.json last. */
   run?: { store: ReplayRunStore; manifest: RunManifest };
   control?: ReplayControl;
+  /** Sees every journal line as it is written: step events and the run's evidence alike. */
   observe?: (event: Event) => void;
 }
 
