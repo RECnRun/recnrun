@@ -95,7 +95,7 @@ export function launchForUnpacked({
 }
 
 /** Installs the build at `path` over CDP and returns its id. */
-export async function installUnpacked(chrome: LaunchedChrome, path: string): Promise<string> {
+async function installUnpacked(chrome: LaunchedChrome, path: string): Promise<string> {
   const params = { path };
   const loaded = chrome.pipe
     ? await chrome.pipe.send<{ id: string }>("Extensions.loadUnpacked", params)

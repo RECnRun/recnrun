@@ -34,8 +34,8 @@ function without(key: string): Record<string, unknown> {
 
 describe("committed lab verdicts", () => {
   test("the full and smoke files parse", () => {
-    expect(parseVerdicts(committed("E0-lab-full.json"))).toHaveLength(2);
-    expect(parseVerdicts(committed("E0-lab-smoke.json"))).toHaveLength(2);
+    expect(parseVerdicts(committed("E0-lab-full.json"))).toHaveLength(3);
+    expect(parseVerdicts(committed("E0-lab-smoke.json"))).toHaveLength(3);
   });
 
   test("the versions file parses", () => {

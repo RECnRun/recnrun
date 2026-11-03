@@ -7,7 +7,6 @@ import { expect, resolveChromePath, test } from "../browser/fixtures/chrome.ts";
 import {
   attachExtension,
   EXTENSION_PATH,
-  installUnpacked,
   launchForUnpacked,
   loadUnpacked,
 } from "../browser/fixtures/extension-loaders.ts";
@@ -19,6 +18,8 @@ import {
 } from "../browser/fixtures/policy-install.ts";
 import type { InstalledState } from "../browser/fixtures/policy-install.ts";
 import { windowShows } from "../browser/fixtures/x-display.ts";
+import { observePersistence, persistenceProblems } from "./relaunch.ts";
+import type { RelaunchSteps } from "./relaunch.ts";
 import { sized } from "./samples.ts";
 import { appendVerdict, readVerdicts } from "./verdicts.ts";
 import type { Verdict } from "./verdicts.ts";
@@ -29,7 +30,7 @@ import type { Verdict } from "./verdicts.ts";
  */
 
 const EXPERIMENT = "E0";
-const HYPOTHESES = ["E0.loadUnpacked", "E0.managedPolicy"];
+const HYPOTHESES = ["E0.loadUnpacked", "E0.loadUnpacked.persists", "E0.managedPolicy"];
 // The dashboard RECnRun opens and focuses on install and on startup (src/background/start.ts).
 const DASHBOARD_WINDOW = "^RECnRun - Google Chrome$";
 const INSTALL_TIMEOUT_MS = 60_000;
@@ -60,39 +61,50 @@ async function withRoot<T>(run: (root: string) => Promise<T>): Promise<T> {
   }
 }
 
-/** Installs over CDP, pings the worker, quits, relaunches the same root, and compares the id. */
+/** Installs over CDP and pings the worker, which must answer with its own id. */
 const unpackedSample = (path: string): Promise<Sample> =>
   withRoot(async (root) => {
-    const first = await loadUnpacked(path, { userDataDir: root });
-    const { extensionId } = first;
-    await first.close();
-    const again = await launchForUnpacked({ userDataDir: root });
-    let persisted = false;
-    let idAfterRelaunch = extensionId;
-    let dashboardAfterRelaunch = false;
-    try {
-      // Whether the extension ran at startup on its own, before anything installs it again.
-      dashboardAfterRelaunch = await windowShows(DASHBOARD_WINDOW, STARTUP_TIMEOUT_MS / 3);
-      persisted = await attachExtension(again, extensionId).then(
-        () => true,
-        () => false,
-      );
-      if (!persisted) idAfterRelaunch = await installUnpacked(again, path);
-      if (!persisted) await attachExtension(again, idAfterRelaunch);
-    } finally {
-      await again.close();
-    }
-    const state = await installedState(root, extensionId);
-    const observation = {
-      extensionId,
-      idAfterRelaunch,
-      persistedAcrossRelaunch: persisted,
-      dashboardAfterRelaunch,
-      state,
-    };
+    const loaded = await loadUnpacked(path, { userDataDir: root });
+    await loaded.close();
+    const { extensionId } = loaded;
+    const observation = { extensionId, stateAfterQuit: await installedState(root, extensionId) };
+    return { ok: true, observation };
+  });
 
-    if (idAfterRelaunch === extensionId) return { ok: true, observation };
-    return { ok: false, error: `id ${extensionId} became ${idAfterRelaunch}`, observation };
+/** The same root relaunched with the install's flags, observed before anything installs it again. */
+function relaunchSteps(root: string, path: string, extensionId: string): RelaunchSteps {
+  return {
+    relaunch: async () => {
+      const chrome = await launchForUnpacked({ userDataDir: root });
+      const running = () =>
+        attachExtension(chrome, extensionId).then(
+          () => true,
+          () => false,
+        );
+      const dashboard = () => windowShows(DASHBOARD_WINDOW, STARTUP_TIMEOUT_MS / 3);
+      return { dashboard, running, quit: () => chrome.close() };
+    },
+    state: () => installedState(root, extensionId),
+    reinstall: async () => {
+      const again = await loadUnpacked(path, { userDataDir: root });
+      await again.close();
+      return again.extensionId;
+    },
+  };
+}
+
+/** Installs over CDP, quits, relaunches the same root with the same flags, and checks it still runs. */
+const persistsSample = (path: string): Promise<Sample> =>
+  withRoot(async (root) => {
+    const first = await loadUnpacked(path, { userDataDir: root });
+    await first.close();
+    const { extensionId } = first;
+    const stateAfterQuit = await installedState(root, extensionId);
+    const observed = await observePersistence(relaunchSteps(root, path, extensionId));
+    const observation = { extensionId, stateAfterQuit, ...observed };
+    const problems = persistenceProblems(observed);
+    if (problems.length === 0) return { ok: true, observation };
+    return { ok: false, error: problems.join("; "), observation };
   });
 
 const disabled = ({ disableReasons }: InstalledState) =>
@@ -189,9 +201,14 @@ async function record(hypothesis: string, common: Common, take: () => Promise<Sa
 }
 
 test.describe("E0: install the test build into Google Chrome Stable", () => {
-  test("E0.loadUnpacked: installs over CDP, the worker answers, and the id survives a relaunch", async () => {
-    const common: Common = { install: "loadUnpacked", label: "diagnostic", externalClient: true };
-    await record("E0.loadUnpacked", common, () => unpackedSample(EXTENSION_PATH));
+  const unpacked: Common = { install: "loadUnpacked", label: "diagnostic", externalClient: true };
+
+  test("E0.loadUnpacked: installs over CDP and the worker answers", async () => {
+    await record("E0.loadUnpacked", unpacked, () => unpackedSample(EXTENSION_PATH));
+  });
+
+  test("E0.loadUnpacked.persists: still installed and running after a quit and relaunch", async () => {
+    await record("E0.loadUnpacked.persists", unpacked, () => persistsSample(EXTENSION_PATH));
   });
 
   test("E0.managedPolicy: force-installs with no CDP client and stays installed after a relaunch", async () => {
