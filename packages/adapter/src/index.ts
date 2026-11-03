@@ -25,3 +25,13 @@ export {
 export { isLoopbackEndpoint, NonLoopbackEndpointError } from "./loopback.ts";
 export { AlreadyConnectedError } from "./adapter.ts";
 export { CdpOpenError, type CdpOpenFailure } from "./cdp-socket.ts";
+export { startRecording, type Recording } from "./recording.ts";
+export { TargetScope } from "./instrumentation-scope.ts";
+export {
+  PICKER_BINDING,
+  PICKER_WORLD,
+  pickerSource,
+  startPicker,
+  type Picker,
+  type PickerOptions,
+} from "./picker.ts";

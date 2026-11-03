@@ -24,6 +24,7 @@ import {
   trackContext,
   type TargetRecord,
 } from "./instrumentation-targets.ts";
+import type { TargetScope } from "./instrumentation-scope.ts";
 import { assertLoopbackEndpoint } from "./loopback.ts";
 
 export interface InstrumentOptions {
@@ -32,6 +33,8 @@ export interface InstrumentOptions {
   capture?: CaptureOptions;
   now?: () => Date;
   openChannel?: (endpoint: string) => Promise<CdpChannel>;
+  /** Limits instrumentation to these targets; without it every target is instrumented. */
+  scope?: TargetScope;
 }
 
 export interface Instrumentation {
@@ -74,7 +77,7 @@ class Instrumenter {
   }
 
   handle(event: CdpEvent): void {
-    if (event.method === "Target.attachedToTarget") this.attach(event.params);
+    if (event.method === "Target.attachedToTarget") this.attach(event.params, event.sessionId);
     else if (event.method === "Target.detachedFromTarget") this.detach(event.params);
     else {
       const record = event.sessionId ? this.sessions.get(event.sessionId) : undefined;
@@ -85,11 +88,17 @@ class Instrumenter {
     }
   }
 
-  private attach(params: unknown): void {
+  private attach(params: unknown, parent: string | undefined): void {
     const attached = v.safeParse(AttachedSchema, params);
     if (!attached.success) return;
     const { sessionId, targetInfo, waitingForDebugger } = attached.output;
     const { targetId, type, url, openerId } = targetInfo;
+    const viaInstrumented = parent === undefined ? undefined : this.sessions.has(parent);
+    const { scope } = this.options;
+    if (scope && !scope.admits({ targetId, type, openerId, viaInstrumented })) {
+      this.track(this.release(sessionId, waitingForDebugger));
+      return;
+    }
     const mode: InstallMode = !isInstrumented(type)
       ? "ignored"
       : waitingForDebugger
@@ -120,6 +129,12 @@ class Instrumenter {
   private async resumeIgnored(sessionId: string, waiting: boolean) {
     if (!waiting) return;
     await this.channel.send(RESUME.method, RESUME.params, sessionId).catch(() => undefined);
+  }
+
+  // Outside the scope: resumed when held, then detached, so nothing is installed or captured there.
+  private async release(sessionId: string, waiting: boolean) {
+    await this.resumeIgnored(sessionId, waiting);
+    await this.channel.send("Target.detachFromTarget", { sessionId }).catch(() => undefined);
   }
 
   private detach(params: unknown): void {
