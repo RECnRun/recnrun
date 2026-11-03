@@ -42,3 +42,4 @@ export { createServiceClient, ServiceCallError, type ServiceClient } from "./cli
 export type { CommandHandlers } from "./dispatch.ts";
 export { loadFlowFile } from "./flow-file.ts";
 export { SERVICE_VERSION } from "./version.ts";
+export type { BrowserPort, DriverHandle, PickerHandle, RecordingHandle } from "./browser.ts";

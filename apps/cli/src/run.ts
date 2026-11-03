@@ -1,4 +1,4 @@
-import { RUN_EXIT_CODES, type RunSummary } from "@recnrun/protocol";
+import { RUN_EXIT_CODES, type Flow, type RunSummary } from "@recnrun/protocol";
 import { ServiceCallError, type ServiceClient } from "@recnrun/service";
 
 const POLL_MS = 250;
@@ -12,7 +12,7 @@ export interface RunOptions {
 }
 
 export interface RunDeps {
-  load(path: string): Promise<{ id: string }>;
+  load(path: string): Promise<Flow>;
   connect(): Promise<{ client: Pick<ServiceClient, "call">; close(): Promise<void> }>;
   out(line: string): void;
   err(line: string): void;
@@ -47,6 +47,8 @@ async function replay(options: RunOptions, deps: RunDeps): Promise<number> {
   const flow = await deps.load(options.flow);
   const connection = await deps.connect();
   try {
+    // The file is the source of truth for this run, so the store gets its content first.
+    await connection.client.call("flow.import", { flow });
     const params = options.dataset === undefined ? {} : { dataset: options.dataset };
     const { runId } = await connection.client.call("flow.replay", { flowId: flow.id, ...params });
     deps.err(`Run ${runId} of flow ${flow.id} started.`);

@@ -2,8 +2,15 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import type { Duplex } from "node:stream";
 import type { ResponseEnvelope } from "@recnrun/protocol";
 import { authorize, checkSource, presentedToken, tokenMatches, type Guard } from "./auth.ts";
-import { dispatch, failure, UNKNOWN_REQUEST_ID, type CommandHandlers } from "./dispatch.ts";
+import {
+  dispatch,
+  failure,
+  UNKNOWN_REQUEST_ID,
+  type CommandHandlers,
+  type PushChannel,
+} from "./dispatch.ts";
 import type { Logger } from "./logger.ts";
+import { isUiPath, serveUi } from "./static.ts";
 import { acceptWebSocket, CLOSE, refuseUpgrade, type WebSocketChannel } from "./websocket.ts";
 
 /** A request body larger than this is refused with 413. */
@@ -13,6 +20,8 @@ export interface ApiContext {
   guard: Guard;
   handlers: CommandHandlers;
   logger: Logger;
+  /** The built UI (`apps/ui/dist`) served on `GET /` and `GET /assets/*`. */
+  uiRoot: string;
 }
 
 export interface ApiServer {
@@ -63,8 +72,18 @@ const parseJson = (text: string): { ok: true; value: unknown } | { ok: false } =
   }
 };
 
+/** The UI's own page and files: `Host` and `Origin` are checked, the token is what they hand out. */
+async function handleUi(request: IncomingMessage, response: ServerResponse, context: ApiContext) {
+  const source = checkSource(request.headers, context.guard);
+  if (!source.ok)
+    return sendJson(response, 403, failure(UNKNOWN_REQUEST_ID, source.code, source.message));
+  await serveUi(context.uiRoot, pathOf(request.url), context.guard.token, response);
+}
+
 /** Routes `POST /api` to the dispatcher once the caller passed `Host`, `Origin`, and the token. */
 async function handleHttp(request: IncomingMessage, response: ServerResponse, context: ApiContext) {
+  if (request.method === "GET" && isUiPath(pathOf(request.url)))
+    return handleUi(request, response, context);
   const verdict = authorize(request, context.guard, false);
   if (!verdict.ok) {
     const challenge: Record<string, string> =
@@ -102,10 +121,17 @@ async function handleHttp(request: IncomingMessage, response: ServerResponse, co
 async function answer(channel: WebSocketChannel, text: string, handlers: CommandHandlers) {
   const json = parseJson(text);
   const envelope = json.ok
-    ? await dispatch(json.value, handlers)
+    ? await dispatch(json.value, handlers, pushTo(channel))
     : failure(UNKNOWN_REQUEST_ID, "invalid-request", "The message is not JSON.");
   channel.send(JSON.stringify(envelope));
 }
+
+const pushTo = (channel: WebSocketChannel): PushChannel => ({
+  push: (message) => {
+    if (!channel.closed) channel.send(JSON.stringify(message));
+  },
+  onClose: (listener) => channel.onClose(listener),
+});
 
 /** `/ws`: `Host` and `Origin` are refused with 403 before the handshake; a bad token closes 4401. */
 function handleUpgrade(

@@ -157,6 +157,12 @@ export const FEATURE_CAPABILITIES: Feature[] = [
     "CLI: open, run, doctor",
     "Delivered by F2.7; tests/contract/cli.test.ts runs the real recnrun binary on a temporary home: open starts or reuses the service and prints the UI URL, doctor --json reports Chrome, DevToolsActivePort, bindings, disk, and versions (exit 1 without Chrome), and run prints one JSON summary with exit 0, 1, or 2 for passed, failed, and error. The replay itself is F2.5.",
   ),
+  implemented(
+    "service-session",
+    "F2.6",
+    "Service sessions, flows, runs, and picker",
+    "Delivered by F2.6a; tests/browser/service-session.spec.ts records the fixture form through the service in Google Chrome, finalizes a flow with fill and click, replays it to passed, and picks the submit button without clicking it; tests/contract/service-session.test.ts covers the commands, the event pushes, and the UI's token meta and CSP over a fake Chrome.",
+  ),
   planned(
     "coverage-loss-accounting",
     "F3.5",

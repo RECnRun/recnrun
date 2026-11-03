@@ -1,0 +1,226 @@
+import { randomUUID } from "node:crypto";
+import { join } from "node:path";
+import {
+  applySessionEvent,
+  createSession,
+  createsSuggestedSteps,
+  isCapturing,
+  pauseSession,
+  resumeSession,
+  type CaptureGap,
+  type LeaseRegistry,
+  type LifecycleEvent,
+  type Session,
+  type SessionResult,
+} from "@recnrun/engine";
+import type { BindingsStore, JournalWriter } from "@recnrun/persistence";
+import type { CapturedEvent, Event, PauseMode, SessionStatus, Step } from "@recnrun/protocol";
+import {
+  endpointOf,
+  type BrowserPort,
+  type PickerHandle,
+  type RecordingHandle,
+} from "./browser.ts";
+import { ServiceFailure } from "./dispatch.ts";
+import type { EventHub } from "./hub.ts";
+import type { JournalRegistry } from "./journals.ts";
+import type { Logger } from "./logger.ts";
+
+/** The holder id of the person recording in Chrome. */
+export const PERSON = "person";
+
+/** A recording session the service runs: its page, journal, captured events, and draft assertions. */
+export interface LiveSession {
+  readonly id: string;
+  readonly flowId: string | undefined;
+  readonly endpoint: string;
+  readonly targetId: string;
+  readonly recording: RecordingHandle;
+  readonly journal: JournalWriter;
+  readonly events: CapturedEvent[];
+  /** DOM events captured while step creation was paused; they never become steps. */
+  readonly ignored: Set<string>;
+  readonly assertions: Step[];
+  readonly writes: Set<Promise<void>>;
+  state: Session;
+  gaps: number;
+  picker?: PickerHandle | undefined;
+}
+
+export interface SessionDeps {
+  home: string;
+  browser: BrowserPort;
+  bindings: BindingsStore;
+  journals: JournalRegistry;
+  hub: EventHub;
+  leases: LeaseRegistry;
+  logger: Logger;
+  now: () => number;
+  sessions: Map<string, LiveSession>;
+}
+
+export function sessionOf(deps: SessionDeps, sessionId: string): LiveSession {
+  const live = deps.sessions.get(sessionId);
+  if (live === undefined) throw new ServiceFailure("not-found", `No session ${sessionId}.`);
+  return live;
+}
+
+export function statusOf(deps: SessionDeps, live: LiveSession): SessionStatus {
+  const lease = deps.leases.current(live.targetId);
+  return {
+    sessionId: live.id,
+    state: live.state.state,
+    control: deps.leases.control(live.targetId),
+    pauses: live.state.pauses,
+    ...(lease && { lease }),
+  };
+}
+
+/** Publishes the new status to subscribers and returns it. */
+export function announce(deps: SessionDeps, live: LiveSession): SessionStatus {
+  const status = statusOf(deps, live);
+  deps.hub.publish({ type: "session.status", sessionId: live.id, status });
+  return status;
+}
+
+/** Moves the session or refuses with `conflict`, naming the transition the machine forbids. */
+function settle(live: LiveSession, result: SessionResult): CaptureGap | undefined {
+  if (!result.ok)
+    throw new ServiceFailure(
+      "conflict",
+      `The session is ${result.error.from}; it cannot ${result.error.event}.`,
+    );
+  live.state = result.session;
+  return result.gap;
+}
+
+export const advance = (live: LiveSession, event: LifecycleEvent) =>
+  settle(live, applySessionEvent(live.state, event));
+
+function track(deps: SessionDeps, live: LiveSession, event: Event): void {
+  const write = live.journal.append(event).catch((error: unknown) => {
+    deps.logger.error("session.journal-failed", { message: String(error) });
+  });
+  live.writes.add(write);
+  void write.finally(() => live.writes.delete(write));
+}
+
+function accept(deps: SessionDeps, live: LiveSession, event: CapturedEvent): void {
+  if (!isCapturing(live.state)) return;
+  live.events.push(event);
+  if (event.category === "dom" && !createsSuggestedSteps(live.state)) live.ignored.add(event.id);
+  track(deps, live, event);
+  deps.hub.publish({ type: "session.event", sessionId: live.id, event });
+  // The person is active, so their control does not lapse while they record.
+  const lease = deps.leases.current(live.targetId);
+  if (lease?.holderId === PERSON) deps.leases.heartbeat(live.targetId, lease);
+}
+
+/** F2 records one Chrome: every actor binds to the same profile, or none names one. */
+async function profileFolder(
+  deps: SessionDeps,
+  actors: Readonly<Record<string, string>> = {},
+): Promise<string | undefined> {
+  const names = new Set(Object.values(actors));
+  if (names.size > 1)
+    throw new ServiceFailure("capability-unavailable", "A session records one Chrome profile.");
+  const [name] = names;
+  if (name === undefined) return undefined;
+  const binding = (await deps.bindings.list()).find((entry) => entry.name === name);
+  if (binding === undefined) throw new ServiceFailure("not-found", `No profile binding ${name}.`);
+  return binding.userDataDir;
+}
+
+/** Opens the session's page in Chrome, captures it into its journal, and gives the person control. */
+export async function startSession(
+  deps: SessionDeps,
+  params: { flowId?: string | undefined; actors?: Record<string, string> | undefined },
+): Promise<SessionStatus> {
+  const endpoint = await endpointOf(deps.browser, await profileFolder(deps, params.actors));
+  const id = `session-${randomUUID()}`;
+  const journal = await deps.journals.open(
+    join(deps.home, ".recnrun", "sessions", id, "events.jsonl"),
+  );
+  const early: CapturedEvent[] = [];
+  let sink: (event: CapturedEvent) => void = (event) => early.push(event);
+  let recording: RecordingHandle;
+  try {
+    recording = await deps.browser.record(endpoint, { runId: id, onEvent: (event) => sink(event) });
+  } catch (error) {
+    await journal.close();
+    throw error;
+  }
+  const live: LiveSession = {
+    id,
+    flowId: params.flowId,
+    endpoint,
+    targetId: recording.targetId,
+    recording,
+    journal,
+    events: [],
+    ignored: new Set(),
+    assertions: [],
+    writes: new Set(),
+    gaps: 0,
+    state: createSession(),
+  };
+  advance(live, "start");
+  deps.sessions.set(id, live);
+  deps.leases.takeControl(live.targetId, PERSON);
+  sink = (event) => accept(deps, live, event);
+  for (const event of early) sink(event);
+  return announce(deps, live);
+}
+
+/** The journal line of a capture suspension, written once capture resumes. */
+function gapEvent(deps: SessionDeps, live: LiveSession, gap: CaptureGap): Event {
+  live.gaps += 1;
+  return {
+    schemaVersion: 1,
+    id: `${live.id}-gap-${live.gaps}`,
+    runId: live.id,
+    seq: live.gaps,
+    source: "service",
+    producer: "service:session",
+    timestamp: new Date(deps.now()).toISOString(),
+    targetId: null,
+    frameId: null,
+    documentId: null,
+    type: "capture-suspended",
+    category: "gap",
+    payload: { reason: gap.reason, startedAt: new Date(gap.startedAt).toISOString() },
+  };
+}
+
+export function pause(deps: SessionDeps, live: LiveSession, mode: PauseMode): SessionStatus {
+  settle(live, pauseSession(live.state, mode, deps.now()));
+  return announce(deps, live);
+}
+
+export function resume(deps: SessionDeps, live: LiveSession, mode: PauseMode): SessionStatus {
+  const gap = settle(live, resumeSession(live.state, mode, deps.now()));
+  if (gap) track(deps, live, gapEvent(deps, live, gap));
+  return announce(deps, live);
+}
+
+/** Ends capture: the picker and the recording stop, the journal closes, and control is released. */
+export async function stopSession(deps: SessionDeps, live: LiveSession): Promise<SessionStatus> {
+  advance(live, "stop");
+  await live.picker?.stop();
+  live.picker = undefined;
+  await live.recording.settled();
+  live.recording.stop();
+  await Promise.all(live.writes);
+  await live.journal.close();
+  const lease = deps.leases.current(live.targetId);
+  if (lease) deps.leases.release(live.targetId, lease);
+  return announce(deps, live);
+}
+
+/** Stops every session still capturing, for the service's shutdown. */
+export async function stopAll(deps: SessionDeps): Promise<void> {
+  const live = [...deps.sessions.values()].filter(({ state }) =>
+    ["recording", "paused"].includes(state.state),
+  );
+  await Promise.allSettled(live.map((session) => stopSession(deps, session)));
+}

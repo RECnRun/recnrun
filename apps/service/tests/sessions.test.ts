@@ -1,0 +1,191 @@
+import { join } from "node:path";
+import { readJournal } from "@recnrun/persistence";
+import type { Lease, ServiceMessage, SessionStatus } from "@recnrun/protocol";
+import { expect, test } from "vite-plus/test";
+import { fillAndClick, harness, SEND_BUTTON, type Harness } from "./fakes.ts";
+
+const resultOf = <T>(envelope: unknown): T => {
+  expect(envelope).toMatchObject({ ok: true });
+  return (envelope as { result: T }).result;
+};
+const codeOf = (envelope: unknown) => (envelope as { error?: { code: string } }).error?.code;
+const fenceOf = ({ leaseId, fencingToken }: Lease) => ({ leaseId, fencingToken });
+
+async function started(h: Harness): Promise<SessionStatus> {
+  return resultOf<SessionStatus>(await h.call("session.start", {}));
+}
+
+const journalOf = (h: Harness, sessionId: string) =>
+  readJournal(join(h.home, ".recnrun", "sessions", sessionId, "events.jsonl"));
+
+test("session.start records a page of its own and gives the person control", async () => {
+  const h = await harness();
+  const status = await started(h);
+  expect(status).toMatchObject({ state: "recording", control: "manual" });
+  expect(status.lease).toMatchObject({ holderId: "person", kind: "manual", targetId: "page-1" });
+  expect(h.browser.calls).toEqual(["discover ", "record"]);
+  expect(h.published.at(-1)).toEqual({
+    type: "session.status",
+    sessionId: status.sessionId,
+    status,
+  });
+  expect(resultOf(await h.call("session.status", { sessionId: status.sessionId }))).toEqual(status);
+});
+
+test("captured events are journaled, pushed, and suggested as steps", async () => {
+  const h = await harness();
+  const { sessionId } = await started(h);
+  for (const event of fillAndClick(1)) h.browser.emit(event);
+  const suggested = resultOf<{ steps: { action: string }[] }>(
+    await h.call("session.suggestions", { sessionId }),
+  );
+  expect(suggested.steps.map(({ action }) => action)).toEqual(["fill", "click"]);
+  expect(h.published.filter(({ type }) => type === "session.event")).toHaveLength(7);
+  await h.call("session.stop", { sessionId });
+  expect((await journalOf(h, sessionId)).events).toHaveLength(7);
+});
+
+test("the three pauses: no steps, then no capture and a gap in the journal", async () => {
+  const h = await harness();
+  const { sessionId } = await started(h);
+  const pause = (mode: string) => h.call("session.pause", { sessionId, mode });
+  const resume = (mode: string) => h.call("session.resume", { sessionId, mode });
+  expect(resultOf<SessionStatus>(await pause("pauseStepCreation")).state).toBe("paused");
+  for (const event of fillAndClick(1)) h.browser.emit(event);
+  expect(resultOf<SessionStatus>(await resume("pauseStepCreation")).state).toBe("recording");
+  expect(codeOf(await resume("pauseStepCreation"))).toBe("conflict");
+  await pause("suspendCapture");
+  for (const event of fillAndClick(20)) h.browser.emit(event);
+  await resume("suspendCapture");
+  expect(
+    resultOf<{ steps: unknown[] }>(await h.call("session.suggestions", { sessionId })).steps,
+  ).toEqual([]);
+  await h.call("session.stop", { sessionId });
+  const { events } = await journalOf(h, sessionId);
+  expect(events.map(({ category }) => category)).toEqual([...Array(7).fill("dom"), "gap"]);
+  expect(events.at(-1)?.payload).toMatchObject({ reason: "capture-suspended" });
+});
+
+test("handing control away needs the holder's fence; a person takes it back at once", async () => {
+  const h = await harness();
+  const { sessionId, lease } = await started(h);
+  if (!lease) throw new Error("The person holds no lease.");
+  expect(codeOf(await h.call("session.handoff", { sessionId, to: "agent" }))).toBe("stale-lease");
+  const toAgent = await h.call(
+    "session.handoff",
+    { sessionId, to: "agent" },
+    { lease: fenceOf(lease) },
+  );
+  expect(resultOf<SessionStatus>(toAgent)).toMatchObject({ control: "agent" });
+  const back = resultOf<SessionStatus>(
+    await h.call("session.handoff", { sessionId, to: "manual" }),
+  );
+  expect(back).toMatchObject({ control: "manual", lease: { holderId: "person" } });
+  const away = await h.call(
+    "session.handoff",
+    { sessionId, to: "unassigned" },
+    { lease: fenceOf(lease) },
+  );
+  expect(codeOf(away)).toBe("stale-lease");
+});
+
+test("the picker pushes each pick with its locators and needs the current fence", async () => {
+  const h = await harness();
+  const { sessionId, lease } = await started(h);
+  if (!lease) throw new Error("The person holds no lease.");
+  expect(codeOf(await h.call("picker.start", { sessionId }))).toBe("stale-lease");
+  const picking = await h.call("picker.start", { sessionId }, { lease: fenceOf(lease) });
+  expect(resultOf(picking)).toEqual({ sessionId, picking: true });
+  h.browser.pickElement(SEND_BUTTON);
+  const picked = h.published.find((message) => message.type === "picker.picked");
+  expect(picked).toMatchObject({ sessionId, target: SEND_BUTTON });
+  expect(
+    (picked as Extract<ServiceMessage, { type: "picker.picked" }>).locators.locators[0],
+  ).toEqual({ strategy: "testId", value: "send" });
+  expect(resultOf(await h.call("picker.stop", { sessionId }))).toEqual({
+    sessionId,
+    picking: false,
+  });
+  expect(h.browser.calls).toContain("pick.stop");
+});
+
+test("finalize stores the suggested steps, then the draft assertions, once the session stopped", async () => {
+  const h = await harness();
+  const { sessionId } = await started(h);
+  for (const event of fillAndClick(1)) h.browser.emit(event);
+  expect(codeOf(await h.call("flow.finalize", { sessionId }))).toBe("conflict");
+  const step = { id: "sent", assertion: "visible", target: { testId: "send" } };
+  expect(resultOf(await h.call("flow.addAssertion", { sessionId, step }))).toEqual({
+    stepId: "sent",
+  });
+  expect(codeOf(await h.call("flow.addAssertion", { sessionId, step }))).toBe("conflict");
+  expect(resultOf<SessionStatus>(await h.call("session.stop", { sessionId })).state).toBe(
+    "finalizing",
+  );
+  expect(h.browser.calls).toContain("record.stop");
+  const saved = resultOf<{ flowId: string; revision: string }>(
+    await h.call("flow.finalize", { sessionId }),
+  );
+  const stored = await h.flows.get(saved.flowId);
+  expect(stored.revision).toBe(saved.revision);
+  expect(stored.manifest.status).toBe("recorded");
+  expect(stored.flow.steps.map(({ id }) => id)).toEqual(["fill-1", "click-2", "sent"]);
+  expect(resultOf<SessionStatus>(await h.call("session.status", { sessionId })).state).toBe(
+    "completed",
+  );
+  expect(codeOf(await h.call("session.stop", { sessionId }))).toBe("conflict");
+});
+
+test("an unknown session is not found and no Chrome is a refusal with the remedy", async () => {
+  const h = await harness();
+  expect(codeOf(await h.call("session.status", { sessionId: "nope" }))).toBe("not-found");
+  h.browser.found = { ok: false, code: "missing-file", remedy: "Open Chrome.", userDataDir: "/x" };
+  expect(await h.call("session.start", {})).toMatchObject({
+    ok: false,
+    error: { code: "capability-unavailable", message: "Open Chrome." },
+  });
+});
+
+test("actors bound to one profile record in that profile's Chrome", async () => {
+  const h = await harness();
+  const binding = (name: string) => ({
+    name,
+    userDataDir: `/profiles/${name}`,
+    browserContextIds: [],
+    chrome: "Chrome/156.0.8078.79",
+    wsEndpoint: "ws://127.0.0.1:9222/devtools/browser/fake",
+    createdAt: "2026-11-03T10:00:00.000Z",
+    lastSeenAt: "2026-11-03T10:00:00.000Z",
+  });
+  await h.deps.bindings.save(binding("ana"));
+  await h.deps.bindings.save(binding("bea"));
+  expect(
+    resultOf<{ profiles: unknown[] }>(await h.call("profiles.list", {})).profiles,
+  ).toHaveLength(2);
+  resultOf(await h.call("session.start", { actors: { a: "ana", b: "ana" } }));
+  expect(h.browser.calls[0]).toBe("discover /profiles/ana");
+  const unknown = await h.call("session.start", { actors: { a: "zoe" } });
+  expect(codeOf(unknown)).toBe("not-found");
+  const two = await h.call("session.start", { actors: { a: "ana", b: "bea" } });
+  expect(codeOf(two)).toBe("capability-unavailable");
+});
+
+test("events.subscribe needs the WebSocket and ends with it", async () => {
+  const h = await harness();
+  expect(codeOf(await h.call("events.subscribe", {}))).toBe("invalid-request");
+  const pushed: ServiceMessage[] = [];
+  let close = () => {};
+  const channel = {
+    push: (m: ServiceMessage) => pushed.push(m),
+    onClose: (l: () => void) => (close = l),
+  };
+  const { sessionId } = await started(h);
+  await h.call("events.subscribe", { sessionId }, { channel });
+  const [first, second] = fillAndClick(1);
+  if (!first || !second) throw new Error("No events to emit.");
+  h.browser.emit(first);
+  expect(pushed.map(({ type }) => type)).toEqual(["session.event"]);
+  close();
+  h.browser.emit(second);
+  expect(pushed).toHaveLength(1);
+});

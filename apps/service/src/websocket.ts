@@ -36,6 +36,8 @@ export interface WebSocketChannel {
   start(head: Buffer, onText: (text: string) => void): void;
   send(text: string): void;
   close(code: number, reason?: string): void;
+  /** Runs once the socket is gone, whichever side closed it. */
+  onClose(listener: () => void): void;
   readonly closed: boolean;
 }
 
@@ -122,9 +124,7 @@ function createChannel(socket: Duplex): WebSocketChannel {
   let pending: Buffer = Buffer.alloc(0);
   let closed = false;
   let listener: (text: string) => void = () => {};
-  socket.on("close", () => {
-    closed = true;
-  });
+  socket.on("close", () => (closed = true));
   const write = (opcode: number, payload: Buffer) => {
     if (!closed) socket.write(encode(opcode, payload));
   };
@@ -164,6 +164,7 @@ function createChannel(socket: Duplex): WebSocketChannel {
     },
     send: (text) => write(OPCODE.text, Buffer.from(text)),
     close,
+    onClose: (notify) => void (socket.destroyed ? notify() : socket.once("close", notify)),
     get closed() {
       return closed;
     },

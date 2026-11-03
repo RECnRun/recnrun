@@ -1,0 +1,148 @@
+import { randomUUID } from "node:crypto";
+import { replayFlow } from "@recnrun/engine";
+import type { FlowStore } from "@recnrun/persistence";
+import {
+  PROTOCOL_SCHEMA_VERSION,
+  type Event,
+  type RunManifest,
+  type RunSummary,
+} from "@recnrun/protocol";
+import { endpointOf, type BrowserPort } from "./browser.ts";
+import { ServiceFailure } from "./dispatch.ts";
+import type { EventHub } from "./hub.ts";
+import type { Logger } from "./logger.ts";
+import { SERVICE_VERSION } from "./version.ts";
+
+/** A replay this service started; `summary` or `error` is set once it ends. */
+interface RunRecord {
+  flowId: string;
+  summary?: RunSummary;
+  error?: string;
+}
+
+export interface RunDeps {
+  browser: BrowserPort;
+  hub: EventHub;
+  logger: Logger;
+  store: () => FlowStore;
+  now: () => number;
+  runs: Map<string, RunRecord>;
+  /** Replays still running, so stopping the service waits for them. */
+  active: Set<Promise<void>>;
+}
+
+export interface ReplayParams {
+  flowId: string;
+  dataset?: string | undefined;
+  inputs?: Record<string, unknown> | undefined;
+}
+
+const DEFAULT_LIMIT = 100;
+
+async function execute(
+  deps: RunDeps,
+  manifest: RunManifest,
+  endpoint: string,
+  inputs: Record<string, unknown>,
+) {
+  const store = deps.store();
+  const { runId, flowId } = manifest;
+  const record: RunRecord = { flowId };
+  deps.runs.set(runId, record);
+  try {
+    const flow = await store.getRevision(flowId, manifest.flowRevision);
+    const connection = await deps.browser.replayDriver(endpoint);
+    try {
+      const outcome = await replayFlow(connection.driver, flow, {
+        runId,
+        inputs,
+        run: { store, manifest },
+        observe: (event) => deps.hub.publish({ type: "run.step", runId, event }),
+      });
+      record.summary = outcome.summary;
+      deps.hub.publish({ type: "run.finished", runId, summary: outcome.summary });
+    } finally {
+      await connection.close();
+    }
+  } catch (error) {
+    record.error = error instanceof Error ? error.message : String(error);
+    deps.logger.error("run.failed", { runId, message: record.error });
+  }
+}
+
+/** Starts a replay of the flow's current revision and answers with its run id at once. */
+export async function startReplay(deps: RunDeps, params: ReplayParams): Promise<{ runId: string }> {
+  const store = deps.store();
+  const { revision } = await store.get(params.flowId);
+  const dataset =
+    params.dataset === undefined
+      ? undefined
+      : await store.getDataset(params.flowId, params.dataset);
+  // Inputs given with the request override the dataset's.
+  const inputs = { ...dataset?.inputs, ...params.inputs };
+  const endpoint = await endpointOf(deps.browser);
+  const runId = `run-${randomUUID()}`;
+  const manifest: RunManifest = {
+    schemaVersion: PROTOCOL_SCHEMA_VERSION,
+    runId,
+    flowId: params.flowId,
+    flowRevision: revision,
+    startedAt: new Date(deps.now()).toISOString(),
+    captureLevel: "normal",
+    ...(params.dataset !== undefined && { dataset: params.dataset }),
+    versions: { engine: SERVICE_VERSION, protocol: PROTOCOL_SCHEMA_VERSION, node: process.version },
+    bindings: {},
+  };
+  const done = execute(deps, manifest, endpoint, inputs);
+  deps.active.add(done);
+  void done.finally(() => deps.active.delete(done));
+  return { runId };
+}
+
+/** The flow a run belongs to: this process's runs first, then the store's index. */
+async function flowOfRun(deps: RunDeps, runId: string): Promise<string> {
+  const known = deps.runs.get(runId)?.flowId;
+  if (known !== undefined) return known;
+  const entry = (await deps.store().listRuns()).find(({ id }) => id === runId);
+  if (entry === undefined) throw new ServiceFailure("not-found", `No run ${runId}.`);
+  return entry.flowId;
+}
+
+/** A finished run's summary; a run still going is a `conflict` the caller polls past. */
+export async function runSummary(deps: RunDeps, runId: string): Promise<RunSummary> {
+  const record = deps.runs.get(runId);
+  if (record?.summary) return record.summary;
+  if (record?.error !== undefined) throw new ServiceFailure("internal", record.error);
+  if (record) throw new ServiceFailure("conflict", `Run ${runId} is still running.`);
+  const stored = await deps.store().getRun(await flowOfRun(deps, runId), runId);
+  if (stored.summary === undefined)
+    throw new ServiceFailure("conflict", `Run ${runId} has no summary; it did not finish.`);
+  return stored.summary;
+}
+
+export interface EventQuery {
+  runId: string;
+  category?: Event["category"] | undefined;
+  stepId?: string | undefined;
+  cursor?: string | undefined;
+  limit?: number | undefined;
+}
+
+/** A page of the run's journal; `nextCursor` is the offset of the next matching event. */
+export async function queryEvents(
+  deps: RunDeps,
+  query: EventQuery,
+): Promise<{ events: Event[]; nextCursor?: string }> {
+  const offset = query.cursor === undefined ? 0 : Number(query.cursor);
+  if (!Number.isSafeInteger(offset) || offset < 0)
+    throw new ServiceFailure("invalid-request", "The cursor is not one this service returned.");
+  const { journal } = await deps.store().getRun(await flowOfRun(deps, query.runId), query.runId);
+  const matching = journal.events.filter(
+    (event) =>
+      (query.category === undefined || event.category === query.category) &&
+      (query.stepId === undefined || event.stepId === query.stepId),
+  );
+  const end = offset + (query.limit ?? DEFAULT_LIMIT);
+  const events = matching.slice(offset, end);
+  return end < matching.length ? { events, nextCursor: String(end) } : { events };
+}

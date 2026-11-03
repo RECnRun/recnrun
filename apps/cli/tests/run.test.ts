@@ -1,4 +1,4 @@
-import { RUN_EXIT_CODES, type RunStatus, type RunSummary } from "@recnrun/protocol";
+import { RUN_EXIT_CODES, type Flow, type RunStatus, type RunSummary } from "@recnrun/protocol";
 import { ServiceCallError } from "@recnrun/service";
 import { expect, test } from "vite-plus/test";
 import { runFlow, type RunDeps } from "@/run";
@@ -25,6 +25,17 @@ const summary = (status: RunStatus): RunSummary => ({
   failures: status === "failed" ? [{ stepId: "open", message: "boom" }] : [],
 });
 
+const tiny = {
+  schemaVersion: 1,
+  id: "tiny",
+  name: "tiny",
+  actors: {},
+  inputs: {},
+  requirements: [],
+  preconditions: [],
+  steps: [],
+} satisfies Flow;
+
 type Answer = () => unknown;
 
 function setup(answers: Partial<Record<"flow.replay" | "run.summary", Answer>>) {
@@ -33,7 +44,7 @@ function setup(answers: Partial<Record<"flow.replay" | "run.summary", Answer>>) 
   const calls: unknown[] = [];
   let clock = 0;
   const deps: RunDeps = {
-    load: async () => ({ id: "tiny" }),
+    load: async () => tiny,
     connect: async () => ({
       client: {
         call: (async (command: string, params: unknown) => {
@@ -66,17 +77,18 @@ test.each(["passed", "failed", "error", "interrupted"] as const)(
   },
 );
 
-test("the replay request names the flow and the dataset", async () => {
+test("the flow file is imported, then the replay names the flow and the dataset", async () => {
   const { deps, calls } = setup({ "run.summary": () => summary("passed") });
   await runFlow(options, deps);
-  expect(calls[0]).toEqual(["flow.replay", { flowId: "tiny", dataset: "default" }]);
-  expect(calls[1]).toEqual(["run.summary", { runId: "run-1" }]);
+  expect(calls[0]).toEqual(["flow.import", { flow: tiny }]);
+  expect(calls[1]).toEqual(["flow.replay", { flowId: "tiny", dataset: "default" }]);
+  expect(calls[2]).toEqual(["run.summary", { runId: "run-1" }]);
 });
 
 test("without a dataset the request sends none", async () => {
   const { deps, calls } = setup({ "run.summary": () => summary("passed") });
   await runFlow({ ...options, dataset: undefined }, deps);
-  expect(calls[0]).toEqual(["flow.replay", { flowId: "tiny" }]);
+  expect(calls[1]).toEqual(["flow.replay", { flowId: "tiny" }]);
 });
 
 test("run.summary is polled while the run is unfinished", async () => {

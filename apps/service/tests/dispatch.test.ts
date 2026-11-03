@@ -1,6 +1,6 @@
 import { CAPABILITY_MATRIX, type DiscoveryResult } from "@recnrun/protocol";
 import { expect, test } from "vite-plus/test";
-import { dispatch, type CommandHandlers } from "@/dispatch";
+import { dispatch, ServiceFailure, type CallContext, type CommandHandlers } from "@/dispatch";
 import { createHandlers } from "@/handlers";
 
 const chrome: DiscoveryResult = {
@@ -73,4 +73,32 @@ test("a result that breaks the protocol is never sent", async () => {
     ok: false,
     error: { code: "internal" },
   });
+});
+
+test("a ServiceFailure answers with its own code, not internal", async () => {
+  const failing: CommandHandlers = {
+    "session.status": async () => {
+      throw new ServiceFailure("not-found", "No session s-9.");
+    },
+  };
+  expect(await dispatch(request("session.status", { sessionId: "s-9" }), failing)).toEqual({
+    requestId: "r-1",
+    ok: false,
+    error: { code: "not-found", message: "No session s-9.", retryable: false },
+  });
+});
+
+test("a handler sees the lease fence and the channel of its request", async () => {
+  const seen: CallContext[] = [];
+  const recording: CommandHandlers = {
+    "picker.stop": async ({ sessionId }, call) => {
+      seen.push(call);
+      return { sessionId, picking: false };
+    },
+  };
+  const channel = { push: () => undefined, onClose: () => undefined };
+  const lease = { leaseId: "T/1", fencingToken: 1 };
+  const input = { ...request("picker.stop", { sessionId: "s-1" }), lease };
+  expect(await dispatch(input, recording, channel)).toMatchObject({ ok: true });
+  expect(seen).toEqual([{ lease, channel }]);
 });

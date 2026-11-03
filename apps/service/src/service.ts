@@ -1,9 +1,13 @@
 import { randomBytes } from "node:crypto";
 import type { Server } from "node:http";
-import { createCdpAdapter } from "@recnrun/adapter";
+import { join } from "node:path";
+import { createLeaseRegistry } from "@recnrun/engine";
 import {
+  openBindingsStore,
+  openFlowStore,
   openRotatingLog,
   openServiceStateStore,
+  type FlowStore,
   type ServiceStateStore,
 } from "@recnrun/persistence";
 import {
@@ -11,13 +15,17 @@ import {
   type DiscoveryResult,
   type ServiceState,
 } from "@recnrun/protocol";
+import { createBrowserPort, type BrowserPort } from "./browser.ts";
+import { createCommands, type CommandDeps } from "./commands.ts";
 import { forbidEgress } from "./egress.ts";
 import type { CommandHandlers } from "./dispatch.ts";
 import { createHandlers } from "./handlers.ts";
+import { createEventHub } from "./hub.ts";
 import { claimInstance } from "./instance.ts";
 import { createJournalRegistry, type JournalRegistry } from "./journals.ts";
 import { createLogger, type Logger } from "./logger.ts";
 import { createApiServer, type ApiServer } from "./server.ts";
+import { stopAll } from "./sessions.ts";
 import { SERVICE_VERSION } from "./version.ts";
 
 export interface ServiceOptions {
@@ -25,7 +33,12 @@ export interface ServiceOptions {
   home: string;
   /** 0 (the default) lets the system pick a free port, written to service.json. */
   port?: number;
+  /** Discovery of the default profile; it overrides the adapter's, so tests can name their Chrome. */
   discover?: () => Promise<DiscoveryResult>;
+  /** Chrome as the session, picker, and replay commands reach it; the CDP adapter by default. */
+  adapter?: BrowserPort;
+  /** The built UI served on `GET /`; `apps/ui/dist` by default. */
+  uiRoot?: string;
   /** Handlers that replace or add to the built-in ones; the F2.5 executor and tests pass theirs here. */
   handlers?: CommandHandlers;
   /** `RECNRUN_FORBID_EGRESS=1` here forbids non-loopback connections in this process. */
@@ -47,6 +60,9 @@ export interface RunningService {
 export type StartResult =
   | { reused: false; service: RunningService }
   | { reused: true; state: ServiceState };
+
+// A person's control lapses after this long without activity on their page.
+const LEASE_TTL_MS = 10 * 60 * 1000;
 
 /** Whether the service named by `state` answers `capabilities.get` with its token. */
 async function answers(state: ServiceState): Promise<boolean> {
@@ -84,11 +100,26 @@ interface Parts {
   api: ApiServer;
   journals: JournalRegistry;
   logger: Logger;
+  commands: CommandDeps;
+  flows: FlowStore;
 }
 
-async function shutdown({ store, nonce, api, journals, logger }: Parts): Promise<void> {
+// A replay still running gets this long to finish before the store closes under it.
+const REPLAY_GRACE_MS = 5000;
+
+const settledOrLate = (work: Promise<unknown>[]) =>
+  Promise.race([
+    Promise.allSettled(work),
+    new Promise((resolve) => setTimeout(resolve, REPLAY_GRACE_MS).unref()),
+  ]);
+
+async function shutdown(parts: Parts): Promise<void> {
+  const { store, nonce, api, journals, logger } = parts;
   logger.info("service.stopping");
   await api.close();
+  await stopAll(parts.commands);
+  await settledOrLate([...parts.commands.active]);
+  parts.flows.close();
   const failures = await journals.drain();
   for (const message of failures) logger.error("journal.close-failed", { message });
   await store.removeState(process.pid);
@@ -97,10 +128,39 @@ async function shutdown({ store, nonce, api, journals, logger }: Parts): Promise
   await logger.close();
 }
 
-async function listen(options: ServiceOptions, store: ServiceStateStore, nonce: string) {
-  const startedAt = Date.now();
-  const token = randomBytes(32).toString("base64url");
-  const logger = createLogger(
+function commandDeps(
+  options: ServiceOptions,
+  parts: { logger: Logger; flows: FlowStore; journals: JournalRegistry },
+) {
+  const real = options.adapter ?? createBrowserPort();
+  const discover = options.discover ?? (() => real.discover());
+  // A binding's folder goes to the adapter; the default profile is whatever `discover` finds.
+  const browser: BrowserPort = {
+    ...real,
+    discover: (found) => (found?.userDataDir ? real.discover(found) : discover()),
+  };
+  const commands: CommandDeps = {
+    home: options.home,
+    browser,
+    logger: parts.logger,
+    journals: parts.journals,
+    bindings: openBindingsStore({ home: options.home }),
+    hub: createEventHub(),
+    leases: createLeaseRegistry({
+      now: Date.now,
+      ttlMs: LEASE_TTL_MS,
+    }),
+    now: Date.now,
+    sessions: new Map(),
+    store: () => parts.flows,
+    runs: new Map(),
+    active: new Set(),
+  };
+  return { commands, discover };
+}
+
+const openLogger = (options: ServiceOptions, store: ServiceStateStore) =>
+  createLogger(
     openRotatingLog({
       folder: store.logsFolder,
       name: "service.log",
@@ -108,14 +168,29 @@ async function listen(options: ServiceOptions, store: ServiceStateStore, nonce: 
       keep: options.log?.keep ?? 3,
     }),
   );
-  const discover = options.discover ?? (() => createCdpAdapter().discover());
+
+async function listen(options: ServiceOptions, store: ServiceStateStore, nonce: string) {
+  const startedAt = Date.now();
+  const token = randomBytes(32).toString("base64url");
+  const logger = openLogger(options, store);
+  const flows = await openFlowStore({ home: options.home });
+  const journals = createJournalRegistry();
+  const { commands, discover } = commandDeps(options, { logger, flows, journals });
   const guard = { port: 0, token };
   const api = createApiServer({
     guard,
-    handlers: { ...createHandlers({ startedAt, discover }), ...options.handlers },
+    handlers: {
+      ...createHandlers({ startedAt, discover }),
+      ...createCommands(commands),
+      ...options.handlers,
+    },
     logger,
+    uiRoot: options.uiRoot ?? join(import.meta.dirname, "..", "..", "ui", "dist"),
   });
-  guard.port = await bind(api.server, options.port ?? 0);
+  guard.port = await bind(api.server, options.port ?? 0).catch((error: unknown) => {
+    flows.close();
+    throw error;
+  });
   await store
     .writeState({
       schemaVersion: SERVICE_STATE_SCHEMA_VERSION,
@@ -127,17 +202,17 @@ async function listen(options: ServiceOptions, store: ServiceStateStore, nonce: 
     })
     .catch(async (error: unknown) => {
       await api.close();
+      flows.close();
       throw error;
     });
   logger.info("service.started", { port: guard.port, version: SERVICE_VERSION });
-  const journals = createJournalRegistry();
   let stopped: Promise<void> | undefined;
   const service: RunningService = {
     port: guard.port,
     token,
     url: `http://127.0.0.1:${guard.port}`,
     journals,
-    stop: () => (stopped ??= shutdown({ store, nonce, api, journals, logger })),
+    stop: () => (stopped ??= shutdown({ store, nonce, api, journals, logger, commands, flows })),
   };
   return service;
 }

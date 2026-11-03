@@ -156,11 +156,8 @@ test("run of an invalid flow exits 2 with the validation message on stderr", asy
   expect(result.stderr).toContain("not a valid flow");
 });
 
-test("run with a service that has no executor yet exits 2 naming capability-unavailable", async () => {
-  const result = await runCli(
-    ["run", "--flow", FLOW, "--dataset", "default", "--home", home],
-    home,
-  );
+test("run with no Chrome to replay in exits 2 naming capability-unavailable", async () => {
+  const result = await runCli(["run", "--flow", FLOW, "--home", home], home);
   expect(result.code).toBe(2);
   expect(result.stdout).toBe("");
   expect(result.stderr).toContain("capability-unavailable");

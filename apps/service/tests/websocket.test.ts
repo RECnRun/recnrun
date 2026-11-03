@@ -84,3 +84,13 @@ test("refuses an upgrade without a version 13 key", () => {
   expect(acceptWebSocket(request, socket)).toBeUndefined();
   expect(String(socket.read())).toMatch(/^HTTP\/1\.1 400 Bad Request/);
 });
+
+test("onClose runs once the socket closes, and at once for a socket already gone", async () => {
+  const { socket, channel } = open();
+  const calls: string[] = [];
+  channel?.onClose(() => calls.push("before"));
+  socket.destroy();
+  await new Promise((resolve) => socket.once("close", resolve));
+  channel?.onClose(() => calls.push("after"));
+  expect(calls).toEqual(["before", "after"]);
+});
