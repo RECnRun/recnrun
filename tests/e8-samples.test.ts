@@ -2,7 +2,8 @@ import { describe, expect, test } from "vite-plus/test";
 import type { E1Browser } from "./experiments/e1-aggregate.ts";
 import { COLD_KINDS, RESTART_KINDS, SW_SCRIPT, e8Verdict } from "./experiments/e8-samples.ts";
 import { childDetachesOf, evaluateCold, evaluateOthers } from "./experiments/e8-samples.ts";
-import { evaluateRestart } from "./experiments/e8-samples.ts";
+import { evaluateRestart, traceFrom, traceOf } from "./experiments/e8-samples.ts";
+import type { LabJournal } from "./browser/fixtures/strict-lab.ts";
 import type { ColdSample, RestartSample } from "./experiments/e8-samples.ts";
 
 const CHROME: E1Browser = { chrome: "Google Chrome 156.0.8078.79", method: "managed-policy" };
@@ -128,5 +129,32 @@ describe("e8Verdict", () => {
       verdict: "fail",
       counts: { held: 1, noReport: 0, databaseUnmarked: 0 },
     });
+  });
+});
+
+describe("traceOf", () => {
+  const event = (at: number) => ({ at, method: "Target.detachedFromTarget" });
+  const journal = (events: number[], eventsDropped: number, commands: string[]) =>
+    ({
+      routeA: { entries: [], unattached: [], events: events.map(event), eventsDropped },
+      commands: commands.map((key) => ({ key, at: 0, result: [] })),
+    }) as unknown as LabJournal;
+
+  test("counts dropped events into the checkpoint, so a capped journal still slices from it", () => {
+    const from = traceFrom(journal([1, 2], 1, ["arm", "stop:a"]));
+    expect(from).toEqual({ events: 3, commands: 2 });
+    // Two more events arrived and the cap dropped one more: 3, 4, 5 are held, 1 and 2 are gone.
+    const trace = traceOf(journal([3, 4, 5], 2, ["arm", "stop:a", "stop:b"]), from);
+    expect(trace.events).toEqual([event(4), event(5)]);
+    expect(trace.truncated).toBe(0);
+    expect(trace.stops.map(({ key }) => key)).toEqual(["stop:b"]);
+  });
+
+  test("reports how many events since the checkpoint the journal no longer holds", () => {
+    const from = traceFrom(journal([1], 0, []));
+    const trace = traceOf(journal([4, 5], 3, []), from);
+    expect(trace.events).toEqual([event(4), event(5)]);
+    expect(trace.truncated).toBe(2);
+    expect(traceFrom(undefined)).toEqual({ events: 0, commands: 0 });
   });
 });

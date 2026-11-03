@@ -12,7 +12,7 @@ import type { E1Browser } from "./e1-aggregate.ts";
 import type { Names } from "./e5-samples.ts";
 import { errorOf, slotName } from "./e6-loads.ts";
 import type { SwitchSample } from "./e6-samples.ts";
-import { SW_SCRIPT } from "./e8-samples.ts";
+import { SW_SCRIPT, traceFrom, traceOf } from "./e8-samples.ts";
 import type { ColdSample } from "./e8-samples.ts";
 import { checkpoint, fromOf, ledger } from "./page-loads.ts";
 
@@ -79,24 +79,10 @@ export async function coldSample(lab: Lab): Promise<ColdSample> {
   };
 }
 
-/** Route A's Target events and the lab's stop reports since `from`, to say why a restart held. */
-function traceOf(journal: LabJournal | undefined, from: { events: number; commands: number }) {
-  return {
-    events: (journal?.routeA.events ?? []).slice(from.events),
-    stops: (journal?.commands ?? [])
-      .slice(from.commands)
-      .filter(({ key }) => key.startsWith("stop:")),
-  };
-}
-
 /** A marked registration, the lab's closeTarget, then a reload typed in the omnibox (E3's cold start). */
 export async function restartSample(lab: Lab) {
   const tab = await armedTab(lab);
-  const before = lab.strict.sink.journal;
-  const from = {
-    events: before?.routeA.events?.length ?? 0,
-    commands: before?.commands.length ?? 0,
-  };
+  const from = traceFrom(lab.strict.sink.journal);
   const registered = databaseOf(await visit(tab));
   await stopWorkers(lab.strict);
   const since = await checkpoint();

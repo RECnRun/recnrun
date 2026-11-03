@@ -1,3 +1,4 @@
+import type { LabJournal } from "../browser/fixtures/strict-lab.ts";
 import type { E1Browser } from "./e1-aggregate.ts";
 import { isMarked, unmarked } from "./e2-samples.ts";
 import { verdictOf } from "./e5-samples.ts";
@@ -114,6 +115,35 @@ export function evaluateRestart(sample: RestartSample): Outcome {
   }
   const ran = sample.restarted === expected ? "marked" : String(sample.restarted);
   return outcome(reasons, { [`ran:${ran}`]: 1 });
+}
+
+/** Where the lab's journal stood before a sample: events (dropped ones included) and commands so far. */
+export interface TraceFrom {
+  events: number;
+  commands: number;
+}
+
+export function traceFrom(journal: LabJournal | undefined): TraceFrom {
+  const routeA = journal?.routeA;
+  return {
+    events: (routeA?.events?.length ?? 0) + (routeA?.eventsDropped ?? 0),
+    commands: journal?.commands.length ?? 0,
+  };
+}
+
+/**
+ * Route A's Target events and the lab's stop reports since `from`, to say why a restart held.
+ * The journal keeps only its most recent events, so `truncated` counts those since `from` it lost.
+ */
+export function traceOf(journal: LabJournal | undefined, from: TraceFrom) {
+  const start = from.events - (journal?.routeA.eventsDropped ?? 0);
+  return {
+    events: (journal?.routeA.events ?? []).slice(Math.max(0, start)),
+    truncated: Math.max(0, -start),
+    stops: (journal?.commands ?? [])
+      .slice(from.commands)
+      .filter(({ key }) => key.startsWith("stop:")),
+  };
 }
 
 /** The `Target.detachFromTarget` outcomes in the lab's stop results (Route A's `CloseReport.sessions`). */
