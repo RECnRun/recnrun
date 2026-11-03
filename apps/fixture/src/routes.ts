@@ -30,6 +30,7 @@ export const ROUTES: readonly FixtureRoute[] = [
     summary: "10 000 rows, only visible ones in the DOM",
   },
   { name: "ime", title: "IME", summary: "Logs composition events" },
+  { name: "burst", title: "Burst", summary: "One click dispatches 1000 input events in one task" },
   { name: "indexeddb", title: "IndexedDB", summary: "A committed and an aborted transaction" },
   { name: "service-worker", title: "Service worker", summary: "Cache Storage behind a worker" },
   { name: "network", title: "Network", summary: "JSON, binary, 500, redirects, stream, WebSocket" },

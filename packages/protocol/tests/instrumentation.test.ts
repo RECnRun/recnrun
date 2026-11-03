@@ -1,6 +1,7 @@
 import * as v from "valibot";
-import { expect, test } from "vite-plus/test";
+import { describe, expect, test } from "vite-plus/test";
 import {
+  DEFAULT_OBSERVER_BUFFER,
   HOOK_VERSION,
   INSTALL_MODES,
   InstrumentationEventSchema,
@@ -77,4 +78,29 @@ test("a report lists targets with their install mode and counters", () => {
   expect(v.is(InstrumentationReportSchema, report)).toBe(true);
   const broken = { ...report, targets: [{ ...report.targets[0], droppedInvalid: -1 }] };
   expect(v.is(InstrumentationReportSchema, broken)).toBe(false);
+});
+
+describe("the hook's buffer-exhausted message", () => {
+  const exhausted = {
+    kind: "gap",
+    type: "buffer.exhausted",
+    seq: 12,
+    documentId: DOC,
+    ts: 9,
+    targetId: "T1",
+    payload: { fromSeq: 2, toSeq: 11, lost: 10, kinds: ["dom"] },
+  };
+
+  test("names the sequence range it dropped and the kinds of message in it", () => {
+    expect(v.parse(ObserverMessageSchema, exhausted)).toEqual(exhausted);
+    expect(DEFAULT_OBSERVER_BUFFER).toBeGreaterThanOrEqual(1000);
+  });
+
+  test.each([
+    ["an empty range", { fromSeq: 0, toSeq: 0, lost: 0, kinds: [] }],
+    ["an unknown kind", { fromSeq: 2, toSeq: 2, lost: 1, kinds: ["network"] }],
+    ["a missing count", { fromSeq: 2, toSeq: 3, kinds: ["dom"] }],
+  ])("rejects %s", (_name, payload) => {
+    expect(v.is(ObserverMessageSchema, { ...exhausted, payload })).toBe(false);
+  });
 });

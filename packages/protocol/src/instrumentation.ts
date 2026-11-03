@@ -7,7 +7,10 @@ import { StorageOperationPayloadSchema } from "./storage.ts";
 export const OBSERVER_BINDING = "__recnrunObserver";
 
 /** The version of the hook injected into every document; it changes with the hook's messages. */
-export const HOOK_VERSION = 3;
+export const HOOK_VERSION = 4;
+
+/** How many messages a document's hook keeps unacknowledged before it drops new ones as a gap. */
+export const DEFAULT_OBSERVER_BUFFER = 1000;
 
 /** Longer binding payloads are dropped unparsed, so a page cannot make the adapter parse megabytes. */
 export const MAX_OBSERVER_MESSAGE_LENGTH = 65_536;
@@ -60,11 +63,33 @@ export const StorageMessageSchema = v.strictObject({
   payload: StorageOperationPayloadSchema,
 });
 
+/** The message kinds a hook numbers; a buffer-exhausted message names the kinds it dropped. */
+export const OBSERVER_KINDS = ["lifecycle", "dom", "storage"] as const;
+
+const PositiveSchema = v.pipe(CountSchema, v.minValue(1));
+
+/**
+ * The hook's buffer of unacknowledged messages was full, so it dropped `fromSeq` to `toSeq`
+ * instead of growing; the adapter journals this as a `buffer-exhausted` gap.
+ */
+export const BufferExhaustedMessageSchema = v.strictObject({
+  kind: v.literal("gap"),
+  type: v.literal("buffer.exhausted"),
+  ...observerEntries,
+  payload: v.strictObject({
+    fromSeq: PositiveSchema,
+    toSeq: PositiveSchema,
+    lost: PositiveSchema,
+    kinds: v.pipe(v.array(v.picklist(OBSERVER_KINDS)), v.minLength(1)),
+  }),
+});
+
 /** A message page instrumentation posts through the observer binding; untrusted until it parses. */
 export const ObserverMessageSchema = v.variant("type", [
   HookInstalledMessageSchema,
   DomMessageSchema,
   StorageMessageSchema,
+  BufferExhaustedMessageSchema,
 ]);
 
 /** An observer message the adapter accepted, with what CDP itself says about where it came from. */

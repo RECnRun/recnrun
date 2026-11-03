@@ -33,3 +33,4 @@ export * from "./service-state.ts";
 export * from "./doctor.ts";
 export * from "./service-messages.ts";
 export * from "./snapshots.ts";
+export * from "./coverage.ts";

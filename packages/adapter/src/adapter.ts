@@ -1,8 +1,8 @@
-import type { BrowserAdapter, ReplayDriver } from "@recnrun/engine";
+import type { BrowserAdapter } from "@recnrun/engine";
 import type { AdapterEvent } from "@recnrun/protocol";
 import { connect, type CdpConnection, type ConnectOptions } from "./connection.ts";
 import { discover } from "./discovery.ts";
-import { createPageDriver } from "./replay.ts";
+import { createPageDriver, type PageDriver } from "./replay.ts";
 
 export type AdapterDependencies = Pick<ConnectOptions, "transport" | "discover" | "now">;
 
@@ -49,8 +49,8 @@ export function createCdpAdapter(deps: AdapterDependencies = {}): BrowserAdapter
     return current;
   };
   // Replay tabs belong to one connection; a new connection opens its own on the next write.
-  let driver: Required<ReplayDriver> | undefined;
-  const replay = (): Required<ReplayDriver> => {
+  let driver: PageDriver | undefined;
+  const replay = (): PageDriver => {
     driver ??= createPageDriver(async () => connected().openPage());
     return driver;
   };

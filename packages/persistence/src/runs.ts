@@ -83,10 +83,15 @@ export async function createRunFolder(
   return { folder, manifest, journal, blobs: await openBlobStore({ folder: runBlobs(folder) }) };
 }
 
+/** Writes `coverage.json` into a run's or a session's folder. */
+export async function writeCoverage(folder: string, coverage: RunCoverage): Promise<void> {
+  await writeStored("run-coverage", join(folder, RUN_FILES.coverage), coverage);
+}
+
 /** Writes steps, coverage, and last the summary, which marks the run finished. */
 export async function writeRunResult(folder: string, result: RunResult): Promise<void> {
   await writeStored("run-steps", join(folder, RUN_FILES.steps), result.steps);
-  await writeStored("run-coverage", join(folder, RUN_FILES.coverage), result.coverage);
+  await writeCoverage(folder, result.coverage);
   await writeStored("run-summary", join(folder, RUN_FILES.summary), result.summary);
 }
 

@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { JOURNAL_FILE, type GapPayload, type RunCatalogEntry } from "@recnrun/protocol";
+import { JOURNAL_FILE, type Event, type GapPayload, type RunCatalogEntry } from "@recnrun/protocol";
 import { flowPaths } from "./flow-folders.ts";
 import type { FlowStore } from "./flow-store.ts";
 import { interruptedResult, recoveryGap } from "./interrupted-run.ts";
@@ -14,13 +14,14 @@ export interface RecoveryReport {
 
 // The gaps go first, so the journal says why it stops before the summary says the run ended.
 async function journalGaps(path: string, runId: string, at: string, gaps: GapPayload[]) {
+  const events: Event[] = gaps.map((gap, index) => recoveryGap(runId, index + 1, at, gap));
   const journal = await openJournal(path);
   try {
-    for (const [index, gap] of gaps.entries())
-      await journal.append(recoveryGap(runId, index + 1, at, gap));
+    for (const event of events) await journal.append(event);
   } finally {
     await journal.close();
   }
+  return events;
 }
 
 async function recoverRun(store: FlowStore, { flowId, id: runId }: RunCatalogEntry, at: string) {
@@ -34,8 +35,8 @@ async function recoverRun(store: FlowStore, { flowId, id: runId }: RunCatalogEnt
     ...(lastSeq !== undefined && { lastSeq }),
   };
   const truncated = run.journal.gap ? [{ ...run.journal.gap, startedAt: at }] : [];
-  await journalGaps(join(folder, JOURNAL_FILE), runId, at, [...truncated, restarted]);
-  const result = interruptedResult(flow, run);
+  const gaps = await journalGaps(join(folder, JOURNAL_FILE), runId, at, [...truncated, restarted]);
+  const result = interruptedResult(flow, run, gaps);
   await store.finishRun(result);
   return result.summary.counts.indeterminate;
 }

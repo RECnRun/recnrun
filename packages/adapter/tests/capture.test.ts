@@ -21,7 +21,7 @@ test("a captured page also enables the network, the log, and DOM storage before 
   expect(channel.methods("W1")).not.toContain("Network.enable");
 });
 
-test("target lifecycle and hook messages become envelopes numbered per producer", async () => {
+test("target lifecycle and hook messages become envelopes numbered per producer, the hook by its own sequence", async () => {
   const { channel, events, handle } = await capturing();
   channel.attach("S1", { targetId: "T1", type: "page", url: "about:blank" });
   channel.emit("Target.attachedToTarget", {
@@ -57,7 +57,8 @@ test("target lifecycle and hook messages become envelopes numbered per producer"
       payload: expect.objectContaining({ openerId: "T1", installMode: "late" }),
     }),
     expect.objectContaining({
-      id: "cdp:S1#1",
+      id: `hook:${DOC}#1`,
+      producer: `hook:${DOC}`,
       source: "S1",
       frameId: "T1",
       documentId: DOC,
@@ -68,7 +69,7 @@ test("target lifecycle and hook messages become envelopes numbered per producer"
       payload: { url: "http://127.0.0.1:4600/routes/form", hookVersion: HOOK_VERSION },
     }),
     expect.objectContaining({
-      id: "cdp:S1#2",
+      id: `hook:${DOC}#2`,
       documentId: DOC,
       monotonicTimeMs: 9.5,
       category: "dom",

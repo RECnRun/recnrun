@@ -40,6 +40,8 @@ export const GAP_REASONS = [
   "capture-suspended",
   // Stopping capture lost results it was still waiting for.
   "capture-stopped",
+  // Observer messages that never reached the adapter, or that it rejected, and no resend recovered.
+  "delivery-lost",
 ] as const;
 
 const PageIdSchema = v.nullable(NonEmptyStringSchema);
@@ -93,6 +95,8 @@ export const typedEvent = <
 export const GapPayloadSchema = v.strictObject({
   reason: v.picklist(GAP_REASONS),
   surface: v.optional(CaptureSurfaceSchema),
+  // The producer whose sequence numbers `fromSeq` to `toSeq` are missing; the gap's own when absent.
+  producer: v.optional(NonEmptyStringSchema),
   fromSeq: v.optional(CountSchema),
   toSeq: v.optional(CountSchema),
   lost: v.optional(CountSchema),

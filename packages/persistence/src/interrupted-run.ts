@@ -2,6 +2,7 @@ import {
   PROTOCOL_SCHEMA_VERSION,
   RUN_EXIT_CODES,
   STEP_STATES,
+  coverageOf,
   isReadOnlyStep,
   isStepResult,
   type Event,
@@ -77,8 +78,15 @@ function tally(results: readonly StepResult[]): RunSummary["counts"] {
   return { total: results.length, ...states };
 }
 
-/** The run files of a run the service lost: status `interrupted`, ended at its last journal line. */
-export function interruptedResult(flow: Flow, run: StoredRun): RunResult {
+/**
+ * The run files of a run the service lost: status `interrupted`, ended at its last journal line.
+ * `gaps` are the lines recovery appended, which coverage counts with the rest of the journal.
+ */
+export function interruptedResult(
+  flow: Flow,
+  run: StoredRun,
+  gaps: readonly Event[] = [],
+): RunResult {
   const { manifest } = run;
   const steps = interruptedSteps(flow, run.journal.events);
   const last = run.journal.events.at(-1)?.timestamp ?? manifest.startedAt;
@@ -99,5 +107,6 @@ export function interruptedResult(flow: Flow, run: StoredRun): RunResult {
         ...(evidence && { evidence }),
       })),
   };
-  return { steps: { ...entries, steps }, coverage: { ...entries, surfaces: [] }, summary };
+  const coverage = coverageOf(manifest.runId, [...run.journal.events, ...gaps]);
+  return { steps: { ...entries, steps }, coverage, summary };
 }

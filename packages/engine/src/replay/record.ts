@@ -1,6 +1,8 @@
 import {
   PROTOCOL_SCHEMA_VERSION,
   RUN_EXIT_CODES,
+  tallyCoverage,
+  type AdapterEvent,
   type BodyEncoding,
   type BodyRef,
   type Event,
@@ -52,6 +54,8 @@ export interface Recorder {
   /** The run's blob store; undefined when the run is not stored or its store keeps no blobs. */
   readonly blobs: ReplayBlobs | undefined;
   snapshot(stepId: string, payload: SnapshotPayload): Promise<void>;
+  /** Journals the gap of a lost connection under the adapter's own producer and sequence. */
+  lost(event: Extract<AdapterEvent, { type: "connection.lost" }>): void;
   /** `problem` is why the run could not start; its steps are all blocked. */
   finish(problem?: RunProblem): Promise<RunSummary>;
 }
@@ -62,6 +66,7 @@ export interface RunProblem {
 }
 
 const PRODUCER = "engine:replay";
+const ADAPTER_PRODUCER = "adapter:connection";
 
 type StepEvent = Exclude<Event, { category: "gap" }>;
 type Category = "step" | "snapshot";
@@ -137,22 +142,64 @@ function stepEnvelope(
   };
 }
 
+function lostEvent(
+  runId: string,
+  event: Extract<AdapterEvent, { type: "connection.lost" }>,
+): Event {
+  return {
+    schemaVersion: PROTOCOL_SCHEMA_VERSION,
+    id: `${ADAPTER_PRODUCER}#${event.seq}`,
+    runId,
+    seq: event.seq,
+    source: "adapter",
+    producer: ADAPTER_PRODUCER,
+    timestamp: event.at,
+    component: "collector",
+    targetId: null,
+    frameId: null,
+    documentId: null,
+    category: "gap",
+    type: event.gap.reason,
+    payload: event.gap,
+  };
+}
+
+/** Journal lines and their coverage counts; a gap written outside the step order is awaited at finish. */
+function journalWriter(
+  options: RecorderOptions,
+  journal?: { append(event: Event): Promise<void> },
+) {
+  const tally = tallyCoverage();
+  const pending = new Set<Promise<void>>();
+  const write = async (event: Event) => {
+    tally.add(event);
+    options.observe?.(event);
+    await journal?.append(event);
+  };
+  const detached = (event: Event) => {
+    const line = write(event).catch(() => {});
+    pending.add(line);
+    void line.finally(() => pending.delete(line));
+  };
+  return { tally, write, detached, settled: () => Promise.all(pending) };
+}
+
 /** Opens the run in the store, when there is one, and records into it. */
 export async function openRecorder(options: RecorderOptions): Promise<Recorder> {
   const run = options.store && (await options.store.store.createRun(options.store.manifest));
   const startedAt = options.now();
   const results: StepResult[] = [];
+  const writer = journalWriter(options, run?.journal);
   let seq = 0;
   const emit: Emit = async (stepId, type, payload, category = "step") => {
     seq += 1;
-    const event: StepEvent = { ...stepEnvelope(options, seq, stepId, category), type, payload };
-    options.observe?.(event);
-    await run?.journal.append(event);
+    await writer.write({ ...stepEnvelope(options, seq, stepId, category), type, payload });
   };
   return {
     blobs: run?.blobs,
     started: (stepId, index) => emit(stepId, "step.started", { index }),
     snapshot: (stepId, payload) => emit(stepId, "captured", payload, "snapshot"),
+    lost: (event) => writer.detached(lostEvent(options.runId, event)),
     async finished(result, index) {
       results.push(result);
       if (result.status === "blocked" || result.status === "cancelled") return;
@@ -172,9 +219,10 @@ export async function openRecorder(options: RecorderOptions): Promise<Recorder> 
         counts: counts(results),
         failures: failures(results, problem),
       };
+      await writer.settled();
       if (!run || !options.store) return summary;
       await run.journal.close();
-      const coverage: RunCoverage = { ...runEntries, surfaces: [] };
+      const coverage: RunCoverage = writer.tally.coverage(options.runId);
       await options.store.store.finishRun({
         steps: { ...runEntries, steps: results },
         coverage,

@@ -11,6 +11,7 @@ import {
   secretReferences,
   withoutSecrets,
 } from "@/features/run/inputs";
+import { Gaps } from "@/features/run/Gaps";
 import { StepResults, Summary } from "@/features/run/Results";
 import { Snapshots } from "@/features/run/Snapshots";
 import { useRun } from "@/features/run/useRun";
@@ -145,6 +146,11 @@ function RunFlow({ flowId, flow, onDiagnostics }: { flowId: string; flow: Flow }
           }
         >
           <Summary summary={replay.summary} />
+        </Card>
+      ) : null}
+      {replay.summary ? (
+        <Card title="Collector gaps">
+          <Gaps runId={replay.summary.runId} />
         </Card>
       ) : null}
       {replay.summary ? (

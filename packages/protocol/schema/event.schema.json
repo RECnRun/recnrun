@@ -74,6 +74,10 @@
               "minimum": 0,
               "type": "integer"
             },
+            "producer": {
+              "minLength": 1,
+              "type": "string"
+            },
             "reason": {
               "enum": [
                 "buffer-exhausted",
@@ -82,7 +86,8 @@
                 "target-unattached",
                 "producer-restarted",
                 "capture-suspended",
-                "capture-stopped"
+                "capture-stopped",
+                "delivery-lost"
               ],
               "type": "string"
             },

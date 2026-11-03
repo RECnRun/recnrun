@@ -127,6 +127,21 @@ describe("CapturedEventSchema", () => {
   });
 });
 
+test("a gap the hook reported is a captured event naming the producer it covers", () => {
+  const payload = {
+    reason: "buffer-exhausted",
+    producer: `hook:${"a".repeat(32)}`,
+    surface: "dom-events",
+    fromSeq: 2,
+    toSeq: 11,
+    lost: 10,
+  };
+  const gap = { ...at("gap", "buffer-exhausted", payload), component: "collector" };
+  expect(v.parse(CapturedEventSchema, gap)).toEqual(gap);
+  const unknown = { ...gap, payload: { ...payload, reason: "other" } };
+  expect(v.is(CapturedEventSchema, unknown)).toBe(false);
+});
+
 describe("DOM observer messages", () => {
   const message = {
     kind: "dom",

@@ -28,14 +28,20 @@ export function isInstrumented(type: string): type is InstrumentedType {
   return (INSTRUMENTED_TARGET_TYPES as readonly string[]).includes(type);
 }
 
-function documentCommands(targetId: string): CdpCommand[] {
+function documentCommands(targetId: string, buffer: number | undefined): CdpCommand[] {
   // `runImmediately` hooks a document that already has a script context: a running page, or a
   // popup's about:blank whose context Chrome hands on to the popup's first same-origin document.
   const script: CdpCommand = {
     method: "Page.addScriptToEvaluateOnNewDocument",
-    params: { source: hookSource(targetId), runImmediately: true },
+    params: { source: hookSource(targetId, buffer), runImmediately: true },
   };
   return [AUTO_ATTACH, { method: "Page.enable" }, script, RUNTIME, BINDING];
+}
+
+/** What the install adds: raw capture commands, and the hook's window of unacknowledged messages. */
+export interface InstallOptions {
+  capture?: boolean;
+  buffer?: number | undefined;
 }
 
 /** The commands, in order, that instrument one attached target; only a held target is resumed. */
@@ -43,11 +49,11 @@ export function installCommands(
   type: InstrumentedType,
   targetId: string,
   mode: InstallMode,
-  capture = false,
+  { capture = false, buffer }: InstallOptions = {},
 ): CdpCommand[] {
   let commands: CdpCommand[];
   if (type === "page" || type === "iframe")
-    commands = [...documentCommands(targetId), ...(capture ? CAPTURE : [])];
+    commands = [...documentCommands(targetId, buffer), ...(capture ? CAPTURE : [])];
   // A dedicated worker can start nested workers; a service worker cannot.
   else if (type === "worker") commands = [AUTO_ATTACH, RUNTIME, BINDING];
   else commands = [RUNTIME, BINDING];

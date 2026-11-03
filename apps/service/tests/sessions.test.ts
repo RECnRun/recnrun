@@ -1,7 +1,14 @@
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { BodySink } from "@recnrun/adapter";
 import { openBlobStore, readJournal } from "@recnrun/persistence";
-import type { CapturedEvent, Lease, ServiceMessage, SessionStatus } from "@recnrun/protocol";
+import {
+  coverageOf,
+  type CapturedEvent,
+  type Lease,
+  type ServiceMessage,
+  type SessionStatus,
+} from "@recnrun/protocol";
 import { expect, test } from "vite-plus/test";
 import { fillAndClick, harness, navigated, SEND_BUTTON, type Harness } from "./fakes.ts";
 
@@ -143,6 +150,12 @@ test("a session stopped while capture is suspended journals that gap", async () 
   for (const event of fillAndClick(1)) h.browser.emit(event);
   resultOf(await h.call("session.stop", { sessionId }, fenced(status)));
   expect(await categoriesOf(h, sessionId)).toEqual(["gap:capture-suspended"]);
+  const folder = join(h.home, ".recnrun", "sessions", sessionId);
+  const coverage: unknown = JSON.parse(await readFile(join(folder, "coverage.json"), "utf8"));
+  expect(coverage, "coverage.json reconciles with the journal").toEqual(
+    coverageOf(sessionId, (await journalOf(h, sessionId)).events),
+  );
+  expect(coverage).toMatchObject({ gaps: [{ reason: "capture-suspended", gaps: 1 }] });
 });
 
 test("handing control away needs the holder's fence; a person takes it back at once", async () => {

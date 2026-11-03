@@ -15,7 +15,7 @@
           "additionalProperties": false,
           "properties": {
             "hookVersion": {
-              "const": 3
+              "const": 4
             },
             "url": {
               "type": "string"
@@ -266,6 +266,62 @@
         },
         "type": {
           "const": "storage.operation"
+        }
+      },
+      "required": ["kind", "type", "seq", "documentId", "ts", "targetId", "payload"],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "documentId": {
+          "pattern": "^[0-9a-f]{32}$",
+          "type": "string"
+        },
+        "kind": {
+          "const": "gap"
+        },
+        "payload": {
+          "additionalProperties": false,
+          "properties": {
+            "fromSeq": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "kinds": {
+              "items": {
+                "enum": ["lifecycle", "dom", "storage"],
+                "type": "string"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            "lost": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "toSeq": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          "required": ["fromSeq", "toSeq", "lost", "kinds"],
+          "type": "object"
+        },
+        "seq": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "targetId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "ts": {
+          "minimum": 0,
+          "type": "number"
+        },
+        "type": {
+          "const": "buffer.exhausted"
         }
       },
       "required": ["kind", "type", "seq", "documentId", "ts", "targetId", "payload"],

@@ -1,4 +1,4 @@
-import type { Target } from "@recnrun/protocol";
+import type { AdapterEvent, Target } from "@recnrun/protocol";
 
 /** What a target matches now; the element fields describe the match only when `count` is 1. */
 export interface ElementState {
@@ -70,4 +70,6 @@ export interface ReplayDriver {
   act(command: DriverCommand, options: ReadOptions): Promise<ActResult>;
   /** Captures the current tab for a snapshot; never opens a tab and never writes to the page. */
   capture?(options: ReadOptions): Promise<PageCapture>;
+  /** Subscribes to the connection's events; the run journals a lost connection as a gap. */
+  onEvent?(listener: (event: AdapterEvent) => void): () => void;
 }

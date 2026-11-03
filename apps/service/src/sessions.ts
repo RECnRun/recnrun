@@ -13,14 +13,21 @@ import {
   type Session,
   type SessionResult,
 } from "@recnrun/engine";
-import { openBlobStore, type BindingsStore, type JournalWriter } from "@recnrun/persistence";
-import type {
-  AssertionStep,
-  CapturedEvent,
-  Event,
-  GapPayload,
-  PauseMode,
-  SessionStatus,
+import {
+  openBlobStore,
+  writeCoverage,
+  type BindingsStore,
+  type JournalWriter,
+} from "@recnrun/persistence";
+import {
+  tallyCoverage,
+  type AssertionStep,
+  type CapturedEvent,
+  type CoverageTally,
+  type Event,
+  type GapPayload,
+  type PauseMode,
+  type SessionStatus,
 } from "@recnrun/protocol";
 import {
   endpointOf,
@@ -44,6 +51,8 @@ export interface LiveSession {
   readonly targetId: string;
   readonly recording: RecordingHandle;
   readonly journal: JournalWriter;
+  /** Counts what the journal holds, for `coverage.json` at stop. */
+  readonly coverage: CoverageTally;
   readonly events: CapturedEvent[];
   /** Events captured while step creation was paused; they never become steps. */
   readonly ignored: Set<string>;
@@ -109,6 +118,7 @@ export const advance = (live: LiveSession, event: LifecycleEvent) =>
   settle(live, applySessionEvent(live.state, event));
 
 function track(deps: SessionDeps, live: LiveSession, event: Event): void {
+  live.coverage.add(event);
   const write = live.journal.append(event).catch((error: unknown) => {
     deps.logger.error("session.journal-failed", { message: String(error) });
   });
@@ -175,6 +185,7 @@ export async function startSession(
     targetId: recording.targetId,
     recording,
     journal,
+    coverage: tallyCoverage(),
     events: [],
     ignored: new Set(),
     assertions: [],
@@ -273,6 +284,8 @@ export async function stopSession(deps: SessionDeps, live: LiveSession): Promise
   await drain(deps, live, stopping);
   await Promise.all(live.writes);
   await live.journal.close();
+  const folder = join(deps.home, ".recnrun", "sessions", live.id);
+  await writeCoverage(folder, live.coverage.coverage(live.id));
   const lease = deps.leases.current(live.targetId);
   if (lease) deps.leases.release(live.targetId, lease);
   return announce(deps, live);

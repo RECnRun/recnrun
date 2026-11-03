@@ -1,6 +1,7 @@
 import {
   MAX_INLINE_BODY_LENGTH,
   type CapturedEvent,
+  type CaptureSurface,
   type ObserverMessage,
 } from "@recnrun/protocol";
 import type { CdpChannel, CdpEvent } from "./cdp-socket.ts";
@@ -17,6 +18,7 @@ import { sensitiveHeaders, type BodySink } from "./capture-network-evidence.ts";
 import { mapPageEvent } from "./capture-page.ts";
 import { StorageCapture } from "./capture-storage.ts";
 import type { TargetRecord } from "./instrumentation-targets.ts";
+import { hookProducer, type Hole } from "./observer-delivery.ts";
 
 /** Raw capture: every event becomes a validated journal line handed to `onEvent`. */
 export interface CaptureOptions {
@@ -75,10 +77,26 @@ export class Capture {
   attached({ info }: TargetRecord, openerId: string | undefined): void {
     const { targetId, type, url, installMode } = info;
     const payload = { type, url, installMode, ...(openerId && { openerId }) };
-    this.emitter.emit(
-      { ...BROWSER, targetId },
-      { category: "target", type: "attached", component: "browser", payload },
-    );
+    const origin = { ...BROWSER, targetId };
+    this.emitter.emit(origin, {
+      category: "target",
+      type: "attached",
+      component: "browser",
+      payload,
+    });
+    // A worker that ran before the attach did things nothing observed; a page reloads to cover them.
+    if (type === "worker" && installMode === "late")
+      this.emitter.emit(
+        origin,
+        gapDraft({ reason: "target-unattached", surface: "workers-frames" }),
+      );
+  }
+
+  /** Hook messages of an ended document that never arrived and that no gap message reported. */
+  undelivered(record: TargetRecord, { producer, fromSeq, toSeq }: Hole): void {
+    const lost = toSeq - fromSeq + 1;
+    const payload = { reason: "delivery-lost", producer, fromSeq, toSeq, lost };
+    this.emitter.emit(this.origin(record, null), gapDraft(payload));
   }
 
   /** The target's instrumentation was sent; a target that was already running reads its storage. */
@@ -110,8 +128,13 @@ export class Capture {
   ): void {
     const key = `${record.sessionId}:${contextId}`;
     this.documents.set(key, message.documentId);
-    const origin = { ...this.origin(record, frameId), documentId: message.documentId };
-    this.emitter.emit(origin, { ...observedDraft(message), monotonicTimeMs: message.ts });
+    const origin = {
+      ...this.origin(record, frameId),
+      producer: hookProducer(message.documentId),
+      documentId: message.documentId,
+    };
+    const draft = { ...observedDraft(message), monotonicTimeMs: message.ts };
+    this.emitter.emit(origin, draft, message.seq);
     // An install starts a document in this context; what waited for it belongs to that document.
     if (message.type === "document.hook-installed") this.documents.release(key, message.documentId);
   }
@@ -222,7 +245,31 @@ export class Capture {
   }
 }
 
+const KIND_SURFACES: Record<string, CaptureSurface> = {
+  dom: "dom-events",
+  storage: "web-storage",
+  lifecycle: "navigation",
+};
+
+const gapDraft = (payload: Record<string, unknown>): Draft => ({
+  category: "gap",
+  type: String(payload["reason"]),
+  component: "collector",
+  payload,
+});
+
 function observedDraft(message: ObserverMessage): Draft {
+  if (message.kind === "gap") {
+    const { kinds, ...range } = message.payload;
+    const surface = kinds.length === 1 ? KIND_SURFACES[kinds[0] as string] : undefined;
+    const producer = hookProducer(message.documentId);
+    return gapDraft({
+      reason: "buffer-exhausted",
+      producer,
+      ...range,
+      ...(surface && { surface }),
+    });
+  }
   if (message.kind === "dom")
     return {
       category: "dom",

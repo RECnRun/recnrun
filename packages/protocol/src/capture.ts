@@ -2,7 +2,12 @@ import * as v from "valibot";
 import { CountSchema, NonEmptyStringSchema } from "./common.ts";
 import { CapturedTextSchema as TextSchema } from "./captured-text.ts";
 import { ConsoleEventSchema, ErrorEventSchema } from "./console.ts";
-import { EVENT_ENVELOPE_ENTRIES, typedEvent as typed } from "./events.ts";
+import {
+  EVENT_ENVELOPE_ENTRIES,
+  GAP_REASONS,
+  GapPayloadSchema,
+  typedEvent as typed,
+} from "./events.ts";
 import { NetworkEventSchema } from "./network.ts";
 import { StorageEventSchema } from "./storage.ts";
 
@@ -125,6 +130,13 @@ export const CapturedEventSchema = v.variant("category", [
   StorageEventSchema,
   navigationEvents,
   targetEvents,
+  // A loss the collector accounts for, such as messages a full observer buffer dropped.
+  v.strictObject({
+    ...EVENT_ENVELOPE_ENTRIES,
+    category: v.literal("gap"),
+    type: v.picklist(GAP_REASONS),
+    payload: GapPayloadSchema,
+  }),
 ]);
 
 export type DomEventType = v.InferOutput<typeof DomEventTypeSchema>;

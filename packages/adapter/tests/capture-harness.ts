@@ -28,8 +28,15 @@ export class ReplyingChannel extends FakeChannel {
     );
   }
 
+  // The hook numbers each document's messages; a message without `seq` takes the next number.
+  private readonly hookSeqs = new Map<unknown, number>();
+
   post(sessionId: string, contextId: number, message: Record<string, unknown>): void {
-    const payload = JSON.stringify({ seq: 1, documentId: DOC, ts: 5, targetId: "T1", ...message });
+    const documentId = message["documentId"] ?? DOC;
+    const seq = Number(message["seq"] ?? (this.hookSeqs.get(documentId) ?? 0) + 1);
+    this.hookSeqs.set(documentId, Math.max(seq, this.hookSeqs.get(documentId) ?? 0));
+    const fields = { seq, documentId, ts: 5, targetId: "T1" };
+    const payload = JSON.stringify({ ...fields, ...message, seq });
     this.emit(
       "Runtime.bindingCalled",
       { name: OBSERVER_BINDING, payload, executionContextId: contextId },

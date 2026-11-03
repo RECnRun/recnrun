@@ -17,7 +17,7 @@ const PAUSE_LABELS: Record<PauseMode, string> = {
   suspendCapture: "Suspend capture",
 };
 
-// Collector gaps reach the UI with F3.5's coverage accounting; F2 shows a suspended capture.
+// The Run screen lists a run's collector gaps (F3.5); a live session shows only that capture is suspended.
 function Coverage({ suspended }: { suspended: boolean }) {
   if (!suspended) return <p class="muted">Capture is on for this page and the popups it opens.</p>;
   return <p>Capture is suspended: nothing is observed until you resume it.</p>;

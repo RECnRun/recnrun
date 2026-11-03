@@ -34,22 +34,29 @@ declare global {
   }
 }
 
-/** What a spec may add to the capture: a blob sink, headers to redact, an inline cap. */
-export type CaptureExtras = Pick<CaptureOptions, "blobs" | "redactHeaders" | "maxBodyLength">;
+/** What a spec may add to the capture: a blob sink, headers to redact, an inline cap, a hook buffer. */
+export type CaptureExtras = Pick<CaptureOptions, "blobs" | "redactHeaders" | "maxBodyLength"> & {
+  observerBuffer?: number;
+};
 
 export const test = appTest.extend<{ captureExtras: CaptureExtras; captured: Captured }>({
   captureExtras: [{}, { option: true }],
-  captured: async ({ app, chrome, captureExtras }, use, testInfo) => {
+  captured: async (
+    { app, chrome, captureExtras: { observerBuffer, ...extras } },
+    use,
+    testInfo,
+  ) => {
     void app;
     const events: CapturedEvent[] = [];
     const path = testInfo.outputPath("events.jsonl");
     const journal = await openJournal(path);
     const writes: Promise<void>[] = [];
     const handle = await instrument(chrome.wsEndpoint, {
+      ...(observerBuffer !== undefined && { observerBuffer }),
       capture: {
         runId: "capture-spec",
         bodyTimeoutMs: BODY_TIMEOUT_MS,
-        ...captureExtras,
+        ...extras,
         onEvent: (event) => {
           events.push(event);
           writes.push(journal.append(event));

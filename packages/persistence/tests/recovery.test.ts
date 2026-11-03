@@ -1,7 +1,7 @@
 import { appendFile, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { Event } from "@recnrun/protocol";
+import { coverageOf, type Event } from "@recnrun/protocol";
 import { afterEach, beforeEach, expect, test } from "vite-plus/test";
 import { openFlowStore, recoverRuns, type FlowStore } from "../src/index.ts";
 import { runManifest, runSummary, spikeFlow } from "./flow-fixtures.ts";
@@ -111,6 +111,14 @@ test("a read-only step cut short is cancelled and a truncated journal keeps its 
     "producer-restarted 2",
   ]);
   expect(summary).toMatchObject({ status: "interrupted", failures: [] });
+  const { coverage } = await store.getRun("form-submit", "run-1");
+  expect(coverage, "coverage.json reconciles with the journal").toEqual(
+    coverageOf("run-1", journal.events),
+  );
+  expect(coverage?.gaps).toEqual([
+    { reason: "journal-truncated", gaps: 1, lostEvents: 0 },
+    { reason: "producer-restarted", gaps: 1, lostEvents: 0 },
+  ]);
 });
 
 test("a run it cannot read stays as it is and is reported", async () => {

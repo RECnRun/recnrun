@@ -239,7 +239,7 @@ export const SURFACE_CAPABILITIES: Surface[] = [
     status: "partial",
     phase: "F6.2",
     notes:
-      "F1.4; tests/browser/instrumentation.spec.ts observes dedicated workers as CDP targets, held until the binding is added and then resumed, but nothing is captured inside them yet. A worker already running at connection time is recorded as late on the instrumentation report; reporting it as a gap comes with F3.5.",
+      "F1.4; tests/browser/instrumentation.spec.ts observes dedicated workers as CDP targets, held until the binding is added and then resumed, but nothing is captured inside them yet. A worker already running at connection time is recorded as late on the instrumentation report and journaled as a target-unattached gap of workers and frames (F3.5).",
   },
   {
     kind: "surface",

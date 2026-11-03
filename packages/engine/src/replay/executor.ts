@@ -211,8 +211,14 @@ export async function replayFlow(
   const timeoutMs = options.defaultTimeoutMs ?? DEFAULT_STEP_TIMEOUT_MS;
   const snapshot = snapshotter(driver, recorder, secrets);
   const run: Run = { driver, scope, secrets, clock, timeoutMs, recorder, snapshot };
+  const stopListening = driver.onEvent?.((event) => {
+    if (event.type === "connection.lost") recorder.lost(event);
+  });
   if (problem) await skip(run, flow.steps, 0, "block");
-  const steps = problem ? [] : await runAll(run, flow.steps, options.control);
+  const steps = problem
+    ? []
+    : await runAll(run, flow.steps, options.control).finally(stopListening);
+  stopListening?.();
   const summary = await recorder.finish(problem);
   const vars = Object.fromEntries(
     Object.entries(scope.vars).map(([name, value]) => [name, redact(value, secrets)]),

@@ -34,11 +34,14 @@ async function readState(locator: Locator, timeoutMs: number): Promise<ElementSt
   return { count, visible, enabled, editable, text: text ?? "", value };
 }
 
+/** Every driver method but `onEvent`, which the adapter answers from its connection. */
+export type PageDriver = Required<Omit<ReplayDriver, "onEvent">>;
+
 /**
  * Drives the replay's tabs through Playwright's input methods, so Chrome dispatches trusted
  * events. Reads never open a tab; the first write opens one in the default browser context.
  */
-export function createPageDriver(open: () => Promise<ReplayPage>): Required<ReplayDriver> {
+export function createPageDriver(open: () => Promise<ReplayPage>): PageDriver {
   const tabs = createTabs(open);
   const onPage = <T>(absent: T, read: (page: ReplayPage) => Promise<T>): Promise<T> => {
     const page = tabs.selected();

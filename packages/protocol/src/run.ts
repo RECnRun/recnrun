@@ -7,6 +7,7 @@ import {
   NameSchema,
   NonEmptyStringSchema,
 } from "./common.ts";
+import { GAP_REASONS } from "./events.ts";
 import { RevisionHashSchema } from "./flow-folder.ts";
 import { StepStateSchema } from "./states.ts";
 import type { Step } from "./steps.ts";
@@ -65,18 +66,33 @@ export const StepResultSchema = v.strictObject({
 /** runs/<id>/steps.json. */
 export const RunStepsSchema = v.strictObject({ ...runEntries, steps: v.array(StepResultSchema) });
 
-/** One surface of runs/<id>/coverage.json, with the reasons behind a status below `implemented`. */
+/**
+ * One surface of runs/<id>/coverage.json: `partial` with the gap reasons that touched it, either
+ * naming it or naming no surface (a lost connection touches every one). `events` counts its journal
+ * lines; `gaps` and `lostEvents` count only the gaps that name it.
+ */
 export const CoverageEntrySchema = v.strictObject({
   surface: CaptureSurfaceSchema,
   status: CapabilityStatusSchema,
   reasons: v.array(NonEmptyStringSchema),
+  events: v.optional(CountSchema),
   gaps: v.optional(CountSchema),
   lostEvents: v.optional(CountSchema),
 });
 
-/** runs/<id>/coverage.json. */
+/** The gaps of one reason in a journal, and the events they say were lost. */
+export const GapTallySchema = v.strictObject({
+  reason: v.picklist(GAP_REASONS),
+  gaps: CountSchema,
+  lostEvents: CountSchema,
+});
+
+/** runs/<id>/coverage.json; `events` (every line but gaps) and `gaps` reconcile with events.jsonl. */
 export const RunCoverageSchema = v.strictObject({
   ...runEntries,
+  // Optional only so coverage written before F3.5 still reads.
+  events: v.optional(CountSchema),
+  gaps: v.optional(v.array(GapTallySchema)),
   surfaces: v.array(CoverageEntrySchema),
 });
 

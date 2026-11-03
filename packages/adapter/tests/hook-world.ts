@@ -15,7 +15,7 @@ export interface Page {
 }
 
 // A minimal main world: window, document, location, performance, crypto, timers, and listeners.
-export function page(url: string, withBinding = true): Page {
+export function page(url: string, withBinding = true, buffer?: number): Page {
   const posted: unknown[] = [];
   const listeners = new Map<string, Listener>();
   const window: Record<string, unknown> = {
@@ -39,7 +39,7 @@ export function page(url: string, withBinding = true): Page {
   return {
     window: context,
     posted,
-    run: () => runInContext(hookSource("T1"), context),
+    run: () => runInContext(hookSource("T1", buffer), context),
     navigate: (next) => {
       context.document = {};
       context.location = { href: next };
@@ -53,4 +53,5 @@ export const hookOf = (target: Page) =>
     version: number;
     documentId: string;
     installedAt: number;
+    ack: (documentId: string, upTo: number, resendFrom?: number) => void;
   };

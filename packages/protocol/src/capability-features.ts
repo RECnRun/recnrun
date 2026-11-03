@@ -168,11 +168,11 @@ export const FEATURE_CAPABILITIES: Feature[] = [
     "Service sessions, flows, runs, and picker",
     "Delivered by F2.6a; tests/browser/service-session.spec.ts records the fixture form through the service in Google Chrome, finalizes a flow with fill and click, replays it to passed, and picks the submit button without clicking it; tests/contract/service-session.test.ts covers the commands, the event pushes, and the UI's token meta and CSP over a fake Chrome.",
   ),
-  planned(
+  implemented(
     "coverage-loss-accounting",
     "F3.5",
     "Coverage and loss accounting",
-    "Bounded buffers emit explicit gap events instead of dropping silently.",
+    "Delivered by F3.5; tests/browser/coverage.spec.ts bursts 1000 events through a hook that keeps 10 unacknowledged messages, and the buffer-exhausted gaps name every sequence number that never arrived; killing Chrome with SIGKILL mid-run journals a connection-lost gap; coverage.json counts events per surface and gaps per reason, and equals the count of the journal. The hook resends what the adapter did not acknowledge; a hole no resend filled is a delivery-lost gap. A document that dies before pagehide can still lose its last unreported messages.",
   ),
   implemented(
     "crash-recovery",

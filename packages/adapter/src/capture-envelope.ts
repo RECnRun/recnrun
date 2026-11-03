@@ -32,7 +32,8 @@ export interface Mapped {
 }
 
 export interface Emitter {
-  emit(origin: Origin, draft: Draft): void;
+  /** `seq` is the producer's own number when it numbers its events itself, as the hook does. */
+  emit(origin: Origin, draft: Draft, seq?: number): void;
   counts(): { events: number; dropped: number };
 }
 
@@ -48,9 +49,9 @@ export function createEmitter({ runId, onEvent, now }: EmitterOptions): Emitter 
   let events = 0;
   let dropped = 0;
   return {
-    emit(origin, { monotonicTimeMs, ...draft }) {
-      const seq = (sequences.get(origin.producer) ?? 0) + 1;
-      sequences.set(origin.producer, seq);
+    emit(origin, { monotonicTimeMs, ...draft }, own) {
+      const seq = own ?? (sequences.get(origin.producer) ?? 0) + 1;
+      if (own === undefined) sequences.set(origin.producer, seq);
       const candidate = {
         schemaVersion: PROTOCOL_SCHEMA_VERSION,
         id: `${origin.producer}#${seq}`,

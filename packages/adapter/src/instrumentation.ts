@@ -26,6 +26,7 @@ import {
 } from "./instrumentation-targets.ts";
 import type { TargetScope } from "./instrumentation-scope.ts";
 import { assertLoopbackEndpoint } from "./loopback.ts";
+import { ObserverDelivery } from "./observer-delivery.ts";
 
 export interface InstrumentOptions {
   onEvent?: (event: InstrumentationEvent) => void;
@@ -35,6 +36,8 @@ export interface InstrumentOptions {
   openChannel?: (endpoint: string) => Promise<CdpChannel>;
   /** Limits instrumentation to these targets; without it every target is instrumented. */
   scope?: TargetScope;
+  /** How many unacknowledged messages each hooked document keeps before it reports a gap. */
+  observerBuffer?: number;
 }
 
 export interface Instrumentation {
@@ -54,6 +57,8 @@ const CONTEXT_EVENTS = new Set([
 
 const reason = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
+const ContextIdSchema = v.object({ executionContextId: v.number() });
+
 class Instrumenter {
   readonly records: TargetRecord[] = [];
   private readonly sessions = new Map<string, TargetRecord>();
@@ -61,10 +66,17 @@ class Instrumenter {
   private readonly channel: CdpChannel;
   private readonly options: InstrumentOptions;
   readonly capture: Capture | undefined;
+  readonly delivery: ObserverDelivery;
 
   constructor(channel: CdpChannel, options: InstrumentOptions) {
     this.channel = channel;
     this.options = options;
+    this.delivery = new ObserverDelivery({
+      acknowledge: (sessionId, contextId, expression) => {
+        const params = { expression, contextId, silent: true };
+        void channel.send("Runtime.evaluate", params, sessionId).catch(() => undefined);
+      },
+    });
     const now = options.now ?? (() => new Date());
     this.capture =
       options.capture &&
@@ -82,8 +94,10 @@ class Instrumenter {
     else {
       const record = event.sessionId ? this.sessions.get(event.sessionId) : undefined;
       if (!record) return;
-      if (CONTEXT_EVENTS.has(event.method)) trackContext(record, event.method, event.params);
-      else if (event.method === "Runtime.bindingCalled") this.receive(record, event.params);
+      if (CONTEXT_EVENTS.has(event.method)) {
+        trackContext(record, event.method, event.params);
+        this.contextEnded(record, event.method, event.params);
+      } else if (event.method === "Runtime.bindingCalled") this.receive(record, event.params);
       else if (record.info.installMode !== "ignored") this.capture?.sessionEvent(record, event);
     }
   }
@@ -118,7 +132,10 @@ class Instrumenter {
   // Sent in one burst without awaiting replies: Chrome runs a session's commands in order, a held
   // worker answers nothing until resumed, and another client's resume releases a held popup.
   private async install(record: TargetRecord, type: InstrumentedType, mode: InstallMode) {
-    const commands = installCommands(type, record.info.targetId, mode, Boolean(this.capture));
+    const commands = installCommands(type, record.info.targetId, mode, {
+      capture: Boolean(this.capture),
+      buffer: this.options.observerBuffer,
+    });
     const replies = commands.map(({ method, params }) =>
       this.channel.send(method, params, record.sessionId),
     );
@@ -144,6 +161,7 @@ class Instrumenter {
     const record = this.sessions.get(detached.output.sessionId);
     if (record) {
       record.info.detached = true;
+      this.closeDocuments((sessionId) => sessionId === record.sessionId);
       this.capture?.detached(record);
     }
     this.sessions.delete(detached.output.sessionId);
@@ -158,6 +176,13 @@ class Instrumenter {
     const verdict = judge(record, called.output.payload, called.output.executionContextId);
     if (!verdict.ok) return;
     const { message, frameId } = verdict;
+    const arrival = this.delivery.arrive(
+      record.sessionId,
+      called.output.executionContextId,
+      message,
+    );
+    if (arrival === "invalid") info.droppedInvalid += 1;
+    if (arrival !== "new") return;
     this.capture?.observed(record, message, frameId, called.output.executionContextId);
     if (message.type === "document.hook-installed") this.installed(record, message, frameId);
   }
@@ -191,6 +216,25 @@ class Instrumenter {
     });
   }
 
+  /** Journals the sequence numbers of ended documents that no message or gap accounted for. */
+  closeDocuments(matches: (sessionId: string, contextId: number) => boolean): void {
+    for (const hole of this.delivery.close(matches)) {
+      const record = this.sessions.get(hole.sessionId);
+      if (record) this.capture?.undelivered(record, hole);
+    }
+  }
+
+  private contextEnded(record: TargetRecord, method: string, params: unknown): void {
+    const ofSession = (sessionId: string) => sessionId === record.sessionId;
+    if (method === "Runtime.executionContextsCleared") this.closeDocuments(ofSession);
+    const destroyed = v.safeParse(ContextIdSchema, params);
+    if (method !== "Runtime.executionContextDestroyed" || !destroyed.success) return;
+    const { executionContextId } = destroyed.output;
+    this.closeDocuments(
+      (sessionId, contextId) => ofSession(sessionId) && contextId === executionContextId,
+    );
+  }
+
   report(): InstrumentationReport {
     const targets = this.records.map(({ info }) => ({ ...info }));
     const observed = (type: string) => ({ observed: targets.some((t) => t.type === type) });
@@ -214,6 +258,7 @@ export async function instrumentChannel(
   const instrumenter = new Instrumenter(channel, options);
   channel.onEvent((event) => instrumenter.handle(event));
   const stop = () => {
+    instrumenter.closeDocuments(() => true);
     instrumenter.capture?.stop();
     channel.close();
   };
