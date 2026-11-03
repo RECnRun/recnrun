@@ -4,10 +4,16 @@ import type { RouteBJournal } from "@/background/route-b/types";
 import type { SelectionApis } from "@/background/selection/types";
 
 /** One isolated-world injection that returns the page's `#report` text. */
+/** What the lab reads inside a page: its report text and its origin's IndexedDB names. */
+export interface PageView {
+  report: string | null;
+  databases: string[] | { error: string };
+}
+
 export interface ReportInjection {
   target: { tabId: number };
   world: "ISOLATED";
-  func: (waitMs: number) => Promise<string | null>;
+  func: (waitMs: number) => Promise<PageView>;
   args: [number];
 }
 

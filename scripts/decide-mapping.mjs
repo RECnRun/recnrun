@@ -22,12 +22,14 @@ export const SPECS = {
   E5: "tests/experiments/E5-route-b-fetch.spec.ts",
   E6: "tests/experiments/E6-route-b-selection.spec.ts",
   E7: "tests/experiments/E7-route-c-pages-workers.spec.ts",
+  E8: "tests/experiments/E8-strict.spec.ts",
 };
 
 /** Experiments that probe what Chrome allows, not a route, and so feed no cell. */
 export const NOT_MAPPED = {
   E0: "extension loading methods; a precondition of every route",
   E1: "what chrome.debugger can do; a precondition of Routes A and B",
+  E8: "d-other-clients: no other debugger client in the strict lab; a precondition of E8",
 };
 
 const SW = "serviceWorker";
@@ -48,6 +50,7 @@ const BY_ROUTE = {
         "E3/direct-attach-race/sw-*",
         "attaching by target id as getTargets() lists it loses the race",
       ],
+      ["E8/a-cold-start", "the same hold in Chrome without CDP, the isolator installed by policy"],
     ],
     dedicated: [
       [
@@ -70,6 +73,7 @@ const BY_ROUTE = {
       ["E4/debugger-pause", "a pause holds the worker without stopping it"],
       ["E4/dnr-block-evict", "a DNR block does not evict a running worker"],
       ["E4/unregister", "unregister() leaves the target listed"],
+      ["E8/b-restart", "without CDP a reload after closeTarget must still load"],
     ],
     [`${SW}.wake`]: [
       ["E3/wake-without-tab", "a worker woken with no tab open is attached by watch"],
@@ -96,10 +100,12 @@ const BY_ROUTE = {
     dedicated: [
       ["E6/c-workers/dedicated:*", "the slot switch reaches dedicated workers"],
       ["E6/suspend/dedicated:*", "dedicated workers survive a suspended background"],
+      ["E8/c-selection-workers/dedicated:*", "the same switch in Chrome without CDP"],
     ],
     shared: [
       ["E6/c-workers/shared:*", "the slot switch reaches shared workers"],
       ["E6/suspend/shared:*", "shared workers survive a suspended background"],
+      ["E8/c-selection-workers/shared:*", "the same switch in Chrome without CDP"],
     ],
   },
   C: {

@@ -15,8 +15,8 @@ const TARGETS: TargetInfo[] = [
   { type: "worker", id: "sw", url: `${APP}/sw-main.js?variant=classic`, attached: false },
   { type: "worker", id: "self", url: "chrome-extension://isolator/background.js", attached: false },
 ];
+// chrome.debugger answers IndexedDB.requestDatabaseNames with -32601, so the page lists them.
 const REPLIES = {
-  "IndexedDB.requestDatabaseNames": { databaseNames: ["__rec:lab-t7:fixture-sw"] },
   "CacheStorage.requestCacheNames": { caches: [{ cacheName: "__rec:lab-t7:fixture-sw" }] },
 };
 
@@ -32,7 +32,8 @@ function setup(lab: unknown) {
     scripting: {
       executeScript: async (injection) => {
         injections.push(injection);
-        return [{ result: '{"worker":{"database":"__rec:lab-t7:fixture-sw"}}' }];
+        const report = '{"worker":{"database":"__rec:lab-t7:fixture-sw"}}';
+        return [{ result: { report, databases: ["__rec:lab-t7:fixture-sw"] } }];
       },
     },
     selection: {

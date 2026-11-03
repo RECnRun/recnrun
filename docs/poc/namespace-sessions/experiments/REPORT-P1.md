@@ -2,7 +2,7 @@
 
 Task P1.8 of [PLAN.md](../PLAN.md#p1-minimal-service-worker-proof-source-5-14-deliverable-2). P1 asked whether branded Chrome lets the extension run its bootstrap before the first statement of a page or worker, stop a service worker, and control its restart, through three routes: Route A (`chrome.debugger` pauses the target and evaluates the bootstrap), Route B (`Fetch` fulfils the service-worker script with a wrapper), and Route C (MAIN-world content scripts for pages, wrapped or refused `Worker` and `SharedWorker`). Result: Google Chrome 156.0.8078.79 on Linux in Docker, load method `cdp-load-unpacked`, 2026-11-03. Nothing here is validated on macOS or Windows. This report does not pick a route: the owner does, per capability, from the output below, and records the decision in [CHECKLIST.md](../CHECKLIST.md).
 
-The report is hand-written around one generated block. `scripts/decide.mjs` maps each hypothesis of [E2](E2.md) to [E7](E7.md) to a capability and a route (`scripts/decide-mapping.mjs`, one reason per row) and prints the tables; `vp run docs:check` fails when the block differs from a fresh run against the committed verdicts, and `node scripts/decide.mjs --write` refreshes it. [E0](E0.md) and [E1](E1.md) probe what Chrome allows and feed no cell.
+The report is hand-written around one generated block. `scripts/decide.mjs` maps each hypothesis of [E2](E2.md) to [E8](E8.md) to a capability and a route (`scripts/decide-mapping.mjs`, one reason per row) and prints the tables; `vp run docs:check` fails when the block differs from a fresh run against the committed verdicts, and `node scripts/decide.mjs --write` refreshes it. [E0](E0.md) and [E1](E1.md) probe what Chrome allows and feed no cell, nor does E8's `d-other-clients`, a precondition of the strict lab.
 
 ## Evidence run
 
@@ -27,18 +27,18 @@ The `held-module` sample lost is the navigation trigger (E4.md: 1 of 1; this run
 
 <!-- decide:start -->
 
-Chrome: Google Chrome 156.0.8078.79 (69 verdicts); Google Chrome for Testing 156.0.8078.4 (1 verdict)
+Chrome: Google Chrome 156.0.8078.79 (73 verdicts); Google Chrome for Testing 156.0.8078.4 (1 verdict)
 
 **Which route passed, per capability**
 
 | Capability            | Route A                               | Route B                | Route C                       |
 | --------------------- | ------------------------------------- | ---------------------- | ----------------------------- |
 | page                  | not tested                            | not tested             | mixed (3 pass, 3 unavailable) |
-| dedicated             | mixed (1 pass, 2 fail, 1 unavailable) | pass (2)               | fail (1)                      |
-| shared                | fail (1)                              | pass (2)               | fail (2)                      |
-| serviceWorker.first   | mixed (1 pass, 2 fail)                | mixed (1 pass, 2 fail) | not tested                    |
+| dedicated             | mixed (1 pass, 2 fail, 1 unavailable) | pass (3)               | fail (1)                      |
+| shared                | fail (1)                              | pass (3)               | fail (2)                      |
+| serviceWorker.first   | mixed (2 pass, 2 fail)                | mixed (1 pass, 2 fail) | not tested                    |
 | serviceWorker.update  | not tested                            | fail (2)               | not tested                    |
-| serviceWorker.cold    | mixed (1 pass, 6 fail)                | pass (1)               | not tested                    |
+| serviceWorker.cold    | mixed (1 pass, 7 fail)                | pass (1)               | not tested                    |
 | serviceWorker.offline | not tested                            | fail (2)               | not tested                    |
 | serviceWorker.wake    | unavailable (1)                       | not tested             | not tested                    |
 
@@ -57,6 +57,7 @@ Chrome: Google Chrome 156.0.8078.79 (69 verdicts); Google Chrome for Testing 156
 | serviceWorker.first   | A     | E2 service-worker-register               | fail              | tests/experiments/E2-route-a-register.spec.ts      | auto-attach before register(); caches is undefined at the pause         |
 | serviceWorker.first   | A     | E3 before-script-execution [sw-*]        | pass              | tests/experiments/E3-route-a-cold.spec.ts          | armed tab, auto-attach and a breakpoint hold each worker                |
 | serviceWorker.first   | A     | E3 direct-attach-race [sw-*]             | fail              | tests/experiments/E3-route-a-cold.spec.ts          | attaching by target id as getTargets() lists it loses the race          |
+| serviceWorker.first   | A     | E8 a-cold-start                          | pass              | tests/experiments/E8-strict.spec.ts                | the same hold in Chrome without CDP, the isolator installed by policy   |
 | dedicated             | A     | E2 dedicated-worker                      | fail              | tests/experiments/E2-route-a-register.spec.ts      | auto-attach before the worker starts; caches is undefined at the pause  |
 | dedicated             | A     | E2 nested-worker                         | unavailable       | tests/experiments/E2-route-a-register.spec.ts      | the frozen fixture starts no worker from a worker                       |
 | dedicated             | A     | E3 before-script-execution [dedicated-*] | pass              | tests/experiments/E3-route-a-cold.spec.ts          | armed tab, auto-attach and a breakpoint hold each worker                |
@@ -69,6 +70,7 @@ Chrome: Google Chrome 156.0.8078.79 (69 verdicts); Google Chrome for Testing 156
 | serviceWorker.cold    | A     | E4 debugger-pause                        | pass              | tests/experiments/E4-stop-restart.spec.ts          | a pause holds the worker without stopping it                            |
 | serviceWorker.cold    | A     | E4 dnr-block-evict                       | fail              | tests/experiments/E4-stop-restart.spec.ts          | a DNR block does not evict a running worker                             |
 | serviceWorker.cold    | A     | E4 unregister                            | fail              | tests/experiments/E4-stop-restart.spec.ts          | unregister() leaves the target listed                                   |
+| serviceWorker.cold    | A     | E8 b-restart                             | fail              | tests/experiments/E8-strict.spec.ts                | without CDP a reload after closeTarget must still load                  |
 | serviceWorker.wake    | A     | E3 wake-without-tab                      | unavailable       | tests/experiments/E3-route-a-cold.spec.ts          | a worker woken with no tab open is attached by watch                    |
 | serviceWorker.first   | B     | E5 first                                 | fail              | tests/experiments/E5-route-b-fetch.spec.ts         | the main script is fulfilled with the wrapper on the first registration |
 | serviceWorker.first   | B     | E5 imports                               | pass              | tests/experiments/E5-route-b-fetch.spec.ts         | importScripts and static imports pause on the worker session            |
@@ -83,8 +85,10 @@ Chrome: Google Chrome 156.0.8078.79 (69 verdicts); Google Chrome for Testing 156
 | serviceWorker.offline | B     | E6 a-offline                             | fail              | tests/experiments/E6-route-b-selection.spec.ts     | a slot switch while the fixture is offline                              |
 | dedicated             | B     | E6 c-workers [dedicated:*]               | pass              | tests/experiments/E6-route-b-selection.spec.ts     | the slot switch reaches dedicated workers                               |
 | dedicated             | B     | E6 suspend [dedicated:*]                 | pass              | tests/experiments/E6-route-b-selection.spec.ts     | dedicated workers survive a suspended background                        |
+| dedicated             | B     | E8 c-selection-workers [dedicated:*]     | pass              | tests/experiments/E8-strict.spec.ts                | the same switch in Chrome without CDP                                   |
 | shared                | B     | E6 c-workers [shared:*]                  | pass              | tests/experiments/E6-route-b-selection.spec.ts     | the slot switch reaches shared workers                                  |
 | shared                | B     | E6 suspend [shared:*]                    | pass              | tests/experiments/E6-route-b-selection.spec.ts     | shared workers survive a suspended background                           |
+| shared                | B     | E8 c-selection-workers [shared:*]        | pass              | tests/experiments/E8-strict.spec.ts                | the same switch in Chrome without CDP                                   |
 | page                  | C     | E7 page                                  | pass              | tests/experiments/E7-route-c-pages-workers.spec.ts | a registered content script marks the page before its first script      |
 | page                  | C     | E7 cross-site-iframe                     | pass              | tests/experiments/E7-route-c-pages-workers.spec.ts | a cross-site frame is marked only when its origin is registered         |
 | page                  | C     | E7 popup                                 | pass              | tests/experiments/E7-route-c-pages-workers.spec.ts | a popup is marked before its first script                               |
@@ -97,10 +101,11 @@ Chrome: Google Chrome 156.0.8078.79 (69 verdicts); Google Chrome for Testing 156
 
 **Not mapped to a capability**
 
-| Experiment | Verdicts | Pass | Fail | Unavailable | Reason                                                        |
-| ---------- | -------- | ---- | ---- | ----------- | ------------------------------------------------------------- |
-| E0         | 4        | 4    | 0    | 0           | extension loading methods; a precondition of every route      |
-| E1         | 30       | 24   | 6    | 0           | what chrome.debugger can do; a precondition of Routes A and B |
+| Experiment | Verdicts | Pass | Fail | Unavailable | Reason                                                                            |
+| ---------- | -------- | ---- | ---- | ----------- | --------------------------------------------------------------------------------- |
+| E0         | 4        | 4    | 0    | 0           | extension loading methods; a precondition of every route                          |
+| E1         | 30       | 24   | 6    | 0           | what chrome.debugger can do; a precondition of Routes A and B                     |
+| E8         | 1        | 1    | 0    | 0           | d-other-clients: no other debugger client in the strict lab; a precondition of E8 |
 
 stress: not recorded
 <!-- decide:end -->

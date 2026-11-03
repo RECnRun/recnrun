@@ -8,7 +8,7 @@ const EXPERIMENT = "E6";
 // packages/isolation-core/src/marker.ts restated, so the harness checks the bootstrap's effect on its own.
 const RESERVED_PREFIX = "__rec:";
 
-const SWITCH_KINDS = [
+export const SWITCH_KINDS = [
   "firstNotSelected",
   "notRestarted",
   "unmarked",

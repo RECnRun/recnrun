@@ -57,7 +57,7 @@ const reloaded = async (tab: StrictTab): Promise<unknown> => databaseOf(await vi
 export const HELD = "held";
 
 /** The database after a reload, or HELD, with the load stopped, when the page shows no report in 10 s. */
-async function reloadedOrHeld(tab: StrictTab): Promise<unknown> {
+export async function reloadedOrHeld(tab: StrictTab): Promise<unknown> {
   try {
     return databaseOf(await visit(tab, SW_PAGE, HOLD_MS));
   } catch {
@@ -84,7 +84,7 @@ const appWorkers = (journal: LabJournal, origin: string) =>
   journal.targets.filter(({ type, url }) => type === "worker" && url.startsWith(`${origin}/`));
 
 /** Stops the origin's workers through the lab's `closeTarget`, again when one still runs after 5 s. */
-async function stopWorkers(strict: StrictExtension, origin = APP): Promise<void> {
+export async function stopWorkers(strict: StrictExtension, origin = APP): Promise<void> {
   for (let tries = 5; tries > 0; tries--) {
     await command(strict, "stop", { origin });
     const gone = (journal: LabJournal) => appWorkers(journal, origin).length === 0;
