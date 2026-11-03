@@ -28,6 +28,7 @@ export interface LabSettings {
   };
   selection?: { slot: number; origins: string[] };
   stop?: { id: string; origin: string };
+  clear?: { id: string; tabId: number };
   pollMs?: number;
 }
 
@@ -96,6 +97,30 @@ export interface LabJournal {
   errors: string[];
 }
 
+/** What a timeout prints of the journal: no page bodies, no bootstrap steps. */
+function summaryOf(journal: LabJournal | undefined): unknown {
+  if (journal === undefined) return null;
+  const { seq, armed, routeA, pages, commands, errors, targets } = journal;
+  return {
+    seq,
+    armed,
+    tabDetached: routeA.tabDetached,
+    entries: routeA.entries.map(({ type, url, waitingForDebugger, released, error, pause }) => ({
+      type,
+      url,
+      waitingForDebugger,
+      released,
+      error,
+      paused: pause?.paused,
+    })),
+    unattached: routeA.unattached,
+    pages: pages.map(({ url, report }) => [url, report?.length]),
+    commands: commands.map(({ key }) => key),
+    errors,
+    targets: targets.map(({ type, url, attached }) => `${type} ${attached} ${url.slice(0, 60)}`),
+  };
+}
+
 /** Keeps every beacon and the last journal the isolator posted. */
 class LabSink {
   readonly loaded: LabLoaded[] = [];
@@ -112,7 +137,17 @@ class LabSink {
 
   /** Waits until the last journal satisfies `check`, and returns it. */
   async until(check: (journal: LabJournal) => boolean, what: string, ms = 15_000) {
-    await until(async () => this.journal !== undefined && check(this.journal), what, ms);
+    try {
+      await until(async () => this.journal !== undefined && check(this.journal), what, ms);
+    } catch (error) {
+      // The journal is the only view into the browser, so a timeout carries it.
+      const journal = JSON.stringify(summaryOf(this.journal));
+      throw new Error(
+        `${(error as Error).message}
+Last journal: ${journal}`,
+        { cause: error },
+      );
+    }
     return this.journal as LabJournal;
   }
 }
@@ -147,6 +182,8 @@ async function installByPolicyStrict(
   let current: LabSettings = lab;
   const write = (settings: LabSettings) =>
     install.writePolicy({
+      // The fixture's push subscription waits on a notification prompt nobody answers.
+      DefaultNotificationsSetting: 2,
       "3rdparty": { extensions: { [install.id]: { lab: { journalUrl, ...settings } } } },
     });
   let chrome: StrictChrome | undefined;

@@ -21,6 +21,8 @@ function isLoopbackOrigin(value: string): boolean {
 }
 
 const OriginSchema = v.pipe(v.string(), v.check(isLoopbackOrigin, "expected a loopback origin"));
+const IdSchema = v.pipe(v.string(), v.minLength(1));
+const TabIdSchema = v.pipe(v.number(), v.integer(), v.minValue(0));
 
 // The managed value comes from a policy file, so it is checked where it enters like any message.
 const LabConfigSchema = v.object({
@@ -46,7 +48,9 @@ const LabConfigSchema = v.object({
   /** The slot the selection's session rules point at; applied whenever the value changes. */
   selection: v.optional(SelectRequest),
   /** Closes every worker target of `origin` once per new `id`, as E3's `closeTarget` does. */
-  stop: v.optional(v.object({ id: v.pipe(v.string(), v.minLength(1)), origin: OriginSchema })),
+  stop: v.optional(v.object({ id: IdSchema, origin: OriginSchema })),
+  /** Clears an armed tab's origin through its own session once per new `id` (Route A's `clearOrigin`). */
+  clear: v.optional(v.object({ id: IdSchema, tabId: TabIdSchema })),
   /** How often the journal is compared and posted when it changed. */
   pollMs: v.optional(v.pipe(v.number(), v.integer(), v.minValue(50), v.maxValue(5_000)), 200),
 });

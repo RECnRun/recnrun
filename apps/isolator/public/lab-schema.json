@@ -31,6 +31,13 @@
             "origin": { "type": "string" }
           }
         },
+        "clear": {
+          "type": "object",
+          "properties": {
+            "id": { "type": "string" },
+            "tabId": { "type": "integer" }
+          }
+        },
         "pollMs": { "type": "integer" }
       }
     }

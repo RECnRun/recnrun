@@ -50,7 +50,7 @@ export class LabChannel {
   readonly #commands: CommandRecord[] = [];
   readonly #errors: string[] = [];
   #targetsAtStart: TargetInfo[] = [];
-  readonly #applied = { selection: "", stop: "" };
+  readonly #applied = { selection: "", stop: "", clear: "" };
   #seq = 0;
   #posted = "";
 
@@ -147,16 +147,21 @@ export class LabChannel {
   }
 
   async #apply(config: LabConfig): Promise<void> {
-    const { selection, stop } = config;
+    const { selection, stop, clear } = config;
     const key = JSON.stringify(selection ?? null);
     if (selection !== undefined && key !== this.#applied.selection) {
       this.#applied.selection = key;
       await this.#record(`select:${key}`, () => this.#selection.select(selection));
     }
-    if (stop !== undefined && stop.id !== this.#applied.stop) {
-      this.#applied.stop = stop.id;
-      await this.#record(`stop:${stop.id}`, () => stopWorkers(this.#engines(), stop.origin));
-    }
+    const engines = this.#engines();
+    if (stop) await this.#once("stop", stop.id, () => stopWorkers(engines, stop.origin));
+    if (clear) await this.#once("clear", clear.id, () => engines.routeA.clearOrigin(clear));
+  }
+
+  async #once(name: "stop" | "clear", id: string, run: () => Promise<unknown>) {
+    if (id === this.#applied[name]) return;
+    this.#applied[name] = id;
+    await this.#record(`${name}:${id}`, run);
   }
 
   async #record(key: string, run: () => Promise<unknown>): Promise<void> {

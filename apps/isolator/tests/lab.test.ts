@@ -148,6 +148,21 @@ describe("LabChannel", () => {
     ]);
   });
 
+  test("clears an armed tab's origin through its session, once per id", async () => {
+    const lab = { journalUrl: JOURNAL, arm: { ...ARM, clear: false } };
+    const { channel, fake, managed, journal } = setup(lab);
+    await channel.start();
+    channel.tabUpdated(TAB, { status: "complete" }, { url: `${APP}/offline.html` });
+    await settle(channel);
+    managed.lab = { ...lab, clear: { id: "1", tabId: TAB } };
+    await channel.managedChanged();
+    await channel.managedChanged();
+    const clears = fake.sent.filter((sent) => sent.method === "Storage.clearDataForOrigin");
+    expect(clears.map((sent) => sent.params)).toMatchObject([{ origin: APP }]);
+    await channel.flush();
+    expect(journal().commands).toMatchObject([{ key: "clear:1", result: { origin: APP } }]);
+  });
+
   test("starts when the policy delivers the key after a start without it", async () => {
     const { channel, managed, posts } = setup(undefined);
     await channel.start();
