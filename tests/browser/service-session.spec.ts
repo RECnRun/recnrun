@@ -109,7 +109,7 @@ test("a session records the form, finalizes a flow that replays, and picks witho
         return suggested(steps);
       })
       .toEqual(expect.arrayContaining(["fill", "click"]));
-    await result(service, "session.stop", { sessionId: status.sessionId });
+    await result(service, "session.stop", { sessionId: status.sessionId }, status.lease);
     const { flowId } = await result<{ flowId: string }>(service, "flow.finalize", {
       sessionId: status.sessionId,
     });

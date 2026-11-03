@@ -16,7 +16,8 @@ export function DraftAssertions({ session }: { session: PickerSession }) {
   const add = (target: Target, kind: AssertionKind, expected: string) =>
     run(async () => {
       const step = buildAssertion(`assert-${added.length + 1}`, kind, target, expected);
-      await api.call("flow.addAssertion", { sessionId: session.sessionId, step });
+      const fence = { lease: session.lease };
+      await api.call("flow.addAssertion", { sessionId: session.sessionId, step }, fence);
       setAdded((list) => [...list, step]);
     });
   return (

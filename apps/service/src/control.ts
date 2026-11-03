@@ -10,16 +10,30 @@ function requireLive(live: LiveSession): void {
   if (!isLive(live)) throw new ServiceFailure("conflict", `The session is ${live.state.state}.`);
 }
 
-/** While someone holds the target, only a request carrying their current fence acts on it. */
+/**
+ * While someone holds the target, only a request carrying their current fence acts on it; a
+ * fence that matches no live lease (passed on, released, or expired) acts on nothing.
+ */
 function requireFence(leases: LeaseRegistry, targetId: string, fence: LeaseFence | undefined) {
   const lease = leases.current(targetId);
-  if (lease === undefined) return undefined;
-  if (fence === undefined || !leases.authorize(targetId, fence).ok)
-    throw new ServiceFailure(
-      "stale-lease",
-      `The page is controlled by ${lease.holderId}; send its current lease to act on it.`,
-    );
-  return lease;
+  if (fence === undefined ? lease === undefined : leases.authorize(targetId, fence).ok)
+    return lease;
+  throw new ServiceFailure(
+    "stale-lease",
+    lease === undefined
+      ? "The lease expired or was released; take control again to act on the page."
+      : `The page is controlled by ${lease.holderId}; send its current lease to act on it.`,
+  );
+}
+
+/** The session, once the request's fence may act on its page. */
+export function controlled(
+  deps: SessionDeps,
+  live: LiveSession,
+  fence: LeaseFence | undefined,
+): LiveSession {
+  requireFence(deps.leases, live.targetId, fence);
+  return live;
 }
 
 function grant(leases: LeaseRegistry, targetId: string, to: Exclude<ControlState, "unassigned">) {

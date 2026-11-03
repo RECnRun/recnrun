@@ -5,6 +5,13 @@ import { useAction, useApi } from "@/api/context";
 /** The recording session whose page the picker runs on, and the lease that controls it. */
 export type PickerSession = { sessionId: string; lease?: LeaseFence | undefined };
 
+/** A ref that holds the value of the latest render. */
+function useLatest<T>(value: T) {
+  const ref = useRef(value);
+  ref.current = value;
+  return ref;
+}
+
 /** Shows the picker on the session's page and hands over the pick's locators; no session, no picker. */
 export function usePicker(
   session: PickerSession | undefined,
@@ -13,13 +20,14 @@ export function usePicker(
   const api = useApi();
   const { error, busy, run } = useAction();
   const [picking, setPicking] = useState(false);
-  const active = useRef(false);
-  active.current = picking;
+  const active = useLatest(picking);
+  // The unmount cleanup runs after the last render, so it reads the latest fence from here.
+  const lease = useLatest(session?.lease);
   const sessionId = session?.sessionId;
   const stop = (id: string) => {
     setPicking(false);
     run(async () => {
-      await api.call("picker.stop", { sessionId: id });
+      await api.call("picker.stop", { sessionId: id }, { lease: lease.current });
     });
   };
   useEffect(() => {
@@ -35,7 +43,7 @@ export function usePicker(
   useEffect(
     () => () => {
       if (active.current && sessionId)
-        api.call("picker.stop", { sessionId }).catch(() => undefined);
+        api.call("picker.stop", { sessionId }, { lease: lease.current }).catch(() => undefined);
     },
     [api, sessionId],
   );

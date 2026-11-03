@@ -71,6 +71,8 @@ export interface Harness {
   home: string;
   /** Every message the hub published. */
   published: ServiceMessage[];
+  /** Moves the lease clock forward, so leases can expire. */
+  advance(ms: number): void;
   call(
     command: string,
     params: unknown,
@@ -115,7 +117,8 @@ export async function harness(): Promise<Harness> {
     const envelope = { requestId: "r-1", command, params, ...(lease && { lease }) };
     return dispatch(envelope, handlers, channel);
   };
-  return { deps, browser, flows, home, published, call };
+  const advance = (ms: number) => void (clock += ms);
+  return { deps, browser, flows, home, published, advance, call };
 }
 
 /** A DOM event as the page hook reports it. */

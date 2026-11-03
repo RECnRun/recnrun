@@ -1,7 +1,12 @@
 import type { FlowStore } from "@recnrun/persistence";
 import { FlowStoreError } from "@recnrun/persistence";
-import { validateFlow, type FlowStoreErrorCode, type ServiceError } from "@recnrun/protocol";
-import { handoff, startPicking, stopPicking } from "./control.ts";
+import {
+  validateFlow,
+  type FlowStoreErrorCode,
+  type LeaseFence,
+  type ServiceError,
+} from "@recnrun/protocol";
+import { controlled, handoff, startPicking, stopPicking } from "./control.ts";
 import type { CommandHandlers } from "./dispatch.ts";
 import { ServiceFailure } from "./dispatch.ts";
 import { addAssertion, finalize, suggestions } from "./drafts.ts";
@@ -52,20 +57,27 @@ async function saveChecked(store: FlowStore, input: unknown) {
 
 function sessionCommands(deps: CommandDeps): CommandHandlers {
   const of = (sessionId: string) => sessionOf(deps, sessionId);
+  // Every command that changes a session needs the holder's fence; only manual takeover does not.
+  const held = (sessionId: string, fence: LeaseFence | undefined) =>
+    controlled(deps, of(sessionId), fence);
   return {
     "profiles.list": async () => ({ profiles: await deps.bindings.list() }),
     "session.start": (params) => startSession(deps, params),
     "session.status": async ({ sessionId }) => statusOf(deps, of(sessionId)),
-    "session.pause": async ({ sessionId, mode }) => pause(deps, of(sessionId), mode),
-    "session.resume": async ({ sessionId, mode }) => resume(deps, of(sessionId), mode),
-    "session.stop": ({ sessionId }) => stopSession(deps, of(sessionId)),
+    "session.pause": async ({ sessionId, mode }, { lease }) =>
+      pause(deps, held(sessionId, lease), mode),
+    "session.resume": async ({ sessionId, mode }, { lease }) =>
+      resume(deps, held(sessionId, lease), mode),
+    "session.stop": ({ sessionId }, { lease }) => stopSession(deps, held(sessionId, lease)),
     "session.handoff": async ({ sessionId, to }, { lease }) =>
       handoff(deps, of(sessionId), to, lease),
     "session.suggestions": async ({ sessionId }) => suggestions(of(sessionId)),
     "picker.start": ({ sessionId }, { lease }) => startPicking(deps, of(sessionId), lease),
-    "picker.stop": ({ sessionId }) => stopPicking(of(sessionId)),
-    "flow.addAssertion": async ({ sessionId, step }) => addAssertion(of(sessionId), step),
-    "flow.finalize": ({ sessionId }) => stored(() => finalize(deps, deps.store(), of(sessionId))),
+    "picker.stop": ({ sessionId }, { lease }) => stopPicking(held(sessionId, lease)),
+    "flow.addAssertion": async ({ sessionId, step }, { lease }) =>
+      addAssertion(held(sessionId, lease), step),
+    "flow.finalize": ({ sessionId }, { lease }) =>
+      stored(() => finalize(deps, deps.store(), held(sessionId, lease))),
   };
 }
 

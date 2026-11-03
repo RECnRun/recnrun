@@ -129,15 +129,15 @@ test("a recorded session becomes a stored flow that replays to a summary and eve
   const events = await subscribe();
   type Status = { sessionId: string; state: string; control: string; lease?: Lease };
   const status = await result<Status>("session.start", {});
-  const { sessionId } = status;
+  const { sessionId, lease } = status;
   for (const event of typedAndSent()) chrome.emit(event);
   const suggested = await result<{ steps: { action: string }[] }>("session.suggestions", {
     sessionId,
   });
   expect(suggested.steps.map(({ action }) => action)).toEqual(["fill", "click"]);
   const step = { id: "sent", assertion: "visible", target: { testId: "send" } };
-  await result("flow.addAssertion", { sessionId, step });
-  await result("session.stop", { sessionId });
+  await result("flow.addAssertion", { sessionId, step }, lease);
+  await result("session.stop", { sessionId }, lease);
   const saved = await result<{ flowId: string; revision: string }>("flow.finalize", { sessionId });
   const stored = await result<{ flow: { steps: { action?: string }[] } }>("flow.get", {
     flowId: saved.flowId,
@@ -169,8 +169,10 @@ test("pause, resume, and handoff change the session's status", async () => {
   type Status = { sessionId: string; state: string; control: string; lease?: Lease };
   const { sessionId, lease } = await result<Status>("session.start", {});
   const mode = "pauseStepCreation";
-  expect((await result<Status>("session.pause", { sessionId, mode })).state).toBe("paused");
-  expect((await result<Status>("session.resume", { sessionId, mode })).state).toBe("recording");
+  expect((await call("session.pause", { sessionId, mode })).error?.code).toBe("stale-lease");
+  expect((await result<Status>("session.pause", { sessionId, mode }, lease)).state).toBe("paused");
+  const resumed = await result<Status>("session.resume", { sessionId, mode }, lease);
+  expect(resumed.state).toBe("recording");
   expect((await call("session.handoff", { sessionId, to: "agent" })).error?.code).toBe(
     "stale-lease",
   );

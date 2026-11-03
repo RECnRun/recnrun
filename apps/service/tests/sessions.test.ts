@@ -15,6 +15,9 @@ async function started(h: Harness): Promise<SessionStatus> {
   return resultOf<SessionStatus>(await h.call("session.start", {}));
 }
 
+/** The fence of a status, as a command carries it. */
+const fenced = ({ lease }: SessionStatus) => (lease ? { lease: fenceOf(lease) } : {});
+
 const journalOf = (h: Harness, sessionId: string) =>
   readJournal(join(h.home, ".recnrun", "sessions", sessionId, "events.jsonl"));
 
@@ -34,22 +37,24 @@ test("session.start records a page of its own and gives the person control", asy
 
 test("captured events are journaled, pushed, and suggested as steps", async () => {
   const h = await harness();
-  const { sessionId } = await started(h);
+  const status = await started(h);
+  const { sessionId } = status;
   for (const event of fillAndClick(1)) h.browser.emit(event);
   const suggested = resultOf<{ steps: { action: string }[] }>(
     await h.call("session.suggestions", { sessionId }),
   );
   expect(suggested.steps.map(({ action }) => action)).toEqual(["fill", "click"]);
   expect(h.published.filter(({ type }) => type === "session.event")).toHaveLength(7);
-  await h.call("session.stop", { sessionId });
+  resultOf(await h.call("session.stop", { sessionId }, fenced(status)));
   expect((await journalOf(h, sessionId)).events).toHaveLength(7);
 });
 
 test("the three pauses: no steps, then no capture and a gap in the journal", async () => {
   const h = await harness();
-  const { sessionId } = await started(h);
-  const pause = (mode: string) => h.call("session.pause", { sessionId, mode });
-  const resume = (mode: string) => h.call("session.resume", { sessionId, mode });
+  const status = await started(h);
+  const { sessionId } = status;
+  const pause = (mode: string) => h.call("session.pause", { sessionId, mode }, fenced(status));
+  const resume = (mode: string) => h.call("session.resume", { sessionId, mode }, fenced(status));
   expect(resultOf<SessionStatus>(await pause("pauseStepCreation")).state).toBe("paused");
   for (const event of fillAndClick(1)) h.browser.emit(event);
   expect(resultOf<SessionStatus>(await resume("pauseStepCreation")).state).toBe("recording");
@@ -60,7 +65,7 @@ test("the three pauses: no steps, then no capture and a gap in the journal", asy
   expect(
     resultOf<{ steps: unknown[] }>(await h.call("session.suggestions", { sessionId })).steps,
   ).toEqual([]);
-  await h.call("session.stop", { sessionId });
+  resultOf(await h.call("session.stop", { sessionId }, fenced(status)));
   const { events } = await journalOf(h, sessionId);
   expect(events.map(({ category }) => category)).toEqual([...Array(7).fill("dom"), "gap"]);
   expect(events.at(-1)?.payload).toMatchObject({ reason: "capture-suspended" });
@@ -102,7 +107,7 @@ test("the picker pushes each pick with its locators and needs the current fence"
   expect(
     (picked as Extract<ServiceMessage, { type: "picker.picked" }>).locators.locators[0],
   ).toEqual({ strategy: "testId", value: "send" });
-  expect(resultOf(await h.call("picker.stop", { sessionId }))).toEqual({
+  expect(resultOf(await h.call("picker.stop", { sessionId }, { lease: fenceOf(lease) }))).toEqual({
     sessionId,
     picking: false,
   });
@@ -111,20 +116,22 @@ test("the picker pushes each pick with its locators and needs the current fence"
 
 test("finalize stores the suggested steps, then the draft assertions, once the session stopped", async () => {
   const h = await harness();
-  const { sessionId } = await started(h);
+  const status = await started(h);
+  const { sessionId } = status;
+  const fence = fenced(status);
   for (const event of fillAndClick(1)) h.browser.emit(event);
-  expect(codeOf(await h.call("flow.finalize", { sessionId }))).toBe("conflict");
+  expect(codeOf(await h.call("flow.finalize", { sessionId }, fence))).toBe("conflict");
   const picked = {
     resolution: "orderedFallback",
     cardinality: "one",
     locators: [{ strategy: "testId", value: "send" }],
   };
   const step = { id: "sent", assertion: "visible", target: picked };
-  expect(resultOf(await h.call("flow.addAssertion", { sessionId, step }))).toEqual({
+  expect(resultOf(await h.call("flow.addAssertion", { sessionId, step }, fence))).toEqual({
     stepId: "sent",
   });
-  expect(codeOf(await h.call("flow.addAssertion", { sessionId, step }))).toBe("conflict");
-  expect(resultOf<SessionStatus>(await h.call("session.stop", { sessionId })).state).toBe(
+  expect(codeOf(await h.call("flow.addAssertion", { sessionId, step }, fence))).toBe("conflict");
+  expect(resultOf<SessionStatus>(await h.call("session.stop", { sessionId }, fence)).state).toBe(
     "finalizing",
   );
   expect(h.browser.calls).toContain("record.stop");

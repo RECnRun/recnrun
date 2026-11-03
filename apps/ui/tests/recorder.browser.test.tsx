@@ -163,6 +163,10 @@ test("picks an element on the session's page and adds the assertion to the draft
       step: { id: "assert-1", assertion: "textEquals", target: PICKED, expected: "Submitted" },
     },
   ]);
+  // The service refuses session changes that do not carry the holder's fence.
+  const fenced = (command: string) => fake.calls.find((call) => call.command === command);
+  for (const command of ["picker.stop", "flow.addAssertion"])
+    expect(fenced(command)?.options?.lease).toMatchObject({ leaseId: "lease-1", fencingToken: 3 });
 });
 
 test("cancels a pick and shows a refused assertion", async () => {
