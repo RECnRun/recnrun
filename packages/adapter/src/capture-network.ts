@@ -45,8 +45,9 @@ interface Request {
   mimeType?: string;
   // Chrome reports a memory cache hit before the response, which carries no flag for it.
   fromMemory?: boolean;
-  // `open` until the body is settled one way or another; a body is recorded at most once.
-  body: "none" | "open" | "reading" | "done";
+  // `open` until the body is settled one way or another; a body is recorded at most once. A
+  // `writing` body has Chrome's answer and is being stored: a close no longer settles it.
+  body: "none" | "open" | "reading" | "writing" | "done";
   timer?: ReturnType<typeof setTimeout>;
   // Ends a body read that settled another way, so `settled()` never waits for a late reply.
   abandon?: () => void;
@@ -78,7 +79,7 @@ export class NetworkCapture {
     }
   }
 
-  /** Settles every body still open, as when the capture stops or the target goes away. */
+  /** Settles every body still loading or unread, as when the capture stops or the target goes away; a body being written lands on its own. */
   close(why: string): void {
     for (const request of this.requests.values()) {
       if (request.body === "open" || request.body === "reading")
@@ -218,7 +219,7 @@ export class NetworkCapture {
         (error: unknown) => ({ condition: "unavailable" as const, reason: reason(error) }),
       )
       .then((body) => {
-        if (entry.body === "reading") this.settle(entry, body);
+        if (entry.body === "reading" || entry.body === "writing") this.settle(entry, body);
       });
     const work = Promise.race([reply, abandoned]).then(() => this.forget(requestId, entry));
     this.session.track(work);
@@ -230,7 +231,11 @@ export class NetworkCapture {
       return { condition: "unavailable", reason: "Chrome answered without a body." };
     const { body, base64Encoded } = parsed.output;
     const { blobs } = this.session;
-    if (blobs && entry.body === "reading") return this.store(blobs, entry, body, base64Encoded);
+    if (blobs && entry.body === "reading") {
+      // The write outlives a target that goes away now; the drain still waits for it to land.
+      entry.body = "writing";
+      return this.store(blobs, entry, body, base64Encoded);
+    }
     const max = this.session.maxBodyLength;
     const condition = body.length > max ? "truncated" : "captured";
     return { condition, size: body.length, base64Encoded, body: body.slice(0, max) };
