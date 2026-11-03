@@ -1,7 +1,7 @@
 import { realpathSync } from "node:fs";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
-import type { Server } from "node:http";
+import type { IncomingMessage, Server, ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
@@ -128,10 +128,36 @@ function policyUnavailability(): string | undefined {
   return undefined;
 }
 
-async function serveUpdates(id: string, version: string, crx: Buffer): Promise<Server> {
+/** Receives what the isolator posts to its `journalUrl` (E8's strict lab). */
+export type LabReceiver = (body: unknown) => void;
+
+/** `POST /lab`: the isolator's beacon or journal, kept by the receiver; anything unparsable is a 400. */
+function receiveLab(request: IncomingMessage, response: ServerResponse, receive: LabReceiver) {
+  const chunks: Buffer[] = [];
+  request.on("data", (chunk: Buffer) => chunks.push(chunk));
+  request.on("end", () => {
+    try {
+      receive(JSON.parse(Buffer.concat(chunks).toString("utf8")) as unknown);
+      response.statusCode = 204;
+    } catch {
+      response.statusCode = 400;
+    }
+    response.end();
+  });
+}
+
+async function serveUpdates(
+  id: string,
+  version: string,
+  crx: Buffer,
+  { lab, requests }: { lab?: LabReceiver; requests: string[] },
+): Promise<Server> {
   const server = createServer((request, response) => {
     const { port } = server.address() as AddressInfo;
-    if (request.url?.startsWith("/updates.xml")) {
+    requests.push(`${request.method ?? "?"} ${request.url ?? ""}`);
+    if (lab && request.method === "POST" && request.url === "/lab") {
+      receiveLab(request, response, lab);
+    } else if (request.url?.startsWith("/updates.xml")) {
       response.setHeader("content-type", "text/xml");
       const codebase = `http://127.0.0.1:${port}/isolator.crx`;
       const app = `<app appid='${id}'><updatecheck codebase='${codebase}' version='${version}'/></app>`;
@@ -159,28 +185,55 @@ export async function forceInstallByPolicy(
   path: string,
   allowDevTools = true,
 ): Promise<LoadedExtension> {
+  const install = await preparePolicyInstall(path, { allowDevTools });
+  try {
+    await install.writePolicy();
+    return await settle(await launchChrome(), "managed-policy", install.id, () =>
+      install.cleanup(),
+    );
+  } catch (error) {
+    await install.cleanup();
+    throw error;
+  }
+}
+
+/** A packed CRX3 served from the loopback, and the policy file that force-installs it. */
+export interface PolicyInstall {
+  id: string;
+  /** The loopback server's port: update manifest, CRX, and, with a receiver, `POST /lab`. */
+  port: number;
+  /** Every request the server answered, as `METHOD /path`, for a failure message. */
+  requests: readonly string[];
+  /** Writes the policy file; `extra` adds top-level keys such as `3rdparty`. */
+  writePolicy(extra?: Record<string, unknown>): Promise<void>;
+  cleanup(): Promise<void>;
+}
+
+export async function preparePolicyInstall(
+  path: string,
+  { allowDevTools = true, lab }: { allowDevTools?: boolean; lab?: LabReceiver } = {},
+): Promise<PolicyInstall> {
   const unavailable = policyUnavailability();
   if (unavailable) throw new UnavailableError(unavailable);
   const { id, version, crx } = await packCrx3(path);
-  const server = await serveUpdates(id, version, crx);
+  const requests: string[] = [];
+  const server = await serveUpdates(id, version, crx, { lab, requests });
+  const { port } = server.address() as AddressInfo;
+  const update_url = `http://127.0.0.1:${port}/updates.xml`;
+  const writePolicy = async (extra: Record<string, unknown> = {}): Promise<void> => {
+    const policy = {
+      ...(allowDevTools ? { DeveloperToolsAvailability: 1 } : {}),
+      ExtensionSettings: { [id]: { installation_mode: "force_installed", update_url } },
+      ...extra,
+    };
+    await mkdir(join(POLICY_FILE, ".."), { recursive: true });
+    await writeFile(POLICY_FILE, JSON.stringify(policy));
+  };
   const cleanup = async (): Promise<void> => {
     await rm(POLICY_FILE, { force: true });
     await new Promise((resolve) => server.close(resolve));
   };
-  try {
-    const { port } = server.address() as AddressInfo;
-    const update_url = `http://127.0.0.1:${port}/updates.xml`;
-    const policy = {
-      ...(allowDevTools ? { DeveloperToolsAvailability: 1 } : {}),
-      ExtensionSettings: { [id]: { installation_mode: "force_installed", update_url } },
-    };
-    await mkdir(join(POLICY_FILE, ".."), { recursive: true });
-    await writeFile(POLICY_FILE, JSON.stringify(policy));
-    return await settle(await launchChrome(), "managed-policy", id, cleanup);
-  } catch (error) {
-    await cleanup();
-    throw error;
-  }
+  return { id, port, requests, writePolicy, cleanup };
 }
 
 /** Hypothesis (c): Playwright's Chromium, which still honours `--load-extension`; diagnostic only. */
