@@ -44,7 +44,7 @@ export interface LiveSession {
   readonly recording: RecordingHandle;
   readonly journal: JournalWriter;
   readonly events: CapturedEvent[];
-  /** DOM events captured while step creation was paused; they never become steps. */
+  /** Events captured while step creation was paused; they never become steps. */
   readonly ignored: Set<string>;
   readonly assertions: AssertionStep[];
   readonly writes: Set<Promise<void>>;
@@ -114,7 +114,8 @@ function track(deps: SessionDeps, live: LiveSession, event: Event): void {
 function accept(deps: SessionDeps, live: LiveSession, event: CapturedEvent): void {
   if (!isCapturing(live.state)) return;
   live.events.push(event);
-  if (event.category === "dom" && !createsSuggestedSteps(live.state)) live.ignored.add(event.id);
+  // Navigations make steps too, so the pause excludes every event, not only DOM ones.
+  if (!createsSuggestedSteps(live.state)) live.ignored.add(event.id);
   track(deps, live, event);
   deps.hub.publish({ type: "session.event", sessionId: live.id, event });
   // The person is active, so their control does not lapse while they record.

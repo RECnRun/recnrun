@@ -172,3 +172,12 @@ export function fillAndClick(start: number): CapturedEvent[] {
 }
 
 export const SEND_BUTTON = SEND;
+
+/** The session's page commits a navigation to `url`. */
+export function navigated(seq: number, url: string): CapturedEvent {
+  return {
+    ...domEvent(seq, "committed", SEND),
+    category: "navigation",
+    payload: { url },
+  } as CapturedEvent;
+}

@@ -2,7 +2,7 @@ import { join } from "node:path";
 import { readJournal } from "@recnrun/persistence";
 import type { Lease, ServiceMessage, SessionStatus } from "@recnrun/protocol";
 import { expect, test } from "vite-plus/test";
-import { fillAndClick, harness, SEND_BUTTON, type Harness } from "./fakes.ts";
+import { fillAndClick, harness, navigated, SEND_BUTTON, type Harness } from "./fakes.ts";
 
 const resultOf = <T>(envelope: unknown): T => {
   expect(envelope).toMatchObject({ ok: true });
@@ -57,6 +57,7 @@ test("the three pauses: no steps, then no capture and a gap in the journal", asy
   const resume = (mode: string) => h.call("session.resume", { sessionId, mode }, fenced(status));
   expect(resultOf<SessionStatus>(await pause("pauseStepCreation")).state).toBe("paused");
   for (const event of fillAndClick(1)) h.browser.emit(event);
+  h.browser.emit(navigated(8, "http://127.0.0.1:4600/routes/links"));
   expect(resultOf<SessionStatus>(await resume("pauseStepCreation")).state).toBe("recording");
   expect(codeOf(await resume("pauseStepCreation"))).toBe("conflict");
   await pause("suspendCapture");
@@ -67,7 +68,11 @@ test("the three pauses: no steps, then no capture and a gap in the journal", asy
   ).toEqual([]);
   resultOf(await h.call("session.stop", { sessionId }, fenced(status)));
   const { events } = await journalOf(h, sessionId);
-  expect(events.map(({ category }) => category)).toEqual([...Array(7).fill("dom"), "gap"]);
+  expect(events.map(({ category }) => category)).toEqual([
+    ...Array(7).fill("dom"),
+    "navigation",
+    "gap",
+  ]);
   expect(events.at(-1)?.payload).toMatchObject({ reason: "capture-suspended" });
 });
 
