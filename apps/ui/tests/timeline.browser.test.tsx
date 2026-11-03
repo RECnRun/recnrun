@@ -119,10 +119,16 @@ test("opens a finished run's diagnostics from the run screen and goes back", asy
   await page.getByRole("button", { name: "Diagnostics" }).click();
   expect(location.hash).toBe("#/runs/run-1");
   await expect.element(page.getByRole("heading", { name: "Timeline" })).toBeVisible();
+  for (const name of ["Requests", "Storage operations"])
+    await expect.element(page.getByRole("heading", { name })).toBeVisible();
   await page.getByRole("button", { name: "Back to run" }).click();
   expect(location.hash).toBe("#/flows/save-form/run");
   sessionStorage.clear();
 });
+
+// Timeline pages ask for 100 events; the other cards read whole categories.
+const timelineQueries = (fake: ReturnType<typeof fakeApi>) =>
+  fake.paramsOf("run.queryEvents").filter((params) => (params as { limit?: number }).limit === 100);
 
 function diagnostics(pages: Record<string, { events: unknown[]; nextCursor?: string }>) {
   const fake = fakeApi({
@@ -150,7 +156,7 @@ describe("the diagnostics screen", () => {
     await expectTexts(timeline, "collector gap: buffer-exhausted on network, 2 events lost");
     await expect.element(page.getByRole("button", { name: "Load more" })).not.toBeInTheDocument();
     expect(timeline.query()?.textContent).not.toContain("application failure");
-    expect(fake.paramsOf("run.queryEvents").filter((p) => !("types" in (p as object)))).toEqual([
+    expect(timelineQueries(fake)).toEqual([
       { runId: "run-1", limit: 100 },
       { runId: "run-1", limit: 100, cursor: "2" },
     ]);
@@ -165,7 +171,7 @@ describe("the diagnostics screen", () => {
     await page.getByRole("textbox", { name: "Origin" }).fill("http://127.0.0.1:4600");
     await page.getByRole("button", { name: "Apply filters" }).click();
     await expect
-      .poll(() => fake.paramsOf("run.queryEvents").at(-1))
+      .poll(() => timelineQueries(fake).at(-1))
       .toEqual({
         runId: "run-1",
         limit: 100,

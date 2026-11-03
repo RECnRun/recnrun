@@ -2,6 +2,8 @@ import type { RunSummary } from "@recnrun/protocol";
 import type { Api } from "@/api/api";
 import { useLoad } from "@/api/context";
 import { allEvents } from "@/features/diagnostics/filters";
+import { Requests } from "@/features/diagnostics/Requests";
+import { StorageOperations } from "@/features/diagnostics/StorageOperations";
 import { Timeline } from "@/features/diagnostics/Timeline";
 import { Badge } from "@/ui/Badge";
 import { Button } from "@/ui/Button";
@@ -45,6 +47,12 @@ export function Diagnostics({ runId, onBack }: Props) {
           <RunFacts summary={summary} onBack={onBack} />
           <Card title="Timeline">
             <Timeline runId={runId} steps={steps} />
+          </Card>
+          <Card title="Requests">
+            <Requests runId={runId} />
+          </Card>
+          <Card title="Storage operations">
+            <StorageOperations runId={runId} />
           </Card>
         </>
       )}

@@ -280,3 +280,12 @@ img.viewer {
   margin: 0.25rem 0 0;
   overflow-wrap: anywhere;
 }
+
+/* Wide tables scroll inside their card instead of widening the page. */
+.scroll {
+  overflow-x: auto;
+}
+
+.table .url {
+  overflow-wrap: anywhere;
+}

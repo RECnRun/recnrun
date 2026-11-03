@@ -54,11 +54,13 @@ function gapSummary({ payload }: Gap): string {
   return `collector gap: ${payload.reason}${surface}${lost}`;
 }
 
+/** The time of day in UTC to the millisecond, as the journal stamps it. */
+export const timeOf = (event: Event) => event.timestamp.slice(11, 23);
+
 export function timelineRow(event: Event): TimelineRow {
   return {
     key: event.id,
-    // The time of day in UTC to the millisecond, as the journal stamps it.
-    time: event.timestamp.slice(11, 23),
+    time: timeOf(event),
     category: event.category,
     type: event.type,
     stepId: event.stepId,
