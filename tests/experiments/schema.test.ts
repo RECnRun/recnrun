@@ -59,6 +59,23 @@ describe("parseVerdicts", () => {
   test("refuses an extra key", () => {
     expect(() => parseVerdicts([{ ...valid, surprise: 1 }])).toThrow(/surprise/);
   });
+
+  test("accepts an unavailable verdict with no sample when it names the reason", () => {
+    const unavailable = { ...valid, verdict: "unavailable", samples: 0, error: "needs root" };
+    expect(parseVerdicts([unavailable])).toHaveLength(1);
+  });
+
+  test("refuses an unavailable verdict without a reason", () => {
+    expect(() => parseVerdicts([{ ...valid, verdict: "unavailable", samples: 0 }])).toThrow(
+      /error/,
+    );
+    const blank = { ...valid, verdict: "unavailable", samples: 0, error: "" };
+    expect(() => parseVerdicts([blank])).toThrow(/error/);
+  });
+
+  test.each(["pass", "fail"])("refuses a %s verdict with no sample", (verdict) => {
+    expect(() => parseVerdicts([{ ...valid, verdict, samples: 0 }])).toThrow(/samples/);
+  });
 });
 
 describe("Gestures", () => {

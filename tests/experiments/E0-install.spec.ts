@@ -153,25 +153,35 @@ async function takeSamples(take: () => Promise<Sample>) {
   return { samples, unavailable: undefined };
 }
 
-async function record(hypothesis: string, common: Common, take: () => Promise<Sample>) {
-  const { samples, unavailable } = await takeSamples(take);
+// Distributes over the verdict variants, so each keeps its own error and sample rules.
+type Outcome<V extends Verdict = Verdict> = V extends unknown
+  ? Pick<V, "verdict" | "error" | "samples">
+  : never;
+
+/** `unavailable` only when the method could not run at all; it names the reason with no sample. */
+function outcome(samples: Sample[], unavailable: string | undefined): Outcome {
+  if (unavailable && samples.length === 0) {
+    return { verdict: "unavailable", error: unavailable, samples: 0 };
+  }
   const errors = samples.flatMap((sample) => (sample.error ? [sample.error] : []));
   const passed = samples.length > 0 && samples.every((sample) => sample.ok);
-  const outcome: Verdict["verdict"] =
-    unavailable && samples.length === 0 ? "unavailable" : passed ? "pass" : "fail";
   const error = unavailable ?? (errors.length > 0 ? errors.join(" | ") : undefined);
+  const verdict = passed ? "pass" : "fail";
+  return { verdict, ...(error === undefined ? {} : { error }), samples: samples.length };
+}
+
+async function record(hypothesis: string, common: Common, take: () => Promise<Sample>) {
+  const { samples, unavailable } = await takeSamples(take);
   const verdict: Verdict = {
     experiment: EXPERIMENT,
     hypothesis,
-    verdict: outcome,
-    ...(error === undefined ? {} : { error }),
+    ...outcome(samples, unavailable),
     chrome: await chromeVersion(),
     environment: "lab",
     ...common,
     variant: "test",
     topology: "single-root",
     debugger: "none",
-    samples: samples.length,
     observations: samples.map((sample) => sample.observation),
   };
   await appendVerdict(verdict);

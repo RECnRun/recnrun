@@ -6,12 +6,9 @@ const Variant = v.picklist(["test", "poc-d0", "poc-d1", "poc-d2"]);
 const DebuggerState = v.picklist(["none", "declared", "attached"]);
 const Topology = v.pipe(v.string(), v.nonEmpty());
 
-/** One hypothesis outcome (POC PLAN.md decision 8). */
-export const Verdict = v.strictObject({
+const VerdictFields = {
   experiment: v.pipe(v.string(), v.nonEmpty()),
   hypothesis: v.pipe(v.string(), v.nonEmpty()),
-  verdict: v.picklist(["pass", "fail", "unavailable"]),
-  error: v.optional(v.string()),
   /** `--version` of the browser that ran it, as versions.json records it. */
   chrome: v.pipe(v.string(), v.nonEmpty()),
   environment: Environment,
@@ -22,11 +19,26 @@ export const Verdict = v.strictObject({
   variant: Variant,
   topology: Topology,
   debugger: DebuggerState,
-  samples: v.pipe(v.number(), v.integer(), v.minValue(1)),
   observations: v.optional(v.array(v.record(v.string(), v.unknown()))),
   /** `smoke` when `verify` ran with one sample per hypothesis; absent means full evidence. */
   mode: v.optional(v.picklist(["smoke", "full"])),
-});
+};
+
+/** One hypothesis outcome (POC PLAN.md decision 8); `unavailable` may have no sample but names why. */
+export const Verdict = v.variant("verdict", [
+  v.strictObject({
+    ...VerdictFields,
+    verdict: v.picklist(["pass", "fail"]),
+    error: v.optional(v.string()),
+    samples: v.pipe(v.number(), v.integer(), v.minValue(1)),
+  }),
+  v.strictObject({
+    ...VerdictFields,
+    verdict: v.literal("unavailable"),
+    error: v.pipe(v.string(), v.nonEmpty()),
+    samples: v.pipe(v.number(), v.integer(), v.minValue(0)),
+  }),
+]);
 export type Verdict = v.InferOutput<typeof Verdict>;
 
 export const Gestures = v.strictObject({
