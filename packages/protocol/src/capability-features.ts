@@ -186,11 +186,11 @@ export const FEATURE_CAPABILITIES: Feature[] = [
     "Diagnostics timeline",
     "Causal confidence is labeled; correlation is not proof.",
   ),
-  planned(
+  implemented(
     "run-compare-query",
     "F3.8",
     "run.compare and run.queryEvents",
-    "Paginated and filterable.",
+    "Delivered by F3.8; tests/contract/runs-api.test.ts pages run.queryEvents with a cursor that stays valid while the journal grows and filters it by event types, URL origin, profile binding, and time range; run.compare names a different response status as the first divergence, a failed assertion as the application's, and lost events as a collector gap, never the application.",
   ),
   planned(
     "overhead-benchmark",

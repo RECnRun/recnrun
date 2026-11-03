@@ -41,7 +41,7 @@ export function recoveryGap(runId: string, seq: number, at: string, payload: Gap
 }
 
 /** The step results the journal recorded, by step id: started ones with their time, finished ones whole. */
-function journaledSteps(events: readonly Event[]) {
+export function journaledSteps(events: readonly Event[]) {
   const started = new Map<string, string>();
   const finished = new Map<string, StepResult>();
   for (const event of events) {

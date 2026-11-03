@@ -1,3 +1,5 @@
+import { APPLICATION_FAILURE_CODES } from "@recnrun/protocol";
+
 /** How a running step ended, before timestamps and redaction. */
 export interface StepOutcome {
   status: "passed" | "failed" | "indeterminate";
@@ -17,13 +19,7 @@ export class StepFailure extends Error {
 }
 
 /** Failure codes that blame the application under test (exit 1); any other code is a run error. */
-export const APPLICATION_FAILURES: ReadonlySet<string> = new Set([
-  "assertion-failed",
-  "timeout",
-  "ambiguous",
-  "navigation-failed",
-  "not-actionable",
-]);
+export const APPLICATION_FAILURES: ReadonlySet<string> = new Set(APPLICATION_FAILURE_CODES);
 
 export const quoted = (label: string, text: string): string => `${label}: ${JSON.stringify(text)}`;
 

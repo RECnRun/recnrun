@@ -11,6 +11,7 @@ export * from "./flow.ts";
 export * from "./interpolation.ts";
 export * from "./locators.ts";
 export * from "./run.ts";
+export * from "./run-compare.ts";
 export * from "./states.ts";
 export * from "./steps.ts";
 export * from "./validate.ts";

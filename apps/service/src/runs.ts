@@ -52,8 +52,6 @@ export interface ReplayParams {
 
 type RunValues = Pick<ReplayParams, "inputs" | "secrets">;
 
-const DEFAULT_LIMIT = 100;
-
 /** The service tracks the run's journal, so stopping closes it even when the replay cannot. */
 function owned(
   store: FlowStore,
@@ -215,7 +213,7 @@ export async function startReplay(deps: RunDeps, params: ReplayParams): Promise<
 }
 
 /** The flow a run belongs to: this process's runs first, then the store's index. */
-async function flowOfRun(deps: RunDeps, runId: string): Promise<string> {
+export async function flowOfRun(deps: RunDeps, runId: string): Promise<string> {
   const known = deps.runs.get(runId)?.flowId;
   if (known !== undefined) return known;
   const entry = (await deps.store().listRuns()).find(({ id }) => id === runId);
@@ -233,31 +231,4 @@ export async function runSummary(deps: RunDeps, runId: string): Promise<RunSumma
   if (stored.summary === undefined)
     throw new ServiceFailure("conflict", `Run ${runId} has no summary; it did not finish.`);
   return stored.summary;
-}
-
-export interface EventQuery {
-  runId: string;
-  category?: Event["category"] | undefined;
-  stepId?: string | undefined;
-  cursor?: string | undefined;
-  limit?: number | undefined;
-}
-
-/** A page of the run's journal; `nextCursor` is the offset of the next matching event. */
-export async function queryEvents(
-  deps: RunDeps,
-  query: EventQuery,
-): Promise<{ events: Event[]; nextCursor?: string }> {
-  const offset = query.cursor === undefined ? 0 : Number(query.cursor);
-  if (!Number.isSafeInteger(offset) || offset < 0)
-    throw new ServiceFailure("invalid-request", "The cursor is not one this service returned.");
-  const { journal } = await deps.store().getRun(await flowOfRun(deps, query.runId), query.runId);
-  const matching = journal.events.filter(
-    (event) =>
-      (query.category === undefined || event.category === query.category) &&
-      (query.stepId === undefined || event.stepId === query.stepId),
-  );
-  const end = offset + (query.limit ?? DEFAULT_LIMIT);
-  const events = matching.slice(offset, end);
-  return end < matching.length ? { events, nextCursor: String(end) } : { events };
 }

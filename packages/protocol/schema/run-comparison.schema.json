@@ -1,0 +1,310 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "properties": {
+    "baselineRunId": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "divergence": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "baseline": {
+              "additionalProperties": false,
+              "properties": {
+                "error": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "message": {
+                      "minLength": 1,
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "type": "object"
+                },
+                "eventId": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "gap": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "fromSeq": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "lastSeq": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "lost": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "reason": {
+                      "enum": [
+                        "buffer-exhausted",
+                        "connection-lost",
+                        "journal-truncated",
+                        "target-unattached",
+                        "producer-restarted",
+                        "capture-suspended",
+                        "capture-stopped"
+                      ],
+                      "type": "string"
+                    },
+                    "startedAt": {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "surface": {
+                      "enum": [
+                        "dom-events",
+                        "navigation",
+                        "network",
+                        "websocket-sse",
+                        "console-errors",
+                        "dom-screen",
+                        "web-storage",
+                        "cookies",
+                        "indexeddb",
+                        "cache-storage",
+                        "files-opfs",
+                        "workers-frames"
+                      ],
+                      "type": "string"
+                    },
+                    "toSeq": {
+                      "minimum": 0,
+                      "type": "integer"
+                    }
+                  },
+                  "required": ["reason"],
+                  "type": "object"
+                },
+                "httpStatus": {
+                  "type": "integer"
+                },
+                "status": {
+                  "enum": [
+                    "pending",
+                    "running",
+                    "passed",
+                    "failed",
+                    "blocked",
+                    "cancelled",
+                    "indeterminate"
+                  ],
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": [],
+              "type": "object"
+            },
+            "index": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "kind": {
+              "enum": ["application", "collector-gap", "replay"],
+              "type": "string"
+            },
+            "message": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "reason": {
+              "enum": ["step-status", "assertion-failed", "network-status", "collector-gap"],
+              "type": "string"
+            },
+            "run": {
+              "additionalProperties": false,
+              "properties": {
+                "error": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "message": {
+                      "minLength": 1,
+                      "type": "string"
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "type": "object"
+                },
+                "eventId": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "gap": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "fromSeq": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "lastSeq": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "lost": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "reason": {
+                      "enum": [
+                        "buffer-exhausted",
+                        "connection-lost",
+                        "journal-truncated",
+                        "target-unattached",
+                        "producer-restarted",
+                        "capture-suspended",
+                        "capture-stopped"
+                      ],
+                      "type": "string"
+                    },
+                    "startedAt": {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "surface": {
+                      "enum": [
+                        "dom-events",
+                        "navigation",
+                        "network",
+                        "websocket-sse",
+                        "console-errors",
+                        "dom-screen",
+                        "web-storage",
+                        "cookies",
+                        "indexeddb",
+                        "cache-storage",
+                        "files-opfs",
+                        "workers-frames"
+                      ],
+                      "type": "string"
+                    },
+                    "toSeq": {
+                      "minimum": 0,
+                      "type": "integer"
+                    }
+                  },
+                  "required": ["reason"],
+                  "type": "object"
+                },
+                "httpStatus": {
+                  "type": "integer"
+                },
+                "status": {
+                  "enum": [
+                    "pending",
+                    "running",
+                    "passed",
+                    "failed",
+                    "blocked",
+                    "cancelled",
+                    "indeterminate"
+                  ],
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": [],
+              "type": "object"
+            },
+            "stepId": {
+              "pattern": "^[A-Za-z0-9][\\w.-]*$",
+              "type": "string"
+            }
+          },
+          "required": ["kind", "reason", "message", "baseline", "run"],
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "flowId": {
+      "pattern": "^[A-Za-z0-9][\\w.-]*$",
+      "type": "string"
+    },
+    "runId": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "sameRevision": {
+      "type": "boolean"
+    },
+    "schemaVersion": {
+      "const": 1
+    },
+    "steps": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "baseline": {
+            "enum": [
+              "pending",
+              "running",
+              "passed",
+              "failed",
+              "blocked",
+              "cancelled",
+              "indeterminate"
+            ],
+            "type": "string"
+          },
+          "index": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "run": {
+            "enum": [
+              "pending",
+              "running",
+              "passed",
+              "failed",
+              "blocked",
+              "cancelled",
+              "indeterminate"
+            ],
+            "type": "string"
+          },
+          "stepId": {
+            "pattern": "^[A-Za-z0-9][\\w.-]*$",
+            "type": "string"
+          }
+        },
+        "required": ["stepId", "index"],
+        "type": "object"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "baselineRunId",
+    "runId",
+    "flowId",
+    "sameRevision",
+    "steps",
+    "divergence"
+  ],
+  "type": "object"
+}

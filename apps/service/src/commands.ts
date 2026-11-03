@@ -10,7 +10,8 @@ import { controlled, handoff, startPicking, stopPicking } from "./control.ts";
 import type { CommandHandlers } from "./dispatch.ts";
 import { ServiceFailure } from "./dispatch.ts";
 import { addAssertion, finalize, suggestions } from "./drafts.ts";
-import { queryEvents, runSummary, startReplay, type RunDeps } from "./runs.ts";
+import { compare, queryEvents } from "./run-queries.ts";
+import { runSummary, startReplay, type RunDeps } from "./runs.ts";
 import {
   pause,
   resume,
@@ -95,6 +96,7 @@ function flowCommands(deps: CommandDeps): CommandHandlers {
     "flow.replay": (params) => stored(() => startReplay(deps, params)),
     "run.summary": ({ runId }) => stored(() => runSummary(deps, runId)),
     "run.queryEvents": (query) => stored(() => queryEvents(deps, query)),
+    "run.compare": (runs) => stored(() => compare(deps, runs)),
   };
 }
 

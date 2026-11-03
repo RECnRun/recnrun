@@ -49,7 +49,7 @@ test("an error envelope becomes a ServiceCallError with its code", async () => {
 
 test("a command with no handler answers capability-unavailable", async () => {
   const client = createServiceClient(service);
-  const failure = await client.call("run.compare", {}).catch((error: unknown) => error);
+  const failure = await client.call("run.getArtifact", {}).catch((error: unknown) => error);
   expect(failure).toMatchObject({ code: "capability-unavailable" });
 });
 

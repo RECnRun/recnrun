@@ -2,13 +2,20 @@ import * as v from "valibot";
 import { AssertionStepSchema } from "./actions.ts";
 import { ProfileBindingSchema } from "./bindings.ts";
 import { CapabilityMatrixSchema } from "./capabilities.ts";
-import { CountSchema, IdSchema, NameSchema, NonEmptyStringSchema } from "./common.ts";
+import {
+  CountSchema,
+  IdSchema,
+  IsoTimestampSchema,
+  NameSchema,
+  NonEmptyStringSchema,
+} from "./common.ts";
 import { DiscoveryResultSchema } from "./discovery.ts";
 import { EventCategorySchema, EventSchema } from "./events.ts";
 import { FlowSchema } from "./flow.ts";
 import { FlowManifestSchema, RevisionHashSchema } from "./flow-folder.ts";
 import { TargetSchema } from "./locators.ts";
 import { RunSummarySchema } from "./run.ts";
+import { RunComparisonSchema } from "./run-compare.ts";
 import { LeaseSchema } from "./lease.ts";
 import { PidSchema } from "./service-state.ts";
 import { FlowCatalogEntrySchema } from "./stored-files.ts";
@@ -132,6 +139,16 @@ export const SERVICE_COMMANDS = {
       runId: NonEmptyStringSchema,
       category: v.optional(EventCategorySchema),
       stepId: v.optional(IdSchema),
+      // Any of these event types.
+      types: v.optional(v.pipe(v.array(NonEmptyStringSchema), v.minLength(1), v.maxLength(64))),
+      // Events whose payload `url` has this origin, such as `http://127.0.0.1:4600`.
+      origin: v.optional(NonEmptyStringSchema),
+      // Events of the actor bound to this profile binding.
+      profile: v.optional(NonEmptyStringSchema),
+      // Event timestamps from `from` (inclusive) to `to` (exclusive).
+      from: v.optional(IsoTimestampSchema),
+      to: v.optional(IsoTimestampSchema),
+      // A `nextCursor` of an earlier page; it stays valid while the journal grows.
       cursor: v.optional(NonEmptyStringSchema),
       limit: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(1000))),
     }),
@@ -140,9 +157,12 @@ export const SERVICE_COMMANDS = {
       nextCursor: v.optional(NonEmptyStringSchema),
     }),
   },
-  // F3 defines artifact retrieval, F3.8 the comparison.
+  // F3 defines artifact retrieval.
   "run.getArtifact": unspecified,
-  "run.compare": unspecified,
+  "run.compare": {
+    params: v.strictObject({ baselineRunId: NonEmptyStringSchema, runId: NonEmptyStringSchema }),
+    result: RunComparisonSchema,
+  },
   // F5.5 defines the reproducer folder.
   "issue.createReproducer": unspecified,
   "locators.validate": { params: v.strictObject({ target: TargetSchema }), result: v.unknown() },

@@ -29,6 +29,8 @@ export {
 export { flowToYaml, parseFlowYaml } from "./flow-yaml.ts";
 export type { CatalogRows, FlowCatalog } from "./index-db.ts";
 export { recoverRuns, type RecoveryReport } from "./recovery.ts";
+export { compareRuns } from "./run-compare.ts";
+export { pageRunEvents, type RunEventFilter, type RunEventPage } from "./run-events.ts";
 export { revisionOf } from "./revisions.ts";
 export type { RunHandle, RunResult, StoredRun } from "./runs.ts";
 export { FlowStoreError } from "./store-files.ts";
