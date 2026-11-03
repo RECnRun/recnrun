@@ -3,11 +3,12 @@ import { expect, test } from "../browser/fixtures/extension.ts";
 import type { LoadedExtension } from "../browser/fixtures/extension.ts";
 import { browserOf, provenance, summarize } from "./e1-aggregate.ts";
 import type { ProbeResult } from "./e1-aggregate.ts";
+import { sized } from "./samples.ts";
 import { appendVerdict, mergeCapabilities } from "./verdicts.ts";
 
 // Hypotheses of PLAN.md P0.4; docs/poc/namespace-sessions/experiments/E1.md reports them.
 // The harness only drives pages and reads results: every chrome.debugger call runs in the isolator.
-const SAMPLES = 3;
+const SAMPLES = sized(3);
 const APP = "http://app.localhost:4600";
 // Node does not resolve *.localhost everywhere, so the harness reaches the ledger on the loopback.
 const CONTROL = "http://127.0.0.1:4601";

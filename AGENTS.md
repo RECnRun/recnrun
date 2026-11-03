@@ -41,7 +41,7 @@ Vite+ (`vp`) is the only toolchain. `vp <name>` runs a built-in command and `vp 
 | `vp run dead-code`, `vp run duplication`              | Knip; jscpd                                                          |
 | `vp run docs:check`                                   | Relative Markdown links resolve; generated `CAPABILITIES.md` current |
 | `vp run test:e2e -- tests/e2e/explorer.spec.ts -g ''` | Targeted Playwright run (arguments go after `--`)                    |
-| `vp run verify`                                       | Full gate (`vp run ready` is an alias)                               |
+| `vp run verify`                                       | Full gate (`vp run ready` is an alias); experiments in smoke mode    |
 
 Test commands and `verify` run in Docker, so start Docker Desktop first. If Docker fails, the command fails; it never falls back to host browsers. `:local` variants (`vp run test:e2e:local`) and the built-in `vp test` run on the host and are for debugging only. Logs and failure artifacts are in `.artifacts/docker/<run-id>/`.
 

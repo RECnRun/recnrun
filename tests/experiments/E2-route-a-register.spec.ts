@@ -23,13 +23,14 @@ import {
   writeSamples,
 } from "./page-loads.ts";
 import type { LedgerEntry, Run } from "./page-loads.ts";
+import { sized } from "./samples.ts";
 import { appendVerdict } from "./verdicts.ts";
 
 // Hypotheses of PLAN.md P1.1; docs/poc/namespace-sessions/experiments/E2.md reports them.
 // The harness drives pages and reads results: every chrome.debugger call runs in the isolator.
 const BLANK = "about:blank#recnrun-e2";
-const SW_ITERATIONS = 20;
-const WORKER_ITERATIONS = 10;
+const SW_ITERATIONS = sized(20);
+const WORKER_ITERATIONS = sized(10);
 const NESTED =
   "the frozen fixture starts no worker from a worker (apps/fixture/public/app/worker.js, shared-worker.js)";
 // Base 36 has no 32-hex run, which the evidence redaction would hash.

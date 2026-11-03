@@ -19,10 +19,12 @@ function launch(context, scenario = "success", extra = [], task = "test:e2e:loca
     writeFileSync(docker, `#!${process.execPath}\nimport ${JSON.stringify(fixture)};\n`);
     chmodSync(docker, 0o755);
   }
+  // verify sets the smoke mode in the container; the checks decide it per task themselves.
+  const { RECNRUN_EXPERIMENT_SAMPLES: _inherited, ...inherited } = process.env;
   const child = spawn(process.execPath, [runner, task, ...extra], {
     cwd: directory,
     env: {
-      ...process.env,
+      ...inherited,
       RECNRUN_STRESS_ITERATIONS: "3",
       PATH: scenario === "missing-cli" ? directory : `${directory}${delimiter}${process.env.PATH}`,
       DOCKER_FIXTURE_DIR: directory,
@@ -113,6 +115,17 @@ test("runs the stress task in Docker and forwards the iteration count", async (c
   assert.ok(create.includes("RECNRUN_STRESS_ITERATIONS=3"));
   assert.deepEqual(create.slice(-3), ["test:stress:local", "--iterations", "2"]);
   assert.equal(directoryCopies(result.calls).length, 4);
+});
+
+test("runs the experiments of verify in smoke mode and leaves the experiments task alone", async (context) => {
+  const verify = await launch(context, "success", [], "verify:local");
+  assert.equal(verify.code, 0, verify.output);
+  const verifyCreate = verify.calls.find(([command]) => command === "create");
+  assert.ok(verifyCreate.includes("RECNRUN_EXPERIMENT_SAMPLES=smoke"));
+  const experiments = await launch(context, "success", [], "test:experiments:local");
+  assert.equal(experiments.code, 0, experiments.output);
+  const create = experiments.calls.find(([command]) => command === "create");
+  assert.ok(!create.some((argument) => argument.startsWith("RECNRUN_EXPERIMENT_SAMPLES=")));
 });
 
 test("preserves a failing test's exit code and copies evidence before removing the container", async (context) => {

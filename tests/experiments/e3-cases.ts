@@ -2,7 +2,6 @@ import { evaluateSample } from "./e3-samples.ts";
 import type { E3Sample } from "./e3-samples.ts";
 import {
   CONDITION,
-  STRESSED,
   clearApp,
   load,
   markerFor,
@@ -15,12 +14,13 @@ import {
 import type { CloseReport, Loaded } from "./e3-loads.ts";
 import { APP, SERVICE_WORKERS } from "./page-loads.ts";
 import type { Run } from "./page-loads.ts";
+import { sized } from "./samples.ts";
 
 // The loops of E3's hypotheses that load pages: a new registration per load, or a cold restart.
 /** Loads per service-worker variant, and per dedicated-worker type, in each hypothesis. */
-export const SW_LOADS = STRESSED ? 1 : 20;
-export const DEDICATED_LOADS = STRESSED ? 1 : 10;
-export const COLD_LOADS = STRESSED ? 1 : 20;
+export const SW_LOADS = sized(20);
+export const DEDICATED_LOADS = sized(10);
+export const COLD_LOADS = sized(20);
 export const DEDICATED_TYPES = ["classic", "module"] as const;
 const COLD_MODES = ["pause", "watch"] as const;
 

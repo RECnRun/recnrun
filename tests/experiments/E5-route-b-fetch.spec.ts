@@ -15,13 +15,14 @@ import { evaluateFirst, evaluateImports, verdictOf } from "./e5-samples.ts";
 import type { FirstSample, ImportSample, RouteBJournal } from "./e5-samples.ts";
 import { CONTROL, prepareFixture, test, writeSamples } from "./page-loads.ts";
 import type { Run } from "./page-loads.ts";
+import { sized } from "./samples.ts";
 import { appendVerdict, mergeCapabilities } from "./verdicts.ts";
 
 // Hypotheses of PLAN.md P1.4; docs/poc/namespace-sessions/experiments/E5.md reports them.
 // The harness drives pages and reads results: every Fetch.*, Target.*, and Runtime.* call runs in the isolator.
-const FIRST_ITERATIONS = 20;
-const PATH_ITERATIONS = 10;
-const DIAGNOSTIC_ITERATIONS = 5;
+const FIRST_ITERATIONS = sized(20);
+const PATH_ITERATIONS = sized(10);
+const DIAGNOSTIC_ITERATIONS = sized(5);
 const SERVICE_WORKERS: Record<string, string> = {
   classic: CLASSIC,
   module: "/sw-main.js?variant=module",

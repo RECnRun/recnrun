@@ -1,6 +1,8 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { sampleMode } from "./samples.ts";
+import type { SampleMode } from "./samples.ts";
 
 /** One hypothesis outcome (PLAN.md decision 6). */
 export interface Verdict {
@@ -24,6 +26,8 @@ export interface Verdict {
   condition?: string;
   /** Samples where the worker ran before the bootstrap reached it; scripts/test-stress.mjs sums them. */
   lateAttaches?: number;
+  /** `smoke` when `verify` ran the spec with one sample per hypothesis; absent means full evidence. */
+  mode?: SampleMode;
 }
 
 const ROOT = fileURLToPath(new URL("../../", import.meta.url));
@@ -54,7 +58,8 @@ export async function readVerdicts(): Promise<Verdict[]> {
 
 export async function appendVerdict(verdict: Verdict): Promise<void> {
   const verdicts = await readVerdicts();
-  await writeJson(join(evidenceDirectory(), "verdicts.json"), [...verdicts, verdict]);
+  const stamped = sampleMode() === "smoke" ? { ...verdict, mode: "smoke" as const } : verdict;
+  await writeJson(join(evidenceDirectory(), "verdicts.json"), [...verdicts, stamped]);
 }
 
 type Json = { [key: string]: unknown };

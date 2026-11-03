@@ -23,8 +23,6 @@ import type { LedgerEntry, Run } from "./page-loads.ts";
 
 /** `RECNRUN_STRESS_CONDITION` of scripts/test-stress.mjs; `baseline` outside a stress run. */
 export const CONDITION = process.env.RECNRUN_STRESS_CONDITION ?? "baseline";
-/** A stress iteration runs one load per case, so each iteration stays near two minutes. */
-export const STRESSED = process.env.RECNRUN_STRESS_ITERATION !== undefined;
 export const BLANK = "about:blank#recnrun-e3";
 // Base 36 has no 32-hex run, which the evidence redaction would hash.
 const RUN = Date.now().toString(36);

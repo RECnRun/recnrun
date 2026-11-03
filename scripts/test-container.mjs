@@ -93,10 +93,20 @@ async function buildImage() {
 }
 
 async function startTests() {
-  const forwarded = ["CI", "DEBUG", "FORCE_COLOR", "RECNRUN_STRESS_ITERATIONS"];
+  const forwarded = [
+    "CI",
+    "DEBUG",
+    "FORCE_COLOR",
+    "RECNRUN_STRESS_ITERATIONS",
+    "RECNRUN_EXPERIMENT_SAMPLES",
+  ];
   const environment = forwarded.flatMap((key) =>
     process.env[key] === undefined ? [] : ["--env", `${key}=${process.env[key]}`],
   );
+  // The gate checks that every experiment still runs; evidence comes from test:experiments in full.
+  if (task === "verify:local" && process.env.RECNRUN_EXPERIMENT_SAMPLES === undefined) {
+    environment.push("--env", "RECNRUN_EXPERIMENT_SAMPLES=smoke");
+  }
   // Experiments name their evidence directory after the run (tests/experiments/verdicts.ts).
   environment.push("--env", `RECNRUN_RUN_ID=${runId}`);
   const result = await docker(

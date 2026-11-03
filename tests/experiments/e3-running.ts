@@ -1,7 +1,6 @@
 import type { E3Entry, Mode } from "./e3-samples.ts";
 import {
   BLANK,
-  STRESSED,
   clearApp,
   delay,
   load,
@@ -30,10 +29,11 @@ import {
   targetsLeft,
 } from "./page-loads.ts";
 import type { Run } from "./page-loads.ts";
+import { sized } from "./samples.ts";
 
 // The E3 hypotheses about a worker Route A meets late: one already running, one woken without a tab.
-export const RUNNING_SAMPLES = STRESSED ? 2 : 10;
-export const WAKE_SAMPLES = STRESSED ? 1 : 5;
+export const RUNNING_SAMPLES = sized(10, 2);
+export const WAKE_SAMPLES = sized(5);
 export const WAKE_TIMEOUT_MS = 10_000;
 const CUT_MS = 1_000;
 const LISTED_TIMEOUT_MS = 5_000;

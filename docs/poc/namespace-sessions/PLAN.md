@@ -62,15 +62,15 @@ Measured on Playwright Chromium or Chrome for Testing 156 (never branded Chrome)
 - A phase closes when its tasks are `[x]` in [CHECKLIST.md](CHECKLIST.md), `vp run verify` exits 0 on the branch, for phases that own an order-critical scenario the checklist records the `vp run test:stress` run, and the checklist records a Codex code review of the phase's commits (model `gpt-6.1-sol`, high reasoning effort) with the findings the orchestrator applied and the ones it rejected, each with a reason (checklist resume protocol, step 6).
 - Layers, all run by `vp run verify` inside Docker unless noted:
 
-| Layer       | Files                                                                                      | Command                                 | Added in |
-| ----------- | ------------------------------------------------------------------------------------------ | --------------------------------------- | -------- |
-| Unit        | `{apps,packages}/*/tests/*.test.ts`                                                        | `vp run test:unit`                      | exists   |
-| Component   | `*.browser.test.ts(x)` in Vitest Browser Mode: isolation patches against real browser APIs | `vp run test:components`                | exists   |
-| Browser     | `tests/browser/*.spec.ts`: Google Chrome Stable, extension loaded, fixture, observer       | `vp run test:browser`                   | P0.2     |
-| Experiments | `tests/experiments/*.spec.ts`: hypotheses that write verdicts                              | `vp run test:experiments`               | P0.4     |
-| Stress      | the specs tagged `@order-critical`, 100 iterations, varied conditions                      | `vp run test:stress` (outside `verify`) | P1.2     |
-| Container   | `tests/container/*.checks.mjs`: image reports Google Chrome ≥ 144, versions file           | `vp run test:container`                 | P0.2     |
-| Docs        | `scripts/check-docs.mjs`: links and anchors resolve, generated tables current              | `vp run docs:check`                     | P0.1     |
+| Layer       | Files                                                                                                                                               | Command                                 | Added in |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- | -------- |
+| Unit        | `{apps,packages}/*/tests/*.test.ts`                                                                                                                 | `vp run test:unit`                      | exists   |
+| Component   | `*.browser.test.ts(x)` in Vitest Browser Mode: isolation patches against real browser APIs                                                          | `vp run test:components`                | exists   |
+| Browser     | `tests/browser/*.spec.ts`: Google Chrome Stable, extension loaded, fixture, observer                                                                | `vp run test:browser`                   | P0.2     |
+| Experiments | `tests/experiments/*.spec.ts`: hypotheses that write verdicts; `verify` runs them in smoke mode (one sample each, verdicts stamped `mode: "smoke"`) | `vp run test:experiments`               | P0.4     |
+| Stress      | the specs tagged `@order-critical`, 100 iterations, varied conditions                                                                               | `vp run test:stress` (outside `verify`) | P1.2     |
+| Container   | `tests/container/*.checks.mjs`: image reports Google Chrome ≥ 144, versions file                                                                    | `vp run test:container`                 | P0.2     |
+| Docs        | `scripts/check-docs.mjs`: links and anchors resolve, generated tables current                                                                       | `vp run docs:check`                     | P0.1     |
 
 - Coverage thresholds (80/80/80/75), Knip, jscpd (4%), lint caps, and the architecture rules apply to every new workspace. Vendored SplitSession files are tested through the modules that import them; they are not excluded from analysis.
 - `docs/poc/namespace-sessions/CAPABILITIES.md` is generated from `capabilities.json` (what `chrome.debugger` and the installed Chrome allowed) and `REPORT.md` embeds the output of `scripts/decide.mjs`; `docs:check` fails when either is stale.

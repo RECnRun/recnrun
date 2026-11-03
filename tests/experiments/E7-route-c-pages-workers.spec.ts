@@ -15,13 +15,14 @@ import { capabilitiesOf, summarize, summarizeIdentity, unavailable } from "./e7-
 import type { IdentitySample } from "./e7-summary.ts";
 import { CONTROL, expect, prepareFixture, test, writeSamples } from "./page-loads.ts";
 import type { Run } from "./page-loads.ts";
+import { sized } from "./samples.ts";
 import { appendVerdict, mergeCapabilities } from "./verdicts.ts";
 
 // Hypotheses of PLAN.md P1.6; docs/poc/namespace-sessions/experiments/E7.md reports them.
 // Route C is a MAIN-world registered content script; the harness only drives pages and reads results.
-const PAGE_ITERATIONS = 20;
-const WORKER_ITERATIONS = 10;
-const IDP_ITERATIONS = 5;
+const PAGE_ITERATIONS = sized(20);
+const WORKER_ITERATIONS = sized(10);
+const IDP_ITERATIONS = sized(5);
 const IDENTITY_PAIRS = 3;
 const PAGES = ["/", "/storage.html"];
 const STRATEGIES: Strategy[] = ["fail-closed", "blob", "data"];

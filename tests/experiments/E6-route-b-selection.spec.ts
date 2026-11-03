@@ -11,18 +11,17 @@ import { suspendedOutcome, unavailableVerdict, withRestarts } from "./e6-samples
 import type { E6Context, Suspension, SwitchSample } from "./e6-samples.ts";
 import { CONTROL, isolator, prepareFixture, test, writeSamples } from "./page-loads.ts";
 import type { Run } from "./page-loads.ts";
+import { sized } from "./samples.ts";
 import { appendVerdict, mergeCapabilities } from "./verdicts.ts";
 import type { Verdict } from "./verdicts.ts";
 
 // Hypotheses of PLAN.md P1.5; docs/poc/namespace-sessions/experiments/E6.md reports them.
 // The harness drives pages and reads results: every chrome.debugger and DNR call runs in the isolator.
-// A stress run (scripts/test-stress.mjs) repeats the order-critical test, one sample per variant each time.
-const STRESSED = process.env.RECNRUN_STRESS_ITERATION !== undefined;
 // 50 switches of the workers page give 100 worker samples; a service-worker restart can take 300 s.
-const WORKER_ITERATIONS = STRESSED ? 1 : 50;
-const SERVICE_ITERATIONS = STRESSED ? 1 : 2;
-const PATH_ITERATIONS = 5;
-const SUSPEND_ITERATIONS = 3;
+const WORKER_ITERATIONS = sized(50);
+const SERVICE_ITERATIONS = sized(2);
+const PATH_ITERATIONS = sized(5);
+const SUSPEND_ITERATIONS = sized(3);
 const TIMING: Timing = CONDITION === "switch-early" ? "early" : "late";
 // A slot pair per variant, so a warm run's kept stores never name another variant's slot.
 const SERVICE_PLANS = [

@@ -10,13 +10,14 @@ import type { E4Sample, Mechanism, Trigger } from "./e4-samples.ts";
 import { cleanup } from "./e4-steps.ts";
 import { APP, CONTROL, control, expect, test } from "./page-loads.ts";
 import type { Run } from "./page-loads.ts";
+import { sized } from "./samples.ts";
 import { appendVerdict, mergeCapabilities } from "./verdicts.ts";
 
 // Hypotheses of PLAN.md P1.3; docs/poc/namespace-sessions/experiments/E4.md reports them.
 // The harness drives pages and reads the ledger: every chrome.* call runs in the isolator.
-const SAMPLES = 10;
+const SAMPLES = sized(10);
 /** Variants beside the main one, and mechanisms Chrome refuses, get fewer samples. */
-const FEW = 3;
+const FEW = sized(3);
 const ROTATION: Trigger[] = ["navigation", "post-message", "sync"];
 const MECHANISMS: Mechanism[] = [
   "close-target",
