@@ -1,5 +1,11 @@
-import { join } from "node:path";
-import { JOURNAL_FILE, type Event, type GapPayload, type RunCatalogEntry } from "@recnrun/protocol";
+import { join, relative, sep } from "node:path";
+import {
+  JOURNAL_FILE,
+  type Event,
+  type GapPayload,
+  type RunCatalogEntry,
+  type StoreProblem,
+} from "@recnrun/protocol";
 import { flowPaths } from "./flow-folders.ts";
 import type { FlowStore } from "./flow-store.ts";
 import { interruptedResult, recoveryGap } from "./interrupted-run.ts";
@@ -41,13 +47,26 @@ async function recoverRun(store: FlowStore, { flowId, id: runId }: RunCatalogEnt
   return result.summary.counts.indeterminate;
 }
 
+/** The run a rebuild problem is about, when its path is inside flows/<flowId>/runs/<runId>/. */
+function unreadableRun(flowsRoot: string, problem: StoreProblem) {
+  const [flowId, runs, runId] = relative(flowsRoot, problem.path).split(sep);
+  if (flowId === undefined || runs !== "runs" || runId === undefined) return undefined;
+  return { flowId, runId, message: problem.message };
+}
+
 /**
  * Closes every run a stopped service left without a summary; nothing is re-executed.
  * Call it before the service accepts commands, while no replay can be active.
  */
 export async function recoverRuns(store: FlowStore, now: () => Date): Promise<RecoveryReport> {
   const report: RecoveryReport = { recovered: [], problems: [] };
-  const running = (await store.listRuns()).filter(({ status }) => status === "running");
+  // A crash can leave a finished run indexed as running or a new run folder unindexed, so the folders decide.
+  const rows = await store.rebuildIndex();
+  for (const problem of rows.problems) {
+    const run = unreadableRun(join(store.root, "flows"), problem);
+    if (run) report.problems.push(run);
+  }
+  const running = rows.runs.filter(({ status }) => status === "running");
   for (const entry of running) {
     const ids = { flowId: entry.flowId, runId: entry.id };
     try {

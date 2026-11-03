@@ -3,7 +3,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { coverageOf, type Event } from "@recnrun/protocol";
 import { afterEach, beforeEach, expect, test } from "vite-plus/test";
-import { openFlowStore, recoverRuns, type FlowStore } from "../src/index.ts";
+import { openFlowStore, recoverRuns, type FlowStore, type RunResult } from "../src/index.ts";
+import { createRunFolder, writeRunResult } from "../src/runs.ts";
 import { runManifest, runSummary, spikeFlow } from "./flow-fixtures.ts";
 
 const at = new Date("2026-11-02T11:00:00.000Z");
@@ -11,7 +12,13 @@ const at = new Date("2026-11-02T11:00:00.000Z");
 let home = "";
 let store: FlowStore;
 let revision = "";
-const runFolder = (runId: string) => join(home, ".recnrun", "flows", "form-submit", "runs", runId);
+const flowFolder = () => join(home, ".recnrun", "flows", "form-submit");
+const runFolder = (runId: string) => join(flowFolder(), "runs", runId);
+const emptyResult = (runId: string): RunResult => ({
+  summary: runSummary(runId),
+  steps: { schemaVersion: 1, runId, steps: [] },
+  coverage: { schemaVersion: 1, runId, surfaces: [] },
+});
 
 beforeEach(async () => {
   home = await mkdtemp(join(tmpdir(), "recnrun-recovery-"));
@@ -124,19 +131,51 @@ test("a read-only step cut short is cancelled and a truncated journal keeps its 
 test("a run it cannot read stays as it is and is reported", async () => {
   await leaveRunning("run-1", []);
   await leaveRunning("run-2", []);
-  await store.finishRun({
-    summary: runSummary("run-2"),
-    steps: { schemaVersion: 1, runId: "run-2", steps: [] },
-    coverage: { schemaVersion: 1, runId: "run-2", surfaces: [] },
-  });
+  await store.finishRun(emptyResult("run-2"));
   await writeFile(join(runFolder("run-1"), "manifest.json"), "{");
   const report = await recoverRuns(store, () => at);
   expect(report).toMatchObject({
     recovered: [],
     problems: [{ flowId: "form-submit", runId: "run-1", message: expect.any(String) }],
   });
-  expect((await store.listRuns()).map(({ id, status }) => `${id} ${status}`).toSorted()).toEqual([
-    "run-1 running",
+  // The rebuilt index lists the unreadable run among its problems, not as a run.
+  expect((await store.listRuns()).map(({ id, status }) => `${id} ${status}`)).toEqual([
     "run-2 passed",
+  ]);
+  expect((await store.list()).problems).toEqual([
+    {
+      path: join(runFolder("run-1"), "manifest.json"),
+      code: "not-json",
+      message: expect.any(String),
+    },
+  ]);
+});
+
+test("a completed run the index still lists as running keeps its result", async () => {
+  await leaveRunning("run-1", [["open", true]]);
+  // A crash between writing summary.json and updating the index leaves the run indexed as running.
+  await writeRunResult(runFolder("run-1"), emptyResult("run-1"));
+  expect((await store.listRuns()).map(({ status }) => status)).toEqual(["running"]);
+  expect(await recoverRuns(store, () => at)).toEqual({ recovered: [], problems: [] });
+  const run = await store.getRun("form-submit", "run-1");
+  expect(run.summary).toMatchObject({ status: "passed", exitCode: 0 });
+  expect(run.journal.events.filter(({ category }) => category === "gap")).toEqual([]);
+  expect(await store.listRuns()).toEqual([
+    expect.objectContaining({ id: "run-1", status: "passed" }),
+  ]);
+});
+
+test("a run folder the index never listed is closed like any other", async () => {
+  // A crash between creating the folder and indexing it leaves a run the index does not know.
+  const handle = await createRunFolder(flowFolder(), runManifest(revision, "run-9"));
+  await handle.journal.append(stepEvent("run-9", 1, "open", "step.started"));
+  await handle.journal.close();
+  expect(await store.listRuns()).toEqual([]);
+  expect(await recoverRuns(store, () => at)).toEqual({
+    recovered: [{ flowId: "form-submit", runId: "run-9", indeterminate: 1 }],
+    problems: [],
+  });
+  expect(await store.listRuns()).toEqual([
+    expect.objectContaining({ id: "run-9", status: "interrupted" }),
   ]);
 });
