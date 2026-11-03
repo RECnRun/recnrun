@@ -36,6 +36,8 @@ export interface InstrumentOptions {
   scope?: TargetScope;
   /** How many unacknowledged messages each hooked document keeps before it reports a gap. */
   observerBuffer?: number;
+  /** How long `drain()` waits for capture under way before it fails; 10 s by default. */
+  drainTimeoutMs?: number;
 }
 
 const CONTEXT_EVENTS = new Set([

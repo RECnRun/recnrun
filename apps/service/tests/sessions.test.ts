@@ -104,7 +104,7 @@ function drainingCapture(h: Harness, drain: () => Promise<void>, last: CapturedE
       for (const event of last) void capture.onEvent(event);
       handle.stop();
     };
-    return { targetId: handle.targetId, settled: drain, stop };
+    return { targetId: handle.targetId, drain, stop };
   };
 }
 

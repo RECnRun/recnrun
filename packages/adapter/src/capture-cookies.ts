@@ -72,6 +72,7 @@ export class CookieJar {
   private known = new Map<string, ChromeCookie>();
   private reading = false;
   private next: Request | undefined;
+  private quiet = false;
   private closed = false;
 
   constructor(session: StorageSession, frameId: string, pollMs: number) {
@@ -86,7 +87,7 @@ export class CookieJar {
 
   /** Reads the jar: a snapshot with its reason, or changes since the last read. */
   read(request: Request = "changes"): void {
-    if (this.closed) return;
+    if (this.closed || this.quiet) return;
     if (this.reading) {
       // A pending snapshot wins over a pending comparison, since it reports everything.
       if (this.next === undefined || this.next === "changes") this.next = request;
@@ -96,9 +97,15 @@ export class CookieJar {
     this.session.track(this.load(request));
   }
 
+  /** Ends the poll and starts no further read, so a drain waits only for the read under way. */
+  quiesce(): void {
+    this.quiet = true;
+    clearInterval(this.timer);
+  }
+
   close(): void {
     this.closed = true;
-    clearInterval(this.timer);
+    this.quiesce();
   }
 
   private async load(request: Request): Promise<void> {

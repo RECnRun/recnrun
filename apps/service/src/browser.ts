@@ -6,7 +6,8 @@ import { ServiceFailure } from "./dispatch.ts";
 /** A recording's page and the calls that end it. */
 export interface RecordingHandle {
   readonly targetId: string;
-  settled(): Promise<void>;
+  /** Stops starting new reads and waits for capture under way, within the adapter's deadline. */
+  drain(): Promise<void>;
   stop(): void;
 }
 

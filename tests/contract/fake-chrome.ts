@@ -55,7 +55,7 @@ export function fakeChrome(): FakeChrome {
     discover: async () => FOUND,
     record: async (_endpoint, capture) => {
       onEvent = capture.onEvent;
-      return { targetId: "page-1", settled: async () => {}, stop: () => {} };
+      return { targetId: "page-1", drain: async () => {}, stop: () => {} };
     },
     pick: async (_endpoint, _targetId, picked) => {
       onPicked = picked;

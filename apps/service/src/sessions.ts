@@ -268,7 +268,7 @@ export async function closePicker(live: LiveSession): Promise<void> {
  */
 async function drain(deps: SessionDeps, live: LiveSession, stopping: Session): Promise<void> {
   try {
-    await live.recording.settled();
+    await live.recording.drain();
   } catch (error) {
     deps.logger.warn("session.drain-failed", { message: String(error) });
     void track(

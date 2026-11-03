@@ -23,6 +23,8 @@ export interface ReplayObserver extends CaptureHandle {
 export interface ObserveOptions {
   openChannel?: (endpoint: string) => Promise<CdpChannel>;
   now?: () => Date;
+  /** How long `drain()` waits for capture under way before it journals a `capture-stopped` gap. */
+  drainTimeoutMs?: number;
 }
 
 const ADOPT_TIMEOUT_MS = 5000;
@@ -89,6 +91,7 @@ export async function observeReplay(
     scope,
     now,
     capture: { runId: sink.runId, onEvent, ...(blobs && { blobs }) },
+    ...(options.drainTimeoutMs !== undefined && { drainTimeoutMs: options.drainTimeoutMs }),
   });
   const gaps = createEmitter({ runId: sink.runId, onEvent, now });
   const lose = (reason: "target-unattached" | "capture-stopped") =>
@@ -118,7 +121,7 @@ export async function observeReplay(
     },
     muted: async (work, ms) => mutedIn(instrumentation, work, ms),
     async drain() {
-      await instrumentation.settled().catch(() => lose("capture-stopped"));
+      await instrumentation.drain().catch(() => lose("capture-stopped"));
       stop();
     },
     stop,

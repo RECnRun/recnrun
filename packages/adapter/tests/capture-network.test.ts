@@ -1,6 +1,7 @@
 import { MAX_INLINE_BODY_LENGTH } from "@recnrun/protocol";
 import { expect, test } from "vite-plus/test";
 import { capturing, type ReplyingChannel } from "./capture-harness.ts";
+import { within } from "./within.ts";
 
 const API = "http://127.0.0.1:4600/api/json";
 
@@ -226,15 +227,6 @@ test("a response without its request, and stop or detach while loading, settle e
   expect(channel.closed).toBe(true);
   await handle.settled();
 });
-
-// Fails instead of hanging when `settled()` never resolves.
-const within = (work: Promise<void>, ms: number) =>
-  Promise.race([
-    work,
-    new Promise<void>((_, reject) =>
-      setTimeout(() => reject(new Error(`settled() did not resolve within ${ms} ms`)), ms),
-    ),
-  ]);
 
 test("a body read Chrome never answers is unavailable at the deadline, once", async () => {
   const { channel, handle, bodies } = await page({ bodyTimeoutMs: 20 });

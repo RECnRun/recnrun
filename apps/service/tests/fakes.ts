@@ -48,7 +48,7 @@ function fakeBrowser(): FakeBrowser {
     async record(_endpoint, capture) {
       onEvent = capture.onEvent;
       calls.push("record");
-      return { targetId: "page-1", settled: async () => {}, stop: () => calls.push("record.stop") };
+      return { targetId: "page-1", drain: async () => {}, stop: () => calls.push("record.stop") };
     },
     async pick(_endpoint, _targetId, picked) {
       onPicked = picked;

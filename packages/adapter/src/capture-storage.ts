@@ -53,6 +53,7 @@ export class StorageCapture {
   private readonly session: StorageSession;
   private readonly targetId: string;
   private readonly cookies: CookieJar | undefined;
+  private quiet = false;
   private closed = false;
 
   constructor(session: StorageSession, targetId: string, cookiePollMs: number | undefined) {
@@ -75,6 +76,12 @@ export class StorageCapture {
     if (change) this.change(change, params);
     else if (method === "Page.frameNavigated") this.navigated(params);
     else if (method === "Network.responseReceivedExtraInfo") this.responded(params);
+  }
+
+  /** Starts no further snapshot or cookie read; what is under way still lands. */
+  quiesce(): void {
+    this.quiet = true;
+    this.cookies?.quiesce();
   }
 
   close(): void {
@@ -118,6 +125,7 @@ export class StorageCapture {
   }
 
   private snapshot(frameId: string, reason: SnapshotReason): void {
+    if (this.quiet) return;
     this.session.track(this.read(frameId, reason).catch(() => undefined));
   }
 

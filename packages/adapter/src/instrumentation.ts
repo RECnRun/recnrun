@@ -11,10 +11,31 @@ export interface Instrumentation {
   report(): InstrumentationReport;
   /** Resolves once every install and body read started so far has finished. */
   settled(): Promise<void>;
+  /** Stops starting new storage reads, then waits for what is under way, at most `drainTimeoutMs`. */
+  drain(): Promise<void>;
   /** Evaluates `expression` in every hooked document still open; a failure is ignored. */
   evaluateInDocuments(expression: string): Promise<void>;
   /** Records bodies still loading as unavailable and closes the socket. */
   stop(): void;
+}
+
+const DEFAULT_DRAIN_TIMEOUT_MS = 10_000;
+
+/** `settled` within `ms`; past it, the failure counts the operations that were still pending. */
+function drained(
+  settled: Promise<void>,
+  pending: ReadonlySet<Promise<void>>,
+  ms = DEFAULT_DRAIN_TIMEOUT_MS,
+): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      const left = pending.size;
+      const were = left === 1 ? "operation was" : "operations were";
+      reject(new Error(`Capture did not settle within ${ms} ms; ${left} ${were} still pending.`));
+    }, ms);
+  });
+  return Promise.race([settled, deadline]).finally(() => clearTimeout(timer));
 }
 
 /**
@@ -44,10 +65,15 @@ export async function instrumentChannel(
     stop();
     throw error;
   }
+  const settled = async () => {
+    while (instrumenter.pending.size > 0) await Promise.all(instrumenter.pending);
+  };
   return {
     report: () => instrumenter.report(),
-    settled: async () => {
-      while (instrumenter.pending.size > 0) await Promise.all(instrumenter.pending);
+    settled,
+    drain: () => {
+      instrumenter.capture?.quiesce();
+      return drained(settled(), instrumenter.pending, options.drainTimeoutMs);
     },
     evaluateInDocuments: async (expression) => {
       const sends = instrumenter.delivery

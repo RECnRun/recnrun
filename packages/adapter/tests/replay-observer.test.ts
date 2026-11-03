@@ -2,10 +2,11 @@ import type { CaptureSink, ReplayBlobs } from "@recnrun/engine";
 import { CapturedEventSchema, HOOK_VERSION, type CapturedEvent } from "@recnrun/protocol";
 import * as v from "valibot";
 import { expect, test } from "vite-plus/test";
-import { observeReplay } from "../src/replay-observer.ts";
+import { observeReplay, type ObserveOptions } from "../src/replay-observer.ts";
 import type { ReplayPage } from "../src/replay-page.ts";
 import { ReplyingChannel } from "./capture-harness.ts";
 import { now } from "./fake-cdp.ts";
+import { within } from "./within.ts";
 
 const ENDPOINT = "ws://127.0.0.1:9222/devtools/browser/x";
 const API = "http://127.0.0.1:4600/api/json";
@@ -34,7 +35,7 @@ function pageOf(targetId: string, fail = false): ReplayPage {
   return { context: () => ({ newCDPSession: async () => session }) } as unknown as ReplayPage;
 }
 
-async function observe() {
+async function observe(options: Omit<ObserveOptions, "now" | "openChannel"> = {}) {
   const channel = new ExplicitAttach();
   const events: CapturedEvent[] = [];
   const stored: (string | Uint8Array)[] = [];
@@ -58,8 +59,22 @@ async function observe() {
     },
     blobs,
   };
-  const observer = await observeReplay(ENDPOINT, sink, { now, openChannel: async () => channel });
+  const observer = await observeReplay(ENDPOINT, sink, {
+    ...options,
+    now,
+    openChannel: async () => channel,
+  });
   return { channel, events, stored, observer };
+}
+
+/** A fetch whose body Chrome never answers, so its read stays pending. */
+function fetchHeld(channel: ExplicitAttach, sessionId: string): void {
+  channel.holding.add("Network.getResponseBody");
+  const request = { url: API, method: "GET" };
+  channel.emit("Network.requestWillBeSent", { requestId: "R1", request, type: "Fetch" }, sessionId);
+  const response = { url: API, status: 200, statusText: "", mimeType: "application/json" };
+  channel.emit("Network.responseReceived", { requestId: "R1", type: "Fetch", response }, sessionId);
+  channel.emit("Network.loadingFinished", { requestId: "R1", encodedDataLength: 2 }, sessionId);
 }
 
 test("captures only the tabs replay opened, installed before adopt answers", async () => {
@@ -104,32 +119,10 @@ test("response bodies go to the run's blobs as text, so the run can redact them"
   expect(network[1]?.payload).toMatchObject({ status: 500 });
 });
 
-// Fails instead of hanging when `drain()` never resolves.
-const within = (work: Promise<void>, ms: number) =>
-  Promise.race([
-    work,
-    new Promise<void>((_, reject) =>
-      setTimeout(() => reject(new Error(`drain() did not resolve within ${ms} ms`)), ms),
-    ),
-  ]);
-
 test("losing the evidence socket is a connection-lost gap, and capture under way settles", async () => {
   const { channel, events, observer } = await observe();
   await observer.adopt(pageOf("REPLAY"));
-  channel.holding.add("Network.getResponseBody");
-  const request = { url: API, method: "GET" };
-  channel.emit(
-    "Network.requestWillBeSent",
-    { requestId: "R1", request, type: "Fetch" },
-    "S-REPLAY",
-  );
-  const response = { url: API, status: 200, statusText: "", mimeType: "application/json" };
-  channel.emit(
-    "Network.responseReceived",
-    { requestId: "R1", type: "Fetch", response },
-    "S-REPLAY",
-  );
-  channel.emit("Network.loadingFinished", { requestId: "R1", encodedDataLength: 2 }, "S-REPLAY");
+  fetchHeld(channel, "S-REPLAY");
   channel.lose();
   await within(observer.drain(), 1_000);
   const gaps = events.filter(({ category }) => category === "gap");
@@ -146,6 +139,23 @@ test("losing the evidence socket is a connection-lost gap, and capture under way
     reason: expect.stringContaining("connection to Chrome was lost"),
   });
   expect(events.map(({ type }) => type)).not.toContain("capture-stopped");
+});
+
+test("a drain that misses its deadline is a capture-stopped gap, and the capture stops", async () => {
+  const { channel, events, observer } = await observe({ drainTimeoutMs: 20 });
+  await observer.adopt(pageOf("REPLAY"));
+  fetchHeld(channel, "S-REPLAY");
+  await within(observer.drain(), 1_000);
+  const gaps = events.filter(({ category }) => category === "gap");
+  expect(gaps.map(({ type, producer, payload }) => [type, producer, payload])).toEqual([
+    ["capture-stopped", "adapter:replay", { reason: "capture-stopped" }],
+  ]);
+  const body = events.find(({ category, type }) => category === "network" && type === "body");
+  expect(body?.payload).toMatchObject({
+    condition: "unavailable",
+    reason: expect.stringContaining("Capture stopped"),
+  });
+  expect(channel.closed).toBe(true);
 });
 
 test("a tab that cannot be adopted is a target-unattached gap, never a failed step", async () => {

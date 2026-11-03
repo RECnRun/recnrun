@@ -1,7 +1,6 @@
 import {
   MAX_INLINE_BODY_LENGTH,
   type CapturedEvent,
-  type CaptureSurface,
   type ObserverMessage,
 } from "@recnrun/protocol";
 import type { CdpChannel, CdpEvent } from "./cdp-socket.ts";
@@ -12,7 +11,8 @@ import {
   withDeadline,
 } from "./capture-documents.ts";
 import type { StorageSession } from "./capture-cookies.ts";
-import { createEmitter, type Draft, type Emitter, type Origin } from "./capture-envelope.ts";
+import { gapDraft, observedDraft } from "./capture-drafts.ts";
+import { createEmitter, type Emitter, type Origin } from "./capture-envelope.ts";
 import { NetworkCapture } from "./capture-network.ts";
 import { sensitiveHeaders, type BodySink } from "./capture-network-evidence.ts";
 import { mapPageEvent } from "./capture-page.ts";
@@ -36,10 +36,13 @@ export interface CaptureOptions {
   redactHeaders?: readonly string[];
   /** How often a page's cookie jar is read for changes, in milliseconds; 0 reads it only after a response that sets cookies and on navigation. */
   cookiePollMs?: number;
+  /** How long a storage or cookie read may wait for Chrome's answer; 5 s by default. */
+  readTimeoutMs?: number;
 }
 
 const DEFAULT_BODY_TIMEOUT_MS = 10_000;
 const DEFAULT_COOKIE_POLL_MS = 1_000;
+const DEFAULT_READ_TIMEOUT_MS = 5_000;
 // How long events of a navigated context wait for its hook to name the new document.
 const DOCUMENT_READ_TIMEOUT_MS = 2_000;
 const BROWSER: Origin = {
@@ -59,6 +62,7 @@ export class Capture {
   private readonly channel: CdpChannel;
   private readonly options: CaptureOptions & { now: () => Date };
   private readonly track: (work: Promise<void>) => void;
+  private quiet = false;
 
   constructor(
     channel: CdpChannel,
@@ -163,6 +167,12 @@ export class Capture {
       this.reread(record, mapped.frameId);
   }
 
+  /** Starts no further storage or cookie read, so a drain waits only for what is under way. */
+  quiesce(): void {
+    this.quiet = true;
+    for (const storage of this.storages.values()) storage.quiesce();
+  }
+
   /** Settles every body still loading and every held event; nothing is emitted afterwards. */
   stop(): void {
     this.end("Capture stopped before the response finished loading.");
@@ -224,10 +234,21 @@ export class Capture {
     if (!storage) {
       const pollMs =
         type === "page" ? (this.options.cookiePollMs ?? DEFAULT_COOKIE_POLL_MS) : undefined;
-      storage = new StorageCapture(this.session(record), targetId, pollMs);
+      storage = new StorageCapture(this.storageSession(record), targetId, pollMs);
+      if (this.quiet) storage.quiesce();
       this.storages.set(record.sessionId, storage);
     }
     return storage;
+  }
+
+  // A read Chrome never answers would otherwise hold the drain for as long as the session lives.
+  private storageSession(record: TargetRecord): StorageSession {
+    const session = this.session(record);
+    const timeout = this.options.readTimeoutMs ?? DEFAULT_READ_TIMEOUT_MS;
+    return {
+      ...session,
+      send: (method, params) => withDeadline(session.send(method, params), timeout),
+    };
   }
 
   private session(record: TargetRecord): StorageSession {
@@ -256,48 +277,4 @@ export class Capture {
     }
     return network;
   }
-}
-
-const KIND_SURFACES: Record<string, CaptureSurface> = {
-  dom: "dom-events",
-  storage: "web-storage",
-  lifecycle: "navigation",
-};
-
-const gapDraft = (payload: Record<string, unknown>): Draft => ({
-  category: "gap",
-  type: String(payload["reason"]),
-  component: "collector",
-  payload,
-});
-
-function observedDraft(message: ObserverMessage): Draft {
-  if (message.kind === "gap") {
-    const { kinds, ...range } = message.payload;
-    const surface = kinds.length === 1 ? KIND_SURFACES[kinds[0] as string] : undefined;
-    const producer = hookProducer(message.documentId);
-    return gapDraft({
-      reason: "buffer-exhausted",
-      producer,
-      ...range,
-      ...(surface && { surface }),
-    });
-  }
-  if (message.kind === "dom")
-    return {
-      category: "dom",
-      type: message.type,
-      component: "application",
-      payload: message.payload,
-    };
-  if (message.kind === "storage") {
-    const payload = { observation: "observed-operation", ...message.payload };
-    return { category: "storage", type: "operation", component: "application", payload };
-  }
-  return {
-    category: "target",
-    type: "hook-installed",
-    component: "collector",
-    payload: message.payload,
-  };
 }

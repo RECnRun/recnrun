@@ -1,7 +1,7 @@
 import { CapturedEventSchema, OBSERVER_BINDING, type CapturedEvent } from "@recnrun/protocol";
 import * as v from "valibot";
 import { expect } from "vite-plus/test";
-import { instrumentChannel, type CaptureOptions } from "../src/index.ts";
+import { instrumentChannel, type CaptureOptions, type InstrumentOptions } from "../src/index.ts";
 import { FakeChannel } from "./fake-channel.ts";
 import { now } from "./fake-cdp.ts";
 
@@ -46,10 +46,14 @@ export class ReplyingChannel extends FakeChannel {
 }
 
 /** Instruments a fake browser with capture on; every captured event is checked against its schema. */
-export async function capturing(options: Partial<CaptureOptions> = {}) {
+export async function capturing(
+  options: Partial<CaptureOptions> = {},
+  instrument: Pick<InstrumentOptions, "drainTimeoutMs"> = {},
+) {
   const channel = new ReplyingChannel();
   const events: CapturedEvent[] = [];
   const handle = await instrumentChannel(channel, {
+    ...instrument,
     now,
     capture: {
       runId: "run-1",
