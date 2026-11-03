@@ -1,5 +1,6 @@
 import type { ReplayDriver } from "@recnrun/engine";
-import type { Flow, RunSummary } from "@recnrun/protocol";
+import { ServiceMessageSchema, type Flow, type RunSummary } from "@recnrun/protocol";
+import * as v from "valibot";
 import { expect, test } from "vite-plus/test";
 import { harness, type Harness } from "./fakes.ts";
 import { cancelReplays } from "@/runs";
@@ -9,6 +10,13 @@ const resultOf = <T>(envelope: unknown): T => {
   return (envelope as { result: T }).result;
 };
 const codeOf = (envelope: unknown) => (envelope as { error?: { code: string } }).error?.code;
+
+/** The summaries of the `run.finished` pushes; every push must be a valid service message. */
+const finishedOf = (h: Harness) =>
+  h.published.flatMap((message) => {
+    expect(v.is(ServiceMessageSchema, message)).toBe(true);
+    return message.type === "run.finished" ? [message.summary] : [];
+  });
 
 const flow: Flow = {
   schemaVersion: 1,
@@ -122,6 +130,16 @@ test("a replay that cannot reach Chrome ends as an internal error", async () => 
     ok: false,
     error: { code: "internal", message: "No replay in this fake." },
   });
+  expect(finishedOf(h)).toEqual([
+    expect.objectContaining({
+      runId,
+      flowId: flow.id,
+      status: "error",
+      exitCode: 2,
+      counts: expect.objectContaining({ total: 2, pending: 2, passed: 0 }),
+      failures: [{ stepId: "open", message: "No replay in this fake." }],
+    }),
+  ]);
 });
 
 test("a replay whose journal fails closes that journal and ends as an internal error", async () => {
@@ -149,6 +167,9 @@ test("a replay whose journal fails closes that journal and ends as an internal e
   expect(closes).toBe(1);
   expect(h.deps.journals.openCount).toBe(0);
   expect(codeOf(await h.call("run.summary", { runId: run.runId }))).toBe("internal");
+  const [finished, ...more] = finishedOf(h);
+  expect(more).toEqual([]);
+  expect(finished).toMatchObject({ runId: run.runId, status: "error", exitCode: 2 });
 });
 
 test("a cancelled replay finishes its step under way, skips the rest, and is interrupted", async () => {

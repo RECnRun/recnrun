@@ -9,6 +9,7 @@ import {
 import type { FlowStore, JournalWriter } from "@recnrun/persistence";
 import {
   PROTOCOL_SCHEMA_VERSION,
+  RUN_EXIT_CODES,
   type Event,
   type RunManifest,
   type RunSummary,
@@ -85,6 +86,53 @@ function cancellable(record: RunRecord): ReplayControl {
   return { session: () => session, changed: () => changed };
 }
 
+/** What a replay reported before it failed: its steps, and the status of each that finished. */
+interface Progress {
+  steps: string[];
+  finished: string[];
+}
+
+const COUNTED = ["passed", "failed", "indeterminate"] as const;
+
+function note(progress: Progress, event: Event): void {
+  if (event.category === "gap" || event.type !== "step.finished") return;
+  const status = event.payload["status"];
+  if (typeof status === "string") progress.finished.push(status);
+}
+
+/** The summary of a replay that failed outside its steps, blamed on its first step as the engine does. */
+function failedSummary(
+  deps: RunDeps,
+  manifest: RunManifest,
+  progress: Progress,
+  message: string,
+): RunSummary {
+  const total = progress.steps.length;
+  const tally = (status: string) => progress.finished.filter((each) => each === status).length;
+  const [passed, failed, indeterminate] = COUNTED.map(tally);
+  const [first] = progress.steps;
+  return {
+    schemaVersion: PROTOCOL_SCHEMA_VERSION,
+    runId: manifest.runId,
+    flowId: manifest.flowId,
+    status: "error",
+    exitCode: RUN_EXIT_CODES.error,
+    startedAt: manifest.startedAt,
+    endedAt: new Date(deps.now()).toISOString(),
+    counts: {
+      total,
+      pending: total - progress.finished.length,
+      running: 0,
+      passed: passed ?? 0,
+      failed: failed ?? 0,
+      blocked: 0,
+      cancelled: 0,
+      indeterminate: indeterminate ?? 0,
+    },
+    failures: first === undefined ? [] : [{ stepId: first, message }],
+  };
+}
+
 /** Interrupts every replay still running, for the service's shutdown. */
 export function cancelReplays(deps: RunDeps): void {
   for (const record of deps.runs.values()) record.cancel?.();
@@ -102,8 +150,10 @@ async function execute(
   deps.runs.set(runId, record);
   const control = cancellable(record);
   const opened: JournalWriter[] = [];
+  const progress: Progress = { steps: [], finished: [] };
   try {
     const flow = await store.getRevision(flowId, manifest.flowRevision);
+    progress.steps = flow.steps.map(({ id }) => id);
     const connection = await deps.browser.replayDriver(endpoint);
     try {
       const outcome = await replayFlow(connection.driver, flow, {
@@ -112,7 +162,10 @@ async function execute(
         secrets,
         run: { store: owned(store, deps.journals, opened), manifest },
         control,
-        observe: (event) => deps.hub.publish({ type: "run.step", runId, event }),
+        observe: (event) => {
+          note(progress, event);
+          deps.hub.publish({ type: "run.step", runId, event });
+        },
       });
       record.summary = outcome.summary;
       deps.hub.publish({ type: "run.finished", runId, summary: outcome.summary });
@@ -120,8 +173,11 @@ async function execute(
       await connection.close();
     }
   } catch (error) {
-    record.error = error instanceof Error ? error.message : String(error);
+    record.error = (error instanceof Error ? error.message : String(error)) || "The replay failed.";
     deps.logger.error("run.failed", { runId, message: record.error });
+    // Subscribers wait for run.finished, so a replay that failed still ends with one.
+    const summary = failedSummary(deps, manifest, progress, record.error);
+    deps.hub.publish({ type: "run.finished", runId, summary });
   } finally {
     delete record.cancel;
     // A replay that failed before finishing left its journal open.
