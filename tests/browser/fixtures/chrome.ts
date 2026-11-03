@@ -36,23 +36,47 @@ export interface ChromeLaunchOptions {
   silentDebugger?: boolean;
 }
 
-export interface LaunchedChrome {
-  browser: Browser;
-  /** A CDP session on the browser target, for `Browser.*` and `Target.*` commands. */
-  cdp: CDPSession;
+/** The strict lab (E8): no `--remote-debugging-*` flag, so no CDP client can exist at all. */
+export interface StrictLaunchOptions extends Omit<ChromeLaunchOptions, "pipe"> {
+  cdp: false;
+}
+
+interface ChromeProcess {
   /** Output of `<executable> --version`, for example `Google Chrome 156.0.8078.79`. */
   version: string;
   executable: string;
   userDataDir: string;
-  wsEndpoint: string;
   pid: number;
+  /** The exact argument list Chrome was started with. */
+  flags: readonly string[];
+  close(): Promise<void>;
+}
+
+export interface LaunchedChrome extends ChromeProcess {
+  strict?: false;
+  browser: Browser;
+  /** A CDP session on the browser target, for `Browser.*` and `Target.*` commands. */
+  cdp: CDPSession;
+  wsEndpoint: string;
   /** The `--remote-debugging-pipe` connection, when launched with `pipe: true`. */
   pipe?: CdpClient;
-  close(): Promise<void>;
+}
+
+/** Chrome launched with `cdp: false`: the types leave no CDP handle to use by mistake. */
+export interface StrictChrome extends ChromeProcess {
+  strict: true;
+  browser?: never;
+  cdp?: never;
+  wsEndpoint?: never;
+  pipe?: never;
+  /** Whether the process is gone, and what it printed on stderr, for a loader's failure message. */
+  exited(): boolean;
+  diagnostics(): string;
 }
 
 interface WatchedProcess {
   child: ChildProcess;
+  args: readonly string[];
   exited: () => boolean;
   diagnostics: () => string;
 }
@@ -93,8 +117,10 @@ export function chromeFlags(
   userDataDir: string,
   extra: readonly string[] = [],
   silentDebugger = true,
+  cdp = true,
 ): string[] {
-  const flags = [`--user-data-dir=${userDataDir}`, "--remote-debugging-port=0", "--no-first-run"];
+  const port = cdp ? ["--remote-debugging-port=0"] : [];
+  const flags = [`--user-data-dir=${userDataDir}`, ...port, "--no-first-run"];
   // Hides the "started debugging" infobar; it grants no capability (PLAN.md decision 5).
   if (silentDebugger) flags.push("--silent-debugger-extension-api");
   // Chrome runs as root in the test container, where its sandbox cannot start.
@@ -106,9 +132,8 @@ function watch(binary: string, flags: string[], pipe: boolean): WatchedProcess {
   const stdio: StdioOptions = pipe
     ? ["ignore", "ignore", "pipe", "pipe", "pipe"]
     : ["ignore", "ignore", "pipe"];
-  const child: ChildProcess = spawn(binary, pipe ? ["--remote-debugging-pipe", ...flags] : flags, {
-    stdio,
-  });
+  const args = pipe ? ["--remote-debugging-pipe", ...flags] : flags;
+  const child: ChildProcess = spawn(binary, args, { stdio });
   let stderr = "";
   let failure = "";
   child.stderr?.on("data", (data) => {
@@ -119,6 +144,7 @@ function watch(binary: string, flags: string[], pipe: boolean): WatchedProcess {
   });
   return {
     child,
+    args,
     exited: () => failure !== "" || child.exitCode !== null || child.signalCode !== null,
     diagnostics: () => [failure, stderr].filter(Boolean).join("\n"),
   };
@@ -162,7 +188,14 @@ async function stop(chrome: WatchedProcess): Promise<void> {
   await exited;
 }
 
-export async function launchChrome(options: ChromeLaunchOptions = {}): Promise<LaunchedChrome> {
+interface Started {
+  chrome: WatchedProcess;
+  base: Omit<ChromeProcess, "close">;
+  /** Stops Chrome and deletes a profile the launcher created. */
+  stopAndClean: () => Promise<void>;
+}
+
+async function start(options: ChromeLaunchOptions, cdp: boolean): Promise<Started> {
   requireDisplay();
   const executable = options.executable ?? resolveChromePath();
   const run = promisify(execFile);
@@ -170,8 +203,44 @@ export async function launchChrome(options: ChromeLaunchOptions = {}): Promise<L
   const userDataDir = options.userDataDir ?? (await mkdtemp(join(tmpdir(), "recnrun-chrome-")));
   // The previous launch's port file would be read before this Chrome writes its own.
   await rm(join(userDataDir, "DevToolsActivePort"), { force: true });
-  const flags = chromeFlags(userDataDir, options.args, options.silentDebugger);
+  const flags = chromeFlags(userDataDir, options.args, options.silentDebugger, cdp);
   const chrome = watch(executable, flags, options.pipe === true);
+  const stopAndClean = async (): Promise<void> => {
+    await stop(chrome);
+    if (options.userDataDir !== undefined) return;
+    // Chrome's helper processes can still hold files for a moment after the browser exits.
+    await rm(userDataDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+  };
+  const pid = chrome.child.pid ?? 0;
+  const base = { version: version.trim(), executable, userDataDir, pid, flags: chrome.args };
+  return { chrome, base, stopAndClean };
+}
+
+/** Chrome with no CDP client; whoever launches it confirms it through the extension under test. */
+async function launchStrict(options: StrictLaunchOptions): Promise<StrictChrome> {
+  const { chrome, base, stopAndClean } = await start(options, false);
+  return {
+    ...base,
+    strict: true,
+    exited: chrome.exited,
+    diagnostics: chrome.diagnostics,
+    close: stopAndClean,
+  };
+}
+
+function isStrict(
+  options: ChromeLaunchOptions | StrictLaunchOptions,
+): options is StrictLaunchOptions {
+  return "cdp" in options && options.cdp === false;
+}
+
+export async function launchChrome(options: StrictLaunchOptions): Promise<StrictChrome>;
+export async function launchChrome(options?: ChromeLaunchOptions): Promise<LaunchedChrome>;
+export async function launchChrome(
+  options: ChromeLaunchOptions | StrictLaunchOptions = {},
+): Promise<LaunchedChrome | StrictChrome> {
+  if (isStrict(options)) return launchStrict(options);
+  const { chrome, base, stopAndClean } = await start(options, true);
   const pipe = options.pipe
     ? connectPipe(chrome.child.stdio[3] as Writable, chrome.child.stdio[4] as Readable)
     : undefined;
@@ -179,28 +248,14 @@ export async function launchChrome(options: ChromeLaunchOptions = {}): Promise<L
   const close = async (): Promise<void> => {
     pipe?.close();
     await browser?.close().catch(() => undefined);
-    await stop(chrome);
-    if (options.userDataDir !== undefined) return;
-    // Chrome's helper processes can still hold files for a moment after the browser exits.
-    await rm(userDataDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+    await stopAndClean();
   };
   try {
-    const activePort = await waitForActivePort(join(userDataDir, "DevToolsActivePort"), chrome);
-    const wsEndpoint = endpointFrom(activePort);
+    const port = join(base.userDataDir, "DevToolsActivePort");
+    const wsEndpoint = endpointFrom(await waitForActivePort(port, chrome));
     browser = await chromium.connectOverCDP(wsEndpoint);
     const cdp = await browser.newBrowserCDPSession();
-    const pid = chrome.child.pid ?? 0;
-    return {
-      browser,
-      cdp,
-      version: version.trim(),
-      executable,
-      userDataDir,
-      wsEndpoint,
-      pid,
-      ...(pipe ? { pipe } : {}),
-      close,
-    };
+    return { ...base, browser, cdp, wsEndpoint, ...(pipe ? { pipe } : {}), close };
   } catch (error) {
     await close();
     throw error;
