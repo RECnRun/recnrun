@@ -91,6 +91,8 @@ await test("forwards arguments literally and runs the current workspace in an is
   assert.ok(create.includes("--init"));
   assert.ok(create.includes("--shm-size=2g"));
   assert.ok(create.includes(`RECNRUN_RUN_ID=${basename(result.artifacts)}`));
+  // The managed-policy install writes /etc only when this marker says it runs in the container.
+  assert.ok(create.includes("RECNRUN_TEST_CONTAINER=1"));
   assert.ok(
     result.calls.some(
       ([command, source]) =>

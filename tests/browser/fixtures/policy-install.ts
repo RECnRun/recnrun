@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import type { Server } from "node:http";
@@ -25,17 +26,63 @@ export interface PolicyInstall {
   requests: readonly string[];
   /** Writes the managed policy that force-installs the CRX. */
   writePolicy(): Promise<void>;
-  /** Removes the policy file and stops the update server. */
+  /** Removes the policy file this install wrote, if unchanged, and stops the update server. */
   cleanup(): Promise<void>;
 }
 
-function policyUnavailability(): string | undefined {
-  if (process.platform !== "linux") {
-    return `Google Chrome reads ${POLICY_FILE} on Linux only; this host is ${process.platform}`;
+/** What the guard reads about where it runs; tests pass their own. */
+export interface PolicyHost {
+  platform: NodeJS.Platform;
+  uid: number | undefined;
+  env: NodeJS.ProcessEnv;
+  dockerenv: boolean;
+}
+
+const currentHost = (): PolicyHost => ({
+  platform: process.platform,
+  uid: process.getuid?.(),
+  env: process.env,
+  dockerenv: existsSync("/.dockerenv"),
+});
+
+export function policyUnavailability(host: PolicyHost = currentHost()): string | undefined {
+  if (host.platform !== "linux") {
+    return `Google Chrome reads ${POLICY_FILE} on Linux only; this host is ${host.platform}`;
   }
-  const uid = process.getuid?.();
+  // A root `:local` run on a Linux host would otherwise rewrite that machine's own Chrome policy.
+  if (host.env.RECNRUN_TEST_CONTAINER !== "1" || !host.dockerenv) {
+    return `writing ${POLICY_FILE} happens only inside the test container (RECNRUN_TEST_CONTAINER=1 and /.dockerenv)`;
+  }
+  const { uid } = host;
   if (uid !== 0) return `writing ${POLICY_FILE} needs root; the test runs as uid ${String(uid)}`;
   return undefined;
+}
+
+/** A policy file this invocation created. */
+export interface OwnedPolicy {
+  /** Deletes the file only while it still holds what this invocation wrote. */
+  remove(): Promise<void>;
+}
+
+/** Creates `file` exclusively, so a policy someone else wrote is never overwritten. */
+export async function writeOwnedPolicy(file: string, content: string): Promise<OwnedPolicy> {
+  await mkdir(join(file, ".."), { recursive: true });
+  try {
+    await writeFile(file, content, { flag: "wx" });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+    throw new Error(
+      `${file} already exists; refusing to overwrite a policy this run did not write.`,
+    );
+  }
+  const remove = async (): Promise<void> => {
+    const now = await readFile(file, "utf8").catch(() => undefined);
+    if (now === undefined) return;
+    if (now !== content)
+      throw new Error(`${file} changed; refusing to delete a policy this run did not write.`);
+    await rm(file);
+  };
+  return { remove };
 }
 
 function updateManifest(id: string, version: string, codebase: string): string {
@@ -73,14 +120,20 @@ export async function preparePolicyInstall(path: string): Promise<PolicyInstall>
   const requests: string[] = [];
   const server = await serveUpdates(packed, requests);
   const { port } = server.address() as AddressInfo;
+  let owned: OwnedPolicy | undefined;
   const writePolicy = async (): Promise<void> => {
     const forcelist = [`${packed.id};http://127.0.0.1:${port}/updates.xml`];
-    await mkdir(join(POLICY_FILE, ".."), { recursive: true });
-    await writeFile(POLICY_FILE, JSON.stringify({ ExtensionInstallForcelist: forcelist }));
+    owned = await writeOwnedPolicy(
+      POLICY_FILE,
+      JSON.stringify({ ExtensionInstallForcelist: forcelist }),
+    );
   };
   const cleanup = async (): Promise<void> => {
-    await rm(POLICY_FILE, { force: true });
-    await new Promise((resolve) => server.close(resolve));
+    try {
+      await owned?.remove();
+    } finally {
+      await new Promise((resolve) => server.close(resolve));
+    }
   };
   return { id: packed.id, version: packed.version, requests, writePolicy, cleanup };
 }

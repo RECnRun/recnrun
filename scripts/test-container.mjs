@@ -100,6 +100,8 @@ function containerEnvironment() {
   if (task === "verify:local" && process.env.RECNRUN_EXPERIMENT_SAMPLES === undefined) {
     environment.push("--env", "RECNRUN_EXPERIMENT_SAMPLES=smoke");
   }
+  // Fixtures that write system files (the managed policy) require this marker of the container.
+  environment.push("--env", "RECNRUN_TEST_CONTAINER=1");
   // Experiments name their evidence directory after the run (tests/experiments/verdicts.ts).
   environment.push("--env", `RECNRUN_RUN_ID=${runId}`);
   return environment;
