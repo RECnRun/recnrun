@@ -103,7 +103,12 @@ export async function fakeSession(onOpen: OnOpen = announceToken) {
       await writeFile(join(root, "Default", "Preferences"), preferences);
       const where = downloads ?? defaultDownloads;
       const fake = { presence: freshPresence(), downloads: where } as FakeProfile;
-      fake.profile = { name, root, installed: fakeInstalled(() => fake) };
+      fake.profile = {
+        name,
+        root,
+        profileDirectory: "Default",
+        installed: fakeInstalled(() => fake),
+      };
       fakes.set(fake.profile, fake);
       await placePresence(where, fake.presence);
       return fake.profile;

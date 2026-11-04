@@ -1,5 +1,12 @@
 import { describe, expect, test } from "vite-plus/test";
-import { chainProblems, chainSeen, labelled, triedOf } from "./e8-chain.ts";
+import {
+  bindingProblems,
+  bindingsOf,
+  chainProblems,
+  chainSeen,
+  labelled,
+  triedOf,
+} from "./e8-chain.ts";
 import type { ChainExpected, ChainObserved } from "./e8-chain.ts";
 
 const labels = new Map([
@@ -78,5 +85,61 @@ describe("E8 judgement", () => {
     expect(chainProblems(seen, expected)).toEqual([]);
     const short = { ...seen, chain: { ...seen.chain, tried: ["<OS default>"] } };
     expect(chainProblems(short, expected)[0]).toContain("tried candidates");
+  });
+});
+
+describe("E8 bindings", () => {
+  const names = new Map([["11111111-1111-4111-8111-111111111111", "P"]]);
+  const lines = [
+    "11111111-1111-4111-8111-111111111111\t/r/custom\tDefault\t/h/Downloads\tdistinct",
+    "-\t/r/custom\tProfile 2\t/h/Downloads\tshared",
+    "-\t/elsewhere\tProfile 3\t-\tunbound",
+  ];
+
+  test("reads distinct, shared, and unbound lines with labelled folders", () => {
+    expect(bindingsOf(`${lines.join("\n")}\n`, labels, names)).toEqual([
+      {
+        profile: "P",
+        root: "<custom folder>",
+        profileDirectory: "Default",
+        downloadsRoot: "<OS default>",
+        state: "distinct",
+      },
+      {
+        profile: null,
+        root: "<custom folder>",
+        profileDirectory: "Profile 2",
+        downloadsRoot: "<OS default>",
+        state: "shared",
+      },
+      {
+        profile: null,
+        root: "<another folder>",
+        profileDirectory: "Profile 3",
+        downloadsRoot: null,
+        state: "unbound",
+      },
+    ]);
+  });
+
+  test("keeps an id the harness does not know and reads no lines from empty output", () => {
+    const stranger =
+      "22222222-2222-4222-8222-222222222222\t/r/custom\tDefault\t/h/Downloads\tdistinct";
+    expect(bindingsOf(stranger, labels, names)[0]?.profile).toBe(
+      "22222222-2222-4222-8222-222222222222",
+    );
+    expect(bindingsOf("", labels, names)).toEqual([]);
+  });
+
+  test("a line of another shape is an error, not a binding", () => {
+    expect(() => bindingsOf("a\tb\tc", labels, names)).toThrow("expected 5");
+    expect(() => bindingsOf("-\t/r\tDefault\t-\tmaybe", labels, names)).toThrow("maybe");
+  });
+
+  test("names the difference between the bindings and the expected ones", () => {
+    const [first] = bindingsOf(lines[0] ?? "", labels, names);
+    if (!first) throw new Error("no binding");
+    expect(bindingProblems([first], [first])).toEqual([]);
+    expect(bindingProblems([], [first])[0]).toContain("bindings was []");
   });
 });

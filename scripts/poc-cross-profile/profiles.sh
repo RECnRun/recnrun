@@ -136,7 +136,8 @@ profiles_in_root() {
     [ "$name" = Default ] || printf '%s\n' "$name"
   done
 }
-# Packed: a version folder with a manifest. Unpacked: the id is a key of a preferences file.
+# Packed: a version folder with a manifest. Unpacked: the id is a key of a preferences file with
+# content; Chrome leaves an empty entry (`"id":{}`) behind when the extension is uninstalled.
 extension_in_profile() {
   [ "$#" -eq 3 ] || return 64
   is_directory "$1" && is_profile_directory "$2" && is_extension_id "$3" || return 64
@@ -144,7 +145,7 @@ extension_in_profile() {
     if is_plain_file "$manifest"; then printf 'packed\n'; return 0; fi
   done
   for file in "$1/$2/Preferences" "$1/$2/Secure Preferences"; do
-    if is_plain_file "$file" && grep -F -q -e "\"$3\":{" "$file"; then
+    if is_plain_file "$file" && grep -q -e "\"$3\":{[^}]" "$file"; then
       printf 'unpacked\n'
       return 0
     fi

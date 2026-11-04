@@ -24,6 +24,8 @@ const POLL_MS = 100;
 export interface E4Profile {
   name: string;
   root: string;
+  /** The profile's folder name in the root: `Default`, or the name Chrome gives a secondary one. */
+  profileDirectory: string;
   installed: LoadedExtension;
 }
 
@@ -31,6 +33,14 @@ interface OpenResult {
   code: number | null;
   /** True when it had to be stopped: it did not hand its URL to the running Chrome and exit. */
   stopped: boolean;
+}
+
+/** Where and what to launch: an existing root, a profile folder in it, or a build other than poc-d0. */
+export interface LaunchOptions {
+  root?: string;
+  profileDirectory?: string;
+  /** A folder holding a copy of the build, loaded instead of `extensionPath("poc-d0")`. */
+  build?: string;
 }
 
 /** One sample's profiles and folders; `dispose` stops what it launched and removes what it made. */
@@ -42,7 +52,7 @@ export interface E4Session {
   /** A fresh folder outside the default, for a launcher-created or a custom Downloads folder. */
   folder(name: string): Promise<string>;
   /** poc-d0 on a fresh root whose Chrome downloads to `downloads`, or to the default when undefined. */
-  launch(name: string, downloads?: string): Promise<E4Profile>;
+  launch(name: string, downloads?: string, options?: LaunchOptions): Promise<E4Profile>;
   /** The launcher's opening: Chrome on the profile's root with `url`, forwarded to the running one. */
   open(profile: E4Profile, url: string): Promise<OpenResult>;
   /** Stops one profile's Chrome, as its owner quitting it. */
@@ -56,7 +66,7 @@ export interface E4Session {
 export type SessionPlatform = Pick<E4Session, "defaultDownloads" | "realDefault"> & {
   makeFolder(name: string): Promise<string>;
   removeFolder(path: string): Promise<void>;
-  launch(root: string): Promise<LaunchedChrome>;
+  launch(root: string, args?: readonly string[]): Promise<LaunchedChrome>;
   binary: string;
   /** Flags of the opening besides `--user-data-dir` and the URL. */
   openArgs: readonly string[];
@@ -87,11 +97,14 @@ export async function createSession(platform: SessionPlatform): Promise<E4Sessio
     realDefault: platform.realDefault,
     folder,
     record,
-    launch: async (name, downloads) => {
-      const root = await folder(`profile-${name}`);
+    launch: async (name, downloads, options = {}) => {
+      const { profileDirectory = "Default", build } = options;
+      const root = options.root ?? (await folder(`profile-${name}`));
       const fallback = platform.realDefault ? undefined : platform.defaultDownloads;
-      await writeDownloadsPreference(root, downloads ?? fallback);
-      const profile = { name, root, installed: await installPoc(await platform.launch(root)) };
+      await writeDownloadsPreference(root, downloads ?? fallback, undefined, profileDirectory);
+      const chrome = await platform.launch(root, profileArgs(profileDirectory));
+      const installed = await installPoc(chrome, build ?? extensionPath("poc-d0"));
+      const profile = { name, root, profileDirectory, installed };
       running.add(profile);
       return profile;
     },
@@ -106,17 +119,18 @@ export async function createSession(platform: SessionPlatform): Promise<E4Sessio
   };
 }
 
+// Chrome opens the root's last used profile without it, which is not Default after a secondary ran.
+const profileArgs = (directory: string) => [`--profile-directory=${directory}`];
+
 export const bootstrapUrl = (token: string) =>
   `chrome-extension://${POC_EXTENSION_ID}/bootstrap.html#token=${token}`;
 
 /** Installs poc-d0 after giving Chrome its own download behavior back, so the first presence is Chrome's. */
-async function installPoc(chrome: LaunchedChrome): Promise<LoadedExtension> {
+async function installPoc(chrome: LaunchedChrome, path: string): Promise<LoadedExtension> {
   try {
     // connectOverCDP routes every download to its own folder; Chrome's own must take the first write.
     await chrome.cdp.send("Browser.setDownloadBehavior", { behavior: "default" });
-    const { id } = await chrome.cdp.send("Extensions.loadUnpacked", {
-      path: extensionPath("poc-d0"),
-    });
+    const { id } = await chrome.cdp.send("Extensions.loadUnpacked", { path });
     if (id !== POC_EXTENSION_ID)
       throw new Error(`poc-d0 installed as ${id}, not ${POC_EXTENSION_ID}`);
     return await attachExtension(chrome, id);

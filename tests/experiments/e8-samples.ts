@@ -34,7 +34,7 @@ export const E8_CELLS = {
 } as const;
 export type E8Hypothesis = keyof typeof E8_CELLS;
 
-async function e8Cell(hypothesis: E8Hypothesis, target: VerdictTarget): Promise<Cell> {
+async function e8Cell(hypothesis: string, topology: string, target: VerdictTarget): Promise<Cell> {
   return {
     experiment: "E8",
     hypothesis,
@@ -44,21 +44,28 @@ async function e8Cell(hypothesis: E8Hypothesis, target: VerdictTarget): Promise<
     label: "diagnostic",
     externalClient: true,
     variant: "poc-d0",
-    topology: E8_CELLS[hypothesis],
+    topology,
     debugger: "none",
   };
 }
 
 /** Records one E8 verdict through outcome.ts, in the target's verdicts folder. */
-export async function recordE8(
-  hypothesis: E8Hypothesis,
+export async function recordCell(
+  hypothesis: string,
+  topology: string,
   target: VerdictTarget,
   take: () => Promise<Sample>,
 ) {
   const directory = target.directory?.();
   const options = directory === undefined ? {} : { directory };
-  return recordHypothesis(await e8Cell(hypothesis, target), take, options);
+  return recordHypothesis(await e8Cell(hypothesis, topology, target), take, options);
 }
+
+export const recordE8 = (
+  hypothesis: E8Hypothesis,
+  target: VerdictTarget,
+  take: () => Promise<Sample>,
+) => recordCell(hypothesis, E8_CELLS[hypothesis], target, take);
 
 /** A HOME for the chain: a fresh folder, or the lab's own home so Chrome's real default is under it. */
 async function homeOf(session: E4Session, labels: Labels, realDefault: boolean) {

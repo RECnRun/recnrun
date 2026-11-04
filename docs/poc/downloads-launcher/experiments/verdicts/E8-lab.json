@@ -23,7 +23,7 @@
           "record": [],
           "find": []
         },
-        "chainMs": 8
+        "chainMs": 9
       },
       {
         "chain": {
@@ -37,7 +37,7 @@
           "record": [],
           "find": []
         },
-        "chainMs": 8
+        "chainMs": 9
       },
       {
         "chain": {
@@ -51,7 +51,7 @@
           "record": [],
           "find": []
         },
-        "chainMs": 10
+        "chainMs": 9
       }
     ],
     "gestures": 0,
@@ -111,7 +111,7 @@
           "record": [],
           "find": ["<OS default>"]
         },
-        "chainMs": 4
+        "chainMs": 5
       }
     ],
     "gestures": 0,
@@ -203,7 +203,7 @@
           "record": [],
           "find": ["<folder under home>"]
         },
-        "chainMs": 4
+        "chainMs": 5
       },
       {
         "chain": {
@@ -250,10 +250,6 @@
     "variant": "poc-d0",
     "topology": "one profile on a folder whose presence carries another boot",
     "debugger": "none",
-    "verdict": "pass",
-    "samples": 3,
-    "gestures": 0,
-    "steps": [],
     "observations": [
       {
         "chain": {
@@ -267,7 +263,7 @@
           "record": ["<record folder>"],
           "find": []
         },
-        "chainMs": 8
+        "chainMs": 10
       },
       {
         "chain": {
@@ -296,6 +292,733 @@
           "find": []
         },
         "chainMs": 9
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "E8",
+    "hypothesis": "E8.discovery.chromeClosed",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "two profiles of one root, both quit before the scan",
+    "debugger": "none",
+    "observations": [
+      {
+        "bindings": [
+          {
+            "profile": "A",
+            "root": "<default root>",
+            "profileDirectory": "Default",
+            "downloadsRoot": "<downloads of A>",
+            "state": "distinct"
+          },
+          {
+            "profile": "B",
+            "root": "<default root>",
+            "profileDirectory": "Profile 2",
+            "downloadsRoot": "<downloads of B>",
+            "state": "distinct"
+          }
+        ],
+        "visibleMs": 16,
+        "directories": ["Default", "Profile 2"]
+      },
+      {
+        "bindings": [
+          {
+            "profile": "A",
+            "root": "<default root>",
+            "profileDirectory": "Default",
+            "downloadsRoot": "<downloads of A>",
+            "state": "distinct"
+          },
+          {
+            "profile": "B",
+            "root": "<default root>",
+            "profileDirectory": "Profile 2",
+            "downloadsRoot": "<downloads of B>",
+            "state": "distinct"
+          }
+        ],
+        "visibleMs": 13,
+        "directories": ["Default", "Profile 2"]
+      },
+      {
+        "bindings": [
+          {
+            "profile": "A",
+            "root": "<default root>",
+            "profileDirectory": "Default",
+            "downloadsRoot": "<downloads of A>",
+            "state": "distinct"
+          },
+          {
+            "profile": "B",
+            "root": "<default root>",
+            "profileDirectory": "Profile 2",
+            "downloadsRoot": "<downloads of B>",
+            "state": "distinct"
+          }
+        ],
+        "visibleMs": 14,
+        "directories": ["Default", "Profile 2"]
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "E8",
+    "hypothesis": "E8.discovery.defaultOpen",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "Default open, a secondary profile of its root quit",
+    "debugger": "none",
+    "observations": [
+      {
+        "bindings": [
+          {
+            "profile": "A",
+            "root": "<default root>",
+            "profileDirectory": "Default",
+            "downloadsRoot": "<downloads of A>",
+            "state": "distinct"
+          },
+          {
+            "profile": "B",
+            "root": "<default root>",
+            "profileDirectory": "Profile 2",
+            "downloadsRoot": "<downloads of B>",
+            "state": "distinct"
+          }
+        ],
+        "visibleMs": 10153
+      },
+      {
+        "bindings": [
+          {
+            "profile": "A",
+            "root": "<default root>",
+            "profileDirectory": "Default",
+            "downloadsRoot": "<downloads of A>",
+            "state": "distinct"
+          },
+          {
+            "profile": "B",
+            "root": "<default root>",
+            "profileDirectory": "Profile 2",
+            "downloadsRoot": "<downloads of B>",
+            "state": "distinct"
+          }
+        ],
+        "visibleMs": 10134
+      },
+      {
+        "bindings": [
+          {
+            "profile": "A",
+            "root": "<default root>",
+            "profileDirectory": "Default",
+            "downloadsRoot": "<downloads of A>",
+            "state": "distinct"
+          },
+          {
+            "profile": "B",
+            "root": "<default root>",
+            "profileDirectory": "Profile 2",
+            "downloadsRoot": "<downloads of B>",
+            "state": "distinct"
+          }
+        ],
+        "visibleMs": 10116
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "E8",
+    "hypothesis": "E8.discovery.secondaryOpen",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "a secondary profile open, Default quit",
+    "debugger": "none",
+    "observations": [
+      {
+        "open": {
+          "bindings": [
+            {
+              "profile": "A",
+              "root": "<default root>",
+              "profileDirectory": "Default",
+              "downloadsRoot": "<downloads of A>",
+              "state": "distinct"
+            },
+            {
+              "profile": "B",
+              "root": "<default root>",
+              "profileDirectory": "Profile 2",
+              "downloadsRoot": "<downloads of B>",
+              "state": "distinct"
+            }
+          ],
+          "visibleMs": 10142
+        },
+        "afterRename": {
+          "bindings": [
+            {
+              "profile": "A",
+              "root": "<default root>",
+              "profileDirectory": "Default",
+              "downloadsRoot": "<downloads of A>",
+              "state": "distinct"
+            },
+            {
+              "profile": "B",
+              "root": "<default root>",
+              "profileDirectory": "Profile 2",
+              "downloadsRoot": "<downloads of B>",
+              "state": "distinct"
+            }
+          ],
+          "visibleMs": 16
+        },
+        "names": {
+          "directory": "Profile 2",
+          "chromeName": "Person 1",
+          "renamedTo": "Work display name"
+        }
+      },
+      {
+        "open": {
+          "bindings": [
+            {
+              "profile": "A",
+              "root": "<default root>",
+              "profileDirectory": "Default",
+              "downloadsRoot": "<downloads of A>",
+              "state": "distinct"
+            },
+            {
+              "profile": "B",
+              "root": "<default root>",
+              "profileDirectory": "Profile 2",
+              "downloadsRoot": "<downloads of B>",
+              "state": "distinct"
+            }
+          ],
+          "visibleMs": 10134
+        },
+        "afterRename": {
+          "bindings": [
+            {
+              "profile": "A",
+              "root": "<default root>",
+              "profileDirectory": "Default",
+              "downloadsRoot": "<downloads of A>",
+              "state": "distinct"
+            },
+            {
+              "profile": "B",
+              "root": "<default root>",
+              "profileDirectory": "Profile 2",
+              "downloadsRoot": "<downloads of B>",
+              "state": "distinct"
+            }
+          ],
+          "visibleMs": 15
+        },
+        "names": {
+          "directory": "Profile 2",
+          "chromeName": "Person 1",
+          "renamedTo": "Work display name"
+        }
+      },
+      {
+        "open": {
+          "bindings": [
+            {
+              "profile": "A",
+              "root": "<default root>",
+              "profileDirectory": "Default",
+              "downloadsRoot": "<downloads of A>",
+              "state": "distinct"
+            },
+            {
+              "profile": "B",
+              "root": "<default root>",
+              "profileDirectory": "Profile 2",
+              "downloadsRoot": "<downloads of B>",
+              "state": "distinct"
+            }
+          ],
+          "visibleMs": 10164
+        },
+        "afterRename": {
+          "bindings": [
+            {
+              "profile": "A",
+              "root": "<default root>",
+              "profileDirectory": "Default",
+              "downloadsRoot": "<downloads of A>",
+              "state": "distinct"
+            },
+            {
+              "profile": "B",
+              "root": "<default root>",
+              "profileDirectory": "Profile 2",
+              "downloadsRoot": "<downloads of B>",
+              "state": "distinct"
+            }
+          ],
+          "visibleMs": 15
+        },
+        "names": {
+          "directory": "Profile 2",
+          "chromeName": "Person 1",
+          "renamedTo": "Work display name"
+        }
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "E8",
+    "hypothesis": "E8.discovery.severalRoots",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "the OS default root and a root only the record names",
+    "debugger": "none",
+    "observations": [
+      {
+        "bindings": [
+          {
+            "profile": "A",
+            "root": "<default root>",
+            "profileDirectory": "Default",
+            "downloadsRoot": "<downloads of A>",
+            "state": "distinct"
+          },
+          {
+            "profile": "B",
+            "root": "<recorded root>",
+            "profileDirectory": "Default",
+            "downloadsRoot": "<downloads of B>",
+            "state": "distinct"
+          }
+        ],
+        "visibleMs": 9641,
+        "roots": ["<default root>", "<recorded root>"]
+      },
+      {
+        "bindings": [
+          {
+            "profile": "A",
+            "root": "<default root>",
+            "profileDirectory": "Default",
+            "downloadsRoot": "<downloads of A>",
+            "state": "distinct"
+          },
+          {
+            "profile": "B",
+            "root": "<recorded root>",
+            "profileDirectory": "Default",
+            "downloadsRoot": "<downloads of B>",
+            "state": "distinct"
+          }
+        ],
+        "visibleMs": 9643,
+        "roots": ["<default root>", "<recorded root>"]
+      },
+      {
+        "bindings": [
+          {
+            "profile": "A",
+            "root": "<default root>",
+            "profileDirectory": "Default",
+            "downloadsRoot": "<downloads of A>",
+            "state": "distinct"
+          },
+          {
+            "profile": "B",
+            "root": "<recorded root>",
+            "profileDirectory": "Default",
+            "downloadsRoot": "<downloads of B>",
+            "state": "distinct"
+          }
+        ],
+        "visibleMs": 9625,
+        "roots": ["<default root>", "<recorded root>"]
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "E8",
+    "hypothesis": "E8.discovery.fixedId",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "the pinned id in two roots, a profile without the extension",
+    "debugger": "none",
+    "observations": [
+      {
+        "bindings": [
+          {
+            "profile": "A",
+            "root": "<default root>",
+            "profileDirectory": "Default",
+            "downloadsRoot": "<downloads of A>",
+            "state": "distinct"
+          },
+          {
+            "profile": "B",
+            "root": "<recorded root>",
+            "profileDirectory": "Default",
+            "downloadsRoot": "<downloads of B>",
+            "state": "distinct"
+          }
+        ],
+        "visibleMs": 16,
+        "has": {
+          "code": 0,
+          "printed": "unpacked"
+        },
+        "hasToo": {
+          "code": 0,
+          "printed": "unpacked"
+        },
+        "lacks": {
+          "code": 1,
+          "printed": ""
+        },
+        "sameId": true
+      },
+      {
+        "bindings": [
+          {
+            "profile": "A",
+            "root": "<default root>",
+            "profileDirectory": "Default",
+            "downloadsRoot": "<downloads of A>",
+            "state": "distinct"
+          },
+          {
+            "profile": "B",
+            "root": "<recorded root>",
+            "profileDirectory": "Default",
+            "downloadsRoot": "<downloads of B>",
+            "state": "distinct"
+          }
+        ],
+        "visibleMs": 15,
+        "has": {
+          "code": 0,
+          "printed": "unpacked"
+        },
+        "hasToo": {
+          "code": 0,
+          "printed": "unpacked"
+        },
+        "lacks": {
+          "code": 1,
+          "printed": ""
+        },
+        "sameId": true
+      },
+      {
+        "bindings": [
+          {
+            "profile": "A",
+            "root": "<default root>",
+            "profileDirectory": "Default",
+            "downloadsRoot": "<downloads of A>",
+            "state": "distinct"
+          },
+          {
+            "profile": "B",
+            "root": "<recorded root>",
+            "profileDirectory": "Default",
+            "downloadsRoot": "<downloads of B>",
+            "state": "distinct"
+          }
+        ],
+        "visibleMs": 15,
+        "has": {
+          "code": 0,
+          "printed": "unpacked"
+        },
+        "hasToo": {
+          "code": 0,
+          "printed": "unpacked"
+        },
+        "lacks": {
+          "code": 1,
+          "printed": ""
+        },
+        "sameId": true
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "E8",
+    "hypothesis": "E8.discovery.unpackedPaths",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "the build loaded from two different folders in two roots",
+    "debugger": "none",
+    "observations": [
+      {
+        "bindings": [
+          {
+            "profile": "A",
+            "root": "<default root>",
+            "profileDirectory": "Default",
+            "downloadsRoot": "<downloads of A>",
+            "state": "distinct"
+          },
+          {
+            "profile": "B",
+            "root": "<recorded root>",
+            "profileDirectory": "Default",
+            "downloadsRoot": "<downloads of B>",
+            "state": "distinct"
+          }
+        ],
+        "visibleMs": 16,
+        "sameId": true,
+        "distinctPaths": 3
+      },
+      {
+        "bindings": [
+          {
+            "profile": "A",
+            "root": "<default root>",
+            "profileDirectory": "Default",
+            "downloadsRoot": "<downloads of A>",
+            "state": "distinct"
+          },
+          {
+            "profile": "B",
+            "root": "<recorded root>",
+            "profileDirectory": "Default",
+            "downloadsRoot": "<downloads of B>",
+            "state": "distinct"
+          }
+        ],
+        "visibleMs": 21,
+        "sameId": true,
+        "distinctPaths": 3
+      },
+      {
+        "bindings": [
+          {
+            "profile": "A",
+            "root": "<default root>",
+            "profileDirectory": "Default",
+            "downloadsRoot": "<downloads of A>",
+            "state": "distinct"
+          },
+          {
+            "profile": "B",
+            "root": "<recorded root>",
+            "profileDirectory": "Default",
+            "downloadsRoot": "<downloads of B>",
+            "state": "distinct"
+          }
+        ],
+        "visibleMs": 35,
+        "sameId": true,
+        "distinctPaths": 3
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "E8",
+    "hypothesis": "E8.discovery.extensionUpdated",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "the build reloaded from a copy with a bumped version",
+    "debugger": "none",
+    "observations": [
+      {
+        "bindings": [
+          {
+            "profile": "A",
+            "root": "<default root>",
+            "profileDirectory": "Default",
+            "downloadsRoot": "<downloads of A>",
+            "state": "distinct"
+          }
+        ],
+        "visibleMs": 12,
+        "before": "0.1.0",
+        "after": "0.1.1",
+        "state": {
+          "code": 0,
+          "printed": "unpacked"
+        }
+      },
+      {
+        "bindings": [
+          {
+            "profile": "A",
+            "root": "<default root>",
+            "profileDirectory": "Default",
+            "downloadsRoot": "<downloads of A>",
+            "state": "distinct"
+          }
+        ],
+        "visibleMs": 10,
+        "before": "0.1.0",
+        "after": "0.1.1",
+        "state": {
+          "code": 0,
+          "printed": "unpacked"
+        }
+      },
+      {
+        "bindings": [
+          {
+            "profile": "A",
+            "root": "<default root>",
+            "profileDirectory": "Default",
+            "downloadsRoot": "<downloads of A>",
+            "state": "distinct"
+          }
+        ],
+        "visibleMs": 9,
+        "before": "0.1.0",
+        "after": "0.1.1",
+        "state": {
+          "code": 0,
+          "printed": "unpacked"
+        }
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "E8",
+    "hypothesis": "E8.discovery.extensionRemoved",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "the extension uninstalled from one of two profiles",
+    "debugger": "none",
+    "verdict": "pass",
+    "samples": 3,
+    "gestures": 0,
+    "steps": [],
+    "observations": [
+      {
+        "bindings": [
+          {
+            "profile": "B",
+            "root": "<recorded root>",
+            "profileDirectory": "Default",
+            "downloadsRoot": "<downloads of B>",
+            "state": "distinct"
+          }
+        ],
+        "visibleMs": 11,
+        "uninstall": "Error: Runtime.evaluate: no reply within 30000 ms",
+        "gone": {
+          "code": 1,
+          "printed": ""
+        },
+        "presenceLeft": true
+      },
+      {
+        "bindings": [
+          {
+            "profile": "B",
+            "root": "<recorded root>",
+            "profileDirectory": "Default",
+            "downloadsRoot": "<downloads of B>",
+            "state": "distinct"
+          }
+        ],
+        "visibleMs": 12,
+        "uninstall": "Error: Runtime.evaluate: no reply within 30000 ms",
+        "gone": {
+          "code": 1,
+          "printed": ""
+        },
+        "presenceLeft": true
+      },
+      {
+        "bindings": [
+          {
+            "profile": "B",
+            "root": "<recorded root>",
+            "profileDirectory": "Default",
+            "downloadsRoot": "<downloads of B>",
+            "state": "distinct"
+          }
+        ],
+        "visibleMs": 11,
+        "uninstall": "Error: Runtime.evaluate: no reply within 30000 ms",
+        "gone": {
+          "code": 1,
+          "printed": ""
+        },
+        "presenceLeft": true
       }
     ]
   }

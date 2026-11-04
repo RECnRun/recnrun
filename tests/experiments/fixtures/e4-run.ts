@@ -11,7 +11,7 @@ import {
   readRegistryIn,
   storedOf,
 } from "./e4-profiles.ts";
-import type { E4Environment, E4Profile, E4Session } from "./e4-profiles.ts";
+import type { E4Environment, E4Profile, E4Session, LaunchOptions } from "./e4-profiles.ts";
 
 /*
  * E4's launcher at work, for the samples in ../e4-samples.ts: it opens each profile's bootstrap page
@@ -55,8 +55,9 @@ export async function announced(
   session: E4Session,
   name: string,
   downloads?: string,
+  options?: LaunchOptions,
 ): Promise<Peer> {
-  const profile = await session.launch(name, downloads);
+  const profile = await session.launch(name, downloads, options);
   const where = downloads ?? session.defaultDownloads;
   const { presence } = await presenceOf(profile, where);
   if (!presence) throw new Error(`${name} wrote no presence in the folder its Chrome downloads to`);

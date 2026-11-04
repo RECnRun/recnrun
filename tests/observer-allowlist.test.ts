@@ -50,6 +50,7 @@ const ALLOWED_FLAGS: Record<string, string> = {
   "--no-sandbox": "Chrome runs as root in Docker",
   "--silent-debugger-extension-api": "hides the debugging infobar",
   "--enable-unsafe-extension-debugging": "Extensions.loadUnpacked",
+  "--profile-directory": "E8 opens a secondary profile of a root, as a person's Chrome does",
   "--version": "a version query, not a browser launch",
   "--no-default-browser-check": "no default-browser prompt on the host",
   "--use-mock-keychain": "the host never reads the owner's Chrome Safe Storage key",

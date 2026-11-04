@@ -80,3 +80,51 @@ export function chainProblems(seen: ChainObserved, expected: ChainExpected): str
     ...differs("find step", seen.steps.find, expected.steps.find),
   ];
 }
+
+/** One line of bind_profiles, with folders labelled and the profile id as the harness's name for it. */
+export interface Binding {
+  profile: string | null;
+  root: string;
+  profileDirectory: string;
+  downloadsRoot: string | null;
+  state: "distinct" | "shared" | "unbound";
+}
+
+const STATES = ["distinct", "shared", "unbound"] as const;
+
+function fieldsOf(line: string): [string, string, string, string, Binding["state"]] {
+  const fields = line.split("\t");
+  const [id, root, directory, downloads, state] = fields;
+  const state5 = STATES.find((each) => each === state);
+  if (fields.length !== 5) {
+    throw new Error(`bind_profiles printed ${fields.length} fields, expected 5: ${line}`);
+  }
+  if (state5 === undefined) throw new Error(`bind_profiles printed the state ${String(state)}`);
+  return [id ?? "", root ?? "", directory ?? "", downloads ?? "", state5];
+}
+
+/** Reads bind_profiles' tab-separated lines; a line of another shape is the harness's error. */
+export function bindingsOf(
+  stdout: string,
+  labels: Labels,
+  names: ReadonlyMap<string, string>,
+): Binding[] {
+  return stdout
+    .split("\n")
+    .filter((line) => line !== "")
+    .map((line) => {
+      const [id, root, profileDirectory, downloads, state] = fieldsOf(line);
+      return {
+        profile: id === "-" ? null : (names.get(id) ?? id),
+        root: labelOf(labels, root) ?? root,
+        profileDirectory,
+        downloadsRoot: labelOf(labels, downloads === "-" ? null : downloads),
+        state,
+      };
+    });
+}
+
+/** Problems of the bindings against the expected ones, in order. */
+export function bindingProblems(seen: readonly Binding[], expected: readonly Binding[]): string[] {
+  return differs("bindings", seen, expected);
+}

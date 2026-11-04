@@ -1,0 +1,14 @@
+{
+  "environment": "host",
+  "chrome": "Google Chrome 156.0.8078.80",
+  "product": "Chrome/156.0.8078.80",
+  "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36",
+  "installed": "156.0.8078.80",
+  "macos": {
+    "version": "27.0.1",
+    "build": "26A434"
+  },
+  "arch": "arm64",
+  "node": "v26.13.0",
+  "binary": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+}

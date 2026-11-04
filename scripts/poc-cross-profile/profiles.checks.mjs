@@ -164,7 +164,7 @@ for (const shell of shells) {
     assert.deepEqual(lines(result.out), ["Profile 1"]);
   });
 
-  await test(`${shell}: extension_in_profile tells packed, unpacked, absent, and a decoy`, (context) => {
+  await test(`${shell}: extension_in_profile tells packed, unpacked, absent, uninstalled, and a decoy`, (context) => {
     const { home, env } = lab(context);
     const root = join(home, "Chrome");
     const call = (name, id = EXTENSION) =>
@@ -177,19 +177,23 @@ for (const shell of shells) {
       "Secure Preferences": `{"extensions":{"settings":{"${EXTENSION}":{"path":"/x"}}}}`,
     });
     profile(root, "InPreferences", {
-      Preferences: `{"extensions":{"settings":{"${EXTENSION}":{}}}}`,
+      Preferences: `{"extensions":{"settings":{"${EXTENSION}":{"state":1}}}}`,
+    });
+    // Chrome leaves an empty settings entry behind when the extension is uninstalled (E8).
+    profile(root, "Uninstalled", {
+      Preferences: `{"extensions":{"settings":{"${EXTENSION}":{}}},"protection":{"macs":{"extensions":{"settings":{"${EXTENSION}":"ABCDEF"}}}}}`,
     });
     profile(root, "Absent");
     profile(root, "Decoy", {
       Preferences: "{}",
-      "Secure Preferences": `{"extensions":{"settings":{"${DECOY}":{},"x${EXTENSION}":{}}}}`,
+      "Secure Preferences": `{"extensions":{"settings":{"${DECOY}":{"path":"/x"},"x${EXTENSION}":{"path":"/x"}}}}`,
     });
     profile(root, "EmptyFolder");
     mkdirSync(join(root, "EmptyFolder/Extensions", EXTENSION, "1.0_0"), { recursive: true });
     assert.deepEqual([call("Packed").code, call("Packed").out], [0, "packed\n"]);
     assert.deepEqual([call("Unpacked").code, call("Unpacked").out], [0, "unpacked\n"]);
     assert.equal(call("InPreferences").out, "unpacked\n");
-    for (const name of ["Absent", "Decoy", "EmptyFolder", "Missing"])
+    for (const name of ["Absent", "Decoy", "EmptyFolder", "Missing", "Uninstalled"])
       assert.deepEqual([call(name).code, call(name).out], [1, ""], name);
     assert.equal(call("Decoy", DECOY).out, "unpacked\n");
   });

@@ -87,7 +87,7 @@ export function labEnvironmentOn(host: LabHost): E4Environment {
         realDefault: true,
         makeFolder: (name) => mkdtemp(join(tmpdir(), `recnrun-e4-${name}-`)),
         removeFolder: removeTree,
-        launch: (root) => launchForUnpacked({ userDataDir: root }),
+        launch: (root, args) => launchForUnpacked({ userDataDir: root, args }),
         binary: resolveChromePath(),
         // Chrome runs as root in the test container, where its sandbox cannot start.
         openArgs: ["--no-sandbox"],

@@ -131,11 +131,12 @@ export async function writeDownloadsPreference(
   root: string,
   downloads: string | undefined,
   fs: PreferenceFs = { mkdir, writeFile },
+  profileDirectory = "Default",
 ): Promise<void> {
   const folder = downloads ? { default_directory: downloads, directory_upgrade: true } : {};
   const preferences = { download: { prompt_for_download: false, ...folder } };
-  await fs.mkdir(join(root, "Default"), { recursive: true });
-  await fs.writeFile(join(root, "Default", "Preferences"), JSON.stringify(preferences));
+  await fs.mkdir(join(root, profileDirectory), { recursive: true });
+  await fs.writeFile(join(root, profileDirectory, "Preferences"), JSON.stringify(preferences));
 }
 
 /**
