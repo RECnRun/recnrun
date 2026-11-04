@@ -66,6 +66,9 @@ const dashboards = async () =>
 
 const contentOf = (url: string) => decodeURIComponent(url.slice(url.indexOf(",") + 1));
 
+// The first presence signs with a key made in fake IndexedDB; under a Docker run that outlasts 1 s.
+const settles = (check: () => unknown) => vi.waitFor(check, { timeout: 5_000 });
+
 beforeEach(() => {
   fakeBrowser.reset();
 });
@@ -81,7 +84,7 @@ describe("startPeers", () => {
 
     startPeers({ transport: "downloads", sign: signAs });
 
-    await vi.waitFor(() => expect(written).toHaveLength(1));
+    await settles(() => expect(written).toHaveLength(1));
     expect(written[0]).toMatchObject({
       filename: `RECnRun/poc/lab/peers/${ME}/presence.json`,
       saveAs: false,
@@ -100,7 +103,7 @@ describe("startPeers", () => {
   test("the Downloads variant starts pairing on its own once it learned its root, with no page open", async () => {
     const { link } = await background();
     startPeers({ transport: "downloads", sign: signAs });
-    await vi.waitFor(() =>
+    await settles(() =>
       expect(link.commands).toEqual([
         { type: "folder-watch", profileId: ME, displayName: "Laptop" },
       ]),
@@ -120,7 +123,7 @@ describe("startPeers", () => {
       answering(() => [{ id: 1, filename: renamed, state: "complete" }]),
     );
     const peers = startPeers({ transport: "downloads", sign: signAs });
-    await vi.waitFor(() =>
+    await settles(() =>
       expect(log).toHaveBeenCalledWith(
         "[RECnRun peer]",
         `presence: Chrome wrote "${renamed}", not RECnRun/poc/lab/peers/${ME}/presence.json`,
@@ -139,7 +142,7 @@ describe("startPeers", () => {
     await folderPairingRepository.write({ paused: [PEER] });
     startPeers({ transport: "downloads", sign: signAs });
     // The resume of a profile that waited before, then the start once the root is known.
-    await vi.waitFor(() => expect(link.commands).toHaveLength(2));
+    await settles(() => expect(link.commands).toHaveLength(2));
     expect(new Set(link.commands.map((each) => each.type))).toEqual(new Set(["folder-watch"]));
     expect(await folderPairingRepository.read()).toEqual({ paused: [PEER] });
   });
@@ -153,7 +156,7 @@ describe("startPeers", () => {
 
     await folderPairingRepository.write({});
     startPeers({ transport: "folder", sign: signAs });
-    await vi.waitFor(() =>
+    await settles(() =>
       expect(link.commands).toEqual([
         { type: "folder-watch", profileId: ME, displayName: "Laptop" },
       ]),
@@ -190,15 +193,15 @@ describe("the presence startPeers writes", () => {
     const { written } = await background();
     await fakeBrowser.storage.local.set({ pocNamespace: "e4-common" });
     startPeers({ transport: "downloads", sign: signAs });
-    await vi.waitFor(() => expect(written).toHaveLength(1));
+    await settles(() => expect(written).toHaveLength(1));
     startPeers({ transport: "downloads", sign: signAs });
-    await vi.waitFor(() => expect(written).toHaveLength(2));
+    await settles(() => expect(written).toHaveLength(2));
 
     const [first, again] = written.map((each) => registrationOf(each.url));
     expect(first?.namespace).toBe("e4-common");
     expect(again?.boot).toBe(first?.boot);
     expect(written[1]?.filename).toBe(`RECnRun/poc/e4-common/peers/${ME}/presence.json`);
-    await vi.waitFor(async () =>
+    await settles(async () =>
       expect(await fakeBrowser.storage.session.get("pocDownloadsRoot")).toEqual({
         pocDownloadsRoot: ROOT,
       }),
@@ -209,14 +212,14 @@ describe("the presence startPeers writes", () => {
     const { written } = await background();
     const token = "0f8b6a3e-2c1d-4e5f-9a7b-1c2d3e4f5a6b";
     startPeers({ transport: "downloads", sign: signAs });
-    await vi.waitFor(() => expect(written).toHaveLength(1));
+    await settles(() => expect(written).toHaveLength(1));
     await pocPresenceStore().adoptBoot(token);
     const page = { id: fakeBrowser.runtime.id, url: fakeBrowser.runtime.getURL("/bootstrap.html") };
     const replies: unknown[] = [];
     void fakeBrowser.runtime.onMessage.trigger({ type: "POC_PUBLISH_PRESENCE" }, page, (reply) =>
       replies.push(reply),
     );
-    await vi.waitFor(() => expect(replies).toEqual([{ ok: true }]));
+    await settles(() => expect(replies).toEqual([{ ok: true }]));
     expect(written.map((each) => registrationOf(each.url).boot)).toEqual([
       registrationOf(written[0]?.url ?? "").boot,
       token,
@@ -231,7 +234,7 @@ describe("the presence startPeers writes", () => {
     );
     startPeers({ transport: "downloads", sign: signAs });
     startPeers({ transport: "downloads", sign: signAs });
-    await vi.waitFor(() => {
+    await settles(() => {
       expect(log).toHaveBeenCalledWith("[RECnRun peer]", "presence: No certificate.");
       expect(log).toHaveBeenCalledWith(
         "[RECnRun peer]",
@@ -246,7 +249,7 @@ describe("the transport a page sees", () => {
   test("the Downloads variant tells its pages it pairs through Downloads once Chrome reported the root", async () => {
     await background();
     const peers = startPeers({ transport: "downloads", sign: signAs });
-    await vi.waitFor(async () =>
+    await settles(async () =>
       expect(await peers.request({ type: "status" })).toMatchObject({
         folder: "none",
         rendezvous: { kind: "downloads", available: true },
@@ -263,7 +266,7 @@ describe("a stored template", () => {
     await roleStores().role.write({ role: "template" });
     await folderPairingRepository.write({});
     const peers = startPeers({ transport: "downloads", sign: signAs });
-    await vi.waitFor(() => expect(log).toHaveBeenCalledWith("[RECnRun peer]", silent));
+    await settles(() => expect(log).toHaveBeenCalledWith("[RECnRun peer]", silent));
     const page = { id: fakeBrowser.runtime.id, url: fakeBrowser.runtime.getURL("/bootstrap.html") };
     const replies: unknown[] = [];
     void fakeBrowser.runtime.onMessage.trigger({ type: "POC_PUBLISH_PRESENCE" }, page, (reply) =>
@@ -284,7 +287,7 @@ describe("a stored template", () => {
     const { written } = await background();
     expect(await roleStores().role.read()).toBeNull();
     startPeers({ transport: "downloads", sign: signAs });
-    await vi.waitFor(() => expect(written).toHaveLength(1));
+    await settles(() => expect(written).toHaveLength(1));
   });
 
   test("a catalog sighting notes a profile no record knows for one renewal", async () => {
