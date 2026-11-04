@@ -17,9 +17,13 @@ const skip = available
     : "ShellCheck is not installed on this host (brew install shellcheck)";
 
 function shellcheck(files) {
-  return spawnSync("shellcheck", ["--shell=sh", "--severity=style", ...files], {
-    encoding: "utf8",
-  });
+  return spawnSync(
+    "shellcheck",
+    ["--shell=sh", "--severity=style", "--external-sources", "--source-path=SCRIPTDIR", ...files],
+    {
+      encoding: "utf8",
+    },
+  );
 }
 
 const launcherScripts = readdirSync(here)
