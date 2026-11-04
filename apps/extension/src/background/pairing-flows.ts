@@ -8,6 +8,7 @@ import type { Sign } from "@/background/greeting";
 import type { PeerChannel } from "@/background/peer-channel";
 import { createPins } from "@/p2p/pins";
 import type { PinSource, Pins } from "@/p2p/pins";
+import { answeredOffers } from "@/storage/answered-repository";
 import {
   authorizedPeersRepository,
   folderActedRepository,
@@ -81,6 +82,7 @@ export function createPairingFlows(
     pending: pendingOffersRepository,
     link: peerLinksRepository,
     acted: folderActedRepository,
+    answered: answeredOffers(),
     state: folderPairingRepository,
     pins: trust.pins,
     log,

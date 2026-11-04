@@ -61,6 +61,7 @@ const step = (me: string, seen: Seen, pending: { to: string } | null = null) =>
         }
       : {},
     acted: {},
+    answered: {},
     now: Date.now(),
   });
 

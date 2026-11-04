@@ -146,7 +146,7 @@ export const noPageSample = (environment: E5Environment) =>
     const workersUnattended = await listedNow(profiles);
     for (const profile of profiles) await group.attach(profile);
     const linkMs = await relinked(profiles, LINK_MS);
-    // Its record of the offers it answered ends with the browser, so the last one on disk may get a second answer.
+    // Its record of the offers it answered outlives the browser, so the last one on disk gets no second answer.
     const earlierAnswers = (await signalWrites(answerer)).filter(
       (each) => each.name.startsWith("answer-") && each.pairingId === earlier,
     ).length;
@@ -154,6 +154,7 @@ export const noPageSample = (environment: E5Environment) =>
       ...(offer ? [] : ["the unattended offerer wrote no new offer"]),
       ...(answer ? [] : ["the unattended answerer did not answer it"]),
       ...(linkMs === undefined ? ["the pair was not linked once attached"] : []),
+      ...(earlierAnswers <= 1 ? [] : [`the earlier offer was answered ${earlierAnswers} times`]),
     ];
     return judged(problems, {
       workersAfterIdle,
