@@ -1,7 +1,8 @@
 import { describe, expect, test, vi } from "vite-plus/test";
 import { ask, downloadMessages } from "@/diagnostics/poc-messages";
 import { buildReport } from "@/diagnostics/report";
-import { readBack } from "@/diagnostics/start";
+import { readBack, startDiagnostics } from "@/diagnostics/start";
+import { fakeBrowser } from "wxt/testing/fake-browser";
 
 const sources = (permissions: string[]) => ({
   extensionId: "abc",
@@ -74,5 +75,73 @@ describe("readBack", () => {
     const failing = async () => Promise.reject(new Error("Failed to fetch"));
     expect(await readBack("/tmp/a", failing)).toEqual({ ok: false, error: "Failed to fetch" });
     expect(await readBack("relative")).toMatchObject({ ok: false });
+  });
+});
+
+describe("startDiagnostics", () => {
+  type Poc = Record<string, (...args: never[]) => unknown>;
+  /** A page with the diagnostics element, or without one. */
+  const pageWith = (element: { textContent: string } | null) => {
+    const page = { document: { getElementById: vi.fn(() => element) } };
+    return page as unknown as Window & typeof globalThis & { __poc?: Poc };
+  };
+
+  test("installs window.__poc and writes the report the experiments read", async () => {
+    vi.spyOn(fakeBrowser.runtime, "getManifest").mockReturnValue({
+      manifest_version: 3,
+      name: "RECnRun",
+      version: "0.1.0",
+      permissions: ["storage", "downloads"],
+    });
+    vi.spyOn(fakeBrowser.extension, "isAllowedFileSchemeAccess").mockResolvedValue(true as never);
+    vi.spyOn(fakeBrowser.extension, "isAllowedIncognitoAccess").mockResolvedValue(false as never);
+    const pre = { textContent: "" };
+    const page = pageWith(pre);
+    vi.stubGlobal("window", page);
+
+    await startDiagnostics();
+    vi.unstubAllGlobals();
+
+    expect(Object.keys(page.__poc ?? {}).sort()).toEqual(
+      ["cancel", "probe", "readBack", "readFile", "readPublication", "search"].sort(),
+    );
+    expect(JSON.parse(pre.textContent)).toEqual({
+      extensionId: fakeBrowser.runtime.id,
+      mode: "test",
+      permissions: ["storage", "downloads"],
+      fileSchemeAccess: true,
+      incognitoAccess: false,
+      debuggerDeclared: false,
+    });
+  });
+
+  test("reads a publication through the tolerant reader; a failed read counts as absent", async () => {
+    vi.spyOn(fakeBrowser.extension, "isAllowedFileSchemeAccess").mockResolvedValue(false as never);
+    vi.spyOn(fakeBrowser.extension, "isAllowedIncognitoAccess").mockResolvedValue(false as never);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => Promise.reject(new TypeError("Failed to fetch"))),
+    );
+    const page = pageWith(null);
+
+    await startDiagnostics(page);
+
+    const readPublication = page.__poc?.readPublication as (
+      path: string,
+      previous: undefined,
+    ) => Promise<unknown>;
+    expect(await readPublication("/tmp/none.json", undefined)).toEqual({
+      publication: undefined,
+      reason: "absent",
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("")),
+    );
+    expect(await readPublication("/tmp/empty.json", undefined)).toEqual({
+      publication: undefined,
+      reason: "empty",
+    });
+    vi.unstubAllGlobals();
   });
 });
