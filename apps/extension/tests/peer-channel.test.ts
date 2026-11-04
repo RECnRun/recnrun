@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, test, vi } from "vite-plus/test";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vite-plus/test";
+import { fakeBrowser } from "wxt/testing/fake-browser";
 import { NOT_CONNECTED, createPeerChannel } from "@/background/peer-channel";
 import type { LinkCommand } from "@/messaging/peer-messages";
 import { peerMessage } from "@/p2p/protocol";
@@ -52,6 +53,11 @@ function authorizedPeer(profileId: string): AuthorizedPeer {
 
 const reply = (requestId: string, from = PEER) =>
   JSON.stringify(peerMessage("TABS_SNAPSHOT", { from, to: ME }, { requestId, tabs: [] }));
+
+// The channel's default hierarchy reads this profile's storage, which `isolate: false` shares across files.
+beforeEach(() => {
+  fakeBrowser.reset();
+});
 
 afterEach(() => {
   vi.useRealTimers();
