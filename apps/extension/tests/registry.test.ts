@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import * as v from "valibot";
 import { describe, expect, test } from "vite-plus/test";
 import { presencePath, registryPath } from "@/p2p/downloads-rendezvous";
@@ -123,6 +124,18 @@ describe("RegistrySchema", () => {
     ["a fractional time", registry({ writtenAt: NOW + 0.5 })],
   ])("refuses %s", (_name, value) => {
     expect(v.is(RegistrySchema, value)).toBe(false);
+  });
+});
+
+describe("the catalog scripts/poc-cross-profile/catalog.sh writes", () => {
+  test("validates against RegistrySchema", () => {
+    // catalog.checks.mjs regenerates this sample from a run of the script.
+    const sample = new URL(
+      "../../../scripts/poc-cross-profile/fixtures/registry.sample.json",
+      import.meta.url,
+    );
+    const registry = v.parse(RegistrySchema, JSON.parse(readFileSync(sample, "utf8")));
+    expect(Object.values(registry.peers).map((each) => each.root)).toEqual(["r1", "r2"]);
   });
 });
 

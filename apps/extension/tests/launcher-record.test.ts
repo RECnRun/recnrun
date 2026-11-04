@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import * as v from "valibot";
 import { describe, expect, test } from "vite-plus/test";
 import {
@@ -91,6 +92,20 @@ describe("parseLauncherRecord", () => {
 
   test("refuses a record too long to be the launcher's", () => {
     expect(() => parseLauncherRecord(`downloadsRoot=/${"a".repeat(70_000)}`)).toThrow(/too long/);
+  });
+});
+
+describe("the record scripts/poc-cross-profile/catalog.sh rewrites", () => {
+  test("parses, and serializes back to the same text", () => {
+    // catalog.checks.mjs regenerates this sample from a run of the script.
+    const sample = new URL(
+      "../../../scripts/poc-cross-profile/fixtures/launcher.sample.record",
+      import.meta.url,
+    );
+    const text = readFileSync(sample, "utf8");
+    const records = parseLauncherRecord(text);
+    expect(records.map((record) => record.root)).toEqual(["r1", "r2"]);
+    expect(serializeLauncherRecord(records)).toBe(text);
   });
 });
 

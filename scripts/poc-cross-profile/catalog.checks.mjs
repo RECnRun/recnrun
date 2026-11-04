@@ -1,0 +1,198 @@
+import assert from "node:assert/strict";
+import { mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { test } from "node:test";
+import {
+  ALICE,
+  BOB,
+  CAROL,
+  BOOT,
+  EX_USAGE,
+  NAMESPACE,
+  announce,
+  lab,
+  normalized,
+  peerOf,
+  presence,
+  publish,
+  readRegistry,
+  run,
+  sample,
+  shells,
+} from "./lab.mjs";
+
+for (const shell of shells) {
+  await test(`${shell}: catalogs two roots under two ids and writes the ids back`, (context) => {
+    const { home, rootA, rootB, out, record } = lab(context);
+    const recordText = [
+      `userDataDir=${home}/Chrome`,
+      "profileDirectory=Default",
+      `profileId=${ALICE}`,
+      `namespace=${NAMESPACE}`,
+      "role=master",
+      `downloadsRoot=${rootA}`,
+      "",
+      `downloadsRoot=${rootB}`,
+      "",
+    ].join("\n");
+    writeFileSync(record, recordText);
+    announce(rootA, presence(ALICE, { displayName: "José's Mac" }));
+    announce(rootB, presence(BOB));
+    const before = Date.now();
+    assert.deepEqual(run(shell, [record, NAMESPACE, out]), { code: 0, stderr: "" });
+    const registry = normalized(readRegistry(out), before);
+    assert.deepEqual(registry, {
+      version: 1,
+      namespace: NAMESPACE,
+      writtenAt: 1_800_000_000_500,
+      launcher: { boot: BOOT },
+      peers: {
+        [ALICE]: { ...peerOf(ALICE, "r1"), displayName: "José's Mac" },
+        [BOB]: peerOf(BOB, "r2"),
+      },
+    });
+    const written = readFileSync(record, "utf8");
+    assert.equal(
+      written,
+      recordText
+        .replace(`${rootA}\n`, `${rootA}\nroot=r1\n`)
+        .replace(`${rootB}\n`, `${rootB}\nroot=r2\n`),
+    );
+    sample("registry.sample.json", `${JSON.stringify(registry, null, 2)}\n`);
+    sample("launcher.sample.record", written.replaceAll(home, "/tmp/recnrun-catalog"));
+    assert.deepEqual(run(shell, [record, NAMESPACE, out]), { code: 0, stderr: "" });
+    assert.equal(readFileSync(record, "utf8"), written, "a second run keeps the ids");
+    assert.deepEqual(readdirSync(out), ["registry.json"]);
+  });
+
+  await test(`${shell}: keeps the root ids the record names and numbers the others`, (context) => {
+    const { rootA, rootB, out, record } = lab(context);
+    writeFileSync(record, `downloadsRoot=${rootB}\n\ndownloadsRoot=${rootA}\nroot=r1\n`);
+    announce(rootA, presence(ALICE));
+    announce(rootB, presence(BOB));
+    assert.equal(run(shell, [record, NAMESPACE, out]).code, 0);
+    const { peers } = readRegistry(out);
+    assert.deepEqual([peers[ALICE].root, peers[BOB].root], ["r1", "r2"]);
+    assert.equal(
+      readFileSync(record, "utf8"),
+      `downloadsRoot=${rootB}\nroot=r2\n\ndownloadsRoot=${rootA}\nroot=r1\n`,
+    );
+  });
+
+  await test(`${shell}: keeps the newer presence of a profile found in two roots`, (context) => {
+    const { rootA, rootB, out, record } = lab(context);
+    writeFileSync(record, `downloadsRoot=${rootA}\n\ndownloadsRoot=${rootB}\n`);
+    announce(rootA, presence(ALICE));
+    announce(rootB, presence(ALICE, { createdAt: 1_800_000_000_001 }));
+    assert.equal(run(shell, [record, NAMESPACE, out]).code, 0);
+    assert.deepEqual(Object.keys(readRegistry(out).peers), [ALICE]);
+    assert.equal(readRegistry(out).peers[ALICE].root, "r2");
+  });
+
+  await test(`${shell}: stamps a fresh v4 boot unless the launcher passes its own`, (context) => {
+    const { rootA, out, record } = lab(context);
+    writeFileSync(record, `downloadsRoot=${rootA}\n`);
+    const boots = new Set();
+    for (let index = 0; index < 3; index += 1) {
+      assert.equal(run(shell, [record, NAMESPACE, out], {}).code, 0);
+      boots.add(readRegistry(out).launcher.boot);
+    }
+    assert.equal(boots.size, 3);
+    for (const boot of boots) {
+      assert.match(boot, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    }
+    assert.equal(
+      run(shell, [record, NAMESPACE, out], { RECNRUN_LAUNCHER_BOOT: "x" }).code,
+      EX_USAGE,
+    );
+  });
+
+  await test(`${shell}: holds at most 32 peers`, (context) => {
+    const { rootA, out, record } = lab(context);
+    writeFileSync(record, `downloadsRoot=${rootA}\n`);
+    for (let index = 0; index < 33; index += 1) {
+      announce(rootA, presence(`00000000-0000-4000-8000-${String(index).padStart(12, "0")}`));
+    }
+    const result = run(shell, [record, NAMESPACE, out]);
+    assert.equal(result.code, 0);
+    assert.equal(Object.keys(readRegistry(out).peers).length, 32);
+    assert.match(result.stderr, /at most 32 peers/);
+  });
+
+  await test(`${shell}: skips every file that is not exactly an extension's presence`, (context) => {
+    const { rootA, out, record } = lab(context);
+    writeFileSync(record, `downloadsRoot=${rootA}\n`);
+    const good = presence(ALICE);
+    announce(rootA, good);
+    const text = JSON.stringify(presence(BOB));
+    const skipped = [
+      ["not-a-profile", text, "presence.json", /not a profile id/],
+      [BOB.toUpperCase().replaceAll("2", "B"), text, "presence.json", /not a profile id/],
+      [
+        BOB,
+        text.replace("}", ',"path":"/Users/me/Downloads"}'),
+        "presence.json",
+        /after expiresAt/,
+      ],
+      [BOB, JSON.stringify(presence(BOB), null, 1), "presence.json", /expected/],
+      [BOB, JSON.stringify({ displayName: "Desk", ...presence(BOB) }), "presence.json", /expected/],
+      [BOB, JSON.stringify(presence(BOB, { displayName: 'a"b' })), "presence.json", /displayName/],
+      [
+        BOB,
+        JSON.stringify(presence(BOB, { displayName: "x".repeat(65) })),
+        "presence.json",
+        /displayName/,
+      ],
+      [
+        BOB,
+        JSON.stringify(presence(BOB, { displayName: " Desk" })),
+        "presence.json",
+        /displayName/,
+      ],
+      [
+        BOB,
+        JSON.stringify(presence(BOB, { fingerprint: "ab:cd" })),
+        "presence.json",
+        /fingerprint/,
+      ],
+      [BOB, JSON.stringify(presence(BOB, { createdAt: 1.5 })), "presence.json", /createdAt/],
+      [BOB, JSON.stringify(presence(BOB, { expiresAt: 1000 })), "presence.json", /expired/],
+      [BOB, `${text}\n`, "presence.json", /exact bytes/],
+      [BOB, JSON.stringify(presence(CAROL)), "presence.json", /folder/],
+      [BOB, "x".repeat(4096), "presence.json", /bytes/],
+      [BOB, text, "registration.json", /no presence.json/],
+    ];
+    for (const [folder, content, name, reason] of skipped) {
+      rmSync(join(rootA, "RECnRun/poc", NAMESPACE, "peers", folder), {
+        recursive: true,
+        force: true,
+      });
+      publish(rootA, folder, content, name);
+      const result = run(shell, [record, NAMESPACE, out]);
+      assert.equal(result.code, 0, `${folder}/${name}: ${result.stderr}`);
+      assert.match(result.stderr, /^catalog\.sh: skipped r1\//m, `${folder}: ${content}`);
+      assert.match(result.stderr, reason, `${folder}: ${content}`);
+      assert.deepEqual(Object.keys(readRegistry(out).peers), [ALICE], `${folder}: ${content}`);
+      rmSync(join(rootA, "RECnRun/poc", NAMESPACE, "peers", folder), {
+        recursive: true,
+        force: true,
+      });
+    }
+  });
+
+  await test(`${shell}: follows no symbolic link into or out of a peers folder`, (context) => {
+    const { home, rootA, out, record } = lab(context);
+    writeFileSync(record, `downloadsRoot=${rootA}\n`);
+    const elsewhere = publish(home, ALICE, JSON.stringify(presence(ALICE)));
+    mkdirSync(join(rootA, "RECnRun/poc", NAMESPACE, "peers"), { recursive: true });
+    symlinkSync(elsewhere, join(rootA, "RECnRun/poc", NAMESPACE, "peers", ALICE));
+    const linked = join(rootA, "RECnRun/poc", NAMESPACE, "peers", BOB);
+    mkdirSync(linked);
+    symlinkSync(join(elsewhere, "presence.json"), join(linked, "presence.json"));
+    const result = run(shell, [record, NAMESPACE, out]);
+    assert.equal(result.code, 0);
+    assert.match(result.stderr, /skipped r1\/1111.*not a folder/);
+    assert.match(result.stderr, /skipped r1\/2222.*no presence.json/);
+    assert.deepEqual(readRegistry(out).peers, {});
+  });
+}

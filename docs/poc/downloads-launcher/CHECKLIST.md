@@ -132,7 +132,11 @@ Gate P1: verify · E1–E3 · review
 
 - [ ] P2.1 Bootstrap of the catalog, E4 (lab, host)
 - [ ] P2.2 Registration without a prior choice
-- [ ] P2.3 Registry schema and launcher record
+- [i] P2.3 Registry schema and launcher record
+  red: `vp test --project=extension apps/extension/tests/registry.test.ts apps/extension/tests/launcher-record.test.ts` against stubs (schemas `v.unknown()`, readers returning nothing, path helpers returning `""`): `Tests  73 failed | 2 passed (75)`, e.g. "refuses a registration that names a location in \"path\"": `expected true to be false`; `node --test scripts/poc-cross-profile/*.checks.mjs` against an empty `catalog.sh` in a scratch copy: `fail 25`, e.g. `ENOENT: no such file or directory, open '<tmp>/out/registry.json'`, the lock checks `timed out`, `catalog.sh is empty`
+  green: the same unit command plus `downloads-rendezvous.test.ts` and the fixture tests: 111 passed; `node --test scripts/poc-cross-profile/*.checks.mjs` 25 passed on macOS `/bin/sh` and `/bin/dash`, and 25 passed in the test image (Ubuntu 24.04, `/bin/sh` is dash, root); `vp run test:unit` in Docker passed; `vp check`, `vp run deps`, `vp run dead-code`, `vp run docs:check` clean
+  commit: cherry-picked from agent/p2-registry `5e606f03` (schemas) and its next commit (catalog writer); SHAs recorded at the gate
+  note: the launcher's catalog writer `scripts/poc-cross-profile/catalog.sh` and its checks landed here for E4 (P2.1 hypotheses a and b); ShellCheck is checked by eye until P4.1 adds it to the image
 
 Gate P2: verify · E4 · review
 

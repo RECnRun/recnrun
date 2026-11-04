@@ -3,13 +3,15 @@
   // dependency-cruiser loads @swc/core by name for its "swc" parser.
   "ignoreDependencies": ["oxfmt", "@swc/core"],
   // iproute2 tools of the test image; tests/browser/no-egress.spec.ts reads the route and the tc drop counter.
-  "ignoreBinaries": ["ip", "tc"],
+  // mkfifo (coreutils, and macOS) holds catalog.sh's lock in scripts/poc-cross-profile/catalog-guards.checks.mjs.
+  "ignoreBinaries": ["ip", "tc", "mkfifo"],
   "workspaces": {
     ".": {
       "entry": [
         "scripts/agent-hooks/*.mjs",
         "scripts/git-hooks/*.mjs",
         "scripts/*.checks.mjs",
+        "scripts/poc-cross-profile/*.checks.mjs",
         "tests/container/*.checks.mjs",
       ],
     },
