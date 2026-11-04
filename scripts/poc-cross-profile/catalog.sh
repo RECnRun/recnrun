@@ -124,20 +124,30 @@ if [ ! -r "$record" ] || [ -d "$record" ]; then fail 66 'no readable record file
 [ -d "$out" ] || fail 73 'no output directory'
 
 lock=$out/.catalog.lock
-held=0
+mine=$lock.$$
 tmp=
 record_tmp=
+# The lock is a hard link of a file that already names this run's pid, so a signal that lands between
+# taking the lock and noting it cannot orphan it: cleanup removes the lock whenever it names this run.
+owns_lock() {
+  [ -f "$lock" ] || return 1
+  read -r holder < "$lock" || return 1
+  [ "$holder" = "$$" ]
+}
 cleanup() {
   if [ -n "$tmp" ]; then rm -f -- "$tmp"; fi
   if [ -n "$record_tmp" ]; then rm -f -- "$record_tmp"; fi
-  if [ "$held" = 1 ]; then rmdir -- "$lock" 2>/dev/null || :; fi
+  if owns_lock; then rm -f -- "$lock"; fi
+  rm -f -- "$mine"
 }
 trap cleanup EXIT
 trap 'exit 129' HUP
 trap 'exit 130' INT
 trap 'exit 143' TERM
-# mkdir is atomic: exactly one run creates the lock; the others leave it alone.
-if mkdir -- "$lock" 2>/dev/null; then held=1; else fail 75 "another run holds $lock"; fi
+printf '%s\n' "$$" > "$mine"
+# link is atomic: exactly one run links its pid file to the lock; the others leave it alone. A directory
+# at the lock path (ln would link inside it) counts as held too.
+if [ -d "$lock" ] || ! ln -- "$mine" "$lock" 2>/dev/null; then fail 75 "another run holds $lock"; fi
 # A rename onto a folder, or a link to one, would land inside it.
 destination=$out/registry.json
 if [ -L "$destination" ] || { [ -e "$destination" ] && [ ! -f "$destination" ]; }; then
@@ -310,14 +320,15 @@ read_presence() {
   fresh
 }
 # A closed profile drops out within one TTL: no stamp ahead of the skew, no longer lifetime.
+# The two checks that need no clock come first, so their reasons do not depend on when this runs.
 fresh() {
-  if [ "$pr_expires" -le "$now" ]; then reason='expired'; return 1; fi
-  if [ "$pr_created" -gt $((now + clock_skew_ms)) ]; then reason='createdAt is ahead of this clock'; return 1; fi
   if [ "$pr_expires" -le "$pr_created" ]; then reason='expiresAt is not after createdAt'; return 1; fi
   if [ $((pr_expires - pr_created)) -gt "$presence_ttl_ms" ]; then
     reason="it lives longer than $presence_ttl_ms ms"
     return 1
   fi
+  if [ "$pr_expires" -le "$now" ]; then reason='expired'; return 1; fi
+  if [ "$pr_created" -gt $((now + clock_skew_ms)) ]; then reason='createdAt is ahead of this clock'; return 1; fi
 }
 
 # Accepted presences, one "id<TAB>root<TAB>name<TAB>fingerprint<TAB>createdAt<TAB>expiresAt<TAB>boot" line each.

@@ -192,7 +192,7 @@ for (const shell of shells) {
       ],
       [BOB, signed({ role: "master" }), "presence.json", /expected "},"createdAt"/],
       [BOB, JSON.stringify(presence(BOB, { createdAt: 1.5 })), "presence.json", /createdAt/],
-      [BOB, JSON.stringify(presence(BOB, { expiresAt: 1000 })), "presence.json", /expired/],
+      [BOB, freshness({ createdAt: -10_000, expiresAt: -5_000 }), "presence.json", /expired/],
       [BOB, `${text}\n`, "presence.json", /exact bytes/],
       [BOB, JSON.stringify(presence(CAROL)), "presence.json", /folder/],
       [
