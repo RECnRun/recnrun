@@ -56,10 +56,23 @@ export const hostEnvironment: E4Environment = {
   },
 };
 
-/** The launcher's native reader on macOS: plutil on a throwaway root's Preferences, nothing else. */
-export async function plutilPreference(root: string): Promise<string | null> {
+type Run = (file: string, args: string[]) => Promise<{ stdout: string }>;
+
+/**
+ * The launcher's native reader on macOS: plutil on a throwaway root's Preferences, nothing else.
+ * A missing key is a value (null); any other failure, starting plutil included, is the harness's.
+ */
+export async function plutilPreference(
+  root: string,
+  run: Run = promisify(execFile),
+): Promise<string | null> {
   const preferences = join(root, "Default", "Preferences");
   const args = ["-extract", "download.default_directory", "raw", "-o", "-", preferences];
-  const { stdout } = await promisify(execFile)("plutil", args);
-  return stdout.trim() || null;
+  try {
+    return (await run("plutil", args)).stdout.trim() || null;
+  } catch (error) {
+    const { code, stderr } = error as { code?: unknown; stderr?: unknown };
+    if (code === 1 && String(stderr).includes("No value at that key path")) return null;
+    throw error;
+  }
 }

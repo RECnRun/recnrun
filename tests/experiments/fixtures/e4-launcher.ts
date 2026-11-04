@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import type { ExecFileException } from "node:child_process";
 import { readFile, readdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
@@ -58,16 +59,36 @@ export const namespaceFolder = (downloads: string) => join(downloads, "RECnRun",
 const presenceFile = (downloads: string, profileId: string) =>
   join(namespaceFolder(downloads), "peers", profileId, "presence.json");
 
+type ExecCallback = (error: ExecFileException | null, stdout: string, stderr: string) => void;
+
+/** The launcher's filesystem and process calls, which tests replace to inject failures. */
+export const launcherIo = {
+  readdir: (path: string): Promise<string[]> => readdir(path),
+  readFile: (path: string): Promise<string> => readFile(path, "utf8"),
+  execFile: (file: string, args: readonly string[], callback: ExecCallback): void => {
+    execFile(file, [...args], callback);
+  },
+};
+
+/** What `read` resolves to, or undefined when its path does not exist; any other failure throws. */
+async function unlessAbsent<T>(read: Promise<T>): Promise<T | undefined> {
+  try {
+    return await read;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+    throw error;
+  }
+}
+
+/** A file's value when it matches `schema`; undefined when absent or of another shape, never unread. */
 async function parsedFile<T>(
   schema: v.GenericSchema<unknown, T>,
   path: string,
 ): Promise<T | undefined> {
-  try {
-    const parsed = v.safeParse(schema, JSON.parse(await readFile(path, "utf8")));
-    return parsed.success ? parsed.output : undefined;
-  } catch {
-    return undefined;
-  }
+  const text = await unlessAbsent(launcherIo.readFile(path));
+  if (text === undefined) return undefined;
+  const parsed = v.safeParse(schema, JSON.parse(text));
+  return parsed.success ? parsed.output : undefined;
 }
 
 /** The valid presence of `profileId` under a Downloads folder, or undefined. */
@@ -78,9 +99,10 @@ export const presenceIn = (downloads: string, profileId: string) =>
 export const writePresence = (downloads: string, presence: PresenceFile) =>
   writeFile(presenceFile(downloads, presence.profileId), JSON.stringify(presence));
 
-/** Every valid presence under a Downloads folder; any other file counts as none. */
-async function presencesIn(downloads: string): Promise<PresenceFile[]> {
-  const folders = await readdir(join(namespaceFolder(downloads), "peers")).catch(() => []);
+/** Every valid presence under a Downloads folder; catalog.sh skips the same other names and shapes. */
+export async function presencesIn(downloads: string): Promise<PresenceFile[]> {
+  const listed = await unlessAbsent(launcherIo.readdir(join(namespaceFolder(downloads), "peers")));
+  const folders = (listed ?? []).filter((name) => v.is(Uuid, name));
   const read = await Promise.all(folders.map((folder) => presenceIn(downloads, folder)));
   return read.filter((presence) => presence !== undefined);
 }
@@ -155,12 +177,16 @@ export interface CatalogRun {
 /** Runs catalog.sh once for the namespace folder of `downloads`, then reads what it wrote. */
 export async function runCatalog(record: string, downloads: string): Promise<CatalogRun> {
   const out = namespaceFolder(downloads);
-  const { code, stderr } = await new Promise<{ code: number; stderr: string }>((resolve) => {
-    execFile("sh", [CATALOG, record, NAMESPACE, out], (error, _stdout, stderr) => {
-      const code = error ? Number((error as { code?: unknown }).code ?? 1) : 0;
-      resolve({ code, stderr });
-    });
-  });
+  const { code, stderr } = await new Promise<{ code: number; stderr: string }>(
+    (resolve, reject) => {
+      launcherIo.execFile("sh", [CATALOG, record, NAMESPACE, out], (error, _stdout, stderr) => {
+        // Only catalog.sh's own exit status is a result; a spawn error or a signal is the harness's.
+        const code = error ? error.code : 0;
+        if (typeof code === "number") resolve({ code, stderr });
+        else reject(error ?? new Error("catalog.sh gave no exit status"));
+      });
+    },
+  );
   return {
     code,
     stderr,

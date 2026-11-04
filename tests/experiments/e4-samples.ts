@@ -16,7 +16,6 @@ import {
   names,
   published,
   runSummary,
-  scrub,
   withSession,
 } from "./fixtures/e4-run.ts";
 
@@ -183,14 +182,10 @@ export const preferencesSample = (
       json[peer.profile.name] = labelOf(labels, await jsonPreference(peer.profile.root));
     }
     if (!reader) return judged([], { json });
-    const native: { value: string | null; error?: string } = await reader(p.profile.root).then(
-      (value) => ({ value: labelOf(labels, value) }),
-      (error: unknown) => ({ value: null, error: scrub(String(error), labels) }),
-    );
+    // A reader that fails to run is a harness error; only an UnavailableError marks the method absent.
+    const native = { value: labelOf(labels, await reader(p.profile.root)) };
     const problems =
-      native.value === "<own folder>"
-        ? []
-        : [`the native reader read ${native.error ?? native.value}`];
+      native.value === "<own folder>" ? [] : [`the native reader read ${native.value}`];
     return judged(problems, { json, native });
   });
 

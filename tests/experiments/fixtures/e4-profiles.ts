@@ -137,9 +137,10 @@ async function installPoc(chrome: LaunchedChrome): Promise<LoadedExtension> {
 /** Runs a launcher opening and waits for it to exit; stops only that process when it does not. */
 async function runOpening(binary: string, args: readonly string[]): Promise<OpenResult> {
   const child = spawn(binary, args, { stdio: "ignore" });
-  const exited = new Promise<number | null>((resolve) => {
+  // A spawn error (no binary, no permission) is the harness's, never an exit result.
+  const exited = new Promise<number | null>((resolve, reject) => {
     child.once("exit", (code) => resolve(code));
-    child.once("error", () => resolve(null));
+    child.once("error", reject);
   });
   const outcome = await Promise.race([exited, delay(OPEN_EXIT_MS, "timeout" as const)]);
   if (outcome !== "timeout") return { code: outcome, stopped: false };
