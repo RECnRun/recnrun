@@ -187,7 +187,7 @@ next_free_id() {
 }
 
 block_reset() {
-  b_user= b_profile= b_downloads= b_root= b_seen=' ' b_start=0
+  b_user='' b_profile='' b_downloads='' b_root='' b_seen=' ' b_start=0
 }
 bad_value() { fail 65 "record line $lineno: invalid $1"; }
 set_key() {

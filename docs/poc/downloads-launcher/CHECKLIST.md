@@ -259,7 +259,11 @@ Gate P3: verify · E5–E7 · review
 
 ## P4: Native launcher
 
-- [ ] P4.1 Script harness (`vp run test:scripts`, ShellCheck, package scan)
+- [i] P4.1 Script harness (`vp run test:scripts`, ShellCheck, package scan)
+  red: scanner `node --test scripts/poc-cross-profile/package.checks.mjs` with a stub that finds nothing: 3 of 4 failed ("jq.sh: expected runtime at line 4, got []") · wiring `node --test scripts/test-host.checks.mjs` with a stub: 2 of 2 failed, `vp run test:scripts:local`: Task not found, runner checks 2 failed and image check 1 failed · ShellCheck `vp run test:scripts` with `echo $1` appended to a copy of catalog.sh in the worktree (reverted): "ShellCheck passes every launcher script" failed, SC2086 (`2026-11-04T13-08-44.646Z-48f80682-ef6c-4c64-b6f2-6cdcbc7fbafa`)
+  green: `vp run test:scripts` in Docker 54 passed (`2026-11-04T13-09-08.886Z-81e91ad0-4f01-462c-a273-dd45ae8c9eb0`; the first Docker run, 50 passed before the ShellCheck checks, `2026-11-04T13-07-29.232Z-6650f5f6-9f09-4ec7-ba95-deeea8f4cb90`); `vp run test:host -- scripts` 51 passed, 3 skipped (no ShellCheck on the Mac); `vp run test:container`, `vp check`, `vp run deps`, `vp run dead-code`, `vp run docs:check` clean
+  commit: (agent/p4-harness) `a17a7474` package scan and fixtures · `4a322f12` Docker and host wiring · the ShellCheck commit
+  note: ShellCheck found SC1007 in catalog.sh (`a= b=` in `block_reset`), fixed with `=''`, same behavior. The first host run of the catalog checks failed once on a clock-dependent case ("skipped ...: expired" where "not after createdAt" was expected) and passed on the rerun; not reproduced. `vp run test` never included `test:scripts` (only verify does); unchanged. `coverage.checks.mjs` left `test:scripts` because it needs the coverage summary and already runs in `test:coverage:local`.
 - [ ] P4.2 Discovery of Chrome, roots, and profiles, E8 (lab, host)
 - [ ] P4.3 Open request and token ack (lab, host)
 - [ ] P4.4 Idempotence, timeouts, locks, pause policy, E9
