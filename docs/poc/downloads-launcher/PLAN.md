@@ -88,6 +88,8 @@ Measured before this plan; each line gives the implication.
 apps/extension/src/p2p/rendezvous-transport.ts   the small signaling-transport interface (available, publish, watch, discover, clean)
 apps/extension/src/p2p/folder-store.ts            FSA adapter, unchanged, the control
 apps/extension/src/p2p/downloads-rendezvous.ts    Downloads + file:// adapter (paths, probe, catalog reader, tolerant JSON reader)
+apps/extension/src/p2p/registry.ts                registration and registry.json schemas, the catalog reader (P2.3)
+apps/extension/src/p2p/launcher-record.ts         the launcher record format: parser and serializer, used by tests and diagnostics (P2.3)
 apps/extension/src/background/downloads-publisher.ts   chrome.downloads calls, typed messages from the offscreen, persisted results
 apps/extension/src/background/roles.ts            role registry: master | worker | template, bound master identity, command authorization
 apps/extension/src/background/launcher-requests.ts     open requests and acks the extension exchanges with the launcher

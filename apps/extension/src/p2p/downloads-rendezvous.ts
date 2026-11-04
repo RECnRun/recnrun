@@ -1,7 +1,7 @@
 import * as v from "valibot";
 import { PRESENCE_TTL_MS, PresenceSchema } from "@/p2p/folder-rendezvous";
 import type { Presence } from "@/p2p/folder-rendezvous";
-import { MAX_CODE_LENGTH } from "@/p2p/protocol";
+import { MAX_CODE_LENGTH, ProfileIdSchema } from "@/p2p/protocol";
 
 /*
  * The Downloads + file:// rendezvous (POC PLAN.md §5): pure paths and the tolerant reader. The
@@ -15,12 +15,30 @@ const UNC = /^\\\\[^\\/]+[\\/]/;
 /** A namespace names one folder under RECnRun/poc/, so it never carries a path character. */
 export const NamespaceSchema = v.pipe(v.string(), v.regex(NAMESPACE));
 
-/** The probe's destination, relative to the Downloads root, as chrome.downloads requires. */
-export function probePath(namespace: string): string {
+/** The namespace's folder, relative to the Downloads root, as chrome.downloads requires. */
+function namespaceFolder(namespace: string): string {
   if (!NAMESPACE.test(namespace)) {
     throw new Error(`Invalid namespace ${JSON.stringify(namespace)}: use [a-z0-9-]{1,40}.`);
   }
-  return `RECnRun/poc/${namespace}/probe.json`;
+  return `RECnRun/poc/${namespace}`;
+}
+
+/** The probe's destination, relative to the Downloads root. */
+export function probePath(namespace: string): string {
+  return `${namespaceFolder(namespace)}/probe.json`;
+}
+
+/** The catalog the launcher alone writes (PLAN.md decision 11). */
+export function registryPath(namespace: string): string {
+  return `${namespaceFolder(namespace)}/registry.json`;
+}
+
+/** Where a profile publishes its presence; the launcher reads only this name in a uuid folder. */
+export function presencePath(namespace: string, profileId: string): string {
+  if (!v.is(ProfileIdSchema, profileId)) {
+    throw new Error(`Invalid profile id ${JSON.stringify(profileId)}: use a uuid.`);
+  }
+  return `${namespaceFolder(namespace)}/peers/${profileId}/presence.json`;
 }
 
 function encodedSegments(segments: string[], path: string): string {
@@ -49,18 +67,30 @@ export function fileUrlFor(absolutePath: string): string {
 /** Why the reader kept or dropped what it had. */
 type ReadReason = "fresh" | "absent" | "empty" | "partial" | "invalid" | "older" | "expired";
 
-export interface TolerantRead {
+export interface TolerantRead<T = Presence> {
   /** The publication that counts now: the file's, or the last valid one until its TTL. */
-  publication: Presence | undefined;
+  publication: T | undefined;
   reason: ReadReason;
 }
 
-/** How far ahead of this clock another profile's publication may be stamped. */
-const CLOCK_SKEW_MS = 5000;
+/** How one kind of publication is validated and dated. */
+export interface Freshness<T> {
+  schema: v.GenericSchema<unknown, T>;
+  createdAt: (publication: T) => number;
+  expiresAt: (publication: T) => number;
+  /** The furthest from now an expiry may be. */
+  horizon: number;
+}
 
-/** Current, and never claiming to live longer than one TTL from now. */
-const stands = (publication: Presence, now: number) =>
-  publication.expiresAt > now && publication.expiresAt - now <= PRESENCE_TTL_MS;
+/** How far ahead of this clock another profile's publication may be stamped. */
+export const CLOCK_SKEW_MS = 5000;
+
+const PRESENCE: Freshness<Presence> = {
+  schema: PresenceSchema,
+  createdAt: (presence) => presence.createdAt,
+  expiresAt: (presence) => presence.expiresAt,
+  horizon: PRESENCE_TTL_MS,
+};
 
 function parse(text: string): { value?: unknown; reason?: ReadReason } {
   if (text.trim() === "") return { reason: "empty" };
@@ -72,16 +102,22 @@ function parse(text: string): { value?: unknown; reason?: ReadReason } {
   }
 }
 
+/** Current, and never claiming to live longer than the horizon from now. */
+const stands = <T>(kind: Freshness<T>, publication: T, now: number) =>
+  kind.expiresAt(publication) > now && kind.expiresAt(publication) - now <= kind.horizon;
+
 /** Why a well-formed publication does not replace the usable one, if it does not. */
-function refusal(
-  publication: Presence,
-  usable: Presence | undefined,
+function refusal<T>(
+  kind: Freshness<T>,
+  publication: T,
+  usable: T | undefined,
   now: number,
 ): ReadReason | undefined {
-  if (publication.createdAt > now + CLOCK_SKEW_MS) return "invalid";
-  if (usable && publication.createdAt < usable.createdAt) return "older";
-  if (publication.expiresAt <= now) return "expired";
-  return stands(publication, now) ? undefined : "invalid";
+  const createdAt = kind.createdAt(publication);
+  if (createdAt > now + CLOCK_SKEW_MS) return "invalid";
+  if (usable !== undefined && createdAt < kind.createdAt(usable)) return "older";
+  if (kind.expiresAt(publication) <= now) return "expired";
+  return stands(kind, publication, now) ? undefined : "invalid";
 }
 
 /**
@@ -89,20 +125,30 @@ function refusal(
  * or foreign file, or a temporary read error (passed as undefined), keeps the previous valid
  * publication until its TTL, an expired replacement included; an older one never replaces a newer one.
  */
+export function readTolerantOf<T>(
+  kind: Freshness<T>,
+  text: string | undefined,
+  previous: T | undefined,
+  now = Date.now(),
+): TolerantRead<T> {
+  // An expired previous publication is not a basis for comparison or for keeping.
+  const usable = previous !== undefined && stands(kind, previous, now) ? previous : undefined;
+  const kept = (reason: ReadReason): TolerantRead<T> => ({ publication: usable, reason });
+  if (text === undefined) return kept("absent");
+  const { value, reason } = parse(text);
+  if (reason) return kept(reason);
+  const parsed = v.safeParse(kind.schema, value);
+  if (!parsed.success) return kept("invalid");
+  const publication = parsed.output;
+  const refused = refusal(kind, publication, usable, now);
+  return refused ? kept(refused) : { publication, reason: "fresh" };
+}
+
+/** Reads a presence with the rules of readTolerantOf. */
 export function readTolerant(
   text: string | undefined,
   previous: Presence | undefined,
   now = Date.now(),
 ): TolerantRead {
-  // An expired previous publication is not a basis for comparison or for keeping.
-  const usable = previous && stands(previous, now) ? previous : undefined;
-  const kept = (reason: ReadReason): TolerantRead => ({ publication: usable, reason });
-  if (text === undefined) return kept("absent");
-  const { value, reason } = parse(text);
-  if (reason) return kept(reason);
-  const parsed = v.safeParse(PresenceSchema, value);
-  if (!parsed.success) return kept("invalid");
-  const publication = parsed.output;
-  const refused = refusal(publication, usable, now);
-  return refused ? kept(refused) : { publication, reason: "fresh" };
+  return readTolerantOf(PRESENCE, text, previous, now);
 }
