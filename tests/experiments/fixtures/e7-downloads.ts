@@ -1,7 +1,7 @@
 import { expect } from "@playwright/test";
 import type { DownloadsProfile } from "../../browser/fixtures/downloads-profiles.ts";
 
-type Policy = "baseline" | "linked-silence";
+export type Policy = "baseline" | "linked-silence" | "heartbeat" | "launcher";
 interface Item {
   id: number;
   filename: string;
@@ -20,7 +20,9 @@ interface DownloadsGlobal {
     };
     storage: { local: { set(value: object): Promise<void> } };
     alarms: { clear(name: string): Promise<boolean> };
-    runtime: { sendMessage(message: unknown): Promise<{ ok: boolean; error?: string }> };
+    runtime: {
+      sendMessage(message: unknown): Promise<{ ok: boolean; error?: string; result?: unknown }>;
+    };
   };
   __e7?: {
     original: DownloadsGlobal["chrome"]["downloads"]["download"];
@@ -123,4 +125,17 @@ export async function complete(profile: DownloadsProfile) {
   });
   const history = historyCounts(items);
   return { history, chromeDownloads: await visibleDownloads(profile, history.total) };
+}
+
+/** The DataChannel heartbeats this profile's links sent so far, read from its offscreen document. */
+export async function beatsOf(profile: DownloadsProfile): Promise<number> {
+  const result = await profile.serviceWorker.evaluate(async () => {
+    const reply = await (globalThis as unknown as DownloadsGlobal).chrome.runtime.sendMessage({
+      type: "POC_LIVENESS",
+    });
+    if (!reply.ok) throw new Error(reply.error ?? "POC_LIVENESS failed");
+    return reply.result;
+  });
+  const { peers } = result as { peers: Record<string, { beats: number }> };
+  return Object.values(peers).reduce((sum, link) => sum + link.beats, 0);
 }
