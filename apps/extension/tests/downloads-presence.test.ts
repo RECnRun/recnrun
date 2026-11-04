@@ -84,6 +84,30 @@ describe("startDownloadsPresence", () => {
     );
   });
 
+  test("writes exactly the registration's seven keys, in the schema's order", async () => {
+    const { deps, written } = dependencies();
+    startDownloadsPresence(deps).stop();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(Object.keys(JSON.parse(contentOf(written[0]?.url ?? "")))).toEqual([
+      "profileId",
+      "displayName",
+      "fingerprint",
+      "createdAt",
+      "expiresAt",
+      "namespace",
+      "boot",
+    ]);
+  });
+
+  test("writes nothing, and logs, when the registration carries a key the schema refuses", async () => {
+    const leaky = { profileId: ME, displayName: "Laptop", path: "/home/me/Downloads" };
+    const { deps, written, log } = dependencies({ identity: async () => leaky });
+    startDownloadsPresence(deps).stop();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(written).toEqual([]);
+    expect(log).toHaveBeenCalledWith(expect.stringMatching(/^presence: .*path/));
+  });
+
   test("writes it again every half TTL, each with a newer createdAt, until stopped", async () => {
     const { deps, written } = dependencies();
     const presence = startDownloadsPresence(deps);

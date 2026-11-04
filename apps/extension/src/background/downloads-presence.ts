@@ -8,6 +8,7 @@ import { BackgroundReplySchema } from "@/messaging/background-reply";
 import { PocFingerprintResultSchema, pocFingerprintRequest } from "@/messaging/poc-fingerprint";
 import { NamespaceSchema } from "@/p2p/downloads-rendezvous";
 import { PRESENCE_TTL_MS } from "@/p2p/folder-rendezvous";
+import { RegistrationSchema } from "@/p2p/registry";
 import { readIdentity } from "@/storage/peer-repository";
 import type { ProfileIdentity } from "@/storage/peer-repository";
 import { pocPresenceStore } from "@/storage/poc-presence-repository";
@@ -48,13 +49,17 @@ async function namespaceOf({ namespace, log }: PresenceDependencies): Promise<st
   return DEFAULT_NAMESPACE;
 }
 
-/** The registration, keys in the order the launcher's catalog parses, and no path in it. */
+/** The registration through its schema, so its keys follow the order the catalog parses and a path is refused. */
 async function registration(deps: PresenceDependencies, namespace: string, now: number) {
-  const { profileId, displayName } = await deps.identity();
-  const fingerprint = await deps.fingerprint();
-  const expiresAt = now + PRESENCE_TTL_MS;
-  const boot = await deps.boot();
-  return { profileId, displayName, fingerprint, createdAt: now, expiresAt, namespace, boot };
+  const identity = await deps.identity();
+  return v.parse(RegistrationSchema, {
+    ...identity,
+    fingerprint: await deps.fingerprint(),
+    createdAt: now,
+    expiresAt: now + PRESENCE_TTL_MS,
+    namespace,
+    boot: await deps.boot(),
+  });
 }
 
 /** The Downloads root of an absolute filename that ends with `relative`, in either separator. */
