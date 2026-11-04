@@ -215,7 +215,7 @@ Gate P3: verify · E5–E7 · review
 - [ ] P4.5 Commands and autostart
 - [ ] P4.6 Package and first run (host)
 
-Gate P4: verify · E8–E9 · host cells · review
+Gate P4: verify · E8–E9 · host cells (smoke) · review · push
 
 ## P5: Clean base and graphical cloning on macOS
 
@@ -226,7 +226,7 @@ Gate P4: verify · E8–E9 · host cells · review
 - [ ] P5.5 Matrix CL05, CL08–CL12, three rounds
 - [ ] P5.6 Unpacked code dependency and base update (CL13, CL14)
 
-Gate P5: verify · CL01–CL15 over three rounds · review
+Gate P5: verify · CL01–CL15 over three rounds (review and push fused into Gate P6)
 
 ## P6: Onboarding with the extension installed only in the Default
 
@@ -234,7 +234,7 @@ Gate P5: verify · CL01–CL15 over three rounds · review
 - [ ] P6.2 Automatic persistent installation of the base, E10 (CL17)
 - [ ] P6.3 V3 end to end (CL16)
 
-Gate P6: verify · CL16, CL17 · review
+Gate P6: verify · CL16, CL17 · review of P5+P6 · push
 
 ## P7: Silent and headless execution
 
@@ -243,7 +243,7 @@ Gate P6: verify · CL16, CL17 · review
 - [ ] P7.3 T4–T5 one root, headless attempt, E12 (lab, host)
 - [ ] P7.4 T6–T8 separate roots, headless workers, E13 (lab, host); T9 headless on clones
 
-Gate P7: verify · E11–E13 · review
+Gate P7: verify · E11–E13 (review and push fused into Gate P8)
 
 ## P8: With and without `chrome.debugger`
 
@@ -251,7 +251,7 @@ Gate P7: verify · E11–E13 · review
 - [ ] P8.2 Variant comparison, E14 (lab, headless, host)
 - [ ] P8.3 Clones per variant (host)
 
-Gate P8: verify · E14 · review
+Gate P8: verify · E14 · review of P7+P8 · push
 
 ## P9: Matrix, metrics, report, and decision
 

@@ -202,7 +202,7 @@ Goal: one shell package per supported OS (macOS and Linux in this round) that fi
 - **P4.6 Package and first run.** One directory per OS with a single entry point, the prepared extension bundle, and `README` naming the exact first command and the OS prompts; no build on the colleague's machine (§8.3).
   Accept: `package.checks.mjs`; the host record of the first run on this Mac with the gestures counted.
 
-Gate P4: `vp run verify` exits 0; host cells P4.2, P4.3, P4.6 recorded; §14 questions 4 and 8 computable for V1.
+Gate P4: `vp run verify` exits 0; host cells P4.2, P4.3, P4.6 recorded; §14 questions 4 and 8 computable for V1. Codex review, push, and pull-request update at this gate.
 
 ### P5: Clean base and graphical cloning on macOS (§8.4, CL01–CL15, T9, §13 step 6)
 
@@ -221,7 +221,7 @@ Goal: a clean worker base with one installation, frozen; full copies A and B, la
 - **P5.6 Unpacked code dependency and base update.** CL13: the unpacked path removed temporarily, failure reproduced, recovery after restore, id re-checked after a move; CL14: `base-v2` through a maintenance copy, old clones untouched (§8.4).
   Accept: host cells CL13, CL14 with the diagnostics page's record.
 
-Gate P5: `vp run verify` exits 0; CL01–CL15 recorded over three rounds; §14 questions 11, 12, 14 computable.
+Gate P5: `vp run verify` exits 0; CL01–CL15 recorded over three rounds; §14 questions 11, 12, 14 computable. No separate review or push: fused with Gate P6 (owner decision 2026-11-04).
 
 ### P6: Onboarding with the extension installed only in the Default (CL16, CL17, V3, §13 step 7)
 
@@ -235,7 +235,7 @@ Goal: the onboarding in the personal Default prepares the base automatically, co
 - **P6.3 V3 end to end.** With the extension installed by hand only in the personal Default: the owner runs the launcher once, the base is created and installed by P6.2, frozen, A and B cloned and provisioned, acks reach the Default's onboarding (CL16).
   Accept: host cell recorded by the orchestrator with the gesture columns (Default, machine, base, per clone).
 
-Gate P6: `vp run verify` exits 0; CL16, CL17 recorded; §14 question 13 computable. This phase does not block V1 or V2's independent results (§13).
+Gate P6: `vp run verify` exits 0; CL16, CL17 recorded; §14 question 13 computable. This phase does not block V1 or V2's independent results (§13). One Codex review over P5 and P6, then push and pull-request update.
 
 ### P7: Silent and headless execution (§9, T1–T9, §13 step 8)
 
@@ -253,7 +253,7 @@ Goal: measure, per topology, whether workers start the extension and keep the of
   Hypotheses: pre-installed extensions run under the Default's command in independent headless processes (T6); coordination, discovery, and reconnection persist with the Default's dashboard closed and no worker page visible (T7); a root alternated between visible and headless keeps identity, certificate, cookies, and permissions (T8); remote tabs, navigation, and a response carrying the worker's unique marker on a static test page; focus and PiP recorded as not applicable, separate from tab operations (§9).
   Accept: `tests/headless/E13-separate-roots.spec.ts`; `tests/host/E13-separate-roots.spec.ts`; same clone never open visible and headless at once.
 
-Gate P7: `vp run verify` exits 0; E11–E13 reports; §14 questions 5 and 6 computable.
+Gate P7: `vp run verify` exits 0; E11–E13 reports; §14 questions 5 and 6 computable. No separate review or push: fused with Gate P8 (owner decision 2026-11-04).
 
 ### P8: With and without `chrome.debugger` (§10, §13 step 9)
 
@@ -267,7 +267,7 @@ Goal: the viable modes and topologies run in D0, D1, and D2, built from the same
 - **P8.3 Clones per variant.** Base versions for D0, D1, D2 and the inheritance of permissions in each clone; a build swap that prompts in every clone is not "no gesture per clone" (§10).
   Accept: host cells recorded with gestures.
 
-Gate P8: `vp run verify` exits 0; E14 report; §14 question 7 computable.
+Gate P8: `vp run verify` exits 0; E14 report; §14 question 7 computable. One Codex review over P7 and P8, then push and pull-request update.
 
 ### P9: Matrix, metrics, report, and decision (§11, §14, §13 step 10)
 
@@ -366,6 +366,7 @@ OS rows: Linux = Google Chrome Stable in Docker (Ubuntu noble; Xvfb cells labell
 ## 8. Working rules specific to this plan
 
 - A hypothesis that fails is recorded with its cause and the next hypothesis is tried; a hypothesis that was not executed blocks the task. A tool defect found by a cell becomes the first red test of its fix (§14); a Chrome limit is documented with its CHROMIUM.md source and the experiment, never worked around by changing the goal.
+- Host cells run in smoke mode (one sample, `RECNRUN_EXPERIMENT_SAMPLES=smoke`) from P4 on (owner decision 2026-11-04); a host cell that fails, or whose verdict differs from the lab's, reruns with three samples before it is recorded. Lab cells keep three samples.
 - Every verdict names its environment, install method, variant, topology, debugger state, and whether an external client was attached. Results are reported as "Google Chrome <version> on Linux in Docker" or "Google Chrome <version> on macOS <version>"; Windows and packed cells are "not executed".
 - Host roots live under `~/Documents/RECnRun/poc-downloads-launcher/`; a test refuses any other root. The personal Chrome is never killed; `pkill`-style commands name a PID the launcher recorded, never a process name.
 - Negative controls (file access off, wrong path, expired answer, forged recipient, launcher absent, occupied root, inherited certificate, announcing template, repeated or conflicting bootstrap, interrupted copy, live base, non-persistent CDP install) are scratch mutations, never committed as behaviour (§12).
