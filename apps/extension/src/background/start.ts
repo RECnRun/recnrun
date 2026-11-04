@@ -9,13 +9,13 @@ import { recordingSessionRepository } from "@/storage/recording-session-reposito
 import { startDownloadsPublisher } from "@/background/downloads-publisher";
 import { startPocFileReadRelay } from "@/background/poc-file-read";
 
-// Spelled out, not peersEnabled(), so the production build can drop the POC's background code.
-const PEERS = import.meta.env.MODE === "development" || import.meta.env.MODE === "test";
-// pocEnabled() spelled out for the same reason: production must not carry chrome.downloads calls.
+// pocEnabled() spelled out, not called, so the production build can drop chrome.downloads calls.
 const POC =
   import.meta.env.MODE === "poc-d0" ||
   import.meta.env.MODE === "poc-d1" ||
   import.meta.env.MODE === "poc-d2";
+// Spelled out like peersEnabled(), not called, so production drops the cross-profile mesh.
+const PEERS = import.meta.env.MODE === "development" || import.meta.env.MODE === "test" || POC;
 
 /** Keeps a dashboard in front of the user: on the toolbar icon, on install, and as the profile opens. */
 function openDashboardOnDemand() {

@@ -70,6 +70,12 @@ for (const mode of Object.keys(VARIANTS)) {
     assert.match(pageScript(mode, "diagnostics.html"), /POC_READ_FILE/);
   });
 
+  await test(`${mode} starts the mesh in the background and the pairing UI in the dashboard`, () => {
+    // Strings only the cross-profile mesh carries; the file:// relay alone also calls createDocument.
+    assert.match(withChunks(mode, "background.js"), /The other profile is not connected\./);
+    assert.match(pageScript(mode, "dashboard.html"), /This profile controls no session in another/);
+  });
+
   await test(`${mode} has no content script that matches file:// (POC §4)`, () => {
     const matches = pocManifest(mode).content_scripts.flatMap((script) => script.matches);
     assert.ok(!matches.some((pattern) => /^(file|\*):/.test(pattern)), matches.join(", "));
