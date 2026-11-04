@@ -34,6 +34,27 @@ export const SignalFileSchema = v.strictObject({
  */
 export type SignalFile = v.InferOutput<typeof SignalFileSchema>;
 
+/** The run of a profile's process that wrote a file, so a reader tells an earlier run's apart. */
+const BootSchema = v.pipe(v.string(), v.uuid());
+
+/**
+ * A signal as a transport stores it: stamped with its sender's boot and a sequence that grows with
+ * each signal of that boot, so a reader drops an earlier run's file or a late, older write.
+ */
+const StampedSignalSchema = v.strictObject({
+  // SignalFileSchema's entries spelled out: a spread of them would stay in the production background.
+  kind: v.picklist(["offer", "answer"]),
+  pairingId: v.pipe(v.string(), v.uuid()),
+  profileId: ProfileIdSchema,
+  to: ProfileIdSchema,
+  expiresAt: v.number(),
+  code: v.pipe(v.string(), v.maxLength(MAX_CODE_LENGTH)),
+  boot: BootSchema,
+  sequence: v.pipe(v.number(), v.safeInteger(), v.minValue(1)),
+});
+
+export type StampedSignal = v.InferOutput<typeof StampedSignalSchema>;
+
 /** What the other profiles left for this one. */
 export interface Seen {
   presences: Presence[];

@@ -80,6 +80,9 @@ const RegistryPeerSchema = v.strictObject({
   boot: BootSchema,
 });
 
+/** One profile the catalog lists, with the opaque id of the Downloads root it writes under. */
+export type RegistryPeer = v.InferOutput<typeof RegistryPeerSchema>;
+
 export const RegistrySchema = v.strictObject({
   version: v.literal(1),
   namespace: NamespaceSchema,
