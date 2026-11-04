@@ -92,8 +92,9 @@ test("two profiles in one real folder find each other and cross an offer and an 
   const answer = signalOf("answer", B, A);
   await b.publish(answer);
   expect(step(A, await a.look(), { to: B })).toEqual([{ type: "connect", answer }]);
-  // B never sees its own answer, nor A the offer it made.
-  expect((await b.look()).signals).toEqual([offer]);
+  // B sees its own answer, which tells a relaunch what it answered; A never sees the offer it made.
+  expect((await b.look()).signals).toEqual([answer, offer]);
+  expect((await a.look()).signals).toEqual([answer]);
 
   await a.clean();
   await b.clean();

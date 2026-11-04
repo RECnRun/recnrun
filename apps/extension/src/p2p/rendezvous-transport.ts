@@ -16,7 +16,7 @@ export interface RendezvousTransport {
   announce(presence: Presence): Promise<void>;
   /** Writes a signal for the one profile it names, stamped with this boot and the next sequence. */
   publish(signal: SignalFile): Promise<void>;
-  /** The others' current presences, and the signals they left for this profile. */
+  /** The others' current presences, the signals they left for this profile, and its own answers. */
   look(): Promise<Seen>;
   /** The peers the launcher's catalog lists, this profile excluded; the folder has no catalog. */
   discover(): Promise<RegistryPeer[]>;

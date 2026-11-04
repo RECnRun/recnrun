@@ -4,7 +4,7 @@ import type { LinkCommand } from "@/messaging/peer-messages";
 import { signalFileOf } from "@/p2p/folder-rendezvous";
 import type { Presence, Seen, SignalFile } from "@/p2p/folder-rendezvous";
 import { signerOf } from "@/p2p/identity-key";
-import { decodePairing, fingerprintOf } from "@/p2p/pairing-code";
+import { PAIRING_TTL_MS, decodePairing, fingerprintOf } from "@/p2p/pairing-code";
 import type { Pins } from "@/p2p/pins";
 import type { AnsweredOffer } from "@/storage/answered-repository";
 import type {
@@ -63,7 +63,10 @@ function offererStep(partner: Presence, signals: SignalFile[], situation: Situat
   const answer = signals.find(
     (each) => each.kind === "answer" && each.pairingId === pending.pairingId,
   );
-  return answer && ({ type: "connect", answer } as const);
+  if (answer) return { type: "connect", answer } as const;
+  // Unanswered for a retry period: the answerer may have restarted, and it answers an offer once.
+  const madeAt = pending.expiresAt - PAIRING_TTL_MS;
+  return now - madeAt >= RETRY_MS ? ({ type: "offer", to: partner } as const) : undefined;
 }
 
 /** The next step with one partner, if there is one now. */
@@ -71,10 +74,11 @@ function stepWith(partner: Presence, situation: Situation): FolderStep | undefin
   const { me, seen, now } = situation;
   const signals = seen.signals.filter((each) => vouched(each, partner, now));
   if (me < partner.profileId) return offererStep(partner, signals, situation);
-  const done = [situation.acted, situation.answered].map((each) => each[partner.profileId]);
-  const offer = signals.find(
-    (each) => each.kind === "offer" && done.every((record) => record?.pairingId !== each.pairingId),
-  );
+  const records = [situation.acted, situation.answered].map((each) => each[partner.profileId]);
+  // An answer of its own on disk counts too: a quit may land after it, before the record.
+  const own = seen.signals.filter((each) => each.profileId === me && each.to === partner.profileId);
+  const done = new Set([...records, ...own].flatMap((each) => each?.pairingId ?? []));
+  const offer = signals.find((each) => each.kind === "offer" && !done.has(each.pairingId));
   return offer && { type: "answer", offer };
 }
 

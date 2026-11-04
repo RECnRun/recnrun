@@ -99,12 +99,16 @@ await test("the production build leaves out the POC's file:// read", () => {
   }
 });
 
-await test("the production build leaves out the POC's roles and their storage", () => {
+await test("the production build leaves out the POC's roles, answered offers, and their storage", () => {
   const output = new URL("../.output/chrome-mv3/", import.meta.url);
   for (const file of readdirSync(output, { recursive: true, encoding: "utf8" })) {
     if (!file.endsWith(".js") && !file.endsWith(".html")) continue;
     const code = readFileSync(new URL(file, output), "utf8");
-    assert.doesNotMatch(code, /local:role|local:boundWorkers|REFUSED |not the bound master/, file);
+    assert.doesNotMatch(
+      code,
+      /local:role|local:boundWorkers|local:answeredOffers|REFUSED |not the bound master/,
+      file,
+    );
   }
 });
 

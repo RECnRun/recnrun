@@ -146,7 +146,8 @@ describe("look", () => {
     pairing.drop(STRANGER, "a file where a folder would be");
     const opened = vi.spyOn(pairing, "getDirectoryHandle");
     expect(await rendezvous.look()).toEqual({ presences: [], signals: [] });
-    expect(opened.mock.calls.map(([name]) => name)).toEqual([PEER, STRANGER]);
+    // Its own folder first, for the answers it wrote.
+    expect(opened.mock.calls.map(([name]) => name)).toEqual([ME, PEER, STRANGER]);
   });
 });
 

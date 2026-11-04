@@ -90,11 +90,11 @@ function parseSignal(text: string | undefined): StampedSignal | undefined {
   }
 }
 
-/** The one signal of `kind` that `owner` left for this profile, if it is current. */
-async function signalOf(reading: Reading, owner: string, kind: Kind): Promise<StampedSignal[]> {
-  const { me, at, now } = reading;
-  const signal = parseSignal(await readAt(reading, signalPath(at.namespace, owner, kind, me)));
-  const fits = signal?.kind === kind && signal.profileId === owner && signal.to === me;
+/** The one signal of `kind` that `from` left for `to`, if it is current. */
+async function signalOf(reading: Reading, from: string, kind: Kind, to = reading.me) {
+  const { at, now } = reading;
+  const signal = parseSignal(await readAt(reading, signalPath(at.namespace, from, kind, to)));
+  const fits = signal?.kind === kind && signal.profileId === from && signal.to === to;
   return fits && signal.expiresAt > now ? [signal] : [];
 }
 
@@ -140,12 +140,14 @@ function createDownloadsReads() {
   const presenceOf = createPresenceReader();
   const catalog = createCatalogReader();
   const sightingOf = async (reading: Reading, owner: string): Promise<Sighting> => {
-    const [presence, offers, answers] = await Promise.all([
+    const [presence, offers, answers, mine] = await Promise.all([
       presenceOf(reading, owner),
       signalOf(reading, owner, "offer"),
       signalOf(reading, owner, "answer"),
+      // This profile's own answer to the peer, so a relaunch knows the offer it answered.
+      signalOf(reading, reading.me, "answer", owner),
     ]);
-    return { presences: presence ? [presence] : [], signals: [...offers, ...answers] };
+    return { presences: presence ? [presence] : [], signals: [...offers, ...answers, ...mine] };
   };
   return {
     look: async (reading: Reading) => {

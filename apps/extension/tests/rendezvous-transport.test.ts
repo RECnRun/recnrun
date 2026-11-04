@@ -233,6 +233,15 @@ describe.each(environments)("the $kind transport", ({ create }) => {
     expect((await peer?.look())?.signals).toEqual([signal(ME, PEER, { pairingId: OTHER_PAIRING })]);
   });
 
+  test("shows this profile its own answers on disk, so a relaunch knows what it answered", async () => {
+    const env = create();
+    const [me] = await announced(env, ME, PEER);
+    const answer = signal(ME, PEER, { kind: "answer" });
+    await me?.publish(answer);
+    await me?.publish(signal(ME, PEER));
+    expect((await env.transport(ME).look()).signals).toEqual([answer]);
+  });
+
   test("clean removes only this profile's own files", async () => {
     const env = create();
     const [me, peer] = await announced(env, ME, PEER);

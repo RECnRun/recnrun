@@ -136,6 +136,19 @@ async function readOwner(folder: Directory, owner: string, me: string, now: numb
   return { presence: current(presence) && presence, signals };
 }
 
+/** This profile's own current answers, so a relaunch knows the offers it answered. */
+async function ownAnswers(folder: Directory, me: string, now: number) {
+  const answers: StampedSignal[] = [];
+  for (const name of (await namesIn(folder)).filter(
+    (each) => SIGNAL_NAME.test(each) && each.startsWith("answer-"),
+  )) {
+    const signal = await readFile(folder, name, StampedSignalSchema).catch(() => undefined);
+    const mine = signal?.kind === "answer" && signal.profileId === me;
+    if (mine && signal.expiresAt > now) answers.push(signal);
+  }
+  return answers;
+}
+
 /**
  * Pairing through the folder every profile chose: each writes only into its own subfolder of
  * `pairing`, reads the others', and removes only its own files.
@@ -155,7 +168,7 @@ export function folderRendezvous(pairing: Directory, me: string, now: () => numb
   const publish = async (signal: StampedSignal) =>
     writeFile(await own(), `${signal.kind}-${signal.to}.json`, signal);
   const look = async (): Promise<Sighting> => {
-    const seen: Sighting = { presences: [], signals: [] };
+    const seen: Sighting = { presences: [], signals: await ownAnswers(await own(), me, now()) };
     for (const owner of await namesIn(pairing)) {
       if (owner === me || !v.is(ProfileIdSchema, owner)) continue;
       const folder = await pairing.getDirectoryHandle(owner).catch(() => undefined);

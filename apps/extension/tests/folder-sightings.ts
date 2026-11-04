@@ -69,7 +69,8 @@ export const seen = (presences: Presence[], signals: SignalFile[] = []): Seen =>
   presences,
   signals,
 });
-export const pendingFor = (to: string, expiresAt = NOW + 1000): PendingOffer => ({
+// Made a second ago unless told otherwise.
+export const pendingFor = (to: string, expiresAt = NOW - 1000 + PAIRING_TTL_MS): PendingOffer => ({
   pairingId: OFFER_ID,
   expiresAt,
   to,

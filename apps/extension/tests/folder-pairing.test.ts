@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vite-plus/test";
 import { decideFolderSteps } from "@/background/folder-pairing";
 import type { Seen } from "@/p2p/folder-rendezvous";
+import { PAIRING_TTL_MS } from "@/p2p/pairing-code";
 import type { Pin } from "@/p2p/pins";
 import type { AnsweredOffer } from "@/storage/answered-repository";
 import type { FolderActed, PendingOffer } from "@/storage/peer-repository";
@@ -47,6 +48,14 @@ describe("decideFolderSteps", () => {
     expect(decideFolderSteps(answered)).toEqual([{ type: "connect", answer }]);
   });
 
+  test("offers again once its offer went unanswered for a retry period, as a restarted answerer leaves it", () => {
+    const madeAgo = (ms: number) => ({ [PEER]: pendingFor(PEER, NOW - ms + PAIRING_TTL_MS) });
+    const waiting = { ...situation(ME, seen([presence(PEER)])), pending: madeAgo(29_999) };
+    expect(decideFolderSteps(waiting)).toEqual([]);
+    const unanswered = { ...waiting, pending: madeAgo(30_000) };
+    expect(decideFolderSteps(unanswered)).toEqual([{ type: "offer", to: presence(PEER) }]);
+  });
+
   test("offers again when its offer expired, and an offer to another profile does not count", () => {
     const sighting = seen([presence(PEER)]);
     const expired = { ...situation(ME, sighting), pending: { [PEER]: pendingFor(PEER, NOW) } };
@@ -88,6 +97,18 @@ describe("decideFolderSteps", () => {
     const answered = { [PEER]: { pairingId: OFFER_ID, expiresAt: offer.expiresAt } };
     const relaunched = { ...situation(STRANGER, seen([presence(PEER)], [offer])), answered };
     expect(decideFolderSteps(relaunched)).toEqual([]);
+  });
+
+  test("leaves an offer whose answer of its own it finds on disk, though it kept no record", () => {
+    const offer = signal("offer", PEER, STRANGER);
+    const mine = signal("answer", STRANGER, PEER);
+    expect(decideFolderSteps(situation(STRANGER, seen([presence(PEER)], [offer, mine])))).toEqual(
+      [],
+    );
+    const other = signal("answer", STRANGER, PEER, { pairingId: OTHER_ID });
+    expect(decideFolderSteps(situation(STRANGER, seen([presence(PEER)], [offer, other])))).toEqual([
+      { type: "answer", offer },
+    ]);
   });
 
   test("gives the link time after connecting before it offers again", () => {
