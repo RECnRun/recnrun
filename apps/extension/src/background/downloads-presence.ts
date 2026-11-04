@@ -4,6 +4,7 @@ import { browser } from "wxt/browser";
 import { downloadsWriter, settled } from "@/background/downloads-publisher";
 import type { DownloadsPort } from "@/background/downloads-publisher";
 import { ensureOffscreen } from "@/background/link";
+import { createRendezvousRelay } from "@/background/rendezvous-relay";
 import { BackgroundReplySchema } from "@/messaging/background-reply";
 import type { BackgroundReply } from "@/messaging/background-reply";
 import { PocFingerprintResultSchema, pocFingerprintRequest } from "@/messaging/poc-fingerprint";
@@ -107,7 +108,8 @@ async function publish(deps: PresenceDependencies) {
   let id: number | undefined;
   const transport = downloadsTransport({
     me: presence.profileId,
-    context: async () => ({ namespace, boot: await deps.boot(), root: await deps.root.read() }),
+    context: async () => ({ namespace, root: await deps.root.read() }),
+    boot: deps.boot,
     writer: { ...writer, write: async (path, text) => (id = await writer.write(path, text)) },
     read: () => Promise.reject(new Error("The offscreen document reads the others' files.")),
   });
@@ -187,7 +189,7 @@ async function offscreenFingerprint(): Promise<string> {
 /** The presence over Chrome's own Downloads, this profile's identity, and session storage. */
 export function startPocPresence(log: (entry: string) => void) {
   const store = pocPresenceStore();
-  const presence = startDownloadsPresence({
+  const deps: PresenceDependencies = {
     downloads: browser.downloads,
     identity: readIdentity,
     fingerprint: offscreenFingerprint,
@@ -197,8 +199,17 @@ export function startPocPresence(log: (entry: string) => void) {
     log,
     // Undefined in a build without the alarms permission.
     alarms: (browser as { alarms?: AlarmsPort }).alarms,
-  });
+  };
+  const presence = startDownloadsPresence(deps);
   const own = { extensionId: browser.runtime.id, extensionUrl: browser.runtime.getURL("/") };
   browser.runtime.onMessage.addListener(createPublishListener(presence.publish, own));
+  const relay = {
+    downloads: browser.downloads,
+    me: async () => (await readIdentity()).profileId,
+    namespace: () => namespaceOf(deps),
+    boot: store.boot,
+    root: () => store.root.read(),
+  };
+  browser.runtime.onMessage.addListener(createRendezvousRelay(relay, own));
   return presence;
 }

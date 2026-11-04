@@ -24,10 +24,9 @@ import type { RendezvousTransport } from "@/p2p/rendezvous-transport";
 type Registration = v.InferOutput<typeof RegistrationSchema>;
 type Kind = StampedSignal["kind"];
 
-/** Where this profile stands, as the background knows it. */
+/** Where this profile's files go, as the background knows it. */
 export interface DownloadsContext {
   namespace: string;
-  boot: string;
   /** The absolute Downloads root, once Chrome reported it. */
   root: string | null;
 }
@@ -43,6 +42,8 @@ export interface DownloadsWriter {
 export interface DownloadsTransportOptions {
   me: string;
   context: () => Promise<DownloadsContext>;
+  /** The boot each write is stamped with, asked each time, since the launcher's token may replace it. */
+  boot: () => Promise<string>;
   writer: DownloadsWriter;
   /** The text of a file:// URL, or undefined when it cannot be read. */
   read: (url: string) => Promise<string | undefined>;
@@ -156,7 +157,7 @@ function createDownloadsReads() {
 }
 
 /** This profile's writes, each into its own folder; it erases only the items it wrote. */
-function createDownloadsWrites({ me, context, writer, now }: DownloadsTransportOptions) {
+function createDownloadsWrites({ me, context, boot, writer, now }: DownloadsTransportOptions) {
   const stamp = createSignalStamp(now);
   const written: number[] = [];
   const write = async (path: string, text: string) => {
@@ -164,14 +165,18 @@ function createDownloadsWrites({ me, context, writer, now }: DownloadsTransportO
   };
   return {
     announce: async (presence: Presence) => {
-      const { namespace, boot } = await context();
+      const { namespace } = await context();
       // Through the schema, so the keys follow the order catalog.sh parses and a path is refused.
-      const registration = v.parse(RegistrationSchema, { ...presence, namespace, boot });
+      const registration = v.parse(RegistrationSchema, {
+        ...presence,
+        namespace,
+        boot: await boot(),
+      });
       await write(presencePath(namespace, me), JSON.stringify(registration));
     },
     publish: async (signal: SignalFile) => {
-      const { namespace, boot } = await context();
-      const stamped = v.parse(StampedSignalSchema, stamp(signal, boot));
+      const { namespace } = await context();
+      const stamped = v.parse(StampedSignalSchema, stamp(signal, await boot()));
       await write(signalPath(namespace, me, signal.kind, signal.to), JSON.stringify(stamped));
     },
     clean: async () => {

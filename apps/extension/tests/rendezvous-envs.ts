@@ -105,7 +105,8 @@ function downloadsEnv(): RendezvousEnv {
     transport: (me) =>
       downloadsTransport({
         me,
-        context: async () => ({ namespace: NAMESPACE, boot: boot(me), root: DOWNLOADS_ROOT }),
+        context: async () => ({ namespace: NAMESPACE, root: DOWNLOADS_ROOT }),
+        boot: async () => boot(me),
         writer: disk.writer,
         read: disk.read,
       }),

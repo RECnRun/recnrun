@@ -33,13 +33,11 @@ const offer = {
 /** A Downloads root shared by profiles, and a transport over it for `me`. */
 function shared(root: string | null = DOWNLOADS_ROOT) {
   const disk = downloadsDisk();
-  const context = vi.fn(async (): Promise<DownloadsContext> => ({
-    namespace: NAMESPACE,
-    boot: BOOT,
-    root,
-  }));
+  const context = vi.fn(async (): Promise<DownloadsContext> => ({ namespace: NAMESPACE, root }));
+  const boot = async () => BOOT;
   const read = vi.fn(disk.read);
-  const transport = (me = ME) => downloadsTransport({ me, context, writer: disk.writer, read });
+  const transport = (me = ME) =>
+    downloadsTransport({ me, context, boot, writer: disk.writer, read });
   const sync = () => disk.files.set(registryPath(NAMESPACE), JSON.stringify(catalogOf(disk.files)));
   return { disk, read, transport, sync };
 }

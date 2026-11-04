@@ -1,6 +1,7 @@
 import { pocEnabled } from "@/config/origins";
 import { startPocFileRead } from "@/offscreen/poc-file-read";
 import { startPocFingerprint } from "@/offscreen/poc-fingerprint";
+import { pocDownloadsRendezvous } from "@/offscreen/poc-rendezvous";
 import { startOffscreen } from "@/offscreen/start";
 import { persistentCertificate } from "@/p2p/certificate-store";
 
@@ -8,8 +9,10 @@ import { persistentCertificate } from "@/p2p/certificate-store";
 let held: Promise<RTCCertificate> | undefined;
 const certificate = () => (held ??= persistentCertificate());
 
-startOffscreen({ certificate });
-if (pocEnabled(import.meta.env.MODE)) {
+// POC builds rendezvous over Downloads (P3.1); the folder-watch command stays the same in both.
+const poc = pocEnabled(import.meta.env.MODE);
+startOffscreen({ certificate, ...(poc ? { rendezvous: pocDownloadsRendezvous() } : {}) });
+if (poc) {
   startPocFileRead();
   startPocFingerprint({ certificate });
 }

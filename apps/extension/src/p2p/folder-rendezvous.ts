@@ -35,7 +35,7 @@ export const SignalFileSchema = v.strictObject({
 export type SignalFile = v.InferOutput<typeof SignalFileSchema>;
 
 /** The run of a profile's process that wrote a file, so a reader tells an earlier run's apart. */
-const BootSchema = v.pipe(v.string(), v.uuid());
+export const BootSchema = v.pipe(v.string(), v.uuid());
 
 /** A presence as the folder stores it: with the boot of the document that wrote it. */
 const FolderPresenceSchema = v.strictObject({
