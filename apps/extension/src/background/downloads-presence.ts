@@ -214,7 +214,7 @@ export function startPocPresence({ log, sign, startPairing }: PocPresenceOptions
     namespace: store.namespace,
     boot: store.boot,
     root: store.root,
-    renew: presenceRenewal(store.root.read, log, store.policy),
+    renew: presenceRenewal({ root: store.root.read, log, policy: store.policy }),
     log,
     // Undefined in a build without the alarms permission.
     alarms: (browser as { alarms?: AlarmsPort }).alarms,

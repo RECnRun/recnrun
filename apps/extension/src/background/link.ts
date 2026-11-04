@@ -5,6 +5,8 @@ import { BackgroundReplySchema } from "@/messaging/background-reply";
 import { linkCommandMessage } from "@/messaging/peer-messages";
 import type { LinkCommand } from "@/messaging/peer-messages";
 import { PocFingerprintResultSchema, pocFingerprintRequest } from "@/messaging/poc-fingerprint";
+import { PocLivenessResultSchema, pocLivenessRequest } from "@/messaging/poc-liveness";
+import type { LinkLiveness } from "@/messaging/poc-liveness";
 
 let creating: Promise<void> | undefined;
 // Read through a function, so a check after an await is not narrowed to the value before it.
@@ -58,14 +60,19 @@ export async function askLink(command: LinkCommand): Promise<unknown> {
   return reply.output.result;
 }
 
-/** The offscreen document's certificate fingerprint, creating the document first. */
-export async function offscreenFingerprint(): Promise<string> {
+/** A POC request the offscreen document answers, creating the document first. */
+async function askOffscreen<T>(request: unknown, schema: v.GenericSchema<unknown, T>): Promise<T> {
   await ensureOffscreen();
-  const reply = v.safeParse(
-    BackgroundReplySchema,
-    await browser.runtime.sendMessage(pocFingerprintRequest()),
-  );
+  const reply = v.safeParse(BackgroundReplySchema, await browser.runtime.sendMessage(request));
   if (!reply.success) throw new Error("The offscreen document did not answer.");
   if (!reply.output.ok) throw new Error(reply.output.error);
-  return v.parse(PocFingerprintResultSchema, reply.output.result).fingerprint;
+  return v.parse(schema, reply.output.result);
 }
+
+/** The offscreen document's certificate fingerprint, creating the document first. */
+export const offscreenFingerprint = async (): Promise<string> =>
+  (await askOffscreen(pocFingerprintRequest(), PocFingerprintResultSchema)).fingerprint;
+
+/** When each link of the offscreen document last heard its peer, and the beats it sent (P3.6). */
+export const offscreenLiveness = async (): Promise<Record<string, LinkLiveness>> =>
+  (await askOffscreen(pocLivenessRequest(), PocLivenessResultSchema)).peers;

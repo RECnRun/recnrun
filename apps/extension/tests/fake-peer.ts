@@ -72,13 +72,20 @@ export function fakeOffscreen() {
   const commands: LinkCommand[] = [];
   const notices: unknown[] = [];
   // `pagesOpen: false` rejects notices, as Chrome does when no page listens.
-  const link = { sent: true, pagesOpen: true };
+  const link = {
+    sent: true,
+    pagesOpen: true,
+    // What the POC builds' heartbeat policy reads of each link (POC_LIVENESS).
+    liveness: (): Record<string, { heardAt?: number; beats: number }> => ({}),
+  };
   vi.spyOn(fakeBrowser.runtime, "getContexts").mockImplementation(answering(() => []));
   vi.spyOn(fakeBrowser.offscreen, "createDocument").mockResolvedValue(undefined);
   const answer = (message: unknown) => {
     // The POC builds' presence asks the offscreen document for its certificate's fingerprint.
     if ((message as { type?: string }).type === "POC_FINGERPRINT")
       return { ok: true, result: { fingerprint: FINGERPRINT } };
+    if ((message as { type?: string }).type === "POC_LIVENESS")
+      return { ok: true, result: { peers: link.liveness() } };
     const { target, command } = message as { target?: string; command: LinkCommand };
     if (target !== "offscreen") {
       if (!link.pagesOpen) throw new Error("Receiving end does not exist.");

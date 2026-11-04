@@ -33,7 +33,7 @@ afterEach(() => {
 });
 
 async function setup(policy: unknown = "linked-silence") {
-  fakeOffscreen();
+  const offscreen = fakeOffscreen();
   const download = vi
     .spyOn(fakeBrowser.downloads, "download")
     .mockImplementation(answering(() => 1));
@@ -60,7 +60,7 @@ async function setup(policy: unknown = "linked-silence") {
   const log = vi.fn();
   const presence = startPocPresence({ log, sign, startPairing: async () => {} });
   await vi.advanceTimersByTimeAsync(0);
-  return { download, presence, log };
+  return { download, presence, log, offscreen };
 }
 
 async function tick() {
@@ -124,7 +124,7 @@ test.each([null, "baseline"])("%s retains the baseline half-TTL renewal", async 
 });
 
 test("invalid policy and unreadable link state are logged and keep renewal", async () => {
-  const { download, presence, log } = await setup("heartbeat");
+  const { download, presence, log } = await setup("sometimes");
   await tick();
   expect(download).toHaveBeenCalledTimes(2);
   expect(log).toHaveBeenCalledWith(expect.stringContaining("presence policy"));
@@ -145,4 +145,48 @@ test("a connected but unverified link keeps announcing and an explicit bootstrap
   await presence.publish();
   expect(download).toHaveBeenCalledTimes(3);
   presence.stop();
+});
+
+test("heartbeat stays silent while each peer beat within a TTL, also over a dropped link, and renews after a TTL of silence", async () => {
+  const { download, presence, offscreen } = await setup("heartbeat");
+  let heardAt = Date.now();
+  offscreen.link.liveness = () => ({ [PEER]: { heardAt, beats: 1 } });
+  for (let count = 0; count < 6; count++) {
+    heardAt = Date.now();
+    await tick();
+  }
+  expect(download).toHaveBeenCalledTimes(1);
+  heardAt = Date.now();
+  await peerLinksRepository.set(PEER, { state: "disconnected", verified: false });
+  await tick();
+  expect(download).toHaveBeenCalledTimes(1);
+  await tick();
+  expect(download).toHaveBeenCalledTimes(2);
+  await tick();
+  expect(download).toHaveBeenCalledTimes(3);
+  heardAt = Date.now();
+  await tick();
+  expect(download).toHaveBeenCalledTimes(3);
+  presence.stop();
+});
+
+test("heartbeat renews for an authorized peer whose link never beat", async () => {
+  const { download, presence } = await setup("heartbeat");
+  await tick();
+  expect(download).toHaveBeenCalledTimes(2);
+  presence.stop();
+});
+
+test("launcher writes once to learn the root, then leaves renewal to the launcher across a restart", async () => {
+  const { download, presence } = await setup("launcher");
+  expect(download).toHaveBeenCalledTimes(1);
+  for (let count = 0; count < 6; count++) await tick();
+  expect(download).toHaveBeenCalledTimes(1);
+  presence.stop();
+  const restarted = startPocPresence({ log: vi.fn(), sign, startPairing: async () => {} });
+  await vi.advanceTimersByTimeAsync(0);
+  expect(download).toHaveBeenCalledTimes(1);
+  await restarted.publish();
+  expect(download).toHaveBeenCalledTimes(2);
+  restarted.stop();
 });

@@ -5,6 +5,7 @@ import type { Browser } from "wxt/browser";
 import type { BackgroundReply } from "@/messaging/background-reply";
 import { LinkCommandMessageSchema, linkEventMessage } from "@/messaging/peer-messages";
 import type { LinkCommand, LinkEvent } from "@/messaging/peer-messages";
+import type { LinkLiveness } from "@/messaging/poc-liveness";
 import { createRendezvousWatch } from "@/offscreen/folder-watch";
 import type { RendezvousWatch } from "@/offscreen/folder-watch";
 import { certificateFingerprint, persistentCertificate } from "@/p2p/certificate-store";
@@ -38,13 +39,16 @@ async function runFolderCommand(watch: RendezvousWatch, command: FolderCommand, 
 
 interface Held {
   linkOf: (peer: string) => PeerLink;
+  liveness: () => Record<string, LinkLiveness>;
   watch: RendezvousWatch;
 }
 
 /** One link per peer, made on first use, each reporting its events under the peer's id. */
 function createLinks(certificate: RTCCertificate, report: (event: LinkEvent) => void) {
   const links = new Map<string, PeerLink>();
-  return (peer: string): PeerLink => {
+  const liveness = () =>
+    Object.fromEntries([...links].map(([peer, link]) => [peer, link.liveness()]));
+  const linkOf = (peer: string): PeerLink => {
     const known = links.get(peer);
     if (known) return known;
     const link: PeerLink = createPeerLink(
@@ -61,6 +65,7 @@ function createLinks(certificate: RTCCertificate, report: (event: LinkEvent) => 
     links.set(peer, link);
     return link;
   };
+  return { linkOf, liveness };
 }
 
 /** Runs one command; the offscreen document holds the connections and no logic beyond them. */
@@ -108,7 +113,7 @@ export function startOffscreen({
   folder = loadFolder,
   rendezvous = folderRendezvousOf(folder),
   sign = signedIdentity,
-}: OffscreenOptions = {}): void {
+}: OffscreenOptions = {}) {
   // A sleeping service worker wakes for the message; a closed one makes nothing to report to.
   const report = (event: LinkEvent) => void send(linkEventMessage(event)).catch(() => {});
   const ready = certificate().then((cert) => {
@@ -120,7 +125,7 @@ export function startOffscreen({
       sign: signFor,
       transport: rendezvous,
     });
-    return { linkOf: createLinks(cert, report), watch };
+    return { ...createLinks(cert, report), watch };
   });
   const backgroundUrl = browser.runtime.getURL("/background.js");
   browser.runtime.onMessage.addListener(
@@ -143,4 +148,6 @@ export function startOffscreen({
       return true;
     },
   );
+  // POC builds answer for it (P3.6), so their heartbeat policy reads it without a link command.
+  return { liveness: async () => (await ready).liveness() };
 }
