@@ -55,6 +55,9 @@ export interface TolerantRead {
   reason: ReadReason;
 }
 
+/** How far ahead of this clock another profile's publication may be stamped. */
+const CLOCK_SKEW_MS = 5000;
+
 /** Current, and never claiming to live longer than one TTL from now. */
 const stands = (publication: Presence, now: number) =>
   publication.expiresAt > now && publication.expiresAt - now <= PRESENCE_TTL_MS;
@@ -69,28 +72,37 @@ function parse(text: string): { value?: unknown; reason?: ReadReason } {
   }
 }
 
+/** Why a well-formed publication does not replace the usable one, if it does not. */
+function refusal(
+  publication: Presence,
+  usable: Presence | undefined,
+  now: number,
+): ReadReason | undefined {
+  if (publication.createdAt > now + CLOCK_SKEW_MS) return "invalid";
+  if (usable && publication.createdAt < usable.createdAt) return "older";
+  if (publication.expiresAt <= now) return "expired";
+  return stands(publication, now) ? undefined : "invalid";
+}
+
 /**
  * Reads a publication from a file another writer may be replacing. An absent, empty, truncated,
  * or foreign file, or a temporary read error (passed as undefined), keeps the previous valid
- * publication until its TTL; an older one never replaces a newer one.
+ * publication until its TTL, an expired replacement included; an older one never replaces a newer one.
  */
 export function readTolerant(
   text: string | undefined,
   previous: Presence | undefined,
   now = Date.now(),
 ): TolerantRead {
-  const kept = (reason: ReadReason): TolerantRead => ({
-    publication: previous && stands(previous, now) ? previous : undefined,
-    reason,
-  });
+  // An expired previous publication is not a basis for comparison or for keeping.
+  const usable = previous && stands(previous, now) ? previous : undefined;
+  const kept = (reason: ReadReason): TolerantRead => ({ publication: usable, reason });
   if (text === undefined) return kept("absent");
   const { value, reason } = parse(text);
   if (reason) return kept(reason);
   const parsed = v.safeParse(PresenceSchema, value);
   if (!parsed.success) return kept("invalid");
   const publication = parsed.output;
-  if (previous && publication.createdAt < previous.createdAt) return kept("older");
-  if (publication.expiresAt <= now) return { publication: undefined, reason: "expired" };
-  if (!stands(publication, now)) return kept("invalid");
-  return { publication, reason: "fresh" };
+  const refused = refusal(publication, usable, now);
+  return refused ? kept(refused) : { publication, reason: "fresh" };
 }

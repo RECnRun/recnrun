@@ -130,11 +130,34 @@ describe("readTolerant", () => {
     expect(readTolerant("{", previous, later - 1).publication).toEqual(previous);
   });
 
-  test("an expired publication in the file is not current", () => {
+  test("an expired replacement keeps the valid previous publication until its TTL", () => {
     const expired = presence({ createdAt: NOW, expiresAt: NOW - 1 });
     expect(readTolerant(JSON.stringify(expired), previous, NOW)).toEqual({
+      publication: previous,
+      reason: "expired",
+    });
+    expect(readTolerant(JSON.stringify(expired), undefined, NOW)).toEqual({
       publication: undefined,
       reason: "expired",
+    });
+  });
+
+  test("refuses a creation time beyond a small clock skew", () => {
+    const future = presence({ createdAt: NOW + 60_000 });
+    expect(readTolerant(JSON.stringify(future), previous, NOW)).toEqual({
+      publication: previous,
+      reason: "invalid",
+    });
+    const skewed = presence({ createdAt: NOW + 1000 });
+    expect(readTolerant(JSON.stringify(skewed), undefined, NOW).reason).toBe("fresh");
+  });
+
+  test("a valid publication after an expired previous one is not older", () => {
+    const stale = presence({ createdAt: NOW + 5000, expiresAt: NOW - 1 });
+    const fresh = presence({ createdAt: NOW - 1000 });
+    expect(readTolerant(JSON.stringify(fresh), stale, NOW)).toEqual({
+      publication: fresh,
+      reason: "fresh",
     });
   });
 });
