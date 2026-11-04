@@ -35,12 +35,13 @@ export async function signalLands(
   path: string,
   ms: number,
   match: (signal: StampedSignal) => boolean = () => true,
+  every = SAMPLE_MS,
 ): Promise<{ signal: StampedSignal; mtimeMs: number } | undefined> {
   const read = async () => {
     const signal = await readSignal(path);
     return signal && match(signal) ? { signal, mtimeMs: (await stat(path)).mtimeMs } : undefined;
   };
-  return (await within(read, ms))?.value;
+  return (await within(read, ms, every))?.value;
 }
 
 /** The signal of `kind` that `from` left for `to` under the shared folder, as it stands now. */

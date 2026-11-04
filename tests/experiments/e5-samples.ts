@@ -38,6 +38,7 @@ export const E5_CELLS = {
   "E5.a.corrupt": TWO_VIRTUAL,
   "E5.a.clockChange": TWO_VIRTUAL,
   "E5.a.quitDuringIce": TWO,
+  "E5.a.quitAfterAnswer": TWO,
   "E5.a.bothRestart": TWO,
   "E5.a.readCache": TWO_VIRTUAL,
   "E5.a.noPage": TWO,

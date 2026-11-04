@@ -86,6 +86,52 @@ export const quitDuringIceSample = (environment: E5Environment) =>
     return judged(problems, observation);
   });
 
+/** How often E5.a.quitAfterAnswer looks for the answer: the offerer reads it 100 ms or more after it lands. */
+const ANSWER_POLL_MS = 5;
+
+/**
+ * E5.a.quitAfterAnswer: the answerer dies once its answer is on disk and before the link is up,
+ * comes back, and the pair links within two retry periods; it never answers that offer again.
+ */
+export const quitAfterAnswerSample = (environment: E5Environment) =>
+  withGroup(environment, async (group) => {
+    const { profiles } = await arrive(group, 2);
+    const { offerer, answerer } = pairOf(profiles);
+    const before = await identityOf(answerer);
+    const offerPath = signalFile(group.downloads, offerer.profileId, "offer", answerer.profileId);
+    const offer = await signalLands(offerPath, OFFER_MS);
+    if (!offer) return judged([`no offer within ${OFFER_MS} ms`], {});
+    const { pairingId } = offer.signal;
+    const answerPath = signalFile(group.downloads, answerer.profileId, "answer", offerer.profileId);
+    const mine = (each: { pairingId?: string }) => each.pairingId === pairingId;
+    const answer = await signalLands(answerPath, OFFER_MS, mine, ANSWER_POLL_MS);
+    await group.kill(answerer);
+    const killedAt = Date.now();
+    // A link verified now came up before the kill, since its DTLS needs the answerer alive.
+    const linkedBeforeKill = await linkedWith(offerer, answerer);
+    await group.relaunch(answerer);
+    const linkMs = await relinked(profiles);
+    const after = await identityOf(answerer);
+    const answers = (await signalWrites(answerer)).filter(
+      (each) => each.name.startsWith("answer-") && mine(each),
+    ).length;
+    const observation = {
+      killAfterAnswerMs: answer ? Math.round(killedAt - answer.mtimeMs) : undefined,
+      linkedBeforeKill,
+      relinkAfterKillMs: linkMs === undefined ? undefined : Date.now() - killedAt,
+      answersToThatOffer: answers,
+      sameProfileId: after.profileId === before.profileId,
+    };
+    const problems = [
+      ...(answer ? [] : [`no answer within ${OFFER_MS} ms`]),
+      ...(linkedBeforeKill ? ["the link came up before the kill"] : []),
+      ...(linkMs === undefined ? [`no link within ${RELINK_MS} ms of the relaunch`] : []),
+      ...(answers === 1 ? [] : [`that offer was answered ${answers} times`]),
+      ...(observation.sameProfileId ? [] : ["the relaunched answerer has another profile id"]),
+    ];
+    return judged(problems, observation);
+  });
+
 /** E5.a.bothRestart: both quit, both come back on their roots, and they link with the same identities. */
 export const bothRestartSample = (environment: E5Environment) =>
   withGroup(environment, async (group) => {

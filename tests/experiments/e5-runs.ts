@@ -10,6 +10,7 @@ import {
   bothRestartSample,
   closePagesSample,
   noPageSample,
+  quitAfterAnswerSample,
   quitDuringIceSample,
 } from "./e5-restart-samples.ts";
 import { arrivalSample, iceCompleteSample, simultaneousSample } from "./e5-samples.ts";
@@ -67,6 +68,10 @@ export const E5_RUNS: Record<E5Hypothesis, E5Run> = {
   "E5.a.quitDuringIce": {
     title: "the answerer crashes while it gathers, returns, and links",
     sample: quitDuringIceSample,
+  },
+  "E5.a.quitAfterAnswer": {
+    title: "the answerer crashes once its answer is out, returns, and links",
+    sample: quitAfterAnswerSample,
   },
   "E5.a.bothRestart": {
     title: "both restart and link with the same identities",
