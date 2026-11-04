@@ -21,7 +21,7 @@ const registration = {
   displayName: "Desk",
   fingerprint: FINGERPRINT,
   createdAt: NOW - 1000,
-  expiresAt: NOW + PRESENCE_TTL_MS,
+  expiresAt: NOW - 1000 + PRESENCE_TTL_MS,
   namespace: "lab-1",
   boot: BOOT,
 };
@@ -86,6 +86,20 @@ describe("RegistrationSchema", () => {
         schema.type,
       );
     }
+  });
+
+  test.each([
+    ["expires before it is created", NOW, NOW - 1],
+    ["expires as it is created", NOW, NOW],
+    ["lives a week", NOW, NOW + 7 * 86_400_000],
+    ["lives one millisecond over the TTL", NOW, NOW + PRESENCE_TTL_MS + 1],
+  ])("refuses a registration that %s", (_name, createdAt, expiresAt) => {
+    expect(v.is(RegistrationSchema, { ...registration, createdAt, expiresAt })).toBe(false);
+  });
+
+  test("accepts a registration that lives exactly the TTL", () => {
+    const exact = { ...registration, createdAt: NOW, expiresAt: NOW + PRESENCE_TTL_MS };
+    expect(v.is(RegistrationSchema, exact)).toBe(true);
   });
 
   test("refuses a registration without its boot", () => {

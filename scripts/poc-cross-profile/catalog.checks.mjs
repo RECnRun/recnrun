@@ -30,6 +30,13 @@ const V1 = "11111111-1111-1111-8111-111111111111";
 const timeOver = (key) =>
   JSON.stringify(presence(BOB)).replace(new RegExp(`"${key}":[0-9]+`), `"${key}":9007199254740992`);
 
+const DAY = 86_400_000;
+/** Bob's registration with its times offset from now, so it is not yet expired. */
+function freshness({ createdAt = 0, expiresAt = createdAt + 60_000 }) {
+  const now = Date.now();
+  return JSON.stringify(presence(BOB, { createdAt: now + createdAt, expiresAt: now + expiresAt }));
+}
+
 for (const shell of shells) {
   await test(`${shell}: catalogs two roots under two ids and writes the ids back`, (context) => {
     const { home, rootA, rootB, out, record } = lab(context);
@@ -91,8 +98,9 @@ for (const shell of shells) {
   await test(`${shell}: keeps the newer presence of a profile found in two roots`, (context) => {
     const { rootA, rootB, out, record } = lab(context);
     writeFileSync(record, `downloadsRoot=${rootA}\n\ndownloadsRoot=${rootB}\n`);
-    announce(rootA, presence(ALICE));
-    announce(rootB, presence(ALICE, { createdAt: 1_800_000_000_001 }));
+    const first = presence(ALICE);
+    announce(rootA, first);
+    announce(rootB, presence(ALICE, { createdAt: first.createdAt + 1 }));
     assert.equal(run(shell, [record, NAMESPACE, out]).code, 0);
     assert.deepEqual(Object.keys(readRegistry(out).peers), [ALICE]);
     assert.equal(readRegistry(out).peers[ALICE].root, "r2");
@@ -182,6 +190,14 @@ for (const shell of shells) {
       [BOB, JSON.stringify(presence(BOB, { boot: HYPHEN_BOOT })), "presence.json", /boot/],
       [BOB, timeOver("createdAt"), "presence.json", /invalid createdAt/],
       [BOB, timeOver("expiresAt"), "presence.json", /invalid expiresAt/],
+      [BOB, freshness({ createdAt: DAY }), "presence.json", /ahead of this clock/],
+      [BOB, freshness({ expiresAt: 7 * DAY }), "presence.json", /longer than 60000 ms/],
+      [
+        BOB,
+        freshness({ createdAt: 3000, expiresAt: 2000 }),
+        "presence.json",
+        /not after createdAt/,
+      ],
       [BOB, "x".repeat(4096), "presence.json", /bytes/],
       [BOB, text, "registration.json", /no presence.json/],
     ];

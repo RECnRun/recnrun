@@ -17,8 +17,10 @@ export const NAMESPACE = "lab-1";
 export const ALICE = "11111111-1111-4111-8111-111111111111";
 export const BOB = "22222222-2222-4222-8222-222222222222";
 export const CAROL = "33333333-3333-4333-8333-333333333333";
-// Far enough ahead that no run of these checks sees it expire.
-const LATER = 4_000_000_000_000;
+// PRESENCE_TTL_MS: a registration lives exactly this long after it is stamped.
+export const PRESENCE_TTL_MS = 60_000;
+// Where normalized() puts each peer's expiry, one TTL after the fixed lastSeenAt's second.
+const EXPIRES = 1_800_000_060_000;
 export const EX_USAGE = 64;
 export const EX_DATAERR = 65;
 export const EX_CANTCREAT = 73;
@@ -29,14 +31,15 @@ export const shells = ["sh", ...(dash ? [dash] : [])];
 
 export const PEER_BOOT = "55555555-5555-4555-8555-555555555555";
 
-/** A registration, in the key order of RegistrationSchema, as the extension publishes it. */
+/** A registration, in the key order of RegistrationSchema, stamped now as the extension does. */
 export function presence(profileId, overrides = {}) {
+  const createdAt = overrides.createdAt ?? Date.now();
   return {
     profileId,
     displayName: "Desk",
     fingerprint: "AB:CD:EF",
-    createdAt: 1_800_000_000_000,
-    expiresAt: LATER,
+    createdAt,
+    expiresAt: createdAt + PRESENCE_TTL_MS,
     namespace: NAMESPACE,
     boot: PEER_BOOT,
     ...overrides,
@@ -102,7 +105,9 @@ export function normalized(registry, before) {
   const peers = Object.fromEntries(
     Object.entries(registry.peers).map(([id, peer]) => {
       assert.equal(peer.lastSeenAt, registry.writtenAt);
-      return [id, { ...peer, lastSeenAt: 1_800_000_000_500 }];
+      assert.ok(peer.expiresAt > registry.writtenAt);
+      assert.ok(peer.expiresAt <= registry.writtenAt + PRESENCE_TTL_MS + 5000);
+      return [id, { ...peer, lastSeenAt: 1_800_000_000_500, expiresAt: EXPIRES }];
     }),
   );
   return { ...registry, writtenAt: 1_800_000_000_500, peers };
@@ -124,6 +129,6 @@ export const peerOf = (profileId, root) => ({
   fingerprint: "AB:CD:EF",
   root,
   lastSeenAt: 1_800_000_000_500,
-  expiresAt: LATER,
+  expiresAt: EXPIRES,
   boot: PEER_BOOT,
 });

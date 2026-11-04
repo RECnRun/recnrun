@@ -22,18 +22,25 @@ const TimeSchema = v.pipe(v.number(), v.safeInteger(), v.minValue(0));
 /**
  * What an extension publishes for the launcher: its presence, its namespace, and the boot of its
  * process, which tells a registration of an earlier run apart. A strict object, so a `path`,
- * `root`, `userDataDir`, `directory`, or `filename` key is refused like any other.
+ * `root`, `userDataDir`, `directory`, or `filename` key is refused like any other. It lives at
+ * most one presence TTL after it is stamped, the bound catalog.sh enforces.
  */
-export const RegistrationSchema = v.strictObject({
-  // PresenceSchema's entries spelled out: a spread of them would stay in the production background.
-  profileId: ProfileIdSchema,
-  displayName: DisplayNameSchema,
-  fingerprint: FingerprintSchema,
-  createdAt: v.number(),
-  expiresAt: v.number(),
-  namespace: NamespaceSchema,
-  boot: BootSchema,
-});
+export const RegistrationSchema = v.pipe(
+  v.strictObject({
+    // PresenceSchema's entries spelled out: a spread of them would stay in the production background.
+    profileId: ProfileIdSchema,
+    displayName: DisplayNameSchema,
+    fingerprint: FingerprintSchema,
+    createdAt: v.number(),
+    expiresAt: v.number(),
+    namespace: NamespaceSchema,
+    boot: BootSchema,
+  }),
+  v.check(
+    ({ createdAt, expiresAt }) => expiresAt > createdAt && expiresAt - createdAt <= PRESENCE_TTL_MS,
+    "A registration expires after it is created and within one presence TTL.",
+  ),
+);
 
 /** The launcher's opaque name for one Downloads root it knows, never the path itself. */
 export const RootIdSchema = v.pipe(v.string(), v.regex(/^r[0-9]{1,3}$/));

@@ -218,3 +218,26 @@ await test("the script never evaluates text as shell code", () => {
   assert.doesNotMatch(text, /\beval\b/);
   assert.doesNotMatch(text, /^\s*(\.|source)\s/m);
 });
+
+/** The value of `const <name> = <digits> [* <digits>]...;` in a TypeScript source. */
+function constantIn(path, name) {
+  const text = readFileSync(new URL(`../../${path}`, import.meta.url), "utf8");
+  const match = new RegExp(`export const ${name} = ([0-9_ *]+);`).exec(text);
+  assert.ok(match, `${name} in ${path}`);
+  return match[1]
+    .split("*")
+    .reduce((product, factor) => product * Number(factor.trim().replaceAll("_", "")), 1);
+}
+
+await test("the script's freshness bounds are the extension's constants", () => {
+  const text = readFileSync(script, "utf8");
+  const shellValue = (name) => Number(new RegExp(`^${name}=([0-9]+)$`, "m").exec(text)?.[1]);
+  assert.equal(
+    shellValue("clock_skew_ms"),
+    constantIn("apps/extension/src/p2p/downloads-rendezvous.ts", "CLOCK_SKEW_MS"),
+  );
+  assert.equal(
+    shellValue("presence_ttl_ms"),
+    constantIn("apps/extension/src/p2p/folder-rendezvous.ts", "PRESENCE_TTL_MS"),
+  );
+});

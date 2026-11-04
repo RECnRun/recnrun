@@ -18,7 +18,9 @@
 #    "expiresAt":<ms>,"namespace":"<namespace>","boot":"<v4 uuid>"}
 # where the profile id is a lowercase v4 uuid naming its folder, the boot a lowercase v4 uuid,
 # the namespace the one asked for, the name 1 to 64 bytes with no backslash, quote, control
-# character, or edge space, and the times whole numbers up to 2^53 - 1; anything else is skipped with a reason on stderr. The boot goes into the registry.
+# character, or edge space, the times whole numbers up to 2^53 - 1, createdAt at most 5000 ms
+# ahead of this clock, and expiresAt after now, after createdAt, and at most 60000 ms after
+# createdAt; anything else is skipped with a reason on stderr. The boot goes into the registry.
 # No value read from a file is ever run or expanded.
 #
 # Exit: 0 written, 64 wrong call, 65 invalid record, 66 no record, 73 cannot write,
@@ -32,6 +34,9 @@ nl='
 '
 tab=$(printf '\t')
 max_peers=32
+# No import from sh: CLOCK_SKEW_MS (downloads-rendezvous.ts) and PRESENCE_TTL_MS (folder-rendezvous.ts).
+clock_skew_ms=5000
+presence_ttl_ms=60000
 
 log() { printf 'catalog.sh: %s\n' "$*" >&2; }
 fail() {
@@ -284,7 +289,17 @@ read_presence() {
   is_v4 "$value" || { reason='invalid boot'; return 1; }
   pr_boot=$value
   if [ "$rest" != '"}' ]; then reason='extra keys or text after boot'; return 1; fi
+  fresh
+}
+# A closed profile drops out within one TTL: no stamp ahead of the skew, no longer lifetime.
+fresh() {
   if [ "$pr_expires" -le "$now" ]; then reason='expired'; return 1; fi
+  if [ "$pr_created" -gt $((now + clock_skew_ms)) ]; then reason='createdAt is ahead of this clock'; return 1; fi
+  if [ "$pr_expires" -le "$pr_created" ]; then reason='expiresAt is not after createdAt'; return 1; fi
+  if [ $((pr_expires - pr_created)) -gt "$presence_ttl_ms" ]; then
+    reason="it lives longer than $presence_ttl_ms ms"
+    return 1
+  fi
 }
 
 # Accepted presences, one "id<TAB>root<TAB>name<TAB>fingerprint<TAB>createdAt<TAB>expiresAt<TAB>boot" line each.
