@@ -36,12 +36,28 @@ export function registryPath(namespace: string): string {
   return `${namespaceFolder(namespace)}/registry.json`;
 }
 
-/** Where a profile publishes its presence; the launcher reads only this name in a uuid folder. */
-export function presencePath(namespace: string, profileId: string): string {
+/** A profile id as a path segment, which only a uuid may be. */
+function profileSegment(profileId: string): string {
   if (!v.is(ProfileIdSchema, profileId)) {
     throw new Error(`Invalid profile id ${JSON.stringify(profileId)}: use a uuid.`);
   }
-  return `${namespaceFolder(namespace)}/peers/${profileId}/presence.json`;
+  return profileId;
+}
+
+/** Where a profile publishes its presence; the launcher reads only this name in a uuid folder. */
+export function presencePath(namespace: string, profileId: string): string {
+  return `${namespaceFolder(namespace)}/peers/${profileSegment(profileId)}/presence.json`;
+}
+
+/** Where `from` leaves its one current signal of `kind` for `to`, in its own folder. */
+export function signalPath(
+  namespace: string,
+  from: string,
+  kind: "offer" | "answer",
+  to: string,
+): string {
+  const folder = `${namespaceFolder(namespace)}/peers/${profileSegment(from)}`;
+  return `${folder}/${kind}-${profileSegment(to)}.json`;
 }
 
 function encodedSegments(segments: string[], path: string): string {

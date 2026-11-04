@@ -3,6 +3,7 @@ import * as v from "valibot";
 import { browser } from "wxt/browser";
 import type { Browser } from "wxt/browser";
 import { NamespaceSchema, probePath } from "@/p2p/downloads-rendezvous";
+import type { DownloadsWriter } from "@/p2p/downloads-transport";
 import { MAX_CODE_LENGTH } from "@/p2p/protocol";
 
 /*
@@ -68,8 +69,36 @@ const PocDownloadMessageSchema = v.variant("type", [
 type PocDownloadMessage = v.InferOutput<typeof PocDownloadMessageSchema>;
 type ProbeMessage = Extract<PocDownloadMessage, { type: "POC_DOWNLOAD_PROBE" }>;
 
-export const dataUrl = (content: string) =>
+const dataUrl = (content: string) =>
   `data:application/json;charset=utf-8,${encodeURIComponent(content)}`;
+
+/** The part of chrome.downloads that erases what a transport wrote. */
+export interface DownloadsEraser {
+  removeFile(id: number): Promise<void>;
+  erase(query: { id: number }): Promise<number[]>;
+}
+
+/** Writes rendezvous files through Downloads, replacing each without asking; erases with `eraser` only. */
+export function downloadsWriter(
+  downloads: Pick<DownloadsPort, "download">,
+  eraser?: DownloadsEraser,
+): DownloadsWriter {
+  return {
+    write: (path, text) =>
+      downloads.download({
+        url: dataUrl(text),
+        filename: path,
+        saveAs: false,
+        conflictAction: "overwrite",
+      }),
+    erase: async (id) => {
+      if (!eraser) throw new Error("This writer erases nothing.");
+      // The file may be gone already or unfinished; the history entry goes either way.
+      await eraser.removeFile(id).catch(() => {});
+      await eraser.erase({ id });
+    },
+  };
+}
 
 /** Resolves once the item leaves `in_progress`, or after `ms`, whichever comes first. */
 export function settled(downloads: DownloadsPort, id: number, ms: number): Promise<void> {

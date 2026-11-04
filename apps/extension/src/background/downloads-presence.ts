@@ -1,16 +1,18 @@
 import { errorMessage } from "@recnrun/domain";
 import * as v from "valibot";
 import { browser } from "wxt/browser";
-import { dataUrl, settled } from "@/background/downloads-publisher";
+import { downloadsWriter, settled } from "@/background/downloads-publisher";
 import type { DownloadsPort } from "@/background/downloads-publisher";
 import { ensureOffscreen } from "@/background/link";
 import { BackgroundReplySchema } from "@/messaging/background-reply";
 import type { BackgroundReply } from "@/messaging/background-reply";
 import { PocFingerprintResultSchema, pocFingerprintRequest } from "@/messaging/poc-fingerprint";
 import { PocPublishPresenceSchema } from "@/messaging/poc-presence";
-import { DEFAULT_NAMESPACE, NamespaceSchema } from "@/p2p/downloads-rendezvous";
+import { DEFAULT_NAMESPACE, NamespaceSchema, presencePath } from "@/p2p/downloads-rendezvous";
+import { downloadsTransport } from "@/p2p/downloads-transport";
 import { PRESENCE_TTL_MS } from "@/p2p/folder-rendezvous";
-import { RegistrationSchema, registrationName } from "@/p2p/registry";
+import type { Presence } from "@/p2p/folder-rendezvous";
+import { registrationName } from "@/p2p/registry";
 import { readIdentity } from "@/storage/peer-repository";
 import type { ProfileIdentity } from "@/storage/peer-repository";
 import { pocPresenceStore } from "@/storage/poc-presence-repository";
@@ -52,10 +54,6 @@ export interface PresenceDependencies {
   now?: () => number;
 }
 
-/** The presence's destination, relative to the Downloads root. */
-const presencePath = (namespace: string, profileId: string) =>
-  `RECnRun/poc/${namespace}/peers/${profileId}/presence.json`;
-
 async function namespaceOf({ namespace, log }: PresenceDependencies): Promise<string> {
   const stored = await namespace();
   if (stored === undefined || stored === null) return DEFAULT_NAMESPACE;
@@ -64,22 +62,21 @@ async function namespaceOf({ namespace, log }: PresenceDependencies): Promise<st
   return DEFAULT_NAMESPACE;
 }
 
-/** The registration through its schema, so its keys follow the order the catalog parses and a path is refused. */
-async function registration(deps: PresenceDependencies, namespace: string, now: number) {
+/** This profile's presence; the transport adds the namespace and the boot. */
+async function presenceOf(deps: PresenceDependencies, now: number): Promise<Presence> {
   const identity = await deps.identity();
   const displayName = registrationName(identity.profileId, identity.displayName);
   if (displayName !== identity.displayName) {
     deps.log(`presence: published as "${displayName}", the stored name does not fit the catalog`);
   }
-  return v.parse(RegistrationSchema, {
+  // The whole identity, so the registration schema refuses a key it does not know, a path included.
+  return {
     ...identity,
     displayName,
     fingerprint: await deps.fingerprint(),
     createdAt: now,
     expiresAt: now + PRESENCE_TTL_MS,
-    namespace,
-    boot: await deps.boot(),
-  });
+  };
 }
 
 /** The Downloads root of an absolute filename that ends with `relative`, in either separator. */
@@ -101,18 +98,21 @@ async function learnRoot(deps: PresenceDependencies, id: number, relative: strin
   await deps.root.write(root);
 }
 
+/** Announces through the Downloads transport, keeping the item's id to learn the root from. */
 async function publish(deps: PresenceDependencies) {
   const now = (deps.now ?? Date.now)();
   const namespace = await namespaceOf(deps);
-  const presence = await registration(deps, namespace, now);
-  const filename = presencePath(namespace, presence.profileId);
-  const id = await deps.downloads.download({
-    url: dataUrl(JSON.stringify(presence)),
-    filename,
-    saveAs: false,
-    conflictAction: "overwrite",
+  const presence = await presenceOf(deps, now);
+  const writer = downloadsWriter(deps.downloads);
+  let id: number | undefined;
+  const transport = downloadsTransport({
+    me: presence.profileId,
+    context: async () => ({ namespace, boot: await deps.boot(), root: await deps.root.read() }),
+    writer: { ...writer, write: async (path, text) => (id = await writer.write(path, text)) },
+    read: () => Promise.reject(new Error("The offscreen document reads the others' files.")),
   });
-  await learnRoot(deps, id, filename);
+  await transport.announce(presence);
+  if (id !== undefined) await learnRoot(deps, id, presencePath(namespace, presence.profileId));
 }
 
 /** Calls `refresh` every half TTL; an alarm also restarts a stopped worker, a timer does not. */

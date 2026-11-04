@@ -1,8 +1,8 @@
 import { describe, expect, test } from "vite-plus/test";
 import { PRESENCE_TTL_MS } from "@/p2p/folder-rendezvous";
 import type { Presence } from "@/p2p/folder-rendezvous";
-import { fileUrlFor, probePath, readTolerant } from "@/p2p/downloads-rendezvous";
-import { PEER } from "./fake-peer";
+import { fileUrlFor, probePath, readTolerant, signalPath } from "@/p2p/downloads-rendezvous";
+import { ME, PEER } from "./fake-peer";
 
 const NOW = 1_700_000_000_000;
 
@@ -29,6 +29,24 @@ describe("probePath", () => {
       expect(() => probePath(namespace)).toThrow(/namespace/);
     },
   );
+});
+
+describe("signalPath", () => {
+  test("puts a signal in its sender's folder, named for its kind and the one profile it is for", () => {
+    expect(signalPath("lab", ME, "offer", PEER)).toBe(
+      `RECnRun/poc/lab/peers/${ME}/offer-${PEER}.json`,
+    );
+    expect(signalPath("lab", PEER, "answer", ME)).toBe(
+      `RECnRun/poc/lab/peers/${PEER}/answer-${ME}.json`,
+    );
+  });
+
+  test.each([
+    ["sender", "../x", PEER],
+    ["recipient", ME, "a/b"],
+  ])("refuses a %s that is not a profile id", (_, from, to) => {
+    expect(() => signalPath("lab", from, "offer", to)).toThrow(/profile id/);
+  });
 });
 
 describe("fileUrlFor", () => {

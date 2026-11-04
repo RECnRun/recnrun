@@ -54,7 +54,7 @@ export type FolderPresence = v.InferOutput<typeof FolderPresenceSchema>;
  * A signal as a transport stores it: stamped with its sender's boot and a sequence that grows with
  * each signal of that boot, so a reader drops an earlier run's file or a late, older write.
  */
-const StampedSignalSchema = v.strictObject({
+export const StampedSignalSchema = v.strictObject({
   // SignalFileSchema's entries spelled out: a spread of them would stay in the production background.
   kind: v.picklist(["offer", "answer"]),
   pairingId: v.pipe(v.string(), v.uuid()),

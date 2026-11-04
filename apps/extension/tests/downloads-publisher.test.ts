@@ -1,6 +1,10 @@
 import { describe, expect, test, vi } from "vite-plus/test";
 import { fakeBrowser } from "wxt/testing/fake-browser";
-import { createDownloadsListener, startDownloadsPublisher } from "@/background/downloads-publisher";
+import {
+  createDownloadsListener,
+  downloadsWriter,
+  startDownloadsPublisher,
+} from "@/background/downloads-publisher";
 import type { DownloadItem, DownloadsPort } from "@/background/downloads-publisher";
 
 const ID = "omllgeochjfpkjbkpcgjmnnbncdpiedd";
@@ -157,6 +161,32 @@ describe("POC_DOWNLOAD_CANCEL and POC_DOWNLOAD_SEARCH", () => {
     expect(await deliver(listener, { type: "POC_DOWNLOAD_SEARCH", id: 2 })).toMatchObject({
       result: { count: 1, items: [{ id: 2 }] },
     });
+  });
+});
+
+describe("downloadsWriter", () => {
+  test("writes a rendezvous file by relative path, replacing it without asking", async () => {
+    const { downloads } = fakeDownloads();
+    const path = "RECnRun/poc/lab/peers/x/presence.json";
+    expect(await downloadsWriter(downloads).write(path, '{"a":1}')).toBe(1);
+    expect(downloads.download).toHaveBeenCalledWith({
+      url: "data:application/json;charset=utf-8,%7B%22a%22%3A1%7D",
+      filename: path,
+      saveAs: false,
+      conflictAction: "overwrite",
+    });
+  });
+
+  test("erases an item's file, if Chrome still has one, and then the item", async () => {
+    const { downloads } = fakeDownloads();
+    const eraser = {
+      removeFile: vi.fn(async () => Promise.reject(new Error("Download file already deleted"))),
+      erase: vi.fn(async () => [7]),
+    };
+    await downloadsWriter(downloads, eraser).erase(7);
+    expect(eraser.removeFile).toHaveBeenCalledWith(7);
+    expect(eraser.erase).toHaveBeenCalledWith({ id: 7 });
+    await expect(downloadsWriter(downloads).erase(7)).rejects.toThrow("erases nothing");
   });
 });
 
