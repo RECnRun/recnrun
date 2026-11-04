@@ -184,26 +184,3 @@ export const saveAsPrompts = (environment: DownloadsEnvironment): Promise<Sample
     },
   );
 };
-
-/** What a person sees: new windows (bubble, shelf), Chrome's history count, notifications. */
-export const visibleTraces = (environment: DownloadsEnvironment): Promise<Sample> =>
-  withProbe(environment, { location: "custom" }, async ({ diagnostics }) => {
-    const { display } = environment;
-    const before = await display?.names();
-    const reply = await diagnostics.probe(freshNamespace(), publication());
-    await delay(1_500);
-    const after = await display?.names();
-    const shown =
-      after && before
-        ? [...after].filter(([id]) => !before.has(id)).map(([, name]) => name)
-        : undefined;
-    const screenshot = await display?.screenshot("E2-traces.png");
-    const history = await diagnostics.search();
-    const observation = {
-      newWindows: shown ?? `not observable: ${environment.noDisplay}`,
-      history: history.ok ? history.result.count : history.error,
-      notifications: "D0 declares no notifications permission; Chrome's own download UI only",
-      screenshot,
-    };
-    return judged(reply.ok ? [] : [`the probe failed: ${reply.error}`], observation);
-  });

@@ -55,5 +55,6 @@ export const host: DownloadsEnvironment = {
     const workspace = await openDefaultWorkspace(hostRunId());
     return { relative: workspace.relative(`probe-${namespace}.json`), clean: workspace.clean };
   },
-  noDisplay: "native dialog on macOS, no xdotool; M-P1 manual not scheduled",
+  noDisplay:
+    "macOS has no xdotool or scrot: native dialogs and windows are not observable; M-P1 manual not scheduled",
 };

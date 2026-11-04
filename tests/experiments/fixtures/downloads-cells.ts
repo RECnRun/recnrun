@@ -116,7 +116,7 @@ export const fileUrlReads = (environment: DownloadsEnvironment): Promise<Sample>
   });
 
 /** Writes `count` contents to one destination with `overwrite`; the names Chrome reported. */
-async function overwrite(diagnostics: ProbeChrome["diagnostics"], count: number) {
+export async function overwrite(diagnostics: ProbeChrome["diagnostics"], count: number) {
   const namespace = freshNamespace();
   const names = new Set<string>();
   const failures = new Set<string>();

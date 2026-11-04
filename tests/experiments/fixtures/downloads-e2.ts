@@ -10,8 +10,8 @@ import {
   interruptedByCancel,
   interruptedByNetwork,
   saveAsPrompts,
-  visibleTraces,
 } from "./downloads-cells-states.ts";
+import { historyTraces, uiTraces } from "./downloads-cells-traces.ts";
 import type { Sample, VerdictTarget } from "./downloads-verdicts.ts";
 import { expectEveryHypothesis } from "../outcome.ts";
 
@@ -26,7 +26,8 @@ export const E2_CELLS: Record<string, (environment: DownloadsEnvironment) => Pro
   "E2.saveAs.prompt": saveAsPrompts,
   "E2.location.custom": customLocation,
   "E2.location.default": defaultLocation,
-  "E2.traces": visibleTraces,
+  "E2.traces.history": historyTraces,
+  "E2.traces.ui": uiTraces,
   "E2.path.absoluteRefused": absoluteRefused,
 };
 
