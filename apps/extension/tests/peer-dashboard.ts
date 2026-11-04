@@ -14,8 +14,11 @@ export const NOTES: OpenTab = { ...SHOP, id: 31, title: "Notes", url: "https://n
 export const pairingSection = (root: HTMLElement) =>
   root.querySelector('section[aria-labelledby="pairing-heading"]');
 
+/** How this profile's role answers which profiles it controls; by default, every one. */
+export type Control = Partial<Pick<PeerServices, "mayControl" | "watchControl">>;
+
 /** The paired profiles as `peer` answers for them, each with one tab. */
-export function peerServices(peer: ReturnType<typeof fakePeerClient>) {
+export function peerServices(peer: ReturnType<typeof fakePeerClient>, control: Control = {}) {
   const folders: unknown[] = [];
   const peers: PeerServices = {
     client: peer.client,
@@ -29,6 +32,9 @@ export function peerServices(peer: ReturnType<typeof fakePeerClient>) {
     allowFolder: async () => {
       folders.push("allow");
     },
+    mayControl: async () => true,
+    watchControl: () => () => {},
+    ...control,
   };
   return { peers, folders };
 }
@@ -37,8 +43,9 @@ export function peerServices(peer: ReturnType<typeof fakePeerClient>) {
 export function mount(
   peer: ReturnType<typeof fakePeerClient>,
   recordings = memoryRecordingStore(),
+  control: Control = {},
 ) {
-  const { peers, folders } = peerServices(peer);
+  const { peers, folders } = peerServices(peer, control);
   const sent: SessionRequest[] = [];
   const send = async (request: SessionRequest) => {
     sent.push(request);

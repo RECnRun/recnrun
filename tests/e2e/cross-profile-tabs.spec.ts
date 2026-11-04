@@ -64,6 +64,31 @@ test("Show tab brings the other profile's tab to the front there", async ({
   await expect.poll(() => activeTabId(profileB.serviceWorker)).toBe(firstId);
 });
 
+test("only the master's dashboard offers Record and Show tab on the other profile's tabs", async ({
+  profileA,
+  profileB,
+  native,
+}) => {
+  // A is the master and B its bound worker.
+  await pair(profileA, profileB, native);
+  const inA = (await dashboardIn(profileA)).dashboard;
+  const inB = (await dashboardIn(profileB, "Chrome — Profile B (Local)")).dashboard;
+  const app = await openInB(profileB, "worker");
+  const ofB = remoteTab(inA, app.url());
+  await expect(ofB.getByRole("button", { name: "Record" })).toBeVisible();
+  await expect(ofB.getByRole("button", { name: "Show tab" })).toBeVisible();
+
+  const listOfA = inB.getByRole("complementary", { name: "Chrome — Profile A (Connected)" });
+  await expect(listOfA).toContainText("Only the master controls other profiles");
+  await expect(
+    listOfA.getByRole("listitem").filter({ hasText: profileA.site.url() }),
+  ).toBeVisible();
+  await expect(listOfA.getByRole("button")).toHaveCount(0);
+  // The worker still records its own tabs.
+  const own = remoteTab(inB, app.url(), "Chrome — Profile B (Local)");
+  await expect(own.getByRole("button", { name: "Record" })).toBeVisible();
+});
+
 test("A records, pauses, and stops a session that runs in B, from its PiP window", async ({
   profileA,
   profileB,

@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, test, vi } from "vite-plus/test";
 import { fakeBrowser } from "wxt/testing/fake-browser";
-import { storedRoles } from "@/background/hierarchy";
 import { createPeerChannel } from "@/background/peer-channel";
 import { COMMAND_TYPES, MESSAGE_CLASSES, authorizeCommand } from "@/p2p/authorization";
 import { createPins } from "@/p2p/pins";
 import { peerMessage, peerTypes } from "@/p2p/protocol";
 import type { PeerMessage, PeerPayload, PeerType } from "@/p2p/protocol";
+import { createRoles } from "@/p2p/roles";
+import { roleStores, storedRoles } from "@/storage/hierarchy-repository";
 import { peerPinsRepository } from "@/storage/peer-repository";
 
 const ME = "11111111-1111-4111-8111-111111111111";
@@ -253,5 +254,34 @@ describe("a profile that cannot place itself", () => {
       kind: "refused",
       reason: "the recorded role cannot be read",
     });
+  });
+});
+
+describe("the controls a dashboard offers", () => {
+  test("the master controls itself and each worker it bound, never a stranger", async () => {
+    await masterOf(WORKER);
+    const roles = storedRoles();
+    expect(await roles.controls(ME, ME)).toBe(true);
+    expect(await roles.controls(WORKER, ME)).toBe(true);
+    expect(await roles.controls(STRANGER, ME)).toBe(false);
+  });
+
+  test("a worker controls only itself, not its master or a worker its store still names", async () => {
+    await meet(WORKER);
+    const bound = { fingerprint: fp(WORKER), boundAt: 1, source: "pairing" } as const;
+    await roleStores().workers.set(WORKER, bound);
+    await workerOf(MASTER);
+    const roles = storedRoles();
+    expect(await roles.controls(ME, ME)).toBe(true);
+    expect(await roles.controls(MASTER, ME)).toBe(false);
+    expect(await roles.controls(WORKER, ME)).toBe(false);
+  });
+
+  test("a store of bound workers that cannot be read controls none of them", async () => {
+    await masterOf(WORKER);
+    const { role, workers: stored } = roleStores();
+    const workers = { ...stored, get: () => Promise.reject(new Error("quota")) };
+    const roles = createRoles({ role, workers, pins: createPins(peerPinsRepository) });
+    expect(await roles.controls(WORKER, ME)).toBe(false);
   });
 });

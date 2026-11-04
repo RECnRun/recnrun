@@ -186,6 +186,64 @@ test("a session the other profile cannot start frees the control and shows the e
   await expectControlFree();
 });
 
+test("only the master offers Record and Show tab on another profile's tabs", async () => {
+  let master = false;
+  let changed = () => {};
+  const { root } = mount(fakePeerClient(statusOf("connected")), memoryRecordingStore(), {
+    mayControl: async () => master,
+    watchControl: (onChange) => {
+      changed = onChange;
+      return () => {};
+    },
+  });
+  await expect.poll(() => note(remote(root))).toBe("Only the master controls other profiles");
+  expect(buttons(item(remote(root) ?? root, "Mail"))).toEqual([]);
+  // It still records its own tabs.
+  expect(buttons(item(root, "Shop"))).toEqual(["Record"]);
+  master = true;
+  changed();
+  await expect
+    .poll(() => buttons(item(remote(root) ?? root, "Mail")))
+    .toEqual(["Record", "Show tab"]);
+  expect(note(remote(root))).toBeUndefined();
+});
+
+test("until the role answers, or when it cannot be read, nothing controls another profile", async () => {
+  const pending = mount(fakePeerClient(statusOf("connected")), memoryRecordingStore(), {
+    mayControl: () => new Promise(() => {}),
+  });
+  await expect.poll(() => item(remote(pending.root) ?? pending.root, "Mail")).toBeDefined();
+  expect(buttons(item(remote(pending.root) ?? pending.root, "Mail"))).toEqual([]);
+  expect(note(remote(pending.root))).toBeUndefined();
+  const unreadable = mount(fakePeerClient(statusOf("connected")), memoryRecordingStore(), {
+    mayControl: () => Promise.reject(new Error("The stored local:role does not match its schema.")),
+  });
+  await expect
+    .poll(() => note(remote(unreadable.root)))
+    .toBe("Only the master controls other profiles");
+});
+
+test("an answer about the role that comes late never overrides a later one", async () => {
+  const answers: ((may: boolean) => void)[] = [];
+  let changed = () => {};
+  const { root } = mount(fakePeerClient(statusOf("connected")), memoryRecordingStore(), {
+    mayControl: () => new Promise((resolve) => answers.push(resolve)),
+    watchControl: (onChange) => {
+      changed = onChange;
+      return () => {};
+    },
+  });
+  await expect.poll(() => answers).toHaveLength(1);
+  changed();
+  await expect.poll(() => answers).toHaveLength(2);
+  answers[1]?.(false);
+  await expect.poll(() => note(remote(root))).toBe("Only the master controls other profiles");
+  answers[0]?.(true);
+  // Every answer and render the stale answer could cause runs before this timer.
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(buttons(item(remote(root) ?? root, "Mail"))).toEqual([]);
+});
+
 test("without a way to control the other profile, the dashboard lists only its own tabs", async () => {
   const { peers } = peerServices(fakePeerClient(statusOf("connected")));
   const router = {

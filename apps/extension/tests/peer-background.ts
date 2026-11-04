@@ -1,8 +1,8 @@
 import { vi } from "vite-plus/test";
 import { fakeBrowser } from "wxt/testing/fake-browser";
-import { storedRoles } from "@/background/hierarchy";
 import { startPeers } from "@/background/peers";
 import type { PeerMessage } from "@/p2p/protocol";
+import { storedRoles } from "@/storage/hierarchy-repository";
 import { authorizedPeersRepository, identityRepository } from "@/storage/peer-repository";
 import { FINGERPRINT, ME, PEER, fakeOffscreen } from "./fake-peer";
 

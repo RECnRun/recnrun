@@ -227,6 +227,7 @@ export function createRoles(deps: RoleDependencies) {
       record()
         .then((current) => check(deps, current, { profileId, fingerprint }))
         .catch(() => false);
+  const isBoundWorker = proves(provesWorker);
   return {
     roleOf,
     record,
@@ -243,7 +244,13 @@ export function createRoles(deps: RoleDependencies) {
         () => false,
       ),
     isMasterIdentity: proves(provesMaster),
-    isBoundWorker: proves(provesWorker),
+    isBoundWorker,
+    /** The master controls itself and each worker it bound; a worker or a template, only itself. */
+    controls: async (profileId: string, self: string): Promise<boolean> => {
+      if (profileId === self) return true;
+      const worker = await deps.workers.get(profileId).catch(() => null);
+      return worker !== null && isBoundWorker(profileId, worker.fingerprint);
+    },
   };
 }
 

@@ -23,6 +23,8 @@ function mount(status: PeerStatus, answers: Parameters<typeof fakePeerClient>[1]
     sessionTabs: fakeTabs({ tabs: [] }).source,
     chooseFolder: vi.fn(async () => void grants.push(`choose after ${asked()} releases`)),
     allowFolder: vi.fn(async () => void grants.push(`allow after ${asked()} releases`)),
+    mayControl: async () => true,
+    watchControl: () => () => {},
   };
   const root = document.body.appendChild(document.createElement("div"));
   const show = (next: PeerStatus | undefined) =>

@@ -1,9 +1,9 @@
-import { storedRoles } from "@/background/hierarchy";
 import type { LinkCommand } from "@/messaging/peer-messages";
 import { authorizeCommand } from "@/p2p/authorization";
 import type { Hierarchy, Sender } from "@/p2p/authorization";
 import { parsePeerFrame, peerMessage } from "@/p2p/protocol";
 import type { MessageOf, PeerMessage, PeerPayload, PeerType } from "@/p2p/protocol";
+import { storedRoles } from "@/storage/hierarchy-repository";
 import type {
   AuthorizedPeer,
   PeerLink,

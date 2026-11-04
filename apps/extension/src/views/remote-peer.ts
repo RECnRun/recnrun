@@ -20,6 +20,10 @@ export interface PeerServices {
   chooseFolder: () => Promise<void>;
   /** Asks Chrome again for the folder chosen before, once its grant ended; only a click may. */
   allowFolder: () => Promise<void>;
+  /** Whether this profile may record or show tabs in `profileId`: the master its bound workers. */
+  mayControl: (profileId: string) => Promise<boolean>;
+  /** Calls back whenever the identity, role, bound workers, or a pin changes: `mayControl` may too. */
+  watchControl: (onChange: () => void) => () => void;
 }
 
 /** The background's copy of the executor's last report, as session storage keeps it. */
