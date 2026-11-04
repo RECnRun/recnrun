@@ -26,6 +26,7 @@ export { expect } from "@playwright/test";
 const OFFSCREEN = ["--window-position=-2000,0", "--window-size=800,600"];
 /** Never reads the owner's Chrome Safe Storage key from the login Keychain. */
 const HOST_FLAGS = ["--no-default-browser-check", "--use-mock-keychain"];
+export const HOST_ARGS = [...HOST_FLAGS, ...OFFSCREEN];
 const PREFERENCES_POLL_MS = 1_000;
 
 /** How long the strict method waits for the owner's `Load unpacked`; RECNRUN_HOST_GESTURE_TIMEOUT_MS. */
@@ -47,7 +48,7 @@ export interface HostExtension extends LoadedExtension {
 export const hostUnpackedOptions = (root: string): UnpackedOptions => ({
   executable: CHROME_BINARY,
   userDataDir: root,
-  args: [...HOST_FLAGS, ...OFFSCREEN],
+  args: HOST_ARGS,
 });
 
 /** The strict method: no debugging flag; the owner installed the build with `Load unpacked`. */

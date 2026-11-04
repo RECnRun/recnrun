@@ -16,6 +16,7 @@ import {
   names,
   published,
   runSummary,
+  scrub,
   withSession,
 } from "./fixtures/e4-run.ts";
 
@@ -173,18 +174,24 @@ export const preferencesSample = (
   withSession(environment, async (session, labels) => {
     const own = await session.folder("own");
     labels.set(own, "<own folder>");
-    const peers = [await announced(session, "P", own)];
-    if (session.realDefault) peers.push(await announced(session, "Q"));
-    for (const peer of peers) await session.quit(peer.profile);
+    const p = await announced(session, "P", own);
+    labels.set(p.profile.root, "<root P>");
+    const peers = session.realDefault ? [p, await announced(session, "Q")] : [p];
     const json: Record<string, string | null> = {};
-    for (const peer of peers)
+    for (const peer of peers) {
+      await session.quit(peer.profile);
       json[peer.profile.name] = labelOf(labels, await jsonPreference(peer.profile.root));
-    const p = peers[0]?.profile.root ?? "";
+    }
     if (!reader) return judged([], { json });
-    const native = await reader(p);
+    const native: { value: string | null; error?: string } = await reader(p.profile.root).then(
+      (value) => ({ value: labelOf(labels, value) }),
+      (error: unknown) => ({ value: null, error: scrub(String(error), labels) }),
+    );
     const problems =
-      native === own ? [] : [`the native reader returned ${labelOf(labels, native)}`];
-    return judged(problems, { json, native: labelOf(labels, native) });
+      native.value === "<own folder>"
+        ? []
+        : [`the native reader read ${native.error ?? native.value}`];
+    return judged(problems, { json, native });
   });
 
 /** E4.d control: the owner types each profile's Downloads folder into the record by hand. */

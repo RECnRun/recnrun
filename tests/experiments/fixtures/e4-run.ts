@@ -28,7 +28,7 @@ export type Labels = Map<string, string>;
 export const labelOf = (labels: Labels, path: string | null | undefined) =>
   path ? (labels.get(path) ?? "<another folder>") : null;
 
-const scrub = (text: string, labels: Labels) =>
+export const scrub = (text: string, labels: Labels) =>
   [...labels].reduce((out, [path, label]) => out.replaceAll(path, label), text);
 
 export interface Peer {
