@@ -177,7 +177,12 @@ Gate P2: verify · E4 · review
   green: the same command, 24 passed; `apps/extension` node tests 584 passed; commit `8ced36f8` on agent/p3-pins (the folder offers nothing to a presence announcing another certificate for a pinned profile)
   missing: certificate continuity after renewal: owner decision at Gate P3 (PLAN.md decision 13)
   missing: `tests/browser/forged-sender.spec.ts`, the forged-sender regression of PR #19 on the Downloads transport, is pending P3.2 (the Downloads mesh)
-- [ ] P3.4 Roles and command authorization
+- [~] P3.4 Roles and command authorization
+  red: `npx vitest run tests/roles.test.ts` (in `apps/extension`) against a stub of today's behavior (every profile a master, every bind accepted, every identity the master's): 22 of 23 failed ("expected 'master' to be 'worker'"; two binds at once both accepted); `npx vitest run tests/authorization.test.ts tests/roles.test.ts tests/peers-reports.test.ts` against stubs that accept every verified peer's message and count any peer as a bound worker: 15 failed (worker to worker and worker to master commands accepted; a command from a peer that is not the bound master answered with `COMMAND_RESULT`); `node scripts/manifest.checks.mjs` on a production build of `d6781984`: "the production build leaves out the POC's roles and their storage" failed
+  green: the same commands, 23, 53, and 33 passed; `apps/extension` node tests 626 passed; `vp run test:e2e` on `d6781984` 66 passed; production output byte-identical to `e4af94e8`
+  commit: cherry-picked from agent/p3-roles `a89d9e9d` (role model), `d6781984` (authorization at the channel, before the executor and any waiting request), `9e7e75f8` (role storage out of production), and the docs commit after them
+  binding: in the folder build each worker binds the first profile once their pair is linked, from the certificate it pinned at pairing (`local:role`), and the first profile records itself as master and the workers it bound (`local:boundWorkers`); the e2e fixture `bindHierarchy` writes them, standing in for the launcher record and the P5.3 bootstrap
+  missing: `tests/browser/hierarchy.spec.ts` on the Downloads transport, pending P3.2
 - [ ] P3.5 Master absent and master back, E6
 - [ ] P3.6 Presence cost, E7
 
