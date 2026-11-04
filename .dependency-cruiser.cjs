@@ -155,7 +155,7 @@ module.exports = {
         "Views are what the dashboard and its PiP window render; they get their data injected.",
       from: { path: "^apps/extension/src/views/" },
       to: {
-        path: "^apps/extension/src/(content|background|dashboard|storage|peers|offscreen)/",
+        path: "^apps/extension/src/(content|background|dashboard|storage|peers|offscreen|diagnostics)/",
       },
     },
     {
@@ -187,7 +187,7 @@ module.exports = {
         "Cross-profile POC: src/p2p is the peer protocol, pairing codes, and the WebRTC link, with no extension state.",
       from: { path: "^apps/extension/src/p2p/" },
       to: {
-        path: "^apps/extension/src/(content|background|dashboard|storage|views|peers|offscreen|messaging)/",
+        path: "^apps/extension/src/(content|background|dashboard|storage|views|peers|offscreen|messaging|diagnostics)/",
       },
     },
     {
@@ -198,7 +198,7 @@ module.exports = {
       from: { path: "^apps/extension/src/offscreen/" },
       to: {
         path: [
-          "^apps/extension/src/(content|background|dashboard|storage|views|peers)/",
+          "^apps/extension/src/(content|background|dashboard|storage|views|peers|diagnostics)/",
           "node_modules/wxt/.*storage",
         ],
       },
