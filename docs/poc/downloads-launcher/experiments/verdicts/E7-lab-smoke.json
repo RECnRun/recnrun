@@ -17,38 +17,38 @@
         "smokeShortWindow": true,
         "presenceTtlMs": 60000,
         "renewalMs": 30000,
-        "formedMs": 2329,
+        "formedMs": 3038,
         "linkedAfterWindow": true,
         "listedAtEnd": 5,
         "profiles": [
           {
             "profile": "Default",
-            "windowMs": 35035,
+            "windowMs": 35054,
             "calls": 1,
             "presenceCalls": 1,
             "signalCalls": 0,
             "otherCalls": 0,
             "erasedDuringWindow": 0,
             "history": {
-              "total": 6,
-              "presence": 2,
-              "signal": 4,
-              "other": 0
-            },
-            "downloadsPerHour": 102.75438846867418,
-            "historyBefore": {
               "total": 5,
-              "presence": 1,
-              "signal": 4,
+              "presence": 2,
+              "signal": 3,
               "other": 0
             },
-            "chromeDownloads": 6,
-            "heartbeatFrames": 143,
-            "heartbeatFramesPerHour": 14693.877551020409
+            "downloadsPerHour": 102.69869344440006,
+            "historyBefore": {
+              "total": 4,
+              "presence": 1,
+              "signal": 3,
+              "other": 0
+            },
+            "chromeDownloads": 5,
+            "heartbeatFrames": 140,
+            "heartbeatFramesPerHour": 14377.81708221601
           },
           {
             "profile": "Worker 1",
-            "windowMs": 35261,
+            "windowMs": 35215,
             "calls": 1,
             "presenceCalls": 1,
             "signalCalls": 0,
@@ -60,32 +60,7 @@
               "signal": 4,
               "other": 0
             },
-            "downloadsPerHour": 102.09579989223221,
-            "historyBefore": {
-              "total": 5,
-              "presence": 1,
-              "signal": 4,
-              "other": 0
-            },
-            "chromeDownloads": 6,
-            "heartbeatFrames": 141,
-            "heartbeatFramesPerHour": 14395.507784804742
-          },
-          {
-            "profile": "Worker 2",
-            "windowMs": 35422,
-            "calls": 1,
-            "presenceCalls": 1,
-            "signalCalls": 0,
-            "otherCalls": 0,
-            "erasedDuringWindow": 0,
-            "history": {
-              "total": 6,
-              "presence": 2,
-              "signal": 4,
-              "other": 0
-            },
-            "downloadsPerHour": 101.631754277003,
+            "downloadsPerHour": 102.22916370864688,
             "historyBefore": {
               "total": 5,
               "presence": 1,
@@ -94,11 +69,11 @@
             },
             "chromeDownloads": 6,
             "heartbeatFrames": 140,
-            "heartbeatFramesPerHour": 14228.44559878042
+            "heartbeatFramesPerHour": 14312.082919210563
           },
           {
-            "profile": "Worker 3",
-            "windowMs": 35604,
+            "profile": "Worker 2",
+            "windowMs": 35354,
             "calls": 1,
             "presenceCalls": 1,
             "signalCalls": 0,
@@ -110,7 +85,7 @@
               "signal": 4,
               "other": 0
             },
-            "downloadsPerHour": 101.11223458038423,
+            "downloadsPerHour": 101.82723312779318,
             "historyBefore": {
               "total": 5,
               "presence": 1,
@@ -119,11 +94,11 @@
             },
             "chromeDownloads": 6,
             "heartbeatFrames": 142,
-            "heartbeatFramesPerHour": 14357.93731041456
+            "heartbeatFramesPerHour": 14459.467104146632
           },
           {
-            "profile": "Worker 4",
-            "windowMs": 35790,
+            "profile": "Worker 3",
+            "windowMs": 35516,
             "calls": 1,
             "presenceCalls": 1,
             "signalCalls": 0,
@@ -135,7 +110,7 @@
               "signal": 4,
               "other": 0
             },
-            "downloadsPerHour": 100.58675607711652,
+            "downloadsPerHour": 101.36276607726096,
             "historyBefore": {
               "total": 5,
               "presence": 1,
@@ -143,18 +118,43 @@
               "other": 0
             },
             "chromeDownloads": 6,
-            "heartbeatFrames": 143,
-            "heartbeatFramesPerHour": 14383.90611902766
+            "heartbeatFrames": 142,
+            "heartbeatFramesPerHour": 14393.512782971055
+          },
+          {
+            "profile": "Worker 4",
+            "windowMs": 35663,
+            "calls": 1,
+            "presenceCalls": 1,
+            "signalCalls": 0,
+            "otherCalls": 0,
+            "erasedDuringWindow": 0,
+            "history": {
+              "total": 6,
+              "presence": 2,
+              "signal": 4,
+              "other": 0
+            },
+            "downloadsPerHour": 100.94495695819197,
+            "historyBefore": {
+              "total": 5,
+              "presence": 1,
+              "signal": 4,
+              "other": 0
+            },
+            "chromeDownloads": 6,
+            "heartbeatFrames": 140,
+            "heartbeatFramesPerHour": 14132.293974146874
           }
         ],
         "total": {
           "calls": 5,
-          "history": 30,
+          "history": 29,
           "historyAfterCompletion": 10,
-          "chromeDownloads": 30,
+          "chromeDownloads": 29,
           "chromeDownloadsAfterCompletion": 10,
-          "downloadsPerHour": 508.1809332954101,
-          "heartbeatFramesPerHour": 72059.67436404778,
+          "downloadsPerHour": 509.06281331629305,
+          "heartbeatFramesPerHour": 71675.17386269114,
           "launcherWritesPerHour": 0
         },
         "afterCompletion": [
@@ -235,13 +235,13 @@
         "smokeShortWindow": true,
         "presenceTtlMs": 60000,
         "renewalMs": 30000,
-        "formedMs": 2489,
+        "formedMs": 2857,
         "linkedAfterWindow": true,
         "listedAtEnd": 5,
         "profiles": [
           {
             "profile": "Default",
-            "windowMs": 35042,
+            "windowMs": 35034,
             "calls": 0,
             "presenceCalls": 0,
             "signalCalls": 0,
@@ -262,11 +262,61 @@
             },
             "chromeDownloads": 5,
             "heartbeatFrames": 140,
-            "heartbeatFramesPerHour": 14382.740711146624
+            "heartbeatFramesPerHour": 14386.025004281555
           },
           {
             "profile": "Worker 1",
-            "windowMs": 35199,
+            "windowMs": 35194,
+            "calls": 0,
+            "presenceCalls": 0,
+            "signalCalls": 0,
+            "otherCalls": 0,
+            "erasedDuringWindow": 0,
+            "history": {
+              "total": 4,
+              "presence": 1,
+              "signal": 3,
+              "other": 0
+            },
+            "downloadsPerHour": 0,
+            "historyBefore": {
+              "total": 4,
+              "presence": 1,
+              "signal": 3,
+              "other": 0
+            },
+            "chromeDownloads": 4,
+            "heartbeatFrames": 140,
+            "heartbeatFramesPerHour": 14320.622833437517
+          },
+          {
+            "profile": "Worker 2",
+            "windowMs": 35333,
+            "calls": 0,
+            "presenceCalls": 0,
+            "signalCalls": 0,
+            "otherCalls": 0,
+            "erasedDuringWindow": 0,
+            "history": {
+              "total": 5,
+              "presence": 1,
+              "signal": 4,
+              "other": 0
+            },
+            "downloadsPerHour": 0,
+            "historyBefore": {
+              "total": 5,
+              "presence": 1,
+              "signal": 4,
+              "other": 0
+            },
+            "chromeDownloads": 5,
+            "heartbeatFrames": 141,
+            "heartbeatFramesPerHour": 14366.173265785526
+          },
+          {
+            "profile": "Worker 3",
+            "windowMs": 35466,
             "calls": 0,
             "presenceCalls": 0,
             "signalCalls": 0,
@@ -287,11 +337,11 @@
             },
             "chromeDownloads": 5,
             "heartbeatFrames": 142,
-            "heartbeatFramesPerHour": 14523.139861927895
+            "heartbeatFramesPerHour": 14413.804770766368
           },
           {
-            "profile": "Worker 2",
-            "windowMs": 35330,
+            "profile": "Worker 4",
+            "windowMs": 35596,
             "calls": 0,
             "presenceCalls": 0,
             "signalCalls": 0,
@@ -311,68 +361,18 @@
               "other": 0
             },
             "chromeDownloads": 5,
-            "heartbeatFrames": 140,
-            "heartbeatFramesPerHour": 14265.49674497594
-          },
-          {
-            "profile": "Worker 3",
-            "windowMs": 35469,
-            "calls": 0,
-            "presenceCalls": 0,
-            "signalCalls": 0,
-            "otherCalls": 0,
-            "erasedDuringWindow": 0,
-            "history": {
-              "total": 4,
-              "presence": 1,
-              "signal": 3,
-              "other": 0
-            },
-            "downloadsPerHour": 0,
-            "historyBefore": {
-              "total": 4,
-              "presence": 1,
-              "signal": 3,
-              "other": 0
-            },
-            "chromeDownloads": 4,
-            "heartbeatFrames": 143,
-            "heartbeatFramesPerHour": 14514.082720121796
-          },
-          {
-            "profile": "Worker 4",
-            "windowMs": 35602,
-            "calls": 0,
-            "presenceCalls": 0,
-            "signalCalls": 0,
-            "otherCalls": 0,
-            "erasedDuringWindow": 0,
-            "history": {
-              "total": 4,
-              "presence": 1,
-              "signal": 3,
-              "other": 0
-            },
-            "downloadsPerHour": 0,
-            "historyBefore": {
-              "total": 4,
-              "presence": 1,
-              "signal": 3,
-              "other": 0
-            },
-            "chromeDownloads": 4,
-            "heartbeatFrames": 143,
-            "heartbeatFramesPerHour": 14459.861805516544
+            "heartbeatFrames": 144,
+            "heartbeatFramesPerHour": 14563.434093718395
           }
         ],
         "total": {
           "calls": 0,
-          "history": 23,
+          "history": 24,
           "historyAfterCompletion": 5,
-          "chromeDownloads": 23,
+          "chromeDownloads": 24,
           "chromeDownloadsAfterCompletion": 5,
           "downloadsPerHour": 0,
-          "heartbeatFramesPerHour": 72145.3218436888,
+          "heartbeatFramesPerHour": 72050.05996798936,
           "launcherWritesPerHour": 0
         },
         "afterCompletion": [
@@ -429,7 +429,7 @@
         ],
         "recovery": {
           "boundMs": 60000,
-          "renewedAfterMs": 26988,
+          "renewedAfterMs": 28084,
           "sixLinksRemain": true
         }
       }
@@ -458,13 +458,38 @@
         "smokeShortWindow": true,
         "presenceTtlMs": 60000,
         "renewalMs": 30000,
-        "formedMs": 2737,
+        "formedMs": 1610,
         "linkedAfterWindow": true,
         "listedAtEnd": 5,
         "profiles": [
           {
             "profile": "Default",
-            "windowMs": 35033,
+            "windowMs": 35024,
+            "calls": 0,
+            "presenceCalls": 0,
+            "signalCalls": 0,
+            "otherCalls": 0,
+            "erasedDuringWindow": 0,
+            "history": {
+              "total": 4,
+              "presence": 1,
+              "signal": 3,
+              "other": 0
+            },
+            "downloadsPerHour": 0,
+            "historyBefore": {
+              "total": 4,
+              "presence": 1,
+              "signal": 3,
+              "other": 0
+            },
+            "chromeDownloads": 4,
+            "heartbeatFrames": 140,
+            "heartbeatFramesPerHour": 14390.132480584742
+          },
+          {
+            "profile": "Worker 1",
+            "windowMs": 35174,
             "calls": 0,
             "presenceCalls": 0,
             "signalCalls": 0,
@@ -484,12 +509,37 @@
               "other": 0
             },
             "chromeDownloads": 5,
-            "heartbeatFrames": 141,
-            "heartbeatFramesPerHour": 14489.19590100762
+            "heartbeatFrames": 140,
+            "heartbeatFramesPerHour": 14328.765565474498
           },
           {
-            "profile": "Worker 1",
-            "windowMs": 35221,
+            "profile": "Worker 2",
+            "windowMs": 35321,
+            "calls": 0,
+            "presenceCalls": 0,
+            "signalCalls": 0,
+            "otherCalls": 0,
+            "erasedDuringWindow": 0,
+            "history": {
+              "total": 5,
+              "presence": 1,
+              "signal": 4,
+              "other": 0
+            },
+            "downloadsPerHour": 0,
+            "historyBefore": {
+              "total": 5,
+              "presence": 1,
+              "signal": 4,
+              "other": 0
+            },
+            "chromeDownloads": 5,
+            "heartbeatFrames": 140,
+            "heartbeatFramesPerHour": 14269.13167803856
+          },
+          {
+            "profile": "Worker 3",
+            "windowMs": 35462,
             "calls": 0,
             "presenceCalls": 0,
             "signalCalls": 0,
@@ -509,93 +559,43 @@
               "other": 0
             },
             "chromeDownloads": 2,
-            "heartbeatFrames": 141,
-            "heartbeatFramesPerHour": 14411.85656284603
-          },
-          {
-            "profile": "Worker 2",
-            "windowMs": 35396,
-            "calls": 0,
-            "presenceCalls": 0,
-            "signalCalls": 0,
-            "otherCalls": 0,
-            "erasedDuringWindow": 0,
-            "history": {
-              "total": 5,
-              "presence": 1,
-              "signal": 4,
-              "other": 0
-            },
-            "downloadsPerHour": 0,
-            "historyBefore": {
-              "total": 5,
-              "presence": 1,
-              "signal": 4,
-              "other": 0
-            },
-            "chromeDownloads": 5,
             "heartbeatFrames": 140,
-            "heartbeatFramesPerHour": 14238.897050514182
-          },
-          {
-            "profile": "Worker 3",
-            "windowMs": 35559,
-            "calls": 0,
-            "presenceCalls": 0,
-            "signalCalls": 0,
-            "otherCalls": 0,
-            "erasedDuringWindow": 0,
-            "history": {
-              "total": 5,
-              "presence": 1,
-              "signal": 4,
-              "other": 0
-            },
-            "downloadsPerHour": 0,
-            "historyBefore": {
-              "total": 5,
-              "presence": 1,
-              "signal": 4,
-              "other": 0
-            },
-            "chromeDownloads": 5,
-            "heartbeatFrames": 140,
-            "heartbeatFramesPerHour": 14173.626929891167
+            "heartbeatFramesPerHour": 14212.39636794315
           },
           {
             "profile": "Worker 4",
-            "windowMs": 35712,
+            "windowMs": 35597,
             "calls": 0,
             "presenceCalls": 0,
             "signalCalls": 0,
             "otherCalls": 0,
             "erasedDuringWindow": 0,
             "history": {
-              "total": 3,
+              "total": 5,
               "presence": 1,
-              "signal": 2,
+              "signal": 4,
               "other": 0
             },
             "downloadsPerHour": 0,
             "historyBefore": {
-              "total": 3,
+              "total": 5,
               "presence": 1,
-              "signal": 2,
+              "signal": 4,
               "other": 0
             },
-            "chromeDownloads": 3,
-            "heartbeatFrames": 142,
-            "heartbeatFramesPerHour": 14314.516129032258
+            "chromeDownloads": 5,
+            "heartbeatFrames": 141,
+            "heartbeatFramesPerHour": 14259.628620389358
           }
         ],
         "total": {
           "calls": 0,
-          "history": 20,
+          "history": 21,
           "historyAfterCompletion": 5,
-          "chromeDownloads": 20,
+          "chromeDownloads": 21,
           "chromeDownloadsAfterCompletion": 5,
           "downloadsPerHour": 0,
-          "heartbeatFramesPerHour": 71628.09257329126,
+          "heartbeatFramesPerHour": 71460.0547124303,
           "launcherWritesPerHour": 0
         },
         "afterCompletion": [
@@ -652,7 +652,7 @@
         ],
         "recovery": {
           "boundMs": 95000,
-          "renewedAfterMs": 87139,
+          "renewedAfterMs": 87858,
           "sixLinksRemain": true
         }
       }
@@ -674,10 +674,6 @@
     "variant": "poc-d0",
     "topology": "Default plus four workers, one shared Downloads root, ten DataChannels",
     "debugger": "none",
-    "verdict": "pass",
-    "samples": 1,
-    "gestures": 0,
-    "steps": [],
     "observations": [
       {
         "policy": "launcher",
@@ -685,13 +681,13 @@
         "smokeShortWindow": true,
         "presenceTtlMs": 60000,
         "renewalMs": 30000,
-        "formedMs": 1872,
+        "formedMs": 2747,
         "linkedAfterWindow": true,
         "listedAtEnd": 5,
         "profiles": [
           {
             "profile": "Default",
-            "windowMs": 35050,
+            "windowMs": 35032,
             "calls": 0,
             "presenceCalls": 0,
             "signalCalls": 0,
@@ -712,61 +708,11 @@
             },
             "chromeDownloads": 3,
             "heartbeatFrames": 140,
-            "heartbeatFramesPerHour": 14379.457917261056
+            "heartbeatFramesPerHour": 14386.846311943365
           },
           {
             "profile": "Worker 1",
-            "windowMs": 35214,
-            "calls": 0,
-            "presenceCalls": 0,
-            "signalCalls": 0,
-            "otherCalls": 0,
-            "erasedDuringWindow": 0,
-            "history": {
-              "total": 5,
-              "presence": 1,
-              "signal": 4,
-              "other": 0
-            },
-            "downloadsPerHour": 0,
-            "historyBefore": {
-              "total": 5,
-              "presence": 1,
-              "signal": 4,
-              "other": 0
-            },
-            "chromeDownloads": 5,
-            "heartbeatFrames": 140,
-            "heartbeatFramesPerHour": 14312.489350826376
-          },
-          {
-            "profile": "Worker 2",
-            "windowMs": 35374,
-            "calls": 0,
-            "presenceCalls": 0,
-            "signalCalls": 0,
-            "otherCalls": 0,
-            "erasedDuringWindow": 0,
-            "history": {
-              "total": 5,
-              "presence": 1,
-              "signal": 4,
-              "other": 0
-            },
-            "downloadsPerHour": 0,
-            "historyBefore": {
-              "total": 5,
-              "presence": 1,
-              "signal": 4,
-              "other": 0
-            },
-            "chromeDownloads": 5,
-            "heartbeatFrames": 140,
-            "heartbeatFramesPerHour": 14247.752586645558
-          },
-          {
-            "profile": "Worker 3",
-            "windowMs": 35513,
+            "windowMs": 35176,
             "calls": 0,
             "presenceCalls": 0,
             "signalCalls": 0,
@@ -786,12 +732,12 @@
               "other": 0
             },
             "chromeDownloads": 4,
-            "heartbeatFrames": 142,
-            "heartbeatFramesPerHour": 14394.728690901924
+            "heartbeatFrames": 140,
+            "heartbeatFramesPerHour": 14327.950875596998
           },
           {
-            "profile": "Worker 4",
-            "windowMs": 35650,
+            "profile": "Worker 2",
+            "windowMs": 35309,
             "calls": 0,
             "presenceCalls": 0,
             "signalCalls": 0,
@@ -811,8 +757,58 @@
               "other": 0
             },
             "chromeDownloads": 5,
-            "heartbeatFrames": 143,
-            "heartbeatFramesPerHour": 14440.39270687237
+            "heartbeatFrames": 140,
+            "heartbeatFramesPerHour": 14273.981137953497
+          },
+          {
+            "profile": "Worker 3",
+            "windowMs": 35452,
+            "calls": 0,
+            "presenceCalls": 0,
+            "signalCalls": 0,
+            "otherCalls": 0,
+            "erasedDuringWindow": 0,
+            "history": {
+              "total": 5,
+              "presence": 1,
+              "signal": 4,
+              "other": 0
+            },
+            "downloadsPerHour": 0,
+            "historyBefore": {
+              "total": 5,
+              "presence": 1,
+              "signal": 4,
+              "other": 0
+            },
+            "chromeDownloads": 5,
+            "heartbeatFrames": 141,
+            "heartbeatFramesPerHour": 14317.951032381812
+          },
+          {
+            "profile": "Worker 4",
+            "windowMs": 35588,
+            "calls": 0,
+            "presenceCalls": 0,
+            "signalCalls": 0,
+            "otherCalls": 0,
+            "erasedDuringWindow": 0,
+            "history": {
+              "total": 5,
+              "presence": 1,
+              "signal": 4,
+              "other": 0
+            },
+            "downloadsPerHour": 0,
+            "historyBefore": {
+              "total": 5,
+              "presence": 1,
+              "signal": 4,
+              "other": 0
+            },
+            "chromeDownloads": 5,
+            "heartbeatFrames": 142,
+            "heartbeatFramesPerHour": 14364.392491851186
           }
         ],
         "total": {
@@ -822,8 +818,8 @@
           "chromeDownloads": 22,
           "chromeDownloadsAfterCompletion": 5,
           "downloadsPerHour": 0,
-          "heartbeatFramesPerHour": 71774.82125250727,
-          "launcherWritesPerHour": 1027.1041369472182
+          "heartbeatFramesPerHour": 71671.12184972686,
+          "launcherWritesPerHour": 1027.6318794245262
         },
         "afterCompletion": [
           {
@@ -879,35 +875,103 @@
         ],
         "launcher": {
           "writes": {
-            "aa0d8694-7d73-4f6c-b9af-4c717c7317b8": 2,
-            "47063ab1-28d4-45db-8bde-f2a6d6cc2e61": 2,
-            "1d630097-6b48-42b6-95d8-c0e0b5a9e7bd": 2,
-            "5efa7f50-a377-424d-bdd5-f77165546b84": 2,
-            "8715583f-4d11-4c67-a498-2952219b6a82": 2
+            "e484da0c-11bd-4037-bfbf-6beefd1f90e7": 2,
+            "81a2791a-df0f-4798-be00-64f9dbd4770c": 2,
+            "1b53cef7-6be6-41b9-af9c-9cd736b0053b": 2,
+            "380a6ba6-bed4-4bf0-be90-9a39ce112cd5": 2,
+            "2701cfa0-dc6a-4c32-9de4-c3ff2ec494e8": 2
           },
           "replayed": {
-            "aa0d8694-7d73-4f6c-b9af-4c717c7317b8": [1793796680009],
-            "47063ab1-28d4-45db-8bde-f2a6d6cc2e61": [1793796680354],
-            "1d630097-6b48-42b6-95d8-c0e0b5a9e7bd": [1793796680629],
-            "5efa7f50-a377-424d-bdd5-f77165546b84": [1793796680891],
-            "8715583f-4d11-4c67-a498-2952219b6a82": [1793796681145]
+            "e484da0c-11bd-4037-bfbf-6beefd1f90e7": [1793812725580],
+            "81a2791a-df0f-4798-be00-64f9dbd4770c": [1793812725919],
+            "1b53cef7-6be6-41b9-af9c-9cd736b0053b": [1793812726239],
+            "380a6ba6-bed4-4bf0-be90-9a39ce112cd5": [1793812726477],
+            "2701cfa0-dc6a-4c32-9de4-c3ff2ec494e8": [1793812726802]
           },
           "takes": ["profileId", "displayName", "fingerprint", "identity", "namespace", "boot"],
           "stamps": ["createdAt", "expiresAt"]
         },
         "recovery": {
           "sixLinksRemain": true,
-          "relaunchedAfterMs": 65061,
+          "relaunchedAfterMs": 65029,
           "newBoot": true,
-          "rejoinedMs": 2945,
+          "rejoinedMs": 3158,
           "survivorPresenceCalls": 0,
           "launcherWrites": {
-            "b5b96eb6-94b3-407b-89b6-ef594faf8d09": 3,
-            "77b54da2-5ddf-47d4-8ef6-84bab19e5bfd": 3,
-            "cab39598-bacb-41e8-9465-40f96082f193": 3,
-            "1b16773a-25a0-457a-a9a0-393921e01664": 3,
-            "f8d3b83e-778e-468b-83d8-b653ea257dbc": 1
+            "9927460e-cc96-4056-8c77-5894f4b15735": 3,
+            "200c80cb-21fc-4522-baf7-02572618b3a5": 3,
+            "c52f814c-ef73-4e4f-a7cc-1a743fad9662": 3,
+            "53e4d9ad-7f40-484b-b215-c0ad94be5dee": 3,
+            "97bd8dfd-6ea9-4fa1-86e0-897fc77de403": 1
           }
+        }
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "mode": "smoke",
+    "verdict": "pass",
+    "samples": 1
+  },
+  {
+    "experiment": "E7",
+    "hypothesis": "E7.newcomer.linkedSilence",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "Default plus four workers, one shared Downloads root, ten DataChannels",
+    "debugger": "none",
+    "observations": [
+      {
+        "policy": "linked-silence",
+        "presenceTtlMs": 60000,
+        "waitedMs": 70000,
+        "listedBeforeNewcomer": 0,
+        "linkedMs": 18957,
+        "sinceStartMs": 19216,
+        "renewalCost": {
+          "presenceDownloads": 4,
+          "otherDownloads": 3,
+          "perSurvivor": [1, 1, 1, 1]
+        }
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "mode": "smoke",
+    "verdict": "pass",
+    "samples": 1
+  },
+  {
+    "experiment": "E7",
+    "hypothesis": "E7.newcomer.heartbeat",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "Default plus four workers, one shared Downloads root, ten DataChannels",
+    "debugger": "none",
+    "verdict": "pass",
+    "samples": 1,
+    "gestures": 0,
+    "steps": [],
+    "observations": [
+      {
+        "policy": "heartbeat",
+        "presenceTtlMs": 60000,
+        "waitedMs": 70000,
+        "listedBeforeNewcomer": 0,
+        "linkedMs": 18841,
+        "sinceStartMs": 19128,
+        "renewalCost": {
+          "presenceDownloads": 4,
+          "otherDownloads": 2,
+          "perSurvivor": [1, 1, 1, 1]
         }
       }
     ],
