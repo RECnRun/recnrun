@@ -3,6 +3,7 @@ import { fakeBrowser } from "wxt/testing/fake-browser";
 import type { LinkCommand } from "@/messaging/peer-messages";
 import { peerMessage } from "@/p2p/protocol";
 import type { MessageOf, PeerPayload, PeerType } from "@/p2p/protocol";
+import { identityOf, signAs } from "./test-identity";
 
 /** A spy's stand-in for an overloaded browser API, whose spy takes the callback overload's type. */
 export const answering =
@@ -14,6 +15,16 @@ export const ME = "11111111-1111-4111-8111-111111111111";
 export const PEER = "22222222-2222-4222-8222-222222222222";
 export const STRANGER = "33333333-3333-4333-8333-333333333333";
 export const FINGERPRINT = "AB:CD:EF";
+/** PEER's identity key, which its pin and its authorized record hold. */
+export const PEER_IDENTITY = await identityOf(PEER);
+/** PEER's statement for FINGERPRINT, as its HELLO and its codes carry it. */
+export const PEER_STATEMENT = await signAs({ profileId: PEER, fingerprint: FINGERPRINT });
+/** The HELLO PEER sends as its link comes up. */
+export const PEER_HELLO = {
+  displayName: "Desk",
+  extensionVersion: "0.1.0",
+  identity: PEER_STATEMENT,
+};
 
 /** A message the peer addressed to this profile. */
 export const fromPeer = <T extends PeerType>(type: T, payload: PeerPayload<T>, from = PEER) =>

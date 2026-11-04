@@ -87,7 +87,7 @@ async function senderOf(
   // A verified peer could otherwise claim another's id over its own link.
   if (message.to !== me.profileId || message.from !== peer) return null;
   const authorized = await verifiedPeer(deps, peer);
-  return authorized && { profileId: peer, fingerprint: authorized.fingerprint };
+  return authorized && { profileId: peer, identity: authorized.identity };
 }
 
 /** What `frame` from `peer` is: parsed, addressed by a verified peer, and authorized. */

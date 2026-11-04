@@ -2,6 +2,10 @@ import { describe, expect, test, vi } from "vite-plus/test";
 import { startDownloadsPresence } from "@/background/downloads-presence";
 import type { DownloadsPort } from "@/background/downloads-publisher";
 import { FINGERPRINT, ME } from "./fake-peer";
+import { signAs } from "./test-identity";
+
+// Signed once: a real signature takes longer than the fake timers these tests advance.
+const STATEMENT = await signAs({ profileId: ME, fingerprint: FINGERPRINT });
 
 type Written = Parameters<DownloadsPort["download"]>[0];
 
@@ -19,6 +23,7 @@ async function publishedAs(displayName: string) {
     downloads,
     identity: async () => ({ profileId: ME, displayName }),
     fingerprint: async () => FINGERPRINT,
+    sign: async () => STATEMENT,
     namespace: async () => undefined,
     boot: async () => "99999999-9999-4999-8999-999999999999",
     root: { read: async () => "/home/me/Downloads", write: async () => {} },

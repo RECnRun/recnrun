@@ -4,11 +4,10 @@ import { browser } from "wxt/browser";
 import { createDownloadsPairing } from "@/background/downloads-pairing";
 import { downloadsWriter, settled } from "@/background/downloads-publisher";
 import type { DownloadsPort } from "@/background/downloads-publisher";
-import { ensureOffscreen } from "@/background/link";
+import type { Sign } from "@/background/greeting";
+import { offscreenFingerprint } from "@/background/link";
 import { createRendezvousRelay } from "@/background/rendezvous-relay";
-import { BackgroundReplySchema } from "@/messaging/background-reply";
 import type { BackgroundReply } from "@/messaging/background-reply";
-import { PocFingerprintResultSchema, pocFingerprintRequest } from "@/messaging/poc-fingerprint";
 import { PocPublishPresenceSchema } from "@/messaging/poc-presence";
 import { DEFAULT_NAMESPACE, NamespaceSchema, presencePath } from "@/p2p/downloads-rendezvous";
 import { downloadsTransport } from "@/p2p/downloads-transport";
@@ -44,6 +43,8 @@ export interface PresenceDependencies {
   identity: () => Promise<ProfileIdentity>;
   /** This profile's DTLS certificate fingerprint, which only the offscreen document can read. */
   fingerprint: () => Promise<string>;
+  /** Signs the statement each presence carries, naming the certificate it announces. */
+  sign: Sign;
   /** The stored namespace override, not yet validated. */
   namespace: () => Promise<unknown>;
   /** This browser session's id, so a reader tells this run's presence from an earlier one. */
@@ -68,16 +69,19 @@ async function namespaceOf({ namespace, log }: PresenceDependencies): Promise<st
 
 /** This profile's presence; the transport adds the namespace and the boot. */
 async function presenceOf(deps: PresenceDependencies, now: number): Promise<Presence> {
-  const identity = await deps.identity();
-  const displayName = registrationName(identity.profileId, identity.displayName);
-  if (displayName !== identity.displayName) {
+  const me = await deps.identity();
+  const displayName = registrationName(me.profileId, me.displayName);
+  if (displayName !== me.displayName) {
     deps.log(`presence: published as "${displayName}", the stored name does not fit the catalog`);
   }
+  const fingerprint = await deps.fingerprint();
+  const identity = await deps.sign({ profileId: me.profileId, fingerprint });
   // The whole identity, so the registration schema refuses a key it does not know, a path included.
   return {
-    ...identity,
+    ...me,
     displayName,
-    fingerprint: await deps.fingerprint(),
+    fingerprint,
+    identity,
     createdAt: now,
     expiresAt: now + PRESENCE_TTL_MS,
   };
@@ -182,28 +186,23 @@ export function createPublishListener(
   };
 }
 
-/** The offscreen document's certificate fingerprint, creating the document first. */
-async function offscreenFingerprint(): Promise<string> {
-  await ensureOffscreen();
-  const reply = v.safeParse(
-    BackgroundReplySchema,
-    await browser.runtime.sendMessage(pocFingerprintRequest()),
-  );
-  if (!reply.success) throw new Error("The offscreen document did not answer.");
-  if (!reply.output.ok) throw new Error(reply.output.error);
-  return v.parse(PocFingerprintResultSchema, reply.output.result).fingerprint;
+interface PocPresenceOptions {
+  log: (entry: string) => void;
+  sign: Sign;
+  startPairing: () => Promise<void>;
 }
 
 /**
  * The presence over Chrome's own Downloads, this profile's identity, and session storage; each
  * presence written once the root is known calls `startPairing`, the folder flow's start.
  */
-export function startPocPresence(log: (entry: string) => void, startPairing: () => Promise<void>) {
+export function startPocPresence({ log, sign, startPairing }: PocPresenceOptions) {
   const store = pocPresenceStore();
   const deps: PresenceDependencies = {
     downloads: browser.downloads,
     identity: readIdentity,
     fingerprint: offscreenFingerprint,
+    sign,
     namespace: store.namespace,
     boot: store.boot,
     root: store.root,

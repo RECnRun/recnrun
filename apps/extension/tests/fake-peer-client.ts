@@ -8,13 +8,15 @@ const BOB = { profileId: "22222222-2222-4222-8222-222222222222", displayName: "B
 const CAROL = { profileId: "33333333-3333-4333-8333-333333333333", displayName: "Carol" };
 export const BOB_ID = BOB.profileId;
 export const CAROL_ID = CAROL.profileId;
+/** A well-formed identity key; no view checks a signature. */
+const IDENTITY = "A".repeat(87);
 
 type Link = PeerEntry["link"];
 
 /** This profile as Alice, paired with Bob unless `state` is undefined. */
 export function statusOf(state?: Link["state"], verified = state === "connected"): PeerStatus {
   const bob = (link: Link) => ({
-    peer: { ...BOB, fingerprint: "AB:CD:EF" },
+    peer: { ...BOB, fingerprint: "AB:CD:EF", identity: IDENTITY },
     link,
     peerSession: null,
   });
@@ -41,7 +43,10 @@ export const withCarol = (
   peerSession: PeerEntry["peerSession"] = null,
 ): PeerStatus => ({
   ...status,
-  peers: [...status.peers, { peer: { ...CAROL, fingerprint: "12:34:56" }, link, peerSession }],
+  peers: [
+    ...status.peers,
+    { peer: { ...CAROL, fingerprint: "12:34:56", identity: IDENTITY }, link, peerSession },
+  ],
 });
 
 /** Bob's session as Alice last heard of it. */

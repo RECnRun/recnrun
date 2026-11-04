@@ -4,6 +4,7 @@ import { askLink } from "@/background/link";
 import { createMeshPairing } from "@/background/mesh-pairing";
 import type { MeshPairingFlow } from "@/background/mesh-pairing";
 import { createPairing } from "@/background/pairing";
+import type { Sign } from "@/background/greeting";
 import type { PeerChannel } from "@/background/peer-channel";
 import { createPins } from "@/p2p/pins";
 import type { PinSource, Pins } from "@/p2p/pins";
@@ -40,15 +41,18 @@ interface LinkedEvent {
   remoteFingerprint?: string;
 }
 
-/** Whether DTLS proved the accepted certificate, and the pin, made now on a first meeting, agrees. */
+/**
+ * Whether DTLS proved the accepted certificate, which the accepted code's identity key signed, and
+ * that key is the pinned one: pinned now on a first meeting, its latest certificate noted after.
+ */
 export async function trusted({ peer, remoteFingerprint }: LinkedEvent, { pins, source }: Trust) {
   const authorized = await authorizedPeersRepository.get(peer);
   if (!authorized || !remoteFingerprint || remoteFingerprint !== authorized.fingerprint)
     return false;
-  const verdict = await pins.verify(peer, remoteFingerprint);
-  if (verdict !== "unpinned") return verdict === "pinned-match";
-  // Only the certificate the handshake proved is pinned, never one a file or code announced.
-  return (await pins.pin(peer, remoteFingerprint, source)).ok;
+  // Only a key whose statement names the certificate the handshake proved is pinned, never one a
+  // file or code announced alone.
+  const proven = { identity: authorized.identity, fingerprint: remoteFingerprint };
+  return (await pins.pin(peer, proven, source)).ok;
 }
 
 /** Pairing through the folder and through the mesh, which exchange the same offer and answer codes. */
@@ -56,6 +60,7 @@ export function createPairingFlows(
   channel: PeerChannel,
   transport: Transport,
   log: (entry: string) => void,
+  sign: Sign,
 ): PairingFlows {
   const trust: Trust = {
     pins: createPins(peerPinsRepository),
@@ -67,6 +72,7 @@ export function createPairingFlows(
     authorized: authorizedPeersRepository,
     pending: pendingOffersRepository,
     pins: trust.pins,
+    sign,
   });
   const folder = createFolderPairing({
     askLink,

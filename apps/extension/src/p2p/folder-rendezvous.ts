@@ -1,4 +1,5 @@
 import * as v from "valibot";
+import { IdentityStatementSchema, SIGNED } from "@/p2p/identity-key";
 import { DisplayNameSchema, decodePairing } from "@/p2p/pairing-code";
 import { FingerprintSchema, MAX_CODE_LENGTH, ProfileIdSchema } from "@/p2p/protocol";
 
@@ -7,11 +8,18 @@ const SIGNAL_NAME = /^(offer|answer)-[0-9a-f-]{36}\.json$/;
 /** A presence lasts this long unless refreshed, so a profile that stopped waiting drops out. */
 export const PRESENCE_TTL_MS = 60 * 1000;
 
-/** A profile waiting in the folder to pair: who it is, its certificate, and since when. */
+/**
+ * A profile waiting in the folder to pair: who it is, its certificate, its identity key's statement
+ * that the certificate is its own, and since when.
+ */
 export const PresenceSchema = v.strictObject({
   profileId: ProfileIdSchema,
   displayName: DisplayNameSchema,
   fingerprint: FingerprintSchema,
+  // Production has no rendezvous; the cast types the entry its bundle folds away.
+  ...(SIGNED
+    ? { identity: IdentityStatementSchema }
+    : ({} as { identity: typeof IdentityStatementSchema })),
   createdAt: v.number(),
   expiresAt: v.number(),
 });
@@ -30,7 +38,7 @@ export const SignalFileSchema = v.strictObject({
 
 /**
  * One half of a pairing, as a file: the same code the user would paste, which holds no secret,
- * since the link still proves the certificate fingerprint the code announces.
+ * since the link still proves the certificate the code announces and its maker's key signed.
  */
 export type SignalFile = v.InferOutput<typeof SignalFileSchema>;
 
@@ -43,6 +51,7 @@ const FolderPresenceSchema = v.strictObject({
   profileId: ProfileIdSchema,
   displayName: DisplayNameSchema,
   fingerprint: FingerprintSchema,
+  identity: IdentityStatementSchema,
   createdAt: v.number(),
   expiresAt: v.number(),
   boot: BootSchema,

@@ -8,6 +8,7 @@ const connected: PeerView = {
     profileId: "22222222-2222-4222-8222-222222222222",
     displayName: "Desk",
     fingerprint: "AB:CD:EF",
+    identity: "A".repeat(87),
   },
   link: { state: "connected", verified: true },
   peerSession: null,

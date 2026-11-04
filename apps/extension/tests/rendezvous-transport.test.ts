@@ -3,7 +3,7 @@ import { PAIRING_TTL_MS } from "@/p2p/pairing-code";
 import { PRESENCE_TTL_MS } from "@/p2p/folder-rendezvous";
 import type { Presence, SignalFile, StampedSignal } from "@/p2p/folder-rendezvous";
 import { createSightingFilter, createSignalStamp } from "@/p2p/rendezvous-transport";
-import { ME, PEER, STRANGER } from "./fake-peer";
+import { ME, PEER, PEER_STATEMENT, STRANGER } from "./fake-peer";
 import { environments } from "./rendezvous-envs";
 import type { RendezvousEnv } from "./rendezvous-envs";
 
@@ -17,6 +17,8 @@ const presence = (profileId: string): Presence => ({
   profileId,
   displayName: "Laptop",
   fingerprint: "AB:CD:EF",
+  // The transport carries the statement; the folder pairing verifies it.
+  identity: PEER_STATEMENT,
   createdAt: Date.now(),
   expiresAt: Date.now() + PRESENCE_TTL_MS,
 });

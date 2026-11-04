@@ -1,4 +1,6 @@
 import type { LinkCommand } from "@/messaging/peer-messages";
+import { signerOf } from "@/p2p/identity-key";
+import type { IdentityClaim, IdentityStatement } from "@/p2p/identity-key";
 import { PAIRING_TTL_MS, decodePairing, encodePairing, fingerprintOf } from "@/p2p/pairing-code";
 import type { Pairing } from "@/p2p/pairing-code";
 import type { Pins } from "@/p2p/pins";
@@ -15,8 +17,10 @@ export interface PairingDependencies {
   authorized: Pick<PeerRecords<AuthorizedPeer>, "set">;
   /** This profile's offers waiting for an answer, by the profile each is for. */
   pending: Pick<PeerRecords<PendingOffer>, "get" | "set">;
-  /** A code may announce a pinned profile's certificate only; the link pins, never the code. */
+  /** A code's certificate must be signed by a pinned profile's identity; the link pins, never the code. */
   pins: Pick<Pins, "verify">;
+  /** This profile's statement, by its identity key, that a certificate is its own. */
+  sign: (claim: IdentityClaim) => Promise<IdentityStatement>;
   now?: () => number;
 }
 
@@ -35,23 +39,33 @@ async function verifyCode(code: string, deps: PairingDependencies, now: number) 
   }
   const fingerprint = fingerprintOf(pairing.sdp);
   if (!fingerprint) throw new Error("The code has no certificate fingerprint.");
+  const identity = await signerOf(pairing.identity, { profileId: pairing.profileId, fingerprint });
   // Refused before the link sees its SDP, so a forged code never gets a connection.
-  if ((await deps.pins.verify(pairing.profileId, fingerprint)) === "pinned-mismatch")
+  if ((await deps.pins.verify(pairing.profileId, identity)) === "pinned-mismatch")
     throw new Error(
-      `Refused a code from ${pairing.profileId}: its certificate is not the one pinned.`,
+      `Refused a code from ${pairing.profileId}: its pinned identity did not sign its certificate.`,
     );
-  return { pairing, fingerprint };
+  if (!identity)
+    throw new Error(
+      `Refused a code from ${pairing.profileId}: no valid signature names its certificate.`,
+    );
+  return { pairing, fingerprint, identity };
 }
 
 /**
  * The offer and answer codes profiles exchange through the RECnRun folder: A offers to B, B
- * accepts and answers, A accepts the answer. Accepting pins the code's certificate fingerprint.
+ * accepts and answers, A accepts the answer. Each code carries its maker's signed statement for the
+ * certificate its SDP names; accepting one records that certificate and the key that signed it.
  */
 export function createPairing(deps: PairingDependencies) {
   const now = deps.now ?? Date.now;
   const half = async (kind: Pairing["kind"], pairingId: string, sdp: string) => {
     const me = await deps.identity();
-    return encodePairing({ kind, pairingId, ...me, expiresAt: now() + PAIRING_TTL_MS, sdp });
+    const fingerprint = fingerprintOf(sdp);
+    if (!fingerprint) throw new Error("The link made an SDP with no certificate fingerprint.");
+    const identity = await deps.sign({ profileId: me.profileId, fingerprint });
+    const expiresAt = now() + PAIRING_TTL_MS;
+    return encodePairing({ kind, pairingId, ...me, expiresAt, sdp, identity });
   };
   /** An offer for the profile `to`. */
   const createOffer = async (to: string) => {
@@ -62,10 +76,10 @@ export function createPairing(deps: PairingDependencies) {
     return { code };
   };
   const accept = async (code: string): Promise<{ code?: string }> => {
-    const { pairing, fingerprint } = await verifyCode(code, deps, now());
+    const { pairing, fingerprint, identity } = await verifyCode(code, deps, now());
     const { profileId, displayName } = pairing;
     // Each profile paired joins the others; none replaces another.
-    await deps.authorized.set(profileId, { profileId, displayName, fingerprint });
+    await deps.authorized.set(profileId, { profileId, displayName, fingerprint, identity });
     if (pairing.kind === "offer") {
       const answer = sdpOf(
         await deps.askLink({ type: "answer", peer: profileId, sdp: pairing.sdp }),

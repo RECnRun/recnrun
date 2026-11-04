@@ -1,4 +1,5 @@
 import * as v from "valibot";
+import { IdentityStatementSchema } from "@/p2p/identity-key";
 import { ProfileIdSchema } from "@/p2p/protocol";
 
 const PREFIX = "RECNRUN-PAIR-1.";
@@ -15,6 +16,8 @@ const PairingSchema = v.strictObject({
   displayName: DisplayNameSchema,
   expiresAt: v.pipe(v.number(), v.integer()),
   sdp: v.pipe(v.string(), v.nonEmpty(), v.maxLength(64 * 1024)),
+  /** The maker's identity statement for the certificate its SDP names. */
+  identity: IdentityStatementSchema,
 });
 
 /** One side's half of a pairing: who it is, until when it holds, and its complete SDP. */

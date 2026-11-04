@@ -2,7 +2,7 @@ import { readStored, writeStored } from "@/p2p/p2p-database";
 
 const STORE = "certificates";
 const KEY = "link";
-/** Renewed a day before Chrome would refuse it; a new certificate needs a new pairing. */
+/** Renewed a day before Chrome would refuse it; peers follow it by the identity key's statement. */
 const MARGIN_MS = 24 * 60 * 60 * 1000;
 
 /**

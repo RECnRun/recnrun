@@ -5,19 +5,24 @@ import type { Presence, Seen, SignalFile } from "@/p2p/folder-rendezvous";
 import type { RendezvousTransport } from "@/p2p/rendezvous-transport";
 import { createRendezvousWatch } from "@/offscreen/folder-watch";
 import { folderTransport } from "@/p2p/folder-store";
-import { ME, PEER } from "./fake-peer";
+import { ME, PEER, PEER_STATEMENT } from "./fake-peer";
 import { MemoryDirectory } from "./memory-directory";
+import { signAs } from "./test-identity";
 
 const NOW = 1_700_000_000_000;
 const PAIRING = "44444444-4444-4444-8444-444444444444";
 const IDENTITY = { profileId: ME, displayName: "Laptop" };
 const PEER_BOOT = "66666666-6666-4666-8666-666666666666";
 const BOOT = "77777777-7777-4777-8777-777777777777";
+// Signed once: a real signature takes longer than the fake timers these tests advance.
+const STATEMENT = await signAs({ profileId: ME, fingerprint: "11:22" });
+const sign = async () => STATEMENT;
 
 const peerPresence: Presence = {
   profileId: PEER,
   displayName: "Desk",
   fingerprint: "AB:CD:EF",
+  identity: PEER_STATEMENT,
   createdAt: NOW,
   expiresAt: NOW + 10 * PRESENCE_TTL_MS,
 };
@@ -29,6 +34,7 @@ function watching(chosen: MemoryDirectory | null = new MemoryDirectory()) {
   const watch = createRendezvousWatch({
     report: (event) => events.push(event),
     fingerprint: "11:22",
+    sign,
     transport: (me) => folderTransport({ me, boot: BOOT, load }),
   });
   const pairing = (owner: string) => (chosen ?? new MemoryDirectory()).folder("pairing", owner);
@@ -57,6 +63,7 @@ describe("watch", () => {
     expect(mine()).toEqual({
       ...IDENTITY,
       fingerprint: "11:22",
+      identity: STATEMENT,
       createdAt: NOW,
       expiresAt: NOW + PRESENCE_TTL_MS,
       boot: BOOT,
@@ -142,7 +149,12 @@ function fakeTransport(kind: RendezvousTransport["kind"] = "downloads") {
     clean: vi.fn(async () => {}),
   } satisfies RendezvousTransport;
   const made = vi.fn(() => transport);
-  const watch = createRendezvousWatch({ report: () => {}, fingerprint: "11:22", transport: made });
+  const watch = createRendezvousWatch({
+    report: () => {},
+    fingerprint: "11:22",
+    sign,
+    transport: made,
+  });
   /** Holds the next read until `release` is called. */
   const holdNextLook = () => {
     let release = () => {};

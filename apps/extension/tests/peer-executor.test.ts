@@ -5,7 +5,14 @@ import { execute, sessionStatus, sharedTabs } from "@/background/executor";
 import type { ExecutorDependencies } from "@/background/executor";
 import type { BrowserTabs, OpenTab } from "@/ports/tabs";
 import { memoryRecordingStore } from "./fake-extension";
-import { PEER, STRANGER, fromPeer, memoryRepository, recordingChannel } from "./fake-peer";
+import {
+  PEER,
+  PEER_HELLO,
+  STRANGER,
+  fromPeer,
+  memoryRepository,
+  recordingChannel,
+} from "./fake-peer";
 import { PRIVATE } from "./fake-tabs";
 
 const TAB_CLOSED = "That tab is not open anymore.";
@@ -83,7 +90,7 @@ describe("queries", () => {
     const shop = await openTab("https://shop.example/");
     const { deps, sent } = executor({ tabs: [shop, PRIVATE] }, running(shop.id), PEER);
     const getTabs = fromPeer("GET_TABS", {});
-    const hello = fromPeer("HELLO", { displayName: "Desk", extensionVersion: "0.1.0" });
+    const hello = fromPeer("HELLO", PEER_HELLO);
     for (const message of [getTabs, hello]) await execute(message, deps);
     expect(sent).toEqual([
       {

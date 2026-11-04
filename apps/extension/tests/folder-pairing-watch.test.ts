@@ -3,11 +3,15 @@ import { createFolderPairing } from "@/background/folder-pairing";
 import type { Presence } from "@/p2p/folder-rendezvous";
 import type { FolderPairing } from "@/storage/peer-repository";
 import { ME, PEER, STRANGER, memoryRecords, memoryRepository } from "./fake-peer";
+import { signAs } from "./test-identity";
+
+const STATEMENT = await signAs({ profileId: PEER, fingerprint: "22:22" });
 
 const at = (profileId: string): Presence => ({
   profileId,
   displayName: "Profile",
   fingerprint: "22:22",
+  identity: STATEMENT,
   createdAt: 1,
   expiresAt: Date.now() + 60_000,
 });

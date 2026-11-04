@@ -15,11 +15,13 @@
 # symbolic link followed at any folder below the root or at the file. Temporary files get a
 # random name and are created exclusively; a registry.json that is a folder or a link exits 73. A presence counts only in the exact bytes the extension writes,
 # JSON.stringify of a RegistrationSchema value with no spaces and keys in order:
-#   {"profileId":"<uuid>","displayName":"<name>","fingerprint":"<hex:>","createdAt":<ms>,
-#    "expiresAt":<ms>,"namespace":"<namespace>","boot":"<v4 uuid>"}
+#   {"profileId":"<uuid>","displayName":"<name>","fingerprint":"<hex:>",
+#    "identity":{"key":"<87 base64url>","signedAt":<ms>,"signature":"<86 base64url>"},
+#    "createdAt":<ms>,"expiresAt":<ms>,"namespace":"<namespace>","boot":"<v4 uuid>"}
 # where the profile id is a lowercase v4 uuid naming its folder, the boot a lowercase v4 uuid,
 # the namespace the one asked for, the name 1 to 64 bytes with no backslash, quote, control
-# character, or edge space, the times whole numbers up to 2^53 - 1, createdAt at most 5000 ms
+# character, or edge space, the identity statement in form only (the extension verifies its
+# signature, and the registry does not carry it), the times whole numbers up to 2^53 - 1, createdAt at most 5000 ms
 # ahead of this clock, and expiresAt after now, after createdAt, and at most 60000 ms after
 # createdAt; anything else is skipped with a reason on stderr. The boot goes into the registry.
 # No value read from a file is ever run or expanded.
@@ -86,6 +88,11 @@ is_root_id() {
 is_time() {
   case $1 in '' | *[!0-9]* | 0?*) return 1 ;; esac
   [ "${#1}" -le 16 ] && [ "$1" -le 9007199254740991 ]
+}
+# An unpadded base64url string of exactly $2 characters.
+is_base64url() {
+  case $1 in *[!A-Za-z0-9_-]*) return 1 ;; esac
+  [ "${#1}" -eq "$2" ]
 }
 is_display_name() {
   case $1 in '' | ' '* | *' ' | *\\* | *[[:cntrl:]]*) return 1 ;; esac
@@ -280,7 +287,13 @@ read_presence() {
   take '","fingerprint":"' '"' || return 1
   is_fingerprint "$value" || { reason='invalid fingerprint'; return 1; }
   pr_fingerprint=$value
-  take '","createdAt":' ',' || return 1
+  take '","identity":{"key":"' '"' || return 1
+  is_base64url "$value" 87 || { reason='invalid identity key'; return 1; }
+  take '","signedAt":' ',' || return 1
+  is_time "$value" || { reason='invalid identity signedAt'; return 1; }
+  take ',"signature":"' '"' || return 1
+  is_base64url "$value" 86 || { reason='invalid identity signature'; return 1; }
+  take '"},"createdAt":' ',' || return 1
   is_time "$value" || { reason='invalid createdAt'; return 1; }
   pr_created=$value
   case $rest in ',"expiresAt":'*) rest=${rest#',"expiresAt":'} ;; *) reason='expected ,"expiresAt":'; return 1 ;; esac

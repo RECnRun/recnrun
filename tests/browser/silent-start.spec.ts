@@ -24,13 +24,26 @@ const MEASURE_MS = 2 * PRESENCE_TTL_MS + 5_000;
 const MAX_GAP_MS = PRESENCE_TTL_MS;
 const MIN_REWRITES = 3;
 const SAMPLE_MS = 1_000;
-const KEYS = ["profileId", "displayName", "fingerprint", "createdAt", "expiresAt", "namespace"];
+const KEYS = [
+  "profileId",
+  "displayName",
+  "fingerprint",
+  "identity",
+  "createdAt",
+  "expiresAt",
+  "namespace",
+];
 
 // PresenceSchema plus the namespace and the boot; strict, so a path or root key fails it.
 const RegistrationSchema = v.strictObject({
   profileId: v.pipe(v.string(), v.uuid()),
   displayName: v.pipe(v.string(), v.nonEmpty()),
   fingerprint: v.pipe(v.string(), v.regex(/^[0-9A-F:]+$/)),
+  identity: v.strictObject({
+    key: v.pipe(v.string(), v.regex(/^[\w-]{87}$/)),
+    signedAt: v.number(),
+    signature: v.pipe(v.string(), v.regex(/^[\w-]{86}$/)),
+  }),
   createdAt: v.number(),
   expiresAt: v.number(),
   namespace: v.literal("lab"),

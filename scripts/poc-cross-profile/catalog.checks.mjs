@@ -8,6 +8,7 @@ import {
   CAROL,
   BOOT,
   EX_USAGE,
+  IDENTITY,
   NAMESPACE,
   PEER_BOOT,
   announce,
@@ -35,6 +36,11 @@ const displayNames = JSON.parse(
   readFileSync(new URL("./fixtures/display-names.json", import.meta.url), "utf8"),
 );
 const DAY = 86_400_000;
+/** Bob's registration with its identity statement changed, or dropped as `identity: undefined`. */
+function signed(change) {
+  const identity = "identity" in change ? change.identity : { ...IDENTITY, ...change };
+  return JSON.stringify(presence(BOB, { identity }));
+}
 /** Bob's registration with its times offset from now, so it is not yet expired. */
 function freshness({ createdAt = 0, expiresAt = createdAt + 60_000 }) {
   const now = Date.now();
@@ -149,7 +155,7 @@ for (const shell of shells) {
     const skipped = [
       ["not-a-profile", text, "presence.json", /not a profile id/],
       [BOB.toUpperCase().replaceAll("2", "B"), text, "presence.json", /not a profile id/],
-      [BOB, text.replace("}", ',"path":"/Users/me/Downloads"}'), "presence.json", /after boot/],
+      [BOB, `${text.slice(0, -1)},"path":"/Users/me/Downloads"}`, "presence.json", /after boot/],
       [BOB, JSON.stringify(presence(BOB), null, 1), "presence.json", /expected/],
       [BOB, JSON.stringify({ displayName: "Desk", ...presence(BOB) }), "presence.json", /expected/],
       [BOB, JSON.stringify(presence(BOB, { displayName: 'a"b' })), "presence.json", /displayName/],
@@ -171,6 +177,20 @@ for (const shell of shells) {
         "presence.json",
         /fingerprint/,
       ],
+      [BOB, signed({ identity: undefined }), "presence.json", /expected ","identity"/],
+      [BOB, signed({ key: "B".repeat(86) }), "presence.json", /invalid identity key/],
+      [BOB, signed({ key: `${"B".repeat(86)}+` }), "presence.json", /invalid identity key/],
+      [BOB, signed({ signedAt: 1.5 }), "presence.json", /invalid identity signedAt/],
+      [BOB, signed({ signedAt: -1 }), "presence.json", /invalid identity signedAt/],
+      [BOB, timeOver("signedAt"), "presence.json", /invalid identity signedAt/],
+      [BOB, signed({ signature: "S".repeat(87) }), "presence.json", /invalid identity signature/],
+      [
+        BOB,
+        signed({ signature: `${"S".repeat(85)}=` }),
+        "presence.json",
+        /invalid identity signature/,
+      ],
+      [BOB, signed({ role: "master" }), "presence.json", /expected "},"createdAt"/],
       [BOB, JSON.stringify(presence(BOB, { createdAt: 1.5 })), "presence.json", /createdAt/],
       [BOB, JSON.stringify(presence(BOB, { expiresAt: 1000 })), "presence.json", /expired/],
       [BOB, `${text}\n`, "presence.json", /exact bytes/],

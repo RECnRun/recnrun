@@ -12,14 +12,14 @@ interface StorageGlobal {
   };
 }
 
-/** The certificate `profile` pinned for `peer` when their link was first verified. */
+/** The identity key `profile` pinned for `peer` when their link was first verified. */
 const pinOf = (profile: Profile, peer: string): Promise<string> =>
   profile.serviceWorker.evaluate(async (id) => {
     const { chrome } = globalThis as unknown as StorageGlobal;
     const { peerPins } = await chrome.storage.local.get("peerPins");
-    const pin = (peerPins as Record<string, { fingerprint: string }> | undefined)?.[id];
+    const pin = (peerPins as Record<string, { identity: string }> | undefined)?.[id];
     if (!pin) throw new Error(`No pin for ${id}.`);
-    return pin.fingerprint;
+    return pin.identity;
   }, peer);
 
 const store = (profile: Profile, items: Record<string, unknown>) =>
@@ -30,23 +30,23 @@ const store = (profile: Profile, items: Record<string, unknown>) =>
 
 /**
  * Binds `workers` to `master` as the local channel does once each pair is linked: the FSA flow has
- * no launcher, so the test writes, from the certificates each side pinned at pairing, each
+ * no launcher, so the test writes, from the identity keys each side pinned at pairing, each
  * worker's binding, then the master's workers and its own record.
  */
 export async function bindHierarchy(master: Profile, workers: Profile[]): Promise<void> {
   const masterId = await profileIdOf(master);
   const boundAt = Date.now();
   const boundWorkers: Record<string, unknown> = {};
-  let fingerprint = "";
+  let identity = "";
   for (const worker of workers) {
     const workerId = await profileIdOf(worker);
-    fingerprint = await pinOf(worker, masterId);
-    const binding = { masterProfileId: masterId, masterFingerprint: fingerprint, boundAt };
+    identity = await pinOf(worker, masterId);
+    const binding = { masterProfileId: masterId, masterIdentity: identity, boundAt };
     await store(worker, { role: { role: "worker", ...binding, source: "pairing" } });
     const pinned = await pinOf(master, workerId);
-    boundWorkers[workerId] = { fingerprint: pinned, boundAt, source: "pairing" };
+    boundWorkers[workerId] = { identity: pinned, boundAt, source: "pairing" };
   }
   // The workers go first, so the master never refuses a report of its own workers.
   await store(master, { boundWorkers });
-  await store(master, { role: { role: "master", profileId: masterId, fingerprint } });
+  await store(master, { role: { role: "master", profileId: masterId, identity } });
 }

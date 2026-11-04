@@ -1,5 +1,6 @@
 import * as v from "valibot";
 import { LinkStateSchema } from "@/messaging/peer-messages";
+import { IdentityKeySchema, SIGNED } from "@/p2p/identity-key";
 import { FingerprintSchema, ProfileIdSchema } from "@/p2p/protocol";
 import { DisplayNameSchema } from "@/p2p/pairing-code";
 
@@ -9,11 +10,16 @@ export const ProfileIdentitySchema = v.strictObject({
   displayName: DisplayNameSchema,
 });
 
-/** A profile this one paired with, pinned to its DTLS certificate fingerprint. */
+/**
+ * A profile this one paired with: the certificate fingerprint its last accepted code announced,
+ * and the identity key whose valid signature named that certificate.
+ */
 export const AuthorizedPeerSchema = v.strictObject({
   profileId: ProfileIdSchema,
   displayName: DisplayNameSchema,
   fingerprint: FingerprintSchema,
+  // Production has no peers; the cast types the entry its bundle folds away.
+  ...(SIGNED ? { identity: IdentityKeySchema } : ({} as { identity: typeof IdentityKeySchema })),
 });
 
 export const PeerLinkSchema = v.strictObject({

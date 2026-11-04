@@ -2,7 +2,7 @@ import { describe, expect, test, vi } from "vite-plus/test";
 import { PAIRING_TTL_MS, encodePairing } from "@/p2p/pairing-code";
 import { PRESENCE_TTL_MS, folderRendezvous, signalFileOf } from "@/p2p/folder-rendezvous";
 import type { FolderPresence, StampedSignal } from "@/p2p/folder-rendezvous";
-import { ME, PEER, STRANGER } from "./fake-peer";
+import { ME, PEER, PEER_STATEMENT, STRANGER } from "./fake-peer";
 import { MemoryDirectory } from "./memory-directory";
 
 type Directory = Parameters<typeof folderRendezvous>[0];
@@ -17,6 +17,7 @@ function presence(overrides: Partial<FolderPresence> = {}): FolderPresence {
     profileId: PEER,
     displayName: "Desk",
     fingerprint: "AB:CD:EF",
+    identity: PEER_STATEMENT,
     createdAt: NOW - 1000,
     expiresAt: NOW + PRESENCE_TTL_MS,
     boot: BOOT,
@@ -57,6 +58,7 @@ describe("signalFileOf", () => {
       displayName: "Laptop",
       expiresAt: NOW + PAIRING_TTL_MS,
       sdp: "v=0\r\n",
+      identity: PEER_STATEMENT,
     };
     const code = encodePairing(pairing);
     expect(signalFileOf(code, PEER, NOW)).toEqual({

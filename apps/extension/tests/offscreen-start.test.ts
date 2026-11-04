@@ -3,8 +3,10 @@ import { fakeBrowser } from "wxt/testing/fake-browser";
 import { linkCommandMessage } from "@/messaging/peer-messages";
 import type { LinkCommand } from "@/messaging/peer-messages";
 import { startOffscreen } from "@/offscreen/start";
+import { signerOf } from "@/p2p/identity-key";
 import { ME, PEER, STRANGER, answering } from "./fake-peer";
 import { MemoryDirectory } from "./memory-directory";
+import { identityOf, signAs } from "./test-identity";
 
 const LOCAL_SDP = "v=0\r\na=fingerprint:sha-256 11:22\r\n";
 const REMOTE_SDP = "v=0\r\na=fingerprint:sha-256 aa:bb\r\n";
@@ -84,7 +86,7 @@ function offscreen(
     answering((message) => void events.push((message as { event: unknown }).event)),
   );
   const folder = async () => chosen as unknown as FileSystemDirectoryHandle | undefined;
-  startOffscreen({ certificate: cert, folder });
+  startOffscreen({ certificate: cert, folder, sign: signAs });
   return { events };
 }
 
@@ -183,14 +185,19 @@ describe("the folder", () => {
       ok: true,
     });
     expect(events).toEqual([{ type: "folder", presences: [], signals: [] }]);
-    expect(JSON.parse(chosen.folder("pairing", ME).files.get("presence.json") ?? "")).toEqual({
+    const presence = JSON.parse(chosen.folder("pairing", ME).files.get("presence.json") ?? "");
+    expect(presence).toEqual({
       profileId: ME,
       displayName: "Laptop",
       fingerprint: "AB:CD",
+      identity: expect.any(Object),
       createdAt: expect.any(Number),
       expiresAt: expect.any(Number),
       boot: expect.any(String),
     });
+    // The presence names the certificate under this profile's own identity key.
+    const claim = { profileId: ME, fingerprint: "AB:CD" };
+    expect(await signerOf(presence.identity, claim)).toBe(await identityOf(ME));
     const signal = {
       kind: "offer" as const,
       pairingId: "44444444-4444-4444-8444-444444444444",

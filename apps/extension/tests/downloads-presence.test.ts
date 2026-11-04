@@ -5,6 +5,10 @@ import type { PresenceDependencies } from "@/background/downloads-presence";
 import type { DownloadItem, DownloadsPort } from "@/background/downloads-publisher";
 import { PRESENCE_TTL_MS } from "@/p2p/folder-rendezvous";
 import { FINGERPRINT, ME } from "./fake-peer";
+import { signAs } from "./test-identity";
+
+// Signed once: a real signature takes longer than the fake timers these tests advance.
+const STATEMENT = await signAs({ profileId: ME, fingerprint: FINGERPRINT });
 
 const NOW = 1_700_000_000_000;
 const BOOT = "99999999-9999-4999-8999-999999999999";
@@ -48,6 +52,7 @@ function dependencies(overrides: Partial<PresenceDependencies> = {}) {
     downloads,
     identity: async () => ({ profileId: ME, displayName: "Laptop" }),
     fingerprint: async () => FINGERPRINT,
+    sign: async () => STATEMENT,
     namespace: async () => undefined,
     boot: async () => BOOT,
     root,
@@ -85,11 +90,13 @@ describe("startDownloadsPresence", () => {
     expect(written[0]?.url.startsWith("data:application/json")).toBe(true);
     expect(contentOf(written[0]?.url ?? "")).toBe(
       `{"profileId":"${ME}","displayName":"Laptop","fingerprint":"${FINGERPRINT}",` +
+        `"identity":{"key":"${STATEMENT.key}","signedAt":${STATEMENT.signedAt},` +
+        `"signature":"${STATEMENT.signature}"},` +
         `"createdAt":${NOW},"expiresAt":${NOW + PRESENCE_TTL_MS},"namespace":"lab","boot":"${BOOT}"}`,
     );
   });
 
-  test("writes exactly the registration's seven keys, in the schema's order", async () => {
+  test("writes exactly the registration's eight keys, in the schema's order", async () => {
     const { deps, written } = dependencies();
     startDownloadsPresence(deps).stop();
     await vi.advanceTimersByTimeAsync(0);
@@ -97,11 +104,20 @@ describe("startDownloadsPresence", () => {
       "profileId",
       "displayName",
       "fingerprint",
+      "identity",
       "createdAt",
       "expiresAt",
       "namespace",
       "boot",
     ]);
+  });
+
+  test("signs, as this profile, the certificate it announces", async () => {
+    const sign = vi.fn(async () => STATEMENT);
+    const { deps } = dependencies({ sign });
+    startDownloadsPresence(deps).stop();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(sign).toHaveBeenCalledWith({ profileId: ME, fingerprint: FINGERPRINT });
   });
 
   test("writes nothing, and logs, when the registration carries a key the schema refuses", async () => {

@@ -9,6 +9,8 @@ import { createRendezvousWatch } from "@/offscreen/folder-watch";
 import type { RendezvousWatch } from "@/offscreen/folder-watch";
 import { certificateFingerprint, persistentCertificate } from "@/p2p/certificate-store";
 import { folderAccess, folderTransport, loadFolder } from "@/p2p/folder-store";
+import { signedIdentity } from "@/p2p/identity-key";
+import type { IdentityClaim, IdentityStatement } from "@/p2p/identity-key";
 import { createPeerLink } from "@/p2p/peer-link";
 import type { PeerLink } from "@/p2p/peer-link";
 import type { RendezvousTransport } from "@/p2p/rendezvous-transport";
@@ -89,6 +91,8 @@ interface OffscreenOptions {
   folder?: Folder;
   /** How a profile meets the others; the folder it chose unless a POC build passes Downloads. */
   rendezvous?: (profileId: string) => RendezvousTransport;
+  /** Signs the presence's statement; the identity key in IndexedDB unless a test passes its own. */
+  sign?: (claim: IdentityClaim) => Promise<IdentityStatement>;
 }
 
 /** The folder, in a boot of this document's own, so a document made again stamps its files apart. */
@@ -103,12 +107,19 @@ export function startOffscreen({
   certificate = persistentCertificate,
   folder = loadFolder,
   rendezvous = folderRendezvousOf(folder),
+  sign = signedIdentity,
 }: OffscreenOptions = {}): void {
   // A sleeping service worker wakes for the message; a closed one makes nothing to report to.
   const report = (event: LinkEvent) => void send(linkEventMessage(event)).catch(() => {});
   const ready = certificate().then((cert) => {
     const fingerprint = certificateFingerprint(cert) ?? "";
-    const watch = createRendezvousWatch({ report, fingerprint, transport: rendezvous });
+    const signFor = (profileId: string) => sign({ profileId, fingerprint });
+    const watch = createRendezvousWatch({
+      report,
+      fingerprint,
+      sign: signFor,
+      transport: rendezvous,
+    });
     return { linkOf: createLinks(cert, report), watch };
   });
   const backgroundUrl = browser.runtime.getURL("/background.js");

@@ -8,6 +8,7 @@ import type { PeerMessage, PeerPayload, PeerType } from "@/p2p/protocol";
 import { createRoles } from "@/p2p/roles";
 import { roleStores, storedRoles } from "@/storage/hierarchy-repository";
 import { peerPinsRepository } from "@/storage/peer-repository";
+import { identityOf, signAs } from "./test-identity";
 
 const ME = "11111111-1111-4111-8111-111111111111";
 // The Default's id sorts after its workers' ids, so the offerer election picks a worker.
@@ -23,9 +24,14 @@ const FINGERPRINTS: Record<string, string> = {
   [STRANGER]: "33:33",
 };
 const fp = (profileId: string) => FINGERPRINTS[profileId] ?? "";
+const KEYS: Record<string, string> = Object.fromEntries(
+  await Promise.all(Object.keys(FINGERPRINTS).map(async (id) => [id, await identityOf(id)])),
+);
+const key = (profileId: string) => KEYS[profileId] ?? "";
+const OTHER_KEY = await identityOf("other");
 
-/** This profile's channel, with every peer authorized and linked under its certificate. */
-function channel(certificates: Record<string, string> = FINGERPRINTS) {
+/** This profile's channel, with every peer authorized and linked under its certificate and key. */
+function channel(identities: Record<string, string> = KEYS) {
   const log = vi.fn<(entry: string) => void>();
   const sent: PeerMessage[] = [];
   const created = createPeerChannel({
@@ -38,7 +44,8 @@ function channel(certificates: Record<string, string> = FINGERPRINTS) {
       get: async (id) => ({
         profileId: id,
         displayName: "Peer",
-        fingerprint: certificates[id] ?? "",
+        fingerprint: fp(id),
+        identity: identities[id] ?? "",
       }),
     },
     link: { get: async () => ({ state: "connected", verified: true }) },
@@ -53,17 +60,18 @@ const from = <T extends PeerType>(type: T, author: string, payload: PeerPayload<
 const frame = (message: PeerMessage) => JSON.stringify(message);
 const start = (author: string) => from("SESSION_START", author, { tabId: 7 });
 
-/** The first verified link to each peer pins its certificate, as pairing-flows does. */
+/** The first verified link to each peer pins its key, as pairing-flows does. */
 async function meet(...peers: string[]) {
   const pins = createPins(peerPinsRepository);
-  for (const peer of peers) await pins.pin(peer, fp(peer), "pairing-code");
+  for (const peer of peers)
+    await pins.pin(peer, { identity: key(peer), fingerprint: fp(peer) }, "pairing-code");
 }
 
 async function workerOf(master: string) {
   await meet(master);
   const bound = await storedRoles().bind({
     profileId: master,
-    fingerprint: fp(master),
+    identity: key(master),
     source: "pairing",
   });
   expect(bound.ok).toBe(true);
@@ -71,10 +79,10 @@ async function workerOf(master: string) {
 
 async function masterOf(...workers: string[]) {
   const roles = storedRoles();
-  await roles.becomeMaster({ profileId: ME, fingerprint: fp(ME) });
+  await roles.becomeMaster({ profileId: ME, identity: key(ME) });
   await meet(...workers);
   for (const worker of workers)
-    await roles.bindWorker({ profileId: worker, fingerprint: fp(worker), source: "pairing" });
+    await roles.bindWorker({ profileId: worker, identity: key(worker), source: "pairing" });
 }
 
 beforeEach(() => {
@@ -150,7 +158,7 @@ describe("a command", () => {
   test("relayed for a worker keeps the worker as its author, even when the relay is the master", async () => {
     await workerOf(MASTER);
     await meet(WORKER);
-    const relay = { profileId: MASTER, fingerprint: fp(MASTER) };
+    const relay = { profileId: MASTER, identity: key(MASTER) };
     const verdict = await authorizeCommand(start(WORKER), relay, storedRoles());
     expect(verdict).toEqual({
       ok: false,
@@ -162,9 +170,9 @@ describe("a command", () => {
     expect(refused()).toBe(0);
   });
 
-  test("from the master's id over a link with another certificate is refused", async () => {
+  test("from the master's id over a link proving another identity key is refused", async () => {
     await workerOf(MASTER);
-    const { receive } = channel({ ...FINGERPRINTS, [MASTER]: "BA:D0" });
+    const { receive } = channel({ ...KEYS, [MASTER]: OTHER_KEY });
     expect(await receive(frame(start(MASTER)), MASTER)).toMatchObject({ kind: "refused" });
   });
 });
@@ -175,7 +183,12 @@ describe("results and status", () => {
     const { receive } = channel();
     const snapshot = from("TABS_SNAPSHOT", WORKER, { requestId: crypto.randomUUID(), tabs: [] });
     expect(await receive(frame(snapshot), WORKER)).toMatchObject({ kind: "accepted" });
-    const hello = from("HELLO", STRANGER, { displayName: "Desk", extensionVersion: "0.1.0" });
+    const identity = await signAs({ profileId: STRANGER, fingerprint: fp(STRANGER) });
+    const hello = from("HELLO", STRANGER, {
+      displayName: "Desk",
+      extensionVersion: "0.1.0",
+      identity,
+    });
     expect(await receive(frame(hello), STRANGER)).toMatchObject({ kind: "accepted" });
   });
 
@@ -197,9 +210,9 @@ describe("results and status", () => {
     await expect(asked).rejects.toThrow("The other profile did not answer in time.");
   });
 
-  test("the master refuses a bound worker's report over a link with another certificate", async () => {
+  test("the master refuses a bound worker's report over a link proving another identity key", async () => {
     await masterOf(WORKER);
-    const { receive } = channel({ ...FINGERPRINTS, [WORKER]: "BA:D0" });
+    const { receive } = channel({ ...KEYS, [WORKER]: OTHER_KEY });
     const changed = from("TABS_CHANGED", WORKER, { tabs: [] });
     expect(await receive(frame(changed), WORKER)).toMatchObject({ kind: "refused" });
   });
@@ -219,7 +232,7 @@ describe("heartbeat and signaling", () => {
     expect(await receive(frame(members), STRANGER)).toMatchObject({ kind: "accepted" });
     const roles = storedRoles();
     expect(await roles.roleOf()).toBe("master");
-    expect(await roles.isBoundWorker(STRANGER, fp(STRANGER))).toBe(false);
+    expect(await roles.isBoundWorker(STRANGER, key(STRANGER))).toBe(false);
     expect(await receive(frame(start(STRANGER)), STRANGER)).toMatchObject({ kind: "refused" });
     const status = from("SESSION_STATUS", STRANGER, { session: null, controlledBy: null });
     expect(await receive(frame(status), STRANGER)).toMatchObject({ kind: "refused" });
@@ -233,7 +246,7 @@ describe("heartbeat and signaling", () => {
     expect(await receive(frame(from("BYE", STRANGER, {})), STRANGER)).toMatchObject({
       kind: "accepted",
     });
-    expect(await storedRoles().isMasterIdentity(STRANGER, fp(STRANGER))).toBe(false);
+    expect(await storedRoles().isMasterIdentity(STRANGER, key(STRANGER))).toBe(false);
   });
 });
 
@@ -268,7 +281,7 @@ describe("the controls a dashboard offers", () => {
 
   test("a worker controls only itself, not its master or a worker its store still names", async () => {
     await meet(WORKER);
-    const bound = { fingerprint: fp(WORKER), boundAt: 1, source: "pairing" } as const;
+    const bound = { identity: key(WORKER), boundAt: 1, source: "pairing" } as const;
     await roleStores().workers.set(WORKER, bound);
     await workerOf(MASTER);
     const roles = storedRoles();

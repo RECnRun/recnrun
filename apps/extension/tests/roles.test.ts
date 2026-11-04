@@ -3,39 +3,29 @@ import { beforeEach, describe, expect, test } from "vite-plus/test";
 import { fakeBrowser } from "wxt/testing/fake-browser";
 import { PresenceSchema } from "@/p2p/folder-rendezvous";
 import { parseLauncherRecord } from "@/p2p/launcher-record";
-import { createPins } from "@/p2p/pins";
 import { MemberSchema, parsePeerFrame, peerMessage } from "@/p2p/protocol";
 import { RegistrationSchema } from "@/p2p/registry";
-import { RoleRecordSchema, createRoles } from "@/p2p/roles";
-import { roleStores } from "@/storage/hierarchy-repository";
-import { peerPinsRepository } from "@/storage/peer-repository";
-
-const NOW = 1_700_000_000_000;
-const ME = "11111111-1111-4111-8111-111111111111";
-// The Default's id sorts after its workers' ids, so the offerer election picks a worker.
-const MASTER = "ffffffff-ffff-4fff-8fff-ffffffffffff";
-const LOW_WORKER = "00000000-0000-4000-8000-000000000000";
-const OTHER_MASTER = "33333333-3333-4333-8333-333333333333";
-const CLONE = "44444444-4444-4444-8444-444444444444";
-const MASTER_FP = "AB:CD:EF";
-const OTHER_FP = "12:34:56";
-
-const pins = () => createPins(peerPinsRepository, () => NOW);
-const stores = roleStores();
-const { role: roleRepository, workers: boundWorkersRepository } = stores;
-const roles = () => createRoles({ ...stores, pins: pins(), now: () => NOW });
-const master = { profileId: MASTER, fingerprint: MASTER_FP, source: "pairing" } as const;
-const binding = {
-  role: "worker",
-  masterProfileId: MASTER,
-  masterFingerprint: MASTER_FP,
-  boundAt: NOW,
-  source: "pairing",
-};
-
-/** The handshake proved `fingerprint` for `profileId`, as a first verified link pins it. */
-const proved = (profileId: string, fingerprint: string) =>
-  pins().pin(profileId, fingerprint, "pairing-code");
+import { createRoles } from "@/p2p/roles";
+import {
+  CLONE,
+  FINGERPRINT,
+  LOW_WORKER,
+  MASTER,
+  MASTER_KEY,
+  ME,
+  NOW,
+  OTHER_KEY,
+  OTHER_MASTER,
+  binding,
+  boundWorkersRepository,
+  master,
+  pins,
+  proved,
+  roleRepository,
+  roles,
+  stores,
+} from "./role-fixture";
+import { signAs } from "./test-identity";
 
 beforeEach(() => {
   fakeBrowser.reset();
@@ -51,14 +41,19 @@ describe("the role of a profile", () => {
     const hello = peerMessage(
       "HELLO",
       { from: OTHER_MASTER, to: ME },
-      { displayName: "Default", extensionVersion: "0.1.0" },
+      {
+        displayName: "Default",
+        extensionVersion: "0.1.0",
+        identity: await signAs({ profileId: OTHER_MASTER, fingerprint: FINGERPRINT }),
+      },
     );
     expect(parsePeerFrame(JSON.stringify(hello))).toEqual(hello);
     expect(parsePeerFrame(JSON.stringify({ ...hello, role: "master" }))).toBeUndefined();
     const presence = {
       profileId: OTHER_MASTER,
       displayName: "Default",
-      fingerprint: OTHER_FP,
+      fingerprint: FINGERPRINT,
+      identity: await signAs({ profileId: OTHER_MASTER, fingerprint: FINGERPRINT }),
       createdAt: NOW,
       expiresAt: NOW + 30_000,
     };
@@ -67,16 +62,21 @@ describe("the role of a profile", () => {
     const registration = { ...presence, namespace: "lab", boot: crypto.randomUUID() };
     expect(v.is(RegistrationSchema, registration)).toBe(true);
     expect(v.is(RegistrationSchema, { ...registration, role: "master" })).toBe(false);
-    const member = { profileId: OTHER_MASTER, displayName: "Default", fingerprint: OTHER_FP };
+    const member = {
+      profileId: OTHER_MASTER,
+      displayName: "Default",
+      fingerprint: FINGERPRINT,
+      identity: OTHER_KEY,
+    };
     expect(v.is(MemberSchema, member)).toBe(true);
     expect(v.is(MemberSchema, { ...member, role: "master" })).toBe(false);
-    // Even over a link that proved its certificate, the claimant is no master here.
-    await proved(OTHER_MASTER, OTHER_FP);
+    // Even over a link that proved its certificate and key, the claimant is no master here.
+    await proved(OTHER_MASTER, OTHER_KEY);
     expect(await roles().roleOf()).toBe("worker");
-    expect(await roles().isMasterIdentity(OTHER_MASTER, OTHER_FP)).toBe(false);
-    await proved(MASTER, MASTER_FP);
+    expect(await roles().isMasterIdentity(OTHER_MASTER, OTHER_KEY)).toBe(false);
+    await proved(MASTER, MASTER_KEY);
     await roles().bind(master);
-    expect(await roles().isMasterIdentity(OTHER_MASTER, OTHER_FP)).toBe(false);
+    expect(await roles().isMasterIdentity(OTHER_MASTER, OTHER_KEY)).toBe(false);
   });
 
   test("a clone with a Default/ profile directory is a worker", async () => {
@@ -89,30 +89,30 @@ describe("the role of a profile", () => {
     expect((await roles().bind(master)).ok).toBe(true);
     expect(await roles().roleOf()).toBe("worker");
     // A worker of the Default: the clone's verified link does not make it the master.
-    await proved(CLONE, OTHER_FP);
-    await proved(MASTER, MASTER_FP);
-    expect(await roles().isMasterIdentity(CLONE, OTHER_FP)).toBe(false);
-    expect(await roles().isMasterIdentity(MASTER, MASTER_FP)).toBe(true);
+    await proved(CLONE, OTHER_KEY);
+    await proved(MASTER, MASTER_KEY);
+    expect(await roles().isMasterIdentity(CLONE, OTHER_KEY)).toBe(false);
+    expect(await roles().isMasterIdentity(MASTER, MASTER_KEY)).toBe(true);
   });
 
   test("a worker whose profileId sorts lower than the master's stays a worker", async () => {
     expect([MASTER, LOW_WORKER].toSorted()).toEqual([LOW_WORKER, MASTER]);
-    await proved(MASTER, MASTER_FP);
+    await proved(MASTER, MASTER_KEY);
     await roles().bind(master);
     expect(await roles().roleOf()).toBe("worker");
-    expect(await roles().isMasterIdentity(LOW_WORKER, OTHER_FP)).toBe(false);
+    expect(await roles().isMasterIdentity(LOW_WORKER, OTHER_KEY)).toBe(false);
     // The master's own record makes the low id no master either.
     fakeBrowser.reset();
-    await roles().becomeMaster({ profileId: MASTER, fingerprint: MASTER_FP });
-    await proved(LOW_WORKER, OTHER_FP);
+    await roles().becomeMaster({ profileId: MASTER, identity: MASTER_KEY });
+    await proved(LOW_WORKER, OTHER_KEY);
     expect(await roles().roleOf()).toBe("master");
-    expect(await roles().isMasterIdentity(LOW_WORKER, OTHER_FP)).toBe(false);
+    expect(await roles().isMasterIdentity(LOW_WORKER, OTHER_KEY)).toBe(false);
   });
 });
 
 describe("bind", () => {
-  test("records the master's identity and certificate, with the time and source", async () => {
-    await proved(MASTER, MASTER_FP);
+  test("records the master's profile and identity key, with the time and source", async () => {
+    await proved(MASTER, MASTER_KEY);
     expect(await roles().bind(master)).toEqual({ ok: true, binding });
     expect(await roleRepository.read()).toEqual(binding);
   });
@@ -121,9 +121,9 @@ describe("bind", () => {
     await roles().bind(master);
     const other = { ...master, profileId: OTHER_MASTER };
     expect(await roles().bind(other)).toEqual({ ok: false, reason: "bound-elsewhere", binding });
-    // The same profile with another certificate is another master too.
-    const renewed = { ...master, fingerprint: OTHER_FP };
-    expect(await roles().bind(renewed)).toEqual({ ok: false, reason: "bound-elsewhere", binding });
+    // The same profile with another identity key is another master too.
+    const rekeyed = { ...master, identity: OTHER_KEY };
+    expect(await roles().bind(rekeyed)).toEqual({ ok: false, reason: "bound-elsewhere", binding });
     expect(await roleRepository.read()).toEqual(binding);
   });
 
@@ -141,8 +141,8 @@ describe("bind", () => {
     expect(await roleRepository.read()).toEqual(binding);
   });
 
-  test("refuses a master whose pinned certificate is another", async () => {
-    await proved(MASTER, OTHER_FP);
+  test("refuses a master whose pinned identity key is another", async () => {
+    await proved(MASTER, OTHER_KEY);
     expect(await roles().bind(master)).toEqual({ ok: false, reason: "pinned-different" });
     expect(await roleRepository.read()).toBeNull();
   });
@@ -153,7 +153,7 @@ describe("bind", () => {
   });
 
   test("the master is never a worker", async () => {
-    await roles().becomeMaster({ profileId: MASTER, fingerprint: MASTER_FP });
+    await roles().becomeMaster({ profileId: MASTER, identity: MASTER_KEY });
     const other = { ...master, profileId: OTHER_MASTER };
     expect(await roles().bind(other)).toEqual({ ok: false, reason: "master" });
     expect(await roles().roleOf()).toBe("master");
@@ -161,8 +161,8 @@ describe("bind", () => {
 });
 
 describe("becomeMaster", () => {
-  test("records the Default's own identity and certificate", async () => {
-    const self = { profileId: MASTER, fingerprint: MASTER_FP };
+  test("records the Default's own profile and identity key", async () => {
+    const self = { profileId: MASTER, identity: MASTER_KEY };
     expect(await roles().becomeMaster(self)).toEqual({
       ok: true,
       record: { role: "master", ...self },
@@ -175,15 +175,15 @@ describe("becomeMaster", () => {
 
   test("never promotes a bound worker, even with its master away", async () => {
     await roles().bind(master);
-    const self = { profileId: ME, fingerprint: OTHER_FP };
+    const self = { profileId: ME, identity: OTHER_KEY };
     expect(await roles().becomeMaster(self)).toEqual({ ok: false, reason: "bound", binding });
     expect(await roles().roleOf()).toBe("worker");
   });
 
   test("keeps the first master record against another identity", async () => {
-    const self = { profileId: MASTER, fingerprint: MASTER_FP };
+    const self = { profileId: MASTER, identity: MASTER_KEY };
     await roles().becomeMaster(self);
-    const other = { profileId: MASTER, fingerprint: OTHER_FP };
+    const other = { profileId: MASTER, identity: OTHER_KEY };
     expect(await roles().becomeMaster(other)).toEqual({
       ok: false,
       reason: "master-differs",
@@ -192,68 +192,77 @@ describe("becomeMaster", () => {
   });
 
   test("refuses a malformed identity", async () => {
-    const self = { profileId: MASTER, fingerprint: "not a fingerprint" };
+    const self = { profileId: MASTER, identity: "not an identity key" };
     expect(await roles().becomeMaster(self)).toEqual({ ok: false, reason: "malformed" });
   });
 });
 
 describe("isMasterIdentity", () => {
-  test("is true only for the bound master's id and certificate, pinned as they are", async () => {
+  test("is true only for the bound master's id and identity key, pinned as they are", async () => {
     await roles().bind(master);
-    // Bound before any link: nothing proved the certificate yet.
-    expect(await roles().isMasterIdentity(MASTER, MASTER_FP)).toBe(false);
-    await proved(MASTER, MASTER_FP);
-    expect(await roles().isMasterIdentity(MASTER, MASTER_FP)).toBe(true);
-    expect(await roles().isMasterIdentity(MASTER, OTHER_FP)).toBe(false);
-    expect(await roles().isMasterIdentity(OTHER_MASTER, MASTER_FP)).toBe(false);
+    // Bound before any link: nothing proved the key yet.
+    expect(await roles().isMasterIdentity(MASTER, MASTER_KEY)).toBe(false);
+    await proved(MASTER, MASTER_KEY);
+    expect(await roles().isMasterIdentity(MASTER, MASTER_KEY)).toBe(true);
+    expect(await roles().isMasterIdentity(MASTER, OTHER_KEY)).toBe(false);
+    expect(await roles().isMasterIdentity(OTHER_MASTER, MASTER_KEY)).toBe(false);
   });
 
-  test("is false when the pin is another certificate than the binding's", async () => {
+  test("is false when the pin is another identity key than the binding's", async () => {
     await roles().bind(master);
-    await proved(MASTER, OTHER_FP);
-    expect(await roles().isMasterIdentity(MASTER, MASTER_FP)).toBe(false);
-    expect(await roles().isMasterIdentity(MASTER, OTHER_FP)).toBe(false);
+    await proved(MASTER, OTHER_KEY);
+    expect(await roles().isMasterIdentity(MASTER, MASTER_KEY)).toBe(false);
+    expect(await roles().isMasterIdentity(MASTER, OTHER_KEY)).toBe(false);
+  });
+
+  test("stays true after the master renews its certificate under the same key", async () => {
+    await roles().bind(master);
+    await proved(MASTER, MASTER_KEY);
+    const renewed = { identity: MASTER_KEY, fingerprint: "12:34:56" };
+    expect(await pins().pin(MASTER, renewed, "pairing-code")).toMatchObject({ ok: true });
+    expect(await roles().isMasterIdentity(MASTER, MASTER_KEY)).toBe(true);
+    expect(await roles().record()).toEqual(binding);
   });
 
   test("is false on the master itself and on a template", async () => {
-    await proved(MASTER, MASTER_FP);
-    await roles().becomeMaster({ profileId: MASTER, fingerprint: MASTER_FP });
-    expect(await roles().isMasterIdentity(MASTER, MASTER_FP)).toBe(false);
+    await proved(MASTER, MASTER_KEY);
+    await roles().becomeMaster({ profileId: MASTER, identity: MASTER_KEY });
+    expect(await roles().isMasterIdentity(MASTER, MASTER_KEY)).toBe(false);
     fakeBrowser.reset();
-    await proved(MASTER, MASTER_FP);
+    await proved(MASTER, MASTER_KEY);
     await roles().holdAsTemplate();
-    expect(await roles().isMasterIdentity(MASTER, MASTER_FP)).toBe(false);
+    expect(await roles().isMasterIdentity(MASTER, MASTER_KEY)).toBe(false);
   });
 });
 
 describe("the master's workers", () => {
-  const worker = { profileId: LOW_WORKER, fingerprint: OTHER_FP, source: "pairing" } as const;
-  const bound = { fingerprint: OTHER_FP, boundAt: NOW, source: "pairing" } as const;
-  const asMaster = () => roles().becomeMaster({ profileId: MASTER, fingerprint: MASTER_FP });
+  const worker = { profileId: LOW_WORKER, identity: OTHER_KEY, source: "pairing" } as const;
+  const bound = { identity: OTHER_KEY, boundAt: NOW, source: "pairing" } as const;
+  const asMaster = () => roles().becomeMaster({ profileId: MASTER, identity: MASTER_KEY });
 
-  test("are bound only by the master, by profile id and pinned certificate", async () => {
+  test("are bound only by the master, by profile id and pinned identity key", async () => {
     expect(await roles().bindWorker(worker)).toEqual({ ok: false, reason: "not-master" });
     await asMaster();
     expect(await roles().bindWorker(worker)).toEqual({ ok: true, worker: bound });
     expect(await roles().bindWorker(worker)).toEqual({ ok: true, worker: bound });
-    // Bound before the first meeting: nothing proved the certificate yet.
-    expect(await roles().isBoundWorker(LOW_WORKER, OTHER_FP)).toBe(false);
-    await proved(LOW_WORKER, OTHER_FP);
-    expect(await roles().isBoundWorker(LOW_WORKER, OTHER_FP)).toBe(true);
-    expect(await roles().isBoundWorker(LOW_WORKER, MASTER_FP)).toBe(false);
-    expect(await roles().isBoundWorker(CLONE, OTHER_FP)).toBe(false);
+    // Bound before the first meeting: nothing proved the key yet.
+    expect(await roles().isBoundWorker(LOW_WORKER, OTHER_KEY)).toBe(false);
+    await proved(LOW_WORKER, OTHER_KEY);
+    expect(await roles().isBoundWorker(LOW_WORKER, OTHER_KEY)).toBe(true);
+    expect(await roles().isBoundWorker(LOW_WORKER, MASTER_KEY)).toBe(false);
+    expect(await roles().isBoundWorker(CLONE, OTHER_KEY)).toBe(false);
   });
 
-  test("keep the first certificate and refuse one that contradicts its pin", async () => {
+  test("keep the first identity key and refuse one that contradicts its pin", async () => {
     await asMaster();
     await roles().bindWorker(worker);
-    const renewed = { ...worker, fingerprint: MASTER_FP };
-    expect(await roles().bindWorker(renewed)).toEqual({
+    const rekeyed = { ...worker, identity: MASTER_KEY };
+    expect(await roles().bindWorker(rekeyed)).toEqual({
       ok: false,
       reason: "worker-differs",
       worker: bound,
     });
-    await proved(CLONE, MASTER_FP);
+    await proved(CLONE, MASTER_KEY);
     const contradicted = { ...worker, profileId: CLONE };
     expect(await roles().bindWorker(contradicted)).toEqual({
       ok: false,
@@ -264,10 +273,10 @@ describe("the master's workers", () => {
   });
 
   test("are no workers of a worker", async () => {
-    await proved(LOW_WORKER, OTHER_FP);
+    await proved(LOW_WORKER, OTHER_KEY);
     await boundWorkersRepository.set(LOW_WORKER, bound);
     await roles().bind(master);
-    expect(await roles().isBoundWorker(LOW_WORKER, OTHER_FP)).toBe(false);
+    expect(await roles().isBoundWorker(LOW_WORKER, OTHER_KEY)).toBe(false);
   });
 });
 
@@ -278,7 +287,7 @@ describe("template", () => {
     for (const action of ["announce", "discover", "work"] as const)
       expect(await roles().mayAct(action)).toBe(false);
     expect(await roles().bind(master)).toEqual({ ok: false, reason: "template" });
-    const self = { profileId: MASTER, fingerprint: MASTER_FP };
+    const self = { profileId: MASTER, identity: MASTER_KEY };
     expect(await roles().becomeMaster(self)).toEqual({ ok: false, reason: "template" });
   });
 
@@ -289,50 +298,8 @@ describe("template", () => {
     expect(await roles().holdAsTemplate()).toEqual({ ok: false, reason: "worker" });
     expect(await roles().mayAct("work")).toBe(true);
     fakeBrowser.reset();
-    await roles().becomeMaster({ profileId: MASTER, fingerprint: MASTER_FP });
+    await roles().becomeMaster({ profileId: MASTER, identity: MASTER_KEY });
     expect(await roles().holdAsTemplate()).toEqual({ ok: false, reason: "master" });
     expect(await roles().mayAct("announce")).toBe(true);
-  });
-});
-
-describe("the stored record", () => {
-  test("the binding survives a reload of the store", async () => {
-    await proved(MASTER, MASTER_FP);
-    await roles().bind(master);
-    // What Chrome keeps on disk across a restart: the stored values, as JSON.
-    const kept = JSON.parse(JSON.stringify(await fakeBrowser.storage.local.get())) as Record<
-      string,
-      unknown
-    >;
-    fakeBrowser.reset();
-    await fakeBrowser.storage.local.set(kept);
-    const reloaded = roles();
-    expect(await reloaded.roleOf()).toBe("worker");
-    expect(await reloaded.record()).toEqual(binding);
-    expect(await reloaded.isMasterIdentity(MASTER, MASTER_FP)).toBe(true);
-  });
-
-  test("an unreadable store binds nothing and proves no master", async () => {
-    const broken = {
-      read: () => Promise.reject(new Error("The stored local:role does not match its schema.")),
-      write: () => Promise.reject(new Error("quota")),
-    };
-    const workers = boundWorkersRepository;
-    const failing = createRoles({ role: broken, workers, pins: pins(), now: () => NOW });
-    expect(await failing.bind(master)).toEqual({
-      ok: false,
-      reason: "store-failed",
-      error: "The stored local:role does not match its schema.",
-    });
-    await proved(MASTER, MASTER_FP);
-    expect(await failing.isMasterIdentity(MASTER, MASTER_FP)).toBe(false);
-    expect(await failing.mayAct("announce")).toBe(false);
-  });
-
-  test("refuses a stored role that carries anything else", () => {
-    expect(v.is(RoleRecordSchema, binding)).toBe(true);
-    expect(v.is(RoleRecordSchema, { ...binding, displayName: "Default" })).toBe(false);
-    expect(v.is(RoleRecordSchema, { role: "template", masterProfileId: MASTER })).toBe(false);
-    expect(v.is(RoleRecordSchema, { role: "controller" })).toBe(false);
   });
 });

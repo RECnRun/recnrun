@@ -1,6 +1,12 @@
 import * as v from "valibot";
 import { addStored, deleteStored, readStored, writeStored } from "@/p2p/p2p-database";
 
+/**
+ * Whether this build has peers. Production has none, so a schema it bundles adds an identity only
+ * under this test, inline: its bundle then folds the entry away and keeps its bytes.
+ */
+export const SIGNED = import.meta.env.MODE !== "production";
+
 const STORE = "certificates";
 const KEY = "identity";
 const ALGORITHM: EcKeyImportParams = { name: "ECDSA", namedCurve: "P-256" };
@@ -9,7 +15,7 @@ const SIGNATURE: EcdsaParams = { name: "ECDSA", hash: "SHA-256" };
 const CONTEXT = "RECnRun identity statement 1";
 
 /** A public identity key: the raw P-256 point (65 bytes) in unpadded base64url. */
-const IdentityKeySchema = v.pipe(v.string(), v.regex(/^[\w-]{87}$/));
+export const IdentityKeySchema = v.pipe(v.string(), v.regex(/^[\w-]{87}$/));
 
 /**
  * A profile's statement that a DTLS certificate is its own: the identity key, the time, and the

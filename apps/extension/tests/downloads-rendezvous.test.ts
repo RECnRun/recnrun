@@ -2,7 +2,7 @@ import { describe, expect, test } from "vite-plus/test";
 import { PRESENCE_TTL_MS } from "@/p2p/folder-rendezvous";
 import type { Presence } from "@/p2p/folder-rendezvous";
 import { fileUrlFor, probePath, readTolerant, signalPath } from "@/p2p/downloads-rendezvous";
-import { ME, PEER } from "./fake-peer";
+import { ME, PEER, PEER_STATEMENT } from "./fake-peer";
 
 const NOW = 1_700_000_000_000;
 
@@ -11,6 +11,7 @@ function presence(overrides: Partial<Presence> = {}): Presence {
     profileId: PEER,
     displayName: "Desk",
     fingerprint: "AB:CD:EF",
+    identity: PEER_STATEMENT,
     createdAt: NOW - 1000,
     expiresAt: NOW + PRESENCE_TTL_MS / 2,
     ...overrides,

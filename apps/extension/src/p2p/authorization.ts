@@ -38,10 +38,10 @@ export const COMMAND_TYPES: ReadonlySet<PeerType> = new Set<CommandType>([
 export const isCommand = (message: PeerMessage): message is Command =>
   COMMAND_TYPES.has(message.type);
 
-/** The peer of the link a frame came over, with the certificate its DTLS handshake proved. */
+/** The peer of the link a frame came over, with the identity key whose certificate it proved. */
 export interface Sender {
   profileId: string;
-  fingerprint: string;
+  identity: string;
 }
 
 export type Hierarchy = Pick<Roles, "roleOf" | "isMasterIdentity" | "isBoundWorker">;
@@ -54,13 +54,13 @@ async function authorizeOrder(message: PeerMessage, sender: Sender, roles: Hiera
   // A relay proves its own certificate over its link, never its author's.
   if (message.from !== sender.profileId)
     return refused(`relayed by ${sender.profileId}, so its author's certificate is unproven`);
-  if (await roles.isMasterIdentity(message.from, sender.fingerprint)) return ALLOWED;
+  if (await roles.isMasterIdentity(message.from, sender.identity)) return ALLOWED;
   return refused("not the bound master");
 }
 
 async function authorizeReport(sender: Sender, roles: Hierarchy) {
   if ((await roles.roleOf()) !== "master") return ALLOWED;
-  if (await roles.isBoundWorker(sender.profileId, sender.fingerprint)) return ALLOWED;
+  if (await roles.isBoundWorker(sender.profileId, sender.identity)) return ALLOWED;
   return refused("not a bound worker");
 }
 

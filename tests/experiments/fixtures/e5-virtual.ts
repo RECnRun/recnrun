@@ -5,6 +5,8 @@ import type { Page } from "@playwright/test";
 import * as v from "valibot";
 import { namespaceFolder } from "./e4-launcher.ts";
 import type { PresenceFile } from "./e4-launcher.ts";
+import { identitySigner } from "./identity-statement.ts";
+import type { IdentityStatement, Signer } from "./identity-statement.ts";
 
 /*
  * E5's virtual peer: a profile the test plays by writing its files into the shared Downloads
@@ -43,6 +45,7 @@ const PairingSchema = v.object({
   profileId: v.string(),
   expiresAt: v.number(),
   sdp: v.string(),
+  identity: v.object({ key: v.string(), signedAt: v.number(), signature: v.string() }),
 });
 
 export const signalFile = (downloads: string, from: string, kind: Kind, to: string) =>
@@ -123,6 +126,8 @@ export interface VirtualPeer {
   profileId: string;
   displayName: string;
   fingerprint: string;
+  /** Its own identity key's statement for its certificate, carried by its presence and codes. */
+  identity: IdentityStatement;
   /** The boot of its current run, which its presence and, by default, its signals carry. */
   boot: string;
   /** Its presence now in the extension's key order, `changes` applied, without writing it. */
@@ -138,13 +143,18 @@ export interface VirtualPeer {
   stop(): void;
 }
 
-/** A virtual peer `profileId` whose certificate lives in `page`, writing under `downloads`. */
+/**
+ * A virtual peer `profileId` whose certificate lives in `page`, writing under `downloads`. It signs
+ * with a key of its own unless `sign` is given, so claiming a real profile's id gives no pinned key.
+ */
 export async function virtualPeer(
   page: Page,
   downloads: string,
   profileId = LOWEST_ID,
+  sign?: Signer,
 ): Promise<VirtualPeer> {
   const fingerprint = fingerprintOf(await gatheredSdp(page));
+  const identity = await (sign ?? (await identitySigner()))(profileId, fingerprint);
   const displayName = `Virtual ${profileId.slice(0, 4).toUpperCase()}`;
   let timer: ReturnType<typeof setInterval> | undefined;
   let stopped = false;
@@ -156,7 +166,14 @@ export async function virtualPeer(
     const now = Date.now();
     const fresh = { createdAt: now, expiresAt: now + PRESENCE_TTL_MS };
     // Spread in place, so `changes` keep the extension's key order.
-    const base = { profileId, displayName, fingerprint, ...fresh, namespace: "lab" as const };
+    const base = {
+      profileId,
+      displayName,
+      fingerprint,
+      identity,
+      ...fresh,
+      namespace: "lab" as const,
+    };
     return { ...base, boot: current.boot, ...changes };
   };
   const announce = async (changes: Partial<PresenceFile> = {}) => {
@@ -176,7 +193,7 @@ export async function virtualPeer(
     const expiresAt = options.expiresAt ?? Date.now() + PAIRING_TTL_MS;
     const remote = options.answering && decodeCode(options.answering.code).sdp;
     const sdp = await gatheredSdp(page, remote);
-    const pairing = { kind, pairingId, profileId, displayName, expiresAt, sdp };
+    const pairing = { kind, pairingId, profileId, displayName, expiresAt, sdp, identity };
     const code = PREFIX + Buffer.from(JSON.stringify(pairing)).toString("base64url");
     sequence = Math.max(sequence + 1, Date.now());
     const boot = options.boot ?? current.boot;
@@ -195,6 +212,7 @@ export async function virtualPeer(
     profileId,
     displayName,
     fingerprint,
+    identity,
     boot: randomUUID(),
     presence,
     announce,

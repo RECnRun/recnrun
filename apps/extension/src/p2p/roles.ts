@@ -1,7 +1,8 @@
 import { errorMessage } from "@recnrun/domain";
 import * as v from "valibot";
 import type { Pins } from "@/p2p/pins";
-import { FingerprintSchema, ProfileIdSchema } from "@/p2p/protocol";
+import { IdentityKeySchema } from "@/p2p/identity-key";
+import { ProfileIdSchema } from "@/p2p/protocol";
 
 const RoleSchema = v.picklist(["master", "worker", "template"]);
 
@@ -12,16 +13,16 @@ const BindingSourceSchema = v.picklist(["pairing", "bootstrap", "manual"]);
 const BindingSchema = v.strictObject({
   role: v.literal("worker"),
   masterProfileId: ProfileIdSchema,
-  masterFingerprint: FingerprintSchema,
+  masterIdentity: IdentityKeySchema,
   boundAt: v.pipe(v.number(), v.integer(), v.minValue(0)),
   source: BindingSourceSchema,
 });
 
-/** The Default's own record: its identity and the certificate its workers pinned. */
+/** The Default's own record: its profile id and the identity key its workers pinned. */
 const MasterRecordSchema = v.strictObject({
   role: v.literal("master"),
   profileId: ProfileIdSchema,
-  fingerprint: FingerprintSchema,
+  identity: IdentityKeySchema,
 });
 
 /** A frozen base: it announces, discovers, and works for no one until P5.3's bootstrap clears it. */
@@ -33,22 +34,22 @@ export const RoleRecordSchema = v.variant("role", [
   TemplateRecordSchema,
 ]);
 
-/** On the master: a worker it bound, by the certificate its first verified link pinned. */
+/** On the master: a worker it bound, by the identity key its first verified link pinned. */
 export const BoundWorkerSchema = v.strictObject({
-  fingerprint: FingerprintSchema,
+  identity: IdentityKeySchema,
   boundAt: v.pipe(v.number(), v.integer(), v.minValue(0)),
   source: BindingSourceSchema,
 });
 
 const MasterRequestSchema = v.strictObject({
   profileId: ProfileIdSchema,
-  fingerprint: FingerprintSchema,
+  identity: IdentityKeySchema,
   source: BindingSourceSchema,
 });
 
 const IdentitySchema = v.strictObject({
   profileId: ProfileIdSchema,
-  fingerprint: FingerprintSchema,
+  identity: IdentityKeySchema,
 });
 
 export type Role = v.InferOutput<typeof RoleSchema>;
@@ -110,7 +111,7 @@ const MAY: Record<Role, ReadonlySet<OutwardAction>> = {
 };
 
 const sameMaster = (binding: Binding, master: Identity) =>
-  binding.masterProfileId === master.profileId && binding.masterFingerprint === master.fingerprint;
+  binding.masterProfileId === master.profileId && binding.masterIdentity === master.identity;
 
 async function bindOnce(
   deps: RoleDependencies,
@@ -124,13 +125,13 @@ async function bindOnce(
     if (sameMaster(current, master)) return { ok: true, binding: current };
     return { ok: false, reason: "bound-elsewhere", binding: current };
   }
-  if ((await deps.pins.verify(master.profileId, master.fingerprint)) === "pinned-mismatch")
+  if ((await deps.pins.verify(master.profileId, master.identity)) === "pinned-mismatch")
     return { ok: false, reason: "pinned-different" };
-  const { profileId, fingerprint, source } = master;
+  const { profileId, identity, source } = master;
   const binding: Binding = {
     role: "worker",
     masterProfileId: profileId,
-    masterFingerprint: fingerprint,
+    masterIdentity: identity,
     boundAt: now,
     source,
   };
@@ -144,7 +145,7 @@ async function becomeMasterOnce(store: RoleStore, self: Identity): Promise<Maste
   if (current?.role === "worker") return { ok: false, reason: "bound", binding: current };
   const record: MasterRecord = { role: "master", ...self };
   if (!current) await store.write(record);
-  else if (current.profileId !== self.profileId || current.fingerprint !== self.fingerprint)
+  else if (current.profileId !== self.profileId || current.identity !== self.identity)
     return { ok: false, reason: "master-differs", record: current };
   return { ok: true, record };
 }
@@ -163,29 +164,29 @@ async function bindWorkerOnce(
 ): Promise<WorkerOutcome> {
   if ((await deps.role.read())?.role !== "master") return { ok: false, reason: "not-master" };
   const bound = await deps.workers.get(worker.profileId);
-  if (bound?.fingerprint === worker.fingerprint) return { ok: true, worker: bound };
+  if (bound?.identity === worker.identity) return { ok: true, worker: bound };
   if (bound) return { ok: false, reason: "worker-differs", worker: bound };
-  if ((await deps.pins.verify(worker.profileId, worker.fingerprint)) === "pinned-mismatch")
+  if ((await deps.pins.verify(worker.profileId, worker.identity)) === "pinned-mismatch")
     return { ok: false, reason: "pinned-different" };
-  const { fingerprint, source } = worker;
-  const record: BoundWorker = { fingerprint, boundAt: now, source };
+  const { identity, source } = worker;
+  const record: BoundWorker = { identity, boundAt: now, source };
   await deps.workers.set(worker.profileId, record);
   return { ok: true, worker: record };
 }
 
 const pinMatches = async (deps: RoleDependencies, peer: Identity) =>
-  (await deps.pins.verify(peer.profileId, peer.fingerprint)) === "pinned-match";
+  (await deps.pins.verify(peer.profileId, peer.identity)) === "pinned-match";
 
-/** The bound master's id and certificate, as the pin a verified link made holds them. */
+/** The bound master's id and identity key, as the pin a verified link made holds them. */
 async function provesMaster(deps: RoleDependencies, current: RoleRecord | null, peer: Identity) {
   if (current?.role !== "worker" || !sameMaster(current, peer)) return false;
   return pinMatches(deps, peer);
 }
 
-/** On the master: a worker it bound, with the certificate it bound and pinned. */
+/** On the master: a worker it bound, with the identity key it bound and pinned. */
 async function provesWorker(deps: RoleDependencies, current: RoleRecord | null, peer: Identity) {
   if (current?.role !== "master") return false;
-  if ((await deps.workers.get(peer.profileId))?.fingerprint !== peer.fingerprint) return false;
+  if ((await deps.workers.get(peer.profileId))?.identity !== peer.identity) return false;
   return pinMatches(deps, peer);
 }
 
@@ -223,9 +224,9 @@ export function createRoles(deps: RoleDependencies) {
   // An unreadable role or pin proves nothing and permits nothing: fail closed.
   const proves =
     (check: typeof provesMaster) =>
-    (profileId: string, fingerprint: string): Promise<boolean> =>
+    (profileId: string, identity: string): Promise<boolean> =>
       record()
-        .then((current) => check(deps, current, { profileId, fingerprint }))
+        .then((current) => check(deps, current, { profileId, identity }))
         .catch(() => false);
   const isBoundWorker = proves(provesWorker);
   return {
@@ -249,7 +250,7 @@ export function createRoles(deps: RoleDependencies) {
     controls: async (profileId: string, self: string): Promise<boolean> => {
       if (profileId === self) return true;
       const worker = await deps.workers.get(profileId).catch(() => null);
-      return worker !== null && isBoundWorker(profileId, worker.fingerprint);
+      return worker !== null && isBoundWorker(profileId, worker.identity);
     },
   };
 }

@@ -1,6 +1,7 @@
 import type { LinkEvent } from "@/messaging/peer-messages";
 import { PRESENCE_TTL_MS } from "@/p2p/folder-rendezvous";
 import type { Presence, SignalFile } from "@/p2p/folder-rendezvous";
+import type { IdentityStatement } from "@/p2p/identity-key";
 import type { RendezvousTransport } from "@/p2p/rendezvous-transport";
 
 const POLL_MS = 1000;
@@ -13,6 +14,8 @@ interface WatchOptions {
   report: (event: FolderEvent) => void;
   /** This profile's certificate fingerprint, which its presence announces. */
   fingerprint: string;
+  /** The statement by the profile's identity key that names `fingerprint`, which its presence carries. */
+  sign: (profileId: string) => Promise<IdentityStatement>;
   /** The transport of one profile, made once for it, so its stamps and its filter carry over. */
   transport: (profileId: string) => RendezvousTransport;
 }
@@ -48,7 +51,7 @@ function serialQueue() {
  * a folder presence fresh and reports what the others left. One poll at a time, each scheduled
  * after the last, so a slow read never overlaps the next. The background decides.
  */
-export function createRendezvousWatch({ report, fingerprint, transport }: WatchOptions) {
+export function createRendezvousWatch({ report, fingerprint, sign, transport }: WatchOptions) {
   let me: Presence | undefined;
   let last = { key: "", at: 0 };
   let chain: { timer?: ReturnType<typeof setTimeout>; failures: number } | undefined;
@@ -82,7 +85,8 @@ export function createRendezvousWatch({ report, fingerprint, transport }: WatchO
   };
   const watch = async ({ profileId, displayName }: Pick<Presence, "profileId" | "displayName">) => {
     const createdAt = me?.profileId === profileId ? me.createdAt : Date.now();
-    me = { profileId, displayName, fingerprint, createdAt, expiresAt: 0 };
+    const identity = await sign(profileId);
+    me = { profileId, displayName, fingerprint, identity, createdAt, expiresAt: 0 };
     last = { key: "", at: 0 };
     const presence = me;
     await serially(() => look(presence));

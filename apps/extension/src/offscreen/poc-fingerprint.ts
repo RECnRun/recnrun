@@ -8,7 +8,7 @@ import { certificateFingerprint } from "@/p2p/certificate-store";
 
 /**
  * P2.2 (POC PLAN.md): answers the background with the fingerprint of the certificate the links
- * use, so the presence it writes through Downloads announces the same one.
+ * use, so the presence it writes through Downloads, and the HELLO it signs (P3.3), name that one.
  */
 export function startPocFingerprint({
   certificate,

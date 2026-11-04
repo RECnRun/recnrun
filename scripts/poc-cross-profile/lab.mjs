@@ -30,6 +30,12 @@ const dash = spawnSync("sh", ["-c", "command -v dash"], { encoding: "utf8" }).st
 export const shells = ["sh", ...(dash ? [dash] : [])];
 
 export const PEER_BOOT = "55555555-5555-4555-8555-555555555555";
+// The catalog checks only the statement's form; the extension verifies its signature.
+export const IDENTITY = {
+  key: "B".repeat(87),
+  signedAt: 1_800_000_000_000,
+  signature: "S".repeat(86),
+};
 
 /** A registration, in the key order of RegistrationSchema, stamped now as the extension does. */
 export function presence(profileId, overrides = {}) {
@@ -38,6 +44,7 @@ export function presence(profileId, overrides = {}) {
     profileId,
     displayName: "Desk",
     fingerprint: "AB:CD:EF",
+    identity: IDENTITY,
     createdAt,
     expiresAt: createdAt + PRESENCE_TTL_MS,
     namespace: NAMESPACE,

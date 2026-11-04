@@ -1,27 +1,42 @@
 import { errorMessage } from "@recnrun/domain";
 import * as v from "valibot";
+import { IdentityKeySchema, SIGNED } from "@/p2p/identity-key";
 import { FingerprintSchema, ProfileIdSchema } from "@/p2p/protocol";
 
 /** How a pin was first made: the code pasted or exchanged, the local channel, or a user's approval. */
 const PinSourceSchema = v.picklist(["pairing-code", "local-channel", "manual"]);
 
-/** A peer's DTLS certificate fingerprint as this profile first verified it; never replaced. */
+/**
+ * A peer's identity key as this profile first verified it, never replaced, with the last DTLS
+ * certificate a link proved and the key signed: a renewed certificate moves only `fingerprint`.
+ */
 export const PinSchema = v.strictObject({
   fingerprint: FingerprintSchema,
   pinnedAt: v.pipe(v.number(), v.integer(), v.minValue(0)),
   source: PinSourceSchema,
+  // Production keeps no pins; the cast types the entry its bundle folds away.
+  ...(SIGNED ? { identity: IdentityKeySchema } : ({} as { identity: typeof IdentityKeySchema })),
 });
 
 const PinRequestSchema = v.strictObject({
   profileId: ProfileIdSchema,
+  identity: IdentityKeySchema,
   fingerprint: FingerprintSchema,
   source: PinSourceSchema,
 });
 
 export type Pin = v.InferOutput<typeof PinSchema>;
 export type PinSource = Pin["source"];
-/** Unpinned is a first meeting; a mismatch is a pinned profile announcing another certificate. */
+/**
+ * Unpinned is a first meeting; a mismatch is a pinned profile whose certificate no valid signature
+ * by the pinned identity names: unsigned, or signed by another key.
+ */
 export type PinVerdict = "pinned-match" | "pinned-mismatch" | "unpinned";
+/** What a link proved: the certificate, and the identity key whose statement names it. */
+export interface Proven {
+  identity: string;
+  fingerprint: string;
+}
 export type PinOutcome =
   | { ok: true; pin: Pin }
   | { ok: false; reason: "malformed" }
@@ -39,18 +54,22 @@ async function pinOnce(
   request: v.InferOutput<typeof PinRequestSchema>,
   now: number,
 ) {
-  const { profileId, fingerprint, source } = request;
+  const { profileId, identity, fingerprint, source } = request;
   const pinned = await store.get(profileId);
+  if (pinned && pinned.identity !== identity)
+    return { ok: false, reason: "pinned-different", pinned } as const;
   if (pinned?.fingerprint === fingerprint) return { ok: true, pin: pinned } as const;
-  if (pinned) return { ok: false, reason: "pinned-different", pinned } as const;
-  const pin: Pin = { fingerprint, pinnedAt: now, source };
+  // The pinned identity's renewed certificate: the pin stays, and its last fingerprint follows.
+  const pin: Pin = pinned
+    ? { ...pinned, fingerprint }
+    : { fingerprint, pinnedAt: now, source, identity };
   await store.set(profileId, pin);
   return { ok: true, pin } as const;
 }
 
 /**
- * Each peer's certificate pinned at the first verified meeting. A catalog, presence, or code that
- * announces another certificate for a pinned profile is a mismatch; nothing here overwrites a pin.
+ * Each peer's identity key pinned at the first verified meeting. A catalog, presence, or code whose
+ * certificate the pinned key did not sign is a mismatch; nothing here replaces a pinned key.
  */
 export function createPins(store: PinRecords, now: () => number = Date.now) {
   let queue: Promise<unknown> = Promise.resolve();
@@ -61,13 +80,15 @@ export function createPins(store: PinRecords, now: () => number = Date.now) {
     return next;
   };
   const pinOf = (profileId: string) => serial(() => store.get(profileId));
-  const verify = async (profileId: string, observed: string): Promise<PinVerdict> => {
+  /** `signer` is the key whose valid signature names the certificate seen, undefined if none does. */
+  const verify = async (profileId: string, signer: string | undefined): Promise<PinVerdict> => {
     const pinned = await pinOf(profileId);
     if (!pinned) return "unpinned";
-    return pinned.fingerprint === observed ? "pinned-match" : "pinned-mismatch";
+    return pinned.identity === signer ? "pinned-match" : "pinned-mismatch";
   };
-  const pin = (profileId: string, fingerprint: string, source: PinSource): Promise<PinOutcome> => {
-    const request = v.safeParse(PinRequestSchema, { profileId, fingerprint, source });
+  /** Pins the identity of a first meeting, or notes the pinned identity's latest certificate. */
+  const pin = (profileId: string, proven: Proven, source: PinSource): Promise<PinOutcome> => {
+    const request = v.safeParse(PinRequestSchema, { profileId, ...proven, source });
     if (!request.success) return Promise.resolve({ ok: false, reason: "malformed" });
     return serial(() => pinOnce(store, request.output, now())).catch((error: unknown) => ({
       ok: false as const,

@@ -21,11 +21,19 @@ const SCAN_POLL_MS = 100;
 const Uuid = v.pipe(v.string(), v.uuid());
 const Time = v.pipe(v.number(), v.safeInteger());
 
+/** The identity statement's form, as catalog.sh checks it; the extension verifies the signature. */
+const StatementSchema = v.strictObject({
+  key: v.pipe(v.string(), v.regex(/^[\w-]{87}$/)),
+  signedAt: Time,
+  signature: v.pipe(v.string(), v.regex(/^[\w-]{86}$/)),
+});
+
 /** The extension's RegistrationSchema restated: a presence.json as the launcher reads it. */
 const PresenceFileSchema = v.strictObject({
   profileId: Uuid,
   displayName: v.string(),
   fingerprint: v.pipe(v.string(), v.regex(/^[0-9A-F:]+$/)),
+  identity: StatementSchema,
   createdAt: Time,
   expiresAt: Time,
   namespace: v.literal(NAMESPACE),

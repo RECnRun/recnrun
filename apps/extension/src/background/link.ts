@@ -4,6 +4,7 @@ import { OFFSCREEN_PAGE } from "@/background/listener";
 import { BackgroundReplySchema } from "@/messaging/background-reply";
 import { linkCommandMessage } from "@/messaging/peer-messages";
 import type { LinkCommand } from "@/messaging/peer-messages";
+import { PocFingerprintResultSchema, pocFingerprintRequest } from "@/messaging/poc-fingerprint";
 
 let creating: Promise<void> | undefined;
 // Read through a function, so a check after an await is not narrowed to the value before it.
@@ -55,4 +56,16 @@ export async function askLink(command: LinkCommand): Promise<unknown> {
   if (!reply.success) throw new Error("The link did not answer.");
   if (!reply.output.ok) throw new Error(reply.output.error);
   return reply.output.result;
+}
+
+/** The offscreen document's certificate fingerprint, creating the document first. */
+export async function offscreenFingerprint(): Promise<string> {
+  await ensureOffscreen();
+  const reply = v.safeParse(
+    BackgroundReplySchema,
+    await browser.runtime.sendMessage(pocFingerprintRequest()),
+  );
+  if (!reply.success) throw new Error("The offscreen document did not answer.");
+  if (!reply.output.ok) throw new Error(reply.output.error);
+  return v.parse(PocFingerprintResultSchema, reply.output.result).fingerprint;
 }

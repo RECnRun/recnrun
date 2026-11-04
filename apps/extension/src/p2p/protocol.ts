@@ -1,5 +1,6 @@
 import { RecordingSessionSchema } from "@recnrun/domain";
 import * as v from "valibot";
+import { IdentityKeySchema, IdentityStatementSchema, SIGNED } from "@/p2p/identity-key";
 
 const PEER_CHANNEL = "recnrun-peer";
 const PEER_PROTOCOL = 1;
@@ -52,11 +53,13 @@ const sessionStatus = {
 
 const reply = { requestId: MessageIdSchema };
 
-/** A profile the sender's verified links reach, as the sender pinned it. */
+/** A profile the sender's verified links reach, as the sender accepted it: its identity key too. */
 export const MemberSchema = v.strictObject({
   profileId: ProfileIdSchema,
   displayName: text(64),
   fingerprint: FingerprintSchema,
+  // Production has no peers; the cast types the entry its bundle folds away.
+  ...(SIGNED ? { identity: IdentityKeySchema } : ({} as { identity: typeof IdentityKeySchema })),
 });
 
 export type Member = v.InferOutput<typeof MemberSchema>;
@@ -66,7 +69,14 @@ const relay = { origin: ProfileIdSchema, target: ProfileIdSchema };
 
 /** The closed set of things a peer may say; anything else is dropped. */
 const PeerMessageSchema = v.variant("type", [
-  message("HELLO", { displayName: text(64), extensionVersion: text(32) }),
+  message("HELLO", {
+    displayName: text(64),
+    extensionVersion: text(32),
+    // The sender's statement for the certificate this link proved; production folds it away.
+    ...(SIGNED
+      ? { identity: IdentityStatementSchema }
+      : ({} as { identity: typeof IdentityStatementSchema })),
+  }),
   message("GET_TABS", {}),
   message("TABS_SNAPSHOT", { ...reply, ...SharedTabsSchema.entries }),
   message("TABS_CHANGED", SharedTabsSchema.entries),

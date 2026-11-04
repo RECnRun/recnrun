@@ -12,7 +12,8 @@ import {
   remoteRecordingsRepository,
 } from "@/storage/peer-repository";
 import { createPeerClient } from "@/views/peer-client";
-import { FINGERPRINT, ME, PEER, STRANGER, answering } from "./fake-peer";
+import { FINGERPRINT, ME, PEER, PEER_IDENTITY, STRANGER, answering } from "./fake-peer";
+import { identityOf } from "./test-identity";
 
 const binding = { role: "worker", boundAt: 1, source: "pairing" } as const;
 
@@ -136,13 +137,14 @@ describe("peerServices", () => {
     // Before it has an identity, a profile knows of no one it controls, itself included.
     expect(await services.mayControl(ME)).toBe(false);
     await identityRepository.write({ profileId: ME, displayName: "Alice" });
-    await createPins(peerPinsRepository).pin(PEER, FINGERPRINT, "pairing-code");
+    const proven = { identity: PEER_IDENTITY, fingerprint: FINGERPRINT };
+    await createPins(peerPinsRepository).pin(PEER, proven, "pairing-code");
     const { role, workers } = roleStores();
-    await role.write({ ...binding, masterProfileId: PEER, masterFingerprint: FINGERPRINT });
+    await role.write({ ...binding, masterProfileId: PEER, masterIdentity: PEER_IDENTITY });
     expect(await services.mayControl(ME)).toBe(true);
     expect(await services.mayControl(PEER)).toBe(false);
-    await role.write({ role: "master", profileId: ME, fingerprint: "12:34" });
-    await workers.set(PEER, { fingerprint: FINGERPRINT, boundAt: 1, source: "pairing" });
+    await role.write({ role: "master", profileId: ME, identity: await identityOf(ME) });
+    await workers.set(PEER, { identity: PEER_IDENTITY, boundAt: 1, source: "pairing" });
     expect(await services.mayControl(PEER)).toBe(true);
     expect(await services.mayControl(STRANGER)).toBe(false);
     await expect.poll(() => changes).toBe(5);

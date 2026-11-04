@@ -13,7 +13,7 @@ import {
   registrationName,
 } from "@/p2p/registry";
 import type { Registry } from "@/p2p/registry";
-import { FINGERPRINT, ME, PEER } from "./fake-peer";
+import { FINGERPRINT, ME, PEER, PEER_STATEMENT } from "./fake-peer";
 
 const NOW = 1_700_000_000_000;
 const BOOT = "44444444-4444-4444-8444-444444444444";
@@ -22,6 +22,7 @@ const registration = {
   profileId: PEER,
   displayName: "Desk",
   fingerprint: FINGERPRINT,
+  identity: PEER_STATEMENT,
   createdAt: NOW - 1000,
   expiresAt: NOW - 1000 + PRESENCE_TTL_MS,
   namespace: "lab-1",
@@ -102,6 +103,15 @@ describe("RegistrationSchema", () => {
   test("accepts a registration that lives exactly the TTL", () => {
     const exact = { ...registration, createdAt: NOW, expiresAt: NOW + PRESENCE_TTL_MS };
     expect(v.is(RegistrationSchema, exact)).toBe(true);
+  });
+
+  test.each([
+    ["without its identity statement", undefined],
+    ["with a key that is not a P-256 point", { ...PEER_STATEMENT, key: "AAAA" }],
+    ["with a signature that is not 64 bytes", { ...PEER_STATEMENT, signature: "AAAA" }],
+    ["with a fractional signing time", { ...PEER_STATEMENT, signedAt: 1.5 }],
+  ])("refuses a registration %s", (_name, identity) => {
+    expect(v.is(RegistrationSchema, { ...registration, identity })).toBe(false);
   });
 
   test("refuses a registration without its boot", () => {

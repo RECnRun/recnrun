@@ -38,6 +38,8 @@ export const freshPresence = (profileId = randomUUID()): PresenceFile => ({
   profileId,
   displayName: "Fake profile",
   fingerprint: "AB:CD",
+  // Well formed for catalog.sh, which checks no signature; no real profile would trust it.
+  identity: { key: "B".repeat(87), signedAt: Date.now(), signature: "S".repeat(86) },
   createdAt: Date.now(),
   expiresAt: Date.now() + 60_000,
   namespace: "lab",

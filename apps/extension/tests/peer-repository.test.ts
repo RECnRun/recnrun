@@ -7,6 +7,7 @@ import {
   peerLinksRepository,
   readIdentity,
 } from "@/storage/peer-repository";
+import { PEER_IDENTITY } from "./fake-peer";
 
 beforeEach(() => {
   fakeBrowser.reset();
@@ -31,11 +32,13 @@ const HOME = {
   profileId: "22222222-2222-4222-8222-222222222222",
   displayName: "Home",
   fingerprint: "AB:CD",
+  identity: PEER_IDENTITY,
 };
 const WORK = {
   profileId: "33333333-3333-4333-8333-333333333333",
   displayName: "Work",
   fingerprint: "EF:01",
+  identity: PEER_IDENTITY,
 };
 
 test("stores, announces, and clears each authorized peer apart", async () => {

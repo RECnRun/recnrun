@@ -2,6 +2,7 @@ import * as v from "valibot";
 import { CLOCK_SKEW_MS, NamespaceSchema, readTolerantOf } from "@/p2p/downloads-rendezvous";
 import type { Freshness, TolerantRead } from "@/p2p/downloads-rendezvous";
 import { PRESENCE_TTL_MS } from "@/p2p/folder-rendezvous";
+import { IdentityStatementSchema } from "@/p2p/identity-key";
 import { DisplayNameSchema } from "@/p2p/pairing-code";
 import { FingerprintSchema, ProfileIdSchema } from "@/p2p/protocol";
 
@@ -55,6 +56,7 @@ export const RegistrationSchema = v.pipe(
     profileId: ProfileIdSchema,
     displayName: RegistrationNameSchema,
     fingerprint: FingerprintSchema,
+    identity: IdentityStatementSchema,
     createdAt: v.number(),
     expiresAt: v.number(),
     namespace: NamespaceSchema,

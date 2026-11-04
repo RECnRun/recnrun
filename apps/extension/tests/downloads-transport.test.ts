@@ -5,7 +5,7 @@ import type { DownloadsContext } from "@/p2p/downloads-transport";
 import { PRESENCE_TTL_MS } from "@/p2p/folder-rendezvous";
 import type { Presence } from "@/p2p/folder-rendezvous";
 import { PAIRING_TTL_MS } from "@/p2p/pairing-code";
-import { FINGERPRINT, ME, PEER, STRANGER } from "./fake-peer";
+import { FINGERPRINT, ME, PEER, PEER_STATEMENT, STRANGER } from "./fake-peer";
 import { DOWNLOADS_ROOT, NAMESPACE, catalogOf, downloadsDisk } from "./rendezvous-envs";
 
 const NOW = 1_700_000_000_000;
@@ -17,6 +17,8 @@ const presence = (profileId: string): Presence => ({
   profileId,
   displayName: "Laptop",
   fingerprint: FINGERPRINT,
+  // The transport carries the statement; the folder pairing verifies it.
+  identity: PEER_STATEMENT,
   createdAt: Date.now(),
   expiresAt: Date.now() + PRESENCE_TTL_MS,
 });
@@ -71,7 +73,7 @@ describe("downloadsTransport", () => {
     await mine.publish(offer);
     expect(disk.files.get(`${FOLDER}/presence.json`)).toBe(
       `{"profileId":"${ME}","displayName":"Laptop","fingerprint":"${FINGERPRINT}",` +
-        `"createdAt":${NOW},"expiresAt":${NOW + PRESENCE_TTL_MS},"namespace":"lab","boot":"${BOOT}"}`,
+        `"identity":${JSON.stringify(PEER_STATEMENT)},"createdAt":${NOW},"expiresAt":${NOW + PRESENCE_TTL_MS},"namespace":"lab","boot":"${BOOT}"}`,
     );
     expect(JSON.parse(disk.files.get(`${FOLDER}/offer-${PEER}.json`) ?? "")).toEqual({
       ...offer,

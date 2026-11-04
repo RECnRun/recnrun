@@ -6,7 +6,7 @@ import {
   remoteRecordingsRepository,
 } from "@/storage/peer-repository";
 import { recordingSessionRepository } from "@/storage/recording-session-repository";
-import { ME, PEER, STRANGER, fromPeer } from "./fake-peer";
+import { ME, PEER, PEER_HELLO, STRANGER, fromPeer } from "./fake-peer";
 import { bindToPeer, peerBackground } from "./peer-background";
 
 const session = { tabId: 4, status: "recording" as const, banked: 0, since: 1 };
@@ -175,7 +175,7 @@ describe("the peer's reports", () => {
     });
     await peers.receive(fromPeer("TABS_CHANGED", { tabs: [] }));
     expect(await peers.routes.request({ type: "tabs", peer: PEER })).toStrictEqual({ tabs: [] });
-    await peers.receive(fromPeer("HELLO", { displayName: "Desk", extensionVersion: "0.1.0" }));
+    await peers.receive(fromPeer("HELLO", PEER_HELLO));
     const listed = peers.routes.request({ type: "tabs", peer: PEER });
     // Found by type: a TABS_CHANGED report from the HELLO may follow the request (CI run 41730590018).
     await vi.waitFor(() => expect(peers.link.sentTypes()).toContain("GET_TABS"));
@@ -190,7 +190,8 @@ describe("the peer's reports", () => {
   test("a HELLO renames the authorized peer, and is answered with the session", async () => {
     const peers = await peerBackground();
     await peers.connect();
-    await peers.receive(fromPeer("HELLO", { displayName: "Studio", extensionVersion: "0.2.0" }));
+    const renamed = { ...PEER_HELLO, displayName: "Studio", extensionVersion: "0.2.0" };
+    await peers.receive(fromPeer("HELLO", renamed));
     expect(await authorizedPeersRepository.get(PEER)).toMatchObject({ displayName: "Studio" });
     expect(peers.link.frames().at(-1)).toMatchObject({ type: "SESSION_STATUS", session: null });
   });

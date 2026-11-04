@@ -38,8 +38,10 @@ export function createSignalStamp(now: () => number = Date.now) {
 const unstamped = ({ kind, pairingId, profileId, to, expiresAt, code }: StampedSignal) =>
   ({ kind, pairingId, profileId, to, expiresAt, code }) satisfies SignalFile;
 
-const unbooted = ({ profileId, displayName, fingerprint, createdAt, expiresAt }: Presence) =>
-  ({ profileId, displayName, fingerprint, createdAt, expiresAt }) satisfies Presence;
+const unbooted = (presence: Presence): Presence => {
+  const { profileId, displayName, fingerprint, identity, createdAt, expiresAt } = presence;
+  return { profileId, displayName, fingerprint, identity, createdAt, expiresAt };
+};
 
 /**
  * Sifts what a transport read into what the mesh sees. A signal counts only in its sender's

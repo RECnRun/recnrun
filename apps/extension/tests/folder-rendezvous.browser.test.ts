@@ -3,17 +3,24 @@ import { decideFolderSteps } from "@/background/folder-pairing";
 import { PRESENCE_TTL_MS, folderRendezvous, signalFileOf } from "@/p2p/folder-rendezvous";
 import type { FolderPresence, Seen, SignalFile, StampedSignal } from "@/p2p/folder-rendezvous";
 import { PAIRING_TTL_MS, encodePairing } from "@/p2p/pairing-code";
+import { signAs } from "./test-identity";
 
 const A = "11111111-1111-4111-8111-111111111111";
 const B = "22222222-2222-4222-8222-222222222222";
 const PAIRING = "44444444-4444-4444-8444-444444444444";
 const FINGERPRINTS: Record<string, string> = { [A]: "AA:AA", [B]: "BB:BB" };
 const BOOT = "66666666-6666-4666-8666-666666666666";
+const STATEMENTS = {
+  [A]: await signAs({ profileId: A, fingerprint: "AA:AA" }),
+  [B]: await signAs({ profileId: B, fingerprint: "BB:BB" }),
+};
+const statementOf = (profileId: string) => (profileId === A ? STATEMENTS[A] : STATEMENTS[B]);
 
 const presence = (profileId: string): FolderPresence => ({
   profileId,
   displayName: profileId === A ? "Laptop" : "Desk",
   fingerprint: FINGERPRINTS[profileId] ?? "",
+  identity: statementOf(profileId),
   createdAt: Date.now(),
   expiresAt: Date.now() + PRESENCE_TTL_MS,
   boot: BOOT,
@@ -29,6 +36,7 @@ const signalOf = (kind: SignalFile["kind"], from: string, to: string): StampedSi
       displayName: "Profile",
       expiresAt: Date.now() + PAIRING_TTL_MS,
       sdp: `v=0\r\na=fingerprint:sha-256 ${FINGERPRINTS[from] ?? ""}\r\n`,
+      identity: statementOf(from),
     }),
     to,
   ),

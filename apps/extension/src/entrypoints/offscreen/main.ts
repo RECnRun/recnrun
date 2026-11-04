@@ -12,7 +12,6 @@ const certificate = () => (held ??= persistentCertificate());
 // POC builds rendezvous over Downloads (P3.1); the folder-watch command stays the same in both.
 const poc = pocEnabled(import.meta.env.MODE);
 startOffscreen({ certificate, ...(poc ? { rendezvous: pocDownloadsRendezvous() } : {}) });
-if (poc) {
-  startPocFileRead();
-  startPocFingerprint({ certificate });
-}
+// Every build's HELLO signs the certificate the links use, so every build answers for it.
+startPocFingerprint({ certificate });
+if (poc) startPocFileRead();

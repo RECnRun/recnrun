@@ -8,7 +8,9 @@ import { namespaceFolder } from "./fixtures/e4-launcher.ts";
 import { signalWrites } from "./fixtures/e5-observe.ts";
 import { virtualIn, withGroup } from "./fixtures/e5-run.ts";
 import type { E5Environment } from "./fixtures/e5-run.ts";
-import { LOWEST_ID, virtualPeer } from "./fixtures/e5-virtual.ts";
+import { LOWEST_ID, decodeCode, virtualPeer } from "./fixtures/e5-virtual.ts";
+import { signedBytes } from "./fixtures/identity-statement.ts";
+import type { IdentityStatement } from "./fixtures/identity-statement.ts";
 
 vi.mock("../browser/fixtures/downloads-profiles.ts", () => ({
   createDownloadsGroup: async () => ({ downloads: folder, dispose: async () => undefined }),
@@ -29,6 +31,16 @@ afterEach(async () => {
   await rm(folder, { recursive: true, force: true });
 });
 
+/** Whether `statement` is its key's valid signature that `fingerprint` is `profileId`'s. */
+async function verifies(statement: IdentityStatement, profileId: string, fingerprint: string) {
+  const algorithm = { name: "ECDSA", namedCurve: "P-256" };
+  const raw = Buffer.from(statement.key, "base64url");
+  const key = await crypto.subtle.importKey("raw", raw, algorithm, false, ["verify"]);
+  const signature = Buffer.from(statement.signature, "base64url");
+  const bytes = signedBytes(profileId, fingerprint, statement.signedAt);
+  return crypto.subtle.verify({ name: "ECDSA", hash: "SHA-256" }, key, signature, bytes);
+}
+
 const presenceText = () =>
   readFile(join(namespaceFolder(folder), "peers", LOWEST_ID, "presence.json"), "utf8");
 
@@ -42,6 +54,7 @@ describe("E5 virtual peer", () => {
       "profileId",
       "displayName",
       "fingerprint",
+      "identity",
       "createdAt",
       "expiresAt",
       "namespace",
@@ -52,6 +65,18 @@ describe("E5 virtual peer", () => {
       fingerprint: "AB:CD:EF",
       boot: peer.boot,
     });
+  });
+
+  test("signs its certificate with its own key, in its presence and in its codes", async () => {
+    const peer = await virtualPeer(page, folder);
+    const offer = await peer.signal("offer", LOWEST_ID);
+    peer.stop();
+    expect(peer.presence().identity).toEqual(peer.identity);
+    expect(decodeCode(offer.code).identity).toEqual(peer.identity);
+    expect(await verifies(peer.identity, LOWEST_ID, "AB:CD:EF")).toBe(true);
+    expect(await verifies(peer.identity, LOWEST_ID, "AB:CD:EE")).toBe(false);
+    const other = await virtualPeer(page, folder);
+    expect(other.identity.key).not.toBe(peer.identity.key);
   });
 
   test("keeps no refresh once stopped during its first write", async () => {

@@ -1,59 +1,16 @@
 import { describe, expect, test, vi } from "vite-plus/test";
 import { createFolderPairing, decideFolderSteps } from "@/background/folder-pairing";
 import type { LinkCommand } from "@/messaging/peer-messages";
-import type { Presence, Seen, SignalFile } from "@/p2p/folder-rendezvous";
-import { PAIRING_TTL_MS, encodePairing } from "@/p2p/pairing-code";
+import type { Seen } from "@/p2p/folder-rendezvous";
+import { PAIRING_TTL_MS } from "@/p2p/pairing-code";
 import { createPins } from "@/p2p/pins";
 import type { Pin } from "@/p2p/pins";
 import type { FolderActed, FolderPairing, PeerLink, PendingOffer } from "@/storage/peer-repository";
 import { ME, PEER, STRANGER, memoryRecords, memoryRepository } from "./fake-peer";
+import { NOW, OFFER_ID, OTHER_ID, pendingFor, presence, seen, signal } from "./folder-sightings";
+import type { SignalOptions } from "./folder-sightings";
+import { identityOf, signAs } from "./test-identity";
 
-const NOW = 1_700_000_000_000;
-const OFFER_ID = "44444444-4444-4444-8444-444444444444";
-const OTHER_ID = "55555555-5555-4555-8555-555555555555";
-const FINGERPRINTS: Record<string, string> = {
-  [ME]: "11:11",
-  [PEER]: "22:22",
-  [STRANGER]: "33:33",
-};
-
-const presence = (profileId: string, createdAt = NOW - 1000): Presence => ({
-  profileId,
-  displayName: `Profile ${profileId.slice(0, 1)}`,
-  fingerprint: FINGERPRINTS[profileId] ?? "",
-  createdAt,
-  expiresAt: NOW + 60_000,
-});
-
-interface SignalOptions {
-  pairingId?: string;
-  fingerprint?: string;
-  codeFrom?: string;
-  expiresAt?: number;
-}
-
-/** A signal `from` made for `to`, whose code announces `from`'s certificate unless told otherwise. */
-function signal(kind: SignalFile["kind"], from: string, to: string, options: SignalOptions = {}) {
-  const { pairingId = OFFER_ID, codeFrom = from, expiresAt = NOW + PAIRING_TTL_MS } = options;
-  const fingerprint = options.fingerprint ?? FINGERPRINTS[from] ?? "";
-  const code = encodePairing({
-    kind,
-    pairingId,
-    profileId: codeFrom,
-    displayName: "Profile",
-    expiresAt,
-    sdp: `v=0\r\na=fingerprint:sha-256 ${fingerprint}\r\n`,
-  });
-  return { kind, pairingId, profileId: from, to, expiresAt, code } satisfies SignalFile;
-}
-
-const seen = (presences: Presence[], signals: SignalFile[] = []): Seen => ({ presences, signals });
-const pendingFor = (to: string, expiresAt = NOW + 1000): PendingOffer => ({
-  pairingId: OFFER_ID,
-  expiresAt,
-  to,
-  code: "offer-code",
-});
 const situation = (me: string, sighting: Seen) => ({
   me,
   seen: sighting,
@@ -225,15 +182,44 @@ describe("createFolderPairing", () => {
     expect(commands).toEqual([{ type: "folder-publish", signal: offer }]);
   });
 
-  test("offers nothing to a presence announcing another certificate for a pinned profile", async () => {
+  const pin = async (identity: string): Promise<Pin> => ({
+    fingerprint: "EE:EE",
+    pinnedAt: 1,
+    source: "local-channel",
+    identity: await identityOf(identity),
+  });
+
+  test("offers nothing to a presence another key signed for a pinned profile", async () => {
     const { flow, commands, pairing, pinned, log } = folderPairing();
-    await pinned.set(PEER, { fingerprint: "EE:EE", pinnedAt: 1, source: "local-channel" });
+    await pinned.set(PEER, await pin("forger"));
     await flow.seen(seen([presence(PEER)]));
     expect(pairing.createOffer).not.toHaveBeenCalled();
     expect(commands).toEqual([]);
     expect(log.mock.calls).toEqual([
-      [`folder pairing: no offer to ${PEER}, whose presence announces another certificate`],
+      [
+        `folder pairing: no offer to ${PEER}: its certificate is signed by another identity than the one pinned`,
+      ],
     ]);
+  });
+
+  test("offers nothing to a presence no valid statement vouches for", async () => {
+    const { flow, pairing, log } = folderPairing();
+    const unsigned = {
+      ...presence(PEER),
+      identity: await signAs({ profileId: PEER, fingerprint: "99:99" }),
+    };
+    await flow.seen(seen([unsigned]));
+    expect(pairing.createOffer).not.toHaveBeenCalled();
+    expect(log.mock.calls).toEqual([
+      [`folder pairing: no offer to ${PEER}: no valid signature names its certificate`],
+    ]);
+  });
+
+  test("offers to a renewed certificate's presence that the pinned key signed", async () => {
+    const { flow, pairing, pinned } = folderPairing();
+    await pinned.set(PEER, await pin(PEER));
+    await flow.seen(seen([presence(PEER)]));
+    expect(pairing.createOffer).toHaveBeenCalledWith(PEER);
   });
 
   test("answers an offer, publishing the answer for the offerer", async () => {
