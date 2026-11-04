@@ -21,6 +21,7 @@ export const CAROL = "33333333-3333-4333-8333-333333333333";
 const LATER = 4_000_000_000_000;
 export const EX_USAGE = 64;
 export const EX_DATAERR = 65;
+export const EX_CANTCREAT = 73;
 export const EX_TEMPFAIL = 75;
 
 const dash = spawnSync("sh", ["-c", "command -v dash"], { encoding: "utf8" }).stdout.trim();

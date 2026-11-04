@@ -1,15 +1,26 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import {
   ALICE,
+  BOOT,
+  EX_CANTCREAT,
   EX_DATAERR,
   EX_TEMPFAIL,
   EX_USAGE,
   NAMESPACE,
   announce,
+  publish,
   lab,
   presence,
   readRegistry,
@@ -93,6 +104,101 @@ for (const shell of shells) {
       assert.match(result.stderr, reason, text);
       assert.deepEqual(readdirSync(out), [], text);
       assert.equal(readFileSync(record, "utf8"), text);
+    }
+  });
+
+  await test(`${shell}: follows no symbolic link at RECnRun, poc, or the namespace`, (context) => {
+    const { home, rootA, out, record } = lab(context);
+    writeFileSync(record, `downloadsRoot=${rootA}\n`);
+    publish(join(home, "elsewhere"), ALICE, JSON.stringify(presence(ALICE)));
+    const parts = ["RECnRun", "poc", NAMESPACE];
+    for (const [index, part] of parts.entries()) {
+      const above = join(rootA, ...parts.slice(0, index));
+      mkdirSync(above, { recursive: true });
+      symlinkSync(join(home, "elsewhere", ...parts.slice(0, index + 1)), join(above, part));
+      const result = run(shell, [record, NAMESPACE, out]);
+      assert.equal(result.code, 0, `${part}: ${result.stderr}`);
+      assert.match(result.stderr, new RegExp(`skipped r1: ${part} is a symbolic link`), part);
+      assert.deepEqual(readRegistry(out).peers, {}, part);
+      rmSync(join(above, part));
+      if (index < parts.length - 1) mkdirSync(join(above, part));
+    }
+  });
+
+  await test(`${shell}: never writes through a link planted at a temporary name`, (context) => {
+    const { home, rootA, out, record } = lab(context);
+    const recordText = `downloadsRoot=${rootA}\n`;
+    writeFileSync(record, recordText);
+    announce(rootA, presence(ALICE));
+    const outside = join(home, "outside");
+    writeFileSync(outside, "kept");
+    // exec keeps the pid, so the links sit at the names a run derived from $$ would use.
+    const planted = spawnSync(
+      shell,
+      [
+        "-c",
+        'ln -s "$1" "$3/registry.json.tmp.$$" && ln -s "$1" "$2.tmp.$$" && exec "$0" "$4" "$2" "$5" "$3"',
+        shell,
+        outside,
+        record,
+        out,
+        script,
+        NAMESPACE,
+      ],
+      { encoding: "utf8", env: { PATH: process.env.PATH, RECNRUN_LAUNCHER_BOOT: BOOT } },
+    );
+    assert.equal(planted.status, 0, planted.stderr);
+    assert.equal(readFileSync(outside, "utf8"), "kept");
+    assert.deepEqual(Object.keys(readRegistry(out).peers), [ALICE]);
+    assert.equal(readFileSync(record, "utf8"), `${recordText}root=r1\n`);
+  });
+
+  await test(`${shell}: refuses a temporary name that already exists with exit 73`, (context) => {
+    const { home, rootA, out, record } = lab(context);
+    const recordText = `downloadsRoot=${rootA}\n`;
+    writeFileSync(record, recordText);
+    announce(rootA, presence(ALICE));
+    const outside = join(home, "outside");
+    writeFileSync(outside, "kept");
+    // An od that always gives the same bytes makes the run's random names known in advance.
+    const bin = join(home, "bin");
+    mkdirSync(bin);
+    writeFileSync(join(bin, "od"), "#!/bin/sh\nprintf ' 01 23 45 67 89 ab cd ef\\n'\n", {
+      mode: 0o755,
+    });
+    const env = { PATH: `${bin}:${process.env.PATH}`, RECNRUN_LAUNCHER_BOOT: BOOT };
+    for (const name of [
+      `${record}.0123456789abcdef.tmp`,
+      join(out, "registry.json.0123456789abcdef.tmp"),
+    ]) {
+      symlinkSync(outside, name);
+      const result = spawnSync(shell, [script, record, NAMESPACE, out], { encoding: "utf8", env });
+      assert.equal(result.status, EX_CANTCREAT, result.stderr);
+      assert.equal(readFileSync(outside, "utf8"), "kept", name);
+      assert.match(result.stderr, /temporary name .* is taken/);
+      assert.equal(existsSync(join(out, "registry.json")), false, name);
+      assert.equal(readFileSync(record, "utf8"), recordText, name);
+      rmSync(name);
+    }
+  });
+
+  await test(`${shell}: refuses a registry.json that is a folder or a link with exit 73`, (context) => {
+    const { home, rootA, out, record } = lab(context);
+    const recordText = `downloadsRoot=${rootA}\n`;
+    writeFileSync(record, recordText);
+    announce(rootA, presence(ALICE));
+    mkdirSync(join(home, "folder"));
+    for (const make of [
+      () => mkdirSync(join(out, "registry.json")),
+      () => symlinkSync(join(home, "folder"), join(out, "registry.json")),
+    ]) {
+      make();
+      const result = run(shell, [record, NAMESPACE, out]);
+      assert.equal(result.code, EX_CANTCREAT, result.stderr);
+      assert.match(result.stderr, /registry\.json/);
+      assert.deepEqual(readdirSync(join(out, "registry.json")), []);
+      assert.equal(readFileSync(record, "utf8"), recordText, "the record is left as it was");
+      rmSync(join(out, "registry.json"), { recursive: true });
     }
   });
 

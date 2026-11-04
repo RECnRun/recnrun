@@ -11,7 +11,8 @@
 # downloadsRoot is scanned; one without a root id gets the next free r<n>, written back.
 #
 # Scan: <downloadsRoot>/RECnRun/poc/<namespace>/peers/<uuid>/presence.json, nothing else, no
-# symbolic link followed. A presence counts only in the exact bytes the extension writes,
+# symbolic link followed at any folder below the root or at the file. Temporary files get a
+# random name and are created exclusively; a registry.json that is a folder or a link exits 73. A presence counts only in the exact bytes the extension writes,
 # JSON.stringify of a RegistrationSchema value with no spaces and keys in order:
 #   {"profileId":"<uuid>","displayName":"<name>","fingerprint":"<hex:>","createdAt":<ms>,
 #    "expiresAt":<ms>,"namespace":"<namespace>","boot":"<v4 uuid>"}
@@ -84,6 +85,16 @@ is_display_name() {
   case $1 in '' | ' '* | *' ' | *\\* | *[[:cntrl:]]*) return 1 ;; esac
   [ "${#1}" -le 64 ]
 }
+# A fresh name for a temporary file: no other process can plant a link at it in advance.
+random_hex() { od -An -N8 -tx1 /dev/urandom | tr -d ' \n'; }
+# Noclobber alone would still open a link to a fifo or a device, so a taken name is refused first.
+taken() { [ -e "$1" ] || [ -L "$1" ]; }
+write_new() {
+  (
+    set -C
+    printf '%s' "$2" >"$1"
+  )
+}
 # Folder names come from other profiles; only safe characters reach the log.
 shown() { printf '%s' "$1" | tr -c 'A-Za-z0-9._-' '?'; }
 
@@ -114,6 +125,11 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 # mkdir is atomic: exactly one run creates the lock; the others leave it alone.
 if mkdir -- "$lock" 2>/dev/null; then held=1; else fail 75 "another run holds $lock"; fi
+# A rename onto a folder, or a link to one, would land inside it.
+destination=$out/registry.json
+if [ -L "$destination" ] || { [ -e "$destination" ] && [ ! -f "$destination" ]; }; then
+  fail 73 'registry.json in the output directory is not a regular file'
+fi
 
 # Read once, so both passes see the same record.
 if [ -f "$record" ] && [ "$(wc -c <"$record" | tr -d ' ')" -gt 65536 ]; then
@@ -304,9 +320,22 @@ EOF
   fi
   peers="$peers$pr_id$tab$1$tab$pr_name$tab$pr_fingerprint$tab$pr_created$tab$pr_expires$tab$pr_boot$nl"
 }
+# Every folder from below the Downloads root down to peers is a real folder, never a link.
+rendezvous_folder() {
+  folder=$1
+  reason=
+  for part in RECnRun poc "$namespace" peers; do
+    folder=$folder/$part
+    if [ -L "$folder" ]; then reason="$part is a symbolic link"; return 1; fi
+    if [ ! -e "$folder" ]; then return 1; fi
+    if [ ! -d "$folder" ]; then reason="$part is not a folder"; return 1; fi
+  done
+}
 scan_root() {
-  folder=$2/RECnRun/poc/$namespace/peers
-  if [ -L "$folder" ] || [ ! -d "$folder" ]; then return 0; fi
+  if ! rendezvous_folder "$2"; then
+    if [ -n "$reason" ]; then log "skipped $1: $reason"; fi
+    return 0
+  fi
   for entry in "$folder"/*; do
     if [ ! -e "$entry" ] && [ ! -L "$entry" ]; then continue; fi
     name=${entry##*/}
@@ -351,15 +380,20 @@ $peers
 EOF
 json="$json}}"
 
+# Both names are checked before either file is written, so a refusal changes nothing.
+registry_name=$out/registry.json.$(random_hex).tmp
+record_name=$record.$(random_hex).tmp
+if taken "$registry_name"; then fail 73 'the temporary name of the registry is taken'; fi
 if [ "$changed" = 1 ]; then
   [ -f "$record" ] || fail 73 'cannot write root ids back to a record that is not a regular file'
-  record_tmp=$record.tmp.$$
-  printf '%s' "$rewritten" >"$record_tmp" || fail 73 'cannot write the record'
+  if taken "$record_name"; then fail 73 'the temporary name of the record is taken'; fi
+  record_tmp=$record_name
+  write_new "$record_tmp" "$rewritten" || fail 73 'cannot write the record'
   mv -f -- "$record_tmp" "$record" || fail 73 'cannot replace the record'
   record_tmp=
 fi
-tmp=$out/registry.json.tmp.$$
-printf '%s' "$json" >"$tmp" || fail 73 'cannot write the registry'
+tmp=$registry_name
+write_new "$tmp" "$json" || fail 73 'cannot write the registry'
 # A rename within one folder is atomic: readers see the old catalog or the new one.
-mv -f -- "$tmp" "$out/registry.json" || fail 73 'cannot replace the registry'
+mv -f -- "$tmp" "$destination" || fail 73 'cannot replace the registry'
 tmp=
