@@ -8,7 +8,8 @@
 # blank line; keys userDataDir, profileDirectory, profileId, namespace, role (master, worker,
 # template), masterFingerprint, downloadsRoot, root. Directories are absolute, use only
 # [A-Za-z0-9._:/ -], and have no .. segment; root is r plus 1 to 3 digits. Every
-# downloadsRoot is scanned; one without a root id gets the next free r<n>, written back.
+# downloadsRoot is scanned; one without a root id gets the next free r<n>, written back. Any
+# byte other than printable ASCII or a newline, NUL included, exits 65 before anything is read.
 #
 # Scan: <downloadsRoot>/RECnRun/poc/<namespace>/peers/<uuid>/presence.json, nothing else, no
 # symbolic link followed at any folder below the root or at the file. Temporary files get a
@@ -140,8 +141,12 @@ fi
 if [ -f "$record" ] && [ "$(wc -c <"$record" | tr -d ' ')" -gt 65536 ]; then
   fail 65 'the record file is over 64 KiB'
 fi
-record_text=$(cat -- "$record")
+# Command substitution drops NUL bytes, so tr marks every byte outside the format before the
+# shell holds any, and one mark refuses the whole record.
+mark=$(printf '\001')
+record_text=$(tr -c '\n -~' '\001' <"$record")
 [ "${#record_text}" -le 65536 ] || fail 65 'the record file is over 64 KiB'
+case $record_text in *"$mark"*) fail 65 'the record file holds a byte other than printable ASCII or a newline' ;; esac
 
 # --- Record ---------------------------------------------------------------------------------
 

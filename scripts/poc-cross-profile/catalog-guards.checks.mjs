@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import {
+  closeSync,
+  constants,
   existsSync,
   mkdirSync,
+  openSync,
   readFileSync,
   readdirSync,
   rmSync,
@@ -30,6 +33,15 @@ import {
   start,
   until,
 } from "./lab.mjs";
+
+/** Opens and closes the pipe for writing if a reader waits on it; does nothing otherwise. */
+function release(pipe) {
+  try {
+    closeSync(openSync(pipe, constants.O_WRONLY | constants.O_NONBLOCK));
+  } catch {
+    // ENXIO: no reader holds the pipe open.
+  }
+}
 
 for (const shell of shells) {
   await test(`${shell}: a run that finds the lock held exits 75 and writes nothing`, (context) => {
@@ -73,7 +85,16 @@ for (const shell of shells) {
     const pid = running.child.pid ?? 0;
     assert.ok(pid > 0);
     process.kill(-pid, "SIGTERM");
-    const exit = await running.exited;
+    // A reader forked just after the signal still waits on the pipe, and the shell defers its
+    // trap until that reader ends, so an empty writer is offered until the run exits.
+    let exit;
+    void running.exited.then((value) => {
+      exit = value;
+    });
+    await until(() => {
+      release(pipe);
+      return exit !== undefined;
+    });
     assert.ok(exit.code === 143 || exit.signal === "SIGTERM", JSON.stringify(exit));
     assert.deepEqual(readdirSync(out), []);
   });
@@ -96,6 +117,10 @@ for (const shell of shells) {
       [`role=worker\n`, /names no/],
       [`downloadsRoot ${rootA}\n`, /key=value/],
       [`downloadsRoot=${rootA}\n${"\n".repeat(70_000)}`, /64 KiB/],
+      // Command substitution would drop the NUL and accept /safetail.
+      ["downloadsRoot=/safe\0tail\n", /byte other than/],
+      [`downloadsRoot=${rootA}\r\n`, /byte other than/],
+      [`downloadsRoot=${home}/caf\u00e9\n`, /byte other than/],
     ];
     for (const [text, reason] of refused) {
       writeFileSync(record, text);
