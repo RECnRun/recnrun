@@ -6,12 +6,18 @@ import { linkCommandMessage } from "@/messaging/peer-messages";
 import type { LinkCommand } from "@/messaging/peer-messages";
 
 let creating: Promise<void> | undefined;
+// Read through a function, so a check after an await is not narrowed to the value before it.
+const pending = () => creating;
 
 /** One offscreen document holds the RTCPeerConnection, which a service worker cannot. */
 export async function ensureOffscreen(): Promise<void> {
+  // getContexts() lists the frame before its page has loaded, so a pending creation is awaited first.
+  if (creating) return creating;
   const contexts = await browser.runtime.getContexts({
     contextTypes: [browser.runtime.ContextType.OFFSCREEN_DOCUMENT],
   });
+  const racing = pending();
+  if (racing) return racing;
   if (contexts.length > 0) return;
   // Two commands at once would otherwise both create it, and Chrome refuses the second.
   creating ??= browser.offscreen
@@ -31,6 +37,8 @@ export async function ensureOffscreen(): Promise<void> {
  * chrome_file_system_access_permission_context.cc).
  */
 export async function closeOffscreen(): Promise<void> {
+  // Closing during a creation would race it, so the creation settles first.
+  await creating?.catch(() => {});
   const contexts = await browser.runtime.getContexts({
     contextTypes: [browser.runtime.ContextType.OFFSCREEN_DOCUMENT],
   });

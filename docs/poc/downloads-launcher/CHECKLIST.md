@@ -103,6 +103,7 @@ Gate P0: verify · baseline counts · Chrome versions (lab, host) · review
   verdict: E3.directoryListing unavailable / not run ("no dedicated experiment and validated parser (§6.3)"; the folder URL resolves with status 0 and Chrome's 9447-character HTML listing with `addRow(...)` naming both files, page and offscreen alike)
   review-fix: E3 finding 3: CHROMIUM.md group 10 inventories `file_url_loader_factory.cc` (`CreateLoaderAndStart`, `FileURLLoader::Start`, `FileURLDirectoryLoader::Start`) and Blink's raw-resource cache path at `156.0.8078.80` and reconciles them with E3 (cache and directory status agree; errors and `Last-Modified` not measured); E3.md "Prediction check" points at it
   rule: no content script matches `file:` in any build (`vp run test:extension-manifest`, not a verdict) · lab Google Chrome 157.0.8103.38 on Linux in Docker · files `experiments/verdicts/E3-{lab-full,lab-smoke,lab-versions,host}.json`
+  review-fix: E3 finding 1 (`ensureOffscreen` returned while creation was pending). red: `npx vitest run tests/link.test.ts` in `apps/extension` on the old `link.ts`: `a second caller waits for a creation that is still loading` failed `expected true to be false`, `closing waits for a pending creation...` timed out; green: same command, 7 passed
   commit: the commit that adds this line
 
 Gate P1: verify · E1–E3 · review
