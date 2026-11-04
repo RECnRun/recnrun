@@ -2,6 +2,8 @@
   // The Oxc Zed extension requires a direct oxfmt dependency to find its LSP executable.
   // dependency-cruiser loads @swc/core by name for its "swc" parser.
   "ignoreDependencies": ["oxfmt", "@swc/core"],
+  // iproute2 tools of the test image; tests/browser/no-egress.spec.ts reads the route and the tc drop counter.
+  "ignoreBinaries": ["ip", "tc"],
   "workspaces": {
     ".": {
       "entry": [
