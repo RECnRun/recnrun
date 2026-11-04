@@ -18,6 +18,10 @@ export async function persistentCertificate(now = Date.now()): Promise<RTCCertif
   return created;
 }
 
+/** Stores `certificate` as this profile's, for the next document that starts to load (P3.3 lab). */
+export const storeCertificate = (certificate: RTCCertificate): Promise<void> =>
+  writeStored(STORE, KEY, certificate);
+
 /** The certificate's SHA-256 fingerprint, written as an SDP writes it. */
 export function certificateFingerprint(certificate: RTCCertificate): string | undefined {
   const sha = certificate.getFingerprints().find(({ algorithm }) => algorithm === "sha-256");

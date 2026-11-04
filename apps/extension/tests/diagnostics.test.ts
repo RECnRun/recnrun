@@ -110,6 +110,7 @@ describe("startDiagnostics", () => {
         "readFile",
         "readPublication",
         "readRegistry",
+        "renewCertificate",
         "search",
       ].sort(),
     );
