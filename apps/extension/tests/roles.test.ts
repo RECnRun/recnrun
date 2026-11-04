@@ -7,11 +7,8 @@ import { createPins } from "@/p2p/pins";
 import { MemberSchema, parsePeerFrame, peerMessage } from "@/p2p/protocol";
 import { RegistrationSchema } from "@/p2p/registry";
 import { RoleRecordSchema, createRoles } from "@/p2p/roles";
-import {
-  boundWorkersRepository,
-  peerPinsRepository,
-  roleRepository,
-} from "@/storage/peer-repository";
+import { roleStores } from "@/storage/hierarchy-repository";
+import { peerPinsRepository } from "@/storage/peer-repository";
 
 const NOW = 1_700_000_000_000;
 const ME = "11111111-1111-4111-8111-111111111111";
@@ -24,7 +21,8 @@ const MASTER_FP = "AB:CD:EF";
 const OTHER_FP = "12:34:56";
 
 const pins = () => createPins(peerPinsRepository, () => NOW);
-const stores = { role: roleRepository, workers: boundWorkersRepository };
+const stores = roleStores();
+const { role: roleRepository, workers: boundWorkersRepository } = stores;
 const roles = () => createRoles({ ...stores, pins: pins(), now: () => NOW });
 const master = { profileId: MASTER, fingerprint: MASTER_FP, source: "pairing" } as const;
 const binding = {
