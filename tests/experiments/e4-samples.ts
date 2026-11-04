@@ -144,15 +144,42 @@ export const closedProfileSample = (environment: E4Environment) =>
         own.peers.map((peer) => peer.profileId),
       ),
     };
-    const problems = [
-      ...(afterExpiry.code === 0 ? [] : [`catalog.sh exited ${afterExpiry.code}`]),
-      ...(afterExpiry.listed.join(",") === "A"
-        ? []
-        : [`after expiry it lists ${afterExpiry.listed.join(",")}`]),
-      ...(read.listed.join(",") === "A" ? [] : [`A reads ${read.listed.join(",")}`]),
-    ];
-    return judged(problems, { afterQuit, afterExpiry, readByA: read });
+    const seen = { afterQuit, afterExpiry, readByA: read };
+    // The expiry is written, not waited for: the observation says so, and E4.md keeps the distinction.
+    return judged(closedProfileProblems(seen), { ...seen, expiry: "forced" });
   });
+
+interface CatalogSeen {
+  code: number;
+  listed: string[];
+}
+
+/** Problems of one catalog run that must exit 0 and list exactly `expected`. */
+const runProblems = (when: string, run: CatalogSeen, expected: string) => [
+  ...(run.code === 0 ? [] : [`${when} catalog.sh exited ${run.code}`]),
+  ...(run.listed.join(",") === expected ? [] : [`${when} it lists ${run.listed.join(",")}`]),
+];
+
+/**
+ * What E4.b.closedProfile requires: right after B quits, a run that lists A and B (its presence is
+ * still valid); once B's presence expired, a run that lists only A, and A reading that `fresh`.
+ */
+export function closedProfileProblems({
+  afterQuit,
+  afterExpiry,
+  readByA,
+}: {
+  afterQuit: CatalogSeen;
+  afterExpiry: CatalogSeen;
+  readByA: { reason: string; listed: string[] };
+}): string[] {
+  const read = `${readByA.reason} with ${readByA.listed.join(",")}`;
+  return [
+    ...runProblems("after the quit", afterQuit, "A,B"),
+    ...runProblems("after expiry", afterExpiry, "A"),
+    ...(read === "fresh with A" ? [] : [`A reads ${read}`]),
+  ];
+}
 
 /** download.default_directory of a root as JSON.parse reads it, or null when it is absent. */
 async function jsonPreference(root: string): Promise<string | null> {
