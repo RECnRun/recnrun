@@ -280,10 +280,6 @@
     "variant": "poc-d0",
     "topology": "single-root",
     "debugger": "none",
-    "verdict": "pass",
-    "samples": 3,
-    "gestures": 0,
-    "steps": [],
     "observations": [
       {
         "extensionId": "omllgeochjfpkjbkpcgjmnnbncdpiedd",
@@ -441,6 +437,28 @@
         ],
         "noStoreNeeded": false
       }
-    ]
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "E3",
+    "hypothesis": "E3.directoryListing",
+    "chrome": "Google Chrome 156.0.8078.80",
+    "environment": "host",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "single-root",
+    "debugger": "none",
+    "verdict": "unavailable",
+    "error": "no dedicated experiment and validated parser (§6.3)",
+    "samples": 0,
+    "gestures": 0,
+    "steps": [],
+    "observations": []
   }
 ]

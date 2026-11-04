@@ -1,21 +1,31 @@
 import { extensionPath } from "../browser/fixtures/extension-loaders.ts";
 import { observe } from "../experiments/e1-samples.ts";
-import { cacheSample, fetchSample } from "../experiments/e3-samples.ts";
+import { cacheSample, fetchSample, LISTING_REASON } from "../experiments/e3-samples.ts";
 import type { E3Cells } from "../experiments/e3-samples.ts";
 import { requireBuild } from "../experiments/file-access.ts";
-import { expectEveryHypothesis, recordHypothesis } from "../experiments/outcome.ts";
+import {
+  expectEveryHypothesis,
+  recordHypothesis,
+  recordUnavailable,
+} from "../experiments/outcome.ts";
 import type { Cell, Sample } from "../experiments/outcome.ts";
 import { openHostExtension, test } from "./fixtures/host-chrome.ts";
 import { evidence, installedChromeVersion } from "./fixtures/host-env.ts";
 
 /*
  * E3's host twin (POC PLAN.md P1.4): the installed Google Chrome of this Mac on throwaway roots,
- * reading file:// in the extension page and in the offscreen document. The directory listing
- * stays in the lab, so no host path lands in a verdict.
+ * reading file:// in the extension page and in the offscreen document. The directory listing is
+ * recorded `unavailable` without reading a folder, so no host path lands in a verdict.
  */
 
 const EXPERIMENT = "E3";
-const HYPOTHESES = ["E3.page.fetch", "E3.offscreen.fetch", "E3.page.cache", "E3.offscreen.cache"];
+const HYPOTHESES = [
+  "E3.page.fetch",
+  "E3.offscreen.fetch",
+  "E3.page.cache",
+  "E3.offscreen.cache",
+  "E3.directoryListing",
+];
 const VARIANT = "poc-d0";
 const PATH = extensionPath(VARIANT);
 
@@ -71,6 +81,10 @@ test.describe("E3 on the host: file:// reads of the poc-d0 build", () => {
 
   test("E3.offscreen.cache: the offscreen document sees every change A→B→C→D on its first read", async () => {
     await record("E3.offscreen.cache", () => cacheSample(hostCells, "offscreen"));
+  });
+
+  test("E3.directoryListing: unavailable, no folder is read on the host", async () => {
+    await recordUnavailable(await cell("E3.directoryListing"), LISTING_REASON, directory());
   });
 
   test("every E3 hypothesis left a verdict", async () => {
