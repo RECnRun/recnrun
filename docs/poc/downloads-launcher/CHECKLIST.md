@@ -169,7 +169,11 @@ Gate P2: verify · E4 · review
 
 - [ ] P3.1 Transport interface and Downloads adapter
 - [ ] P3.2 Handshake over Downloads, E5 (lab, host)
-- [ ] P3.3 Trust and pins
+- [~] P3.3 Trust and pins
+  red: `npx vitest run tests/pins.test.ts` (in `apps/extension`) against a stub of today's behavior (every fingerprint replaces the last, `verify` always `unpinned`): 9 failed ("expected 'unpinned' to be 'pinned-mismatch'" for a presence and a catalog entry with a new certificate; a second fingerprint returned `{ ok: true }`); `npx vitest run tests/pairing.test.ts tests/peers-pins.test.ts tests/peers-start.test.ts` before the wiring: 6 failed (an offer with another certificate for a pinned profile resolved with an answer code; the first verified link pinned nothing; a link proving the accepted but not the pinned certificate was verified; a relayed `SIGNAL` with another certificate for a pinned profile was answered)
+  green: the same commands, 11 and 24 passed; `apps/extension` node tests 583 passed; `vp run test:extension-manifest` 32 passed
+  commit: cherry-picked from agent/p3-pins `4098b95b` (pin store), `328ac950` (pairing and link refuse a mismatch, the first proved link pins), and the docs commit after them (decision 13)
+  missing: `tests/browser/forged-sender.spec.ts`, the forged-sender regression of PR #19 on the Downloads transport, is pending P3.2 (the Downloads mesh)
 - [ ] P3.4 Roles and command authorization
 - [ ] P3.5 Master absent and master back, E6
 - [ ] P3.6 Presence cost, E7
