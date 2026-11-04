@@ -26,6 +26,7 @@ import {
   remoteControllerRepository,
   remoteRecordingsRepository,
 } from "@/storage/peer-repository";
+import { storedRoles } from "@/storage/hierarchy-repository";
 import { recordingSessionRepository } from "@/storage/recording-session-repository";
 import { browserTabs } from "@/tabs/open-tabs";
 // Imported last, so the production bundle (which drops them) keeps its module order and bytes.
@@ -226,8 +227,33 @@ function watchExecutor(channel: PeerChannel, executor: ExecutorDependencies) {
 
 const FolderStatusSchema = v.object({ access: FolderAccessSchema });
 
+/** The stored role's gate on everything outward; an unreadable role permits nothing. */
+function outwardGate() {
+  const roles = storedRoles();
+  const mayAnnounce = async () =>
+    (await roles.mayAct("announce")) && (await roles.mayAct("discover"));
+  const outward: Outward = async (work) => {
+    if (await mayAnnounce()) await work();
+  };
+  /** Runs `start` unless the role is a template, which waits for a later role change. */
+  const startOutward = async <T>(start: () => Promise<T>): Promise<T | undefined> => {
+    try {
+      if (await mayAnnounce()) return await start();
+      log("role template: no announcement, discovery, or pairing");
+    } catch (error) {
+      log(errorMessage(error));
+    }
+    return undefined;
+  };
+  return { outward, startOutward };
+}
+
+/** What a profile does outward only if its stored role lets it: a template does none of it. */
+type Outward = (work: () => Promise<void>) => Promise<void>;
+
 function requestDependencies(
   { channel, tabs, flows, sign }: Omit<LinkContext, "executor">,
+  outward: Outward,
   downloadsAvailable?: () => Promise<boolean>,
 ): PeerRequestDependencies {
   const { folder, mesh } = flows;
@@ -250,10 +276,10 @@ function requestDependencies(
         v.parse(FolderStatusSchema, await askLink({ type: "folder-status" })).access,
       waiting: async () => (await folderPairingRepository.read()) !== null,
       paused: folder.paused,
-      start: () => folder.start().then(notifyPages),
+      start: () => outward(() => folder.start().then(notifyPages)),
       pause: folder.pause,
-      unpause: (peer) => folder.unpause(peer).then(viaMesh).then(notifyPages),
-      unpauseAll: () => folder.unpauseAll().then(viaMesh).then(notifyPages),
+      unpause: (peer) => outward(() => folder.unpause(peer).then(viaMesh).then(notifyPages)),
+      unpauseAll: () => outward(() => folder.unpauseAll().then(viaMesh).then(notifyPages)),
       release: closeOffscreen,
       ...(downloadsAvailable && { downloadsAvailable }),
     },
@@ -291,17 +317,22 @@ export function startPeers(
   watchExecutor(channel, executor);
   const flows = createPairingFlows(channel, transport, log, sign);
   const { folder } = flows;
+  const { outward, startOutward } = outwardGate();
   // Chrome starts the worker with the browser only for a startup listener; starting resumes.
   browser.runtime.onStartup.addListener(() => {});
-  void folder.resume().catch((error: unknown) => log(errorMessage(error)));
-  // Downloads needs no prior choice: the profile announces itself as its worker starts, then pairs.
-  const downloads =
-    transport === "downloads"
-      ? startPocPresence({ log, sign, startPairing: () => folder.start().then(notifyPages) })
-      : undefined;
+  const downloads = startOutward(async () => {
+    void folder.resume().catch((error: unknown) => log(errorMessage(error)));
+    // Downloads needs no prior choice: the profile announces itself as its worker starts, then pairs.
+    if (transport !== "downloads") return undefined;
+    return startPocPresence({ log, sign, startPairing: () => folder.start().then(notifyPages) });
+  });
   // Chrome ends the folder's grant with the last extension page, so the pages read it again.
   browser.tabs.onRemoved.addListener(notifyPages);
-  const deps = requestDependencies({ channel, tabs, flows, sign }, downloads?.available);
+  const available =
+    transport === "downloads"
+      ? async () => (await (await downloads)?.available()) ?? false
+      : undefined;
+  const deps = requestDependencies({ channel, tabs, flows, sign }, outward, available);
   return {
     request: (request) => handlePeerRequest(deps, request),
     link: createLinkHandler({ channel, executor, tabs, flows, sign }),

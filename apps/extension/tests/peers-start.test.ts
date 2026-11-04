@@ -9,6 +9,7 @@ import {
   identityRepository,
   peerPinsRepository,
 } from "@/storage/peer-repository";
+import { roleStores } from "@/storage/hierarchy-repository";
 import { pocPresenceStore } from "@/storage/poc-presence-repository";
 import { FINGERPRINT, ME, PEER, PEER_IDENTITY, answering, fakeOffscreen } from "./fake-peer";
 import { signAs } from "./test-identity";
@@ -243,5 +244,38 @@ describe("the transport a page sees", () => {
         rendezvous: { kind: "downloads", available: true },
       }),
     );
+  });
+});
+
+describe("a stored template", () => {
+  const silent = "role template: no announcement, discovery, or pairing";
+
+  test("announces nothing, watches no folder, and starts no pairing through the real startup", async () => {
+    const { link, written, log } = await background();
+    await roleStores().role.write({ role: "template" });
+    await folderPairingRepository.write({});
+    const peers = startPeers({ transport: "downloads", sign: signAs });
+    await vi.waitFor(() => expect(log).toHaveBeenCalledWith("[RECnRun peer]", silent));
+    const page = { id: fakeBrowser.runtime.id, url: fakeBrowser.runtime.getURL("/bootstrap.html") };
+    const replies: unknown[] = [];
+    void fakeBrowser.runtime.onMessage.trigger({ type: "POC_PUBLISH_PRESENCE" }, page, (reply) =>
+      replies.push(reply),
+    );
+    await peers.request({ type: "folder-pair" });
+    await peers.request({ type: "pair-again" });
+    await peers.request({ type: "reconnect", peer: PEER });
+    expect(written).toEqual([]);
+    expect(link.commands).toEqual([]);
+    expect(replies).toEqual([]);
+    expect(await peers.request({ type: "status" })).toMatchObject({
+      rendezvous: { kind: "downloads", available: false },
+    });
+  });
+
+  test("a profile without a stored role still announces", async () => {
+    const { written } = await background();
+    expect(await roleStores().role.read()).toBeNull();
+    startPeers({ transport: "downloads", sign: signAs });
+    await vi.waitFor(() => expect(written).toHaveLength(1));
   });
 });
