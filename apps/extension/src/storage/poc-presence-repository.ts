@@ -10,11 +10,13 @@ const BootSchema = v.pipe(v.string(), v.uuid());
 export function pocPresenceStore() {
   // Local, so an experiment sets it before the worker's first presence.
   const namespace = storage.defineItem<unknown>("local:pocNamespace");
+  const policy = storage.defineItem<unknown>("local:pocPresencePolicy");
   // Session storage ends with the browser, as a boot does; a worker restart keeps both.
   const boot = storage.defineItem<unknown>("session:pocBoot");
   const root = storage.defineItem<unknown>("session:pocDownloadsRoot");
   return {
     namespace: () => namespace.getValue(),
+    policy: () => policy.getValue(),
     boot: async () => {
       const stored = await boot.getValue();
       if (v.is(BootSchema, stored)) return stored;

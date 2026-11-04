@@ -7,6 +7,7 @@ import type { DownloadsPort } from "@/background/downloads-publisher";
 import type { Sign } from "@/background/greeting";
 import { offscreenFingerprint } from "@/background/link";
 import { createRendezvousRelay } from "@/background/rendezvous-relay";
+import { presenceRenewal } from "@/background/presence-renewal";
 import type { BackgroundReply } from "@/messaging/background-reply";
 import { PocPublishPresenceSchema } from "@/messaging/poc-presence";
 import { DEFAULT_NAMESPACE, NamespaceSchema, presencePath } from "@/p2p/downloads-rendezvous";
@@ -55,8 +56,10 @@ export interface PresenceDependencies {
   /** Chrome's alarms, absent without the permission; a timer then refreshes only while the worker runs. */
   alarms?: AlarmsPort;
   now?: () => number;
-  /** Runs after each presence written, so pairing starts once the root is known (P3.2). */
+  /** Starts or restores pairing once the root is known, even when renewal is silenced. */
   published?: () => Promise<void>;
+  /** POC-only renewal policy; an explicit bootstrap publication always writes. */
+  renew?: () => Promise<boolean>;
 }
 
 async function namespaceOf({ namespace, log }: PresenceDependencies): Promise<string> {
@@ -144,7 +147,7 @@ function scheduleRefresh(refresh: () => void, { alarms, log }: PresenceDependenc
   };
 }
 
-/** Announces this profile now and every half TTL, so it never lapses while Chrome runs the profile. */
+/** Checks renewal at startup and every half TTL; explicit bootstrap publication always writes. */
 export function startDownloadsPresence(deps: PresenceDependencies) {
   const now = deps.now ?? Date.now;
   let last = Number.NEGATIVE_INFINITY;
@@ -155,10 +158,13 @@ export function startDownloadsPresence(deps: PresenceDependencies) {
   };
   const attempt = () => {
     last = now();
-    void publishNow().catch((error: unknown) => deps.log(`presence: ${errorMessage(error)}`));
+    void (async () => {
+      if ((await deps.renew?.()) ?? true) await publishNow();
+      else void deps.published?.();
+    })().catch((error: unknown) => deps.log(`presence: ${errorMessage(error)}`));
   };
   attempt();
-  // The alarm that restarted the worker arrives just after the write at start, which refreshed already.
+  // The alarm that restarted the worker arrives just after the startup renewal check.
   const stop = scheduleRefresh(() => {
     if (now() - last >= REFRESH_MS / 2) attempt();
   }, deps);
@@ -208,6 +214,7 @@ export function startPocPresence({ log, sign, startPairing }: PocPresenceOptions
     namespace: store.namespace,
     boot: store.boot,
     root: store.root,
+    renew: presenceRenewal(store.root.read, log, store.policy),
     log,
     // Undefined in a build without the alarms permission.
     alarms: (browser as { alarms?: AlarmsPort }).alarms,

@@ -1,6 +1,7 @@
 import { vi } from "vite-plus/test";
 import { fakeBrowser } from "wxt/testing/fake-browser";
 import { startPeers } from "@/background/peers";
+import type { PeersOptions } from "@/background/peers";
 import type { PeerMessage } from "@/p2p/protocol";
 import { storedRoles } from "@/storage/hierarchy-repository";
 import { authorizedPeersRepository, identityRepository } from "@/storage/peer-repository";
@@ -21,7 +22,13 @@ export const bindToPeer = () =>
  * The background's peer half over the fake browser and offscreen document, with this profile's
  * identity stored and, unless told otherwise, the peer authorized with FINGERPRINT and its key.
  */
-export async function peerBackground({ authorized = true } = {}) {
+export async function peerBackground({
+  authorized = true,
+  transport = "folder",
+}: {
+  authorized?: boolean;
+  transport?: PeersOptions["transport"];
+} = {}) {
   vi.spyOn(fakeBrowser.runtime, "getManifest").mockReturnValue(manifest);
   // The fake browser has no tabs.onMoved or tabs.onAttached; these stand in for them.
   const moved: (() => void)[] = [];
@@ -40,7 +47,7 @@ export async function peerBackground({ authorized = true } = {}) {
       fingerprint: FINGERPRINT,
       identity: PEER_IDENTITY,
     });
-  const routes = startPeers({ transport: "folder", sign: signAs });
+  const routes = startPeers({ transport, sign: signAs });
   // Null stands for a link that reported no certificate.
   const connect = (remoteFingerprint: string | null = FINGERPRINT, peer = PEER) =>
     routes.link({
