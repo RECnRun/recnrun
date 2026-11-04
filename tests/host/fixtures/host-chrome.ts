@@ -17,6 +17,7 @@ import type {
 } from "../../browser/fixtures/extension-loaders.ts";
 import { CHROME_BINARY, evidence, hostRunId, requireHost } from "./host-env.ts";
 import type { Evidence } from "./host-env.ts";
+import { launchOnRoot } from "./host-launch.ts";
 import { removeHostRoot, rootFor } from "./roots.ts";
 
 export { expect } from "@playwright/test";
@@ -120,20 +121,21 @@ export async function openHostExtension(
 ): Promise<HostExtension> {
   const root = await newRoot(name);
   const record = evidence();
-  let loaded: LoadedExtension | undefined;
-  try {
-    loaded = await loadUnpacked(path, hostUnpackedOptions(root));
-    const { product, userAgent } = await loaded.chrome.cdp.send("Browser.getVersion");
-    await record.versions({ version: loaded.chrome.version, product, userAgent });
-  } catch (error) {
-    await loaded?.close();
-    await removeRoot(root);
-    throw error;
-  }
-  const launched = loaded;
+  const launched = await launchOnRoot<LoadedExtension>({
+    launch: () => loadUnpacked(path, hostUnpackedOptions(root)),
+    after: async (loaded) => {
+      const { product, userAgent } = await loaded.chrome.cdp.send("Browser.getVersion");
+      await record.versions({ version: loaded.chrome.version, product, userAgent });
+    },
+    stop: (loaded) => loaded.close(),
+    removeRoot: () => removeRoot(root),
+  });
   const close = async (): Promise<void> => {
-    await launched.close();
-    await removeRoot(root);
+    try {
+      await launched.close();
+    } finally {
+      await removeRoot(root);
+    }
   };
   return { ...launched, root, path, evidence: record, quit: () => launched.close(), close };
 }

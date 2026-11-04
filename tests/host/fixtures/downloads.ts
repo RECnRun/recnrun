@@ -9,6 +9,7 @@ import type { DownloadsEnvironment } from "../../experiments/fixtures/downloads-
 import { parseVerdicts } from "../../experiments/schema.ts";
 import type { Verdict } from "../../experiments/schema.ts";
 import { CHROME_BINARY, evidence, hostRunId, requireHost } from "./host-env.ts";
+import { launchOnRoot } from "./host-launch.ts";
 import { removeHostRoot, rootFor } from "./roots.ts";
 
 /** Keeps the diagnostic window off the owner's screen and away from the login Keychain. */
@@ -64,20 +65,24 @@ export const host: DownloadsEnvironment = {
   target: { environment: "host", chrome: chromeVersion, append: appendHostVerdict },
   launch: async (preferences) => {
     const root = await rootFor(requireHost(), hostRunId(), `e2-${++launches}`);
-    try {
-      const options = { executable: CHROME_BINARY, args: HOST_ARGS };
-      const probe = await launchProbe(root, preferences, options);
-      const { product, userAgent } = await probe.loaded.chrome.cdp.send("Browser.getVersion");
-      await evidence().versions({ version: probe.loaded.chrome.version, product, userAgent });
-      const close = async () => {
+    const options = { executable: CHROME_BINARY, args: HOST_ARGS };
+    const probe = await launchOnRoot({
+      launch: () => launchProbe(root, preferences, options),
+      after: async ({ loaded }) => {
+        const { product, userAgent } = await loaded.chrome.cdp.send("Browser.getVersion");
+        await evidence().versions({ version: loaded.chrome.version, product, userAgent });
+      },
+      stop: ({ loaded }) => loaded.close(),
+      removeRoot: () => removeRoot(root),
+    });
+    const close = async () => {
+      try {
         await probe.loaded.close();
+      } finally {
         await removeRoot(root);
-      };
-      return { ...probe, root, close };
-    } catch (error) {
-      await removeRoot(root);
-      throw error;
-    }
+      }
+    };
+    return { ...probe, root, close };
   },
   defaultDestination: (namespace) =>
     `RECnRun/poc-downloads-launcher/${hostRunId()}/probe-${namespace}.json`,
