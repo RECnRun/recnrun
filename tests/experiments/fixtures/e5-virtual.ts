@@ -17,7 +17,7 @@ import type { IdentityStatement, Signer } from "./identity-statement.ts";
 
 const PREFIX = "RECNRUN-PAIR-1.";
 // PAIRING_TTL_MS of apps/extension/src/p2p/pairing-code.ts and PRESENCE_TTL_MS of folder-rendezvous.ts.
-const PAIRING_TTL_MS = 5 * 60_000;
+export const PAIRING_TTL_MS = 5 * 60_000;
 export const PRESENCE_TTL_MS = 60_000;
 const REFRESH_MS = 20_000;
 

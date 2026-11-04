@@ -18,7 +18,13 @@ import {
   withGroup,
 } from "./fixtures/e5-run.ts";
 import type { E5Environment, Facing } from "./fixtures/e5-run.ts";
-import { HIGHEST_ID, LOWEST_ID, PRESENCE_TTL_MS, signalFile } from "./fixtures/e5-virtual.ts";
+import {
+  HIGHEST_ID,
+  LOWEST_ID,
+  PAIRING_TTL_MS,
+  PRESENCE_TTL_MS,
+  signalFile,
+} from "./fixtures/e5-virtual.ts";
 
 /*
  * E5's cells that need a file no real profile would write (POC PLAN.md P3.2): the virtual peer
@@ -235,7 +241,12 @@ async function skewChecks(run: Facing) {
     );
   await stamped(Date.now() + HOUR_MS);
   const ahead = await catalogued(group, THIRD_ID);
-  const fromAhead = await third.signal("offer", to.profileId);
+  // Stamped by the clock its presence was, so it stays refused once that presence is set right.
+  const aheadAt = Date.now() + HOUR_MS;
+  const fromAhead = await third.signal("offer", to.profileId, {
+    sequence: aheadAt,
+    expiresAt: aheadAt + PAIRING_TTL_MS,
+  });
   const aheadOfferIgnored = await ignored(thirdRun, JSON.stringify(fromAhead), fromAhead.pairingId);
   await stamped(Date.now() - HOUR_MS);
   const behind = await catalogued(group, THIRD_ID);
