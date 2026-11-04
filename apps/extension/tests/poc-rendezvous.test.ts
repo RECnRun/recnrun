@@ -10,7 +10,7 @@ const REGISTRY_URL = `file://${ROOT}/RECnRun/poc/lab/registry.json`;
 /** The background's side of the relay, recording each request. */
 function background(root: string | null = ROOT, refuse?: string) {
   const ops: string[] = [];
-  const send = vi.fn(async (message: unknown) => {
+  const send = vi.fn(async (message: unknown): Promise<unknown> => {
     const { op } = message as { op: string };
     ops.push(op);
     if (op === "write" && refuse) return { ok: false, error: refuse };
@@ -59,6 +59,19 @@ describe("pocDownloadsRendezvous", () => {
     expect(write.path).toBe(`RECnRun/poc/lab/peers/${ME}/offer-${PEER}.json`);
     expect(JSON.parse(write.text)).toMatchObject({ ...offer, boot: BOOT });
     expect(send.mock.calls[3]?.[0]).toEqual({ type: "POC_RENDEZVOUS", op: "erase", id: 7 });
+  });
+
+  test("takes a file it reads that does not parse for absent", async () => {
+    const { fetch, transport } = background();
+    fetch.mockResolvedValue(new Response("not json"));
+    expect(await transport.look()).toEqual({ presences: [], signals: [] });
+    expect(fetch).toHaveBeenCalledWith(REGISTRY_URL, { cache: "no-store" });
+  });
+
+  test("fails when the background gives no reply", async () => {
+    const { send, transport } = background();
+    send.mockResolvedValueOnce(undefined);
+    await expect(transport.look()).rejects.toThrow("The background did not answer.");
   });
 
   test("fails a write the background refuses", async () => {
