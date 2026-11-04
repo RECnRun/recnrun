@@ -26,7 +26,7 @@ const REFRESH_MS = PRESENCE_TTL_MS / 2;
 const PRESENCE_ALARM = "poc-presence";
 
 /** The part of `chrome.alarms` the presence uses. */
-export interface AlarmsPort {
+interface AlarmsPort {
   create(name: string, info: { periodInMinutes: number }): Promise<void>;
   clear(name: string): Promise<boolean>;
   onAlarm: {
