@@ -1,0 +1,350 @@
+[
+  {
+    "experiment": "E6",
+    "hypothesis": "E6.a.absent",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "Default bound as master of two workers, one shared Downloads root",
+    "debugger": "none",
+    "observations": [
+      {
+        "goneMs": [2853, 3363],
+        "masterUnlistedMs": 58021,
+        "presenceWrites": [3, 3],
+        "longestPresenceGapMs": [30002, 30003],
+        "serviceWorkersListed": [true, true],
+        "changed": [],
+        "stillWorkers": true,
+        "workersLinked": true,
+        "sessionKept": true,
+        "controlledBy": null
+      },
+      {
+        "goneMs": [2911, 3167],
+        "masterUnlistedMs": 59855,
+        "presenceWrites": [3, 3],
+        "longestPresenceGapMs": [30005, 30005],
+        "serviceWorkersListed": [true, true],
+        "changed": [],
+        "stillWorkers": true,
+        "workersLinked": true,
+        "sessionKept": true,
+        "controlledBy": null
+      },
+      {
+        "goneMs": [2590, 2845],
+        "masterUnlistedMs": 59628,
+        "presenceWrites": [3, 3],
+        "longestPresenceGapMs": [30003, 30004],
+        "serviceWorkersListed": [true, true],
+        "changed": [],
+        "stillWorkers": true,
+        "workersLinked": true,
+        "sessionKept": true,
+        "controlledBy": null
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "E6",
+    "hypothesis": "E6.a.forgedMaster",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "Default bound as master of two workers and a virtual peer the test writes under the Default's id, one shared Downloads root",
+    "debugger": "none",
+    "observations": [
+      {
+        "refusedMs": [1104, 1367],
+        "linkedToForger": [false, false],
+        "forgerConnected": false,
+        "answersToForger": 0,
+        "offersToForger": 0,
+        "changed": [],
+        "relinkMs": 1126
+      },
+      {
+        "refusedMs": [1158, 420],
+        "linkedToForger": [false, false],
+        "forgerConnected": false,
+        "answersToForger": 0,
+        "offersToForger": 0,
+        "changed": [],
+        "relinkMs": 2150
+      },
+      {
+        "refusedMs": [991, 1258],
+        "linkedToForger": [false, false],
+        "forgerConnected": false,
+        "answersToForger": 0,
+        "offersToForger": 0,
+        "changed": [],
+        "relinkMs": 1692
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "E6",
+    "hypothesis": "E6.a.thirdMaster",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "Default bound as master of two workers and a third profile that claims to be master, one shared Downloads root",
+    "debugger": "none",
+    "observations": [
+      {
+        "meshMs": 1107,
+        "commands": [
+          {
+            "dropped": 1,
+            "refused": true,
+            "tabActive": false,
+            "session": null
+          },
+          {
+            "dropped": 1,
+            "refused": true,
+            "tabActive": false,
+            "session": null
+          }
+        ],
+        "changed": []
+      },
+      {
+        "meshMs": 2599,
+        "commands": [
+          {
+            "dropped": 1,
+            "refused": true,
+            "tabActive": false,
+            "session": null
+          },
+          {
+            "dropped": 1,
+            "refused": true,
+            "tabActive": false,
+            "session": null
+          }
+        ],
+        "changed": []
+      },
+      {
+        "meshMs": 2566,
+        "commands": [
+          {
+            "dropped": 1,
+            "refused": true,
+            "tabActive": false,
+            "session": null
+          },
+          {
+            "dropped": 1,
+            "refused": true,
+            "tabActive": false,
+            "session": null
+          }
+        ],
+        "changed": []
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "E6",
+    "hypothesis": "E6.b.relink",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "Default bound as master of two workers, one shared Downloads root",
+    "debugger": "none",
+    "observations": [
+      {
+        "relinkFromLaunchMs": 3518,
+        "relinkFromPresenceMs": 3148,
+        "newBoot": true,
+        "sameProfileId": true,
+        "changed": []
+      },
+      {
+        "relinkFromLaunchMs": 3280,
+        "relinkFromPresenceMs": 3050,
+        "newBoot": true,
+        "sameProfileId": true,
+        "changed": []
+      },
+      {
+        "relinkFromLaunchMs": 1499,
+        "relinkFromPresenceMs": 1279,
+        "newBoot": true,
+        "sameProfileId": true,
+        "changed": []
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "E6",
+    "hypothesis": "E6.b.status",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "Default bound as master of two workers, one shared Downloads root",
+    "debugger": "none",
+    "observations": [
+      {
+        "statusMs": 11,
+        "busySession": {
+          "status": "recording",
+          "mine": true,
+          "live": true
+        },
+        "idleSession": null,
+        "linksVerified": [true, true],
+        "listsWork": true
+      },
+      {
+        "statusMs": 17,
+        "busySession": {
+          "status": "recording",
+          "mine": true,
+          "live": true
+        },
+        "idleSession": null,
+        "linksVerified": [true, true],
+        "listsWork": true
+      },
+      {
+        "statusMs": 15,
+        "busySession": {
+          "status": "recording",
+          "mine": true,
+          "live": true
+        },
+        "idleSession": null,
+        "linksVerified": [true, true],
+        "listsWork": true
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "E6",
+    "hypothesis": "E6.b.results",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "Default bound as master of two workers, one shared Downloads root",
+    "debugger": "none",
+    "observations": [
+      {
+        "startsAfterRelaunch": 0,
+        "sessionKept": true,
+        "stopAccepted": true,
+        "stopMs": 2
+      },
+      {
+        "startsAfterRelaunch": 0,
+        "sessionKept": true,
+        "stopAccepted": true,
+        "stopMs": 3
+      },
+      {
+        "startsAfterRelaunch": 0,
+        "sessionKept": true,
+        "stopAccepted": true,
+        "stopMs": 7
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "E6",
+    "hypothesis": "E6.c.workerRestart",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "Default bound as master of two workers, one shared Downloads root",
+    "debugger": "none",
+    "verdict": "pass",
+    "samples": 3,
+    "gestures": 0,
+    "steps": [],
+    "observations": [
+      {
+        "goneMs": 3115,
+        "relinkMs": 2336,
+        "newWorkerBoot": true,
+        "masterBootKept": true,
+        "steadyLinkDrops": 0,
+        "steadyLinkPolls": 22,
+        "changed": [],
+        "commandAccepted": true,
+        "tabActive": true
+      },
+      {
+        "goneMs": 2809,
+        "relinkMs": 2341,
+        "newWorkerBoot": true,
+        "masterBootKept": true,
+        "steadyLinkDrops": 0,
+        "steadyLinkPolls": 21,
+        "changed": [],
+        "commandAccepted": true,
+        "tabActive": true
+      },
+      {
+        "goneMs": 3613,
+        "relinkMs": 2312,
+        "newWorkerBoot": true,
+        "masterBootKept": true,
+        "steadyLinkDrops": 0,
+        "steadyLinkPolls": 24,
+        "changed": [],
+        "commandAccepted": true,
+        "tabActive": true
+      }
+    ]
+  }
+]

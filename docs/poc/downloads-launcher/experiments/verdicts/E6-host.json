@@ -1,0 +1,305 @@
+[
+  {
+    "experiment": "E6",
+    "hypothesis": "E6.a.absent",
+    "chrome": "Google Chrome 156.0.8078.80",
+    "environment": "host",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "Default bound as master of two workers, one shared Downloads root",
+    "debugger": "none",
+    "observations": [
+      {
+        "goneMs": [3117, 2857],
+        "masterUnlistedMs": 57128,
+        "presenceWrites": [3, 3],
+        "longestPresenceGapMs": [30003, 30002],
+        "serviceWorkersListed": [true, true],
+        "changed": [],
+        "stillWorkers": true,
+        "workersLinked": true,
+        "sessionKept": true,
+        "controlledBy": null
+      },
+      {
+        "goneMs": [3607, 3606],
+        "masterUnlistedMs": 57740,
+        "presenceWrites": [3, 3],
+        "longestPresenceGapMs": [30002, 30001],
+        "serviceWorkersListed": [true, true],
+        "changed": [],
+        "stillWorkers": true,
+        "workersLinked": true,
+        "sessionKept": true,
+        "controlledBy": null
+      },
+      {
+        "goneMs": [3372, 3372],
+        "masterUnlistedMs": 57433,
+        "presenceWrites": [3, 3],
+        "longestPresenceGapMs": [30003, 30001],
+        "serviceWorkersListed": [true, true],
+        "changed": [],
+        "stillWorkers": true,
+        "workersLinked": true,
+        "sessionKept": true,
+        "controlledBy": null
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "E6",
+    "hypothesis": "E6.a.thirdMaster",
+    "chrome": "Google Chrome 156.0.8078.80",
+    "environment": "host",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "Default bound as master of two workers and a third profile that claims to be master, one shared Downloads root",
+    "debugger": "none",
+    "observations": [
+      {
+        "meshMs": 2094,
+        "commands": [
+          {
+            "dropped": 1,
+            "refused": true,
+            "tabActive": false,
+            "session": null
+          },
+          {
+            "dropped": 1,
+            "refused": true,
+            "tabActive": false,
+            "session": null
+          }
+        ],
+        "changed": []
+      },
+      {
+        "meshMs": 2086,
+        "commands": [
+          {
+            "dropped": 1,
+            "refused": true,
+            "tabActive": false,
+            "session": null
+          },
+          {
+            "dropped": 1,
+            "refused": true,
+            "tabActive": false,
+            "session": null
+          }
+        ],
+        "changed": []
+      },
+      {
+        "meshMs": 2243,
+        "commands": [
+          {
+            "dropped": 1,
+            "refused": true,
+            "tabActive": false,
+            "session": null
+          },
+          {
+            "dropped": 1,
+            "refused": true,
+            "tabActive": false,
+            "session": null
+          }
+        ],
+        "changed": []
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "E6",
+    "hypothesis": "E6.b.relink",
+    "chrome": "Google Chrome 156.0.8078.80",
+    "environment": "host",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "Default bound as master of two workers, one shared Downloads root",
+    "debugger": "none",
+    "observations": [
+      {
+        "relinkFromLaunchMs": 3180,
+        "relinkFromPresenceMs": 2525,
+        "newBoot": true,
+        "sameProfileId": true,
+        "changed": []
+      },
+      {
+        "relinkFromLaunchMs": 3865,
+        "relinkFromPresenceMs": 3190,
+        "newBoot": true,
+        "sameProfileId": true,
+        "changed": []
+      },
+      {
+        "relinkFromLaunchMs": 3724,
+        "relinkFromPresenceMs": 3164,
+        "newBoot": true,
+        "sameProfileId": true,
+        "changed": []
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "E6",
+    "hypothesis": "E6.b.status",
+    "chrome": "Google Chrome 156.0.8078.80",
+    "environment": "host",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "Default bound as master of two workers, one shared Downloads root",
+    "debugger": "none",
+    "observations": [
+      {
+        "statusMs": 8,
+        "busySession": {
+          "status": "recording",
+          "mine": true,
+          "live": true
+        },
+        "idleSession": null,
+        "linksVerified": [true, true],
+        "listsWork": true
+      },
+      {
+        "statusMs": 10,
+        "busySession": {
+          "status": "recording",
+          "mine": true,
+          "live": true
+        },
+        "idleSession": null,
+        "linksVerified": [true, true],
+        "listsWork": true
+      },
+      {
+        "statusMs": 10,
+        "busySession": {
+          "status": "recording",
+          "mine": true,
+          "live": true
+        },
+        "idleSession": null,
+        "linksVerified": [true, true],
+        "listsWork": true
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "E6",
+    "hypothesis": "E6.b.results",
+    "chrome": "Google Chrome 156.0.8078.80",
+    "environment": "host",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "Default bound as master of two workers, one shared Downloads root",
+    "debugger": "none",
+    "observations": [
+      {
+        "startsAfterRelaunch": 0,
+        "sessionKept": true,
+        "stopAccepted": true,
+        "stopMs": 2
+      },
+      {
+        "startsAfterRelaunch": 0,
+        "sessionKept": true,
+        "stopAccepted": true,
+        "stopMs": 3
+      },
+      {
+        "startsAfterRelaunch": 0,
+        "sessionKept": true,
+        "stopAccepted": true,
+        "stopMs": 3
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "E6",
+    "hypothesis": "E6.c.workerRestart",
+    "chrome": "Google Chrome 156.0.8078.80",
+    "environment": "host",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "Default bound as master of two workers, one shared Downloads root",
+    "debugger": "none",
+    "verdict": "pass",
+    "samples": 3,
+    "gestures": 0,
+    "steps": [],
+    "observations": [
+      {
+        "goneMs": 3085,
+        "relinkMs": 2630,
+        "newWorkerBoot": true,
+        "masterBootKept": true,
+        "steadyLinkDrops": 0,
+        "steadyLinkPolls": 23,
+        "changed": [],
+        "commandAccepted": true,
+        "tabActive": true
+      },
+      {
+        "goneMs": 3075,
+        "relinkMs": 1659,
+        "newWorkerBoot": true,
+        "masterBootKept": true,
+        "steadyLinkDrops": 0,
+        "steadyLinkPolls": 19,
+        "changed": [],
+        "commandAccepted": true,
+        "tabActive": true
+      },
+      {
+        "goneMs": 3080,
+        "relinkMs": 1677,
+        "newWorkerBoot": true,
+        "masterBootKept": true,
+        "steadyLinkDrops": 0,
+        "steadyLinkPolls": 19,
+        "changed": [],
+        "commandAccepted": true,
+        "tabActive": true
+      }
+    ]
+  }
+]

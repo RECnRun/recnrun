@@ -9,7 +9,7 @@ import type { CatalogRun } from "../../experiments/fixtures/e4-launcher.ts";
 import { writeDownloadsPreference } from "../../host/fixtures/roots.ts";
 import { pairingSection } from "../../e2e/fixtures/profiles.ts";
 import type { Profile } from "../../e2e/fixtures/profiles.ts";
-import { connectWebSocket } from "./cdp-client.ts";
+import { type CdpClient, connectWebSocket } from "./cdp-client.ts";
 import { extensionPath, launchForUnpacked } from "./extension-loaders.ts";
 import type { LaunchedChrome } from "./chrome.ts";
 
@@ -111,24 +111,29 @@ const installed = (id: string) => {
 async function install(chrome: LaunchedChrome): Promise<void> {
   // connectOverCDP routes every download to its own folder; Chrome's own must take the writes.
   await chrome.cdp.send("Browser.setDownloadBehavior", { behavior: "default" });
-  const { id } = await chrome.cdp.send("Extensions.loadUnpacked", {
-    path: extensionPath("poc-d0"),
-  });
-  installed(id);
+  const path = extensionPath("poc-d0");
+  installed((await chrome.cdp.send("Extensions.loadUnpacked", { path })).id);
+}
+
+/** Gives Chrome its own download behavior back over a client of its own, then runs `then` on it. */
+async function overOwnClient(wsEndpoint: string, then?: (client: CdpClient) => Promise<void>) {
+  const client = await connectWebSocket(wsEndpoint);
+  try {
+    await client.send("Browser.setDownloadBehavior", { behavior: "default" });
+    await then?.(client);
+  } finally {
+    client.close();
+  }
 }
 
 /** Installs poc-d0 over a client of its own once Playwright let go, so no client meets its worker. */
 async function installUnattended(chrome: LaunchedChrome): Promise<void> {
   // Closed first: its connection keeps a worker running (group 12), and one it saw start then left stalled for a minute (E5).
   await chrome.browser.close();
-  const client = await connectWebSocket(chrome.wsEndpoint);
-  try {
-    await client.send("Browser.setDownloadBehavior", { behavior: "default" });
+  await overOwnClient(chrome.wsEndpoint, async (client) => {
     const path = extensionPath("poc-d0");
     installed((await client.send<{ id: string }>("Extensions.loadUnpacked", { path })).id);
-  } finally {
-    client.close();
-  }
+  });
 }
 
 /** Playwright's default context of `browser` and the poc-d0 worker in it. */
@@ -266,6 +271,8 @@ export async function createDownloadsGroup(platform: DownloadsPlatform): Promise
     attach: async (profile) => {
       const browser = await chromium.connectOverCDP(profile.chrome.wsEndpoint);
       browsers.set(profile, browser);
+      // The connection routes every download to Playwright's folder again, as at launch.
+      await overOwnClient(profile.chrome.wsEndpoint);
       Object.assign(profile, await connected(browser));
     },
     dispose: async () => {

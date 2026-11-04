@@ -14,7 +14,7 @@ import { within } from "./trust.ts";
  * Nothing here writes a profile's storage but bindHierarchy, which stands in for the launcher.
  */
 
-export const HIERARCHY_NAMES = ["Default", "Worker 1", "Worker 2"] as const;
+const HIERARCHY_NAMES = ["Default", "Worker 1", "Worker 2"] as const;
 const MESH_MS = 60_000;
 const DASHBOARD = `chrome-extension://${POC_EXTENSION_ID}/dashboard.html`;
 

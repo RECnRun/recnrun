@@ -1,0 +1,209 @@
+[
+  {
+    "experiment": "E6",
+    "hypothesis": "E6.a.absent",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "Default bound as master of two workers, one shared Downloads root",
+    "debugger": "none",
+    "observations": [
+      {
+        "goneMs": [2617, 2871],
+        "masterUnlistedMs": 57582,
+        "presenceWrites": [3, 3],
+        "longestPresenceGapMs": [30005, 30003],
+        "serviceWorkersListed": [true, true],
+        "changed": [],
+        "stillWorkers": true,
+        "workersLinked": true,
+        "sessionKept": true,
+        "controlledBy": null
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "mode": "smoke",
+    "verdict": "pass",
+    "samples": 1
+  },
+  {
+    "experiment": "E6",
+    "hypothesis": "E6.a.forgedMaster",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "Default bound as master of two workers and a virtual peer the test writes under the Default's id, one shared Downloads root",
+    "debugger": "none",
+    "observations": [
+      {
+        "refusedMs": [721, 983],
+        "linkedToForger": [false, false],
+        "forgerConnected": false,
+        "answersToForger": 0,
+        "offersToForger": 0,
+        "changed": [],
+        "relinkMs": 1886
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "mode": "smoke",
+    "verdict": "pass",
+    "samples": 1
+  },
+  {
+    "experiment": "E6",
+    "hypothesis": "E6.a.thirdMaster",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "Default bound as master of two workers and a third profile that claims to be master, one shared Downloads root",
+    "debugger": "none",
+    "observations": [
+      {
+        "meshMs": 3720,
+        "commands": [
+          {
+            "dropped": 1,
+            "refused": true,
+            "tabActive": false,
+            "session": null
+          },
+          {
+            "dropped": 1,
+            "refused": true,
+            "tabActive": false,
+            "session": null
+          }
+        ],
+        "changed": []
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "mode": "smoke",
+    "verdict": "pass",
+    "samples": 1
+  },
+  {
+    "experiment": "E6",
+    "hypothesis": "E6.b.relink",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "Default bound as master of two workers, one shared Downloads root",
+    "debugger": "none",
+    "observations": [
+      {
+        "relinkFromLaunchMs": 1287,
+        "relinkFromPresenceMs": 1042,
+        "newBoot": true,
+        "sameProfileId": true,
+        "changed": []
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "mode": "smoke",
+    "verdict": "pass",
+    "samples": 1
+  },
+  {
+    "experiment": "E6",
+    "hypothesis": "E6.b.status",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "Default bound as master of two workers, one shared Downloads root",
+    "debugger": "none",
+    "observations": [
+      {
+        "statusMs": 14,
+        "busySession": {
+          "status": "recording",
+          "mine": true,
+          "live": true
+        },
+        "idleSession": null,
+        "linksVerified": [true, true],
+        "listsWork": true
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "mode": "smoke",
+    "verdict": "pass",
+    "samples": 1
+  },
+  {
+    "experiment": "E6",
+    "hypothesis": "E6.b.results",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "Default bound as master of two workers, one shared Downloads root",
+    "debugger": "none",
+    "observations": [
+      {
+        "startsAfterRelaunch": 0,
+        "sessionKept": true,
+        "stopAccepted": true,
+        "stopMs": 3
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "mode": "smoke",
+    "verdict": "pass",
+    "samples": 1
+  },
+  {
+    "experiment": "E6",
+    "hypothesis": "E6.c.workerRestart",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "Default bound as master of two workers, one shared Downloads root",
+    "debugger": "none",
+    "verdict": "pass",
+    "samples": 1,
+    "gestures": 0,
+    "steps": [],
+    "observations": [
+      {
+        "goneMs": 2792,
+        "relinkMs": 2391,
+        "newWorkerBoot": true,
+        "masterBootKept": true,
+        "steadyLinkDrops": 0,
+        "steadyLinkPolls": 21,
+        "changed": [],
+        "commandAccepted": true,
+        "tabActive": true
+      }
+    ],
+    "mode": "smoke"
+  }
+]
