@@ -65,6 +65,9 @@ export function fakeOffscreen() {
   vi.spyOn(fakeBrowser.runtime, "getContexts").mockImplementation(answering(() => []));
   vi.spyOn(fakeBrowser.offscreen, "createDocument").mockResolvedValue(undefined);
   const answer = (message: unknown) => {
+    // The POC builds' presence asks the offscreen document for its certificate's fingerprint.
+    if ((message as { type?: string }).type === "POC_FINGERPRINT")
+      return { ok: true, result: { fingerprint: FINGERPRINT } };
     const { target, command } = message as { target?: string; command: LinkCommand };
     if (target !== "offscreen") {
       if (!link.pagesOpen) throw new Error("Receiving end does not exist.");

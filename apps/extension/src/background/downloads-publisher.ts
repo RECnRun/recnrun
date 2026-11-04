@@ -68,11 +68,11 @@ const PocDownloadMessageSchema = v.variant("type", [
 type PocDownloadMessage = v.InferOutput<typeof PocDownloadMessageSchema>;
 type ProbeMessage = Extract<PocDownloadMessage, { type: "POC_DOWNLOAD_PROBE" }>;
 
-const dataUrl = (content: string) =>
+export const dataUrl = (content: string) =>
   `data:application/json;charset=utf-8,${encodeURIComponent(content)}`;
 
 /** Resolves once the item leaves `in_progress`, or after `ms`, whichever comes first. */
-function settled(downloads: DownloadsPort, id: number, ms: number): Promise<void> {
+export function settled(downloads: DownloadsPort, id: number, ms: number): Promise<void> {
   return new Promise((resolve) => {
     const done = () => {
       clearTimeout(timer);

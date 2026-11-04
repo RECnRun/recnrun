@@ -102,9 +102,31 @@ test.each(["poc-d0", "poc-d1", "poc-d2"])(
   },
 );
 
+test.each(["poc-d0", "poc-d1", "poc-d2"])(
+  "starts the %s peers on Downloads silently: no dashboard on install, start-up, or a new window",
+  async (mode) => {
+    await startIn(mode);
+    expect(started.peers).toHaveBeenCalledWith({ transport: "downloads" });
+    const url = fakeBrowser.runtime.getURL("/dashboard.html");
+    const dashboards = async () =>
+      (await fakeBrowser.tabs.query({})).filter((each) => each.url === url);
+
+    await fakeBrowser.runtime.onInstalled.trigger({ reason: "install" });
+    await fakeBrowser.runtime.onStartup.trigger();
+    const window = await fakeBrowser.windows.create({});
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(await dashboards()).toEqual([]);
+
+    // The toolbar icon still opens it.
+    await fakeBrowser.action.onClicked.trigger({ windowId: window?.id, incognito: false } as never);
+    await vi.waitFor(async () => expect(await dashboards()).toHaveLength(1));
+  },
+);
+
 test("starts the mesh but no POC wiring in a test build", async () => {
   await startIn("test");
   expect(started.peers).toHaveBeenCalledTimes(1);
+  expect(started.peers).toHaveBeenCalledWith({ transport: "folder" });
   expect(started.publisher).not.toHaveBeenCalled();
   expect(started.relay).not.toHaveBeenCalled();
 });

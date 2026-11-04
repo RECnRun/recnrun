@@ -75,6 +75,15 @@ await test("the production build leaves out every POC-only permission and page",
   assert.doesNotMatch(String(background), /downloads\.download/);
 });
 
+await test("the production build leaves out the POC's Downloads presence", () => {
+  const output = new URL("../.output/chrome-mv3/", import.meta.url);
+  for (const file of readdirSync(output, { recursive: true, encoding: "utf8" })) {
+    if (!file.endsWith(".js") && !file.endsWith(".html")) continue;
+    const code = readFileSync(new URL(file, output), "utf8");
+    assert.doesNotMatch(code, /presence\.json|downloads-presence|POC_FINGERPRINT/, file);
+  }
+});
+
 await test("the production build leaves out the POC's file:// read", () => {
   const output = new URL("../.output/chrome-mv3/", import.meta.url);
   for (const file of readdirSync(output, { recursive: true, encoding: "utf8" })) {

@@ -24,6 +24,8 @@ function openDashboardOnDemand() {
   browser.action.onClicked.addListener(({ windowId, incognito }) => {
     void opener.show({ windowId, incognito });
   });
+  // A POC worker starts silently (source §9): only the toolbar icon opens its dashboard.
+  if (POC) return opener;
   // Chrome restores a profile's windows before the worker starts, so both look at what is open.
   browser.runtime.onInstalled.addListener(() => void opener.lead());
   browser.runtime.onStartup.addListener(() => void opener.lead());
@@ -40,7 +42,7 @@ export function startBackground(): void {
     extensionVersion: browser.runtime.getManifest().version,
     store: recordingSessionRepository,
     showDashboard: opener.show,
-    peers: PEERS ? startPeers() : undefined,
+    peers: PEERS ? startPeers({ transport: POC ? "downloads" : "folder" }) : undefined,
   });
   const identity = { extensionId: browser.runtime.id, extensionUrl: browser.runtime.getURL("/") };
   browser.runtime.onMessage.addListener(createBackgroundListener(routes, identity));

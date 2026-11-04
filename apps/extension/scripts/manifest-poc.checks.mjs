@@ -76,6 +76,11 @@ for (const mode of Object.keys(VARIANTS)) {
     assert.match(pageScript(mode, "dashboard.html"), /This profile controls no session in another/);
   });
 
+  await test(`${mode} announces the profile through Downloads as its worker starts (P2.2)`, () => {
+    assert.match(withChunks(mode, "background.js"), /presence\.json/);
+    assert.match(pageScript(mode, "offscreen.html"), /POC_FINGERPRINT/);
+  });
+
   await test(`${mode} has no content script that matches file:// (POC §4)`, () => {
     const matches = pocManifest(mode).content_scripts.flatMap((script) => script.matches);
     assert.ok(!matches.some((pattern) => /^(file|\*):/.test(pattern)), matches.join(", "));

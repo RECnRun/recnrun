@@ -33,6 +33,8 @@ import {
 } from "@/storage/peer-repository";
 import { recordingSessionRepository } from "@/storage/recording-session-repository";
 import { browserTabs } from "@/tabs/open-tabs";
+// Imported last, so the production bundle (which drops it) keeps its module order and bytes.
+import { startPocPresence } from "@/background/downloads-presence";
 
 const log = (entry: string) => console.debug("[RECnRun peer]", entry);
 const notifyPages = () => void browser.runtime.sendMessage(peerNotice()).catch(() => {});
@@ -303,11 +305,16 @@ function createPairingFlows(channel: PeerChannel): PairingFlows {
   return { folder, mesh };
 }
 
+export interface PeersOptions {
+  /** How this profile finds the others: the chosen folder, or the POC builds' Downloads. */
+  transport: "folder" | "downloads";
+}
+
 /**
  * The background's half of the cross-profile POC: pairing, the authorized channel, the executor
  * of the peer's commands, and the controller's copy of what the peer reports.
  */
-export function startPeers(): PeerRoutes {
+export function startPeers({ transport }: PeersOptions = { transport: "folder" }): PeerRoutes {
   const channel = createPeerChannel({
     askLink: tappedAskLink,
     identity: readIdentity,
@@ -328,6 +335,8 @@ export function startPeers(): PeerRoutes {
   // Chrome starts the worker with the browser only for a startup listener; starting resumes.
   browser.runtime.onStartup.addListener(() => {});
   void folder.resume().catch((error: unknown) => log(errorMessage(error)));
+  // Downloads needs no prior choice, so the profile announces itself as its worker starts.
+  if (transport === "downloads") startPocPresence(log);
   // Chrome ends the folder's grant with the last extension page, so the pages read it again.
   browser.tabs.onRemoved.addListener(notifyPages);
   const deps = requestDependencies(channel, tabs, flows);
