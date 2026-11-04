@@ -35,7 +35,7 @@ export function peerServices(): PeerServices {
       roles.controls(profileId, (await identityRepository.read())?.profileId ?? ""),
     watchControl: (onChange) => {
       const { role, workers } = roleStores();
-      const stores = [identityRepository, role, workers, peerPinsRepository];
+      const stores = [identityRepository, role, workers, peerPinsRepository()];
       const stops = stores.map((store) => store.watch(onChange));
       return () => {
         for (const stop of stops) stop();

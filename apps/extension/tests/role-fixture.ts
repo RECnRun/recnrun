@@ -15,7 +15,7 @@ export const FINGERPRINT = "AB:CD:EF";
 export const MASTER_KEY = await identityOf(MASTER);
 export const OTHER_KEY = await identityOf("other");
 
-export const pins = () => createPins(peerPinsRepository, () => NOW);
+export const pins = () => createPins(peerPinsRepository(), () => NOW);
 export const stores = roleStores();
 export const { role: roleRepository, workers: boundWorkersRepository } = stores;
 export const roles = () => createRoles({ ...stores, pins: pins(), now: () => NOW });

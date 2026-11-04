@@ -32,7 +32,7 @@ describe("pins on a new link", () => {
   test("the first link the handshake proved pins the key that signed its certificate", async () => {
     const { connect } = await peerBackground();
     await connect();
-    expect(await peerPinsRepository.get(PEER)).toEqual({
+    expect(await peerPinsRepository().get(PEER)).toEqual({
       fingerprint: FINGERPRINT,
       pinnedAt: expect.any(Number),
       source: "pairing-code",
@@ -45,36 +45,36 @@ describe("pins on a new link", () => {
     const { connect } = await peerBackground();
     await connect("00:11:22");
     await connect(null);
-    expect(await peerPinsRepository.all()).toEqual({});
+    expect(await peerPinsRepository().all()).toEqual({});
   });
 
   test("closes a link to the accepted certificate when another key is pinned", async () => {
     const { connect, link, log } = await peerBackground();
-    await peerPinsRepository.set(PEER, OTHER);
+    await peerPinsRepository().set(PEER, OTHER);
     await connect();
     expect(await peerLinksRepository.get(PEER)).toEqual(MISMATCH);
     expect(link.commands).toEqual([{ type: "close", peer: PEER }]);
     expect(link.sentTypes()).toEqual([]);
-    expect(await peerPinsRepository.get(PEER)).toEqual(OTHER);
+    expect(await peerPinsRepository().get(PEER)).toEqual(OTHER);
     expect(log).toHaveBeenCalledTimes(1);
   });
 
   test("a link to the pinned key's certificate is verified and leaves the pin as it was", async () => {
     const { connect } = await peerBackground();
     const pin: Pin = { ...OTHER, fingerprint: FINGERPRINT, identity: PEER_IDENTITY };
-    await peerPinsRepository.set(PEER, pin);
+    await peerPinsRepository().set(PEER, pin);
     await connect();
     expect(await peerLinksRepository.get(PEER)).toEqual({ state: "connected", verified: true });
-    expect(await peerPinsRepository.get(PEER)).toEqual(pin);
+    expect(await peerPinsRepository().get(PEER)).toEqual(pin);
   });
 
   test("a renewed certificate of the pinned key is verified, and the pin follows it", async () => {
     const { connect } = await peerBackground();
     const pin: Pin = { ...OTHER, identity: PEER_IDENTITY };
-    await peerPinsRepository.set(PEER, pin);
+    await peerPinsRepository().set(PEER, pin);
     await connect();
     expect(await peerLinksRepository.get(PEER)).toEqual({ state: "connected", verified: true });
-    expect(await peerPinsRepository.get(PEER)).toEqual({ ...pin, fingerprint: FINGERPRINT });
+    expect(await peerPinsRepository().get(PEER)).toEqual({ ...pin, fingerprint: FINGERPRINT });
   });
 });
 
@@ -98,11 +98,11 @@ describe("the HELLO statement", () => {
   ])("a HELLO signed for %s closes the link and keeps the pin", async (_, hello) => {
     const { connect, receive, link, log } = await peerBackground();
     await connect();
-    const pin = await peerPinsRepository.get(PEER);
+    const pin = await peerPinsRepository().get(PEER);
     await receive(fromPeer("HELLO", await hello()));
     expect(await peerLinksRepository.get(PEER)).toEqual(MISMATCH);
     expect(link.commands.at(-1)).toEqual({ type: "close", peer: PEER });
-    expect(await peerPinsRepository.get(PEER)).toEqual(pin);
+    expect(await peerPinsRepository().get(PEER)).toEqual(pin);
     expect(log).toHaveBeenCalledWith(
       "[RECnRun peer]",
       `closed the link to ${PEER}, whose HELLO no valid signature by its identity vouches for`,
@@ -143,7 +143,7 @@ describe("pins on a signal", () => {
   async function relayedOffer(code: string, pinned: Pin | null = { ...OTHER, identity: LOW_KEY }) {
     const background = await peerBackground();
     await folderPairingRepository.write({});
-    if (pinned) await peerPinsRepository.set(LOW, pinned);
+    if (pinned) await peerPinsRepository().set(LOW, pinned);
     await background.connect();
     const member = {
       profileId: LOW,
@@ -168,7 +168,7 @@ describe("pins on a signal", () => {
       ),
     );
     expect(lowCommands(background)).toEqual([]);
-    expect(await peerPinsRepository.get(LOW)).toEqual({ ...OTHER, identity: LOW_KEY });
+    expect(await peerPinsRepository().get(LOW)).toEqual({ ...OTHER, identity: LOW_KEY });
   });
 
   test("refuses a signal no valid signature vouches for, even from an unpinned peer", async () => {
@@ -181,7 +181,7 @@ describe("pins on a signal", () => {
       ),
     );
     expect(lowCommands(background)).toEqual([]);
-    expect(await peerPinsRepository.get(LOW)).toBeNull();
+    expect(await peerPinsRepository().get(LOW)).toBeNull();
   });
 
   test("answers a renewed certificate's signal the pinned key signed", async () => {

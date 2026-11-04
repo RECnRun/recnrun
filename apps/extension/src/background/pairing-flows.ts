@@ -64,7 +64,7 @@ export function createPairingFlows(
   sign: Sign,
 ): PairingFlows {
   const trust: Trust = {
-    pins: createPins(peerPinsRepository),
+    pins: createPins(peerPinsRepository()),
     source: transport === "downloads" ? "local-channel" : "pairing-code",
   };
   const pairing = createPairing({

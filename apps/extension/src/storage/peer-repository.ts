@@ -111,8 +111,9 @@ export type PeerRecords<T> = ReturnType<typeof peerRecords<T>>;
 
 export const identityRepository = repository("local:profileIdentity", ProfileIdentitySchema);
 export const authorizedPeersRepository = peerRecords("local:authorizedPeers", AuthorizedPeerSchema);
-// Local and apart from the authorized peers, so a pin outlives a restart and a Forget alike.
-export const peerPinsRepository = peerRecords("local:peerPins", PinSchema);
+let pins: PeerRecords<v.InferOutput<typeof PinSchema>> | undefined;
+// Local and apart from the authorized peers, so a pin outlives a restart and a Forget alike; made on first call so production drops it.
+export const peerPinsRepository = () => (pins ??= peerRecords("local:peerPins", PinSchema));
 // Local, so waiting in the folder survives a restart of the browser.
 export const folderPairingRepository = repository("local:folderPairing", FolderPairingSchema);
 // Session storage ends with the browser, as the link and anything it carried do.

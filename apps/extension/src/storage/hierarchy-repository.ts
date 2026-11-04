@@ -16,4 +16,4 @@ export const roleStores = () => (stores ??= create());
 
 /** This profile's recorded role, bound master or bound workers, and the pins that prove them. */
 export const storedRoles = () =>
-  createRoles({ ...roleStores(), pins: createPins(peerPinsRepository) });
+  createRoles({ ...roleStores(), pins: createPins(peerPinsRepository()) });

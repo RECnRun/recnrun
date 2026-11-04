@@ -62,7 +62,7 @@ const start = (author: string) => from("SESSION_START", author, { tabId: 7 });
 
 /** The first verified link to each peer pins its key, as pairing-flows does. */
 async function meet(...peers: string[]) {
-  const pins = createPins(peerPinsRepository);
+  const pins = createPins(peerPinsRepository());
   for (const peer of peers)
     await pins.pin(peer, { identity: key(peer), fingerprint: fp(peer) }, "pairing-code");
 }
@@ -294,7 +294,7 @@ describe("the controls a dashboard offers", () => {
     await masterOf(WORKER);
     const { role, workers: stored } = roleStores();
     const workers = { ...stored, get: () => Promise.reject(new Error("quota")) };
-    const roles = createRoles({ role, workers, pins: createPins(peerPinsRepository) });
+    const roles = createRoles({ role, workers, pins: createPins(peerPinsRepository()) });
     expect(await roles.controls(WORKER, ME)).toBe(false);
   });
 });

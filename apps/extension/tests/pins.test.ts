@@ -16,7 +16,7 @@ const SECOND = "12:34:56";
 const KEY = await identityOf(PEER);
 const FORGER = await identityOf("forger");
 
-const pins = () => createPins(peerPinsRepository, () => NOW);
+const pins = () => createPins(peerPinsRepository(), () => NOW);
 const proven = (fingerprint: string, identity = KEY) => ({ identity, fingerprint });
 
 beforeEach(() => {
@@ -29,7 +29,7 @@ describe("pin", () => {
     const pin = { fingerprint: FIRST, pinnedAt: NOW, source: "local-channel", identity: KEY };
     expect(outcome).toEqual({ ok: true, pin });
     expect(await pins().pinOf(PEER)).toEqual(pin);
-    expect(await peerPinsRepository.get(PEER)).toEqual(pin);
+    expect(await peerPinsRepository().get(PEER)).toEqual(pin);
   });
 
   test("refuses another identity and the first stands", async () => {
@@ -42,7 +42,10 @@ describe("pin", () => {
   });
 
   test("a renewed certificate of the pinned identity moves only the fingerprint", async () => {
-    const store = createPins(peerPinsRepository, vi.fn().mockReturnValueOnce(1).mockReturnValue(2));
+    const store = createPins(
+      peerPinsRepository(),
+      vi.fn().mockReturnValueOnce(1).mockReturnValue(2),
+    );
     await store.pin(PEER, proven(FIRST), "pairing-code");
     const renewed = await store.pin(PEER, proven(SECOND), "local-channel");
     const pin = { fingerprint: SECOND, pinnedAt: 1, source: "pairing-code", identity: KEY };
@@ -51,8 +54,8 @@ describe("pin", () => {
   });
 
   test("pinning the same identity and certificate again writes nothing", async () => {
-    const set = vi.fn(peerPinsRepository.set);
-    const store = createPins({ get: peerPinsRepository.get, set }, () => NOW);
+    const set = vi.fn(peerPinsRepository().set);
+    const store = createPins({ get: peerPinsRepository().get, set }, () => NOW);
     await store.pin(PEER, proven(FIRST), "local-channel");
     const again = await store.pin(PEER, proven(FIRST), "manual");
     const pin = { fingerprint: FIRST, pinnedAt: NOW, source: "local-channel", identity: KEY };
@@ -86,7 +89,7 @@ describe("pin", () => {
         ok: false,
         reason: "malformed",
       });
-    expect(await peerPinsRepository.all()).toEqual({});
+    expect(await peerPinsRepository().all()).toEqual({});
   });
 
   test("a store that fails is a refusal, never an exception", async () => {

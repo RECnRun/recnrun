@@ -138,7 +138,7 @@ describe("peerServices", () => {
     expect(await services.mayControl(ME)).toBe(false);
     await identityRepository.write({ profileId: ME, displayName: "Alice" });
     const proven = { identity: PEER_IDENTITY, fingerprint: FINGERPRINT };
-    await createPins(peerPinsRepository).pin(PEER, proven, "pairing-code");
+    await createPins(peerPinsRepository()).pin(PEER, proven, "pairing-code");
     const { role, workers } = roleStores();
     await role.write({ ...binding, masterProfileId: PEER, masterIdentity: PEER_IDENTITY });
     expect(await services.mayControl(ME)).toBe(true);

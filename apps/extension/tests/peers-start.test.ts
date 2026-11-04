@@ -170,7 +170,7 @@ describe("startPeers", () => {
       state: "connected",
       remoteFingerprint: FINGERPRINT,
     });
-    expect(await peerPinsRepository.get(PEER)).toMatchObject({
+    expect(await peerPinsRepository().get(PEER)).toMatchObject({
       fingerprint: FINGERPRINT,
       source: "local-channel",
     });
