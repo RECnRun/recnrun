@@ -110,7 +110,7 @@ describe("startPeers", () => {
     vi.mocked(fakeBrowser.downloads.search).mockImplementation(
       answering(() => [{ id: 1, filename: renamed, state: "complete" }]),
     );
-    startPeers({ transport: "downloads", sign: signAs });
+    const peers = startPeers({ transport: "downloads", sign: signAs });
     await vi.waitFor(() =>
       expect(log).toHaveBeenCalledWith(
         "[RECnRun peer]",
@@ -120,6 +120,9 @@ describe("startPeers", () => {
     expect(written).toHaveLength(1);
     expect(link.commands).toEqual([]);
     expect(await folderPairingRepository.read()).toBeNull();
+    expect(await peers.request({ type: "status" })).toMatchObject({
+      rendezvous: { kind: "downloads", available: false },
+    });
   });
 
   test("the Downloads variant keeps the profiles the user disconnected when it starts pairing", async () => {
@@ -171,7 +174,9 @@ describe("startPeers", () => {
       source: "local-channel",
     });
   });
+});
 
+describe("the presence startPeers writes", () => {
   test("keeps one boot per browser session, learns the root, and joins the stored namespace", async () => {
     const { written } = await background();
     await fakeBrowser.storage.local.set({ pocNamespace: "e4-common" });
@@ -225,5 +230,18 @@ describe("startPeers", () => {
       );
     });
     expect(written).toEqual([]);
+  });
+});
+
+describe("the transport a page sees", () => {
+  test("the Downloads variant tells its pages it pairs through Downloads once Chrome reported the root", async () => {
+    await background();
+    const peers = startPeers({ transport: "downloads", sign: signAs });
+    await vi.waitFor(async () =>
+      expect(await peers.request({ type: "status" })).toMatchObject({
+        folder: "none",
+        rendezvous: { kind: "downloads", available: true },
+      }),
+    );
   });
 });

@@ -226,12 +226,10 @@ function watchExecutor(channel: PeerChannel, executor: ExecutorDependencies) {
 
 const FolderStatusSchema = v.object({ access: FolderAccessSchema });
 
-function requestDependencies({
-  channel,
-  tabs,
-  flows,
-  sign,
-}: Omit<LinkContext, "executor">): PeerRequestDependencies {
+function requestDependencies(
+  { channel, tabs, flows, sign }: Omit<LinkContext, "executor">,
+  downloadsAvailable?: () => Promise<boolean>,
+): PeerRequestDependencies {
   const { folder, mesh } = flows;
   // Reconnect also asks the peers linked already, which need no folder.
   const viaMesh = () => mesh.look("all");
@@ -257,6 +255,7 @@ function requestDependencies({
       unpause: (peer) => folder.unpause(peer).then(viaMesh).then(notifyPages),
       unpauseAll: () => folder.unpauseAll().then(viaMesh).then(notifyPages),
       release: closeOffscreen,
+      ...(downloadsAvailable && { downloadsAvailable }),
     },
   };
 }
@@ -296,11 +295,13 @@ export function startPeers(
   browser.runtime.onStartup.addListener(() => {});
   void folder.resume().catch((error: unknown) => log(errorMessage(error)));
   // Downloads needs no prior choice: the profile announces itself as its worker starts, then pairs.
-  if (transport === "downloads")
-    startPocPresence({ log, sign, startPairing: () => folder.start().then(notifyPages) });
+  const downloads =
+    transport === "downloads"
+      ? startPocPresence({ log, sign, startPairing: () => folder.start().then(notifyPages) })
+      : undefined;
   // Chrome ends the folder's grant with the last extension page, so the pages read it again.
   browser.tabs.onRemoved.addListener(notifyPages);
-  const deps = requestDependencies({ channel, tabs, flows, sign });
+  const deps = requestDependencies({ channel, tabs, flows, sign }, downloads?.available);
   return {
     request: (request) => handlePeerRequest(deps, request),
     link: createLinkHandler({ channel, executor, tabs, flows, sign }),

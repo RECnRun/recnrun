@@ -195,9 +195,11 @@ interface PocPresenceOptions {
 /**
  * The presence over Chrome's own Downloads, this profile's identity, and session storage; each
  * presence written once the root is known calls `startPairing`, the folder flow's start.
+ * `available` tells whether Chrome reported the root yet.
  */
 export function startPocPresence({ log, sign, startPairing }: PocPresenceOptions) {
   const store = pocPresenceStore();
+  const available = async () => (await store.root.read()) !== null;
   const deps: PresenceDependencies = {
     downloads: browser.downloads,
     identity: readIdentity,
@@ -210,7 +212,7 @@ export function startPocPresence({ log, sign, startPairing }: PocPresenceOptions
     // Undefined in a build without the alarms permission.
     alarms: (browser as { alarms?: AlarmsPort }).alarms,
     published: createDownloadsPairing({
-      available: async () => (await store.root.read()) !== null,
+      available,
       start: startPairing,
       log,
     }),
@@ -226,5 +228,5 @@ export function startPocPresence({ log, sign, startPairing }: PocPresenceOptions
     root: () => store.root.read(),
   };
   browser.runtime.onMessage.addListener(createRendezvousRelay(relay, own));
-  return presence;
+  return { ...presence, available };
 }

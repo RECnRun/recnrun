@@ -14,6 +14,7 @@ describe("the status", () => {
       paused: [],
       folder: "granted",
       folderPairing: false,
+      rendezvous: { kind: "folder", available: true },
     });
     await deps.link.set(PEER, VERIFIED);
     expect(await handlePeerRequest(deps, { type: "status" })).toMatchObject({
@@ -76,6 +77,27 @@ describe("the status", () => {
     expect(await handlePeerRequest(deps, { type: "status" })).toMatchObject({ folder: "none" });
     await handlePeerRequest(deps, { type: "folder-pair" });
     expect(deps.folder.start).toHaveBeenCalledOnce();
+  });
+
+  test("reports the transport: the folder available once granted, Downloads once its root is known", async () => {
+    const { deps } = requests();
+    deps.folder.access.mockResolvedValue("prompt");
+    expect(await handlePeerRequest(deps, { type: "status" })).toMatchObject({
+      rendezvous: { kind: "folder", available: false },
+    });
+    let known = false;
+    const downloads = {
+      ...deps,
+      folder: { ...deps.folder, downloadsAvailable: async () => known },
+    };
+    expect(await handlePeerRequest(downloads, { type: "status" })).toMatchObject({
+      folder: "prompt",
+      rendezvous: { kind: "downloads", available: false },
+    });
+    known = true;
+    expect(await handlePeerRequest(downloads, { type: "status" })).toMatchObject({
+      rendezvous: { kind: "downloads", available: true },
+    });
   });
 });
 

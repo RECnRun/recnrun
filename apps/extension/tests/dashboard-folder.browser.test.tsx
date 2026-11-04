@@ -4,7 +4,14 @@ import { FolderBanner, PairingSection } from "@/dashboard/FolderPairing";
 import type { PeerStatus } from "@/messaging/peer-results";
 import type { PeerServices } from "@/views/remote-peer";
 import { memoryRecordingStore } from "./fake-extension";
-import { BOB_ID, closedFor, fakePeerClient, pausedBob, statusOf } from "./fake-peer-client";
+import {
+  BOB_ID,
+  closedFor,
+  fakePeerClient,
+  overDownloads,
+  pausedBob,
+  statusOf,
+} from "./fake-peer-client";
 import { fakeTabs } from "./fake-tabs";
 import { alertText } from "./dashboard-page";
 import { button, field, type } from "./queries";
@@ -94,6 +101,24 @@ test("a linked profile without the folder lets another profile join, from the pa
   expect(button(root, "Let another profile join")).toBeUndefined();
   show({ ...statusOf(), folder: "prompt" });
   expect(button(root, "Let another profile join")).toBeUndefined();
+});
+
+test("over Downloads, a forgotten profile pairs again, and the folder's own controls never show", async () => {
+  const { peer, root, show } = mount(overDownloads(pausedBob(statusOf())));
+  expect(banner(root)).toBeUndefined();
+  expect(button(root, "Choose folder")).toBeUndefined();
+  button(root, "Pair with other profiles")?.click();
+  await expect.poll(() => peer.asked("pair-again")).toEqual([{ type: "pair-again" }]);
+  // Linked over Downloads, a newcomer needs no grant to join.
+  show(overDownloads(statusOf("connected")));
+  expect(banner(root)).toBeUndefined();
+  expect(button(root, "Let another profile join")).toBeUndefined();
+  show(overDownloads(statusOf()));
+  expect(banner(root)).toBeUndefined();
+  // Until Chrome reported the Downloads root, there is nothing to pair through.
+  show(overDownloads(pausedBob(statusOf()), false));
+  expect(button(root, "Pair with other profiles")).toBeUndefined();
+  expect(banner(root)).toBeUndefined();
 });
 
 test("an unpaired profile pairs from the dashboard, then waits in the folder", async () => {

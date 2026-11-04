@@ -16,6 +16,7 @@ const connected: PeerView = {
   paused: false,
   folder: "granted",
   folderPairing: false,
+  rendezvous: { kind: "folder", available: true },
 };
 const DESK = connected.peer.profileId;
 const STUDIO = "33333333-3333-4333-8333-333333333333";

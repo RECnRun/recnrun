@@ -1,5 +1,6 @@
 import type { PeerChannel } from "@/background/peer-channel";
 import type { LinkCommand, PeerRequest } from "@/messaging/peer-messages";
+import type { RendezvousStatus } from "@/messaging/peer-results";
 import type { FolderAccess } from "@/p2p/folder-store";
 import type { PeerMessage, PeerPayload, PeerType, SharedTabs } from "@/p2p/protocol";
 import type { RecordingStore } from "@/ports/recording-store";
@@ -39,6 +40,8 @@ export interface PeerRequestDependencies {
     unpauseAll: () => Promise<void>;
     /** Drops every handle to the folder, so Chrome may offer to keep it on every visit. */
     release: () => Promise<void>;
+    /** Whether the POC builds' Downloads root is known; absent where the folder carries pairing. */
+    downloadsAvailable?: () => Promise<boolean>;
   };
 }
 
@@ -102,6 +105,13 @@ async function entry(deps: Deps, peer: AuthorizedPeer) {
   return { peer, link, peerSession: peerSession(mirror, link) };
 }
 
+/** The transport pairing goes through, and whether it can work now. */
+async function rendezvousOf(deps: Deps, folder: FolderAccess): Promise<RendezvousStatus> {
+  const { downloadsAvailable } = deps.folder;
+  if (!downloadsAvailable) return { kind: "folder", available: folder === "granted" };
+  return { kind: "downloads", available: await downloadsAvailable() };
+}
+
 async function status(deps: Deps) {
   const [identity, authorized, controller, local, paused] = await Promise.all([
     deps.identity(),
@@ -119,7 +129,8 @@ async function status(deps: Deps) {
   // A folder the offscreen document cannot read is one the user has to choose again.
   const folder = await deps.folder.access().catch((): FolderAccess => "none");
   const folderPairing = await deps.folder.waiting();
-  return { identity, peers, controlledBy, paused, folder, folderPairing };
+  const rendezvous = await rendezvousOf(deps, folder);
+  return { identity, peers, controlledBy, paused, folder, folderPairing, rendezvous };
 }
 
 /** Tells a verified peer the close is intended, so it does not report a failure, then closes. */

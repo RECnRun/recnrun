@@ -41,6 +41,14 @@ const PeerSessionSchema = v.strictObject({
 /** Whether this profile may use the RECnRun folder: none chosen, Chrome asks again, or granted. */
 export const FolderAccessSchema = v.picklist(["none", "prompt", "granted"]);
 
+/** How this profile meets the others, and whether it can now: the folder granted, or the Downloads root learned. */
+const RendezvousStatusSchema = v.strictObject({
+  kind: v.picklist(["folder", "downloads"]),
+  available: v.boolean(),
+});
+
+export type RendezvousStatus = v.InferOutput<typeof RendezvousStatusSchema>;
+
 /** One paired profile, its link, and its session as this profile knows them. */
 const PeerEntrySchema = v.object({
   peer: AuthorizedPeerSchema,
@@ -61,6 +69,8 @@ export const PeerStatusSchema = v.object({
   folder: FolderAccessSchema,
   /** Whether this profile waits in the folder to pair, or to reconnect with its peers. */
   folderPairing: v.boolean(),
+  /** The transport the background pairs through, so a page shows only the controls it has. */
+  rendezvous: RendezvousStatusSchema,
   /** The profiles in the folder, as this one last looked, that it has no link with nor paused. */
 });
 

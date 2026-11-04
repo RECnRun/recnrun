@@ -50,9 +50,17 @@ function GrantButton({
   );
 }
 
+/** Whether pairing goes through the folder, whose grant only a click in a page gives. */
+const folderOnly = (status: PeerStatus) => status.rendezvous.kind === "folder";
+
+/** Whether pairing can go on now: the folder granted, or the Downloads root known. */
+const ready = (status: PeerStatus) =>
+  folderOnly(status) ? status.folder === "granted" : status.rendezvous.available;
+
 /** Asks for the folder in the dashboard, which holds Chrome's grant while it is open. */
 export function FolderBanner({ peers, status }: FolderPairingProps) {
-  if (!status || status.folder === "granted" || anyLinked(status)) return null;
+  if (!status || !folderOnly(status) || status.folder === "granted" || anyLinked(status))
+    return null;
   const again = status.folder === "prompt";
   return (
     <section class="folder-banner" aria-labelledby="folder-banner-heading">
@@ -74,9 +82,9 @@ interface FolderStep {
   pair?: { label: string; request: PeerRequest };
 }
 
-/** What the dashboard shows about the folder: a wait, or the one click pairing needs. */
+/** What the dashboard shows about the rendezvous: a wait, or the one click pairing needs. */
 function folderStep(status: PeerStatus | undefined): FolderStep {
-  if (status?.folder !== "granted") return {};
+  if (!status || !ready(status)) return {};
   if (status.paused.length > 0) {
     return { pair: { label: "Pair with other profiles", request: { type: "pair-again" } } };
   }
@@ -144,11 +152,12 @@ function PeerLine({ view, ask, busy }: { view: PeerView; ask: Ask; busy: boolean
 
 /** Linked, the banner stays hidden, yet a newcomer pairs only while this profile holds the folder. */
 function JoinButton({ peers, status }: FolderPairingProps) {
-  if (status?.folder === "granted" || !anyLinked(status)) return null;
+  if (!status || !folderOnly(status) || status.folder === "granted" || !anyLinked(status))
+    return null;
   return (
     <GrantButton
       peers={peers}
-      again={status?.folder === "prompt"}
+      again={status.folder === "prompt"}
       label="Let another profile join"
     />
   );

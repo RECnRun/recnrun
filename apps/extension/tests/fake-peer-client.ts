@@ -27,8 +27,16 @@ export function statusOf(state?: Link["state"], verified = state === "connected"
     paused: [],
     folder: "granted",
     folderPairing: false,
+    rendezvous: { kind: "folder", available: true },
   };
 }
+
+/** `status` as a POC build reports it: pairing through Downloads, whose root is known unless `available` is false. */
+export const overDownloads = (status: PeerStatus, available = true): PeerStatus => ({
+  ...status,
+  folder: "none",
+  rendezvous: { kind: "downloads", available },
+});
 
 /** Changes Bob's entry in `status`. */
 const withBob = (status: PeerStatus, change: (bob: PeerEntry) => PeerEntry): PeerStatus => ({
