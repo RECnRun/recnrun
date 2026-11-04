@@ -10,6 +10,7 @@ import {
   tempPlatform,
   waitForMesh,
 } from "./downloads-profiles.ts";
+import { readOrAbsent } from "./absence.ts";
 import type { DownloadsGroup, DownloadsProfile } from "./downloads-profiles.ts";
 
 /*
@@ -74,7 +75,7 @@ export async function pinOf(profile: DownloadsProfile, peer: DownloadsProfile) {
 export async function within<T>(read: () => Promise<T | undefined>, ms: number) {
   const deadline = Date.now() + ms;
   for (;;) {
-    const value = await read().catch(() => undefined);
+    const value = await readOrAbsent(read);
     if (value !== undefined || Date.now() > deadline) return value;
     await delay(POLL_MS);
   }

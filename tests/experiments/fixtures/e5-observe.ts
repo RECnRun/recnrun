@@ -1,6 +1,7 @@
 import { readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
+import { readOrAbsent } from "../../browser/fixtures/absence.ts";
 import { connectWebSocket } from "../../browser/fixtures/cdp-client.ts";
 import { POC_EXTENSION_ID, storedIn } from "../../browser/fixtures/downloads-profiles.ts";
 import type { DownloadsProfile } from "../../browser/fixtures/downloads-profiles.ts";
@@ -15,7 +16,7 @@ import type { StampedSignal } from "./e5-virtual.ts";
 
 const SAMPLE_MS = 25;
 
-/** Polls `read` until it gives a value or `ms` pass: the value and when it came, or undefined. */
+/** Polls `read` until it gives a value or `ms` pass: the value and when it came, or undefined; only absence is retried. */
 export async function within<T>(
   read: () => Promise<T | undefined>,
   ms: number,
@@ -23,7 +24,7 @@ export async function within<T>(
 ): Promise<{ value: T; at: number } | undefined> {
   const deadline = Date.now() + ms;
   for (;;) {
-    const value = await read().catch(() => undefined);
+    const value = await readOrAbsent(read);
     if (value !== undefined) return { value, at: Date.now() };
     if (Date.now() > deadline) return undefined;
     await delay(every);

@@ -9,6 +9,8 @@ import type { CatalogRun } from "../../experiments/fixtures/e4-launcher.ts";
 import { writeDownloadsPreference } from "../../host/fixtures/roots.ts";
 import { pairingSection } from "../../e2e/fixtures/profiles.ts";
 import type { Profile } from "../../e2e/fixtures/profiles.ts";
+import { readOrAbsent } from "./absence.ts";
+import { loop } from "./catalog-loop.ts";
 import { type CdpClient, connectWebSocket } from "./cdp-client.ts";
 import { extensionPath, launchForUnpacked } from "./extension-loaders.ts";
 import type { LaunchedChrome } from "./chrome.ts";
@@ -95,7 +97,7 @@ export const storedIn = (worker: Worker, area: "local" | "session", key: string)
 async function until<T>(read: () => Promise<T | undefined>, what: string, ms = READY_MS) {
   const deadline = Date.now() + ms;
   for (;;) {
-    const value = await read().catch(() => undefined);
+    const value = await readOrAbsent(read);
     if (value !== undefined) return value;
     if (Date.now() > deadline) throw new Error(`${what} within ${ms} ms`);
     await delay(POLL_MS);
@@ -164,23 +166,6 @@ async function exited(chrome: LaunchedChrome): Promise<void> {
     async () => (chrome.exited() ? true : undefined),
     `Chrome ${chrome.pid} did not exit`,
   );
-}
-
-/** A loop of `run` every `everyMs`; the stop ends it and rethrows the first failure. */
-function loop(run: () => Promise<unknown>, everyMs: number): () => Promise<void> {
-  const abort = new AbortController();
-  let failure: unknown;
-  const done = (async () => {
-    while (!abort.signal.aborted) {
-      await run().catch((error: unknown) => (failure ??= error));
-      await delay(everyMs, undefined, { signal: abort.signal }).catch(() => undefined);
-    }
-  })();
-  return async () => {
-    abort.abort();
-    await done;
-    if (failure !== undefined) throw failure;
-  };
 }
 
 /** A group over `platform`: what it launched is stopped, and what it made removed, on dispose. */
@@ -276,10 +261,14 @@ export async function createDownloadsGroup(platform: DownloadsPlatform): Promise
       Object.assign(profile, await connected(browser));
     },
     dispose: async () => {
-      for (const stop of loops) await stop().catch(() => undefined);
+      const stops = loops.splice(0);
+      const failures: unknown[] = [];
+      for (const stop of stops) await stop().catch((error: unknown) => failures.push(error));
       for (const profile of profiles) await quit(profile).catch(() => undefined);
-      for (const path of folders.reverse()) await platform.removeFolder(path);
+      for (const path of folders.splice(0).reverse()) await platform.removeFolder(path);
       await platform.cleanup?.();
+      // A failed catalog run is a harness error: the sample measured nothing (outcome.ts).
+      if (failures.length > 0) throw failures[0];
     },
   };
 }
