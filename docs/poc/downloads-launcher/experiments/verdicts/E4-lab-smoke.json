@@ -20,7 +20,7 @@
             },
             "bootstrapTabs": 1,
             "scanned": ["<default Downloads>"],
-            "foundIn": "<default Downloads>",
+            "foundIn": ["<default Downloads>"],
             "ownRoot": "<default Downloads>"
           },
           "B": {
@@ -30,7 +30,7 @@
             },
             "bootstrapTabs": 1,
             "scanned": ["<default Downloads>"],
-            "foundIn": "<default Downloads>",
+            "foundIn": ["<default Downloads>"],
             "ownRoot": "<default Downloads>"
           }
         },
@@ -43,8 +43,8 @@
             "stderr": "",
             "listed": ["A", "B"],
             "roots": {
-              "A": "r1",
-              "B": "r1"
+              "B": "r1",
+              "A": "r1"
             }
           }
         },
@@ -87,7 +87,7 @@
             },
             "bootstrapTabs": 1,
             "scanned": ["<default Downloads>", "<launcher folder>"],
-            "foundIn": "<default Downloads>",
+            "foundIn": ["<default Downloads>"],
             "ownRoot": "<default Downloads>"
           },
           "B": {
@@ -97,7 +97,7 @@
             },
             "bootstrapTabs": 1,
             "scanned": ["<default Downloads>", "<launcher folder>"],
-            "foundIn": "<launcher folder>",
+            "foundIn": ["<launcher folder>"],
             "ownRoot": "<launcher folder>"
           }
         },
@@ -164,7 +164,7 @@
             },
             "bootstrapTabs": 1,
             "scanned": ["<default Downloads>"],
-            "foundIn": "<default Downloads>",
+            "foundIn": ["<default Downloads>"],
             "ownRoot": "<default Downloads>"
           },
           "B": {
@@ -174,7 +174,7 @@
             },
             "bootstrapTabs": 1,
             "scanned": ["<default Downloads>"],
-            "foundIn": null,
+            "foundIn": [],
             "ownRoot": "<custom folder>"
           }
         },
@@ -206,8 +206,8 @@
           "stderr": "",
           "listed": ["A", "B"],
           "roots": {
-            "B": "r1",
-            "A": "r1"
+            "A": "r1",
+            "B": "r1"
           }
         },
         "afterExpiry": {
@@ -221,7 +221,8 @@
         "readByA": {
           "reason": "fresh",
           "listed": ["A"]
-        }
+        },
+        "expiry": "forced"
       }
     ],
     "gestures": 0,

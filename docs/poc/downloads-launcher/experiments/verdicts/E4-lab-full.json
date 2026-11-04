@@ -20,7 +20,7 @@
             },
             "bootstrapTabs": 1,
             "scanned": ["<default Downloads>"],
-            "foundIn": "<default Downloads>",
+            "foundIn": ["<default Downloads>"],
             "ownRoot": "<default Downloads>"
           },
           "B": {
@@ -30,7 +30,55 @@
             },
             "bootstrapTabs": 1,
             "scanned": ["<default Downloads>"],
-            "foundIn": "<default Downloads>",
+            "foundIn": ["<default Downloads>"],
+            "ownRoot": "<default Downloads>"
+          }
+        },
+        "rootIds": {
+          "<default Downloads>": "r1"
+        },
+        "catalog": {
+          "<default Downloads>": {
+            "code": 0,
+            "stderr": "",
+            "listed": ["A", "B"],
+            "roots": {
+              "A": "r1",
+              "B": "r1"
+            }
+          }
+        },
+        "reads": {
+          "A": {
+            "reason": "fresh",
+            "listed": ["A", "B"]
+          },
+          "B": {
+            "reason": "fresh",
+            "listed": ["A", "B"]
+          }
+        }
+      },
+      {
+        "discovery": {
+          "A": {
+            "opened": {
+              "code": 0,
+              "stopped": false
+            },
+            "bootstrapTabs": 1,
+            "scanned": ["<default Downloads>"],
+            "foundIn": ["<default Downloads>"],
+            "ownRoot": "<default Downloads>"
+          },
+          "B": {
+            "opened": {
+              "code": 0,
+              "stopped": false
+            },
+            "bootstrapTabs": 1,
+            "scanned": ["<default Downloads>"],
+            "foundIn": ["<default Downloads>"],
             "ownRoot": "<default Downloads>"
           }
         },
@@ -68,7 +116,7 @@
             },
             "bootstrapTabs": 1,
             "scanned": ["<default Downloads>"],
-            "foundIn": "<default Downloads>",
+            "foundIn": ["<default Downloads>"],
             "ownRoot": "<default Downloads>"
           },
           "B": {
@@ -78,55 +126,7 @@
             },
             "bootstrapTabs": 1,
             "scanned": ["<default Downloads>"],
-            "foundIn": "<default Downloads>",
-            "ownRoot": "<default Downloads>"
-          }
-        },
-        "rootIds": {
-          "<default Downloads>": "r1"
-        },
-        "catalog": {
-          "<default Downloads>": {
-            "code": 0,
-            "stderr": "",
-            "listed": ["A", "B"],
-            "roots": {
-              "B": "r1",
-              "A": "r1"
-            }
-          }
-        },
-        "reads": {
-          "A": {
-            "reason": "fresh",
-            "listed": ["A", "B"]
-          },
-          "B": {
-            "reason": "fresh",
-            "listed": ["A", "B"]
-          }
-        }
-      },
-      {
-        "discovery": {
-          "A": {
-            "opened": {
-              "code": 0,
-              "stopped": false
-            },
-            "bootstrapTabs": 1,
-            "scanned": ["<default Downloads>"],
-            "foundIn": "<default Downloads>",
-            "ownRoot": "<default Downloads>"
-          },
-          "B": {
-            "opened": {
-              "code": 0,
-              "stopped": false
-            },
-            "bootstrapTabs": 1,
-            "scanned": ["<default Downloads>"],
-            "foundIn": "<default Downloads>",
+            "foundIn": ["<default Downloads>"],
             "ownRoot": "<default Downloads>"
           }
         },
@@ -182,7 +182,7 @@
             },
             "bootstrapTabs": 1,
             "scanned": ["<default Downloads>", "<launcher folder>"],
-            "foundIn": "<default Downloads>",
+            "foundIn": ["<default Downloads>"],
             "ownRoot": "<default Downloads>"
           },
           "B": {
@@ -192,7 +192,7 @@
             },
             "bootstrapTabs": 1,
             "scanned": ["<default Downloads>", "<launcher folder>"],
-            "foundIn": "<launcher folder>",
+            "foundIn": ["<launcher folder>"],
             "ownRoot": "<launcher folder>"
           }
         },
@@ -240,7 +240,7 @@
             },
             "bootstrapTabs": 1,
             "scanned": ["<default Downloads>", "<launcher folder>"],
-            "foundIn": "<default Downloads>",
+            "foundIn": ["<default Downloads>"],
             "ownRoot": "<default Downloads>"
           },
           "B": {
@@ -250,7 +250,7 @@
             },
             "bootstrapTabs": 1,
             "scanned": ["<default Downloads>", "<launcher folder>"],
-            "foundIn": "<launcher folder>",
+            "foundIn": ["<launcher folder>"],
             "ownRoot": "<launcher folder>"
           }
         },
@@ -298,7 +298,7 @@
             },
             "bootstrapTabs": 1,
             "scanned": ["<default Downloads>", "<launcher folder>"],
-            "foundIn": "<default Downloads>",
+            "foundIn": ["<default Downloads>"],
             "ownRoot": "<default Downloads>"
           },
           "B": {
@@ -308,7 +308,7 @@
             },
             "bootstrapTabs": 1,
             "scanned": ["<default Downloads>", "<launcher folder>"],
-            "foundIn": "<launcher folder>",
+            "foundIn": ["<launcher folder>"],
             "ownRoot": "<launcher folder>"
           }
         },
@@ -374,7 +374,7 @@
             },
             "bootstrapTabs": 1,
             "scanned": ["<default Downloads>"],
-            "foundIn": "<default Downloads>",
+            "foundIn": ["<default Downloads>"],
             "ownRoot": "<default Downloads>"
           },
           "B": {
@@ -384,7 +384,7 @@
             },
             "bootstrapTabs": 1,
             "scanned": ["<default Downloads>"],
-            "foundIn": null,
+            "foundIn": [],
             "ownRoot": "<custom folder>"
           }
         },
@@ -399,7 +399,7 @@
             },
             "bootstrapTabs": 1,
             "scanned": ["<default Downloads>"],
-            "foundIn": "<default Downloads>",
+            "foundIn": ["<default Downloads>"],
             "ownRoot": "<default Downloads>"
           },
           "B": {
@@ -409,7 +409,7 @@
             },
             "bootstrapTabs": 1,
             "scanned": ["<default Downloads>"],
-            "foundIn": null,
+            "foundIn": [],
             "ownRoot": "<custom folder>"
           }
         },
@@ -424,7 +424,7 @@
             },
             "bootstrapTabs": 1,
             "scanned": ["<default Downloads>"],
-            "foundIn": "<default Downloads>",
+            "foundIn": ["<default Downloads>"],
             "ownRoot": "<default Downloads>"
           },
           "B": {
@@ -434,7 +434,7 @@
             },
             "bootstrapTabs": 1,
             "scanned": ["<default Downloads>"],
-            "foundIn": null,
+            "foundIn": [],
             "ownRoot": "<custom folder>"
           }
         },
@@ -480,30 +480,8 @@
         "readByA": {
           "reason": "fresh",
           "listed": ["A"]
-        }
-      },
-      {
-        "afterQuit": {
-          "code": 0,
-          "stderr": "",
-          "listed": ["A", "B"],
-          "roots": {
-            "A": "r1",
-            "B": "r1"
-          }
         },
-        "afterExpiry": {
-          "code": 0,
-          "stderr": "catalog.sh: skipped r1/B: expired",
-          "listed": ["A"],
-          "roots": {
-            "A": "r1"
-          }
-        },
-        "readByA": {
-          "reason": "fresh",
-          "listed": ["A"]
-        }
+        "expiry": "forced"
       },
       {
         "afterQuit": {
@@ -526,7 +504,32 @@
         "readByA": {
           "reason": "fresh",
           "listed": ["A"]
-        }
+        },
+        "expiry": "forced"
+      },
+      {
+        "afterQuit": {
+          "code": 0,
+          "stderr": "",
+          "listed": ["A", "B"],
+          "roots": {
+            "B": "r1",
+            "A": "r1"
+          }
+        },
+        "afterExpiry": {
+          "code": 0,
+          "stderr": "catalog.sh: skipped r1/B: expired",
+          "listed": ["A"],
+          "roots": {
+            "A": "r1"
+          }
+        },
+        "readByA": {
+          "reason": "fresh",
+          "listed": ["A"]
+        },
+        "expiry": "forced"
       }
     ],
     "gestures": 0,
