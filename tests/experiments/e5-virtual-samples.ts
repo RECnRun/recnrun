@@ -266,20 +266,20 @@ export const clockChangeSample = (environment: E5Environment) =>
     const firstAnswered = await control(run);
     const skew = await skewChecks(run);
     const checks: Record<string, boolean> = { firstAnswered, ...skew.checks };
+    // A signal may live one pairing TTL and be stamped one clock skew ahead, no more.
     const farExpiry = await peer.signal("offer", to.profileId, { expiresAt: Date.now() + HOUR_MS });
-    const farExpiryAnswered = (await offered(run, farExpiry)) !== undefined;
+    checks.farExpiryIgnored = await ignored(run, JSON.stringify(farExpiry), farExpiry.pairingId);
     const far = await peer.signal("offer", to.profileId, { sequence: Date.now() + HOUR_MS });
-    const farSequenceAnswered = (await offered(run, far)) !== undefined;
+    checks.farSequenceIgnored = await ignored(run, JSON.stringify(far), far.pairingId);
     // A stamp that restarted at the stepped-back clock within the same boot.
     const reset = await peer.signal("offer", to.profileId, { sequence: Date.now() });
-    const heardAfterStampReset = !(await ignored(run, JSON.stringify(reset), reset.pairingId));
+    checks.heardAfterStampReset = (await offered(run, reset)) !== undefined;
     peer.boot = randomUUID();
     await peer.announce();
     await quiet(SETTLE_MS);
     checks.nextBootAnswered = await control(run);
     checks.pairLinked = await pairLinked();
-    const seen = { farExpiryAnswered, farSequenceAnswered, heardAfterStampReset };
-    return verdictOf(setup, checks, { ...seen, ...skew.logs });
+    return verdictOf(setup, checks, { withinSkewMs: skew.withinSkewMs, ...skew.logs });
   });
 
 /** E5.a.readCache: each rewrite of one offer path is read and answered, never a cached copy. */

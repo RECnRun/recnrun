@@ -1,4 +1,6 @@
+import { CLOCK_SKEW_MS } from "@/p2p/downloads-rendezvous";
 import type { Presence, Seen, Sighting, SignalFile, StampedSignal } from "@/p2p/folder-rendezvous";
+import { PAIRING_TTL_MS } from "@/p2p/pairing-code";
 import type { RegistryPeer } from "@/p2p/registry";
 
 /*
@@ -24,12 +26,13 @@ export interface RendezvousTransport {
 
 /**
  * Stamps each signal with the boot and a sequence above the last one and no lower than the
- * clock, so a document made again in the same boot still writes higher numbers.
+ * clock, so a document made again in the same boot still writes higher numbers. Once the clock
+ * stepped back further than a reader takes, the stamp restarts at it, which readers accept.
  */
 export function createSignalStamp(now: () => number = Date.now) {
   let last = 0;
   return (signal: SignalFile, boot: string): StampedSignal => {
-    last = Math.max(last + 1, now());
+    last = last + 1 > now() + CLOCK_SKEW_MS ? now() : Math.max(last + 1, now());
     return { ...signal, boot, sequence: last };
   };
 }
@@ -46,18 +49,25 @@ const unbooted = (presence: Presence): Presence => {
 /**
  * Sifts what a transport read into what the mesh sees. A signal counts only in its sender's
  * current boot, the one its latest presence named, and only if no later signal of that boot
- * already replaced its file: Downloads may finish an older write after a newer one.
+ * already replaced its file: Downloads may finish an older write after a newer one. A stamp or
+ * expiry further ahead than an honest writer's clock could put it never counts, so a forged file
+ * can neither outlive the pairing nor hold back that writer's later signals.
  */
-export function createSightingFilter() {
+export function createSightingFilter(now: () => number = Date.now) {
   const boots = new Map<string, string>();
   const highest = new Map<string, { boot: string; sequence: number }>();
+  const plausible = ({ sequence, expiresAt }: StampedSignal) =>
+    sequence <= now() + CLOCK_SKEW_MS && expiresAt <= now() + PAIRING_TTL_MS + CLOCK_SKEW_MS;
   const current = (signal: StampedSignal) => {
     const boot = boots.get(signal.profileId);
     if (boot !== undefined && boot !== signal.boot) return false;
+    if (!plausible(signal)) return false;
     // Each sender writes one file of each kind for this profile, so the order is per file.
     const file = `${signal.profileId}/${signal.kind}`;
     const seen = highest.get(file);
-    if (seen?.boot === signal.boot && signal.sequence < seen.sequence) return false;
+    // An order now ahead of the clock only a backward clock step leaves, and the writer restarts.
+    const holds = seen !== undefined && seen.sequence < now() + CLOCK_SKEW_MS;
+    if (holds && seen.boot === signal.boot && signal.sequence < seen.sequence) return false;
     highest.set(file, { boot: signal.boot, sequence: signal.sequence });
     return true;
   };

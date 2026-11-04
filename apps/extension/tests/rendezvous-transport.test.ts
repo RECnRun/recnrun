@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vite-plus/test";
+import { CLOCK_SKEW_MS } from "@/p2p/downloads-rendezvous";
 import { PAIRING_TTL_MS } from "@/p2p/pairing-code";
 import { PRESENCE_TTL_MS } from "@/p2p/folder-rendezvous";
 import type { Presence, SignalFile, StampedSignal } from "@/p2p/folder-rendezvous";
@@ -12,6 +13,7 @@ const PAIRING = "44444444-4444-4444-8444-444444444444";
 const OTHER_PAIRING = "55555555-5555-4555-8555-555555555555";
 const BOOT = "66666666-6666-4666-8666-666666666666";
 const EARLIER_BOOT = "77777777-7777-4777-8777-777777777777";
+const HOUR_MS = 3_600_000;
 
 const presence = (profileId: string): Presence => ({
   profileId,
@@ -55,7 +57,8 @@ describe("createSignalStamp", () => {
     const sequences = [stamp(signal(ME, PEER), BOOT), stamp(signal(ME, STRANGER), BOOT)];
     clock = NOW + 5000;
     sequences.push(stamp(signal(ME, PEER), BOOT));
-    clock = NOW;
+    // Back by less than a reader's clock skew, so the order goes on.
+    clock = NOW + 1000;
     sequences.push(stamp(signal(ME, PEER), BOOT));
     expect(sequences.map(({ boot, sequence }) => ({ boot, sequence }))).toEqual([
       { boot: BOOT, sequence: NOW },
@@ -64,6 +67,14 @@ describe("createSignalStamp", () => {
       { boot: BOOT, sequence: NOW + 5001 },
     ]);
     expect(sequences[0]).toEqual({ ...signal(ME, PEER), boot: BOOT, sequence: NOW });
+  });
+
+  test("restarts at the clock once it stepped back further than a reader would take", () => {
+    let clock = NOW;
+    const stamp = createSignalStamp(() => clock);
+    stamp(signal(ME, PEER), BOOT);
+    clock = NOW - HOUR_MS;
+    expect(stamp(signal(ME, PEER), BOOT).sequence).toBe(NOW - HOUR_MS);
   });
 });
 
@@ -100,6 +111,32 @@ describe("createSightingFilter", () => {
     expect(look(stamped())).toEqual([]);
     // An answer of the same sender is another file, with its own order.
     expect(look(stamped({ kind: "answer" }))).toHaveLength(1);
+  });
+
+  test("drops a signal stamped further ahead than an honest writer could, and hears that writer after it", () => {
+    const sift = createSightingFilter();
+    const look = (each: StampedSignal) => sift({ presences: [sender()], signals: [each] }).signals;
+    expect(look(stamped({ sequence: NOW + CLOCK_SKEW_MS + 1 }))).toEqual([]);
+    expect(look(stamped({ expiresAt: NOW + PAIRING_TTL_MS + CLOCK_SKEW_MS + 1 }))).toEqual([]);
+    // A sequence refused leaves the order alone, so the writer's next stamp still counts.
+    expect(look(stamped())).toHaveLength(1);
+    const edge = { sequence: NOW + CLOCK_SKEW_MS, expiresAt: NOW + PAIRING_TTL_MS + CLOCK_SKEW_MS };
+    expect(look(stamped({ pairingId: OTHER_PAIRING, ...edge }))).toHaveLength(1);
+  });
+
+  test("hears a writer whose clock stepped back and whose stamp restarted at it", () => {
+    let clock = NOW;
+    const sift = createSightingFilter(() => clock);
+    const look = (each: StampedSignal) => sift({ presences: [sender()], signals: [each] }).signals;
+    expect(look(stamped())).toHaveLength(1);
+    clock = NOW - HOUR_MS;
+    expect(look(stamped({ sequence: NOW }))).toEqual([]);
+    const restarted = {
+      pairingId: OTHER_PAIRING,
+      sequence: clock,
+      expiresAt: clock + PAIRING_TTL_MS,
+    };
+    expect(look(stamped(restarted))).toHaveLength(1);
   });
 
   test("takes a new boot's first signal once the sender's presence names it", () => {
@@ -172,6 +209,25 @@ describe.each(environments)("the $kind transport", ({ create }) => {
     const written = JSON.parse(env.file(ME, `offer-${PEER}.json`) ?? "{}") as StampedSignal;
     const late = { ...written, pairingId: OTHER_PAIRING, sequence: written.sequence - 1 };
     env.drop(ME, `offer-${PEER}.json`, JSON.stringify(late));
+    expect((await peer?.look())?.signals).toEqual([]);
+    await me?.publish(signal(ME, PEER, { pairingId: OTHER_PAIRING }));
+    expect((await peer?.look())?.signals).toEqual([signal(ME, PEER, { pairingId: OTHER_PAIRING })]);
+  });
+
+  test("ignores a signal stamped an hour ahead, then takes the writer's next one", async () => {
+    const env = create();
+    const [me, peer] = await announced(env, ME, PEER);
+    await me?.publish(signal(ME, PEER));
+    const written = JSON.parse(env.file(ME, `offer-${PEER}.json`) ?? "{}") as StampedSignal;
+    const ahead = { ...written, pairingId: OTHER_PAIRING, sequence: written.sequence + HOUR_MS };
+    env.drop(ME, `offer-${PEER}.json`, JSON.stringify(ahead));
+    expect((await peer?.look())?.signals).toEqual([]);
+    const lasting = { ...written, pairingId: OTHER_PAIRING, expiresAt: NOW + HOUR_MS };
+    env.drop(
+      ME,
+      `offer-${PEER}.json`,
+      JSON.stringify({ ...lasting, sequence: written.sequence + 1 }),
+    );
     expect((await peer?.look())?.signals).toEqual([]);
     await me?.publish(signal(ME, PEER, { pairingId: OTHER_PAIRING }));
     expect((await peer?.look())?.signals).toEqual([signal(ME, PEER, { pairingId: OTHER_PAIRING })]);
