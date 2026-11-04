@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vite-plus/test";
 import { fakeBrowser } from "wxt/testing/fake-browser";
+import { provenHello } from "@/background/greeting";
 import { PAIRING_TTL_MS, encodePairing } from "@/p2p/pairing-code";
 import type { Pin } from "@/p2p/pins";
 import {
+  authorizedPeersRepository,
   folderPairingRepository,
   peerLinksRepository,
   peerPinsRepository,
@@ -105,6 +107,15 @@ describe("the HELLO statement", () => {
       "[RECnRun peer]",
       `closed the link to ${PEER}, whose HELLO no valid signature by its identity vouches for`,
     );
+  });
+
+  test("a HELLO proves nothing once its peer's authorized record is gone", async () => {
+    await peerBackground();
+    const hello = fromPeer("HELLO", PEER_HELLO);
+    expect(await provenHello(hello)).toBe(true);
+    // A Forget between the channel's check and this one drops the record the statement needs.
+    await authorizedPeersRepository.set(PEER, null);
+    expect(await provenHello(hello)).toBe(false);
   });
 
   test("this profile's HELLO carries its own statement for its link's certificate", async () => {
