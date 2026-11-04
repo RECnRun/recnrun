@@ -33,7 +33,7 @@ export interface DownloadsEnvironment {
 }
 
 /** The default-location cell's destination outside the root, and its cleanup. */
-export interface DefaultWorkspace {
+interface DefaultWorkspace {
   relative: string;
   clean(reported: string[]): Promise<Record<string, unknown>>;
 }

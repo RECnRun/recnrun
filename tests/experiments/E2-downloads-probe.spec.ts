@@ -3,13 +3,12 @@ import { mkdtemp, rm, rmdir } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
 import { promisify } from "node:util";
-import { expect, resolveChromePath, test } from "../browser/fixtures/chrome.ts";
+import { resolveChromePath, test } from "../browser/fixtures/chrome.ts";
 import { launchProbe } from "./fixtures/downloads.ts";
-import { E2_CELLS, missingVerdicts } from "./fixtures/downloads-e2.ts";
+import { E2_CELLS, expectEveryE2 } from "./fixtures/downloads-e2.ts";
 import type { DownloadsEnvironment } from "./fixtures/downloads-cells.ts";
 import { recordE2 } from "./fixtures/downloads-verdicts.ts";
 import { pressIn, screenshot, windowNames } from "./fixtures/x-windows.ts";
-import { appendVerdict, readVerdicts } from "./verdicts.ts";
 
 /*
  * E2 (POC PLAN.md P1.3): the D0 build writes a probe through chrome.downloads and reads it back
@@ -39,7 +38,7 @@ async function cleanDefault(paths: string[]) {
 }
 
 const lab: DownloadsEnvironment = {
-  target: { environment: "lab", chrome: chromeVersion, append: appendVerdict },
+  target: { environment: "lab", chrome: chromeVersion },
   launch: async (preferences) => {
     const root = await mkdtemp(join(tmpdir(), "recnrun-e2-"));
     const removeRoot = () =>
@@ -81,6 +80,6 @@ test.describe("E2: probe write and real path in Google Chrome Stable", () => {
   }
 
   test("every E2 hypothesis left a verdict", async () => {
-    expect(missingVerdicts(await readVerdicts())).toEqual([]);
+    await expectEveryE2(lab.target);
   });
 });

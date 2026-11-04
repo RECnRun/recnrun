@@ -4,8 +4,6 @@ import { dirname } from "node:path";
 import { promisify } from "node:util";
 import { launchProbe } from "../../experiments/fixtures/downloads.ts";
 import type { DownloadsEnvironment } from "../../experiments/fixtures/downloads-cells.ts";
-import { parseVerdicts } from "../../experiments/schema.ts";
-import type { Verdict } from "../../experiments/schema.ts";
 import { CHROME_BINARY, evidence, hostRunId, requireHost } from "./host-env.ts";
 import { openDefaultWorkspace } from "./default-downloads.ts";
 import { launchOnRoot } from "./host-launch.ts";
@@ -26,21 +24,12 @@ async function removeRoot(root: string): Promise<void> {
   await rmdir(dirname(root)).catch(() => undefined);
 }
 
-async function appendHostVerdict(verdict: Verdict): Promise<void> {
-  const record = evidence();
-  const earlier = await record.read("verdicts.json").catch(() => []);
-  await record.write("verdicts.json", parseVerdicts([...parseVerdicts(earlier), verdict]));
-}
-
-export const readHostVerdicts = async (): Promise<Verdict[]> =>
-  parseVerdicts(await evidence().read("verdicts.json"));
-
 const chromeVersion = async () =>
   (await promisify(execFile)(CHROME_BINARY, ["--version"])).stdout.trim();
 
 /** E2 on the installed Google Chrome of this Mac, one fresh throwaway root per sample. */
 export const host: DownloadsEnvironment = {
-  target: { environment: "host", chrome: chromeVersion, append: appendHostVerdict },
+  target: { environment: "host", chrome: chromeVersion, directory: () => evidence().directory },
   launch: async (preferences) => {
     const root = await rootFor(requireHost(), hostRunId(), `e2-${++launches}`);
     const options = { executable: CHROME_BINARY, args: HOST_ARGS };

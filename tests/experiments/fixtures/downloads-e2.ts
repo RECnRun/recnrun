@@ -7,8 +7,8 @@ import {
   defaultLocation,
 } from "./downloads-cells-paths.ts";
 import { interruptedTolerated, saveAsPrompts, visibleTraces } from "./downloads-cells-states.ts";
-import type { Sample } from "./downloads-verdicts.ts";
-import type { Verdict } from "../verdicts.ts";
+import type { Sample, VerdictTarget } from "./downloads-verdicts.ts";
+import { expectEveryHypothesis } from "../outcome.ts";
 
 /** E2's hypotheses (POC PLAN.md P1.3), shared by the lab spec and its host twin. */
 export const E2_CELLS: Record<string, (environment: DownloadsEnvironment) => Promise<Sample>> = {
@@ -24,15 +24,6 @@ export const E2_CELLS: Record<string, (environment: DownloadsEnvironment) => Pro
   "E2.path.absoluteRefused": absoluteRefused,
 };
 
-/** Why the E2 verdicts are incomplete: a hypothesis with no verdict, or one with no sample and no reason. */
-export function missingVerdicts(verdicts: readonly Verdict[]): string[] {
-  const latest = new Map(
-    verdicts.filter((entry) => entry.experiment === "E2").map((entry) => [entry.hypothesis, entry]),
-  );
-  return Object.keys(E2_CELLS).flatMap((hypothesis) => {
-    const verdict = latest.get(hypothesis);
-    if (!verdict) return [`${hypothesis} left no verdict`];
-    const sampled = verdict.samples > 0 || (verdict.verdict === "unavailable" && verdict.error);
-    return sampled ? [] : [`${hypothesis} took no sample`];
-  });
-}
+/** Fails when an E2 hypothesis left no verdict in `target`'s folder, or one with no sample and no reason. */
+export const expectEveryE2 = (target: VerdictTarget): Promise<void> =>
+  expectEveryHypothesis("E2", Object.keys(E2_CELLS), target.directory?.());

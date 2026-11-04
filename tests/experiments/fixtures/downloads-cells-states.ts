@@ -129,18 +129,18 @@ const SAVE_DIALOG = /save/i;
 /** Escape in the dialog until the probe answers, at most three times; each press is a gesture. */
 async function dismiss(
   display: NonNullable<DownloadsEnvironment["display"]>,
-  id: string,
+  [id, title]: [string, string],
   reply: Promise<unknown>,
 ) {
   const state = { answered: false };
   void reply.finally(() => (state.answered = true));
-  let gestures = 0;
-  while (!state.answered && gestures < 3) {
+  const steps: string[] = [];
+  while (!state.answered && steps.length < 3) {
     await display.press(id, "Escape");
-    gestures++;
+    steps.push(`xdotool: Escape in the "${title}" dialog`);
     await poll(async () => (state.answered ? true : undefined), 5_000);
   }
-  return gestures;
+  return steps;
 }
 
 /** "Ask where to save" turns the write into a native dialog: seen, dismissed by keyboard, nothing written. */
@@ -161,14 +161,14 @@ export const saveAsPrompts = (environment: DownloadsEnvironment): Promise<Sample
       };
       const shown = await poll(found);
       const screenshot = shown ? await display.screenshot("E2-save-as.png") : undefined;
-      const gestures = shown ? await dismiss(display, shown.dialog[0], reply) : 0;
+      const steps = shown ? await dismiss(display, shown.dialog, reply) : [];
       const answered = await reply;
       const written = existsSync(join(directory, relativeProbe(namespace)));
       const problems = [];
       if (!shown) problems.push("no Save dialog showed");
       if (written) problems.push("the probe was written without an answer");
-      const observation = { title: shown?.dialog[1], newWindows: shown?.fresh, gestures, answered };
-      return judged(problems, { ...observation, written, screenshot });
+      const observation = { title: shown?.dialog[1], newWindows: shown?.fresh, answered };
+      return judged(problems, { ...observation, written, screenshot }, steps);
     },
   );
 };
