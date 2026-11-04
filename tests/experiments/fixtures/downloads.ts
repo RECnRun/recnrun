@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Page } from "@playwright/test";
 import { loadUnpacked } from "../../browser/fixtures/extension-loaders.ts";
+import type { TolerantRead } from "./downloads-interrupted.ts";
 import type { LoadedExtension, UnpackedOptions } from "../../browser/fixtures/extension-loaders.ts";
 
 /** The D0 variant `vp run --no-cache extension#build:poc-d0` writes, with its pinned key. */
@@ -39,11 +40,6 @@ interface ProbeOptions {
   filename?: string;
   url?: string;
   settle?: boolean;
-}
-
-interface TolerantRead {
-  publication?: { profileId: string; createdAt: number };
-  reason: string;
 }
 
 /** The diagnostics page's `window.__poc`, which sends the extension's own messages. */
@@ -132,13 +128,21 @@ export async function launchProbe(
   }
 }
 
-/** A loopback source that sends its first bytes and then stalls, so a download stays in progress. */
+/**
+ * A loopback source that sends its first bytes and then stalls, so a download stays in progress;
+ * `abort()` drops every connection and keeps the source down, so each retry loses its connection.
+ */
 export async function stallingSource() {
   const open = new Set<ServerResponse>();
   /** The Range header of every request, so a resumed download shows. */
   const requests: string[] = [];
+  const state = { down: false };
   const server = createServer((request, response) => {
     requests.push(request.headers.range ?? "no range");
+    if (state.down) {
+      request.socket.destroy();
+      return;
+    }
     open.add(response);
     response.writeHead(200, { "content-type": "application/json", "content-length": 4 << 20 });
     response.write("x".repeat(256 << 10));
@@ -146,6 +150,7 @@ export async function stallingSource() {
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const { port } = server.address() as AddressInfo;
   const abort = () => {
+    state.down = true;
     for (const response of open) response.destroy();
     open.clear();
   };

@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { readdir } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { UnavailableError } from "../../browser/fixtures/policy-install.ts";
@@ -13,6 +13,8 @@ import {
   withProbe,
 } from "./downloads-cells.ts";
 import type { DownloadsEnvironment } from "./downloads-cells.ts";
+import { interruptionProblems, NETWORK, USER_CANCELED } from "./downloads-interrupted.ts";
+import type { Expected, Interruption } from "./downloads-interrupted.ts";
 import { judged } from "./downloads-verdicts.ts";
 import type { Sample } from "./downloads-verdicts.ts";
 
@@ -44,8 +46,20 @@ interface Target {
   directory: string;
   namespace: string;
   filename: string;
-  previous: unknown;
+  content: string;
+  previous: Record<string, unknown>;
 }
+
+const sameBytes = async (path: string, content: string) =>
+  (await readFile(path).catch(() => undefined))?.equals(Buffer.from(content)) ?? false;
+
+/** The fields of the settled item a verdict needs (search returns the whole DownloadItem). */
+const settledAs = ({ state, error, filename, bytesReceived }: ProbeItem, root: string) => ({
+  state,
+  error,
+  filename: redact(filename, root),
+  bytesReceived,
+});
 
 /** Starts an overwrite from a stalling loopback source, stops it with `stop`, and reads around it. */
 async function interruptOnce(
@@ -56,7 +70,7 @@ async function interruptOnce(
 ) {
   const { namespace, filename, previous } = target;
   const started = await diagnostics.probe(namespace, "", { url: source, settle: false });
-  if (!started.ok) return { error: started.error };
+  if (!started.ok) return { error: `the stalled probe failed: ${started.error}` };
   const { id } = started.result;
   const folder = dirname(filename);
   const during = await poll(async () =>
@@ -65,64 +79,62 @@ async function interruptOnce(
   const readDuring = await diagnostics.readPublication(filename, previous);
   await stop(id);
   const item = await stopped(diagnostics, id);
-  const entries = await readdir(folder);
-  const readAfter = await diagnostics.readPublication(filename, previous);
-  // Chrome resumes some interrupted downloads by itself; one still running is cancelled here.
-  const cleanup = item ? undefined : await diagnostics.cancel(id);
-  const final = item ?? (cleanup?.ok ? cleanup.result : undefined);
-  const settled = final && {
-    state: final.state,
-    error: final.error,
-    filename: redact(final.filename, target.root),
-  };
-  const downloads = await readdir(target.directory);
-  const stoppedWithin15s = Boolean(item);
-  return {
+  const run: Interruption = {
     during: during ?? [],
     readDuring,
-    stoppedWithin15s,
-    settled,
-    entries,
-    downloads,
-    readAfter,
+    settledInWait: Boolean(item),
+    settled: item && settledAs(item, target.root),
+    entries: await readdir(folder),
+    strays: (await readdir(target.directory)).filter((entry) => entry !== "RECnRun"),
+    bytesKept: await sameBytes(filename, target.content),
+    readAfter: await diagnostics.readPublication(filename, previous),
   };
+  // Harness cleanup only, never part of the verdict: an item still running is cancelled.
+  const cleanup = item ? undefined : await diagnostics.cancel(id);
+  return { run, cleanup: cleanup && { reply: cleanup, partials: await partials(folder) } };
 }
 
-/** A cancelled and a network-interrupted overwrite: the reader keeps the last valid publication. */
-export const interruptedTolerated = (environment: DownloadsEnvironment): Promise<Sample> =>
-  withProbe(environment, { location: "custom" }, async ({ diagnostics, root, directory = "" }) => {
-    const namespace = freshNamespace();
-    const content = publication();
-    const first = await diagnostics.probe(namespace, content);
-    if (!first.ok) return judged([`the first probe failed: ${first.error}`], {});
-    const previous = JSON.parse(content) as { createdAt: number; profileId: string };
-    const target = { root, directory, namespace, filename: first.result.filename, previous };
-    const source = await stallingSource();
-    try {
-      const cancelled = await interruptOnce(
-        diagnostics,
-        target,
-        (id) => diagnostics.cancel(id),
-        source.url,
-      );
-      const dropped = await interruptOnce(
-        diagnostics,
-        target,
-        async () => source.abort(),
-        source.url,
-      );
-      const reads = [cancelled, dropped].flatMap((run) =>
-        "readDuring" in run ? [run.readDuring, run.readAfter] : [],
-      );
-      const kept = reads.filter((read) => read?.publication?.profileId === previous.profileId);
-      const problems =
-        reads.length === 4 && kept.length === 4 ? [] : ["the reader lost the previous publication"];
-      const requests = [...source.requests];
-      return judged(problems, { relative: relativeProbe(namespace), cancelled, dropped, requests });
-    } finally {
-      await source.close();
-    }
-  });
+/** A stalled overwrite stopped by `how`; the reader must keep the exact last publication. */
+const interruptedBy =
+  (how: "cancel" | "network", expected: Expected) =>
+  (environment: DownloadsEnvironment): Promise<Sample> =>
+    withProbe(
+      environment,
+      { location: "custom" },
+      async ({ diagnostics, root, directory = "" }) => {
+        const namespace = freshNamespace();
+        const content = publication();
+        const first = await diagnostics.probe(namespace, content);
+        if (!first.ok) return judged([`the first probe failed: ${first.error}`], {});
+        const previous = JSON.parse(content) as Record<string, unknown>;
+        const target = {
+          root,
+          directory,
+          namespace,
+          filename: first.result.filename,
+          content,
+          previous,
+        };
+        const source = await stallingSource();
+        try {
+          const stop =
+            how === "cancel" ? (id: number) => diagnostics.cancel(id) : async () => source.abort();
+          const measured = await interruptOnce(diagnostics, target, stop, source.url);
+          if ("error" in measured) return judged([measured.error ?? ""], {});
+          const problems = interruptionProblems(measured.run, previous, expected);
+          const observation = { relative: relativeProbe(namespace), how, ...measured };
+          return judged(problems, { ...observation, requests: [...source.requests] });
+        } finally {
+          await source.close();
+        }
+      },
+    );
+
+/** `chrome.downloads.cancel` on the stalled overwrite: `USER_CANCELED`, nothing partial left. */
+export const interruptedByCancel = interruptedBy("cancel", USER_CANCELED);
+
+/** The source drops every connection and stays down: Chrome itself interrupts, nothing left. */
+export const interruptedByNetwork = interruptedBy("network", NETWORK);
 
 const SAVE_DIALOG = /save/i;
 

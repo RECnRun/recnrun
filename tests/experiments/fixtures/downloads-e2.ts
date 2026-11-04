@@ -6,7 +6,12 @@ import {
   customLocation,
   defaultLocation,
 } from "./downloads-cells-paths.ts";
-import { interruptedTolerated, saveAsPrompts, visibleTraces } from "./downloads-cells-states.ts";
+import {
+  interruptedByCancel,
+  interruptedByNetwork,
+  saveAsPrompts,
+  visibleTraces,
+} from "./downloads-cells-states.ts";
 import type { Sample, VerdictTarget } from "./downloads-verdicts.ts";
 import { expectEveryHypothesis } from "../outcome.ts";
 
@@ -16,7 +21,8 @@ export const E2_CELLS: Record<string, (environment: DownloadsEnvironment) => Pro
   "E2.filename.fileUrl": fileUrlReads,
   "E2.overwrite.100": overwriteMany,
   "E2.content.roundTrip": contentRoundTrips,
-  "E2.interrupted.crdownload": interruptedTolerated,
+  "E2.interrupted.cancel": interruptedByCancel,
+  "E2.interrupted.network": interruptedByNetwork,
   "E2.saveAs.prompt": saveAsPrompts,
   "E2.location.custom": customLocation,
   "E2.location.default": defaultLocation,
