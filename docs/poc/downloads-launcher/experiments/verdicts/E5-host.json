@@ -217,6 +217,10 @@
     "variant": "poc-d0",
     "topology": "Default plus one worker and a virtual peer the test writes, one shared Downloads root",
     "debugger": "none",
+    "verdict": "pass",
+    "samples": 3,
+    "gestures": 0,
+    "steps": [],
     "observations": [
       {
         "firstAnswered": true,
@@ -225,14 +229,16 @@
         "behindRefused": true,
         "withinSkewListed": true,
         "withinSkewAnswered": true,
+        "withinSkewPrompt": true,
+        "farExpiryIgnored": true,
+        "farSequenceIgnored": true,
+        "heardAfterStampReset": true,
         "nextBootAnswered": true,
         "pairLinked": true,
-        "farExpiryAnswered": true,
-        "farSequenceAnswered": true,
-        "heardAfterStampReset": false,
+        "withinSkewMs": 251,
         "aheadLog": "catalog.sh: skipped r1/00000000-0000-4000-8000-000000000001: createdAt is ahead of this clock",
         "behindLog": "catalog.sh: skipped r1/00000000-0000-4000-8000-000000000001: expired",
-        "answerMs": [1001, 3396, 691, 679, 358]
+        "answerMs": [767, 251, 1029, 660]
       },
       {
         "firstAnswered": true,
@@ -241,14 +247,16 @@
         "behindRefused": true,
         "withinSkewListed": true,
         "withinSkewAnswered": true,
+        "withinSkewPrompt": true,
+        "farExpiryIgnored": true,
+        "farSequenceIgnored": true,
+        "heardAfterStampReset": true,
         "nextBootAnswered": true,
         "pairLinked": true,
-        "farExpiryAnswered": true,
-        "farSequenceAnswered": true,
-        "heardAfterStampReset": false,
+        "withinSkewMs": 282,
         "aheadLog": "catalog.sh: skipped r1/00000000-0000-4000-8000-000000000001: createdAt is ahead of this clock",
         "behindLog": "catalog.sh: skipped r1/00000000-0000-4000-8000-000000000001: expired",
-        "answerMs": [971, 3252, 651, 624, 375]
+        "answerMs": [877, 282, 1059, 666]
       },
       {
         "firstAnswered": true,
@@ -257,20 +265,18 @@
         "behindRefused": true,
         "withinSkewListed": true,
         "withinSkewAnswered": true,
+        "withinSkewPrompt": true,
+        "farExpiryIgnored": true,
+        "farSequenceIgnored": true,
+        "heardAfterStampReset": true,
         "nextBootAnswered": true,
         "pairLinked": true,
-        "farExpiryAnswered": true,
-        "farSequenceAnswered": true,
-        "heardAfterStampReset": false,
+        "withinSkewMs": 346,
         "aheadLog": "catalog.sh: skipped r1/00000000-0000-4000-8000-000000000001: createdAt is ahead of this clock",
         "behindLog": "catalog.sh: skipped r1/00000000-0000-4000-8000-000000000001: expired",
-        "answerMs": [924, 3298, 653, 620, 395]
+        "answerMs": [486, 346, 954, 593]
       }
-    ],
-    "gestures": 0,
-    "steps": [],
-    "verdict": "pass",
-    "samples": 3
+    ]
   },
   {
     "experiment": "E5",
@@ -287,19 +293,58 @@
       {
         "readBeforeKill": true,
         "answerOutBeforeKill": false,
-        "relinkAfterKillMs": 1220,
-        "sameProfileId": true
-      },
-      {
-        "readBeforeKill": true,
-        "answerOutBeforeKill": true,
-        "relinkAfterKillMs": 32899,
+        "relinkAfterKillMs": 1932,
         "sameProfileId": true
       },
       {
         "readBeforeKill": true,
         "answerOutBeforeKill": false,
-        "relinkAfterKillMs": 984,
+        "relinkAfterKillMs": 1937,
+        "sameProfileId": true
+      },
+      {
+        "readBeforeKill": true,
+        "answerOutBeforeKill": false,
+        "relinkAfterKillMs": 1801,
+        "sameProfileId": true
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "E5",
+    "hypothesis": "E5.a.quitAfterAnswer",
+    "chrome": "Google Chrome 156.0.8078.80",
+    "environment": "host",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "Default plus one worker, one shared Downloads root",
+    "debugger": "none",
+    "observations": [
+      {
+        "killAfterAnswerMs": 118,
+        "linkedBeforeKill": false,
+        "relinkAfterKillMs": 33050,
+        "answersToThatOffer": 1,
+        "sameProfileId": true
+      },
+      {
+        "killAfterAnswerMs": 109,
+        "linkedBeforeKill": false,
+        "relinkAfterKillMs": 31810,
+        "answersToThatOffer": 1,
+        "sameProfileId": true
+      },
+      {
+        "killAfterAnswerMs": 122,
+        "linkedBeforeKill": false,
+        "relinkAfterKillMs": 33051,
+        "answersToThatOffer": 1,
         "sameProfileId": true
       }
     ],
@@ -385,6 +430,10 @@
     "variant": "poc-d0",
     "topology": "Default plus one worker, one shared Downloads root",
     "debugger": "none",
+    "verdict": "pass",
+    "samples": 3,
+    "gestures": 0,
+    "steps": [],
     "observations": [
       {
         "workersAfterIdle": {
@@ -395,8 +444,8 @@
           "Default": true,
           "Worker 1": true
         },
-        "exchangedAfterKillMs": 11704,
-        "earlierOfferAnswers": 2
+        "exchangedAfterKillMs": 12059,
+        "earlierOfferAnswers": 1
       },
       {
         "workersAfterIdle": {
@@ -407,8 +456,8 @@
           "Default": true,
           "Worker 1": true
         },
-        "exchangedAfterKillMs": 11701,
-        "earlierOfferAnswers": 2
+        "exchangedAfterKillMs": 12206,
+        "earlierOfferAnswers": 1
       },
       {
         "workersAfterIdle": {
@@ -419,14 +468,10 @@
           "Default": true,
           "Worker 1": true
         },
-        "exchangedAfterKillMs": 11720,
-        "earlierOfferAnswers": 2
+        "exchangedAfterKillMs": 12127,
+        "earlierOfferAnswers": 1
       }
-    ],
-    "gestures": 0,
-    "steps": [],
-    "verdict": "pass",
-    "samples": 3
+    ]
   },
   {
     "experiment": "E5",

@@ -3,5 +3,5 @@
   "node": "v24.21.0",
   "pnpm": "12.14.0",
   "playwright": "1.64.1",
-  "image": "sha256:cb7c82b0e0dd02c6d71f32cbb0514caba649a9c1004c76d114cf580c98345121"
+  "image": "sha256:da55b083d744fd045e35cf6c2fbf9b09142a5096a45f534436455591731e8fce"
 }

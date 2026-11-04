@@ -12,9 +12,9 @@
     "debugger": "none",
     "observations": [
       {
-        "offerToAnswererMs": 354,
-        "answerToOffererMs": 552,
-        "linkMs": 8,
+        "offerToAnswererMs": 237,
+        "answerToOffererMs": 689,
+        "linkMs": 10,
         "pollMs": 1000
       }
     ],
@@ -41,7 +41,7 @@
         "answerCandidates": 1,
         "offerWrites": 1,
         "answerWrites": 1,
-        "linkMs": 7
+        "linkMs": 119
       }
     ],
     "gestures": 0,
@@ -70,7 +70,7 @@
         "lowerSequenceIgnored": true,
         "higherSequenceAnswered": true,
         "pairLinked": true,
-        "answerMs": [605, 722, 692]
+        "answerMs": [581, 675, 700]
       }
     ],
     "gestures": 0,
@@ -96,7 +96,7 @@
         "lowerOffers": 1,
         "higherOffers": 0,
         "higherAnswers": 1,
-        "linkMs": 1910
+        "linkMs": 1912
       }
     ],
     "gestures": 0,
@@ -124,7 +124,7 @@
         "repeatedAnswerChangesNothing": true,
         "pairLinked": true,
         "repeatedAnswers": 0,
-        "answerMs": [524]
+        "answerMs": [596]
       }
     ],
     "gestures": 0,
@@ -155,7 +155,7 @@
         "lastAnswered": true,
         "pairLinked": true,
         "catalogLog": "catalog.sh: skipped r1/00000000-0000-4000-8000-000000000001: expired",
-        "answerMs": [555, 438, 879]
+        "answerMs": [569, 304, 870]
       }
     ],
     "gestures": 0,
@@ -187,7 +187,7 @@
         "pairLinked": true,
         "reorderedAnswered": true,
         "catalogLog": "catalog.sh: skipped r1/00000000-0000-4000-8000-000000000001: expected {\"profileId\":\"",
-        "answerMs": [477, 451, 564]
+        "answerMs": [535, 486, 504]
       }
     ],
     "gestures": 0,
@@ -215,14 +215,16 @@
         "behindRefused": true,
         "withinSkewListed": true,
         "withinSkewAnswered": true,
+        "withinSkewPrompt": true,
+        "farExpiryIgnored": true,
+        "farSequenceIgnored": true,
+        "heardAfterStampReset": true,
         "nextBootAnswered": true,
         "pairLinked": true,
-        "farExpiryAnswered": true,
-        "farSequenceAnswered": true,
-        "heardAfterStampReset": false,
+        "withinSkewMs": 593,
         "aheadLog": "catalog.sh: skipped r1/00000000-0000-4000-8000-000000000001: createdAt is ahead of this clock",
         "behindLog": "catalog.sh: skipped r1/00000000-0000-4000-8000-000000000001: expired",
-        "answerMs": [479, 3478, 825, 808, 718]
+        "answerMs": [599, 593, 657, 827]
       }
     ],
     "gestures": 0,
@@ -246,7 +248,33 @@
       {
         "readBeforeKill": true,
         "answerOutBeforeKill": false,
-        "relinkAfterKillMs": 1191,
+        "relinkAfterKillMs": 1249,
+        "sameProfileId": true
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "mode": "smoke",
+    "verdict": "pass",
+    "samples": 1
+  },
+  {
+    "experiment": "E5",
+    "hypothesis": "E5.a.quitAfterAnswer",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "Default plus one worker, one shared Downloads root",
+    "debugger": "none",
+    "observations": [
+      {
+        "killAfterAnswerMs": 109,
+        "linkedBeforeKill": false,
+        "relinkAfterKillMs": 31436,
+        "answersToThatOffer": 1,
         "sameProfileId": true
       }
     ],
@@ -269,7 +297,7 @@
     "debugger": "none",
     "observations": [
       {
-        "relinkAfterQuitMs": 1468,
+        "relinkAfterQuitMs": 1461,
         "newBoots": true,
         "sameProfileIds": true,
         "samePins": true
@@ -294,7 +322,7 @@
     "debugger": "none",
     "observations": [
       {
-        "delays": [640, 842, 902, 803],
+        "delays": [438, 786, 812, 864],
         "pairLinked": true
       }
     ],
@@ -325,8 +353,8 @@
           "Default": true,
           "Worker 1": true
         },
-        "exchangedAfterKillMs": 12356,
-        "earlierOfferAnswers": 2
+        "exchangedAfterKillMs": 11488,
+        "earlierOfferAnswers": 1
       }
     ],
     "gestures": 0,
@@ -349,7 +377,7 @@
     "observations": [
       {
         "rewrites": [5, 5],
-        "longestGapsMs": [30002, 30002],
+        "longestGapsMs": [30003, 30004],
         "workers": {
           "Default": true,
           "Worker 1": true
@@ -377,7 +405,7 @@
     "observations": [
       {
         "listedInFirstCatalog": 5,
-        "linkMs": 2050,
+        "linkMs": 3538,
         "pairsThroughFiles": 10
       }
     ],
@@ -402,7 +430,7 @@
       {
         "workersBefore": [true, true, true, true],
         "workersAfter": [true, true, true, true],
-        "joinMs": 2838,
+        "joinMs": 3326,
         "linked": true
       }
     ],
@@ -425,7 +453,7 @@
     "debugger": "none",
     "observations": [
       {
-        "droppedAfterMs": 3368,
+        "droppedAfterMs": 3308,
         "restIntact": true,
         "relinked": true,
         "sameProfileId": true,
@@ -449,8 +477,7 @@
     "variant": "poc-d0",
     "topology": "Default plus four workers, one shared Downloads root",
     "debugger": "none",
-    "verdict": "fail",
-    "error": "pairAgainOffered did not hold",
+    "verdict": "pass",
     "samples": 1,
     "gestures": 0,
     "steps": [],
@@ -463,7 +490,7 @@
         "forgetRemovesLine": true,
         "forgetClearsTrust": true,
         "forgetHeld": true,
-        "pairAgainOffered": false,
+        "pairAgainOffered": true,
         "pairedAgain": true
       }
     ],
