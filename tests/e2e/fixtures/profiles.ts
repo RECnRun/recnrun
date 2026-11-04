@@ -144,7 +144,7 @@ interface RuntimeGlobal {
 }
 
 /** Sends a raw frame over the link to `peer` from a profile's background, as a faulty peer would. */
-export const sendRaw = (profile: Profile, peer: string, frame: string) =>
+export const sendRaw = (profile: Pick<Profile, "serviceWorker">, peer: string, frame: string) =>
   profile.serviceWorker.evaluate(
     ([to, raw]) =>
       (globalThis as unknown as RuntimeGlobal).chrome.runtime.sendMessage({
@@ -155,7 +155,7 @@ export const sendRaw = (profile: Profile, peer: string, frame: string) =>
   );
 
 /** The profile's own id, as its peers know it. */
-export const profileIdOf = (profile: Profile): Promise<string> =>
+export const profileIdOf = (profile: Pick<Profile, "serviceWorker">): Promise<string> =>
   profile.serviceWorker.evaluate(async () => {
     const { chrome } = globalThis as unknown as RuntimeGlobal;
     const { profileIdentity } = await chrome.storage.local.get("profileIdentity");

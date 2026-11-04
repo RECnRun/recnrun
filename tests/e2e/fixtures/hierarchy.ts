@@ -1,6 +1,9 @@
 import { profileIdOf } from "./profiles.ts";
 import type { Profile } from "./profiles.ts";
 
+/** A profile as the binding needs it: its service worker alone. */
+type Bindable = Pick<Profile, "serviceWorker">;
+
 interface StorageGlobal {
   chrome: {
     storage: {
@@ -13,7 +16,7 @@ interface StorageGlobal {
 }
 
 /** The identity key `profile` pinned for `peer` when their link was first verified. */
-const pinOf = (profile: Profile, peer: string): Promise<string> =>
+const pinOf = (profile: Bindable, peer: string): Promise<string> =>
   profile.serviceWorker.evaluate(async (id) => {
     const { chrome } = globalThis as unknown as StorageGlobal;
     const { peerPins } = await chrome.storage.local.get("peerPins");
@@ -22,7 +25,7 @@ const pinOf = (profile: Profile, peer: string): Promise<string> =>
     return pin.identity;
   }, peer);
 
-const store = (profile: Profile, items: Record<string, unknown>) =>
+const store = (profile: Bindable, items: Record<string, unknown>) =>
   profile.serviceWorker.evaluate(
     (values) => (globalThis as unknown as StorageGlobal).chrome.storage.local.set(values),
     items,
@@ -33,7 +36,7 @@ const store = (profile: Profile, items: Record<string, unknown>) =>
  * no launcher, so the test writes, from the identity keys each side pinned at pairing, each
  * worker's binding, then the master's workers and its own record.
  */
-export async function bindHierarchy(master: Profile, workers: Profile[]): Promise<void> {
+export async function bindHierarchy(master: Bindable, workers: Bindable[]): Promise<void> {
   const masterId = await profileIdOf(master);
   const boundAt = Date.now();
   const boundWorkers: Record<string, unknown> = {};

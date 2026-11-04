@@ -18,6 +18,7 @@ import {
   waitForMesh,
 } from "./fixtures/downloads-profiles.ts";
 import type { DownloadsGroup, DownloadsProfile } from "./fixtures/downloads-profiles.ts";
+import { isActive, openTab, sendOverLink } from "./fixtures/master-restart.ts";
 import { backgroundLog, within } from "./fixtures/trust.ts";
 
 /*
@@ -80,59 +81,11 @@ const test = base.extend<{ hierarchy: Hierarchy }>({
 
 test.describe.configure({ timeout: 300_000 });
 
-interface ChromeGlobal {
-  chrome: {
-    runtime: { sendMessage(message: unknown): Promise<unknown> };
-    tabs: {
-      create(properties: { url: string; active: boolean }): Promise<{ id?: number }>;
-      get(tabId: number): Promise<{ active: boolean }>;
-    };
-  };
-}
-
-/** Sends `message` from `from` to `to` over `from`'s own verified link, as its background would. */
-async function sendOverLink(from: Member, to: Member, message: Record<string, unknown>) {
-  const route = { from: from.profile.profileId, to: to.profile.profileId };
-  const frame = JSON.stringify({
-    channel: "recnrun-peer",
-    protocol: 1,
-    id: randomUUID(),
-    ...route,
-    ...message,
-  });
-  const reply = await from.profile.serviceWorker.evaluate(
-    ({ peer, text }) =>
-      (globalThis as unknown as ChromeGlobal).chrome.runtime.sendMessage({
-        target: "offscreen",
-        command: { type: "send", peer, frame: text },
-      }),
-    { peer: route.to, text: frame },
-  );
-  expect(reply).toEqual({ ok: true, result: { sent: true } });
-}
-
 /** A tab `member` opens behind its current one, at an address that names it. */
 async function tabBehind({ profile, view }: Member, baseURL: string) {
   const url = new URL(`/privacy/?behind-${view.name.replace(" ", "-")}`, baseURL).href;
-  const id = await profile.serviceWorker.evaluate(
-    async (address) =>
-      (
-        await (globalThis as unknown as ChromeGlobal).chrome.tabs.create({
-          url: address,
-          active: false,
-        })
-      ).id,
-    url,
-  );
-  if (id === undefined) throw new Error(`${view.name} opened no tab.`);
-  return { id, url };
+  return { id: await openTab(profile, url), url };
 }
-
-const isActive = ({ profile }: Member, tabId: number) =>
-  profile.serviceWorker.evaluate(
-    async (id) => (await (globalThis as unknown as ChromeGlobal).chrome.tabs.get(id)).active,
-    tabId,
-  );
 
 /** The first line `member` logs from line `from` on that contains `text`, waiting for it. */
 const logged = (member: Member, text: string, from = 0) =>
@@ -146,13 +99,13 @@ test("a worker's commands over its verified link are refused by another worker a
   const heard = sender.log.length;
   for (const to of [other, master]) {
     const tab = await tabBehind(to, baseURL);
-    await sendOverLink(sender, to, { type: "ACTIVATE_TAB", tabId: tab.id });
-    await sendOverLink(sender, to, { type: "SESSION_START", tabId: tab.id });
+    await sendOverLink(sender.profile, to.profile, { type: "ACTIVATE_TAB", tabId: tab.id });
+    await sendOverLink(sender.profile, to.profile, { type: "SESSION_START", tabId: tab.id });
     for (const type of ["ACTIVATE_TAB", "SESSION_START"]) {
       const refusal = `REFUSED ${type} from ${sender.profile.profileId}: not the bound master`;
       expect(await logged(to, refusal), to.log.join("\n")).toBeDefined();
     }
-    expect(await isActive(to, tab.id)).toBe(false);
+    expect(await isActive(to.profile, tab.id)).toBe(false);
     expect(await storedSession(to.profile.serviceWorker)).toBeNull();
   }
   // A refused command gets no answer at all.
@@ -171,7 +124,7 @@ test("the master's command runs in a worker, whose result and status reach the m
   const tab = await tabBehind(worker, baseURL);
   const item = listOf(master.view, worker.view).getByRole("listitem").filter({ hasText: tab.url });
   await item.getByRole("button", { name: "Show tab" }).click();
-  await expect.poll(() => isActive(worker, tab.id)).toBe(true);
+  await expect.poll(() => isActive(worker.profile, tab.id)).toBe(true);
   expect(await logged(master, "received TABS_CHANGED", from)).toBeDefined();
   expect(await logged(master, "received COMMAND_RESULT", from)).toBeDefined();
 
@@ -211,7 +164,11 @@ test("a role=master a worker writes into its presence, a signal, or a message ch
     await writeFile(path, JSON.stringify({ ...stamped, code: "x", role: "master" }));
   }
   const tab = await tabBehind(other, baseURL);
-  await sendOverLink(forger, other, { type: "SESSION_START", tabId: tab.id, role: "master" });
+  await sendOverLink(forger.profile, other.profile, {
+    type: "SESSION_START",
+    tabId: tab.id,
+    role: "master",
+  });
   expect(await logged(other, "dropped an invalid frame"), other.log.join("\n")).toBeDefined();
   await delay(QUIET_MS);
 
@@ -219,9 +176,9 @@ test("a role=master a worker writes into its presence, a signal, or a message ch
   expect(await boundWorkers()).toEqual(boundBefore);
   expect(await storedSession(other.profile.serviceWorker)).toBeNull();
   // Still a worker to the others: its next command is refused as before.
-  await sendOverLink(forger, other, { type: "ACTIVATE_TAB", tabId: tab.id });
+  await sendOverLink(forger.profile, other.profile, { type: "ACTIVATE_TAB", tabId: tab.id });
   const refusal = `REFUSED ACTIVATE_TAB from ${forger.profile.profileId}: not the bound master`;
   expect(await logged(other, refusal), other.log.join("\n")).toBeDefined();
-  expect(await isActive(other, tab.id)).toBe(false);
+  expect(await isActive(other.profile, tab.id)).toBe(false);
   await expect(listOf(forger.view, master.view)).toContainText(NOT_MASTER);
 });
