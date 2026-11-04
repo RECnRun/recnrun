@@ -18,7 +18,7 @@ export const ALICE = "11111111-1111-4111-8111-111111111111";
 export const BOB = "22222222-2222-4222-8222-222222222222";
 export const CAROL = "33333333-3333-4333-8333-333333333333";
 // PRESENCE_TTL_MS: a registration lives exactly this long after it is stamped.
-export const PRESENCE_TTL_MS = 60_000;
+const PRESENCE_TTL_MS = 60_000;
 // Where normalized() puts each peer's expiry, one TTL after the fixed lastSeenAt's second.
 const EXPIRES = 1_800_000_060_000;
 export const EX_USAGE = 64;
