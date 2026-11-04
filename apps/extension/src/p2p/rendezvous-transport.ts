@@ -1,4 +1,4 @@
-import type { Presence, Seen, SignalFile, StampedSignal } from "@/p2p/folder-rendezvous";
+import type { Presence, Seen, Sighting, SignalFile, StampedSignal } from "@/p2p/folder-rendezvous";
 import type { RegistryPeer } from "@/p2p/registry";
 
 /*
@@ -20,12 +20,6 @@ export interface RendezvousTransport {
   discover(): Promise<RegistryPeer[]>;
   /** Removes this profile's own files, and never another's. */
   clean(): Promise<void>;
-}
-
-/** What a transport read before sifting: each presence keeps the boot that wrote it. */
-export interface Sighting {
-  presences: (Presence & { boot: string })[];
-  signals: StampedSignal[];
 }
 
 /**

@@ -37,6 +37,19 @@ export type SignalFile = v.InferOutput<typeof SignalFileSchema>;
 /** The run of a profile's process that wrote a file, so a reader tells an earlier run's apart. */
 const BootSchema = v.pipe(v.string(), v.uuid());
 
+/** A presence as the folder stores it: with the boot of the document that wrote it. */
+const FolderPresenceSchema = v.strictObject({
+  // PresenceSchema's entries spelled out: a spread of them would stay in the production background.
+  profileId: ProfileIdSchema,
+  displayName: DisplayNameSchema,
+  fingerprint: FingerprintSchema,
+  createdAt: v.number(),
+  expiresAt: v.number(),
+  boot: BootSchema,
+});
+
+export type FolderPresence = v.InferOutput<typeof FolderPresenceSchema>;
+
 /**
  * A signal as a transport stores it: stamped with its sender's boot and a sequence that grows with
  * each signal of that boot, so a reader drops an earlier run's file or a late, older write.
@@ -54,6 +67,12 @@ const StampedSignalSchema = v.strictObject({
 });
 
 export type StampedSignal = v.InferOutput<typeof StampedSignalSchema>;
+
+/** What a transport read for this profile: each file still carries its boot, and a signal its sequence. */
+export interface Sighting {
+  presences: (Presence & { boot: string })[];
+  signals: StampedSignal[];
+}
 
 /** What the other profiles left for this one. */
 export interface Seen {
@@ -97,10 +116,12 @@ async function readOwner(folder: Directory, owner: string, me: string, now: numb
   // A file counts only in its owner's folder, and only until it expires.
   const current = (item: { profileId: string; expiresAt: number } | undefined) =>
     item?.profileId === owner && item.expiresAt > now ? item : undefined;
-  const presence = await readFile(folder, PRESENCE_FILE, PresenceSchema).catch(() => undefined);
-  const signals: SignalFile[] = [];
+  const presence = await readFile(folder, PRESENCE_FILE, FolderPresenceSchema).catch(
+    () => undefined,
+  );
+  const signals: StampedSignal[] = [];
   for (const name of (await namesIn(folder)).filter((each) => SIGNAL_NAME.test(each))) {
-    const signal = await readFile(folder, name, SignalFileSchema).catch(() => undefined);
+    const signal = await readFile(folder, name, StampedSignalSchema).catch(() => undefined);
     if (current(signal) && signal?.to === me) signals.push(signal);
   }
   return { presence: current(presence) && presence, signals };
@@ -116,15 +137,16 @@ export function folderRendezvous(pairing: Directory, me: string, now: () => numb
     const folder = await own();
     for (const name of (await namesIn(folder)).filter(matches)) await folder.removeEntry(name);
   };
-  const announce = async (presence: Presence) => writeFile(await own(), PRESENCE_FILE, presence);
+  const announce = async (presence: FolderPresence) =>
+    writeFile(await own(), PRESENCE_FILE, presence);
   /**
    * Replaces this profile's earlier signal of the same kind for the same profile, so only the
    * current one counts, and answers to two offerers both stay until each reads its own.
    */
-  const publish = async (signal: SignalFile) =>
+  const publish = async (signal: StampedSignal) =>
     writeFile(await own(), `${signal.kind}-${signal.to}.json`, signal);
-  const look = async (): Promise<Seen> => {
-    const seen: Seen = { presences: [], signals: [] };
+  const look = async (): Promise<Sighting> => {
+    const seen: Sighting = { presences: [], signals: [] };
     for (const owner of await namesIn(pairing)) {
       if (owner === me || !v.is(ProfileIdSchema, owner)) continue;
       const folder = await pairing.getDirectoryHandle(owner).catch(() => undefined);

@@ -9,6 +9,7 @@ import { MemoryDirectory } from "./memory-directory";
 const NOW = 1_700_000_000_000;
 const PAIRING = "44444444-4444-4444-8444-444444444444";
 const IDENTITY = { profileId: ME, displayName: "Laptop" };
+const PEER_BOOT = "66666666-6666-4666-8666-666666666666";
 
 const peerPresence: Presence = {
   profileId: PEER,
@@ -54,9 +55,10 @@ describe("watch", () => {
       fingerprint: "11:22",
       createdAt: NOW,
       expiresAt: NOW + PRESENCE_TTL_MS,
+      boot: expect.any(String),
     });
     expect(events).toEqual([sighting()]);
-    pairing(PEER).drop("presence.json", peerPresence);
+    pairing(PEER).drop("presence.json", { ...peerPresence, boot: PEER_BOOT });
     await vi.advanceTimersByTimeAsync(1000);
     await vi.advanceTimersByTimeAsync(1000);
     expect(events).toEqual([sighting(), sighting([peerPresence])]);
@@ -86,7 +88,7 @@ describe("watch", () => {
     const broken = vi.spyOn(chosen, "getDirectoryHandle").mockRejectedValue(new Error("Gone."));
     await vi.advanceTimersByTimeAsync(1000);
     broken.mockRestore();
-    pairing(PEER).drop("presence.json", peerPresence);
+    pairing(PEER).drop("presence.json", { ...peerPresence, boot: PEER_BOOT });
     await vi.advanceTimersByTimeAsync(1000);
     expect(events).toEqual([sighting(), sighting([peerPresence])]);
   });
@@ -113,7 +115,7 @@ describe("publish and stop", () => {
     expect([...pairing(ME).files.keys()]).toEqual(["presence.json", `offer-${PEER}.json`]);
     await watch.stop();
     expect([...pairing(ME).files.keys()]).toEqual([]);
-    pairing(PEER).drop("presence.json", peerPresence);
+    pairing(PEER).drop("presence.json", { ...peerPresence, boot: PEER_BOOT });
     await vi.advanceTimersByTimeAsync(20_000);
     expect(events).toEqual([sighting()]);
   });

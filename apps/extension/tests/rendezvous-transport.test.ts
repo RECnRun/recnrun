@@ -188,9 +188,10 @@ describe.each(environments)("the $kind transport", ({ create }) => {
 
   test("a second instance on the same root sees the first's presence", async () => {
     const env = create();
+    const mine = presence(ME);
     await announced(env, ME);
     vi.advanceTimersByTime(1000);
     const later = env.transport(PEER);
-    expect(await later.look()).toEqual({ presences: [presence(ME)], signals: [] });
+    expect(await later.look()).toEqual({ presences: [mine], signals: [] });
   });
 });

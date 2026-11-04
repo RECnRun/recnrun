@@ -1,7 +1,7 @@
 import { describe, expect, test, vi } from "vite-plus/test";
 import { PAIRING_TTL_MS, encodePairing } from "@/p2p/pairing-code";
 import { PRESENCE_TTL_MS, folderRendezvous, signalFileOf } from "@/p2p/folder-rendezvous";
-import type { Presence, SignalFile } from "@/p2p/folder-rendezvous";
+import type { FolderPresence, StampedSignal } from "@/p2p/folder-rendezvous";
 import { ME, PEER, STRANGER } from "./fake-peer";
 import { MemoryDirectory } from "./memory-directory";
 
@@ -10,19 +10,21 @@ type Directory = Parameters<typeof folderRendezvous>[0];
 const NOW = 1_700_000_000_000;
 const PAIRING = "44444444-4444-4444-8444-444444444444";
 const OTHER_PAIRING = "55555555-5555-4555-8555-555555555555";
+const BOOT = "66666666-6666-4666-8666-666666666666";
 
-function presence(overrides: Partial<Presence> = {}): Presence {
+function presence(overrides: Partial<FolderPresence> = {}): FolderPresence {
   return {
     profileId: PEER,
     displayName: "Desk",
     fingerprint: "AB:CD:EF",
     createdAt: NOW - 1000,
     expiresAt: NOW + PRESENCE_TTL_MS,
+    boot: BOOT,
     ...overrides,
   };
 }
 
-function signal(overrides: Partial<SignalFile> = {}): SignalFile {
+function signal(overrides: Partial<StampedSignal> = {}): StampedSignal {
   return {
     kind: "offer",
     pairingId: PAIRING,
@@ -30,6 +32,8 @@ function signal(overrides: Partial<SignalFile> = {}): SignalFile {
     to: ME,
     expiresAt: NOW + PAIRING_TTL_MS,
     code: "RECNRUN-PAIR-1.code",
+    boot: BOOT,
+    sequence: NOW,
     ...overrides,
   };
 }

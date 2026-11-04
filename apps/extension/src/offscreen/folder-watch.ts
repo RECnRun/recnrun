@@ -1,7 +1,8 @@
 import type { LinkEvent } from "@/messaging/peer-messages";
-import { PRESENCE_TTL_MS, folderRendezvous } from "@/p2p/folder-rendezvous";
+import { PRESENCE_TTL_MS } from "@/p2p/folder-rendezvous";
 import type { Presence, SignalFile } from "@/p2p/folder-rendezvous";
-import { PAIRING_FOLDER, loadFolder } from "@/p2p/folder-store";
+import { folderTransport, loadFolder } from "@/p2p/folder-store";
+import type { RendezvousTransport } from "@/p2p/rendezvous-transport";
 
 const POLL_MS = 1000;
 /** An unchanged sighting goes again this often, in case the service worker missed it asleep. */
@@ -24,14 +25,16 @@ export function createFolderWatch({ report, fingerprint, folder = loadFolder }: 
   let me: Presence | undefined;
   let timer: ReturnType<typeof setInterval> | undefined;
   let last = { key: "", at: 0 };
-  const rendezvous = async (profileId: string) => {
-    const chosen = await folder();
-    if (!chosen) throw new Error("Choose the RECnRun folder first.");
-    const pairing = await chosen.getDirectoryHandle(PAIRING_FOLDER, { create: true });
-    return folderRendezvous(pairing, profileId);
+  // One boot per document, so a document made again stamps its files apart from this one's.
+  const boot = crypto.randomUUID();
+  let held: { me: string; transport: RendezvousTransport } | undefined;
+  // Kept per profile, so its stamps keep growing and its filter remembers what it saw.
+  const rendezvous = (me: string) => {
+    if (held?.me !== me) held = { me, transport: folderTransport({ me, boot, load: folder }) };
+    return held.transport;
   };
   const look = async (presence: Presence) => {
-    const at = await rendezvous(presence.profileId);
+    const at = rendezvous(presence.profileId);
     if (presence.expiresAt - Date.now() < PRESENCE_TTL_MS / 2) {
       me = { ...presence, expiresAt: Date.now() + PRESENCE_TTL_MS };
       await at.announce(me);
@@ -50,15 +53,14 @@ export function createFolderWatch({ report, fingerprint, folder = loadFolder }: 
     // A failed read, as while Chrome asks for the folder again, waits for the next poll.
     timer ??= setInterval(() => void (me && look(me).catch(() => {})), POLL_MS);
   };
-  const publish = async (signal: SignalFile) =>
-    (await rendezvous(signal.profileId)).publish(signal);
+  const publish = (signal: SignalFile) => rendezvous(signal.profileId).publish(signal);
   /** Stops waiting, and leaves nothing of this profile's behind in the folder. */
   const stop = async () => {
     clearInterval(timer);
     timer = undefined;
     const stopped = me;
     me = undefined;
-    if (stopped) await (await rendezvous(stopped.profileId)).clean();
+    if (stopped) await rendezvous(stopped.profileId).clean();
   };
   return { watch, publish, stop };
 }

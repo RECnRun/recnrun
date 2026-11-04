@@ -189,6 +189,7 @@ describe("the folder", () => {
       fingerprint: "AB:CD",
       createdAt: expect.any(Number),
       expiresAt: expect.any(Number),
+      boot: expect.any(String),
     });
     const signal = {
       kind: "offer" as const,
