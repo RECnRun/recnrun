@@ -1,0 +1,472 @@
+[
+  {
+    "experiment": "E5",
+    "hypothesis": "E5.a.arrival",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "Default plus one worker, one shared Downloads root",
+    "debugger": "none",
+    "observations": [
+      {
+        "offerToAnswererMs": 354,
+        "answerToOffererMs": 552,
+        "linkMs": 8,
+        "pollMs": 1000
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "mode": "smoke",
+    "verdict": "pass",
+    "samples": 1
+  },
+  {
+    "experiment": "E5",
+    "hypothesis": "E5.a.iceComplete",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "Default plus one worker, one shared Downloads root",
+    "debugger": "none",
+    "observations": [
+      {
+        "offerCandidates": 2,
+        "answerCandidates": 1,
+        "offerWrites": 1,
+        "answerWrites": 1,
+        "linkMs": 7
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "mode": "smoke",
+    "verdict": "pass",
+    "samples": 1
+  },
+  {
+    "experiment": "E5",
+    "hypothesis": "E5.a.previousRun",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "Default plus one worker and a virtual peer the test writes, one shared Downloads root",
+    "debugger": "none",
+    "observations": [
+      {
+        "firstAnswered": true,
+        "earlierBootIgnored": true,
+        "earlierPresenceIgnored": true,
+        "currentBootAnswered": true,
+        "lowerSequenceIgnored": true,
+        "higherSequenceAnswered": true,
+        "pairLinked": true,
+        "answerMs": [605, 722, 692]
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "mode": "smoke",
+    "verdict": "pass",
+    "samples": 1
+  },
+  {
+    "experiment": "E5",
+    "hypothesis": "E5.a.simultaneous",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "Default plus one worker, one shared Downloads root",
+    "debugger": "none",
+    "observations": [
+      {
+        "listedInFirstCatalog": 2,
+        "lowerOffers": 1,
+        "higherOffers": 0,
+        "higherAnswers": 1,
+        "linkMs": 1910
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "mode": "smoke",
+    "verdict": "pass",
+    "samples": 1
+  },
+  {
+    "experiment": "E5",
+    "hypothesis": "E5.a.duplicate",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "Default plus one worker and a virtual peer the test writes, one shared Downloads root",
+    "debugger": "none",
+    "observations": [
+      {
+        "offerAnswered": true,
+        "oneAnswerPerOffer": true,
+        "answerAccepted": true,
+        "repeatedAnswerChangesNothing": true,
+        "pairLinked": true,
+        "repeatedAnswers": 0,
+        "answerMs": [524]
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "mode": "smoke",
+    "verdict": "pass",
+    "samples": 1
+  },
+  {
+    "experiment": "E5",
+    "hypothesis": "E5.a.expired",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "Default plus one worker and a virtual peer the test writes, one shared Downloads root",
+    "debugger": "none",
+    "observations": [
+      {
+        "firstAnswered": true,
+        "expiredOfferIgnored": true,
+        "expiredPresenceRefused": true,
+        "expiredPresenceOfferIgnored": true,
+        "freshPresenceListed": true,
+        "freshPresenceAnswered": true,
+        "lastAnswered": true,
+        "pairLinked": true,
+        "catalogLog": "catalog.sh: skipped r1/00000000-0000-4000-8000-000000000001: expired",
+        "answerMs": [555, 438, 879]
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "mode": "smoke",
+    "verdict": "pass",
+    "samples": 1
+  },
+  {
+    "experiment": "E5",
+    "hypothesis": "E5.a.corrupt",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "Default plus one worker and a virtual peer the test writes, one shared Downloads root",
+    "debugger": "none",
+    "observations": [
+      {
+        "firstAnswered": true,
+        "truncatedIgnored": true,
+        "badIdIgnored": true,
+        "contradictingIgnored": true,
+        "reorderedPresenceRefused": true,
+        "reorderedPresenceOfferIgnored": true,
+        "lastAnswered": true,
+        "pairLinked": true,
+        "reorderedAnswered": true,
+        "catalogLog": "catalog.sh: skipped r1/00000000-0000-4000-8000-000000000001: expected {\"profileId\":\"",
+        "answerMs": [477, 451, 564]
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "mode": "smoke",
+    "verdict": "pass",
+    "samples": 1
+  },
+  {
+    "experiment": "E5",
+    "hypothesis": "E5.a.clockChange",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "Default plus one worker and a virtual peer the test writes, one shared Downloads root",
+    "debugger": "none",
+    "observations": [
+      {
+        "firstAnswered": true,
+        "aheadRefused": true,
+        "aheadOfferIgnored": true,
+        "behindRefused": true,
+        "withinSkewListed": true,
+        "withinSkewAnswered": true,
+        "nextBootAnswered": true,
+        "pairLinked": true,
+        "farExpiryAnswered": true,
+        "farSequenceAnswered": true,
+        "heardAfterStampReset": false,
+        "aheadLog": "catalog.sh: skipped r1/00000000-0000-4000-8000-000000000001: createdAt is ahead of this clock",
+        "behindLog": "catalog.sh: skipped r1/00000000-0000-4000-8000-000000000001: expired",
+        "answerMs": [479, 3478, 825, 808, 718]
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "mode": "smoke",
+    "verdict": "pass",
+    "samples": 1
+  },
+  {
+    "experiment": "E5",
+    "hypothesis": "E5.a.quitDuringIce",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "Default plus one worker, one shared Downloads root",
+    "debugger": "none",
+    "observations": [
+      {
+        "readBeforeKill": true,
+        "answerOutBeforeKill": false,
+        "relinkAfterKillMs": 1191,
+        "sameProfileId": true
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "mode": "smoke",
+    "verdict": "pass",
+    "samples": 1
+  },
+  {
+    "experiment": "E5",
+    "hypothesis": "E5.a.bothRestart",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "Default plus one worker, one shared Downloads root",
+    "debugger": "none",
+    "observations": [
+      {
+        "relinkAfterQuitMs": 1468,
+        "newBoots": true,
+        "sameProfileIds": true,
+        "samePins": true
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "mode": "smoke",
+    "verdict": "pass",
+    "samples": 1
+  },
+  {
+    "experiment": "E5",
+    "hypothesis": "E5.a.readCache",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "Default plus one worker and a virtual peer the test writes, one shared Downloads root",
+    "debugger": "none",
+    "observations": [
+      {
+        "delays": [640, 842, 902, 803],
+        "pairLinked": true
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "mode": "smoke",
+    "verdict": "pass",
+    "samples": 1
+  },
+  {
+    "experiment": "E5",
+    "hypothesis": "E5.a.noPage",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "Default plus one worker, one shared Downloads root",
+    "debugger": "none",
+    "observations": [
+      {
+        "workersAfterIdle": {
+          "Default": true,
+          "Worker 1": true
+        },
+        "workersUnattended": {
+          "Default": true,
+          "Worker 1": true
+        },
+        "exchangedAfterKillMs": 12356,
+        "earlierOfferAnswers": 2
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "mode": "smoke",
+    "verdict": "pass",
+    "samples": 1
+  },
+  {
+    "experiment": "E5",
+    "hypothesis": "E5.a.closePages",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "Default plus one worker, one shared Downloads root",
+    "debugger": "none",
+    "observations": [
+      {
+        "rewrites": [5, 5],
+        "longestGapsMs": [30002, 30002],
+        "workers": {
+          "Default": true,
+          "Worker 1": true
+        },
+        "newOffers": 0
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "mode": "smoke",
+    "verdict": "pass",
+    "samples": 1
+  },
+  {
+    "experiment": "E5",
+    "hypothesis": "E5.b.mesh",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "Default plus four workers, one shared Downloads root",
+    "debugger": "none",
+    "observations": [
+      {
+        "listedInFirstCatalog": 5,
+        "linkMs": 2050,
+        "pairsThroughFiles": 10
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "mode": "smoke",
+    "verdict": "pass",
+    "samples": 1
+  },
+  {
+    "experiment": "E5",
+    "hypothesis": "E5.b.fifth",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "Default plus four workers, one shared Downloads root",
+    "debugger": "none",
+    "observations": [
+      {
+        "workersBefore": [true, true, true, true],
+        "workersAfter": [true, true, true, true],
+        "joinMs": 2838,
+        "linked": true
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "mode": "smoke",
+    "verdict": "pass",
+    "samples": 1
+  },
+  {
+    "experiment": "E5",
+    "hypothesis": "E5.b.killExecutor",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "Default plus four workers, one shared Downloads root",
+    "debugger": "none",
+    "observations": [
+      {
+        "droppedAfterMs": 3368,
+        "restIntact": true,
+        "relinked": true,
+        "sameProfileId": true,
+        "samePins": true
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "mode": "smoke",
+    "verdict": "pass",
+    "samples": 1
+  },
+  {
+    "experiment": "E5",
+    "hypothesis": "E5.b.disconnectForget",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "Default plus four workers, one shared Downloads root",
+    "debugger": "none",
+    "verdict": "fail",
+    "error": "pairAgainOffered did not hold",
+    "samples": 1,
+    "gestures": 0,
+    "steps": [],
+    "observations": [
+      {
+        "disconnectShown": true,
+        "disconnectHeld": true,
+        "othersKept": true,
+        "reconnected": true,
+        "forgetRemovesLine": true,
+        "forgetClearsTrust": true,
+        "forgetHeld": true,
+        "pairAgainOffered": false,
+        "pairedAgain": true
+      }
+    ],
+    "mode": "smoke"
+  }
+]

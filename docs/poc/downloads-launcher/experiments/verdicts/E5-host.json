@@ -1,0 +1,575 @@
+[
+  {
+    "experiment": "E5",
+    "hypothesis": "E5.a.arrival",
+    "chrome": "Google Chrome 156.0.8078.80",
+    "environment": "host",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "Default plus one worker, one shared Downloads root",
+    "debugger": "none",
+    "observations": [
+      {
+        "offerToAnswererMs": 806,
+        "answerToOffererMs": 105,
+        "linkMs": 2,
+        "pollMs": 1000
+      },
+      {
+        "offerToAnswererMs": 80,
+        "answerToOffererMs": 836,
+        "linkMs": 2,
+        "pollMs": 1000
+      },
+      {
+        "offerToAnswererMs": 128,
+        "answerToOffererMs": 780,
+        "linkMs": 2,
+        "pollMs": 1000
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "E5",
+    "hypothesis": "E5.a.iceComplete",
+    "chrome": "Google Chrome 156.0.8078.80",
+    "environment": "host",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "Default plus one worker, one shared Downloads root",
+    "debugger": "none",
+    "observations": [
+      {
+        "offerCandidates": 2,
+        "answerCandidates": 1,
+        "offerWrites": 1,
+        "answerWrites": 1,
+        "linkMs": 2
+      },
+      {
+        "offerCandidates": 2,
+        "answerCandidates": 1,
+        "offerWrites": 1,
+        "answerWrites": 1,
+        "linkMs": 2
+      },
+      {
+        "offerCandidates": 2,
+        "answerCandidates": 1,
+        "offerWrites": 1,
+        "answerWrites": 1,
+        "linkMs": 4
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "E5",
+    "hypothesis": "E5.a.previousRun",
+    "chrome": "Google Chrome 156.0.8078.80",
+    "environment": "host",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "Default plus one worker and a virtual peer the test writes, one shared Downloads root",
+    "debugger": "none",
+    "observations": [
+      {
+        "firstAnswered": true,
+        "earlierBootIgnored": true,
+        "earlierPresenceIgnored": true,
+        "currentBootAnswered": true,
+        "lowerSequenceIgnored": true,
+        "higherSequenceAnswered": true,
+        "pairLinked": true,
+        "answerMs": [954, 532, 622]
+      },
+      {
+        "firstAnswered": true,
+        "earlierBootIgnored": true,
+        "earlierPresenceIgnored": true,
+        "currentBootAnswered": true,
+        "lowerSequenceIgnored": true,
+        "higherSequenceAnswered": true,
+        "pairLinked": true,
+        "answerMs": [971, 577, 692]
+      },
+      {
+        "firstAnswered": true,
+        "earlierBootIgnored": true,
+        "earlierPresenceIgnored": true,
+        "currentBootAnswered": true,
+        "lowerSequenceIgnored": true,
+        "higherSequenceAnswered": true,
+        "pairLinked": true,
+        "answerMs": [938, 497, 690]
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "E5",
+    "hypothesis": "E5.a.simultaneous",
+    "chrome": "Google Chrome 156.0.8078.80",
+    "environment": "host",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "Default plus one worker, one shared Downloads root",
+    "debugger": "none",
+    "observations": [
+      {
+        "listedInFirstCatalog": 2,
+        "lowerOffers": 1,
+        "higherOffers": 0,
+        "higherAnswers": 1,
+        "linkMs": 1174
+      },
+      {
+        "listedInFirstCatalog": 2,
+        "lowerOffers": 1,
+        "higherOffers": 0,
+        "higherAnswers": 1,
+        "linkMs": 1263
+      },
+      {
+        "listedInFirstCatalog": 2,
+        "lowerOffers": 1,
+        "higherOffers": 0,
+        "higherAnswers": 1,
+        "linkMs": 1288
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "E5",
+    "hypothesis": "E5.a.duplicate",
+    "chrome": "Google Chrome 156.0.8078.80",
+    "environment": "host",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "Default plus one worker and a virtual peer the test writes, one shared Downloads root",
+    "debugger": "none",
+    "observations": [
+      {
+        "offerAnswered": true,
+        "oneAnswerPerOffer": true,
+        "answerAccepted": true,
+        "repeatedAnswerChangesNothing": true,
+        "pairLinked": true,
+        "repeatedAnswers": 0,
+        "answerMs": [985]
+      },
+      {
+        "offerAnswered": true,
+        "oneAnswerPerOffer": true,
+        "answerAccepted": true,
+        "repeatedAnswerChangesNothing": true,
+        "pairLinked": true,
+        "repeatedAnswers": 0,
+        "answerMs": [939]
+      },
+      {
+        "offerAnswered": true,
+        "oneAnswerPerOffer": true,
+        "answerAccepted": true,
+        "repeatedAnswerChangesNothing": true,
+        "pairLinked": true,
+        "repeatedAnswers": 0,
+        "answerMs": [986]
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "E5",
+    "hypothesis": "E5.a.clockChange",
+    "chrome": "Google Chrome 156.0.8078.80",
+    "environment": "host",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "Default plus one worker and a virtual peer the test writes, one shared Downloads root",
+    "debugger": "none",
+    "observations": [
+      {
+        "firstAnswered": true,
+        "aheadRefused": true,
+        "aheadOfferIgnored": true,
+        "behindRefused": true,
+        "withinSkewListed": true,
+        "withinSkewAnswered": true,
+        "nextBootAnswered": true,
+        "pairLinked": true,
+        "farExpiryAnswered": true,
+        "farSequenceAnswered": true,
+        "heardAfterStampReset": false,
+        "aheadLog": "catalog.sh: skipped r1/00000000-0000-4000-8000-000000000001: createdAt is ahead of this clock",
+        "behindLog": "catalog.sh: skipped r1/00000000-0000-4000-8000-000000000001: expired",
+        "answerMs": [1001, 3396, 691, 679, 358]
+      },
+      {
+        "firstAnswered": true,
+        "aheadRefused": true,
+        "aheadOfferIgnored": true,
+        "behindRefused": true,
+        "withinSkewListed": true,
+        "withinSkewAnswered": true,
+        "nextBootAnswered": true,
+        "pairLinked": true,
+        "farExpiryAnswered": true,
+        "farSequenceAnswered": true,
+        "heardAfterStampReset": false,
+        "aheadLog": "catalog.sh: skipped r1/00000000-0000-4000-8000-000000000001: createdAt is ahead of this clock",
+        "behindLog": "catalog.sh: skipped r1/00000000-0000-4000-8000-000000000001: expired",
+        "answerMs": [971, 3252, 651, 624, 375]
+      },
+      {
+        "firstAnswered": true,
+        "aheadRefused": true,
+        "aheadOfferIgnored": true,
+        "behindRefused": true,
+        "withinSkewListed": true,
+        "withinSkewAnswered": true,
+        "nextBootAnswered": true,
+        "pairLinked": true,
+        "farExpiryAnswered": true,
+        "farSequenceAnswered": true,
+        "heardAfterStampReset": false,
+        "aheadLog": "catalog.sh: skipped r1/00000000-0000-4000-8000-000000000001: createdAt is ahead of this clock",
+        "behindLog": "catalog.sh: skipped r1/00000000-0000-4000-8000-000000000001: expired",
+        "answerMs": [924, 3298, 653, 620, 395]
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "E5",
+    "hypothesis": "E5.a.quitDuringIce",
+    "chrome": "Google Chrome 156.0.8078.80",
+    "environment": "host",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "Default plus one worker, one shared Downloads root",
+    "debugger": "none",
+    "observations": [
+      {
+        "readBeforeKill": true,
+        "answerOutBeforeKill": false,
+        "relinkAfterKillMs": 1220,
+        "sameProfileId": true
+      },
+      {
+        "readBeforeKill": true,
+        "answerOutBeforeKill": true,
+        "relinkAfterKillMs": 32899,
+        "sameProfileId": true
+      },
+      {
+        "readBeforeKill": true,
+        "answerOutBeforeKill": false,
+        "relinkAfterKillMs": 984,
+        "sameProfileId": true
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "E5",
+    "hypothesis": "E5.a.bothRestart",
+    "chrome": "Google Chrome 156.0.8078.80",
+    "environment": "host",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "Default plus one worker, one shared Downloads root",
+    "debugger": "none",
+    "observations": [
+      {
+        "relinkAfterQuitMs": 1666,
+        "newBoots": true,
+        "sameProfileIds": true,
+        "samePins": true
+      },
+      {
+        "relinkAfterQuitMs": 2189,
+        "newBoots": true,
+        "sameProfileIds": true,
+        "samePins": true
+      },
+      {
+        "relinkAfterQuitMs": 2185,
+        "newBoots": true,
+        "sameProfileIds": true,
+        "samePins": true
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "E5",
+    "hypothesis": "E5.a.readCache",
+    "chrome": "Google Chrome 156.0.8078.80",
+    "environment": "host",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "Default plus one worker and a virtual peer the test writes, one shared Downloads root",
+    "debugger": "none",
+    "observations": [
+      {
+        "delays": [985, 820, 865, 765],
+        "pairLinked": true
+      },
+      {
+        "delays": [932, 828, 782, 781],
+        "pairLinked": true
+      },
+      {
+        "delays": [970, 819, 861, 861],
+        "pairLinked": true
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "E5",
+    "hypothesis": "E5.a.noPage",
+    "chrome": "Google Chrome 156.0.8078.80",
+    "environment": "host",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "Default plus one worker, one shared Downloads root",
+    "debugger": "none",
+    "observations": [
+      {
+        "workersAfterIdle": {
+          "Default": true,
+          "Worker 1": true
+        },
+        "workersUnattended": {
+          "Default": true,
+          "Worker 1": true
+        },
+        "exchangedAfterKillMs": 11704,
+        "earlierOfferAnswers": 2
+      },
+      {
+        "workersAfterIdle": {
+          "Default": true,
+          "Worker 1": true
+        },
+        "workersUnattended": {
+          "Default": true,
+          "Worker 1": true
+        },
+        "exchangedAfterKillMs": 11701,
+        "earlierOfferAnswers": 2
+      },
+      {
+        "workersAfterIdle": {
+          "Default": true,
+          "Worker 1": true
+        },
+        "workersUnattended": {
+          "Default": true,
+          "Worker 1": true
+        },
+        "exchangedAfterKillMs": 11720,
+        "earlierOfferAnswers": 2
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "E5",
+    "hypothesis": "E5.a.closePages",
+    "chrome": "Google Chrome 156.0.8078.80",
+    "environment": "host",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "Default plus one worker, one shared Downloads root",
+    "debugger": "none",
+    "observations": [
+      {
+        "rewrites": [5, 5],
+        "longestGapsMs": [30001, 30002],
+        "workers": {
+          "Default": true,
+          "Worker 1": true
+        },
+        "newOffers": 0
+      },
+      {
+        "rewrites": [5, 5],
+        "longestGapsMs": [30001, 30003],
+        "workers": {
+          "Default": true,
+          "Worker 1": true
+        },
+        "newOffers": 0
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 2
+  },
+  {
+    "experiment": "E5",
+    "hypothesis": "E5.b.mesh",
+    "chrome": "Google Chrome 156.0.8078.80",
+    "environment": "host",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "Default plus four workers, one shared Downloads root",
+    "debugger": "none",
+    "observations": [
+      {
+        "listedInFirstCatalog": 5,
+        "linkMs": 2245,
+        "pairsThroughFiles": 10
+      },
+      {
+        "listedInFirstCatalog": 5,
+        "linkMs": 3004,
+        "pairsThroughFiles": 10
+      },
+      {
+        "listedInFirstCatalog": 5,
+        "linkMs": 2494,
+        "pairsThroughFiles": 10
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "E5",
+    "hypothesis": "E5.b.fifth",
+    "chrome": "Google Chrome 156.0.8078.80",
+    "environment": "host",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "Default plus four workers, one shared Downloads root",
+    "debugger": "none",
+    "observations": [
+      {
+        "workersBefore": [true, true, true, true],
+        "workersAfter": [true, true, true, true],
+        "joinMs": 3578,
+        "linked": true
+      },
+      {
+        "workersBefore": [true, true, true, true],
+        "workersAfter": [true, true, true, true],
+        "joinMs": 3323,
+        "linked": true
+      },
+      {
+        "workersBefore": [true, true, true, true],
+        "workersAfter": [true, true, true, true],
+        "joinMs": 3062,
+        "linked": true
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "E5",
+    "hypothesis": "E5.b.killExecutor",
+    "chrome": "Google Chrome 156.0.8078.80",
+    "environment": "host",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "Default plus four workers, one shared Downloads root",
+    "debugger": "none",
+    "verdict": "pass",
+    "samples": 3,
+    "gestures": 0,
+    "steps": [],
+    "observations": [
+      {
+        "droppedAfterMs": 2915,
+        "restIntact": true,
+        "relinked": true,
+        "sameProfileId": true,
+        "samePins": true
+      },
+      {
+        "droppedAfterMs": 3049,
+        "restIntact": true,
+        "relinked": true,
+        "sameProfileId": true,
+        "samePins": true
+      },
+      {
+        "droppedAfterMs": 2854,
+        "restIntact": true,
+        "relinked": true,
+        "sameProfileId": true,
+        "samePins": true
+      }
+    ]
+  }
+]
