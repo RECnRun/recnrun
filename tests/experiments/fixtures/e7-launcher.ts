@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { readFile, rename, rm, writeFile } from "node:fs/promises";
+import { link, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { namespaceFolder, presenceIn } from "./e4-launcher.ts";
@@ -28,23 +28,56 @@ export const LAUNCHER_STAMPS = ["createdAt", "expiresAt"];
 const presencePath = (downloads: string, profileId: string) =>
   join(namespaceFolder(downloads), "peers", profileId, "presence.json");
 
-/** Rewrites one presence by a rename, unless the profile replaced the file since it was read. */
-async function restamp(downloads: string, profileId: string): Promise<boolean> {
+/** The calls that replace a presence file; tests wrap them to interleave a profile's own publication. */
+export const stampIo = { rename, link };
+
+/** A rejection handler that answers `value` for the errno `code` and rethrows any other. */
+const unless =
+  <T>(code: string, value: T) =>
+  (error: unknown) => {
+    if ((error as NodeJS.ErrnoException).code === code) return value;
+    throw error;
+  };
+
+async function fileAt(path: string) {
+  const [text, info] = await Promise.all([readFile(path, "utf8"), stat(path)]);
+  return { text, mtimeMs: info.mtimeMs };
+}
+
+/**
+ * Takes the file aside by an atomic rename, so what was taken is what is judged, then puts the
+ * stamped one back with a link that fails when the profile published in between: its newer boot,
+ * certificate, or statement always wins, and a taken file that is newer goes back.
+ */
+async function replaceIfUnchanged(
+  path: string,
+  temporary: string,
+  seen: Awaited<ReturnType<typeof fileAt>>,
+) {
+  const held = `${path}.${randomUUID()}.held`;
+  try {
+    const moved = await stampIo.rename(path, held).then(() => true, unless("ENOENT", false));
+    if (!moved) return false;
+    const taken = await fileAt(held);
+    const unchanged = taken.text === seen.text && taken.mtimeMs === seen.mtimeMs;
+    const linked = stampIo.link(unchanged ? temporary : held, path);
+    return await linked.then(() => unchanged, unless("EEXIST", false));
+  } finally {
+    await Promise.all([rm(held, { force: true }), rm(temporary, { force: true })]);
+  }
+}
+
+/** Rewrites one presence unless the profile replaced the file since it was read. */
+export async function restamp(downloads: string, profileId: string): Promise<boolean> {
   const path = presencePath(downloads, profileId);
-  const read = await readFile(path, "utf8").catch(() => undefined);
+  const seen = await fileAt(path).catch(unless("ENOENT", undefined));
   const presence = await presenceIn(downloads, profileId);
-  if (read === undefined || presence === undefined) return false;
+  if (seen === undefined || presence === undefined) return false;
   const now = Date.now();
   const text = JSON.stringify({ ...presence, createdAt: now, expiresAt: now + PRESENCE_TTL_MS });
   const temporary = `${path}.${randomUUID()}.tmp`;
   await writeFile(temporary, text);
-  // A profile's own write between the read and here carries a newer boot; it wins.
-  if ((await readFile(path, "utf8").catch(() => undefined)) !== read) {
-    await rm(temporary, { force: true });
-    return false;
-  }
-  await rename(temporary, path);
-  return true;
+  return replaceIfUnchanged(path, temporary, seen);
 }
 
 export interface LauncherPresence {
