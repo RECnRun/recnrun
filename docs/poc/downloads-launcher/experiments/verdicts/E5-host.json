@@ -12,21 +12,21 @@
     "debugger": "none",
     "observations": [
       {
-        "offerToAnswererMs": 806,
-        "answerToOffererMs": 105,
-        "linkMs": 2,
+        "offerToAnswererMs": 86,
+        "answerToOffererMs": 708,
+        "linkMs": 3,
         "pollMs": 1000
       },
       {
-        "offerToAnswererMs": 80,
-        "answerToOffererMs": 836,
-        "linkMs": 2,
+        "offerToAnswererMs": 751,
+        "answerToOffererMs": 25,
+        "linkMs": 107,
         "pollMs": 1000
       },
       {
-        "offerToAnswererMs": 128,
-        "answerToOffererMs": 780,
-        "linkMs": 2,
+        "offerToAnswererMs": 945,
+        "answerToOffererMs": 874,
+        "linkMs": 3,
         "pollMs": 1000
       }
     ],
@@ -48,25 +48,25 @@
     "debugger": "none",
     "observations": [
       {
-        "offerCandidates": 2,
-        "answerCandidates": 1,
+        "offerCandidates": 6,
+        "answerCandidates": 6,
+        "offerWrites": 1,
+        "answerWrites": 1,
+        "linkMs": 3
+      },
+      {
+        "offerCandidates": 6,
+        "answerCandidates": 6,
+        "offerWrites": 1,
+        "answerWrites": 1,
+        "linkMs": 11
+      },
+      {
+        "offerCandidates": 6,
+        "answerCandidates": 6,
         "offerWrites": 1,
         "answerWrites": 1,
         "linkMs": 2
-      },
-      {
-        "offerCandidates": 2,
-        "answerCandidates": 1,
-        "offerWrites": 1,
-        "answerWrites": 1,
-        "linkMs": 2
-      },
-      {
-        "offerCandidates": 2,
-        "answerCandidates": 1,
-        "offerWrites": 1,
-        "answerWrites": 1,
-        "linkMs": 4
       }
     ],
     "gestures": 0,
@@ -94,7 +94,7 @@
         "lowerSequenceIgnored": true,
         "higherSequenceAnswered": true,
         "pairLinked": true,
-        "answerMs": [954, 532, 622]
+        "answerMs": [724, 443, 629]
       },
       {
         "firstAnswered": true,
@@ -104,7 +104,7 @@
         "lowerSequenceIgnored": true,
         "higherSequenceAnswered": true,
         "pairLinked": true,
-        "answerMs": [971, 577, 692]
+        "answerMs": [522, 456, 598]
       },
       {
         "firstAnswered": true,
@@ -114,7 +114,7 @@
         "lowerSequenceIgnored": true,
         "higherSequenceAnswered": true,
         "pairLinked": true,
-        "answerMs": [938, 497, 690]
+        "answerMs": [566, 474, 727]
       }
     ],
     "gestures": 0,
@@ -139,21 +139,21 @@
         "lowerOffers": 1,
         "higherOffers": 0,
         "higherAnswers": 1,
-        "linkMs": 1174
+        "linkMs": 1936
       },
       {
         "listedInFirstCatalog": 2,
         "lowerOffers": 1,
         "higherOffers": 0,
         "higherAnswers": 1,
-        "linkMs": 1263
+        "linkMs": 2857
       },
       {
         "listedInFirstCatalog": 2,
         "lowerOffers": 1,
         "higherOffers": 0,
         "higherAnswers": 1,
-        "linkMs": 1288
+        "linkMs": 2150
       }
     ],
     "gestures": 0,
@@ -180,7 +180,7 @@
         "repeatedAnswerChangesNothing": true,
         "pairLinked": true,
         "repeatedAnswers": 0,
-        "answerMs": [985]
+        "answerMs": [783]
       },
       {
         "offerAnswered": true,
@@ -189,7 +189,7 @@
         "repeatedAnswerChangesNothing": true,
         "pairLinked": true,
         "repeatedAnswers": 0,
-        "answerMs": [939]
+        "answerMs": [557]
       },
       {
         "offerAnswered": true,
@@ -198,7 +198,7 @@
         "repeatedAnswerChangesNothing": true,
         "pairLinked": true,
         "repeatedAnswers": 0,
-        "answerMs": [986]
+        "answerMs": [928]
       }
     ],
     "gestures": 0,
@@ -217,10 +217,6 @@
     "variant": "poc-d0",
     "topology": "Default plus one worker and a virtual peer the test writes, one shared Downloads root",
     "debugger": "none",
-    "verdict": "pass",
-    "samples": 3,
-    "gestures": 0,
-    "steps": [],
     "observations": [
       {
         "firstAnswered": true,
@@ -235,10 +231,10 @@
         "heardAfterStampReset": true,
         "nextBootAnswered": true,
         "pairLinked": true,
-        "withinSkewMs": 251,
+        "withinSkewMs": 215,
         "aheadLog": "catalog.sh: skipped r1/00000000-0000-4000-8000-000000000001: createdAt is ahead of this clock",
         "behindLog": "catalog.sh: skipped r1/00000000-0000-4000-8000-000000000001: expired",
-        "answerMs": [767, 251, 1029, 660]
+        "answerMs": [583, 215, 1005, 645]
       },
       {
         "firstAnswered": true,
@@ -253,10 +249,10 @@
         "heardAfterStampReset": true,
         "nextBootAnswered": true,
         "pairLinked": true,
-        "withinSkewMs": 282,
+        "withinSkewMs": 295,
         "aheadLog": "catalog.sh: skipped r1/00000000-0000-4000-8000-000000000001: createdAt is ahead of this clock",
         "behindLog": "catalog.sh: skipped r1/00000000-0000-4000-8000-000000000001: expired",
-        "answerMs": [877, 282, 1059, 666]
+        "answerMs": [644, 295, 1098, 654]
       },
       {
         "firstAnswered": true,
@@ -271,12 +267,16 @@
         "heardAfterStampReset": true,
         "nextBootAnswered": true,
         "pairLinked": true,
-        "withinSkewMs": 346,
+        "withinSkewMs": 347,
         "aheadLog": "catalog.sh: skipped r1/00000000-0000-4000-8000-000000000001: createdAt is ahead of this clock",
         "behindLog": "catalog.sh: skipped r1/00000000-0000-4000-8000-000000000001: expired",
-        "answerMs": [486, 346, 954, 593]
+        "answerMs": [694, 347, 1129, 669]
       }
-    ]
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 3
   },
   {
     "experiment": "E5",
@@ -293,19 +293,19 @@
       {
         "readBeforeKill": true,
         "answerOutBeforeKill": false,
-        "relinkAfterKillMs": 1932,
+        "relinkAfterKillMs": 2026,
         "sameProfileId": true
       },
       {
         "readBeforeKill": true,
         "answerOutBeforeKill": false,
-        "relinkAfterKillMs": 1937,
+        "relinkAfterKillMs": 2012,
         "sameProfileId": true
       },
       {
         "readBeforeKill": true,
         "answerOutBeforeKill": false,
-        "relinkAfterKillMs": 1801,
+        "relinkAfterKillMs": 1858,
         "sameProfileId": true
       }
     ],
@@ -327,23 +327,23 @@
     "debugger": "none",
     "observations": [
       {
-        "killAfterAnswerMs": 118,
+        "killAfterAnswerMs": 128,
         "linkedBeforeKill": false,
-        "relinkAfterKillMs": 33050,
+        "relinkAfterKillMs": 33083,
         "answersToThatOffer": 1,
         "sameProfileId": true
       },
       {
         "killAfterAnswerMs": 109,
         "linkedBeforeKill": false,
-        "relinkAfterKillMs": 31810,
+        "relinkAfterKillMs": 32895,
         "answersToThatOffer": 1,
         "sameProfileId": true
       },
       {
-        "killAfterAnswerMs": 122,
+        "killAfterAnswerMs": 112,
         "linkedBeforeKill": false,
-        "relinkAfterKillMs": 33051,
+        "relinkAfterKillMs": 32946,
         "answersToThatOffer": 1,
         "sameProfileId": true
       }
@@ -366,19 +366,19 @@
     "debugger": "none",
     "observations": [
       {
-        "relinkAfterQuitMs": 1666,
+        "relinkAfterQuitMs": 1643,
         "newBoots": true,
         "sameProfileIds": true,
         "samePins": true
       },
       {
-        "relinkAfterQuitMs": 2189,
+        "relinkAfterQuitMs": 2186,
         "newBoots": true,
         "sameProfileIds": true,
         "samePins": true
       },
       {
-        "relinkAfterQuitMs": 2185,
+        "relinkAfterQuitMs": 1711,
         "newBoots": true,
         "sameProfileIds": true,
         "samePins": true
@@ -402,15 +402,15 @@
     "debugger": "none",
     "observations": [
       {
-        "delays": [985, 820, 865, 765],
+        "delays": [861, 813, 846, 783],
         "pairLinked": true
       },
       {
-        "delays": [932, 828, 782, 781],
+        "delays": [924, 863, 787, 829],
         "pairLinked": true
       },
       {
-        "delays": [970, 819, 861, 861],
+        "delays": [939, 784, 855, 768],
         "pairLinked": true
       }
     ],
@@ -430,10 +430,6 @@
     "variant": "poc-d0",
     "topology": "Default plus one worker, one shared Downloads root",
     "debugger": "none",
-    "verdict": "pass",
-    "samples": 3,
-    "gestures": 0,
-    "steps": [],
     "observations": [
       {
         "workersAfterIdle": {
@@ -444,7 +440,7 @@
           "Default": true,
           "Worker 1": true
         },
-        "exchangedAfterKillMs": 12059,
+        "exchangedAfterKillMs": 12193,
         "earlierOfferAnswers": 1
       },
       {
@@ -456,7 +452,7 @@
           "Default": true,
           "Worker 1": true
         },
-        "exchangedAfterKillMs": 12206,
+        "exchangedAfterKillMs": 12172,
         "earlierOfferAnswers": 1
       },
       {
@@ -468,10 +464,14 @@
           "Default": true,
           "Worker 1": true
         },
-        "exchangedAfterKillMs": 12127,
+        "exchangedAfterKillMs": 12114,
         "earlierOfferAnswers": 1
       }
-    ]
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 3
   },
   {
     "experiment": "E5",
@@ -496,7 +496,7 @@
       },
       {
         "rewrites": [5, 5],
-        "longestGapsMs": [30001, 30003],
+        "longestGapsMs": [30001, 30001],
         "workers": {
           "Default": true,
           "Worker 1": true
@@ -523,17 +523,17 @@
     "observations": [
       {
         "listedInFirstCatalog": 5,
-        "linkMs": 2245,
+        "linkMs": 2824,
         "pairsThroughFiles": 10
       },
       {
         "listedInFirstCatalog": 5,
-        "linkMs": 3004,
+        "linkMs": 2000,
         "pairsThroughFiles": 10
       },
       {
         "listedInFirstCatalog": 5,
-        "linkMs": 2494,
+        "linkMs": 2317,
         "pairsThroughFiles": 10
       }
     ],
@@ -557,19 +557,19 @@
       {
         "workersBefore": [true, true, true, true],
         "workersAfter": [true, true, true, true],
-        "joinMs": 3578,
+        "joinMs": 4129,
         "linked": true
       },
       {
         "workersBefore": [true, true, true, true],
         "workersAfter": [true, true, true, true],
-        "joinMs": 3323,
+        "joinMs": 3309,
         "linked": true
       },
       {
         "workersBefore": [true, true, true, true],
         "workersAfter": [true, true, true, true],
-        "joinMs": 3062,
+        "joinMs": 3321,
         "linked": true
       }
     ],
@@ -595,21 +595,21 @@
     "steps": [],
     "observations": [
       {
-        "droppedAfterMs": 2915,
+        "droppedAfterMs": 2877,
         "restIntact": true,
         "relinked": true,
         "sameProfileId": true,
         "samePins": true
       },
       {
-        "droppedAfterMs": 3049,
+        "droppedAfterMs": 2828,
         "restIntact": true,
         "relinked": true,
         "sameProfileId": true,
         "samePins": true
       },
       {
-        "droppedAfterMs": 2854,
+        "droppedAfterMs": 2743,
         "restIntact": true,
         "relinked": true,
         "sameProfileId": true,
