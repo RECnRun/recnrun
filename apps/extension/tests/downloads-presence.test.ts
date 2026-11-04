@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vite-plus/test";
-import { startDownloadsPresence } from "@/background/downloads-presence";
+import { createPublishListener, startDownloadsPresence } from "@/background/downloads-presence";
 import type { PresenceDependencies } from "@/background/downloads-presence";
 import type { DownloadItem, DownloadsPort } from "@/background/downloads-publisher";
 import { PRESENCE_TTL_MS } from "@/p2p/folder-rendezvous";
@@ -7,6 +7,7 @@ import { FINGERPRINT, ME } from "./fake-peer";
 
 const NOW = 1_700_000_000_000;
 const BOOT = "99999999-9999-4999-8999-999999999999";
+const TOKEN = "0f8b6a3e-2c1d-4e5f-9a7b-1c2d3e4f5a6b";
 const PATH = `RECnRun/poc/lab/peers/${ME}/presence.json`;
 
 type Written = Parameters<DownloadsPort["download"]>[0];
@@ -162,6 +163,17 @@ describe("startDownloadsPresence", () => {
     expect(invalid.log).toHaveBeenCalledWith(expect.stringContaining("../escape"));
   });
 
+  test("writes again at once on request, with the boot as it now stands", async () => {
+    let boot = BOOT;
+    const { deps, written } = dependencies({ boot: async () => boot });
+    const presence = startDownloadsPresence(deps);
+    await vi.advanceTimersByTimeAsync(0);
+    boot = TOKEN;
+    await presence.publish();
+    presence.stop();
+    expect(written.map((each) => JSON.parse(contentOf(each.url)).boot)).toEqual([BOOT, TOKEN]);
+  });
+
   test("logs a failed write and writes again at the next half TTL", async () => {
     const { downloads, written } = fakeDownloads();
     downloads.download.mockRejectedValueOnce(new Error("Invalid filename"));
@@ -173,5 +185,39 @@ describe("startDownloadsPresence", () => {
     await vi.advanceTimersByTimeAsync(PRESENCE_TTL_MS / 2);
     presence.stop();
     expect(written).toHaveLength(1);
+  });
+});
+
+describe("createPublishListener", () => {
+  const own = { extensionId: "own", extensionUrl: "chrome-extension://own/" };
+  const page = { id: "own", url: `chrome-extension://own/bootstrap.html#token=${TOKEN}` };
+  const request = { type: "POC_PUBLISH_PRESENCE" };
+
+  test("publishes for the extension's own page and replies once it is written", async () => {
+    const publish = vi.fn(async () => {});
+    const reply = vi.fn();
+    expect(createPublishListener(publish, own)(request, page, reply)).toBe(true);
+    await vi.waitFor(() => expect(reply).toHaveBeenCalledWith({ ok: true }));
+    expect(publish).toHaveBeenCalledTimes(1);
+  });
+
+  test.each([
+    ["another message", { type: "POC_DOWNLOAD_SEARCH" }, page],
+    ["an extra key", { ...request, boot: TOKEN }, page],
+    ["another extension", request, { ...page, id: "stranger" }],
+    ["a web page", request, { id: "own", url: "https://recnrun.com/" }],
+  ])("ignores %s", (_name, message, sender) => {
+    const publish = vi.fn(async () => {});
+    expect(createPublishListener(publish, own)(message, sender, vi.fn())).toBe(false);
+    expect(publish).not.toHaveBeenCalled();
+  });
+
+  test("replies with the error of a failed write", async () => {
+    const publish = vi.fn(async () => Promise.reject(new Error("Invalid filename")));
+    const reply = vi.fn();
+    createPublishListener(publish, own)(request, page, reply);
+    await vi.waitFor(() =>
+      expect(reply).toHaveBeenCalledWith({ ok: false, error: "Invalid filename" }),
+    );
   });
 });

@@ -103,7 +103,15 @@ describe("startDiagnostics", () => {
     vi.unstubAllGlobals();
 
     expect(Object.keys(page.__poc ?? {}).sort()).toEqual(
-      ["cancel", "probe", "readBack", "readFile", "readPublication", "search"].sort(),
+      [
+        "cancel",
+        "probe",
+        "readBack",
+        "readFile",
+        "readPublication",
+        "readRegistry",
+        "search",
+      ].sort(),
     );
     expect(JSON.parse(pre.textContent)).toEqual({
       extensionId: fakeBrowser.runtime.id,

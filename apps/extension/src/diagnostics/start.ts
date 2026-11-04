@@ -2,6 +2,7 @@ import { errorMessage } from "@recnrun/domain";
 import { browser } from "wxt/browser";
 import { downloadMessages } from "@/diagnostics/poc-messages";
 import { installReadFile } from "@/diagnostics/read-file";
+import { installReadRegistry } from "@/diagnostics/read-registry";
 import { buildReport } from "@/diagnostics/report";
 import type { Presence } from "@/p2p/folder-rendezvous";
 import { fileUrlFor, readTolerant } from "@/p2p/downloads-rendezvous";
@@ -31,6 +32,7 @@ export async function startDiagnostics(page: Window & typeof globalThis = window
   };
   Object.assign(page, { __poc: poc });
   installReadFile(page, send);
+  installReadRegistry(page);
   const report = await buildReport({
     extensionId: browser.runtime.id,
     mode: import.meta.env.MODE,

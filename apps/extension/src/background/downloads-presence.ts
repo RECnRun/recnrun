@@ -5,8 +5,10 @@ import { dataUrl, settled } from "@/background/downloads-publisher";
 import type { DownloadsPort } from "@/background/downloads-publisher";
 import { ensureOffscreen } from "@/background/link";
 import { BackgroundReplySchema } from "@/messaging/background-reply";
+import type { BackgroundReply } from "@/messaging/background-reply";
 import { PocFingerprintResultSchema, pocFingerprintRequest } from "@/messaging/poc-fingerprint";
-import { NamespaceSchema } from "@/p2p/downloads-rendezvous";
+import { PocPublishPresenceSchema } from "@/messaging/poc-presence";
+import { DEFAULT_NAMESPACE, NamespaceSchema } from "@/p2p/downloads-rendezvous";
 import { PRESENCE_TTL_MS } from "@/p2p/folder-rendezvous";
 import { RegistrationSchema } from "@/p2p/registry";
 import { readIdentity } from "@/storage/peer-repository";
@@ -18,8 +20,6 @@ import { pocPresenceStore } from "@/storage/poc-presence-repository";
  * with no folder chosen and no page open, and learns its Downloads root from Chrome's answer.
  */
 
-/** The namespace a POC build joins unless `pocNamespace` in chrome.storage.local names another. */
-const DEFAULT_NAMESPACE = "lab";
 const SETTLE_MS = 10_000;
 
 export interface PresenceDependencies {
@@ -101,7 +101,28 @@ export function startDownloadsPresence(deps: PresenceDependencies) {
     void publish(deps).catch((error: unknown) => deps.log(`presence: ${errorMessage(error)}`));
   attempt();
   const timer = setInterval(attempt, PRESENCE_TTL_MS / 2);
-  return { stop: () => clearInterval(timer) };
+  return { stop: () => clearInterval(timer), publish: () => publish(deps) };
+}
+
+interface Sender {
+  id?: string;
+  url?: string;
+}
+
+/** P2.1: the bootstrap page, once it stored the launcher's token as the boot, asks for a presence now. */
+export function createPublishListener(
+  publishNow: () => Promise<void>,
+  own: { extensionId: string; extensionUrl: string },
+) {
+  return (message: unknown, sender: Sender, reply: (answer: BackgroundReply) => void) => {
+    const ownPage = sender.id === own.extensionId && sender.url?.startsWith(own.extensionUrl);
+    if (!v.is(PocPublishPresenceSchema, message) || !ownPage) return false;
+    publishNow().then(
+      () => reply({ ok: true }),
+      (error: unknown) => reply({ ok: false, error: errorMessage(error) }),
+    );
+    return true;
+  };
 }
 
 /** The offscreen document's certificate fingerprint, creating the document first. */
@@ -119,7 +140,7 @@ async function offscreenFingerprint(): Promise<string> {
 /** The presence over Chrome's own Downloads, this profile's identity, and session storage. */
 export function startPocPresence(log: (entry: string) => void) {
   const store = pocPresenceStore();
-  return startDownloadsPresence({
+  const presence = startDownloadsPresence({
     downloads: browser.downloads,
     identity: readIdentity,
     fingerprint: offscreenFingerprint,
@@ -128,4 +149,7 @@ export function startPocPresence(log: (entry: string) => void) {
     root: store.root,
     log,
   });
+  const own = { extensionId: browser.runtime.id, extensionUrl: browser.runtime.getURL("/") };
+  browser.runtime.onMessage.addListener(createPublishListener(presence.publish, own));
+  return presence;
 }

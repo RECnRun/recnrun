@@ -22,6 +22,8 @@ export function pocPresenceStore() {
       await boot.setValue(created);
       return created;
     },
+    /** The launcher's bootstrap token becomes the boot, so it finds the presence that carries it. */
+    adoptBoot: (token: string) => boot.setValue(token),
     root: {
       read: async () => {
         const stored = await root.getValue();

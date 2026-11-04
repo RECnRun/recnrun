@@ -15,6 +15,9 @@ const UNC = /^\\\\[^\\/]+[\\/]/;
 /** A namespace names one folder under RECnRun/poc/, so it never carries a path character. */
 export const NamespaceSchema = v.pipe(v.string(), v.regex(NAMESPACE));
 
+/** The namespace a POC build joins unless `pocNamespace` in chrome.storage.local names another. */
+export const DEFAULT_NAMESPACE = "lab";
+
 /** The namespace's folder, relative to the Downloads root, as chrome.downloads requires. */
 function namespaceFolder(namespace: string): string {
   if (!NAMESPACE.test(namespace)) {

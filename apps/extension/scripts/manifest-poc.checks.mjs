@@ -37,7 +37,7 @@ for (const [mode, permissions] of Object.entries(VARIANTS)) {
     assert.equal(extensionIdOf(manifest.key), POC_EXTENSION_ID);
     // MV3 reads file:// from an extension page only with this host permission and the toggle (E1).
     assert.deepEqual(manifest.host_permissions, ["file:///*"]);
-    for (const page of ["diagnostics.html", "offscreen.html"]) {
+    for (const page of ["diagnostics.html", "offscreen.html", "bootstrap.html"]) {
       assert.ok(existsSync(`${outputDir(mode)}${page}`), `${mode} lacks ${page}`);
     }
     const matches = manifest.content_scripts.flatMap((script) => script.matches);
@@ -79,6 +79,12 @@ for (const mode of Object.keys(VARIANTS)) {
   await test(`${mode} announces the profile through Downloads as its worker starts (P2.2)`, () => {
     assert.match(withChunks(mode, "background.js"), /presence\.json/);
     assert.match(pageScript(mode, "offscreen.html"), /POC_FINGERPRINT/);
+  });
+
+  await test(`${mode} publishes at once when its bootstrap page asks, and reads the registry (P2.1)`, () => {
+    assert.match(withChunks(mode, "background.js"), /POC_PUBLISH_PRESENCE/);
+    assert.match(pageScript(mode, "bootstrap.html"), /POC_PUBLISH_PRESENCE/);
+    assert.match(pageScript(mode, "diagnostics.html"), /registry\.json/);
   });
 
   await test(`${mode} has no content script that matches file:// (POC §4)`, () => {

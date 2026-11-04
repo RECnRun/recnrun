@@ -8,7 +8,7 @@ import { debuggerDeclared, peersEnabled, pocEnabled } from "./src/config/origins
 const PEER_ENTRYPOINTS = new Set(["offscreen"]);
 
 /** The downloads-launcher POC pages, left out of every build but the POC variants. */
-const POC_ENTRYPOINTS = new Set(["diagnostics"]);
+const POC_ENTRYPOINTS = new Set(["diagnostics", "bootstrap"]);
 
 const chromiumProfile = fileURLToPath(new URL("./.wxt/chrome-data", import.meta.url));
 

@@ -67,10 +67,13 @@ await test("the production build leaves out every POC-only permission and page",
   for (const permission of ["downloads", "debugger", "offscreen"]) {
     assert.ok(!manifest.permissions.includes(permission), permission);
   }
-  assert.equal(
-    existsSync(new URL("../.output/chrome-mv3/diagnostics.html", import.meta.url)),
-    false,
-  );
+  for (const page of ["diagnostics.html", "bootstrap.html"]) {
+    assert.equal(
+      existsSync(new URL(`../.output/chrome-mv3/${page}`, import.meta.url)),
+      false,
+      page,
+    );
+  }
   const background = readFileSync(new URL("../.output/chrome-mv3/background.js", import.meta.url));
   assert.doesNotMatch(String(background), /downloads\.download/);
 });
@@ -80,7 +83,11 @@ await test("the production build leaves out the POC's Downloads presence", () =>
   for (const file of readdirSync(output, { recursive: true, encoding: "utf8" })) {
     if (!file.endsWith(".js") && !file.endsWith(".html")) continue;
     const code = readFileSync(new URL(file, output), "utf8");
-    assert.doesNotMatch(code, /presence\.json|downloads-presence|POC_FINGERPRINT/, file);
+    assert.doesNotMatch(
+      code,
+      /presence\.json|downloads-presence|POC_FINGERPRINT|POC_PUBLISH_PRESENCE|registry\.json/,
+      file,
+    );
   }
 });
 

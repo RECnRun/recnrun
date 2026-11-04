@@ -4,6 +4,7 @@ import { fakeBrowser } from "wxt/testing/fake-browser";
 import { startPeers } from "@/background/peers";
 import { PresenceSchema } from "@/p2p/folder-rendezvous";
 import { folderPairingRepository, identityRepository } from "@/storage/peer-repository";
+import { pocPresenceStore } from "@/storage/poc-presence-repository";
 import { FINGERPRINT, ME, answering, fakeOffscreen } from "./fake-peer";
 
 const ROOT = "/home/me/Downloads";
@@ -117,6 +118,24 @@ describe("startPeers", () => {
         pocDownloadsRoot: ROOT,
       }),
     );
+  });
+
+  test("writes at once, with the boot the bootstrap page stored, when that page asks", async () => {
+    const { written } = await background();
+    const token = "0f8b6a3e-2c1d-4e5f-9a7b-1c2d3e4f5a6b";
+    startPeers({ transport: "downloads" });
+    await vi.waitFor(() => expect(written).toHaveLength(1));
+    await pocPresenceStore().adoptBoot(token);
+    const page = { id: fakeBrowser.runtime.id, url: fakeBrowser.runtime.getURL("/bootstrap.html") };
+    const replies: unknown[] = [];
+    void fakeBrowser.runtime.onMessage.trigger({ type: "POC_PUBLISH_PRESENCE" }, page, (reply) =>
+      replies.push(reply),
+    );
+    await vi.waitFor(() => expect(replies).toEqual([{ ok: true }]));
+    expect(written.map((each) => registrationOf(each.url).boot)).toEqual([
+      registrationOf(written[0]?.url ?? "").boot,
+      token,
+    ]);
   });
 
   test("writes no presence, and says why, while the offscreen document gives no fingerprint", async () => {
