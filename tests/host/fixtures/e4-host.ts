@@ -18,16 +18,21 @@ import { removeHostRoot, rootFor } from "./roots.ts";
 
 let folders = 0;
 
-const makeFolder = (name: string) => rootFor(requireHost(), hostRunId(), `e4-${name}-${++folders}`);
+/** A fresh throwaway root of this run named `name`, numbered so names never collide. */
+export const hostFolder = (name: string) =>
+  rootFor(requireHost(), hostRunId(), `${name}-${++folders}`);
 
-async function removeFolder(path: string): Promise<void> {
+const makeFolder = (name: string) => hostFolder(`e4-${name}`);
+
+/** Removes a root of this run, and its run folder once empty; RECNRUN_HOST_KEEP_ROOTS=1 keeps both. */
+export async function removeFolder(path: string): Promise<void> {
   if (process.env.RECNRUN_HOST_KEEP_ROOTS === "1") return;
   await removeHostRoot(path, hostRunId());
   await rmdir(dirname(path)).catch(() => undefined);
 }
 
 /** Launches Chrome for Extensions.loadUnpacked on a root and records its versions for the run. */
-async function launch(root: string) {
+export async function launch(root: string) {
   const chrome = await launchForUnpacked(hostUnpackedOptions(root));
   try {
     const { product, userAgent } = await chrome.cdp.send("Browser.getVersion");

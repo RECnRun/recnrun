@@ -9,6 +9,7 @@ import type { CatalogRun } from "../../experiments/fixtures/e4-launcher.ts";
 import { writeDownloadsPreference } from "../../host/fixtures/roots.ts";
 import { pairingSection } from "../../e2e/fixtures/profiles.ts";
 import type { Profile } from "../../e2e/fixtures/profiles.ts";
+import { connectWebSocket } from "./cdp-client.ts";
 import { extensionPath, launchForUnpacked } from "./extension-loaders.ts";
 import type { LaunchedChrome } from "./chrome.ts";
 
@@ -65,8 +66,11 @@ export interface DownloadsGroup {
   quit(profile: DownloadsProfile): Promise<void>;
   /** SIGKILL to the PID this group spawned, as a crash; the root stays. */
   kill(profile: DownloadsProfile): Promise<void>;
-  /** Chrome again on the profile's root, poc-d0 installed again (CHROMIUM.md group 9). */
-  relaunch(profile: DownloadsProfile): Promise<void>;
+  /**
+   * Chrome again on the profile's root, poc-d0 installed again (CHROMIUM.md group 9); with
+   * `attach: false` no client stays on it, so `context` and `serviceWorker` stay stale until `attach`.
+   */
+  relaunch(profile: DownloadsProfile, options?: { attach?: boolean }): Promise<void>;
   /** Closes the extension's pages and drops Playwright's connection, so the worker may stop (group 12). */
   detach(profile: DownloadsProfile): Promise<void>;
   attach(profile: DownloadsProfile): Promise<void>;
@@ -98,6 +102,11 @@ async function until<T>(read: () => Promise<T | undefined>, what: string, ms = R
   }
 }
 
+const installed = (id: string) => {
+  if (id !== POC_EXTENSION_ID)
+    throw new Error(`poc-d0 installed as ${id}, not ${POC_EXTENSION_ID}`);
+};
+
 /** Gives Chrome its own download behavior back, then installs poc-d0 over CDP. */
 async function install(chrome: LaunchedChrome): Promise<void> {
   // connectOverCDP routes every download to its own folder; Chrome's own must take the writes.
@@ -105,8 +114,21 @@ async function install(chrome: LaunchedChrome): Promise<void> {
   const { id } = await chrome.cdp.send("Extensions.loadUnpacked", {
     path: extensionPath("poc-d0"),
   });
-  if (id !== POC_EXTENSION_ID)
-    throw new Error(`poc-d0 installed as ${id}, not ${POC_EXTENSION_ID}`);
+  installed(id);
+}
+
+/** Installs poc-d0 over a client of its own once Playwright let go, so no client meets its worker. */
+async function installUnattended(chrome: LaunchedChrome): Promise<void> {
+  // Closed first: its connection keeps a worker running (group 12), and one it saw start then left stalled for a minute (E5).
+  await chrome.browser.close();
+  const client = await connectWebSocket(chrome.wsEndpoint);
+  try {
+    await client.send("Browser.setDownloadBehavior", { behavior: "default" });
+    const path = extensionPath("poc-d0");
+    installed((await client.send<{ id: string }>("Extensions.loadUnpacked", { path })).id);
+  } finally {
+    client.close();
+  }
 }
 
 /** Playwright's default context of `browser` and the poc-d0 worker in it. */
@@ -225,8 +247,14 @@ export async function createDownloadsGroup(platform: DownloadsPlatform): Promise
       await exited(profile.chrome);
       await quit(profile);
     },
-    relaunch: async (profile) => {
-      Object.assign(profile, await start(await platform.launch(profile.root)));
+    relaunch: async (profile, { attach = true } = {}) => {
+      const chrome = await platform.launch(profile.root);
+      if (attach) return void Object.assign(profile, await start(chrome));
+      await installUnattended(chrome).catch(async (error: unknown) => {
+        await chrome.close();
+        throw error;
+      });
+      profile.chrome = chrome;
     },
     detach: async (profile) => {
       // Chrome quits with its last window, so the tabs that are not the extension's stay.

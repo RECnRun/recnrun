@@ -20,7 +20,7 @@ const ALLOWED_COMMANDS: Record<string, string> = {
   "Input.dispatchMouseEvent":
     "E1's recorded fallback click on the file-access toggle where no xdotool exists (macOS host)",
   "Browser.setDownloadBehavior":
-    "E2, E4, and silent-start reset to Chrome's default the download override Playwright's connectOverCDP installs",
+    "E2, E4, E5, silent-start, and the Downloads mesh reset to Chrome's default the download override Playwright's connectOverCDP installs",
 };
 
 /** Commands that pause, instrument, block, or rewrite. */

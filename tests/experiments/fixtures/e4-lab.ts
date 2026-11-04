@@ -29,7 +29,7 @@ export interface LabHost {
 const removeTree = (path: string) =>
   rm(path, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 
-const currentHost: LabHost = {
+export const currentHost: LabHost = {
   env: process.env,
   dockerenv: () => existsSync("/.dockerenv"),
   home: () => userInfo().homedir,
