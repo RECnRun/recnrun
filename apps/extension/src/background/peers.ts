@@ -3,12 +3,10 @@ import * as v from "valibot";
 import { browser } from "wxt/browser";
 import { execute, sessionStatus, sharedTabs } from "@/background/executor";
 import type { ExecutorDependencies } from "@/background/executor";
-import { createFolderPairing } from "@/background/folder-pairing";
-import type { FolderPairingFlow } from "@/background/folder-pairing";
 import { askLink, closeOffscreen } from "@/background/link";
-import { createMeshPairing } from "@/background/mesh-pairing";
 import type { MeshPairingFlow } from "@/background/mesh-pairing";
-import { createPairing } from "@/background/pairing";
+import { createPairingFlows, trusted } from "@/background/pairing-flows";
+import type { PairingFlows, Transport } from "@/background/pairing-flows";
 import { createPeerChannel } from "@/background/peer-channel";
 import type { PeerChannel } from "@/background/peer-channel";
 import { handlePeerRequest } from "@/background/peer-requests";
@@ -20,13 +18,10 @@ import { FolderAccessSchema } from "@/messaging/peer-results";
 import type { PeerMessage, PeerPayload, PeerType, SharedTabs } from "@/p2p/protocol";
 import {
   authorizedPeersRepository,
-  folderActedRepository,
   folderPairingRepository,
   identityRepository,
-  meshMembersRepository,
   peerLinksRepository,
   peerTabsRepository,
-  pendingOffersRepository,
   readIdentity,
   remoteControllerRepository,
   remoteRecordingsRepository,
@@ -97,12 +92,6 @@ async function hello(channel: PeerChannel, peer: string): Promise<void> {
   });
 }
 
-/** Pairing through the RECnRun folder, and through the peers linked already. */
-interface PairingFlows {
-  folder: FolderPairingFlow;
-  mesh: MeshPairingFlow;
-}
-
 /** The link to `peer` went down; every other peer's link, waiters, and reports stay. */
 async function linkDown(
   peer: string,
@@ -124,9 +113,8 @@ async function linkDown(
 type StateEvent = Extract<LinkEvent, { type: "state" }>;
 
 async function linkUp(event: StateEvent, channel: PeerChannel, flows: PairingFlows) {
-  const authorized = await authorizedPeersRepository.get(event.peer);
-  // DTLS proved the other side holds this certificate; only the one the user accepted may talk.
-  if (!authorized || event.remoteFingerprint !== authorized.fingerprint) {
+  // DTLS proved the other side holds this certificate; only the one accepted and pinned may talk.
+  if (!(await trusted(event, flows.trust))) {
     log("closed a link whose certificate is not the accepted one");
     const refused = { state: "failed", verified: false, reason: "certificate" } as const;
     await peerLinksRepository.set(event.peer, refused);
@@ -271,43 +259,9 @@ function requestDependencies(
   };
 }
 
-/** Pairing through the folder and through the mesh, which exchange the same offer and answer codes. */
-function createPairingFlows(channel: PeerChannel): PairingFlows {
-  const pairing = createPairing({
-    askLink,
-    identity: readIdentity,
-    authorized: authorizedPeersRepository,
-    pending: pendingOffersRepository,
-  });
-  const folder = createFolderPairing({
-    askLink,
-    identity: readIdentity,
-    pairing,
-    pending: pendingOffersRepository,
-    link: peerLinksRepository,
-    acted: folderActedRepository,
-    state: folderPairingRepository,
-    log,
-  });
-  const mesh = createMeshPairing({
-    channel,
-    identity: readIdentity,
-    pairing,
-    authorized: authorizedPeersRepository,
-    link: peerLinksRepository,
-    pending: pendingOffersRepository,
-    acted: folderActedRepository,
-    members: meshMembersRepository,
-    state: folderPairingRepository,
-    exclusive: folder.exclusive,
-    log,
-  });
-  return { folder, mesh };
-}
-
 export interface PeersOptions {
   /** How this profile finds the others: the chosen folder, or the POC builds' Downloads. */
-  transport: "folder" | "downloads";
+  transport: Transport;
 }
 
 /**
@@ -330,7 +284,7 @@ export function startPeers({ transport }: PeersOptions = { transport: "folder" }
   };
   const tabs = createTabsCache();
   watchExecutor(channel, executor);
-  const flows = createPairingFlows(channel);
+  const flows = createPairingFlows(channel, transport, log);
   const { folder } = flows;
   // Chrome starts the worker with the browser only for a startup listener; starting resumes.
   browser.runtime.onStartup.addListener(() => {});

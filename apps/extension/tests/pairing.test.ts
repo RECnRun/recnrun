@@ -2,6 +2,8 @@ import { describe, expect, test, vi } from "vite-plus/test";
 import { createPairing } from "@/background/pairing";
 import type { LinkCommand } from "@/messaging/peer-messages";
 import { PAIRING_TTL_MS, decodePairing, encodePairing } from "@/p2p/pairing-code";
+import { createPins } from "@/p2p/pins";
+import type { Pin } from "@/p2p/pins";
 import type { AuthorizedPeer } from "@/storage/peer-repository";
 import { memoryRecords } from "./fake-peer";
 
@@ -31,14 +33,16 @@ function side(identity: typeof A, fingerprint: string, clock = { now: NOW }) {
   });
   const authorized = memoryRecords<AuthorizedPeer>();
   const pending = memoryRecords<PendingOffer>();
+  const pinned = memoryRecords<Pin>();
   const flow = createPairing({
     askLink,
     identity: async () => identity,
     authorized,
     pending,
+    pins: createPins(pinned),
     now: () => clock.now,
   });
-  return { ...flow, askLink, authorized, pending, clock };
+  return { ...flow, askLink, authorized, pending, pinned, clock };
 }
 
 async function offered() {
@@ -109,10 +113,50 @@ describe("a full pairing", () => {
       identity: async () => A,
       authorized: memoryRecords<AuthorizedPeer>(),
       pending: memoryRecords<PendingOffer>(),
+      pins: createPins(memoryRecords<Pin>()),
     });
     const before = Date.now();
     const { expiresAt } = decodePairing((await flow.createOffer(B.profileId)).code);
     expect(expiresAt).toBeGreaterThanOrEqual(before + PAIRING_TTL_MS);
+  });
+});
+
+describe("pinned certificates", () => {
+  const OTHER: Pin = { fingerprint: "EE:EE", pinnedAt: 1, source: "local-channel" };
+
+  test("accepting a code pins nothing, since only the handshake proves its certificate", async () => {
+    const { a, b, offer } = await offered();
+    await a.accept((await b.accept(offer)).code ?? "");
+    expect(await a.pinned.all()).toEqual({});
+    expect(await b.pinned.all()).toEqual({});
+  });
+
+  test("accepts a code whose certificate is the one pinned", async () => {
+    const { b, offer } = await offered();
+    await b.pinned.set(A.profileId, { ...OTHER, fingerprint: FP_A });
+    expect((await b.accept(offer)).code).toBeTruthy();
+    expect(b.askLink).toHaveBeenCalledWith(expect.objectContaining({ type: "answer" }));
+  });
+
+  test("refuses an offer announcing another certificate for a pinned profile before any connection", async () => {
+    const { b, offer } = await offered();
+    await b.pinned.set(A.profileId, OTHER);
+    await expect(b.accept(offer)).rejects.toThrow(
+      `Refused a code from ${A.profileId}: its certificate is not the one pinned.`,
+    );
+    expect(b.askLink).not.toHaveBeenCalled();
+    expect(await b.authorized.all()).toEqual({});
+    expect(await b.pinned.get(A.profileId)).toEqual(OTHER);
+  });
+
+  test("refuses such an answer before it reaches the link, and the offer still waits", async () => {
+    const { a, b, offer } = await offered();
+    const { code: answer = "" } = await b.accept(offer);
+    await a.pinned.set(B.profileId, OTHER);
+    await expect(a.accept(answer)).rejects.toThrow("its certificate is not the one pinned.");
+    expect(a.askLink.mock.calls.map(([command]) => command.type)).toEqual(["offer"]);
+    expect(await a.authorized.all()).toEqual({});
+    expect(Object.keys(await a.pending.all())).toEqual([B.profileId]);
   });
 });
 

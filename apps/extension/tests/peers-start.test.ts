@@ -3,9 +3,14 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vite-plus/tes
 import { fakeBrowser } from "wxt/testing/fake-browser";
 import { startPeers } from "@/background/peers";
 import { PresenceSchema } from "@/p2p/folder-rendezvous";
-import { folderPairingRepository, identityRepository } from "@/storage/peer-repository";
+import {
+  authorizedPeersRepository,
+  folderPairingRepository,
+  identityRepository,
+  peerPinsRepository,
+} from "@/storage/peer-repository";
 import { pocPresenceStore } from "@/storage/poc-presence-repository";
-import { FINGERPRINT, ME, answering, fakeOffscreen } from "./fake-peer";
+import { FINGERPRINT, ME, PEER, answering, fakeOffscreen } from "./fake-peer";
 
 const ROOT = "/home/me/Downloads";
 const manifest = { manifest_version: 3 as const, name: "RECnRun", version: "0.1.0" };
@@ -99,6 +104,23 @@ describe("startPeers", () => {
     );
     expect(written).toEqual([]);
     expect(await dashboards()).toEqual([]);
+  });
+
+  test("the Downloads variant pins a peer met through the local channel once the handshake proved it", async () => {
+    await background();
+    const desk = { profileId: PEER, displayName: "Desk", fingerprint: FINGERPRINT };
+    await authorizedPeersRepository.set(PEER, desk);
+    const routes = startPeers({ transport: "downloads" });
+    await routes.link({
+      type: "state",
+      peer: PEER,
+      state: "connected",
+      remoteFingerprint: FINGERPRINT,
+    });
+    expect(await peerPinsRepository.get(PEER)).toMatchObject({
+      fingerprint: FINGERPRINT,
+      source: "local-channel",
+    });
   });
 
   test("keeps one boot per browser session, learns the root, and joins the stored namespace", async () => {

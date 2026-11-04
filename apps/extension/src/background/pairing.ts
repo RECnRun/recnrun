@@ -1,6 +1,7 @@
 import type { LinkCommand } from "@/messaging/peer-messages";
 import { PAIRING_TTL_MS, decodePairing, encodePairing, fingerprintOf } from "@/p2p/pairing-code";
 import type { Pairing } from "@/p2p/pairing-code";
+import type { Pins } from "@/p2p/pins";
 import type {
   AuthorizedPeer,
   PeerRecords,
@@ -14,6 +15,8 @@ export interface PairingDependencies {
   authorized: Pick<PeerRecords<AuthorizedPeer>, "set">;
   /** This profile's offers waiting for an answer, by the profile each is for. */
   pending: Pick<PeerRecords<PendingOffer>, "get" | "set">;
+  /** A code may announce a pinned profile's certificate only; the link pins, never the code. */
+  pins: Pick<Pins, "verify">;
   now?: () => number;
 }
 
@@ -32,6 +35,11 @@ async function verifyCode(code: string, deps: PairingDependencies, now: number) 
   }
   const fingerprint = fingerprintOf(pairing.sdp);
   if (!fingerprint) throw new Error("The code has no certificate fingerprint.");
+  // Refused before the link sees its SDP, so a forged code never gets a connection.
+  if ((await deps.pins.verify(pairing.profileId, fingerprint)) === "pinned-mismatch")
+    throw new Error(
+      `Refused a code from ${pairing.profileId}: its certificate is not the one pinned.`,
+    );
   return { pairing, fingerprint };
 }
 
