@@ -77,40 +77,58 @@ async function replaceFile(path: string, text: string): Promise<void> {
 }
 
 interface PageGlobal {
-  __virtual?: { certificate: RTCCertificate };
+  __virtual?: { certificate: RTCCertificate; held: RTCPeerConnection[]; states: string[] };
 }
 
-/** A complete SDP from an RTCPeerConnection on the page's one certificate: an offer, or an answer to `remote`. */
-function gatheredSdp(page: Page, remote?: string): Promise<string> {
-  return page.evaluate(async (offer) => {
-    const held = globalThis as unknown as PageGlobal;
-    held.__virtual ??= {
-      certificate: await RTCPeerConnection.generateCertificate({
-        name: "ECDSA",
-        namedCurve: "P-256",
-      } as EcKeyGenParams),
-    };
-    const pc = new RTCPeerConnection({ certificates: [held.__virtual.certificate] });
-    const complete = new Promise<void>((resolve) => {
-      pc.onicegatheringstatechange = () => pc.iceGatheringState === "complete" && resolve();
-    });
-    if (offer === undefined) {
-      pc.createDataChannel("recnrun-peer");
-      await pc.setLocalDescription(await pc.createOffer());
-    } else {
-      await pc.setRemoteDescription({ type: "offer", sdp: offer });
-      await pc.setLocalDescription(await pc.createAnswer());
-    }
-    await complete;
-    const sdp = pc.localDescription?.sdp ?? "";
-    // Closed, so no real profile ever links to it: the test reads files, not a connection.
-    pc.close();
-    return sdp;
-  }, remote);
+/**
+ * A complete SDP from an RTCPeerConnection on the page's one certificate: an offer, or an answer
+ * to `remote`. A held one stays open, so a profile can attempt a handshake with it, and notes its states.
+ */
+function gatheredSdp(page: Page, remote?: string, hold = false): Promise<string> {
+  return page.evaluate(
+    async ({ offer, keep }) => {
+      const held = globalThis as unknown as PageGlobal;
+      held.__virtual ??= {
+        certificate: await RTCPeerConnection.generateCertificate({
+          name: "ECDSA",
+          namedCurve: "P-256",
+        } as EcKeyGenParams),
+        held: [],
+        states: [],
+      };
+      const own = held.__virtual;
+      const pc = new RTCPeerConnection({ certificates: [own.certificate] });
+      if (keep) {
+        own.held.push(pc);
+        pc.oniceconnectionstatechange = () => own.states.push(`ice:${pc.iceConnectionState}`);
+        pc.onconnectionstatechange = () => own.states.push(`peer:${pc.connectionState}`);
+      }
+      const complete = new Promise<void>((resolve) => {
+        pc.onicegatheringstatechange = () => pc.iceGatheringState === "complete" && resolve();
+      });
+      if (offer === undefined) {
+        pc.createDataChannel("recnrun-peer");
+        await pc.setLocalDescription(await pc.createOffer());
+      } else {
+        await pc.setRemoteDescription({ type: "offer", sdp: offer });
+        await pc.setLocalDescription(await pc.createAnswer());
+      }
+      await complete;
+      const sdp = pc.localDescription?.sdp ?? "";
+      // Closed unless held, so no real profile links to it: the test reads files, not a connection.
+      if (!keep) pc.close();
+      return sdp;
+    },
+    { offer: remote, keep: hold },
+  );
 }
 
 const fingerprintOf = (sdp: string) =>
   /^a=fingerprint:sha-256 ([0-9A-F:]+)\s*$/im.exec(sdp)?.[1]?.toUpperCase() ?? "";
+
+/** `sdp` naming `fingerprint` instead of the certificate its connection holds. */
+const naming = (sdp: string, fingerprint: string) =>
+  sdp.replaceAll(/^a=fingerprint:sha-256 [0-9A-F:]+/gim, `a=fingerprint:sha-256 ${fingerprint}`);
 
 interface SignalOptions {
   boot?: string;
@@ -120,7 +138,17 @@ interface SignalOptions {
   expiresAt?: number;
   /** The offer an answer answers: its SDP and pairing id. */
   answering?: StampedSignal;
+  /** Another profile's certificate and statement, which the SDP and the code name in place of its own. */
+  claim?: { fingerprint: string; identity: IdentityStatement };
+  /** Keeps the connection behind the SDP open, so a profile that accepts the code attempts a handshake. */
+  hold?: boolean;
 }
+
+/** The SDP and statement a code carries: its own, or a claimed certificate's in their place. */
+const claimed = (sdp: string, own: IdentityStatement, claim?: SignalOptions["claim"]) =>
+  claim
+    ? { sdp: naming(sdp, claim.fingerprint), identity: claim.identity }
+    : { sdp, identity: own };
 
 export interface VirtualPeer {
   profileId: string;
@@ -140,6 +168,8 @@ export interface VirtualPeer {
   write(kind: Kind, to: string, text: string): Promise<void>;
   /** Replaces its presence by `text` and stops refreshing it. */
   writePresence(text: string): Promise<void>;
+  /** The ICE and connection states its held connections went through, in order. */
+  linkStates(): Promise<string[]>;
   stop(): void;
 }
 
@@ -192,8 +222,8 @@ export async function virtualPeer(
     const pairingId = options.pairingId ?? options.answering?.pairingId ?? randomUUID();
     const expiresAt = options.expiresAt ?? Date.now() + PAIRING_TTL_MS;
     const remote = options.answering && decodeCode(options.answering.code).sdp;
-    const sdp = await gatheredSdp(page, remote);
-    const pairing = { kind, pairingId, profileId, displayName, expiresAt, sdp, identity };
+    const carried = claimed(await gatheredSdp(page, remote, options.hold), identity, options.claim);
+    const pairing = { kind, pairingId, profileId, displayName, expiresAt, ...carried };
     const code = PREFIX + Buffer.from(JSON.stringify(pairing)).toString("base64url");
     sequence = Math.max(sequence + 1, Date.now());
     const boot = options.boot ?? current.boot;
@@ -222,6 +252,8 @@ export async function virtualPeer(
       clearInterval(timer);
       await replaceFile(presencePath, text);
     },
+    linkStates: () =>
+      page.evaluate(() => [...((globalThis as unknown as PageGlobal).__virtual?.states ?? [])]),
     stop: () => {
       stopped = true;
       clearInterval(timer);

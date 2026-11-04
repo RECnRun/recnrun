@@ -79,6 +79,17 @@ describe("E5 virtual peer", () => {
     expect(other.identity.key).not.toBe(peer.identity.key);
   });
 
+  test("names a claimed certificate and statement in its code in place of its own", async () => {
+    const peer = await virtualPeer(page, folder);
+    const claim = { fingerprint: "12:34:56", identity: { key: "K", signedAt: 1, signature: "S" } };
+    const answer = await peer.signal("answer", LOWEST_ID, { claim });
+    peer.stop();
+    const pairing = decodeCode(answer.code);
+    expect(pairing.sdp).toBe("v=0\r\na=fingerprint:sha-256 12:34:56\r\n");
+    expect(pairing.identity).toEqual(claim.identity);
+    expect(peer.presence().fingerprint).toBe("AB:CD:EF");
+  });
+
   test("keeps no refresh once stopped during its first write", async () => {
     const peer = await virtualPeer(page, folder);
     const written = peer.announce();

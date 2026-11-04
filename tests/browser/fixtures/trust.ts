@@ -2,7 +2,14 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import type { BrowserContext, Worker } from "@playwright/test";
-import { POC_EXTENSION_ID, storedIn } from "./downloads-profiles.ts";
+import type { IdentityStatement } from "../../experiments/fixtures/identity-statement.ts";
+import {
+  POC_EXTENSION_ID,
+  createDownloadsGroup,
+  storedIn,
+  tempPlatform,
+  waitForMesh,
+} from "./downloads-profiles.ts";
 import type { DownloadsGroup, DownloadsProfile } from "./downloads-profiles.ts";
 
 /*
@@ -13,6 +20,7 @@ import type { DownloadsGroup, DownloadsProfile } from "./downloads-profiles.ts";
 
 const POLL_MS = 250;
 const DAY_MS = 86_400_000;
+const LINK_MS = 60_000;
 
 /** A pin as `p2p/pins.ts` stores it: the identity key and the last certificate it signed. */
 interface Pin {
@@ -20,6 +28,38 @@ interface Pin {
   fingerprint: string;
   pinnedAt: number;
   source: string;
+}
+
+/** Two profiles linked over Downloads, with the launcher's catalog running. */
+export interface Pair {
+  group: DownloadsGroup;
+  /** In launch order: Profile A, then Profile B. */
+  profiles: [DownloadsProfile, DownloadsProfile];
+  /** The lower profile id, which offers; the other answers (folder-pairing.ts). */
+  offerer: DownloadsProfile;
+  answerer: DownloadsProfile;
+  /** Stops the launcher's catalog runs, as a forger who writes registry.json in its place would. */
+  stopCatalog(): Promise<void>;
+}
+
+/** Runs `body` on two profiles that linked over Downloads, then closes them. */
+export async function withPair(prefix: string, body: (pair: Pair) => Promise<void>) {
+  const group = await createDownloadsGroup(tempPlatform(prefix));
+  try {
+    const profiles: Pair["profiles"] = [
+      await group.launch("Profile A"),
+      await group.launch("Profile B"),
+    ];
+    await group.catalog();
+    const stopCatalog = group.startCatalog();
+    await waitForMesh(profiles, LINK_MS);
+    const [offerer, answerer] = [...profiles].sort((one, other) =>
+      one.profileId < other.profileId ? -1 : 1,
+    ) as Pair["profiles"];
+    await body({ group, profiles, offerer, answerer, stopCatalog });
+  } finally {
+    await group.dispose();
+  }
 }
 
 /** The pin `profile` holds for `peer`, if any. */
@@ -42,7 +82,7 @@ export async function within<T>(read: () => Promise<T | undefined>, ms: number) 
 
 interface Presence {
   fingerprint: string;
-  identity: { key: string };
+  identity: IdentityStatement;
 }
 
 /** The presence `profile` last wrote into the group's Downloads folder, read from disk. */

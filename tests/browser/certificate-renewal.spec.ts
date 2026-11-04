@@ -1,12 +1,15 @@
 import { expect, test } from "./fixtures/chrome.ts";
+import { linkedPeers } from "./fixtures/downloads-profiles.ts";
+import type { DownloadsProfile } from "./fixtures/downloads-profiles.ts";
 import {
-  createDownloadsGroup,
-  linkedPeers,
-  tempPlatform,
-  waitForMesh,
-} from "./fixtures/downloads-profiles.ts";
-import type { DownloadsGroup, DownloadsProfile } from "./fixtures/downloads-profiles.ts";
-import { backgroundLog, pinOf, presenceOf, renewAndRestart, within } from "./fixtures/trust.ts";
+  backgroundLog,
+  pinOf,
+  presenceOf,
+  renewAndRestart,
+  withPair,
+  within,
+} from "./fixtures/trust.ts";
+import type { Pair } from "./fixtures/trust.ts";
 
 /*
  * POC PLAN.md P3.3 on Google Chrome Stable: two poc-d0 roots pair over Downloads. One renews its
@@ -20,31 +23,23 @@ const LINK_MS = 60_000;
 const RELINK_MS = 120_000;
 const REFUSED_MS = 90_000;
 
-interface Pair {
-  group: DownloadsGroup;
+interface Renewal {
+  group: Pair["group"];
+  /** Profile A renews; Profile B is its peer. */
   renewing: DownloadsProfile;
   peer: DownloadsProfile;
 }
 
-/** Runs `body` on two profiles that linked over Downloads, then closes them. */
-async function withPair(body: (pair: Pair) => Promise<void>): Promise<void> {
-  const group = await createDownloadsGroup(tempPlatform("recnrun-renewal"));
-  try {
-    const renewing = await group.launch("Profile A");
-    const peer = await group.launch("Profile B");
-    await group.catalog();
-    group.startCatalog();
-    await waitForMesh([renewing, peer], LINK_MS);
-    await body({ group, renewing, peer });
-  } finally {
-    await group.dispose();
-  }
-}
+/** Runs `body` on a linked pair whose Profile A renews. */
+const withRenewal = (body: (renewal: Renewal) => Promise<void>) =>
+  withPair("recnrun-renewal", ({ group, profiles: [renewing, peer] }) =>
+    body({ group, renewing, peer }),
+  );
 
 test.describe.configure({ timeout: 480_000 });
 
 /** Waits until `peer` is linked with `renewing` again under a pin naming `fingerprint`. */
-const relinkedOn = ({ renewing, peer }: Pair, fingerprint: string) =>
+const relinkedOn = ({ renewing, peer }: Renewal, fingerprint: string) =>
   within(async () => {
     const pin = await pinOf(peer, renewing);
     const linked = (await linkedPeers(peer)).includes(renewing.profileId);
@@ -52,7 +47,7 @@ const relinkedOn = ({ renewing, peer }: Pair, fingerprint: string) =>
   }, RELINK_MS);
 
 test("a renewed certificate relinks with no gesture under the same pinned key, online or offline", () =>
-  withPair(async (pair) => {
+  withRenewal(async (pair) => {
     const { group, renewing, peer } = pair;
     const pinned = await pinOf(peer, renewing);
     if (!pinned) throw new Error("The first link pinned nothing.");
@@ -76,7 +71,7 @@ test("a renewed certificate relinks with no gesture under the same pinned key, o
   }));
 
 test("a renewed certificate that the pinned key did not sign is refused, and the pin stays", () =>
-  withPair(async ({ group, renewing, peer }) => {
+  withRenewal(async ({ group, renewing, peer }) => {
     const pinned = await pinOf(peer, renewing);
     if (!pinned) throw new Error("The first link pinned nothing.");
     const log = backgroundLog(peer.context);
