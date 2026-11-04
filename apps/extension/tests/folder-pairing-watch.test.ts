@@ -27,6 +27,7 @@ function watching(state: FolderPairing | null = {}) {
     link: memoryRecords(),
     acted: memoryRecords(),
     state: memoryRepository(state),
+    pins: { verify: async () => "unpinned" as const },
     log,
   });
   return { flow, failing, log, askLink };

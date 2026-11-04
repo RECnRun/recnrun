@@ -4,6 +4,7 @@ import type { LinkCommand } from "@/messaging/peer-messages";
 import { signalFileOf } from "@/p2p/folder-rendezvous";
 import type { Presence, Seen, SignalFile } from "@/p2p/folder-rendezvous";
 import { decodePairing, fingerprintOf } from "@/p2p/pairing-code";
+import type { Pins } from "@/p2p/pins";
 import type {
   FolderActed,
   FolderPairing,
@@ -92,6 +93,8 @@ export interface FolderPairingDependencies {
   link: Pick<PeerRecords<PeerLink>, "all">;
   acted: Pick<PeerRecords<FolderActed>, "all" | "get" | "set">;
   state: Pick<Repository<FolderPairing>, "read" | "write">;
+  /** A presence may announce a pinned profile's certificate only. */
+  pins: Pick<Pins, "verify">;
   log: (entry: string) => void;
   now?: () => number;
 }
@@ -103,8 +106,14 @@ async function act(deps: FolderPairingDependencies, step: FolderStep, now: () =>
   const acted = ({ profileId, pairingId }: SignalFile) =>
     deps.acted.set(profileId, { pairingId, at: now() });
   if (step.type === "offer") {
-    const { code } = await deps.pairing.createOffer(step.to.profileId);
-    await publish(code, step.to.profileId);
+    const { profileId, fingerprint } = step.to;
+    // Checked before the offer, so a forged presence never gets a connection of this profile's.
+    if ((await deps.pins.verify(profileId, fingerprint)) === "pinned-mismatch")
+      return deps.log(
+        `folder pairing: no offer to ${profileId}, whose presence announces another certificate`,
+      );
+    const { code } = await deps.pairing.createOffer(profileId);
+    await publish(code, profileId);
   } else if (step.type === "answer") {
     const { code } = await deps.pairing.accept(step.offer.code);
     await acted(step.offer);

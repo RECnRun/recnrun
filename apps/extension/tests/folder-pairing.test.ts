@@ -3,6 +3,8 @@ import { createFolderPairing, decideFolderSteps } from "@/background/folder-pair
 import type { LinkCommand } from "@/messaging/peer-messages";
 import type { Presence, Seen, SignalFile } from "@/p2p/folder-rendezvous";
 import { PAIRING_TTL_MS, encodePairing } from "@/p2p/pairing-code";
+import { createPins } from "@/p2p/pins";
+import type { Pin } from "@/p2p/pins";
 import type { FolderActed, FolderPairing, PeerLink, PendingOffer } from "@/storage/peer-repository";
 import { ME, PEER, STRANGER, memoryRecords, memoryRepository } from "./fake-peer";
 
@@ -186,6 +188,7 @@ function folderPairing(
   const acted = memoryRecords<FolderActed>(initialActed);
   const link = memoryRecords<PeerLink>();
   const log = vi.fn();
+  const pinned = memoryRecords<Pin>();
   const flow = createFolderPairing({
     askLink,
     identity: async () => ({ profileId: me, displayName: "Laptop" }),
@@ -194,10 +197,11 @@ function folderPairing(
     link,
     acted,
     state,
+    pins: createPins(pinned),
     log,
     now: () => NOW,
   });
-  return { flow, commands, pairing, state, acted, link, pending, log, offer, answer };
+  return { flow, commands, pairing, state, acted, link, pending, pinned, log, offer, answer };
 }
 
 describe("createFolderPairing", () => {
@@ -219,6 +223,17 @@ describe("createFolderPairing", () => {
     expect(pairing.createOffer).toHaveBeenCalledOnce();
     expect(pairing.createOffer).toHaveBeenCalledWith(PEER);
     expect(commands).toEqual([{ type: "folder-publish", signal: offer }]);
+  });
+
+  test("offers nothing to a presence announcing another certificate for a pinned profile", async () => {
+    const { flow, commands, pairing, pinned, log } = folderPairing();
+    await pinned.set(PEER, { fingerprint: "EE:EE", pinnedAt: 1, source: "local-channel" });
+    await flow.seen(seen([presence(PEER)]));
+    expect(pairing.createOffer).not.toHaveBeenCalled();
+    expect(commands).toEqual([]);
+    expect(log.mock.calls).toEqual([
+      [`folder pairing: no offer to ${PEER}, whose presence announces another certificate`],
+    ]);
   });
 
   test("answers an offer, publishing the answer for the offerer", async () => {

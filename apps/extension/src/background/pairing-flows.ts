@@ -76,6 +76,7 @@ export function createPairingFlows(
     link: peerLinksRepository,
     acted: folderActedRepository,
     state: folderPairingRepository,
+    pins: trust.pins,
     log,
   });
   const mesh = createMeshPairing({
