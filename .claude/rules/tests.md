@@ -12,15 +12,15 @@ paths:
 
 ## Layers
 
-| Layer       | Files                                                                    | Command                   |
-| ----------- | ------------------------------------------------------------------------ | ------------------------- |
-| Node unit   | `{apps,packages}/*/tests/*.test.ts`, `tests/*.test.ts` (the lab harness) | `vp run test:unit`        |
-| Component   | `*.browser.test.ts(x)` in Vitest Browser Mode, Chromium                  | `vp run test:components`  |
-| End-to-end  | `tests/e2e/*.spec.ts`, headed Playwright, built website + test extension | `vp run test:e2e`         |
-| Browser     | `tests/browser/*.spec.ts`, Google Chrome Stable over CDP, headed on Xvfb | `vp run test:browser`     |
-| Experiments | `tests/experiments/*.spec.ts`, POC hypotheses on the browser fixtures    | `vp run test:experiments` |
-| Host        | `tests/host/*.spec.ts`, the Mac's installed Google Chrome, never Docker  | `vp run test:host`        |
-| Scripts     | `scripts/*.checks.mjs`, `scripts/poc-cross-profile/*.checks.mjs` (Node)  | `vp run test:scripts`     |
+| Layer       | Files                                                                    | Command                                                                  |
+| ----------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------ |
+| Node unit   | `{apps,packages}/*/tests/*.test.ts`, `tests/*.test.ts` (the lab harness) | `vp run test:unit`                                                       |
+| Component   | `*.browser.test.ts(x)` in Vitest Browser Mode, Chromium                  | `vp run test:components`                                                 |
+| End-to-end  | `tests/e2e/*.spec.ts`, headed Playwright, built website + test extension | `vp run test:e2e`                                                        |
+| Browser     | `tests/browser/*.spec.ts`, Google Chrome Stable over CDP, headed on Xvfb | `vp run test:browser`                                                    |
+| Experiments | `tests/experiments/*.spec.ts`, POC hypotheses on the browser fixtures    | `vp run test:experiments`                                                |
+| Host        | `tests/host/*.spec.ts`, the Mac's installed Google Chrome, never Docker  | `vp run test:host`                                                       |
+| Scripts     | `scripts/*.checks.mjs`, `scripts/poc-cross-profile/*.checks.mjs` (Node)  | `vp run test:scripts` (Docker; on the Mac `vp run test:host -- scripts`) |
 
 - Keep schemas, protocol handling, handlers, and view models in Node unit tests; extract pure functions when that makes a rule testable.
 - Both apps' `vitest.browser.config.ts` call `browserProject(name, dir)` from the root `vitest.browser.shared.ts`; change the Browser Mode setup there, once.

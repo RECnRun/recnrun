@@ -19,6 +19,7 @@ const tasks = new Set([
   "test:experiments:local",
   "test:headless:local",
   "test:coverage:local",
+  "test:scripts:local",
 ]);
 // An internal bridge keeps eth0 for WebRTC host candidates and routes nothing out (POC P1.0).
 const network = "recnrun-tests";

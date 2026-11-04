@@ -212,7 +212,7 @@ await test(
 
 await test("public tests route through Docker while local variants and the hooks retain every gate", () => {
   const manifest = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
-  for (const layer of ["unit", "components", "e2e", "browser", "experiments", "coverage"]) {
+  for (const layer of "unit components e2e browser experiments coverage scripts".split(" ")) {
     assert.equal(
       manifest.scripts[`test:${layer}`],
       `node scripts/test-container.mjs test:${layer}:local`,
@@ -260,6 +260,7 @@ await test("verify runs Vitest once, under coverage, and keeps test:local for vp
     "test:e2e:local",
     "test:browser:local",
     "test:experiments:local",
+    "test:scripts:local",
   ]);
   assert.deepEqual(task("test:local").match(/test:(?:[a-z0-9]+:)?local/g), [
     "test:unit:local",

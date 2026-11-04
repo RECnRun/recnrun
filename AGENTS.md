@@ -37,6 +37,8 @@ Vite+ (`vp`) is the only toolchain. `vp <name>` runs a built-in command and `vp 
 | `vp run test:browser`                             | Google Chrome Stable in Docker: install methods, the mesh            |
 | `vp run test:experiments`                         | POC hypotheses that write verdicts under `.artifacts/evidence/`      |
 | `vp run test:host -- <spec>`                      | Host only: the Mac's Google Chrome; needs `RECNRUN_HOST_ROOTS`       |
+| `vp run test:scripts`                             | Launcher shell checks in Docker: dash, ShellCheck, package scan      |
+| `vp run test:host -- scripts`                     | The same checks on the Mac: macOS `/bin/sh`, ShellCheck if installed |
 | `vp run test`                                     | All five layers                                                      |
 
 | `vp run test:coverage` | Coverage with thresholds |

@@ -7,6 +7,8 @@
   "ignoreBinaries": ["ip", "tc", "mkfifo"],
   "workspaces": {
     ".": {
+      // scripts/test-host.mjs names playwright.host.config.ts, which no package script does.
+      "playwright": { "config": ["playwright*.config.ts"] },
       "entry": [
         "scripts/agent-hooks/*.mjs",
         "scripts/git-hooks/*.mjs",

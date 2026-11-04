@@ -43,3 +43,8 @@ await test("the image filters the container's egress to lo before it runs the ta
   );
   assert.ok(drop < task, "eth0 drops before the task");
 });
+
+await test("the image installs ShellCheck for the launcher scripts", () => {
+  const dockerfile = readFileSync(join(root, "Dockerfile.tests"), "utf8");
+  assert.match(dockerfile, /apt-get install[^\n]*\bshellcheck\b/);
+});
