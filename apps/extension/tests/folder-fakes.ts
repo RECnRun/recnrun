@@ -4,7 +4,7 @@ import type { LinkCommand } from "@/messaging/peer-messages";
 import { PAIRING_TTL_MS } from "@/p2p/pairing-code";
 import { createPins } from "@/p2p/pins";
 import type { Pin } from "@/p2p/pins";
-import type { AnsweredOffer } from "@/storage/answered-repository";
+import type { AnsweredOffers } from "@/storage/answered-repository";
 import type { FolderActed, FolderPairing, PeerLink, PendingOffer } from "@/storage/peer-repository";
 import { ME, PEER, memoryRecords, memoryRepository } from "./fake-peer";
 import { NOW, OFFER_ID, signal } from "./folder-sightings";
@@ -34,7 +34,7 @@ export function folderPairing(
   };
   const state = memoryRepository<FolderPairing>(initial);
   const acted = memoryRecords<FolderActed>(initialActed);
-  const answered = memoryRecords<AnsweredOffer>();
+  const answered = memoryRecords<AnsweredOffers>();
   const link = memoryRecords<PeerLink>();
   const log = vi.fn();
   const pinned = memoryRecords<Pin>();

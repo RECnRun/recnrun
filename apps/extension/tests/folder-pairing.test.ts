@@ -3,7 +3,7 @@ import { decideFolderSteps } from "@/background/folder-pairing";
 import type { Seen } from "@/p2p/folder-rendezvous";
 import { PAIRING_TTL_MS } from "@/p2p/pairing-code";
 import type { Pin } from "@/p2p/pins";
-import type { AnsweredOffer } from "@/storage/answered-repository";
+import type { AnsweredOffers } from "@/storage/answered-repository";
 import type { FolderActed, PendingOffer } from "@/storage/peer-repository";
 import { ME, PEER, STRANGER } from "./fake-peer";
 import { folderPairing } from "./folder-fakes";
@@ -16,7 +16,7 @@ const situation = (me: string, sighting: Seen) => ({
   skip: [] as string[],
   pending: {} as Record<string, PendingOffer>,
   acted: {} as Record<string, FolderActed>,
-  answered: {} as Record<string, AnsweredOffer>,
+  answered: {} as Record<string, AnsweredOffers>,
   now: NOW,
 });
 
@@ -94,7 +94,7 @@ describe("decideFolderSteps", () => {
 
   test("leaves an offer it answered before the browser relaunched", () => {
     const offer = signal("offer", PEER, STRANGER);
-    const answered = { [PEER]: { pairingId: OFFER_ID, expiresAt: offer.expiresAt } };
+    const answered = { [PEER]: [{ pairingId: OFFER_ID, expiresAt: offer.expiresAt }] };
     const relaunched = { ...situation(STRANGER, seen([presence(PEER)], [offer])), answered };
     expect(decideFolderSteps(relaunched)).toEqual([]);
   });
@@ -217,15 +217,15 @@ describe("createFolderPairing", () => {
 
   test("remembers an answer past a relaunch until its offer expires, forgetting expired ones", async () => {
     const { flow, pairing, answered } = folderPairing({}, STRANGER);
-    await answered.set(ME, { pairingId: OTHER_ID, expiresAt: NOW });
+    await answered.set(ME, [{ pairingId: OTHER_ID, expiresAt: NOW }]);
     const made = signal("offer", PEER, STRANGER);
     await flow.seen(seen([presence(PEER)], [made]));
     expect(await answered.all()).toEqual({
-      [PEER]: { pairingId: OFFER_ID, expiresAt: made.expiresAt },
+      [PEER]: [{ pairingId: OFFER_ID, expiresAt: made.expiresAt }],
     });
     // A relaunch keeps local storage and nothing else.
     const relaunched = folderPairing({}, STRANGER);
-    await relaunched.answered.set(PEER, { pairingId: OFFER_ID, expiresAt: made.expiresAt });
+    await relaunched.answered.set(PEER, [{ pairingId: OFFER_ID, expiresAt: made.expiresAt }]);
     await relaunched.flow.seen(seen([presence(PEER)], [made]));
     expect(relaunched.pairing.accept).not.toHaveBeenCalled();
     expect(pairing.accept).toHaveBeenCalledOnce();
@@ -303,5 +303,25 @@ describe("createFolderPairing", () => {
     await flow.seen(seen([presence(PEER), presence(STRANGER)]));
     expect(log).toHaveBeenCalledWith("folder pairing: No link.");
     expect(pairing.createOffer.mock.calls).toEqual([[PEER], [STRANGER]]);
+  });
+});
+
+describe("the offers answered before a relaunch", () => {
+  test("leaves a still-valid earlier offer alone after answering a later one and relaunching", async () => {
+    const first = folderPairing({}, STRANGER);
+    const a = signal("offer", PEER, STRANGER);
+    const b = signal("offer", PEER, STRANGER, { pairingId: OTHER_ID });
+    await first.flow.seen(seen([presence(PEER)], [a]));
+    await first.flow.seen(seen([presence(PEER)], [b]));
+    expect(first.pairing.accept).toHaveBeenCalledTimes(2);
+    // A relaunch keeps local storage and nothing else.
+    const relaunched = folderPairing({}, STRANGER);
+    for (const [peer, kept] of Object.entries(await first.answered.all()))
+      await relaunched.answered.set(peer, kept);
+    // Only the answer to B is on disk, so only the record can say A was answered.
+    await relaunched.flow.seen(
+      seen([presence(PEER)], [a, signal("answer", STRANGER, PEER, { pairingId: OTHER_ID })]),
+    );
+    expect(relaunched.pairing.accept).not.toHaveBeenCalled();
   });
 });

@@ -6,7 +6,7 @@ import type { Presence, Seen, SignalFile } from "@/p2p/folder-rendezvous";
 import { signerOf } from "@/p2p/identity-key";
 import { PAIRING_TTL_MS, decodePairing, fingerprintOf } from "@/p2p/pairing-code";
 import type { Pins } from "@/p2p/pins";
-import type { AnsweredOffer } from "@/storage/answered-repository";
+import type { AnsweredOffers } from "@/storage/answered-repository";
 import type {
   FolderActed,
   FolderPairing,
@@ -34,7 +34,7 @@ interface Situation {
   pending: Record<string, PendingOffer>;
   acted: Record<string, FolderActed>;
   /** The offers answered in this boot or an earlier one, which a relaunch finds on disk again. */
-  answered: Record<string, AnsweredOffer>;
+  answered: Record<string, AnsweredOffers>;
   now: number;
 }
 
@@ -74,7 +74,10 @@ function stepWith(partner: Presence, situation: Situation): FolderStep | undefin
   const { me, seen, now } = situation;
   const signals = seen.signals.filter((each) => vouched(each, partner, now));
   if (me < partner.profileId) return offererStep(partner, signals, situation);
-  const records = [situation.acted, situation.answered].map((each) => each[partner.profileId]);
+  const records = [
+    situation.acted[partner.profileId],
+    ...(situation.answered[partner.profileId] ?? []),
+  ];
   // An answer of its own on disk counts too: a quit may land after it, before the record.
   const own = seen.signals.filter((each) => each.profileId === me && each.to === partner.profileId);
   const done = new Set([...records, ...own].flatMap((each) => each?.pairingId ?? []));
@@ -100,7 +103,7 @@ export interface FolderPairingDependencies {
   pending: Pick<PeerRecords<PendingOffer>, "all">;
   link: Pick<PeerRecords<PeerLink>, "all">;
   acted: Pick<PeerRecords<FolderActed>, "all" | "get" | "set">;
-  answered: Pick<PeerRecords<AnsweredOffer>, "all" | "set">;
+  answered: Pick<PeerRecords<AnsweredOffers>, "all" | "set">;
   state: Pick<Repository<FolderPairing>, "read" | "write">;
   /** A presence's certificate must be signed by the identity key pinned for its profile, if any. */
   pins: Pick<Pins, "verify">;
@@ -121,15 +124,19 @@ async function refusal({ pins }: FolderPairingDependencies, presence: Presence) 
   return undefined;
 }
 
-/** Remembers the answered offer of its sender, and forgets every answered offer that expired. */
+/** Remembers every offer answered from its sender, and forgets each one that expired. */
 async function rememberAnswered(
   records: FolderPairingDependencies["answered"],
   { profileId, pairingId, expiresAt }: SignalFile,
   now: number,
 ) {
-  const expired = Object.entries(await records.all()).filter(([, each]) => each.expiresAt <= now);
-  for (const [peer] of expired) await records.set(peer, null);
-  await records.set(profileId, { pairingId, expiresAt });
+  const all = await records.all();
+  const kept = (peer: string) => (all[peer] ?? []).filter((each) => each.expiresAt > now);
+  for (const peer of Object.keys(all))
+    if (peer !== profileId && kept(peer).length < (all[peer]?.length ?? 0))
+      await records.set(peer, kept(peer).length > 0 ? kept(peer) : null);
+  const same = kept(profileId).filter((each) => each.pairingId !== pairingId);
+  await records.set(profileId, [...same, { pairingId, expiresAt }]);
 }
 
 /** Carries out one step: offers and answers go into the folder, and connecting needs nothing there. */
