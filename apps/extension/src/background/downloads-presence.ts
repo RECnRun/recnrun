@@ -1,6 +1,7 @@
 import { errorMessage } from "@recnrun/domain";
 import * as v from "valibot";
 import { browser } from "wxt/browser";
+import { createAckListener, writeAck } from "@/background/launcher-requests";
 import { createDownloadsPairing } from "@/background/downloads-pairing";
 import { downloadsWriter, settled } from "@/background/downloads-publisher";
 import type { DownloadsPort } from "@/background/downloads-publisher";
@@ -110,7 +111,7 @@ async function learnRoot(deps: PresenceDependencies, id: number, relative: strin
 }
 
 /** Announces through the Downloads transport, keeping the item's id to learn the root from. */
-async function publish(deps: PresenceDependencies) {
+async function publish(deps: PresenceDependencies): Promise<Presence> {
   const now = (deps.now ?? Date.now)();
   const namespace = await namespaceOf(deps);
   const presence = await presenceOf(deps, now);
@@ -125,6 +126,7 @@ async function publish(deps: PresenceDependencies) {
   });
   await transport.announce(presence);
   if (id !== undefined) await learnRoot(deps, id, presencePath(namespace, presence.profileId));
+  return presence;
 }
 
 /** Calls `refresh` every half TTL; an alarm also restarts a stopped worker, a timer does not. */
@@ -151,8 +153,9 @@ function scheduleRefresh(refresh: () => void, { alarms, log }: PresenceDependenc
 export function startDownloadsPresence(deps: PresenceDependencies) {
   const now = deps.now ?? Date.now;
   let last = Number.NEGATIVE_INFINITY;
+  let latest: Presence["identity"] | undefined;
   const publishNow = async () => {
-    await publish(deps);
+    latest = (await publish(deps)).identity;
     // Not awaited: the bootstrap page's answer waits for the presence only.
     void deps.published?.();
   };
@@ -168,7 +171,7 @@ export function startDownloadsPresence(deps: PresenceDependencies) {
   const stop = scheduleRefresh(() => {
     if (now() - last >= REFRESH_MS / 2) attempt();
   }, deps);
-  return { stop, publish: publishNow };
+  return { stop, publish: publishNow, identity: () => latest };
 }
 
 interface Sender {
@@ -232,6 +235,18 @@ export function startPocPresence({ log, sign, startPairing }: PocPresenceOptions
   const presence = startDownloadsPresence(deps);
   const own = { extensionId: browser.runtime.id, extensionUrl: browser.runtime.getURL("/") };
   browser.runtime.onMessage.addListener(createPublishListener(presence.publish, own));
+  const ack = (token: string) =>
+    writeAck(
+      {
+        downloads: browser.downloads,
+        profileId: async () => (await readIdentity()).profileId,
+        identity: presence.identity,
+        namespace: () => namespaceOf(deps),
+        boot: store.boot,
+      },
+      token,
+    );
+  browser.runtime.onMessage.addListener(createAckListener(ack, own));
   const relay = {
     downloads: browser.downloads,
     me: async () => (await readIdentity()).profileId,

@@ -226,6 +226,30 @@ describe("the presence startPeers writes", () => {
     ]);
   });
 
+  test("acknowledges the launcher's attempt with the presence's identity and the session's boot", async () => {
+    const { written } = await background();
+    const token = "0f8b6a3e-2c1d-4e5f-9a7b-1c2d3e4f5a6b";
+    startPeers({ transport: "downloads", sign: signAs });
+    await settles(() => expect(written).toHaveLength(1));
+    await pocPresenceStore().adoptBoot(token);
+    const page = { id: fakeBrowser.runtime.id, url: fakeBrowser.runtime.getURL("/bootstrap.html") };
+    const replies: unknown[] = [];
+    void fakeBrowser.runtime.onMessage.trigger({ type: "POC_PUBLISH_PRESENCE" }, page, (reply) =>
+      replies.push(reply),
+    );
+    await settles(() => expect(replies).toHaveLength(1));
+    void fakeBrowser.runtime.onMessage.trigger({ type: "POC_LAUNCHER_ACK", token }, page, (reply) =>
+      replies.push(reply),
+    );
+    await settles(() => expect(replies).toEqual([{ ok: true }, { ok: true }]));
+    const ack = written.at(-1);
+    expect(ack?.filename).toMatch(new RegExp(`/acks/${ME}/${token}\\.json$`));
+    const body = JSON.parse(decodeURIComponent((ack?.url ?? "").split(",")[1] ?? ""));
+    const presence = registrationOf(written.at(-2)?.url ?? "");
+    expect(Object.keys(body)).toEqual(["token", "profileId", "identity", "boot", "createdAt"]);
+    expect(body).toMatchObject({ token, profileId: ME, boot: token, identity: presence.identity });
+  });
+
   test("writes no presence, and says why, while the offscreen document gives no fingerprint", async () => {
     const { written, log } = await background();
     const replies = [{ ok: false, error: "No certificate." }, "garbage"];

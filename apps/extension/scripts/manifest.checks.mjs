@@ -85,7 +85,7 @@ await test("the production build leaves out the POC's Downloads presence", () =>
     const code = readFileSync(new URL(file, output), "utf8");
     assert.doesNotMatch(
       code,
-      /presence\.json|downloads-presence|poc-presence|POC_FINGERPRINT|POC_PUBLISH_PRESENCE|registry\.json/,
+      /presence\.json|downloads-presence|poc-presence|POC_FINGERPRINT|POC_PUBLISH_PRESENCE|POC_LAUNCHER_ACK|registry\.json/,
       file,
     );
   }

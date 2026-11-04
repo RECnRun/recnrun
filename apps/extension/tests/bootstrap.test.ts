@@ -31,12 +31,37 @@ afterEach(() => {
 describe("bootstrap", () => {
   test("stores the launcher's token as this session's boot, then asks for a presence now", async () => {
     const deps = dependencies(`#token=${TOKEN}`);
-    expect(await bootstrap(deps)).toEqual({ ok: true, token: TOKEN });
+    expect(await bootstrap(deps)).toEqual({ ok: true, token: TOKEN, acked: true });
     expect(deps.adopt).toHaveBeenCalledWith(TOKEN);
-    expect(deps.send).toHaveBeenCalledWith({ type: "POC_PUBLISH_PRESENCE" });
+    expect(deps.send).toHaveBeenNthCalledWith(1, { type: "POC_PUBLISH_PRESENCE" });
     const [adopted] = deps.adopt.mock.invocationCallOrder;
-    const [sent] = deps.send.mock.invocationCallOrder;
-    expect(adopted).toBeLessThan(sent ?? 0);
+    const [presence, ack] = deps.send.mock.invocationCallOrder;
+    expect(adopted).toBeLessThan(presence ?? 0);
+    expect(presence).toBeLessThan(ack ?? 0);
+  });
+
+  test("then asks for the ack of the attempt's token and says it was written", async () => {
+    const deps = dependencies(`#token=${TOKEN}`);
+    expect(await bootstrap(deps)).toMatchObject({ acked: true });
+    expect(deps.send).toHaveBeenNthCalledWith(2, { type: "POC_LAUNCHER_ACK", token: TOKEN });
+    expect(deps.send).toHaveBeenCalledTimes(2);
+  });
+
+  test("keeps the presence when the ack fails, and says it was not written", async () => {
+    const replies = [{ ok: true }, { ok: false, error: "No presence has been published yet." }];
+    const deps = { ...dependencies(`#token=${TOKEN}`), send: vi.fn(async () => replies.shift()) };
+    expect(await bootstrap(deps)).toEqual({
+      ok: true,
+      token: TOKEN,
+      acked: false,
+      error: "No presence has been published yet.",
+    });
+  });
+
+  test("asks for no ack when the presence failed", async () => {
+    const deps = dependencies(`#token=${TOKEN}`, { ok: false, error: "Invalid filename" });
+    expect(await bootstrap(deps)).toEqual({ ok: false, error: "Invalid filename" });
+    expect(deps.send).toHaveBeenCalledTimes(1);
   });
 
   test.each([
@@ -78,7 +103,21 @@ describe("startBootstrap", () => {
 
     expect(await pocPresenceStore().boot()).toBe(TOKEN);
     expect(send).toHaveBeenCalledWith({ type: "POC_PUBLISH_PRESENCE" });
-    expect(JSON.parse(shown.textContent)).toEqual({ ok: true, token: TOKEN });
+    expect(send).toHaveBeenCalledWith({ type: "POC_LAUNCHER_ACK", token: TOKEN });
+    expect(JSON.parse(shown.textContent)).toEqual({ ok: true, token: TOKEN, acked: true });
+  });
+
+  test("a second attempt on the running session leaves the boot, yet still asks for its ack", async () => {
+    const send = vi
+      .spyOn(fakeBrowser.runtime, "sendMessage")
+      .mockResolvedValue({ ok: true } as never);
+    const later = "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d";
+
+    await startBootstrap(pageWith(`#token=${TOKEN}`, { textContent: "" }));
+    await startBootstrap(pageWith(`#token=${later}`, { textContent: "" }));
+
+    expect(await pocPresenceStore().boot()).toBe(TOKEN);
+    expect(send).toHaveBeenCalledWith({ type: "POC_LAUNCHER_ACK", token: later });
   });
 
   test("leaves the boot alone for a refused fragment, with no result element", async () => {

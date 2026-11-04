@@ -91,6 +91,12 @@ for (const mode of Object.keys(VARIANTS)) {
     assert.match(pageScript(mode, "diagnostics.html"), /registry\.json/);
   });
 
+  await test(`${mode} acknowledges the launcher's open attempt under acks/ (P4.3)`, () => {
+    assert.match(withChunks(mode, "background.js"), /POC_LAUNCHER_ACK/);
+    assert.match(withChunks(mode, "background.js"), /\/acks\//);
+    assert.match(pageScript(mode, "bootstrap.html"), /POC_LAUNCHER_ACK/);
+  });
+
   await test(`${mode} has no content script that matches file:// (POC §4)`, () => {
     const matches = pocManifest(mode).content_scripts.flatMap((script) => script.matches);
     assert.ok(!matches.some((pattern) => /^(file|\*):/.test(pattern)), matches.join(", "));

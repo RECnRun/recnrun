@@ -49,6 +49,20 @@ export function presencePath(namespace: string, profileId: string): string {
   return `${namespaceFolder(namespace)}/peers/${profileSegment(profileId)}/presence.json`;
 }
 
+/** The lowercase v4 uuid the launcher gives each open attempt; nothing else may name an ack. */
+export const TokenSchema = v.pipe(
+  v.string(),
+  v.regex(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/),
+);
+
+/** Where a profile answers one open attempt of the launcher, in its own folder. */
+export function ackPath(namespace: string, profileId: string, token: string): string {
+  if (!v.is(TokenSchema, token)) {
+    throw new Error(`Invalid token ${JSON.stringify(token)}: use a lowercase v4 uuid.`);
+  }
+  return `${namespaceFolder(namespace)}/acks/${profileSegment(profileId)}/${token}.json`;
+}
+
 /** Where `from` leaves its one current signal of `kind` for `to`, in its own folder. */
 export function signalPath(
   namespace: string,
