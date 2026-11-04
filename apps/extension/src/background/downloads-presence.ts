@@ -21,6 +21,19 @@ import { pocPresenceStore } from "@/storage/poc-presence-repository";
  */
 
 const SETTLE_MS = 10_000;
+const REFRESH_MS = PRESENCE_TTL_MS / 2;
+/** The alarm that rewrites the presence, and wakes a stopped worker to do it (CHROMIUM.md group 12). */
+const PRESENCE_ALARM = "poc-presence";
+
+/** The part of `chrome.alarms` the presence uses. */
+export interface AlarmsPort {
+  create(name: string, info: { periodInMinutes: number }): Promise<void>;
+  clear(name: string): Promise<boolean>;
+  onAlarm: {
+    addListener(listener: (alarm: { name: string }) => void): void;
+    removeListener(listener: (alarm: { name: string }) => void): void;
+  };
+}
 
 export interface PresenceDependencies {
   downloads: DownloadsPort;
@@ -34,6 +47,8 @@ export interface PresenceDependencies {
   /** The absolute Downloads root learned from Chrome. */
   root: { read(): Promise<string | null>; write(root: string): Promise<void> };
   log: (entry: string) => void;
+  /** Chrome's alarms, absent without the permission; a timer then refreshes only while the worker runs. */
+  alarms?: AlarmsPort;
   now?: () => number;
 }
 
@@ -100,13 +115,40 @@ async function publish(deps: PresenceDependencies) {
   await learnRoot(deps, id, filename);
 }
 
-/** Announces this profile now and every half TTL, so it never lapses while the worker runs. */
+/** Calls `refresh` every half TTL; an alarm also restarts a stopped worker, a timer does not. */
+function scheduleRefresh(refresh: () => void, { alarms, log }: PresenceDependencies) {
+  if (!alarms) {
+    const timer = setInterval(refresh, REFRESH_MS);
+    return () => clearInterval(timer);
+  }
+  const onAlarm = ({ name }: { name: string }) => {
+    if (name === PRESENCE_ALARM) refresh();
+  };
+  // Added synchronously, so the alarm that restarts a stopped worker reaches this listener.
+  alarms.onAlarm.addListener(onAlarm);
+  alarms
+    .create(PRESENCE_ALARM, { periodInMinutes: REFRESH_MS / 60_000 })
+    .catch((error: unknown) => log(`presence: alarm: ${errorMessage(error)}`));
+  return () => {
+    alarms.onAlarm.removeListener(onAlarm);
+    void alarms.clear(PRESENCE_ALARM).catch(() => false);
+  };
+}
+
+/** Announces this profile now and every half TTL, so it never lapses while Chrome runs the profile. */
 export function startDownloadsPresence(deps: PresenceDependencies) {
-  const attempt = () =>
+  const now = deps.now ?? Date.now;
+  let last = Number.NEGATIVE_INFINITY;
+  const attempt = () => {
+    last = now();
     void publish(deps).catch((error: unknown) => deps.log(`presence: ${errorMessage(error)}`));
+  };
   attempt();
-  const timer = setInterval(attempt, PRESENCE_TTL_MS / 2);
-  return { stop: () => clearInterval(timer), publish: () => publish(deps) };
+  // The alarm that restarted the worker arrives just after the write at start, which refreshed already.
+  const stop = scheduleRefresh(() => {
+    if (now() - last >= REFRESH_MS / 2) attempt();
+  }, deps);
+  return { stop, publish: () => publish(deps) };
 }
 
 interface Sender {
@@ -153,6 +195,8 @@ export function startPocPresence(log: (entry: string) => void) {
     boot: store.boot,
     root: store.root,
     log,
+    // Undefined in a build without the alarms permission.
+    alarms: (browser as { alarms?: AlarmsPort }).alarms,
   });
   const own = { extensionId: browser.runtime.id, extensionUrl: browser.runtime.getURL("/") };
   browser.runtime.onMessage.addListener(createPublishListener(presence.publish, own));

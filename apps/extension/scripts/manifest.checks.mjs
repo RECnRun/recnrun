@@ -64,7 +64,7 @@ await test("the production build leaves out the cross-profile POC", () => {
 await test("the production build leaves out every POC-only permission and page", () => {
   const manifest = productionManifest();
   assert.equal(manifest.key, undefined);
-  for (const permission of ["downloads", "debugger", "offscreen"]) {
+  for (const permission of ["downloads", "debugger", "offscreen", "alarms"]) {
     assert.ok(!manifest.permissions.includes(permission), permission);
   }
   for (const page of ["diagnostics.html", "bootstrap.html"]) {
@@ -85,7 +85,7 @@ await test("the production build leaves out the POC's Downloads presence", () =>
     const code = readFileSync(new URL(file, output), "utf8");
     assert.doesNotMatch(
       code,
-      /presence\.json|downloads-presence|POC_FINGERPRINT|POC_PUBLISH_PRESENCE|registry\.json/,
+      /presence\.json|downloads-presence|poc-presence|POC_FINGERPRINT|POC_PUBLISH_PRESENCE|registry\.json/,
       file,
     );
   }

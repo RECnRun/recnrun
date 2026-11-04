@@ -5,7 +5,7 @@ import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { POC_EXTENSION_ID, POC_PUBLIC_KEY } from "./poc-key.mjs";
 
-const BASE = ["storage", "tabs", "offscreen", "downloads"];
+const BASE = ["storage", "tabs", "offscreen", "downloads", "alarms"];
 const VARIANTS = {
   "poc-d0": BASE,
   "poc-d1": [...BASE, "debugger"],
@@ -79,6 +79,10 @@ for (const mode of Object.keys(VARIANTS)) {
   await test(`${mode} announces the profile through Downloads as its worker starts (P2.2)`, () => {
     assert.match(withChunks(mode, "background.js"), /presence\.json/);
     assert.match(pageScript(mode, "offscreen.html"), /POC_FINGERPRINT/);
+  });
+
+  await test(`${mode} rewrites the presence on an alarm, which wakes a stopped worker (P2.2)`, () => {
+    assert.match(withChunks(mode, "background.js"), /poc-presence/);
   });
 
   await test(`${mode} publishes at once when its bootstrap page asks, and reads the registry (P2.1)`, () => {

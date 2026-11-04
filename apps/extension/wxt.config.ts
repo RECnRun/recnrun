@@ -15,7 +15,8 @@ const chromiumProfile = fileURLToPath(new URL("./.wxt/chrome-data", import.meta.
 function permissions(mode: string): string[] {
   if (!peersEnabled(mode)) return ["storage", "tabs"];
   if (!pocEnabled(mode)) return ["storage", "tabs", "offscreen"];
-  const base = ["storage", "tabs", "offscreen", "downloads"];
+  // alarms wakes a stopped POC worker to rewrite its presence (CHROMIUM.md group 12).
+  const base = ["storage", "tabs", "offscreen", "downloads", "alarms"];
   return debuggerDeclared(mode) ? [...base, "debugger"] : base;
 }
 

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vite-plus/test";
+import { fakeBrowser } from "wxt/testing/fake-browser";
 import { createPublishListener, startDownloadsPresence } from "@/background/downloads-presence";
 import type { PresenceDependencies } from "@/background/downloads-presence";
 import type { DownloadItem, DownloadsPort } from "@/background/downloads-publisher";
@@ -9,6 +10,8 @@ const NOW = 1_700_000_000_000;
 const BOOT = "99999999-9999-4999-8999-999999999999";
 const TOKEN = "0f8b6a3e-2c1d-4e5f-9a7b-1c2d3e4f5a6b";
 const PATH = `RECnRun/poc/lab/peers/${ME}/presence.json`;
+const ALARM = "poc-presence";
+const HALF_TTL = PRESENCE_TTL_MS / 2;
 
 type Written = Parameters<DownloadsPort["download"]>[0];
 
@@ -58,6 +61,7 @@ function dependencies(overrides: Partial<PresenceDependencies> = {}) {
 const contentOf = (url: string) => decodeURIComponent(url.slice(url.indexOf(",") + 1));
 
 beforeEach(() => {
+  fakeBrowser.reset();
   vi.useFakeTimers({ now: NOW });
 });
 
@@ -109,7 +113,7 @@ describe("startDownloadsPresence", () => {
     expect(log).toHaveBeenCalledWith(expect.stringMatching(/^presence: .*path/));
   });
 
-  test("writes it again every half TTL, each with a newer createdAt, until stopped", async () => {
+  test("without alarms, writes it again every half TTL, each with a newer createdAt, until stopped", async () => {
     const { deps, written } = dependencies();
     const presence = startDownloadsPresence(deps);
     await vi.advanceTimersByTimeAsync(PRESENCE_TTL_MS / 2 - 1);
@@ -174,7 +178,7 @@ describe("startDownloadsPresence", () => {
     expect(written.map((each) => JSON.parse(contentOf(each.url)).boot)).toEqual([BOOT, TOKEN]);
   });
 
-  test("logs a failed write and writes again at the next half TTL", async () => {
+  test("without alarms, logs a failed write and writes again at the next half TTL", async () => {
     const { downloads, written } = fakeDownloads();
     downloads.download.mockRejectedValueOnce(new Error("Invalid filename"));
     const { deps, log } = dependencies({ downloads });
@@ -184,6 +188,79 @@ describe("startDownloadsPresence", () => {
     expect(written).toEqual([]);
     await vi.advanceTimersByTimeAsync(PRESENCE_TTL_MS / 2);
     presence.stop();
+    expect(written).toHaveLength(1);
+  });
+});
+
+describe("startDownloadsPresence with chrome.alarms", () => {
+  const fire = (name = ALARM) =>
+    fakeBrowser.alarms.onAlarm.trigger({
+      name,
+      scheduledTime: Date.now(),
+      periodInMinutes: 0.5,
+      persistAcrossSessions: true,
+    });
+  const withAlarms = () => dependencies({ alarms: fakeBrowser.alarms });
+
+  test("listens before it returns, and creates a half-TTL alarm that wakes a stopped worker", async () => {
+    const { deps } = withAlarms();
+    const presence = startDownloadsPresence(deps);
+    // MV3 delivers a waking event only to a listener the worker's first run added synchronously.
+    expect(fakeBrowser.alarms.onAlarm.hasListeners()).toBe(true);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(await fakeBrowser.alarms.get(ALARM)).toMatchObject({
+      name: ALARM,
+      periodInMinutes: 0.5,
+    });
+    presence.stop();
+  });
+
+  test("writes at start, then on each alarm only, each with a newer createdAt", async () => {
+    const { deps, written } = withAlarms();
+    const presence = startDownloadsPresence(deps);
+    await vi.advanceTimersByTimeAsync(PRESENCE_TTL_MS);
+    expect(written, "no timer writes when alarms exist").toHaveLength(1);
+    await fire();
+    await vi.advanceTimersByTimeAsync(HALF_TTL);
+    await fire();
+    await vi.advanceTimersByTimeAsync(0);
+    presence.stop();
+    const created = written.map((each) => JSON.parse(contentOf(each.url)).createdAt as number);
+    expect(created).toEqual([NOW, NOW + PRESENCE_TTL_MS, NOW + PRESENCE_TTL_MS + HALF_TTL]);
+  });
+
+  test("writes nothing more for an alarm that arrives right after the write at start", async () => {
+    const { deps, written } = withAlarms();
+    const presence = startDownloadsPresence(deps);
+    await vi.advanceTimersByTimeAsync(1_000);
+    await fire();
+    await vi.advanceTimersByTimeAsync(0);
+    presence.stop();
+    expect(written).toHaveLength(1);
+  });
+
+  test("ignores another alarm, and stops listening and clears its alarm when stopped", async () => {
+    const { deps, written } = withAlarms();
+    const presence = startDownloadsPresence(deps);
+    await vi.advanceTimersByTimeAsync(HALF_TTL);
+    await fire("another");
+    await vi.advanceTimersByTimeAsync(0);
+    expect(written).toHaveLength(1);
+    presence.stop();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fakeBrowser.alarms.onAlarm.hasListeners()).toBe(false);
+    expect(await fakeBrowser.alarms.get(ALARM)).toBeUndefined();
+  });
+
+  test("logs an alarm Chrome refuses, and still wrote at start", async () => {
+    const alarms = {
+      ...fakeBrowser.alarms,
+      create: vi.fn(async () => Promise.reject(new Error("no"))),
+    };
+    const { deps, written, log } = dependencies({ alarms });
+    startDownloadsPresence(deps).stop();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(log).toHaveBeenCalledWith("presence: alarm: no");
     expect(written).toHaveLength(1);
   });
 });
