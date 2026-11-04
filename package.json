@@ -25,7 +25,7 @@
     "test:coverage:local": "vp test --coverage && node --test scripts/coverage.checks.mjs",
     "test:container": "node --test tests/container/runner.checks.mjs tests/container/verified.checks.mjs tests/container/image.checks.mjs",
     "test:scripts": "node scripts/test-container.mjs test:scripts:local",
-    "test:scripts:local": "node --test scripts/*.checks.mjs scripts/poc-cross-profile/*.checks.mjs",
+    "test:scripts:local": "node --test scripts/check-docs.checks.mjs scripts/test-host.checks.mjs scripts/poc-cross-profile/*.checks.mjs",
     "test:hooks": "node --test scripts/agent-hooks/*.checks.mjs scripts/git-hooks/*.checks.mjs",
     "build:poc": "vp run extension#build:poc-d0 && vp run extension#build:poc-d1 && vp run extension#build:poc-d2",
     "test:extension-manifest": "vp run build:poc && vp run extension#test:manifest",
