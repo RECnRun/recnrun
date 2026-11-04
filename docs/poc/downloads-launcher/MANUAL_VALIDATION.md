@@ -12,6 +12,54 @@ Everything in [PLAN.md](PLAN.md) that needs a person. The owner authorized Claud
 - **M-P2.a E2.location.default on the host.** The host twin no longer runs it: with no download folder set, `poc-d0`'s install-time presence would land in `~/Downloads/RECnRun/poc/lab/peers/`, outside the subtree host runs may write. The owner may run it by hand on a throwaway root (no `download.default_directory` in its `Preferences`), record the learned root and the files written, then delete `~/Downloads/RECnRun/poc` and the probe files.
   Result: …
 
+## After P3
+
+- **M-P3.a Try the Downloads mesh by hand.** Three throwaway Chrome roots on this Mac, no Docker, no Playwright, never the personal profile and never `~/Downloads`. Run each block in a terminal and paste as is; `REPO` is this checkout.
+  1. Build `poc-d0` (output `apps/extension/.output/chrome-mv3-poc-d0/`, which holds `manifest.json`):
+     ```sh
+     cd "$REPO" && vp run --no-cache extension#build:poc-d0 && ls apps/extension/.output/chrome-mv3-poc-d0/manifest.json
+     ```
+  2. Make the roots. All three pin `download.default_directory` to ONE stand-in Downloads folder, because the rendezvous is the Downloads folder: each profile writes its presence there through `chrome.downloads` and reads the others' back through `file://`, and the launcher scans that one root. Roots with their own folders never see each other. The `Preferences` are the shape `writeDownloadsPreference` (`tests/host/fixtures/roots.ts`) writes:
+     ```sh
+     T="$HOME/Documents/RECnRun/poc-downloads-launcher/roots/try"
+     DL="$T/downloads"
+     for n in alpha beta gamma; do
+       mkdir -p "$T/$n/Default"
+       printf '{"download":{"prompt_for_download":false,"default_directory":"%s","directory_upgrade":true}}' "$DL" > "$T/$n/Default/Preferences"
+       python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$T/$n/Default/Preferences"
+     done
+     mkdir -p "$DL/RECnRun/poc/lab"
+     ```
+     The last line creates the folder `catalog.sh` writes into (it exits 73 on a missing output folder). `lab` is the namespace every `poc-d0` build uses (`DEFAULT_NAMESPACE` in `src/p2p/downloads-rendezvous.ts`; a stored override is not set here).
+  3. Launch the installed Google Chrome on each root, each in its own terminal (the three commands differ only in the name). `--use-mock-keychain` keeps Chrome off the macOS keychain, so a throwaway root asks for no password and touches no real credential (`tests/host/fixtures/host-chrome.ts` passes it for the same reason):
+     ```sh
+     "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --user-data-dir="$HOME/Documents/RECnRun/poc-downloads-launcher/roots/try/alpha" --no-default-browser-check --use-mock-keychain
+     ```
+  4. In each Chrome: `chrome://extensions`, Developer mode, `Load unpacked`, choose the `chrome-mv3-poc-d0` folder (a counted gesture, as M-P1.a says). The card reads "RECnRun" with id `omllgeochjfpkjbkpcgjmnnbncdpiedd` (pinned by the manifest key). The extension reads the peers through `file://`; an unpacked install has that access from the start (E1.unpacked.default, lab and host: `isAllowedFileSchemeAccess()` true with no gesture, pref `newAllowFileAccess: true`), so leave "Allow access to file URLs" alone and check `chrome-extension://omllgeochjfpkjbkpcgjmnnbncdpiedd/diagnostics.html`: `fileSchemeAccess` is `true`. Gestures so far: Developer mode and `Load unpacked`, per profile. Within about 10 s of the install the extension writes its first presence into the stand-in Downloads folder (step 7); Chrome may show a download bubble, which is fine.
+  5. Run the stand-in launcher in a fourth terminal. The record names the shared root and nothing else (the extension learns the root from Chrome; `downloads-profiles.ts` writes the same one block). `catalog.sh` writes back a `root=r1` line, and rewrites `registry.json` from the presences it finds, so the loop reruns it every 2 s as the E5 fixtures do:
+     ```sh
+     printf 'downloadsRoot=%s\n' "$DL" > "$T/record"
+     while true; do
+       sh "$REPO/scripts/poc-cross-profile/catalog.sh" "$T/record" lab "$DL/RECnRun/poc/lab" || echo "catalog.sh exited $?" >&2
+       sleep 2
+     done
+     ```
+     A line "skipped … invalid …" on stderr names a presence the catalog refused and why; an empty `peers` in `registry.json` with all three Chromes installed means the presences are not there yet.
+  6. In each profile open `chrome-extension://omllgeochjfpkjbkpcgjmnnbncdpiedd/dashboard.html`. Within a minute it lists the other two profiles by name with a link state moving to connected, and their tabs; "Pair with other profiles" is not needed (the Downloads rendezvous pairs by itself). What works at Gate P3: presence, peers, tabs, Disconnect, Reconnect and Forget on a peer, the pair-again after Forget, and the hierarchy refusals. What does not: Record on another profile. Without a recorded hierarchy every profile's role defaults to `worker` (`roleOf` in `src/p2p/roles.ts`), so `mayControl` is false for every peer (`controls` in `roles.ts`: only itself and the workers it bound), the dashboard's Record control is gated on it (`useMayControl` in `src/views/use-peer.ts`), and a `session-start` sent anyway is refused by the receiver as "not the bound master" (`authorizeOrder` in `src/p2p/authorization.ts`, since `provesMaster` needs a `worker` binding). The binding today comes only from `bindHierarchy` (`tests/e2e/fixtures/hierarchy.ts`), the e2e fixture standing in for the launcher record, and from the P5.3 bootstrap; neither is reachable by hand. Driving Record by hand arrives with P4 (the launcher writes the hierarchy) and P5 (bases and bootstrap), see [PLAN.md](PLAN.md).
+  7. Observe, in a fifth terminal:
+     ```sh
+     find "$DL/RECnRun" -type f | sort
+     cat "$DL/RECnRun/poc/lab/registry.json"
+     ```
+     Each profile has `peers/<uuid>/presence.json`, rewritten about every 30 s (watch its `createdAt` move); `offer-<uuid>.json` and `answer-<uuid>.json` signals appear once per pairing; `registry.json` lists the three. The diagnostics page of each profile shows the report with `fileSchemeAccess`.
+  8. Clean up. Quit each Chrome you launched with Cmd+Q (never `pkill`), stop the loop with Ctrl+C, then:
+     ```sh
+     rm -rf "$HOME/Documents/RECnRun/poc-downloads-launcher/roots/try"
+     ```
+     This removes the roots, the record, and the stand-in Downloads folder, which all sit under `try/`.
+     Date, machine, OS, Chrome version, build hash, gestures counted: …
+     Result: …
+
 ## After P4
 
 - **M-P4.a Autostart after an OS login.** `recnrun-launcher autostart on`, log out and back in (or restart), confirm the LaunchAgent started the launcher without a command and that `status` reports it; then `autostart off` and confirm it did not start on the next login.
