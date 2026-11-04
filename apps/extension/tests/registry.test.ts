@@ -33,6 +33,7 @@ const peer = (profileId: string, root = "r1") => ({
   root,
   lastSeenAt: NOW - 500,
   expiresAt: NOW + PRESENCE_TTL_MS,
+  boot: BOOT,
 });
 
 function registry(overrides: Partial<Registry> = {}): Registry {
@@ -94,6 +95,13 @@ describe("RegistrySchema", () => {
       expect(v.is(RegistrySchema, registry({ peers: { [PEER]: peer(PEER, root) } }))).toBe(false);
     },
   );
+
+  test("refuses a peer without the boot of its registration", () => {
+    const { boot: _boot, ...unbooted } = peer(PEER);
+    expect(v.is(RegistrySchema, registry({ peers: { [PEER]: unbooted as never } }))).toBe(false);
+    const badBoot = { ...peer(PEER), boot: "not-a-uuid" };
+    expect(v.is(RegistrySchema, registry({ peers: { [PEER]: badBoot } }))).toBe(false);
+  });
 
   test("refuses a peer filed under another profile's id", () => {
     expect(v.is(RegistrySchema, registry({ peers: { [ME]: peer(PEER) } }))).toBe(false);

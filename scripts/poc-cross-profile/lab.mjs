@@ -26,6 +26,9 @@ export const EX_TEMPFAIL = 75;
 const dash = spawnSync("sh", ["-c", "command -v dash"], { encoding: "utf8" }).stdout.trim();
 export const shells = ["sh", ...(dash ? [dash] : [])];
 
+export const PEER_BOOT = "55555555-5555-4555-8555-555555555555";
+
+/** A registration, in the key order of RegistrationSchema, as the extension publishes it. */
 export function presence(profileId, overrides = {}) {
   return {
     profileId,
@@ -33,6 +36,8 @@ export function presence(profileId, overrides = {}) {
     fingerprint: "AB:CD:EF",
     createdAt: 1_800_000_000_000,
     expiresAt: LATER,
+    namespace: NAMESPACE,
+    boot: PEER_BOOT,
     ...overrides,
   };
 }
@@ -119,4 +124,5 @@ export const peerOf = (profileId, root) => ({
   root,
   lastSeenAt: 1_800_000_000_500,
   expiresAt: LATER,
+  boot: PEER_BOOT,
 });

@@ -137,6 +137,7 @@ Gate P1: verify · E1–E3 · review
   green: the same unit command plus `downloads-rendezvous.test.ts` and the fixture tests: 111 passed; `node --test scripts/poc-cross-profile/*.checks.mjs` 25 passed on macOS `/bin/sh` and `/bin/dash`, and 25 passed in the test image (Ubuntu 24.04, `/bin/sh` is dash, root); `vp run test:unit` in Docker passed; `vp check`, `vp run deps`, `vp run dead-code`, `vp run docs:check` clean
   commit: cherry-picked from agent/p2-registry `5e606f03` (schemas) and its next commit (catalog writer); SHAs recorded at the gate
   note: the launcher's catalog writer `scripts/poc-cross-profile/catalog.sh` and its checks landed here for E4 (P2.1 hypotheses a and b); ShellCheck is checked by eye until P4.1 adds it to the image
+  note: the catalog consumes `RegistrationSchema`, the presence P2.2 publishes (seven keys, `namespace` equal to the catalog's, `boot` a lowercase v4 uuid copied into the registry peer, required by `RegistrySchema`); the five-key presence is skipped. red: the 25 checks writing the seven-key shape, 12 failed (`catalog.sh: skipped r1/1111…: extra keys or text after expiresAt`); `registry.test.ts` with `boot` in the peer, 7 failed (`expected true to be false`). green: 25 passed on macOS `/bin/sh`, `/bin/dash`, and the test image's dash; unit 112 passed; samples regenerated with `RECNRUN_UPDATE_FIXTURES=1`
 
 Gate P2: verify · E4 · review
 

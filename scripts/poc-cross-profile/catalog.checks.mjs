@@ -9,6 +9,7 @@ import {
   BOOT,
   EX_USAGE,
   NAMESPACE,
+  PEER_BOOT,
   announce,
   lab,
   normalized,
@@ -128,12 +129,7 @@ for (const shell of shells) {
     const skipped = [
       ["not-a-profile", text, "presence.json", /not a profile id/],
       [BOB.toUpperCase().replaceAll("2", "B"), text, "presence.json", /not a profile id/],
-      [
-        BOB,
-        text.replace("}", ',"path":"/Users/me/Downloads"}'),
-        "presence.json",
-        /after expiresAt/,
-      ],
+      [BOB, text.replace("}", ',"path":"/Users/me/Downloads"}'), "presence.json", /after boot/],
       [BOB, JSON.stringify(presence(BOB), null, 1), "presence.json", /expected/],
       [BOB, JSON.stringify({ displayName: "Desk", ...presence(BOB) }), "presence.json", /expected/],
       [BOB, JSON.stringify(presence(BOB, { displayName: 'a"b' })), "presence.json", /displayName/],
@@ -159,6 +155,20 @@ for (const shell of shells) {
       [BOB, JSON.stringify(presence(BOB, { expiresAt: 1000 })), "presence.json", /expired/],
       [BOB, `${text}\n`, "presence.json", /exact bytes/],
       [BOB, JSON.stringify(presence(CAROL)), "presence.json", /folder/],
+      [
+        BOB,
+        JSON.stringify(presence(BOB, { namespace: undefined, boot: undefined })),
+        "presence.json",
+        /expected ,"namespace"/,
+      ],
+      [BOB, JSON.stringify(presence(BOB, { namespace: "lab-2" })), "presence.json", /namespace/],
+      [BOB, JSON.stringify(presence(BOB, { boot: "not-a-uuid" })), "presence.json", /boot/],
+      [
+        BOB,
+        JSON.stringify(presence(BOB, { boot: PEER_BOOT.toUpperCase().replaceAll("5", "A") })),
+        "presence.json",
+        /boot/,
+      ],
       [BOB, "x".repeat(4096), "presence.json", /bytes/],
       [BOB, text, "registration.json", /no presence.json/],
     ];

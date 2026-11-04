@@ -40,6 +40,8 @@ const RegistryPeerSchema = v.strictObject({
   root: RootIdSchema,
   lastSeenAt: TimeSchema,
   expiresAt: TimeSchema,
+  /** The boot of the registration it came from, so a peer of an earlier run is told apart. */
+  boot: BootSchema,
 });
 
 export const RegistrySchema = v.strictObject({

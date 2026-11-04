@@ -12,11 +12,13 @@
 #
 # Scan: <downloadsRoot>/RECnRun/poc/<namespace>/peers/<uuid>/presence.json, nothing else, no
 # symbolic link followed. A presence counts only in the exact bytes the extension writes,
-# JSON.stringify of PresenceSchema with no spaces and keys in order:
-#   {"profileId":"<uuid>","displayName":"<name>","fingerprint":"<hex:>","createdAt":<ms>,"expiresAt":<ms>}
-# where the profile id names its folder, the name is 1 to 64 bytes with no backslash, quote,
-# control character, or edge space, and the times are whole numbers; anything else is
-# skipped with a reason on stderr. No value read from a file is ever run or expanded.
+# JSON.stringify of a RegistrationSchema value with no spaces and keys in order:
+#   {"profileId":"<uuid>","displayName":"<name>","fingerprint":"<hex:>","createdAt":<ms>,
+#    "expiresAt":<ms>,"namespace":"<namespace>","boot":"<v4 uuid>"}
+# where the profile id names its folder, the namespace is the one asked for, the name is 1 to
+# 64 bytes with no backslash, quote, control character, or edge space, and the times are whole
+# numbers; anything else is skipped with a reason on stderr. The boot goes into the registry.
+# No value read from a file is ever run or expanded.
 #
 # Exit: 0 written, 64 wrong call, 65 invalid record, 66 no record, 73 cannot write,
 # 75 another run holds <out-dir>/.catalog.lock (nothing written).
@@ -62,6 +64,11 @@ is_profile_directory() {
 is_fingerprint() {
   case $1 in '' | *[!0-9A-F:]*) return 1 ;; esac
   [ "${#1}" -le 200 ]
+}
+is_boot() {
+  is_uuid "$1" || return 1
+  case $1 in ????????-????-4???-[89ab]???-????????????) return 0 ;; esac
+  return 1
 }
 is_root_id() {
   case $1 in r[0-9] | r[0-9][0-9] | r[0-9][0-9][0-9]) return 0 ;; esac
@@ -248,15 +255,21 @@ read_presence() {
   take '","createdAt":' ',' || return 1
   is_time "$value" || { reason='invalid createdAt'; return 1; }
   pr_created=$value
-  take ',"expiresAt":' '}' || return 1
-  case $value in *[!0-9]*) reason='extra keys or text after expiresAt'; return 1 ;; esac
-  if [ "$rest" != '}' ]; then reason='extra keys or text after expiresAt'; return 1; fi
+  case $rest in ',"expiresAt":'*) rest=${rest#',"expiresAt":'} ;; *) reason='expected ,"expiresAt":'; return 1 ;; esac
+  value=${rest%%[!0-9]*}
+  rest=${rest#"$value"}
   is_time "$value" || { reason='invalid expiresAt'; return 1; }
   pr_expires=$value
+  take ',"namespace":"' '"' || return 1
+  if [ "$value" != "$namespace" ]; then reason='another namespace'; return 1; fi
+  take '","boot":"' '"' || return 1
+  is_boot "$value" || { reason='invalid boot'; return 1; }
+  pr_boot=$value
+  if [ "$rest" != '"}' ]; then reason='extra keys or text after boot'; return 1; fi
   if [ "$pr_expires" -le "$now" ]; then reason='expired'; return 1; fi
 }
 
-# Accepted presences, one "id<TAB>root<TAB>name<TAB>fingerprint<TAB>createdAt<TAB>expiresAt" line each.
+# Accepted presences, one "id<TAB>root<TAB>name<TAB>fingerprint<TAB>createdAt<TAB>expiresAt<TAB>boot" line each.
 peers=
 count=0
 drop_peer() {
@@ -270,7 +283,7 @@ EOF
 }
 add_peer() {
   existing=
-  while IFS="$tab" read -r p_id p_root p_name p_fingerprint p_created p_expires; do
+  while IFS="$tab" read -r p_id p_root p_name p_fingerprint p_created p_expires p_boot; do
     if [ "$p_id" = "$pr_id" ]; then existing=$p_created; fi
   done <<EOF
 $peers
@@ -287,7 +300,7 @@ EOF
   else
     count=$((count + 1))
   fi
-  peers="$peers$pr_id$tab$1$tab$pr_name$tab$pr_fingerprint$tab$pr_created$tab$pr_expires$nl"
+  peers="$peers$pr_id$tab$1$tab$pr_name$tab$pr_fingerprint$tab$pr_created$tab$pr_expires$tab$pr_boot$nl"
 }
 scan_root() {
   folder=$2/RECnRun/poc/$namespace/peers
@@ -327,9 +340,9 @@ EOF
 
 json="{\"version\":1,\"namespace\":\"$namespace\",\"writtenAt\":$now,\"launcher\":{\"boot\":\"$boot\"},\"peers\":{"
 separator=
-while IFS="$tab" read -r p_id p_root p_name p_fingerprint p_created p_expires; do
+while IFS="$tab" read -r p_id p_root p_name p_fingerprint p_created p_expires p_boot; do
   [ -n "$p_id" ] || continue
-  json="$json$separator\"$p_id\":{\"profileId\":\"$p_id\",\"displayName\":\"$p_name\",\"fingerprint\":\"$p_fingerprint\",\"root\":\"$p_root\",\"lastSeenAt\":$now,\"expiresAt\":$p_expires}"
+  json="$json$separator\"$p_id\":{\"profileId\":\"$p_id\",\"displayName\":\"$p_name\",\"fingerprint\":\"$p_fingerprint\",\"root\":\"$p_root\",\"lastSeenAt\":$now,\"expiresAt\":$p_expires,\"boot\":\"$p_boot\"}"
   separator=,
 done <<EOF
 $peers
