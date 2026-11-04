@@ -75,24 +75,41 @@ export const customLocation = (environment: DownloadsEnvironment): Promise<Sampl
     return judged(problems, { ...observation, state: reply.result.state });
   });
 
-/** Chrome's own default folder: recorded, then exactly the files written there are removed. */
+function learnedProblems(learned: string | undefined, filename: string, root: string): string[] {
+  if (!learned || !isAbsolute(learned)) return [`no folder learned from ${filename}`];
+  return learned.startsWith(root + sep) ? ["the default resolved inside the root"] : [];
+}
+
+/** One write to `relative` under the default folder; `written` gets the reported path at once. */
+async function writeDefault({ diagnostics, root }: Launched, relative: string, written: string[]) {
+  const namespace = freshNamespace();
+  const content = publication();
+  const reply = await diagnostics.probe(namespace, content, { filename: relative });
+  if (!reply.ok) return { problems: [`the probe failed: ${reply.error}`], observation: {} };
+  const { filename, state } = reply.result;
+  if (filename) written.push(filename);
+  const same = (await readFile(filename).catch(() => undefined))?.equals(Buffer.from(content));
+  const learned = learnedRoot(filename, relative);
+  const problems = [];
+  if (state !== "complete" || !same) problems.push(`state ${state}, same bytes ${same}`);
+  problems.push(...learnedProblems(learned, filename, root));
+  return { problems, observation: { learned: learned && redact(learned, root), state } };
+}
+
+/** Chrome's own default folder: prepared before the write, recorded, and cleaned in `finally`. */
 export const defaultLocation = (environment: DownloadsEnvironment): Promise<Sample> =>
-  withProbe(environment, { location: "default" }, async ({ diagnostics, root }) => {
-    const namespace = freshNamespace();
-    const relative = environment.defaultDestination(namespace);
-    const content = publication();
-    const reply = await diagnostics.probe(namespace, content, { filename: relative });
-    if (!reply.ok) return judged([`the probe failed: ${reply.error}`], { relative });
-    const { filename, state } = reply.result;
-    const same = (await readFile(filename).catch(() => undefined))?.equals(Buffer.from(content));
-    const learned = learnedRoot(filename, relative);
-    const cleaned = await environment.cleanDefault([filename]);
-    const problems = [];
-    if (state !== "complete" || !same) problems.push(`state ${state}, same bytes ${same}`);
-    if (!learned || !isAbsolute(learned)) problems.push(`no folder learned from ${filename}`);
-    if (learned?.startsWith(root + sep)) problems.push("the default resolved inside the root");
-    const observation = { learned: learned && redact(learned, root), relative, cleaned };
-    return judged(problems, { ...observation, state });
+  withProbe(environment, { location: "default" }, async (launched) => {
+    const workspace = await environment.defaultWorkspace(freshNamespace());
+    const written: string[] = [];
+    let measured: Awaited<ReturnType<typeof writeDefault>>;
+    let cleaned: Record<string, unknown>;
+    try {
+      measured = await writeDefault(launched, workspace.relative, written);
+    } finally {
+      cleaned = await workspace.clean(written);
+    }
+    const { problems, observation } = measured;
+    return judged(problems, { ...observation, relative: workspace.relative, cleaned });
   });
 
 /** Absolute and `..` destinations are refused before anything is written. */

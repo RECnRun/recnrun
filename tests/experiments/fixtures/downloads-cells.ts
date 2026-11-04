@@ -18,10 +18,11 @@ export interface Launched extends ProbeChrome {
 export interface DownloadsEnvironment {
   target: VerdictTarget;
   launch(preferences: DownloadPreferences): Promise<Launched>;
-  /** The relative destination of the default-location cell (the host keeps it in its run folder). */
-  defaultDestination(namespace: string): string;
-  /** Removes exactly the files the default-location cell wrote outside the root. */
-  cleanDefault(paths: string[]): Promise<Record<string, unknown>>;
+  /**
+   * Prepares where the default-location cell writes outside the root, before it downloads:
+   * `relative` is the destination, and `clean` removes exactly what the cell wrote there.
+   */
+  defaultWorkspace(namespace: string): Promise<DefaultWorkspace>;
   /** The display's native windows, where xdotool can see them; otherwise `noDisplay` says why. */
   display?: {
     names(): Promise<Map<string, string>>;
@@ -29,6 +30,12 @@ export interface DownloadsEnvironment {
     screenshot(name: string): Promise<string>;
   };
   noDisplay: string;
+}
+
+/** The default-location cell's destination outside the root, and its cleanup. */
+export interface DefaultWorkspace {
+  relative: string;
+  clean(reported: string[]): Promise<Record<string, unknown>>;
 }
 
 const CUSTOM: DownloadPreferences = { location: "custom" };

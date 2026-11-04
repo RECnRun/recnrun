@@ -56,8 +56,11 @@ const lab: DownloadsEnvironment = {
       throw error;
     }
   },
-  defaultDestination: (namespace) => `RECnRun/poc/${namespace}/probe.json`,
-  cleanDefault,
+  // The container's Downloads is as throwaway as the container; the host twin owns a marked folder.
+  defaultWorkspace: async (namespace) => ({
+    relative: `RECnRun/poc/${namespace}/probe.json`,
+    clean: cleanDefault,
+  }),
   display: {
     names: windowNames,
     press: pressIn,

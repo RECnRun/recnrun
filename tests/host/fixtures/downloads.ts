@@ -1,14 +1,13 @@
 import { execFile } from "node:child_process";
-import { existsSync } from "node:fs";
-import { rm, rmdir } from "node:fs/promises";
-import { homedir } from "node:os";
-import { dirname, join, relative } from "node:path";
+import { rmdir } from "node:fs/promises";
+import { dirname } from "node:path";
 import { promisify } from "node:util";
 import { launchProbe } from "../../experiments/fixtures/downloads.ts";
 import type { DownloadsEnvironment } from "../../experiments/fixtures/downloads-cells.ts";
 import { parseVerdicts } from "../../experiments/schema.ts";
 import type { Verdict } from "../../experiments/schema.ts";
 import { CHROME_BINARY, evidence, hostRunId, requireHost } from "./host-env.ts";
+import { openDefaultWorkspace } from "./default-downloads.ts";
 import { launchOnRoot } from "./host-launch.ts";
 import { removeHostRoot, rootFor } from "./roots.ts";
 
@@ -19,33 +18,12 @@ const HOST_ARGS = [
   "--window-position=-2000,0",
   "--window-size=800,600",
 ];
-const DOWNLOADS = join(homedir(), "Downloads");
-/** The only folder of the owner's Downloads a host cell may write: `RECnRun/poc-downloads-launcher/<run>/`. */
-const PARENTS = [join(DOWNLOADS, "RECnRun"), join(DOWNLOADS, "RECnRun", "poc-downloads-launcher")];
-// Folders the owner already had are never removed, even when empty.
-const EXISTED = new Map(PARENTS.map((folder) => [folder, existsSync(folder)]));
-const runFolder = () => join(PARENTS[1] ?? "", hostRunId());
-
 let launches = 0;
 
 async function removeRoot(root: string): Promise<void> {
   if (process.env.RECNRUN_HOST_KEEP_ROOTS === "1") return;
   await removeHostRoot(root, hostRunId());
   await rmdir(dirname(root)).catch(() => undefined);
-}
-
-/** Deletes exactly the reported files inside this run's folder, then the folders this run created. */
-async function cleanDefault(paths: string[]) {
-  const folder = runFolder();
-  const outside = paths.filter((path) => dirname(path) !== folder);
-  if (outside.length > 0) throw new Error(`Chrome wrote outside ${folder}: ${outside.join(", ")}`);
-  for (const path of paths) await rm(path);
-  await rmdir(folder);
-  for (const parent of [...PARENTS].reverse()) {
-    if (!EXISTED.get(parent)) await rmdir(parent).catch(() => undefined);
-  }
-  const left = [folder, ...PARENTS].filter((each) => existsSync(each) && !EXISTED.get(each));
-  return { removed: paths.map((path) => relative(homedir(), path)), left };
 }
 
 async function appendHostVerdict(verdict: Verdict): Promise<void> {
@@ -84,8 +62,9 @@ export const host: DownloadsEnvironment = {
     };
     return { ...probe, root, close };
   },
-  defaultDestination: (namespace) =>
-    `RECnRun/poc-downloads-launcher/${hostRunId()}/probe-${namespace}.json`,
-  cleanDefault,
+  defaultWorkspace: async (namespace) => {
+    const workspace = await openDefaultWorkspace(hostRunId());
+    return { relative: workspace.relative(`probe-${namespace}.json`), clean: workspace.clean };
+  },
   noDisplay: "native dialog on macOS, no xdotool; M-P1 manual not scheduled",
 };
