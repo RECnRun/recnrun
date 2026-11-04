@@ -173,6 +173,9 @@ Gate P2: verify · E4 · review
   red: `npx vitest run tests/pins.test.ts` (in `apps/extension`) against a stub of today's behavior (every fingerprint replaces the last, `verify` always `unpinned`): 9 failed ("expected 'unpinned' to be 'pinned-mismatch'" for a presence and a catalog entry with a new certificate; a second fingerprint returned `{ ok: true }`); `npx vitest run tests/pairing.test.ts tests/peers-pins.test.ts tests/peers-start.test.ts` before the wiring: 6 failed (an offer with another certificate for a pinned profile resolved with an answer code; the first verified link pinned nothing; a link proving the accepted but not the pinned certificate was verified; a relayed `SIGNAL` with another certificate for a pinned profile was answered)
   green: the same commands, 11 and 24 passed; `apps/extension` node tests 583 passed; `vp run test:extension-manifest` 32 passed
   commit: cherry-picked from agent/p3-pins `4098b95b` (pin store), `328ac950` (pairing and link refuse a mismatch, the first proved link pins), and the docs commit after them (decision 13)
+  red: `npx vitest run tests/folder-pairing.test.ts` with the peer pinned to another certificate: 1 failed ("expected "vi.fn()" to not be called at all, but actually been called 1 times", an offer created for the forged presence)
+  green: the same command, 24 passed; `apps/extension` node tests 584 passed; commit `8ced36f8` on agent/p3-pins (the folder offers nothing to a presence announcing another certificate for a pinned profile)
+  missing: certificate continuity after renewal: owner decision at Gate P3 (PLAN.md decision 13)
   missing: `tests/browser/forged-sender.spec.ts`, the forged-sender regression of PR #19 on the Downloads transport, is pending P3.2 (the Downloads mesh)
 - [ ] P3.4 Roles and command authorization
 - [ ] P3.5 Master absent and master back, E6
