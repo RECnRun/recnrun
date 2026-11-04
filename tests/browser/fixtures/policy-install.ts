@@ -45,12 +45,16 @@ const currentHost = (): PolicyHost => ({
   dockerenv: existsSync("/.dockerenv"),
 });
 
+/** The test container's markers, the runner's RECNRUN_TEST_CONTAINER=1 first, then Docker's /.dockerenv. */
+export const insideTestContainer = (env: NodeJS.ProcessEnv, dockerenv: () => boolean) =>
+  env.RECNRUN_TEST_CONTAINER === "1" && dockerenv();
+
 export function policyUnavailability(host: PolicyHost = currentHost()): string | undefined {
   if (host.platform !== "linux") {
     return `Google Chrome reads ${POLICY_FILE} on Linux only; this host is ${host.platform}`;
   }
   // A root `:local` run on a Linux host would otherwise rewrite that machine's own Chrome policy.
-  if (host.env.RECNRUN_TEST_CONTAINER !== "1" || !host.dockerenv) {
+  if (!insideTestContainer(host.env, () => host.dockerenv)) {
     return `writing ${POLICY_FILE} happens only inside the test container (RECNRUN_TEST_CONTAINER=1 and /.dockerenv)`;
   }
   const { uid } = host;
