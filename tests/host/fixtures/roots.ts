@@ -119,3 +119,36 @@ export async function removeHostRoot(
   // Chrome's helper processes can still hold files for a moment after the browser exits.
   await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 }
+
+/** The file calls of a root's preparation, which tests replace. */
+export interface PreferenceFs {
+  mkdir(path: string, options: { recursive: true }): Promise<unknown>;
+  writeFile(path: string, data: string): Promise<void>;
+}
+
+/** Chrome's download folder for a root, written before its first launch; undefined keeps Chrome's own. */
+export async function writeDownloadsPreference(
+  root: string,
+  downloads: string | undefined,
+  fs: PreferenceFs = { mkdir, writeFile },
+): Promise<void> {
+  const folder = downloads ? { default_directory: downloads, directory_upgrade: true } : {};
+  const preferences = { download: { prompt_for_download: false, ...folder } };
+  await fs.mkdir(join(root, "Default"), { recursive: true });
+  await fs.writeFile(join(root, "Default", "Preferences"), JSON.stringify(preferences));
+}
+
+/**
+ * A fresh host root for Chrome (see rootFor) whose downloads go to its own `downloads/`: left to
+ * Chrome's default, the POC's first presence would land in the owner's ~/Downloads.
+ */
+export async function chromeRoot(
+  roots: string,
+  runId: string,
+  name: string,
+  folder: string = HOST_FOLDER,
+): Promise<string> {
+  const root = await rootFor(roots, runId, name, folder);
+  await writeDownloadsPreference(root, join(root, "downloads"));
+  return root;
+}

@@ -2,12 +2,13 @@ import { execFile } from "node:child_process";
 import { rmdir } from "node:fs/promises";
 import { dirname } from "node:path";
 import { promisify } from "node:util";
+import { UnavailableError } from "../../browser/fixtures/policy-install.ts";
 import { launchProbe } from "../../experiments/fixtures/downloads.ts";
 import type { DownloadsEnvironment } from "../../experiments/fixtures/downloads-cells.ts";
 import { CHROME_BINARY, evidence, hostRunId, requireHost } from "./host-env.ts";
 import { openDefaultWorkspace } from "./default-downloads.ts";
 import { launchOnRoot } from "./host-launch.ts";
-import { removeHostRoot, rootFor } from "./roots.ts";
+import { chromeRoot, removeHostRoot } from "./roots.ts";
 
 /** Keeps the diagnostic window off the owner's screen and away from the login Keychain. */
 const HOST_ARGS = [
@@ -16,6 +17,7 @@ const HOST_ARGS = [
   "--window-position=-2000,0",
   "--window-size=800,600",
 ];
+const DEFAULT_UNAVAILABLE = "the POC presence would write outside the allowed Downloads subtree";
 let launches = 0;
 
 async function removeRoot(root: string): Promise<void> {
@@ -31,7 +33,9 @@ const chromeVersion = async () =>
 export const host: DownloadsEnvironment = {
   target: { environment: "host", chrome: chromeVersion, directory: () => evidence().directory },
   launch: async (preferences) => {
-    const root = await rootFor(requireHost(), hostRunId(), `e2-${++launches}`);
+    // Chrome's real default would get the P2.2 presence under ~/Downloads/RECnRun/poc/; M-P2.a covers it.
+    if (preferences.location === "default") throw new UnavailableError(DEFAULT_UNAVAILABLE);
+    const root = await chromeRoot(requireHost(), hostRunId(), `e2-${++launches}`);
     const options = { executable: CHROME_BINARY, args: HOST_ARGS };
     const probe = await launchOnRoot({
       launch: () => launchProbe(root, preferences, options),

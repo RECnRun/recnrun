@@ -7,6 +7,11 @@ Everything in [PLAN.md](PLAN.md) that needs a person. The owner authorized Claud
 - **M-P1.a Install in the personal Default and toggle file access.** With the `poc-d0` build: `chrome://extensions`, Developer mode, `Load unpacked`; record the permission texts on the card, the extension id (must equal the pinned id), `isAllowedFileSchemeAccess()` from the diagnostics page before and after "Allow access to file URLs", and the number of gestures. This is the manual install the source allows in every variant (§1.1); the toggle is a gesture that fails V1's "install only" criterion and is counted as such (§1).
   Result: pending the owner (2026-11-04). Claude cannot drive the native file picker that `Load unpacked` opens, so this item was not attempted by the orchestrator; the build is `apps/extension/.output/chrome-mv3-poc-d0` after `vp run build:poc`. Gate P1 closed without it (CHECKLIST.md resume protocol rule 8).
 
+## After P2
+
+- **M-P2.a E2.location.default on the host.** The host twin no longer runs it: with no download folder set, `poc-d0`'s install-time presence would land in `~/Downloads/RECnRun/poc/lab/peers/`, outside the subtree host runs may write. The owner may run it by hand on a throwaway root (no `download.default_directory` in its `Preferences`), record the learned root and the files written, then delete `~/Downloads/RECnRun/poc` and the probe files.
+  Result: …
+
 ## After P4
 
 - **M-P4.a Autostart after an OS login.** `recnrun-launcher autostart on`, log out and back in (or restart), confirm the LaunchAgent started the launcher without a command and that `status` reports it; then `autostart off` and confirm it did not start on the next login.

@@ -12,7 +12,15 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "vite-plus/test";
-import { HOST_FOLDER, ROOT_MARKER, hostRoots, removeHostRoot, rootFor } from "./fixtures/roots.ts";
+import {
+  HOST_FOLDER,
+  ROOT_MARKER,
+  chromeRoot,
+  hostRoots,
+  removeHostRoot,
+  rootFor,
+  writeDownloadsPreference,
+} from "./fixtures/roots.ts";
 
 // POC PLAN.md §8: host roots live under ~/Documents/RECnRun/poc-downloads-launcher/ and nowhere else.
 let scratch = "";
@@ -136,5 +144,38 @@ describe("host root ownership", () => {
     symlinkSync(root, join(run(), "link"));
     await expect(removeHostRoot(join(run(), "link"), "run-1", folder)).rejects.toThrow(/symlink/);
     expect(existsSync(root)).toBe(true);
+  });
+});
+
+// The P2.2 presence leaked into ~/Downloads from host roots that left Chrome its own default.
+describe("host Chrome roots pin their Downloads folder", () => {
+  test("writes download.default_directory = <root>/downloads before the first launch", async () => {
+    const root = await chromeRoot(folder, "host-run", "a", folder);
+    const preferences = join(root, "Default", "Preferences");
+    expect(existsSync(preferences)).toBe(true);
+    expect(JSON.parse(readFileSync(preferences, "utf8"))).toEqual({
+      download: {
+        prompt_for_download: false,
+        default_directory: join(root, "downloads"),
+        directory_upgrade: true,
+      },
+    });
+  });
+
+  test("writes the preference through the injected file calls", async () => {
+    const calls: unknown[] = [];
+    const fs = {
+      mkdir: async (path: string) => void calls.push(["mkdir", path]),
+      writeFile: async (path: string, data: string) => void calls.push(["writeFile", path, data]),
+    };
+    await writeDownloadsPreference("/r", "/r/downloads", fs);
+    expect(calls).toEqual([
+      ["mkdir", "/r/Default"],
+      [
+        "writeFile",
+        "/r/Default/Preferences",
+        '{"download":{"prompt_for_download":false,"default_directory":"/r/downloads","directory_upgrade":true}}',
+      ],
+    ]);
   });
 });

@@ -18,7 +18,7 @@ import type {
 import { CHROME_BINARY, evidence, hostRunId, requireHost } from "./host-env.ts";
 import type { Evidence } from "./host-env.ts";
 import { launchOnRoot } from "./host-launch.ts";
-import { removeHostRoot, rootFor } from "./roots.ts";
+import { chromeRoot, removeHostRoot } from "./roots.ts";
 
 export { expect } from "@playwright/test";
 
@@ -67,7 +67,7 @@ function rootName(method: string, headless: boolean, testInfo: TestInfo): string
   return `${method}-${testInfo.testId}-${testInfo.retry}`;
 }
 
-const newRoot = (name: string): Promise<string> => rootFor(requireHost(), hostRunId(), name);
+const newRoot = (name: string): Promise<string> => chromeRoot(requireHost(), hostRunId(), name);
 
 /** Deletes this run's marked root and its run folder once empty, unless RECNRUN_HOST_KEEP_ROOTS=1. */
 async function removeRoot(root: string): Promise<void> {

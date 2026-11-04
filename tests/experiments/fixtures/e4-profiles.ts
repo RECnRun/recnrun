@@ -1,9 +1,9 @@
 import { spawn } from "node:child_process";
-import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import * as v from "valibot";
 import { attachExtension, extensionPath } from "../../browser/fixtures/extension-loaders.ts";
+import { writeDownloadsPreference } from "../../host/fixtures/roots.ts";
 import type { LaunchedChrome } from "../../browser/fixtures/chrome.ts";
 import type { LoadedExtension } from "../../browser/fixtures/extension-loaders.ts";
 import type { VerdictTarget } from "./downloads-verdicts.ts";
@@ -67,14 +67,6 @@ export type SessionPlatform = Pick<E4Session, "defaultDownloads" | "realDefault"
 export interface E4Environment {
   target: VerdictTarget;
   session(): Promise<E4Session>;
-}
-
-/** Chrome's download folder for a root, written before its first launch, as E2 does. */
-async function writeDownloadsPreference(root: string, downloads: string | undefined) {
-  const folder = downloads ? { default_directory: downloads, directory_upgrade: true } : {};
-  const preferences = { download: { prompt_for_download: false, ...folder } };
-  await mkdir(join(root, "Default"), { recursive: true });
-  await writeFile(join(root, "Default", "Preferences"), JSON.stringify(preferences));
 }
 
 /** A session over `platform`: profiles and folders it made are stopped and removed on dispose. */
