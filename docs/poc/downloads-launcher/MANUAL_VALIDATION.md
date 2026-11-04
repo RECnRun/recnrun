@@ -5,7 +5,7 @@ Everything in [PLAN.md](PLAN.md) that needs a person. The owner authorized Claud
 ## After P1
 
 - **M-P1.a Install in the personal Default and toggle file access.** With the `poc-d0` build: `chrome://extensions`, Developer mode, `Load unpacked`; record the permission texts on the card, the extension id (must equal the pinned id), `isAllowedFileSchemeAccess()` from the diagnostics page before and after "Allow access to file URLs", and the number of gestures. This is the manual install the source allows in every variant (§1.1); the toggle is a gesture that fails V1's "install only" criterion and is counted as such (§1).
-  Result: …
+  Result: pending the owner (2026-11-04). Claude cannot drive the native file picker that `Load unpacked` opens, so this item was not attempted by the orchestrator; the build is `apps/extension/.output/chrome-mv3-poc-d0` after `vp run build:poc`. Gate P1 closed without it (CHECKLIST.md resume protocol rule 8).
 
 ## After P4
 
