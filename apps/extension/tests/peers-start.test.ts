@@ -66,7 +66,7 @@ afterEach(() => {
 
 describe("startPeers", () => {
   test("the Downloads variant announces this profile with no folder participation and opens no dashboard", async () => {
-    const { link, written } = await background();
+    const { written } = await background();
     expect(await folderPairingRepository.read()).toBeNull();
 
     startPeers({ transport: "downloads" });
@@ -84,8 +84,51 @@ describe("startPeers", () => {
       fingerprint: FINGERPRINT,
     });
     expect(presence.namespace).toBe("lab");
-    expect(link.commands).toEqual([]);
     expect(await dashboards()).toEqual([]);
+  });
+
+  test("the Downloads variant starts pairing on its own once it learned its root, with no page open", async () => {
+    const { link } = await background();
+    startPeers({ transport: "downloads" });
+    await vi.waitFor(() =>
+      expect(link.commands).toEqual([
+        { type: "folder-watch", profileId: ME, displayName: "Laptop" },
+      ]),
+    );
+    expect(await fakeBrowser.storage.session.get("pocDownloadsRoot")).toEqual({
+      pocDownloadsRoot: ROOT,
+    });
+    expect(await folderPairingRepository.read()).toEqual({});
+    expect(await dashboards()).toEqual([]);
+  });
+
+  test("the Downloads variant starts no pairing while Chrome has not told it the root", async () => {
+    const { link, written, log } = await background();
+    // Chrome renamed the write, so its path does not tell the root.
+    const renamed = `${ROOT}/RECnRun/poc/lab/peers/${ME}/presence (1).json`;
+    vi.mocked(fakeBrowser.downloads.search).mockImplementation(
+      answering(() => [{ id: 1, filename: renamed, state: "complete" }]),
+    );
+    startPeers({ transport: "downloads" });
+    await vi.waitFor(() =>
+      expect(log).toHaveBeenCalledWith(
+        "[RECnRun peer]",
+        `presence: Chrome wrote "${renamed}", not RECnRun/poc/lab/peers/${ME}/presence.json`,
+      ),
+    );
+    expect(written).toHaveLength(1);
+    expect(link.commands).toEqual([]);
+    expect(await folderPairingRepository.read()).toBeNull();
+  });
+
+  test("the Downloads variant keeps the profiles the user disconnected when it starts pairing", async () => {
+    const { link } = await background();
+    await folderPairingRepository.write({ paused: [PEER] });
+    startPeers({ transport: "downloads" });
+    // The resume of a profile that waited before, then the start once the root is known.
+    await vi.waitFor(() => expect(link.commands).toHaveLength(2));
+    expect(new Set(link.commands.map((each) => each.type))).toEqual(new Set(["folder-watch"]));
+    expect(await folderPairingRepository.read()).toEqual({ paused: [PEER] });
   });
 
   test("the folder variant writes nothing to Downloads and waits in the folder only once chosen", async () => {

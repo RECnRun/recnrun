@@ -1,6 +1,7 @@
 import { errorMessage } from "@recnrun/domain";
 import * as v from "valibot";
 import { browser } from "wxt/browser";
+import { createDownloadsPairing } from "@/background/downloads-pairing";
 import { downloadsWriter, settled } from "@/background/downloads-publisher";
 import type { DownloadsPort } from "@/background/downloads-publisher";
 import { ensureOffscreen } from "@/background/link";
@@ -53,6 +54,8 @@ export interface PresenceDependencies {
   /** Chrome's alarms, absent without the permission; a timer then refreshes only while the worker runs. */
   alarms?: AlarmsPort;
   now?: () => number;
+  /** Runs after each presence written, so pairing starts once the root is known (P3.2). */
+  published?: () => Promise<void>;
 }
 
 async function namespaceOf({ namespace, log }: PresenceDependencies): Promise<string> {
@@ -141,16 +144,21 @@ function scheduleRefresh(refresh: () => void, { alarms, log }: PresenceDependenc
 export function startDownloadsPresence(deps: PresenceDependencies) {
   const now = deps.now ?? Date.now;
   let last = Number.NEGATIVE_INFINITY;
+  const publishNow = async () => {
+    await publish(deps);
+    // Not awaited: the bootstrap page's answer waits for the presence only.
+    void deps.published?.();
+  };
   const attempt = () => {
     last = now();
-    void publish(deps).catch((error: unknown) => deps.log(`presence: ${errorMessage(error)}`));
+    void publishNow().catch((error: unknown) => deps.log(`presence: ${errorMessage(error)}`));
   };
   attempt();
   // The alarm that restarted the worker arrives just after the write at start, which refreshed already.
   const stop = scheduleRefresh(() => {
     if (now() - last >= REFRESH_MS / 2) attempt();
   }, deps);
-  return { stop, publish: () => publish(deps) };
+  return { stop, publish: publishNow };
 }
 
 interface Sender {
@@ -186,8 +194,11 @@ async function offscreenFingerprint(): Promise<string> {
   return v.parse(PocFingerprintResultSchema, reply.output.result).fingerprint;
 }
 
-/** The presence over Chrome's own Downloads, this profile's identity, and session storage. */
-export function startPocPresence(log: (entry: string) => void) {
+/**
+ * The presence over Chrome's own Downloads, this profile's identity, and session storage; each
+ * presence written once the root is known calls `startPairing`, the folder flow's start.
+ */
+export function startPocPresence(log: (entry: string) => void, startPairing: () => Promise<void>) {
   const store = pocPresenceStore();
   const deps: PresenceDependencies = {
     downloads: browser.downloads,
@@ -199,6 +210,11 @@ export function startPocPresence(log: (entry: string) => void) {
     log,
     // Undefined in a build without the alarms permission.
     alarms: (browser as { alarms?: AlarmsPort }).alarms,
+    published: createDownloadsPairing({
+      available: async () => (await store.root.read()) !== null,
+      start: startPairing,
+      log,
+    }),
   };
   const presence = startDownloadsPresence(deps);
   const own = { extensionId: browser.runtime.id, extensionUrl: browser.runtime.getURL("/") };

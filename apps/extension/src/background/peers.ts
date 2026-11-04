@@ -290,8 +290,8 @@ export function startPeers({ transport }: PeersOptions = { transport: "folder" }
   // Chrome starts the worker with the browser only for a startup listener; starting resumes.
   browser.runtime.onStartup.addListener(() => {});
   void folder.resume().catch((error: unknown) => log(errorMessage(error)));
-  // Downloads needs no prior choice, so the profile announces itself as its worker starts.
-  if (transport === "downloads") startPocPresence(log);
+  // Downloads needs no prior choice: the profile announces itself as its worker starts, then pairs.
+  if (transport === "downloads") startPocPresence(log, () => folder.start().then(notifyPages));
   // Chrome ends the folder's grant with the last extension page, so the pages read it again.
   browser.tabs.onRemoved.addListener(notifyPages);
   const deps = requestDependencies(channel, tabs, flows);
