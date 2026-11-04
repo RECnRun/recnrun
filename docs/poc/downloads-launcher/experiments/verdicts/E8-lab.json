@@ -1,0 +1,302 @@
+[
+  {
+    "experiment": "E8",
+    "hypothesis": "E8.root.preferences",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "one profile on a custom folder its Preferences name",
+    "debugger": "none",
+    "observations": [
+      {
+        "chain": {
+          "code": 0,
+          "found": "<custom folder>",
+          "tried": []
+        },
+        "candidates": ["<custom folder>", "<OS default>"],
+        "steps": {
+          "preferences": "<custom folder>",
+          "record": [],
+          "find": []
+        },
+        "chainMs": 8
+      },
+      {
+        "chain": {
+          "code": 0,
+          "found": "<custom folder>",
+          "tried": []
+        },
+        "candidates": ["<custom folder>", "<OS default>"],
+        "steps": {
+          "preferences": "<custom folder>",
+          "record": [],
+          "find": []
+        },
+        "chainMs": 8
+      },
+      {
+        "chain": {
+          "code": 0,
+          "found": "<custom folder>",
+          "tried": []
+        },
+        "candidates": ["<custom folder>", "<OS default>"],
+        "steps": {
+          "preferences": "<custom folder>",
+          "record": [],
+          "find": []
+        },
+        "chainMs": 10
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "E8",
+    "hypothesis": "E8.root.osDefault",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "one profile on the OS default, found with no other step naming it",
+    "debugger": "none",
+    "observations": [
+      {
+        "chain": {
+          "code": 0,
+          "found": "<OS default>",
+          "tried": []
+        },
+        "candidates": ["<OS default>"],
+        "steps": {
+          "preferences": null,
+          "record": [],
+          "find": ["<OS default>"]
+        },
+        "chainMs": 5
+      },
+      {
+        "chain": {
+          "code": 0,
+          "found": "<OS default>",
+          "tried": []
+        },
+        "candidates": ["<OS default>"],
+        "steps": {
+          "preferences": null,
+          "record": [],
+          "find": ["<OS default>"]
+        },
+        "chainMs": 5
+      },
+      {
+        "chain": {
+          "code": 0,
+          "found": "<OS default>",
+          "tried": []
+        },
+        "candidates": ["<OS default>"],
+        "steps": {
+          "preferences": null,
+          "record": [],
+          "find": ["<OS default>"]
+        },
+        "chainMs": 4
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "E8",
+    "hypothesis": "E8.root.record",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "one profile on a folder only the launcher record names",
+    "debugger": "none",
+    "observations": [
+      {
+        "chain": {
+          "code": 0,
+          "found": "<record folder>",
+          "tried": []
+        },
+        "candidates": ["<OS default>", "<record folder>"],
+        "steps": {
+          "preferences": null,
+          "record": ["<record folder>"],
+          "find": []
+        },
+        "chainMs": 4
+      },
+      {
+        "chain": {
+          "code": 0,
+          "found": "<record folder>",
+          "tried": []
+        },
+        "candidates": ["<OS default>", "<record folder>"],
+        "steps": {
+          "preferences": null,
+          "record": ["<record folder>"],
+          "find": []
+        },
+        "chainMs": 4
+      },
+      {
+        "chain": {
+          "code": 0,
+          "found": "<record folder>",
+          "tried": []
+        },
+        "candidates": ["<OS default>", "<record folder>"],
+        "steps": {
+          "preferences": null,
+          "record": ["<record folder>"],
+          "find": []
+        },
+        "chainMs": 4
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "E8",
+    "hypothesis": "E8.root.find",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "one profile on a folder under HOME that no earlier step names",
+    "debugger": "none",
+    "observations": [
+      {
+        "chain": {
+          "code": 0,
+          "found": "<folder under home>",
+          "tried": []
+        },
+        "candidates": ["<OS default>", "<folder under home>"],
+        "steps": {
+          "preferences": null,
+          "record": [],
+          "find": ["<folder under home>"]
+        },
+        "chainMs": 4
+      },
+      {
+        "chain": {
+          "code": 0,
+          "found": "<folder under home>",
+          "tried": []
+        },
+        "candidates": ["<OS default>", "<folder under home>"],
+        "steps": {
+          "preferences": null,
+          "record": [],
+          "find": ["<folder under home>"]
+        },
+        "chainMs": 4
+      },
+      {
+        "chain": {
+          "code": 0,
+          "found": "<folder under home>",
+          "tried": []
+        },
+        "candidates": ["<OS default>", "<folder under home>"],
+        "steps": {
+          "preferences": null,
+          "record": [],
+          "find": ["<folder under home>"]
+        },
+        "chainMs": 4
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "E8",
+    "hypothesis": "E8.root.notFound",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "one profile on a folder whose presence carries another boot",
+    "debugger": "none",
+    "verdict": "pass",
+    "samples": 3,
+    "gestures": 0,
+    "steps": [],
+    "observations": [
+      {
+        "chain": {
+          "code": 66,
+          "found": null,
+          "tried": ["<custom folder>", "<OS default>", "<record folder>"]
+        },
+        "candidates": ["<custom folder>", "<OS default>", "<record folder>"],
+        "steps": {
+          "preferences": "<custom folder>",
+          "record": ["<record folder>"],
+          "find": []
+        },
+        "chainMs": 8
+      },
+      {
+        "chain": {
+          "code": 66,
+          "found": null,
+          "tried": ["<custom folder>", "<OS default>", "<record folder>"]
+        },
+        "candidates": ["<custom folder>", "<OS default>", "<record folder>"],
+        "steps": {
+          "preferences": "<custom folder>",
+          "record": ["<record folder>"],
+          "find": []
+        },
+        "chainMs": 8
+      },
+      {
+        "chain": {
+          "code": 66,
+          "found": null,
+          "tried": ["<custom folder>", "<OS default>", "<record folder>"]
+        },
+        "candidates": ["<custom folder>", "<OS default>", "<record folder>"],
+        "steps": {
+          "preferences": "<custom folder>",
+          "record": ["<record folder>"],
+          "find": []
+        },
+        "chainMs": 9
+      }
+    ]
+  }
+]
