@@ -4,6 +4,8 @@ import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { openPage } from "../browser/fixtures/cdp-client.ts";
 import type { PageSession } from "../browser/fixtures/cdp-client.ts";
+import { cacheRun, summary, VERSIONS } from "./e3-cache.ts";
+import type { Read } from "./e3-cache.ts";
 import type { Installed } from "./e1-samples.ts";
 import type { Cell, Sample } from "./outcome.ts";
 import { appendVerdict } from "./verdicts.ts";
@@ -17,18 +19,13 @@ import type { Verdict } from "./verdicts.ts";
 const EXTENSION = fileURLToPath(new URL("../../apps/extension/src/", import.meta.url));
 const READY_TIMEOUT_MS = 10_000;
 const READY_POLL_MS = 100;
-const PREVIEW = 200;
 const LISTED = ["a.json", "b.txt"];
 
 const PROBE = "e3-probe.txt";
 export const LISTING_REASON = "no dedicated experiment and validated parser (§6.3)";
-// Same length on purpose: a cache keyed on size and a coarse mtime would miss the change.
-const VERSION_A = "RECnRun E3 probe, version A\n";
-const VERSION_B = "RECnRun E3 probe, version B\n";
-const VERSION_C = "RECnRun E3 probe, version C\n";
+const VERSION_A = VERSIONS[0] ?? "";
 
 type Via = "page" | "offscreen";
-type Read = { ok: true; status: number; text: string } | { ok: false; error: unknown };
 
 /** A running install with the root it lives on; `dispose` quits Chrome and removes the root. */
 interface E3Install extends Installed {
@@ -50,12 +47,8 @@ async function constantOf(file: string, name: string): Promise<number> {
     .reduce((product, part) => product * Number(part.replaceAll("_", "")), 1);
 }
 
-/** The folder rendezvous' poll interval and presence TTL, read from the extension's source. */
-async function rendezvousTiming(): Promise<{ pollMs: number; ttlMs: number }> {
-  const pollMs = await constantOf("offscreen/folder-watch.ts", "POLL_MS");
-  const ttlMs = await constantOf("p2p/folder-rendezvous.ts", "PRESENCE_TTL_MS");
-  return { pollMs, ttlMs };
-}
+/** The folder watch's poll interval, read from the extension's source. */
+const pollInterval = () => constantOf("offscreen/folder-watch.ts", "POLL_MS");
 
 async function diagnostics(installed: Installed): Promise<PageSession> {
   const url = `chrome-extension://${installed.extensionId}/diagnostics.html`;
@@ -75,10 +68,6 @@ const readIn = async (page: PageSession, url: string, options: Record<string, st
   (await page.evaluate(
     `window.__poc.readFile(${JSON.stringify(url)}, ${JSON.stringify(options)})`,
   )) as Read;
-
-/** What a read returned, without the whole text. */
-const summary = (read: Read) =>
-  read.ok ? { ok: true, status: read.status, text: read.text.slice(0, PREVIEW) } : read;
 
 /** A listing's first characters, its length, and whether it names the folder's two files. */
 const listing = (read: Read) => {
@@ -125,69 +114,20 @@ export const fetchSample = (cells: E3Cells, via: Via): Promise<Sample> =>
     return { ok: false, error: `${via} fetch did not read the probe`, observation, steps: [] };
   });
 
-interface Seen {
-  /** Polls after the immediate re-read until the change showed; null when it never did. */
-  polls: number | null;
-  first: Read;
-  elapsedMs: number;
-}
-
-/** Re-reads right after the change, then once per poll until the TTL, until the new text shows. */
-async function untilSeen(
-  read: () => Promise<Read>,
-  expected: string,
-  timing: { pollMs: number; ttlMs: number },
-) {
-  const start = Date.now();
-  const first = await read();
-  let last = first;
-  for (let polls = 0; polls * timing.pollMs <= timing.ttlMs; polls++) {
-    if (polls > 0) {
-      await delay(timing.pollMs);
-      last = await read();
-    }
-    if (last.ok && last.text === expected) return { polls, first, elapsedMs: Date.now() - start };
-  }
-  return { polls: null, first, elapsedMs: Date.now() - start };
-}
-
-/** Changes the probe from Node twice: the default mode must see the first change within one poll; no-store reads the second. */
+/** Changes the probe A→B→C→D from Node, one poll apart; each change must show on the first read after it. */
 export const cacheSample = (cells: E3Cells, via: Via): Promise<Sample> =>
   withPage(cells, async (page, { root, extensionId }) => {
-    const timing = await rendezvousTiming();
+    const pollMs = await pollInterval();
     const path = join(root, PROBE);
     const url = pathToFileURL(path).href;
-    await writeFile(path, VERSION_A);
-    const before = await readIn(page, url, { via });
-    await writeFile(path, VERSION_B);
-    const byDefault: Seen = await untilSeen(() => readIn(page, url, { via }), VERSION_B, timing);
-    await writeFile(path, VERSION_C);
-    const noStore: Seen = await untilSeen(
-      () => readIn(page, url, { via, cache: "no-store" }),
-      VERSION_C,
-      timing,
-    );
-    const seenByDefault = byDefault.polls !== null && byDefault.polls <= 1;
-    const noStoreNeeded = !seenByDefault && noStore.polls !== null && noStore.polls <= 1;
-    const report = (seen: Seen) => ({
-      polls: seen.polls,
-      elapsedMs: seen.elapsedMs,
-      first: summary(seen.first),
+    const run = await cacheRun({
+      write: (text) => writeFile(path, text),
+      read: (cache) => readIn(page, url, cache ? { via, cache } : { via }),
+      wait: () => delay(pollMs),
     });
-    const observation = {
-      extensionId,
-      via,
-      pollMs: timing.pollMs,
-      ttlMs: timing.ttlMs,
-      before: summary(before),
-      byDefault: report(byDefault),
-      noStore: report(noStore),
-      noStoreNeeded,
-    };
-    if (before.ok && before.text === VERSION_A && seenByDefault)
-      return { ok: true, observation, steps: [] };
-    const error = `${via}: the default cache mode saw the change after ${String(byDefault.polls)} polls (no-store: ${String(noStore.polls)})`;
-    return { ok: false, error, observation, steps: [] };
+    const observation = { extensionId, via, pollMs, ...run.observation };
+    if (run.problems.length === 0) return { ok: true, observation, steps: [] };
+    return { ok: false, error: `${via}: ${run.problems.join("; ")}`, observation, steps: [] };
   });
 
 /** What `fetch("file:///<dir>/")` returns in each context, for the next phase to decide on. */

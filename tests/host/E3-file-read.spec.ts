@@ -65,11 +65,11 @@ test.describe("E3 on the host: file:// reads of the poc-d0 build", () => {
     await record("E3.offscreen.fetch", () => fetchSample(hostCells, "offscreen"));
   });
 
-  test("E3.page.cache: the page sees a changed file within one poll", async () => {
+  test("E3.page.cache: the page sees every change A→B→C→D on its first read", async () => {
     await record("E3.page.cache", () => cacheSample(hostCells, "page"));
   });
 
-  test("E3.offscreen.cache: the offscreen document sees a changed file within one poll", async () => {
+  test("E3.offscreen.cache: the offscreen document sees every change A→B→C→D on its first read", async () => {
     await record("E3.offscreen.cache", () => cacheSample(hostCells, "offscreen"));
   });
 

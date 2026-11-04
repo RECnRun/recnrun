@@ -73,30 +73,52 @@
         "extensionId": "omllgeochjfpkjbkpcgjmnnbncdpiedd",
         "via": "page",
         "pollMs": 1000,
-        "ttlMs": 60000,
         "before": {
           "ok": true,
           "status": 200,
           "text": "RECnRun E3 probe, version A\n"
         },
-        "byDefault": {
-          "polls": 0,
-          "elapsedMs": 1,
-          "first": {
-            "ok": true,
-            "status": 200,
-            "text": "RECnRun E3 probe, version B\n"
+        "changes": [
+          {
+            "version": "B",
+            "first": {
+              "ok": true,
+              "status": 200,
+              "text": "RECnRun E3 probe, version B\n"
+            },
+            "afterPoll": {
+              "ok": true,
+              "status": 200,
+              "text": "RECnRun E3 probe, version B\n"
+            }
+          },
+          {
+            "version": "C",
+            "first": {
+              "ok": true,
+              "status": 200,
+              "text": "RECnRun E3 probe, version C\n"
+            },
+            "afterPoll": {
+              "ok": true,
+              "status": 200,
+              "text": "RECnRun E3 probe, version C\n"
+            }
+          },
+          {
+            "version": "D",
+            "first": {
+              "ok": true,
+              "status": 200,
+              "text": "RECnRun E3 probe, version D\n"
+            },
+            "afterPoll": {
+              "ok": true,
+              "status": 200,
+              "text": "RECnRun E3 probe, version D\n"
+            }
           }
-        },
-        "noStore": {
-          "polls": 0,
-          "elapsedMs": 1,
-          "first": {
-            "ok": true,
-            "status": 200,
-            "text": "RECnRun E3 probe, version C\n"
-          }
-        },
+        ],
         "noStoreNeeded": false
       }
     ],
@@ -122,30 +144,52 @@
         "extensionId": "omllgeochjfpkjbkpcgjmnnbncdpiedd",
         "via": "offscreen",
         "pollMs": 1000,
-        "ttlMs": 60000,
         "before": {
           "ok": true,
           "status": 200,
           "text": "RECnRun E3 probe, version A\n"
         },
-        "byDefault": {
-          "polls": 0,
-          "elapsedMs": 2,
-          "first": {
-            "ok": true,
-            "status": 200,
-            "text": "RECnRun E3 probe, version B\n"
+        "changes": [
+          {
+            "version": "B",
+            "first": {
+              "ok": true,
+              "status": 200,
+              "text": "RECnRun E3 probe, version B\n"
+            },
+            "afterPoll": {
+              "ok": true,
+              "status": 200,
+              "text": "RECnRun E3 probe, version B\n"
+            }
+          },
+          {
+            "version": "C",
+            "first": {
+              "ok": true,
+              "status": 200,
+              "text": "RECnRun E3 probe, version C\n"
+            },
+            "afterPoll": {
+              "ok": true,
+              "status": 200,
+              "text": "RECnRun E3 probe, version C\n"
+            }
+          },
+          {
+            "version": "D",
+            "first": {
+              "ok": true,
+              "status": 200,
+              "text": "RECnRun E3 probe, version D\n"
+            },
+            "afterPoll": {
+              "ok": true,
+              "status": 200,
+              "text": "RECnRun E3 probe, version D\n"
+            }
           }
-        },
-        "noStore": {
-          "polls": 0,
-          "elapsedMs": 4,
-          "first": {
-            "ok": true,
-            "status": 200,
-            "text": "RECnRun E3 probe, version C\n"
-          }
-        },
+        ],
         "noStoreNeeded": false
       }
     ],
@@ -173,7 +217,7 @@
     "steps": [],
     "observations": [
       {
-        "url": "file:///tmp/recnrun-e3-hQqhWJ/e3-listing/",
+        "url": "file:///tmp/recnrun-e3-T5AznM/e3-listing/",
         "page": {
           "ok": true,
           "status": 0,

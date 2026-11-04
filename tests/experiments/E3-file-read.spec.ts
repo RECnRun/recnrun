@@ -75,11 +75,11 @@ test.describe("E3: file:// reads of the poc-d0 build in Google Chrome Stable", (
     );
   });
 
-  test("E3.page.cache: the page sees a changed file within one poll", async () => {
+  test("E3.page.cache: the page sees every change A→B→C→D on its first read", async () => {
     await recordHypothesis(await cell("E3.page.cache"), () => cacheSample(labCells, "page"));
   });
 
-  test("E3.offscreen.cache: the offscreen document sees a changed file within one poll", async () => {
+  test("E3.offscreen.cache: the offscreen document sees every change A→B→C→D on its first read", async () => {
     await recordHypothesis(await cell("E3.offscreen.cache"), () =>
       cacheSample(labCells, "offscreen"),
     );
