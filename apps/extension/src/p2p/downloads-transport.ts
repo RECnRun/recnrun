@@ -1,5 +1,6 @@
 import * as v from "valibot";
 import {
+  CLOCK_SKEW_MS,
   fileUrlFor,
   presencePath,
   readTolerantOf,
@@ -63,7 +64,10 @@ interface Reading {
   now: number;
 }
 
-/** A registration counts in its owner's folder and namespace only. */
+/**
+ * A registration counts in its owner's folder and namespace only, with catalog.sh's bounds: the
+ * schema caps its lifetime at the TTL, and it may be stamped up to one clock skew ahead.
+ */
 const registrationOf = (owner: string, namespace: string): Freshness<Registration> => ({
   schema: v.pipe(
     RegistrationSchema,
@@ -71,7 +75,7 @@ const registrationOf = (owner: string, namespace: string): Freshness<Registratio
   ),
   createdAt: (each) => each.createdAt,
   expiresAt: (each) => each.expiresAt,
-  horizon: PRESENCE_TTL_MS,
+  horizon: PRESENCE_TTL_MS + CLOCK_SKEW_MS,
 });
 
 const readAt = ({ at, read }: Reading, path: string) => read(fileUrlFor(`${at.root}/${path}`));

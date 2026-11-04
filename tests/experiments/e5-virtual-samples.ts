@@ -36,6 +36,8 @@ const LINK_MS = 30_000;
 const SETTLE_MS = 2_000;
 /** A rewrite of one offer path must be answered within two polls and one ICE gathering. */
 const REREAD_MS = 3_000;
+/** A presence within the clock skew is heard at once: one poll, a read, and the answer's ICE. */
+const PROMPT_MS = 2_000;
 
 /** The Default facing a listed virtual peer `profileId`, the worker linking beside them. */
 async function facing(group: DownloadsGroup, profileId = LOWEST_ID) {
@@ -238,14 +240,18 @@ async function skewChecks(run: Facing) {
   await stamped(Date.now() - HOUR_MS);
   const behind = await catalogued(group, THIRD_ID);
   await stamped(Date.now() + 3_000);
+  const withinSkewListed = (await catalogued(group, THIRD_ID)).listed;
+  const withinSkewMs = await offered(thirdRun, await third.signal("offer", to.profileId));
   const checks = {
     aheadRefused: !ahead.listed,
     aheadOfferIgnored,
     behindRefused: !behind.listed,
-    withinSkewListed: (await catalogued(group, THIRD_ID)).listed,
-    withinSkewAnswered: await control(thirdRun),
+    withinSkewListed,
+    withinSkewAnswered: withinSkewMs !== undefined,
+    // As catalog.sh lists it, not once this clock caught up with its stamp.
+    withinSkewPrompt: withinSkewMs !== undefined && withinSkewMs <= PROMPT_MS,
   };
-  return { checks, logs: { aheadLog: ahead.log, behindLog: behind.log } };
+  return { checks, logs: { aheadLog: ahead.log, behindLog: behind.log }, withinSkewMs };
 }
 
 /**

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vite-plus/test";
-import { registryPath } from "@/p2p/downloads-rendezvous";
+import { CLOCK_SKEW_MS, registryPath } from "@/p2p/downloads-rendezvous";
 import { downloadsTransport } from "@/p2p/downloads-transport";
 import type { DownloadsContext } from "@/p2p/downloads-transport";
 import { PRESENCE_TTL_MS } from "@/p2p/folder-rendezvous";
@@ -140,5 +140,39 @@ describe("downloadsTransport", () => {
     await first.clean();
     expect(erased).toEqual([2, 1]);
     expect([...disk.files.keys()]).toEqual([`${FOLDER}/offer-${PEER}.json`]);
+  });
+});
+
+describe("a peer's presence, with the bounds catalog.sh applies", () => {
+  const PEER_PRESENCE = `RECnRun/poc/lab/peers/${PEER}/presence.json`;
+  /** What a fresh transport sees of PEER once its presence claims these times. */
+  async function seen(createdAt: number, expiresAt: number) {
+    const { disk, transport, sync } = shared();
+    await transport(PEER).announce(presence(PEER));
+    sync();
+    const listed = JSON.parse(disk.files.get(PEER_PRESENCE) ?? "{}") as Presence;
+    disk.files.set(PEER_PRESENCE, JSON.stringify({ ...listed, createdAt, expiresAt }));
+    return (await transport().look()).presences.map((each) => each.profileId);
+  }
+
+  test.each([
+    ["stamped now", NOW, NOW + PRESENCE_TTL_MS],
+    ["stamped three seconds ahead", NOW + 3000, NOW + 3000 + PRESENCE_TTL_MS],
+    ["stamped one clock skew ahead", NOW + CLOCK_SKEW_MS, NOW + CLOCK_SKEW_MS + PRESENCE_TTL_MS],
+  ])("takes one %s", async (_, createdAt, expiresAt) => {
+    expect(await seen(createdAt, expiresAt)).toEqual([PEER]);
+  });
+
+  test.each([
+    [
+      "stamped past the clock skew",
+      NOW + CLOCK_SKEW_MS + 1,
+      NOW + CLOCK_SKEW_MS + 1 + PRESENCE_TTL_MS,
+    ],
+    ["already expired", NOW - PRESENCE_TTL_MS, NOW],
+    ["living longer than its TTL", NOW, NOW + PRESENCE_TTL_MS + 1],
+    ["expiring when it was made", NOW + 1000, NOW + 1000],
+  ])("refuses one %s", async (_, createdAt, expiresAt) => {
+    expect(await seen(createdAt, expiresAt)).toEqual([]);
   });
 });
