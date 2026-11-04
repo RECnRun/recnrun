@@ -1,7 +1,7 @@
 import * as v from "valibot";
 import { CLOCK_SKEW_MS, NamespaceSchema, readTolerantOf } from "@/p2p/downloads-rendezvous";
 import type { Freshness, TolerantRead } from "@/p2p/downloads-rendezvous";
-import { PRESENCE_TTL_MS, PresenceSchema } from "@/p2p/folder-rendezvous";
+import { PRESENCE_TTL_MS } from "@/p2p/folder-rendezvous";
 import { DisplayNameSchema } from "@/p2p/pairing-code";
 import { FingerprintSchema, ProfileIdSchema } from "@/p2p/protocol";
 
@@ -25,7 +25,12 @@ const TimeSchema = v.pipe(v.number(), v.safeInteger(), v.minValue(0));
  * `root`, `userDataDir`, `directory`, or `filename` key is refused like any other.
  */
 export const RegistrationSchema = v.strictObject({
-  ...PresenceSchema.entries,
+  // PresenceSchema's entries spelled out: a spread of them would stay in the production background.
+  profileId: ProfileIdSchema,
+  displayName: DisplayNameSchema,
+  fingerprint: FingerprintSchema,
+  createdAt: v.number(),
+  expiresAt: v.number(),
   namespace: NamespaceSchema,
   boot: BootSchema,
 });
@@ -61,13 +66,14 @@ export const RegistrySchema = v.strictObject({
 
 export type Registry = v.InferOutput<typeof RegistrySchema>;
 
-const REGISTRY: Freshness<Registry> = {
+// Made on call: a sum at load would stay in the production background, which reads no registry.
+const registryFreshness = (): Freshness<Registry> => ({
   schema: RegistrySchema,
   createdAt: (registry) => registry.writtenAt,
   expiresAt: (registry) => registry.writtenAt + REGISTRY_TTL_MS,
   // A catalog stamped within the clock skew still counts.
   horizon: REGISTRY_TTL_MS + CLOCK_SKEW_MS,
-};
+});
 
 /** Reads registry.json with readTolerant's rules: the last valid catalog stands until its TTL. */
 export function readRegistry(
@@ -75,5 +81,5 @@ export function readRegistry(
   previous: Registry | undefined,
   now = Date.now(),
 ): TolerantRead<Registry> {
-  return readTolerantOf(REGISTRY, text, previous, now);
+  return readTolerantOf(registryFreshness(), text, previous, now);
 }

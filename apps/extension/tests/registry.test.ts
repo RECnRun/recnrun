@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import * as v from "valibot";
 import { describe, expect, test } from "vite-plus/test";
 import { presencePath, registryPath } from "@/p2p/downloads-rendezvous";
-import { PRESENCE_TTL_MS } from "@/p2p/folder-rendezvous";
+import { PRESENCE_TTL_MS, PresenceSchema } from "@/p2p/folder-rendezvous";
 import {
   MAX_REGISTRY_PEERS,
   REGISTRY_TTL_MS,
@@ -73,6 +73,19 @@ describe("RegistrationSchema", () => {
     ["displayName", "x".repeat(65)],
   ])("refuses the %s %j", (key, value) => {
     expect(v.is(RegistrationSchema, { ...registration, [key]: value })).toBe(false);
+  });
+
+  test("has the presence's entries in its order, then the namespace and the boot", () => {
+    expect(Object.keys(RegistrationSchema.entries)).toEqual([
+      ...Object.keys(PresenceSchema.entries),
+      "namespace",
+      "boot",
+    ]);
+    for (const [key, schema] of Object.entries(PresenceSchema.entries)) {
+      expect(RegistrationSchema.entries[key as keyof typeof PresenceSchema.entries].type).toBe(
+        schema.type,
+      );
+    }
   });
 
   test("refuses a registration without its boot", () => {
