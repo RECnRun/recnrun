@@ -14,23 +14,28 @@ Everything in [PLAN.md](PLAN.md) that needs a person. The owner authorized Claud
 
 ## After P3
 
-- **M-P3.a Try the Downloads mesh by hand.** Three throwaway Chrome roots on this Mac, no Docker, no Playwright, never the personal profile and never `~/Downloads`. Run each block in a terminal and paste as is; `REPO` is this checkout.
+- **M-P3.a Try the Downloads mesh by hand.** Three throwaway Chrome roots on this Mac, no Docker, no Playwright, never the personal profile and never `~/Downloads`. Each step names the terminal it runs in; a new terminal inherits nothing, so paste this line first in every terminal you open below (`<checkout>` is this repository's folder):
+  ```sh
+  cd <checkout> && REPO=$PWD && T="$HOME/Documents/RECnRun/poc-downloads-launcher/roots/try" && DL="$T/downloads"
+  ```
   1. Build `poc-d0` (output `apps/extension/.output/chrome-mv3-poc-d0/`, which holds `manifest.json`):
      ```sh
      cd "$REPO" && vp run --no-cache extension#build:poc-d0 && ls apps/extension/.output/chrome-mv3-poc-d0/manifest.json
      ```
   2. Make the roots. All three pin `download.default_directory` to ONE stand-in Downloads folder, because the rendezvous is the Downloads folder: each profile writes its presence there through `chrome.downloads` and reads the others' back through `file://`, and the launcher scans that one root. Roots with their own folders never see each other. The `Preferences` are the shape `writeDownloadsPreference` (`tests/host/fixtures/roots.ts`) writes:
      ```sh
-     T="$HOME/Documents/RECnRun/poc-downloads-launcher/roots/try"
-     DL="$T/downloads"
+     for p in "$HOME/Documents/RECnRun" "$HOME/Documents/RECnRun/poc-downloads-launcher" "$HOME/Documents/RECnRun/poc-downloads-launcher/roots" "$T"; do
+       [ -L "$p" ] && echo "$p is a symbolic link: stop, the recipe writes only under real folders"
+     done
+     mkdir -p "$HOME/Documents/RECnRun/poc-downloads-launcher/roots" && mkdir "$T" && touch "$T/.recnrun-host-root" || echo "$T exists: finish step 8 of the earlier try first"
      for n in alpha beta gamma; do
-       mkdir -p "$T/$n/Default"
+       mkdir "$T/$n" "$T/$n/Default" || break
        printf '{"download":{"prompt_for_download":false,"default_directory":"%s","directory_upgrade":true}}' "$DL" > "$T/$n/Default/Preferences"
        python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$T/$n/Default/Preferences"
      done
      mkdir -p "$DL/RECnRun/poc/lab"
      ```
-     The last line creates the folder `catalog.sh` writes into (it exits 73 on a missing output folder). `lab` is the namespace every `poc-d0` build uses (`DEFAULT_NAMESPACE` in `src/p2p/downloads-rendezvous.ts`; a stored override is not set here).
+     `mkdir` without `-p` makes the run folder and each root exclusively: an occupied `try/` is never reused and no `Preferences` of a profile that may be running is overwritten; the marker `.recnrun-host-root` is what step 8 removes by. The last line creates the folder `catalog.sh` writes into (it exits 73 on a missing output folder). `lab` is the namespace every `poc-d0` build uses (`DEFAULT_NAMESPACE` in `src/p2p/downloads-rendezvous.ts`; a stored override is not set here).
   3. Launch the installed Google Chrome on each root, each in its own terminal (the three commands differ only in the name). `--use-mock-keychain` keeps Chrome off the macOS keychain, so a throwaway root asks for no password and touches no real credential (`tests/host/fixtures/host-chrome.ts` passes it for the same reason):
      ```sh
      "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --user-data-dir="$HOME/Documents/RECnRun/poc-downloads-launcher/roots/try/alpha" --no-default-browser-check --use-mock-keychain
@@ -54,9 +59,9 @@ Everything in [PLAN.md](PLAN.md) that needs a person. The owner authorized Claud
      Each profile has `peers/<uuid>/presence.json`, rewritten about every 30 s (watch its `createdAt` move); `offer-<uuid>.json` and `answer-<uuid>.json` signals appear once per pairing; `registry.json` lists the three. The diagnostics page of each profile shows the report with `fileSchemeAccess`.
   8. Clean up. Quit each Chrome you launched with Cmd+Q (never `pkill`), stop the loop with Ctrl+C, then:
      ```sh
-     rm -rf "$HOME/Documents/RECnRun/poc-downloads-launcher/roots/try"
+     pgrep -lf -- "--user-data-dir=$T" && echo "a Chrome of this try is still running: quit it first" || { [ -f "$T/.recnrun-host-root" ] && [ ! -L "$T" ] && rm -rf "$T"; }
      ```
-     This removes the roots, the record, and the stand-in Downloads folder, which all sit under `try/`.
+     This removes only the folder step 2 made and marked (the roots, the record, and the stand-in Downloads folder all sit under it), and only once no Chrome launched on it is left.
      Date, machine, OS, Chrome version, build hash, gestures counted: …
      Result: …
 
