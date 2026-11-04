@@ -10,7 +10,8 @@ export default defineConfig({
   plugins: [WxtVitest({ root })],
   test: {
     name: "extension",
-    isolate: false,
+    // Files leave peer stacks and reset modules behind; a shared registry made them cross on a slow CPU.
+    isolate: true,
     include: ["tests/**/*.test.ts"],
     exclude: ["**/*.browser.test.{ts,tsx}", "**/node_modules/**"],
   },
