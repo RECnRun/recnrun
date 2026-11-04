@@ -2,7 +2,9 @@ import { errorMessage, toggled } from "@recnrun/domain";
 import type { RecordingSession } from "@recnrun/domain";
 import type { PeerChannel } from "@/background/peer-channel";
 import { focusTab, startSession } from "@/background/session-requests";
-import type { MessageOf, PeerMessage, SharedTabs } from "@/p2p/protocol";
+import { isCommand } from "@/p2p/authorization";
+import type { Command } from "@/p2p/authorization";
+import type { PeerMessage, SharedTabs } from "@/p2p/protocol";
 import type { RecordingStore } from "@/ports/recording-store";
 import type { BrowserTabs } from "@/ports/tabs";
 import type { Repository } from "@/storage/peer-repository";
@@ -82,8 +84,6 @@ async function activate(tabId: number, deps: ExecutorDependencies): Promise<Outc
   return OK;
 }
 
-type Command = MessageOf<"ACTIVATE_TAB" | "SESSION_START" | "SESSION_SET_STATUS" | "SESSION_STOP">;
-
 function run(command: Command, deps: ExecutorDependencies): Promise<Outcome> {
   switch (command.type) {
     case "ACTIVATE_TAB":
@@ -98,14 +98,6 @@ function run(command: Command, deps: ExecutorDependencies): Promise<Outcome> {
       );
   }
 }
-
-const COMMANDS = new Set<PeerMessage["type"]>([
-  "ACTIVATE_TAB",
-  "SESSION_START",
-  "SESSION_SET_STATUS",
-  "SESSION_STOP",
-]);
-const isCommand = (message: PeerMessage): message is Command => COMMANDS.has(message.type);
 
 /** Answers what the peer asks of this profile's tabs and session; ignores everything else. */
 export async function execute(message: PeerMessage, deps: ExecutorDependencies): Promise<void> {

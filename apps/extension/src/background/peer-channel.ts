@@ -1,4 +1,7 @@
+import { storedRoles } from "@/background/hierarchy";
 import type { LinkCommand } from "@/messaging/peer-messages";
+import { authorizeCommand } from "@/p2p/authorization";
+import type { Hierarchy, Sender } from "@/p2p/authorization";
 import { parsePeerFrame, peerMessage } from "@/p2p/protocol";
 import type { MessageOf, PeerMessage, PeerPayload, PeerType } from "@/p2p/protocol";
 import type {
@@ -17,6 +20,8 @@ export interface PeerChannelDependencies {
   link: Pick<PeerRecords<PeerLink>, "get">;
   /** Message types and verdicts only, never payloads. */
   log: (entry: string) => void;
+  /** The recorded hierarchy that authorizes each message; this profile's storage by default. */
+  roles?: Hierarchy;
   replyTimeoutMs?: number;
 }
 
@@ -24,7 +29,8 @@ export interface PeerChannelDependencies {
 export type Received =
   | { kind: "accepted"; message: PeerMessage }
   | { kind: "invalid" }
-  | { kind: "unauthorized" };
+  | { kind: "unauthorized" }
+  | { kind: "refused"; reason: string };
 
 interface Waiter {
   peer: string;
@@ -65,10 +71,43 @@ function createWaiters(timeoutMs: number) {
   return { wait, answer, fail, failPeer };
 }
 
-/** Whether `peer` is authorized and its own link is verified. */
+/** The authorized `peer` while its own link is verified, whose certificate the link proved. */
 async function verifiedPeer(deps: PeerChannelDependencies, peer: string) {
   const [authorized, link] = await Promise.all([deps.authorized.get(peer), deps.link.get(peer)]);
-  return authorized !== null && link?.verified === true;
+  return link?.verified === true ? authorized : null;
+}
+
+/** The verified peer of the link `peer` when it addressed `message` to this profile, else null. */
+async function senderOf(
+  deps: PeerChannelDependencies,
+  message: PeerMessage,
+  peer: string,
+): Promise<Sender | null> {
+  const me = await deps.identity();
+  // A verified peer could otherwise claim another's id over its own link.
+  if (message.to !== me.profileId || message.from !== peer) return null;
+  const authorized = await verifiedPeer(deps, peer);
+  return authorized && { profileId: peer, fingerprint: authorized.fingerprint };
+}
+
+/** What `frame` from `peer` is: parsed, addressed by a verified peer, and authorized. */
+async function admit(
+  deps: PeerChannelDependencies,
+  roles: Hierarchy,
+  frame: string,
+  peer: string,
+): Promise<Received> {
+  const message = parsePeerFrame(frame);
+  if (!message) return { kind: "invalid" };
+  const sender = await senderOf(deps, message, peer);
+  if (!sender) return { kind: "unauthorized" };
+  const verdict = await authorizeCommand(message, sender, roles);
+  if (!verdict.ok) {
+    deps.log(`REFUSED ${message.type} from ${message.from}: ${verdict.reason}`);
+    return { kind: "refused", reason: verdict.reason };
+  }
+  deps.log(`received ${message.type}`);
+  return { kind: "accepted", message };
 }
 
 /**
@@ -78,6 +117,8 @@ async function verifiedPeer(deps: PeerChannelDependencies, peer: string) {
  */
 export function createPeerChannel(deps: PeerChannelDependencies) {
   const waiters = createWaiters(deps.replyTimeoutMs ?? 5000);
+  const roles = deps.roles ?? storedRoles();
+  let refusals = 0;
   const compose = async <T extends PeerType>(to: string, type: T, payload: PeerPayload<T>) => {
     const me = await deps.identity();
     if (!(await verifiedPeer(deps, to))) throw new Error(NOT_CONNECTED);
@@ -105,17 +146,15 @@ export function createPeerChannel(deps: PeerChannelDependencies) {
   };
   /** A frame that came over the link to `peer`, which alone may have sent it. */
   const receive = async (frame: string, peer: string): Promise<Received> => {
-    const message = parsePeerFrame(frame);
-    if (!message) return { kind: "invalid" };
-    const me = await deps.identity();
-    // A verified peer could otherwise claim another's id over its own link.
-    const addressed = message.to === me.profileId && message.from === peer;
-    if (!addressed || !(await verifiedPeer(deps, peer))) return { kind: "unauthorized" };
-    deps.log(`received ${message.type}`);
-    waiters.answer(message);
-    return { kind: "accepted", message };
+    const received = await admit(deps, roles, frame, peer);
+    // A refused reply answers no request, so nothing it carries reaches a caller.
+    if (received.kind === "accepted") waiters.answer(received.message);
+    if (received.kind === "refused") refusals += 1;
+    return received;
   };
-  return { send, request, receive, failPeer: waiters.failPeer };
+  /** How many authorized peers' frames the hierarchy refused, for tests. */
+  const refused = () => refusals;
+  return { send, request, receive, refused, failPeer: waiters.failPeer };
 }
 
 export type PeerChannel = ReturnType<typeof createPeerChannel>;

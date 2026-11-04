@@ -88,6 +88,10 @@ const PeerMessageSchema = v.variant("type", [
 
 export type PeerMessage = v.InferOutput<typeof PeerMessageSchema>;
 export type PeerType = PeerMessage["type"];
+
+/** Every message type the protocol defines, as the schema lists them. */
+export const peerTypes = (): PeerType[] =>
+  PeerMessageSchema.options.map((option) => option.entries.type.literal);
 export type MessageOf<T extends PeerType> = Extract<PeerMessage, { type: T }>;
 export type PeerPayload<T extends PeerType> = Omit<MessageOf<T>, keyof typeof envelope | "type">;
 

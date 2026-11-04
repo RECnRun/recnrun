@@ -7,7 +7,7 @@ import {
 } from "@/storage/peer-repository";
 import { recordingSessionRepository } from "@/storage/recording-session-repository";
 import { ME, PEER, STRANGER, fromPeer } from "./fake-peer";
-import { peerBackground } from "./peer-background";
+import { bindToPeer, peerBackground } from "./peer-background";
 
 const session = { tabId: 4, status: "recording" as const, banked: 0, since: 1 };
 const TAB = { id: 3, windowId: 1, incognito: false as const, title: "Shop", url: "https://s/" };
@@ -123,6 +123,7 @@ describe("this profile's session", () => {
   test("runs as the peer commands, and its end clears the controller marker", async () => {
     const peers = await peerBackground();
     await peers.connect();
+    await bindToPeer();
     const shop = await fakeBrowser.tabs.create({ url: "https://shop.example/" });
     const start = fromPeer("SESSION_START", { tabId: shop.id ?? -1 });
     await peers.receive(start);
@@ -139,6 +140,19 @@ describe("this profile's session", () => {
     await vi.waitFor(() =>
       expect(peers.link.frames().at(-1)).toMatchObject({ type: "SESSION_STATUS", session: null }),
     );
+  });
+
+  test("drops a command from a peer that is not its bound master, with one log line", async () => {
+    const peers = await peerBackground();
+    await peers.connect();
+    const shop = await fakeBrowser.tabs.create({ url: "https://shop.example/" });
+    peers.log.mockClear();
+    await peers.receive(fromPeer("SESSION_START", { tabId: shop.id ?? -1 }));
+    expect(peers.link.sentTypes()).not.toContain("COMMAND_RESULT");
+    expect(await recordingSessionRepository.read()).toBeNull();
+    expect(peers.log.mock.calls).toEqual([
+      ["[RECnRun peer]", `REFUSED SESSION_START from ${PEER}: not the bound master`],
+    ]);
   });
 
   test("ending a session clears the marker even without a link", async () => {

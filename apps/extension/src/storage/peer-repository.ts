@@ -9,7 +9,7 @@ import {
 } from "@/messaging/peer-results";
 import { PinSchema } from "@/p2p/pins";
 import { MAX_CODE_LENGTH, MemberSchema, ProfileIdSchema, SharedTabsSchema } from "@/p2p/protocol";
-import { RoleRecordSchema } from "@/p2p/roles";
+import { BoundWorkerSchema, RoleRecordSchema } from "@/p2p/roles";
 
 export type ProfileIdentity = v.InferOutput<typeof ProfileIdentitySchema>;
 export type AuthorizedPeer = v.InferOutput<typeof AuthorizedPeerSchema>;
@@ -110,6 +110,8 @@ export const authorizedPeersRepository = peerRecords("local:authorizedPeers", Au
 export const peerPinsRepository = peerRecords("local:peerPins", PinSchema);
 // Local, so a worker's binding to its master survives a restart and a Forget alike.
 export const roleRepository = repository("local:role", RoleRecordSchema);
+/** On the master: the workers it bound, so a status or result from anyone else is refused. */
+export const boundWorkersRepository = peerRecords("local:boundWorkers", BoundWorkerSchema);
 // Local, so waiting in the folder survives a restart of the browser.
 export const folderPairingRepository = repository("local:folderPairing", FolderPairingSchema);
 // Session storage ends with the browser, as the link and anything it carried do.

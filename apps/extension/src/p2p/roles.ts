@@ -33,6 +33,13 @@ export const RoleRecordSchema = v.variant("role", [
   TemplateRecordSchema,
 ]);
 
+/** On the master: a worker it bound, by the certificate its first verified link pinned. */
+export const BoundWorkerSchema = v.strictObject({
+  fingerprint: FingerprintSchema,
+  boundAt: v.pipe(v.number(), v.integer(), v.minValue(0)),
+  source: BindingSourceSchema,
+});
+
 const MasterRequestSchema = v.strictObject({
   profileId: ProfileIdSchema,
   fingerprint: FingerprintSchema,
@@ -45,24 +52,32 @@ const IdentitySchema = v.strictObject({
 });
 
 export type Role = v.InferOutput<typeof RoleSchema>;
-export type Binding = v.InferOutput<typeof BindingSchema>;
+type Binding = v.InferOutput<typeof BindingSchema>;
 type MasterRecord = v.InferOutput<typeof MasterRecordSchema>;
 type RoleRecord = v.InferOutput<typeof RoleRecordSchema>;
+type BoundWorker = v.InferOutput<typeof BoundWorkerSchema>;
+type PeerRequest = v.InferOutput<typeof MasterRequestSchema>;
 export type MasterRequest = v.InferInput<typeof MasterRequestSchema>;
 export type Identity = v.InferInput<typeof IdentitySchema>;
 export type OutwardAction = "announce" | "discover" | "work";
 
+type Malformed = { ok: false; reason: "malformed" };
 type StoreFailed = { ok: false; reason: "store-failed"; error: string };
 export type BindOutcome =
   | { ok: true; binding: Binding }
-  | { ok: false; reason: "malformed" | "template" | "master" | "pinned-different" }
+  | { ok: false; reason: "template" | "master" | "pinned-different" }
   | { ok: false; reason: "bound-elsewhere"; binding: Binding }
   | StoreFailed;
 export type MasterOutcome =
   | { ok: true; record: MasterRecord }
-  | { ok: false; reason: "malformed" | "template" }
+  | { ok: false; reason: "template" }
   | { ok: false; reason: "bound"; binding: Binding }
   | { ok: false; reason: "master-differs"; record: MasterRecord }
+  | StoreFailed;
+export type WorkerOutcome =
+  | { ok: true; worker: BoundWorker }
+  | { ok: false; reason: "not-master" | "pinned-different" }
+  | { ok: false; reason: "worker-differs"; worker: BoundWorker }
   | StoreFailed;
 export type TemplateOutcome =
   | { ok: true }
@@ -75,8 +90,15 @@ interface RoleStore {
   write: (value: RoleRecord | null) => Promise<unknown>;
 }
 
+/** On the master: the workers it bound, keyed by profile id. */
+interface WorkerStore {
+  get: (profileId: string) => Promise<BoundWorker | null>;
+  set: (profileId: string, worker: BoundWorker) => Promise<unknown>;
+}
+
 export interface RoleDependencies {
   role: RoleStore;
+  workers: WorkerStore;
   pins: Pick<Pins, "verify">;
   now?: () => number;
 }
@@ -92,7 +114,7 @@ const sameMaster = (binding: Binding, master: Identity) =>
 
 async function bindOnce(
   deps: RoleDependencies,
-  master: v.InferOutput<typeof MasterRequestSchema>,
+  master: PeerRequest,
   now: number,
 ): Promise<BindOutcome> {
   const current = await deps.role.read();
@@ -134,6 +156,39 @@ async function holdOnce(store: RoleStore): Promise<TemplateOutcome> {
   return { ok: true };
 }
 
+async function bindWorkerOnce(
+  deps: RoleDependencies,
+  worker: PeerRequest,
+  now: number,
+): Promise<WorkerOutcome> {
+  if ((await deps.role.read())?.role !== "master") return { ok: false, reason: "not-master" };
+  const bound = await deps.workers.get(worker.profileId);
+  if (bound?.fingerprint === worker.fingerprint) return { ok: true, worker: bound };
+  if (bound) return { ok: false, reason: "worker-differs", worker: bound };
+  if ((await deps.pins.verify(worker.profileId, worker.fingerprint)) === "pinned-mismatch")
+    return { ok: false, reason: "pinned-different" };
+  const { fingerprint, source } = worker;
+  const record: BoundWorker = { fingerprint, boundAt: now, source };
+  await deps.workers.set(worker.profileId, record);
+  return { ok: true, worker: record };
+}
+
+const pinMatches = async (deps: RoleDependencies, peer: Identity) =>
+  (await deps.pins.verify(peer.profileId, peer.fingerprint)) === "pinned-match";
+
+/** The bound master's id and certificate, as the pin a verified link made holds them. */
+async function provesMaster(deps: RoleDependencies, current: RoleRecord | null, peer: Identity) {
+  if (current?.role !== "worker" || !sameMaster(current, peer)) return false;
+  return pinMatches(deps, peer);
+}
+
+/** On the master: a worker it bound, with the certificate it bound and pinned. */
+async function provesWorker(deps: RoleDependencies, current: RoleRecord | null, peer: Identity) {
+  if (current?.role !== "master") return false;
+  if ((await deps.workers.get(peer.profileId))?.fingerprint !== peer.fingerprint) return false;
+  return pinMatches(deps, peer);
+}
+
 const storeFailed = (error: unknown): StoreFailed => ({
   ok: false,
   reason: "store-failed",
@@ -154,41 +209,42 @@ export function createRoles(deps: RoleDependencies) {
     queue = next.catch(() => {});
     return next;
   };
+  const change = <T, R>(
+    schema: v.GenericSchema<unknown, T>,
+    input: unknown,
+    work: (request: T) => Promise<R>,
+  ): Promise<R | Malformed | StoreFailed> => {
+    const request = v.safeParse(schema, input);
+    if (!request.success) return Promise.resolve({ ok: false, reason: "malformed" });
+    return serial(() => work(request.output)).catch(storeFailed);
+  };
   const record = () => serial(() => deps.role.read());
   const roleOf = async (): Promise<Role> => (await record())?.role ?? "worker";
-  const bind = (master: MasterRequest): Promise<BindOutcome> => {
-    const request = v.safeParse(MasterRequestSchema, master);
-    if (!request.success) return Promise.resolve({ ok: false, reason: "malformed" });
-    return serial(() => bindOnce(deps, request.output, now())).catch(storeFailed);
-  };
-  const becomeMaster = (self: Identity): Promise<MasterOutcome> => {
-    const request = v.safeParse(IdentitySchema, self);
-    if (!request.success) return Promise.resolve({ ok: false, reason: "malformed" });
-    return serial(() => becomeMasterOnce(deps.role, request.output)).catch(storeFailed);
-  };
-  const holdAsTemplate = () => serial(() => holdOnce(deps.role)).catch(storeFailed);
-  // An unreadable role is no role to act on: fail closed.
-  const mayAct = (action: OutwardAction) =>
-    roleOf().then(
-      (role) => MAY[role].has(action),
-      () => false,
-    );
-  /** True only for the bound master's id and certificate, as the pin a verified link made holds them. */
-  const isMasterIdentity = async (profileId: string, fingerprint: string) => {
-    const current = await record();
-    if (current?.role !== "worker" || !sameMaster(current, { profileId, fingerprint }))
-      return false;
-    return (await deps.pins.verify(profileId, fingerprint)) === "pinned-match";
-  };
+  // An unreadable role or pin proves nothing and permits nothing: fail closed.
+  const proves =
+    (check: typeof provesMaster) =>
+    (profileId: string, fingerprint: string): Promise<boolean> =>
+      record()
+        .then((current) => check(deps, current, { profileId, fingerprint }))
+        .catch(() => false);
   return {
     roleOf,
     record,
-    bind,
-    becomeMaster,
-    holdAsTemplate,
-    mayAct,
-    // An unreadable role or pin proves no master: fail closed.
-    isMasterIdentity: (profileId: string, fingerprint: string) =>
-      isMasterIdentity(profileId, fingerprint).catch(() => false),
+    bind: (master: MasterRequest) =>
+      change(MasterRequestSchema, master, (request) => bindOnce(deps, request, now())),
+    becomeMaster: (self: Identity) =>
+      change(IdentitySchema, self, (request) => becomeMasterOnce(deps.role, request)),
+    holdAsTemplate: () => serial(() => holdOnce(deps.role)).catch(storeFailed),
+    bindWorker: (worker: MasterRequest) =>
+      change(MasterRequestSchema, worker, (request) => bindWorkerOnce(deps, request, now())),
+    mayAct: (action: OutwardAction) =>
+      roleOf().then(
+        (role) => MAY[role].has(action),
+        () => false,
+      ),
+    isMasterIdentity: proves(provesMaster),
+    isBoundWorker: proves(provesWorker),
   };
 }
+
+export type Roles = ReturnType<typeof createRoles>;

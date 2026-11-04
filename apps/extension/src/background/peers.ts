@@ -148,6 +148,7 @@ function createLinkHandler(
   const onFrame = async (frame: string, peer: string) => {
     tap?.push(frame);
     const received = await channel.receive(frame, peer);
+    if (received.kind === "refused") return;
     if (received.kind !== "accepted") {
       log(`dropped an ${received.kind} frame`);
       // Only a verified peer learns why; anything else gets no answer.

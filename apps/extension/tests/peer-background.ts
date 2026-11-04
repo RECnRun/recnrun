@@ -1,5 +1,6 @@
 import { vi } from "vite-plus/test";
 import { fakeBrowser } from "wxt/testing/fake-browser";
+import { storedRoles } from "@/background/hierarchy";
 import { startPeers } from "@/background/peers";
 import type { PeerMessage } from "@/p2p/protocol";
 import { authorizedPeersRepository, identityRepository } from "@/storage/peer-repository";
@@ -10,6 +11,10 @@ const manifest = { manifest_version: 3 as const, name: "RECnRun", version: "0.1.
 /** Every frame the test build kept, both ways. */
 export const tappedFrames = (): string[] =>
   (globalThis as { recnrunPeerFrames?: string[] }).recnrunPeerFrames ?? [];
+
+/** Binds this profile to PEER as its master, as the local channel would once the pair is linked. */
+export const bindToPeer = () =>
+  storedRoles().bind({ profileId: PEER, fingerprint: FINGERPRINT, source: "pairing" });
 
 /**
  * The background's peer half over the fake browser and offscreen document, with this profile's

@@ -7,7 +7,11 @@ import { createPins } from "@/p2p/pins";
 import { MemberSchema, parsePeerFrame, peerMessage } from "@/p2p/protocol";
 import { RegistrationSchema } from "@/p2p/registry";
 import { RoleRecordSchema, createRoles } from "@/p2p/roles";
-import { peerPinsRepository, roleRepository } from "@/storage/peer-repository";
+import {
+  boundWorkersRepository,
+  peerPinsRepository,
+  roleRepository,
+} from "@/storage/peer-repository";
 
 const NOW = 1_700_000_000_000;
 const ME = "11111111-1111-4111-8111-111111111111";
@@ -20,7 +24,8 @@ const MASTER_FP = "AB:CD:EF";
 const OTHER_FP = "12:34:56";
 
 const pins = () => createPins(peerPinsRepository, () => NOW);
-const roles = () => createRoles({ role: roleRepository, pins: pins(), now: () => NOW });
+const stores = { role: roleRepository, workers: boundWorkersRepository };
+const roles = () => createRoles({ ...stores, pins: pins(), now: () => NOW });
 const master = { profileId: MASTER, fingerprint: MASTER_FP, source: "pairing" } as const;
 const binding = {
   role: "worker",
@@ -126,7 +131,7 @@ describe("bind", () => {
 
   test("binding the same master again changes nothing", async () => {
     await roles().bind(master);
-    const later = createRoles({ role: roleRepository, pins: pins(), now: () => NOW + 1 });
+    const later = createRoles({ ...stores, pins: pins(), now: () => NOW + 1 });
     expect(await later.bind(master)).toEqual({ ok: true, binding });
   });
 
@@ -223,6 +228,51 @@ describe("isMasterIdentity", () => {
   });
 });
 
+describe("the master's workers", () => {
+  const worker = { profileId: LOW_WORKER, fingerprint: OTHER_FP, source: "pairing" } as const;
+  const bound = { fingerprint: OTHER_FP, boundAt: NOW, source: "pairing" } as const;
+  const asMaster = () => roles().becomeMaster({ profileId: MASTER, fingerprint: MASTER_FP });
+
+  test("are bound only by the master, by profile id and pinned certificate", async () => {
+    expect(await roles().bindWorker(worker)).toEqual({ ok: false, reason: "not-master" });
+    await asMaster();
+    expect(await roles().bindWorker(worker)).toEqual({ ok: true, worker: bound });
+    expect(await roles().bindWorker(worker)).toEqual({ ok: true, worker: bound });
+    // Bound before the first meeting: nothing proved the certificate yet.
+    expect(await roles().isBoundWorker(LOW_WORKER, OTHER_FP)).toBe(false);
+    await proved(LOW_WORKER, OTHER_FP);
+    expect(await roles().isBoundWorker(LOW_WORKER, OTHER_FP)).toBe(true);
+    expect(await roles().isBoundWorker(LOW_WORKER, MASTER_FP)).toBe(false);
+    expect(await roles().isBoundWorker(CLONE, OTHER_FP)).toBe(false);
+  });
+
+  test("keep the first certificate and refuse one that contradicts its pin", async () => {
+    await asMaster();
+    await roles().bindWorker(worker);
+    const renewed = { ...worker, fingerprint: MASTER_FP };
+    expect(await roles().bindWorker(renewed)).toEqual({
+      ok: false,
+      reason: "worker-differs",
+      worker: bound,
+    });
+    await proved(CLONE, MASTER_FP);
+    const contradicted = { ...worker, profileId: CLONE };
+    expect(await roles().bindWorker(contradicted)).toEqual({
+      ok: false,
+      reason: "pinned-different",
+    });
+    const malformed = { ...worker, source: "message" } as unknown as typeof worker;
+    expect(await roles().bindWorker(malformed)).toEqual({ ok: false, reason: "malformed" });
+  });
+
+  test("are no workers of a worker", async () => {
+    await proved(LOW_WORKER, OTHER_FP);
+    await boundWorkersRepository.set(LOW_WORKER, bound);
+    await roles().bind(master);
+    expect(await roles().isBoundWorker(LOW_WORKER, OTHER_FP)).toBe(false);
+  });
+});
+
 describe("template", () => {
   test("blocks every outward action from the start", async () => {
     expect(await roles().holdAsTemplate()).toEqual({ ok: true });
@@ -269,7 +319,8 @@ describe("the stored record", () => {
       read: () => Promise.reject(new Error("The stored local:role does not match its schema.")),
       write: () => Promise.reject(new Error("quota")),
     };
-    const failing = createRoles({ role: broken, pins: pins(), now: () => NOW });
+    const workers = boundWorkersRepository;
+    const failing = createRoles({ role: broken, workers, pins: pins(), now: () => NOW });
     expect(await failing.bind(master)).toEqual({
       ok: false,
       reason: "store-failed",
