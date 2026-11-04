@@ -19,6 +19,30 @@ export const MAX_REGISTRY_PEERS = 32;
 const BootSchema = v.pipe(v.string(), v.uuid());
 const TimeSchema = v.pipe(v.number(), v.safeInteger(), v.minValue(0));
 
+const MAX_NAME_BYTES = 64;
+
+/** Written by JSON.stringify as is: no quote, backslash, control character, or lone surrogate. */
+const unescaped = (name: string) =>
+  JSON.stringify(name) === `"${name}"` && !name.includes("\u007f");
+
+/**
+ * The display name catalog.sh lists: 1 to 64 UTF-8 bytes, no quote, backslash, control
+ * character, or edge space. Checked, never trimmed, so the published bytes are the ones checked.
+ */
+export const RegistrationNameSchema = v.pipe(
+  v.string(),
+  v.check((name) => {
+    const bytes = new TextEncoder().encode(name).length;
+    return bytes >= 1 && bytes <= MAX_NAME_BYTES && !/^ | $/.test(name) && unescaped(name);
+  }, "The display name must be 1 to 64 UTF-8 bytes with no quote, backslash, control character, or edge space."),
+);
+
+/** The stored name if the catalog lists it, else the default name a new profile gets. */
+export function registrationName(profileId: string, displayName: string): string {
+  if (v.is(RegistrationNameSchema, displayName)) return displayName;
+  return `Profile ${profileId.slice(0, 4).toUpperCase()}`;
+}
+
 /**
  * What an extension publishes for the launcher: its presence, its namespace, and the boot of its
  * process, which tells a registration of an earlier run apart. A strict object, so a `path`,
@@ -29,7 +53,7 @@ export const RegistrationSchema = v.pipe(
   v.strictObject({
     // PresenceSchema's entries spelled out: a spread of them would stay in the production background.
     profileId: ProfileIdSchema,
-    displayName: DisplayNameSchema,
+    displayName: RegistrationNameSchema,
     fingerprint: FingerprintSchema,
     createdAt: v.number(),
     expiresAt: v.number(),

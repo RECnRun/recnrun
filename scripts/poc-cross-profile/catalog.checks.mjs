@@ -30,6 +30,10 @@ const V1 = "11111111-1111-1111-8111-111111111111";
 const timeOver = (key) =>
   JSON.stringify(presence(BOB)).replace(new RegExp(`"${key}":[0-9]+`), `"${key}":9007199254740992`);
 
+// The table registry.test.ts holds RegistrationNameSchema to.
+const displayNames = JSON.parse(
+  readFileSync(new URL("./fixtures/display-names.json", import.meta.url), "utf8"),
+);
 const DAY = 86_400_000;
 /** Bob's registration with its times offset from now, so it is not yet expired. */
 function freshness({ createdAt = 0, expiresAt = createdAt + 60_000 }) {
@@ -216,6 +220,22 @@ for (const shell of shells) {
         recursive: true,
         force: true,
       });
+    }
+  });
+
+  await test(`${shell}: lists exactly the display names RegistrationNameSchema accepts`, (context) => {
+    const { rootA, out, record } = lab(context);
+    writeFileSync(record, `downloadsRoot=${rootA}\n`);
+    for (const { name, accepted } of displayNames) {
+      announce(rootA, presence(BOB, { displayName: name }));
+      const result = run(shell, [record, NAMESPACE, out]);
+      assert.equal(result.code, 0, result.stderr);
+      const listed = readRegistry(out).peers[BOB]?.displayName;
+      assert.equal(
+        listed,
+        accepted ? name : undefined,
+        `${JSON.stringify(name)}: ${result.stderr}`,
+      );
     }
   });
 

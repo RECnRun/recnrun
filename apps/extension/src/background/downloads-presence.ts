@@ -10,7 +10,7 @@ import { PocFingerprintResultSchema, pocFingerprintRequest } from "@/messaging/p
 import { PocPublishPresenceSchema } from "@/messaging/poc-presence";
 import { DEFAULT_NAMESPACE, NamespaceSchema } from "@/p2p/downloads-rendezvous";
 import { PRESENCE_TTL_MS } from "@/p2p/folder-rendezvous";
-import { RegistrationSchema } from "@/p2p/registry";
+import { RegistrationSchema, registrationName } from "@/p2p/registry";
 import { readIdentity } from "@/storage/peer-repository";
 import type { ProfileIdentity } from "@/storage/peer-repository";
 import { pocPresenceStore } from "@/storage/poc-presence-repository";
@@ -52,8 +52,13 @@ async function namespaceOf({ namespace, log }: PresenceDependencies): Promise<st
 /** The registration through its schema, so its keys follow the order the catalog parses and a path is refused. */
 async function registration(deps: PresenceDependencies, namespace: string, now: number) {
   const identity = await deps.identity();
+  const displayName = registrationName(identity.profileId, identity.displayName);
+  if (displayName !== identity.displayName) {
+    deps.log(`presence: published as "${displayName}", the stored name does not fit the catalog`);
+  }
   return v.parse(RegistrationSchema, {
     ...identity,
+    displayName,
     fingerprint: await deps.fingerprint(),
     createdAt: now,
     expiresAt: now + PRESENCE_TTL_MS,

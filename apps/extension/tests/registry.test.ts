@@ -6,9 +6,11 @@ import { PRESENCE_TTL_MS, PresenceSchema } from "@/p2p/folder-rendezvous";
 import {
   MAX_REGISTRY_PEERS,
   REGISTRY_TTL_MS,
+  RegistrationNameSchema,
   RegistrationSchema,
   RegistrySchema,
   readRegistry,
+  registrationName,
 } from "@/p2p/registry";
 import type { Registry } from "@/p2p/registry";
 import { FINGERPRINT, ME, PEER } from "./fake-peer";
@@ -105,6 +107,28 @@ describe("RegistrationSchema", () => {
   test("refuses a registration without its boot", () => {
     const { boot: _boot, ...presence } = registration;
     expect(v.is(RegistrationSchema, presence)).toBe(false);
+  });
+});
+
+describe("RegistrationNameSchema", () => {
+  // catalog.checks.mjs runs catalog.sh over the same table, so both sides list the same names.
+  const table = new URL(
+    "../../../scripts/poc-cross-profile/fixtures/display-names.json",
+    import.meta.url,
+  );
+  const names: { name: string; accepted: boolean }[] = JSON.parse(readFileSync(table, "utf8"));
+
+  test.each(names)("decides $name as catalog.sh does: $accepted", ({ name, accepted }) => {
+    expect(v.is(RegistrationNameSchema, name)).toBe(accepted);
+    expect(v.is(RegistrationSchema, { ...registration, displayName: name })).toBe(accepted);
+  });
+
+  test("keeps a name the catalog lists and replaces one it skips by the default name", () => {
+    expect(registrationName(PEER, "José's Mac")).toBe("José's Mac");
+    expect(registrationName(PEER, 'My "Mac"')).toBe("Profile 2222");
+    expect(registrationName("abcdef01-2222-4222-8222-222222222222", "é".repeat(40))).toBe(
+      "Profile ABCD",
+    );
   });
 });
 
