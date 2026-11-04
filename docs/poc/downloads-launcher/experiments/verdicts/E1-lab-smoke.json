@@ -2,7 +2,7 @@
   {
     "experiment": "E1",
     "hypothesis": "E1.unpacked.default",
-    "chrome": "Google Chrome 156.0.8078.79",
+    "chrome": "Google Chrome 157.0.8103.38",
     "environment": "lab",
     "install": "loadUnpacked",
     "label": "diagnostic",
@@ -68,7 +68,7 @@
   {
     "experiment": "E1",
     "hypothesis": "E1.unpacked.toggleOff",
-    "chrome": "Google Chrome 156.0.8078.79",
+    "chrome": "Google Chrome 157.0.8103.38",
     "environment": "lab",
     "install": "loadUnpacked",
     "label": "diagnostic",
@@ -150,7 +150,7 @@
   {
     "experiment": "E1",
     "hypothesis": "E1.unpacked.toggleOn",
-    "chrome": "Google Chrome 156.0.8078.79",
+    "chrome": "Google Chrome 157.0.8103.38",
     "environment": "lab",
     "install": "loadUnpacked",
     "label": "diagnostic",
@@ -235,7 +235,7 @@
   {
     "experiment": "E1",
     "hypothesis": "E1.unpacked.reinstall",
-    "chrome": "Google Chrome 156.0.8078.79",
+    "chrome": "Google Chrome 157.0.8103.38",
     "environment": "lab",
     "install": "loadUnpacked",
     "label": "diagnostic",
@@ -394,7 +394,7 @@
   {
     "experiment": "E1",
     "hypothesis": "E1.unpacked.noHostPermission",
-    "chrome": "Google Chrome 156.0.8078.79",
+    "chrome": "Google Chrome 157.0.8103.38",
     "environment": "lab",
     "install": "loadUnpacked",
     "label": "diagnostic",
@@ -427,7 +427,7 @@
   {
     "experiment": "E1",
     "hypothesis": "E1.unpacked.noDeveloperMode",
-    "chrome": "Google Chrome 156.0.8078.79",
+    "chrome": "Google Chrome 157.0.8103.38",
     "environment": "lab",
     "install": "loadUnpacked",
     "label": "diagnostic",
@@ -470,7 +470,7 @@
   {
     "experiment": "E1",
     "hypothesis": "E1.policy.default",
-    "chrome": "Google Chrome 156.0.8078.79",
+    "chrome": "Google Chrome 157.0.8103.38",
     "environment": "lab",
     "install": "managed-policy",
     "label": "strict",
@@ -480,7 +480,7 @@
     "debugger": "none",
     "observations": [
       {
-        "extensionId": "kkgblhffjknfmooggioiighpabhhgnon",
+        "extensionId": "pmdfkpibopgigldephnfaefclhhgbaba",
         "installed": true,
         "ran": true,
         "state": {
@@ -507,7 +507,7 @@
   {
     "experiment": "E1",
     "hypothesis": "E1.packed",
-    "chrome": "Google Chrome 156.0.8078.79",
+    "chrome": "Google Chrome 157.0.8103.38",
     "environment": "lab",
     "install": "none",
     "label": "strict",

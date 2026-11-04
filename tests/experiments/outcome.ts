@@ -27,8 +27,11 @@ export type Cell = Pick<
   | "debugger"
 >;
 
-const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
-
+/**
+ * A sample is what `take` returned after its measurement ran; `ok: false` is a measured fail. Any
+ * other throw (setup, CDP, a missing build) is a harness error: it propagates and fails the test,
+ * so a hypothesis that never ran leaves no verdict (POC PLAN.md §8).
+ */
 async function takeSamples(take: () => Promise<Sample>, count: number) {
   const samples: Sample[] = [];
   for (let index = count; index > 0; index--) {
@@ -36,7 +39,7 @@ async function takeSamples(take: () => Promise<Sample>, count: number) {
       samples.push(await take());
     } catch (error) {
       if (error instanceof UnavailableError) return { samples, unavailable: error.message };
-      samples.push({ ok: false, error: message(error), observation: {} });
+      throw error;
     }
   }
   return { samples, unavailable: undefined };
