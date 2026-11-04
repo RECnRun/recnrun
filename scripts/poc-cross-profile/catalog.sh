@@ -15,9 +15,9 @@
 # JSON.stringify of a RegistrationSchema value with no spaces and keys in order:
 #   {"profileId":"<uuid>","displayName":"<name>","fingerprint":"<hex:>","createdAt":<ms>,
 #    "expiresAt":<ms>,"namespace":"<namespace>","boot":"<v4 uuid>"}
-# where the profile id names its folder, the namespace is the one asked for, the name is 1 to
-# 64 bytes with no backslash, quote, control character, or edge space, and the times are whole
-# numbers; anything else is skipped with a reason on stderr. The boot goes into the registry.
+# where the profile id is a lowercase v4 uuid naming its folder, the boot a lowercase v4 uuid,
+# the namespace the one asked for, the name 1 to 64 bytes with no backslash, quote, control
+# character, or edge space, and the times whole numbers up to 2^53 - 1; anything else is skipped with a reason on stderr. The boot goes into the registry.
 # No value read from a file is ever run or expanded.
 #
 # Exit: 0 written, 64 wrong call, 65 invalid record, 66 no record, 73 cannot write,
@@ -42,9 +42,15 @@ fail() {
 
 # --- Value checks ---------------------------------------------------------------------------
 
+# Lowercase hex in every group: a fifth hyphen means a group holds one.
 is_uuid() {
-  case $1 in *[!0-9a-f-]*) return 1 ;; esac
+  case $1 in *[!0-9a-f-]* | *-*-*-*-*-*) return 1 ;; esac
   case $1 in ????????-????-????-????-????????????) return 0 ;; esac
+  return 1
+}
+is_v4() {
+  is_uuid "$1" || return 1
+  case $1 in ????????-????-4???-[89ab]???-????????????) return 0 ;; esac
   return 1
 }
 is_namespace() {
@@ -65,18 +71,14 @@ is_fingerprint() {
   case $1 in '' | *[!0-9A-F:]*) return 1 ;; esac
   [ "${#1}" -le 200 ]
 }
-is_boot() {
-  is_uuid "$1" || return 1
-  case $1 in ????????-????-4???-[89ab]???-????????????) return 0 ;; esac
-  return 1
-}
 is_root_id() {
   case $1 in r[0-9] | r[0-9][0-9] | r[0-9][0-9][0-9]) return 0 ;; esac
   return 1
 }
+# RegistrySchema's TimeSchema: a safe integer, so at most Number.MAX_SAFE_INTEGER.
 is_time() {
   case $1 in '' | *[!0-9]* | 0?*) return 1 ;; esac
-  [ "${#1}" -le 16 ]
+  [ "${#1}" -le 16 ] && [ "$1" -le 9007199254740991 ]
 }
 is_display_name() {
   case $1 in '' | ' '* | *' ' | *\\* | *[[:cntrl:]]*) return 1 ;; esac
@@ -263,7 +265,7 @@ read_presence() {
   take ',"namespace":"' '"' || return 1
   if [ "$value" != "$namespace" ]; then reason='another namespace'; return 1; fi
   take '","boot":"' '"' || return 1
-  is_boot "$value" || { reason='invalid boot'; return 1; }
+  is_v4 "$value" || { reason='invalid boot'; return 1; }
   pr_boot=$value
   if [ "$rest" != '"}' ]; then reason='extra keys or text after boot'; return 1; fi
   if [ "$pr_expires" -le "$now" ]; then reason='expired'; return 1; fi
@@ -308,7 +310,7 @@ scan_root() {
   for entry in "$folder"/*; do
     if [ ! -e "$entry" ] && [ ! -L "$entry" ]; then continue; fi
     name=${entry##*/}
-    if ! is_uuid "$name"; then
+    if ! is_v4 "$name"; then
       log "skipped $1/$(shown "$name"): not a profile id folder"
     elif [ -L "$entry" ] || [ ! -d "$entry" ]; then
       log "skipped $1/$name: not a folder"

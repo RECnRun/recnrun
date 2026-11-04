@@ -22,6 +22,14 @@ import {
   shells,
 } from "./lab.mjs";
 
+// Shaped like a uuid with no hex digit, or not a v4: neither may reach registry.json.
+const HYPHENS = "-".repeat(36);
+const HYPHEN_BOOT = "--------------4----8----------------";
+const V1 = "11111111-1111-1111-8111-111111111111";
+// One past Number.MAX_SAFE_INTEGER, written as the digits JSON.stringify gives it.
+const timeOver = (key) =>
+  JSON.stringify(presence(BOB)).replace(new RegExp(`"${key}":[0-9]+`), `"${key}":9007199254740992`);
+
 for (const shell of shells) {
   await test(`${shell}: catalogs two roots under two ids and writes the ids back`, (context) => {
     const { home, rootA, rootB, out, record } = lab(context);
@@ -169,6 +177,11 @@ for (const shell of shells) {
         "presence.json",
         /boot/,
       ],
+      [HYPHENS, JSON.stringify(presence(HYPHENS)), "presence.json", /not a profile id/],
+      [V1, JSON.stringify(presence(V1)), "presence.json", /not a profile id/],
+      [BOB, JSON.stringify(presence(BOB, { boot: HYPHEN_BOOT })), "presence.json", /boot/],
+      [BOB, timeOver("createdAt"), "presence.json", /invalid createdAt/],
+      [BOB, timeOver("expiresAt"), "presence.json", /invalid expiresAt/],
       [BOB, "x".repeat(4096), "presence.json", /bytes/],
       [BOB, text, "registration.json", /no presence.json/],
     ];
