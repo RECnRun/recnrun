@@ -11,7 +11,7 @@ import { storedSession } from "./tabs.ts";
  */
 
 /** A tab of the profile's own, at an address that names it; the privacy policy has no frame. */
-export async function openIn(profile: Profile, baseURL?: string): Promise<Page> {
+async function openIn(profile: Profile, baseURL?: string): Promise<Page> {
   const page = await profile.context.newPage();
   const path = `/privacy/?${profile.name.replace(" ", "-")}`;
   // A context Playwright did not create, as over connectOverCDP, has no base URL of its own.
@@ -23,19 +23,19 @@ export async function openIn(profile: Profile, baseURL?: string): Promise<Page> 
 export const listOf = (profile: Profile, other: Profile, state = "Connected") =>
   profile.dashboard.getByRole("complementary", { name: `Chrome — ${other.name} (${state})` });
 
-export const tabIn = (list: ReturnType<typeof listOf>, url: string) =>
+const tabIn = (list: ReturnType<typeof listOf>, url: string) =>
   list.getByRole("listitem").filter({ hasText: url });
 
 const clickLine = (profile: Profile, other: Profile, name: string) =>
   peerLine(profile, other).getByRole("button", { name }).click();
 
 /** Every pair of `profiles`, each way round. */
-export const pairsOf = (profiles: Profile[]): [Profile, Profile][] =>
+const pairsOf = (profiles: Profile[]): [Profile, Profile][] =>
   profiles.flatMap((one) =>
     profiles.filter((other) => other !== one).map((other): [Profile, Profile] => [one, other]),
   );
 
-export async function expectConnected(pairs: [Profile, Profile][]) {
+async function expectConnected(pairs: [Profile, Profile][]) {
   for (const [one, other] of pairs)
     await expect(peerStatus(one, other)).toHaveText(`Connected — ${other.name}`);
 }
