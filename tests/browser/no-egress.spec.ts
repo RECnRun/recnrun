@@ -1,3 +1,5 @@
+import { execFileSync } from "node:child_process";
+import { createSocket } from "node:dgram";
 import { createServer } from "node:http";
 import type { Server } from "node:http";
 import { lookup } from "node:dns/promises";
@@ -8,18 +10,25 @@ import { expect, test } from "./fixtures/chrome.ts";
 import { EXTENSION_PATH, loadUnpacked } from "./fixtures/extension-loaders.ts";
 import type { LoadedExtension } from "./fixtures/extension-loaders.ts";
 
-// POC PLAN.md P1.0: the lab runs on an internal Docker network, so nothing reaches a public host.
+// POC PLAN.md P1.0: the lab runs on an internal Docker network and filters its own egress to lo.
 const PUBLIC_URL = "https://example.com/";
 const OFFLINE_ERROR =
   /net::(ERR_INTERNET_DISCONNECTED|ERR_NAME_NOT_RESOLVED|ERR_ADDRESS_UNREACHABLE)/;
 const LOOPBACK_BODY = "recnrun loopback control";
 const PUBLIC_ADDRESS = { host: "1.1.1.1", port: 443 };
 const CONNECT_TIMEOUT_MS = 10_000;
+// scripts/test-container-entry.sh rejects with admin-prohibited, which connect() reports as this.
+const FILTERED = "EHOSTUNREACH";
+
+interface Target {
+  host: string;
+  port: number;
+}
 
 /** Resolves with the socket's error code, `timeout`, or `connected` when a route out exists. */
-function tcpOutcome(): Promise<string> {
+function tcpOutcome(target: Target): Promise<string> {
   return new Promise((resolve) => {
-    const socket = connect(PUBLIC_ADDRESS);
+    const socket = connect(target);
     const finish = (outcome: string) => {
       socket.destroy();
       resolve(outcome);
@@ -28,6 +37,91 @@ function tcpOutcome(): Promise<string> {
     socket.once("connect", () => finish("connected"));
     socket.once("error", (error: NodeJS.ErrnoException) => finish(error.code ?? error.message));
   });
+}
+
+/** An on-link datagram is queued for ARP and reported sent unless the container's filter refuses it. */
+function udpSendOutcome(target: Target): Promise<string> {
+  return new Promise((resolve) => {
+    const socket = createSocket("udp4");
+    socket.send("recnrun", target.port, target.host, (error) => {
+      socket.close();
+      resolve(error ? ((error as NodeJS.ErrnoException).code ?? error.message) : "sent");
+    });
+  });
+}
+
+/** Chromium's WebRTC binds its host candidate to the address a UDP connect picks; nothing is sent. */
+function udpRouteSource(target: Target): Promise<string> {
+  return new Promise((resolve) => {
+    const socket = createSocket("udp4");
+    socket.connect(target.port, target.host, (error?: Error) => {
+      const outcome = error ? `rejected: ${error.message}` : socket.address().address;
+      socket.close();
+      resolve(outcome);
+    });
+  });
+}
+
+const MDNS = { host: "224.0.0.251", port: 5353 };
+
+/** Frames eth0's egress filter dropped (scripts/test-container-entry.sh). */
+function eth0Dropped(): number {
+  const stats = execFileSync("tc", ["-s", "filter", "show", "dev", "eth0", "egress"], {
+    encoding: "utf8",
+  });
+  return Number(/\(dropped (\d+),/.exec(stats)?.[1] ?? Number.NaN);
+}
+
+/** Sends an mDNS datagram out of eth0 with multicast loop on, and resolves once the loop copy arrives. */
+function mdnsLoop(own: string): Promise<string> {
+  return new Promise((resolve) => {
+    const socket = createSocket({ type: "udp4", reuseAddr: true });
+    const timer = setTimeout(() => finish("no loop copy"), CONNECT_TIMEOUT_MS);
+    const finish = (outcome: string) => {
+      clearTimeout(timer);
+      socket.close();
+      resolve(outcome);
+    };
+    socket.on("message", (message) => {
+      if (String(message) === "recnrun-mdns") finish("looped back");
+    });
+    socket.bind(MDNS.port, () => {
+      socket.addMembership(MDNS.host, own);
+      socket.setMulticastInterface(own);
+      socket.setMulticastLoopback(true);
+      socket.send("recnrun-mdns", MDNS.port, MDNS.host, (error) => {
+        if (error) finish((error as NodeJS.ErrnoException).code ?? error.message);
+      });
+    });
+  });
+}
+
+const toNumber = (address: string) =>
+  address.split(".").reduce((total, part) => total * 256 + Number(part), 0);
+const toAddress = (value: number) =>
+  [16_777_216, 65_536, 256, 1].map((unit) => Math.floor(value / unit) % 256).join(".");
+
+interface Subnet {
+  own: string;
+  gateway: string;
+  peer: string;
+}
+
+/** The internal bridge's default route has no `via`, so its gateway is the subnet's first host (Docker IPAM). */
+function eth0Subnet(): Subnet {
+  const address = execFileSync("ip", ["-o", "-4", "addr", "show", "dev", "eth0"], {
+    encoding: "utf8",
+  });
+  const match = /inet (\d+\.\d+\.\d+\.\d+)\/(\d+)/.exec(address);
+  if (!match?.[1] || !match[2]) throw new Error(`eth0 has no IPv4 address: ${address}`);
+  const own = match[1];
+  const size = 2 ** (32 - Number(match[2]));
+  const route = execFileSync("ip", ["route", "show", "default"], { encoding: "utf8" });
+  const gateway =
+    /\bvia (\S+)/.exec(route)?.[1] ?? toAddress(Math.floor(toNumber(own) / size) * size + 1);
+  const next = toNumber(gateway) + 1;
+  const peer = toAddress(toAddress(next) === own ? next + 1 : next);
+  return { own, gateway, peer };
 }
 
 /** A no-cors fetch resolves with any response, so only a network failure rejects it. */
@@ -65,9 +159,52 @@ test.describe("the container has no route out", () => {
   });
 
   test("a TCP connection to a public address fails", async () => {
-    const outcome = await tcpOutcome();
+    const outcome = await tcpOutcome(PUBLIC_ADDRESS);
     console.log(`TCP connect to ${PUBLIC_ADDRESS.host}:${PUBLIC_ADDRESS.port}: ${outcome}`);
     expect(outcome).not.toBe("connected");
+  });
+
+  // Docker's --internal still lets a container reach the bridge gateway's host services.
+  for (const port of [80, 443]) {
+    test(`the container's filter rejects a TCP connection to the gateway on port ${port}`, async () => {
+      const { gateway } = eth0Subnet();
+      const outcome = await tcpOutcome({ host: gateway, port });
+      console.log(`TCP connect to the gateway ${gateway}:${port}: ${outcome}`);
+      expect(outcome).toBe(FILTERED);
+    });
+  }
+
+  // Docker's --internal still lets containers on the bridge reach each other.
+  test("the container's filter rejects traffic to a peer address on its subnet", async () => {
+    const peer = { host: eth0Subnet().peer, port: 80 };
+    const connected = await tcpOutcome(peer);
+    const sent = await udpSendOutcome(peer);
+    console.log(`Peer ${peer.host}:${peer.port}: TCP connect ${connected}, UDP send ${sent}`);
+    expect(connected).toBe(FILTERED);
+    expect(sent).toBe("EPERM");
+  });
+
+  test("an mDNS datagram loops back to the container and eth0 drops the copy for the bridge", async () => {
+    const { own } = eth0Subnet();
+    const before = eth0Dropped();
+    const outcome = await mdnsLoop(own);
+    const dropped = eth0Dropped() - before;
+    console.log(`mDNS to ${MDNS.host}:${MDNS.port}: ${outcome}, eth0 dropped ${dropped} frames`);
+    expect(outcome).toBe("looped back");
+    expect(dropped).toBeGreaterThan(0);
+  });
+
+  test("the eth0 address answers through lo and still sources the WebRTC route", async () => {
+    const { own } = eth0Subnet();
+    const server = createServer((_request, response) => response.end());
+    await new Promise<void>((resolve) => server.listen(0, own, resolve));
+    try {
+      const { port } = server.address() as AddressInfo;
+      expect(await tcpOutcome({ host: own, port })).toBe("connected");
+    } finally {
+      await new Promise((resolve) => server.close(resolve));
+    }
+    expect(await udpRouteSource(PUBLIC_ADDRESS)).toBe(own);
   });
 });
 

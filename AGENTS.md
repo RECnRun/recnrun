@@ -45,7 +45,7 @@ Vite+ (`vp`) is the only toolchain. `vp <name>` runs a built-in command and `vp 
 | `vp run test:e2e -- tests/e2e/dashboard-tab.spec.ts -g ''` | Targeted Playwright run (arguments go after `--`) |
 | `vp run verify` | Full gate (`vp run ready` is an alias) |
 
-Test commands and `verify` run in Docker, on an internal Docker network with no route out, so start Docker Desktop first. If Docker fails, the command fails; it never falls back to host browsers. `:local` variants (`vp run test:e2e:local`) and the built-in `vp test` run on the host and are for debugging only. Logs and failure artifacts are in `.artifacts/docker/<run-id>/`.
+Test commands and `verify` run in Docker, on an internal Docker network with no route out, and each container filters its own egress to `lo`, so start Docker Desktop first. If Docker fails, the command fails; it never falls back to host browsers. `:local` variants (`vp run test:e2e:local`) and the built-in `vp test` run on the host and are for debugging only. Logs and failure artifacts are in `.artifacts/docker/<run-id>/`.
 
 ## Rules
 

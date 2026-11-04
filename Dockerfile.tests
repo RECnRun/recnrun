@@ -13,12 +13,13 @@ RUN curl -fsSL https://vite.plus -o /tmp/install-vp.sh \
 
 # Google Chrome Stable from Google's apt repository for tests/browser and tests/experiments; tests/e2e keeps the image's Chromium.
 # xdotool and scrot drive Chrome's own folder picker and prompts on the Xvfb display.
-# iproute2 gives scripts/test-container-entry.sh the on-link default route of the internal network.
+# iproute2 gives scripts/test-container-entry.sh the on-link default route of the internal network and the tc drop on eth0,
+# and iptables (nf_tables backend) its lo-only OUTPUT filter.
 RUN curl -fsSL https://dl.google.com/linux/linux_signing_key.pub -o /etc/apt/keyrings/google-chrome.asc \
     && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/google-chrome.asc] https://dl.google.com/linux/chrome/deb/ stable main" \
         > /etc/apt/sources.list.d/google-chrome.list \
     && apt-get update \
-    && apt-get install -y --no-install-recommends google-chrome-stable xdotool scrot iproute2 \
+    && apt-get install -y --no-install-recommends google-chrome-stable xdotool scrot iproute2 iptables \
     && rm -rf /var/lib/apt/lists/* \
     && google-chrome --version
 
