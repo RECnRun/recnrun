@@ -7,7 +7,7 @@ import type { DownloadsPort } from "@/background/downloads-publisher";
 import type { Sign } from "@/background/greeting";
 import { offscreenFingerprint } from "@/background/link";
 import { createRendezvousRelay } from "@/background/rendezvous-relay";
-import { presenceRenewal } from "@/background/presence-renewal";
+import { newcomerNotes, presenceRenewal } from "@/background/presence-renewal";
 import type { BackgroundReply } from "@/messaging/background-reply";
 import { PocPublishPresenceSchema } from "@/messaging/poc-presence";
 import { DEFAULT_NAMESPACE, NamespaceSchema, presencePath } from "@/p2p/downloads-rendezvous";
@@ -214,7 +214,12 @@ export function startPocPresence({ log, sign, startPairing }: PocPresenceOptions
     namespace: store.namespace,
     boot: store.boot,
     root: store.root,
-    renew: presenceRenewal({ root: store.root.read, log, policy: store.policy }),
+    renew: presenceRenewal({
+      root: store.root.read,
+      newcomers: store.newcomers,
+      log,
+      policy: store.policy,
+    }),
     log,
     // Undefined in a build without the alarms permission.
     alarms: (browser as { alarms?: AlarmsPort }).alarms,
@@ -235,5 +240,5 @@ export function startPocPresence({ log, sign, startPairing }: PocPresenceOptions
     root: () => store.root.read(),
   };
   browser.runtime.onMessage.addListener(createRendezvousRelay(relay, own));
-  return { ...presence, available };
+  return { ...presence, available, noticed: newcomerNotes(store.newcomers) };
 }

@@ -138,9 +138,10 @@ interface LinkContext {
   tabs: TabsCache;
   flows: PairingFlows;
   sign: Sign;
+  noticed?: (seen: { profileId: string }[]) => Promise<void>;
 }
 
-function createLinkHandler({ channel, executor, tabs, flows, sign }: LinkContext) {
+function createLinkHandler({ channel, executor, tabs, flows, sign, noticed }: LinkContext) {
   const onFrame = async (frame: string, peer: string) => {
     tap?.push(frame);
     const received = await channel.receive(frame, peer);
@@ -164,7 +165,11 @@ function createLinkHandler({ channel, executor, tabs, flows, sign }: LinkContext
   };
   const handle = async (event: LinkEvent) => {
     if (event.type === "frame") return onFrame(event.frame, event.peer);
-    if (event.type === "folder") return flows.folder.seen(event);
+    if (event.type === "folder") {
+      // A POC presence policy renews once for a profile the catalog shows that no record knows.
+      await noticed?.(event.presences).catch((error: unknown) => log(errorMessage(error)));
+      return flows.folder.seen(event);
+    }
     if (event.state === "connected") return linkUp(event, channel, flows, sign);
     if (event.state !== "connecting") return linkDown(event.peer, event.state, channel, flows.mesh);
     await peerLinksRepository.set(event.peer, { state: "connecting", verified: false });
@@ -333,8 +338,9 @@ export function startPeers(
       ? async () => (await (await downloads)?.available()) ?? false
       : undefined;
   const deps = requestDependencies({ channel, tabs, flows, sign }, outward, available);
+  const noticed = async (seen: { profileId: string }[]) => (await downloads)?.noticed(seen);
   return {
     request: (request) => handlePeerRequest(deps, request),
-    link: createLinkHandler({ channel, executor, tabs, flows, sign }),
+    link: createLinkHandler({ channel, executor, tabs, flows, sign, noticed }),
   };
 }

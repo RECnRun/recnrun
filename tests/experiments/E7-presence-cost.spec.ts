@@ -10,6 +10,8 @@ const TITLES: Record<E7Hypothesis, string> = {
   "E7.variant.linkedSilence": "leave liveness to linked DataChannels",
   "E7.variant.heartbeat": "renew only after a TTL without a heartbeat",
   "E7.variant.launcherPresence": "leave the presence to a launcher stand-in",
+  "E7.newcomer.linkedSilence": "a fresh profile after every presence expired, linked silence",
+  "E7.newcomer.heartbeat": "a fresh profile after every presence expired, heartbeat",
 };
 
 test.describe("E7: presence cost with five profiles in Docker", () => {

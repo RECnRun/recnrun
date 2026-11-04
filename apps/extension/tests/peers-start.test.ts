@@ -11,7 +11,15 @@ import {
 } from "@/storage/peer-repository";
 import { roleStores } from "@/storage/hierarchy-repository";
 import { pocPresenceStore } from "@/storage/poc-presence-repository";
-import { FINGERPRINT, ME, PEER, PEER_IDENTITY, answering, fakeOffscreen } from "./fake-peer";
+import {
+  FINGERPRINT,
+  ME,
+  PEER,
+  PEER_IDENTITY,
+  STRANGER,
+  answering,
+  fakeOffscreen,
+} from "./fake-peer";
 import { signAs } from "./test-identity";
 
 const ROOT = "/home/me/Downloads";
@@ -277,5 +285,20 @@ describe("a stored template", () => {
     expect(await roleStores().role.read()).toBeNull();
     startPeers({ transport: "downloads", sign: signAs });
     await vi.waitFor(() => expect(written).toHaveLength(1));
+  });
+
+  test("a catalog sighting notes a profile no record knows for one renewal", async () => {
+    await background();
+    const routes = startPeers({ transport: "downloads", sign: signAs });
+    const stranger = {
+      profileId: STRANGER,
+      displayName: "Desk",
+      fingerprint: FINGERPRINT,
+      identity: await signAs({ profileId: STRANGER, fingerprint: FINGERPRINT }),
+      createdAt: 0,
+      expiresAt: Date.now() + 60_000,
+    };
+    await routes.link({ type: "folder", presences: [stranger], signals: [] });
+    expect(await pocPresenceStore().newcomers.read()).toEqual({ waiting: [STRANGER], renewed: [] });
   });
 });

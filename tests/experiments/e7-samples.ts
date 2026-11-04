@@ -7,6 +7,7 @@ import { arrive, withGroup } from "./fixtures/e5-run.ts";
 import { beatsOf, complete, measured, meter, visibleDownloads } from "./fixtures/e7-downloads.ts";
 import type { HistoryCounts, Policy } from "./fixtures/e7-downloads.ts";
 import { LAUNCHER_STAMPS, LAUNCHER_TAKES } from "./fixtures/e7-launcher.ts";
+import { newcomer } from "./e7-newcomer.ts";
 import { PRESENCE_TTL_MS, RENEWAL_MS, recovery, startLauncher } from "./e7-recovery.ts";
 import type { Cell } from "./outcome.ts";
 import { sampleMode } from "./samples.ts";
@@ -16,6 +17,8 @@ export const E7_CELLS = [
   "E7.variant.linkedSilence",
   "E7.variant.heartbeat",
   "E7.variant.launcherPresence",
+  "E7.newcomer.linkedSilence",
+  "E7.newcomer.heartbeat",
 ] as const;
 export type E7Hypothesis = (typeof E7_CELLS)[number];
 const POLICY: Record<E7Hypothesis, Policy> = {
@@ -23,6 +26,8 @@ const POLICY: Record<E7Hypothesis, Policy> = {
   "E7.variant.linkedSilence": "linked-silence",
   "E7.variant.heartbeat": "heartbeat",
   "E7.variant.launcherPresence": "launcher",
+  "E7.newcomer.linkedSilence": "linked-silence",
+  "E7.newcomer.heartbeat": "heartbeat",
 };
 const FULL_WINDOW_MS = 185_000;
 const SMOKE_WINDOW_MS = 35_000;
@@ -185,6 +190,10 @@ async function measure(group: DownloadsGroup, policy: Policy) {
 
 export async function presenceCostSample(hypothesis: E7Hypothesis) {
   const policy = POLICY[hypothesis];
+  if (hypothesis.startsWith("E7.newcomer.")) {
+    const found = await withGroup(labE5, (group) => newcomer(group, policy));
+    return judged(found.problems, found.observation);
+  }
   const result = await withGroup(labE5, (group) => measure(group, policy));
   if (policy === "baseline") return judged(result.problems, result.observation);
   const resumed = await recovery(policy);

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, expect, test, vi } from "vite-plus/test";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vite-plus/test";
 import { fakeBrowser } from "wxt/testing/fake-browser";
 import { startPocPresence } from "@/background/downloads-presence";
 import {
@@ -189,4 +189,54 @@ test("launcher writes once to learn the root, then leaves renewal to the launche
   await restarted.publish();
   expect(download).toHaveBeenCalledTimes(2);
   restarted.stop();
+});
+
+// Codex P3 finding 2: a silent mesh must still let a newcomer be discovered after every presence expired.
+describe.each(["linked-silence", "heartbeat"])("%s and a newcomer", (policy) => {
+  async function silent() {
+    const started = await setup(policy);
+    const beat = () => {
+      const heardAt = Date.now();
+      const heard = { heardAt, beats: 1 };
+      started.offscreen.link.liveness = () => ({ [PEER]: heard, [STRANGER]: heard });
+    };
+    const quiet = async (count: number) => {
+      for (let each = 0; each < count; each++) {
+        beat();
+        await tick();
+      }
+    };
+    await quiet(6);
+    expect(started.download).toHaveBeenCalledTimes(1);
+    return { ...started, quiet };
+  }
+
+  test("renews once when the catalog shows a profile no record knows, not for linked peers", async () => {
+    const { download, presence, quiet } = await silent();
+    await presence.noticed([{ profileId: PEER }]);
+    await quiet(2);
+    expect(download).toHaveBeenCalledTimes(1);
+    await presence.noticed([{ profileId: STRANGER }]);
+    await quiet(1);
+    expect(download).toHaveBeenCalledTimes(2);
+    await presence.noticed([{ profileId: STRANGER }]);
+    await quiet(3);
+    expect(download).toHaveBeenCalledTimes(2);
+    presence.stop();
+  });
+
+  test("a newcomer that paired before the alarm costs no renewal", async () => {
+    const { download, presence, quiet } = await silent();
+    await presence.noticed([{ profileId: STRANGER }]);
+    await authorizedPeersRepository.set(STRANGER, {
+      profileId: STRANGER,
+      displayName: "Third",
+      fingerprint: FINGERPRINT,
+      identity: await identityOf(STRANGER),
+    });
+    await peerLinksRepository.set(STRANGER, { state: "connected", verified: true });
+    await quiet(2);
+    expect(download).toHaveBeenCalledTimes(1);
+    presence.stop();
+  });
 });
