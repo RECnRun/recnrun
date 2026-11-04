@@ -112,25 +112,27 @@ export interface Found {
   presence: PresenceFile;
 }
 
-/** The launcher's scan: the first candidate holding a presence whose boot is `token`. */
-async function scanFor(candidates: readonly string[], token: string): Promise<Found | undefined> {
+/** The launcher's scan: every presence whose boot is `token`, in every candidate. */
+async function scanFor(candidates: readonly string[], token: string): Promise<Found[]> {
+  const found: Found[] = [];
   for (const downloads of candidates) {
-    const presence = (await presencesIn(downloads)).find((each) => each.boot === token);
-    if (presence) return { downloads, presence };
+    for (const presence of await presencesIn(downloads)) {
+      if (presence.boot === token) found.push({ downloads, presence });
+    }
   }
-  return undefined;
+  return found;
 }
 
-/** Scans until a candidate holds the token's presence or `ms` pass. */
+/** Scans until a candidate holds a presence carrying the token or `ms` pass; returns every match. */
 export async function waitForToken(
   candidates: readonly string[],
   token: string,
   ms: number,
-): Promise<Found | undefined> {
+): Promise<Found[]> {
   const deadline = Date.now() + ms;
   for (;;) {
     const found = await scanFor(candidates, token);
-    if (found || Date.now() > deadline) return found;
+    if (found.length > 0 || Date.now() > deadline) return found;
     await delay(SCAN_POLL_MS);
   }
 }

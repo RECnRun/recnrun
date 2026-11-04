@@ -23,7 +23,7 @@ interface FakeProfile {
 export type OnOpen = (opened: FakeProfile, token: string) => Promise<void>;
 
 /** The extension's answer to a bootstrap opening: its presence again, with the token as its boot. */
-const announceToken: OnOpen = async (opened, token) => {
+export const announceToken: OnOpen = async (opened, token) => {
   opened.presence = { ...opened.presence, boot: token };
   await writePresence(opened.downloads, opened.presence);
 };
@@ -78,7 +78,7 @@ function fakeInstalled(fake: () => FakeProfile): LoadedExtension {
 }
 
 /** A session over a temporary folder; every profile announces itself where it downloads. */
-async function fakeSession(onOpen: OnOpen = announceToken) {
+export async function fakeSession(onOpen: OnOpen = announceToken) {
   const scratch = await mkdtemp(join(tmpdir(), "recnrun-e4-fake-"));
   let folders = 0;
   const folder = async (name: string) => {

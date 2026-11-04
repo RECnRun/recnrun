@@ -70,7 +70,7 @@ export async function recordE4(
 export const commonRootSample = (environment: E4Environment) =>
   withSession(environment, async (session, labels) => {
     const peers = [await announced(session, "A"), await announced(session, "B")];
-    return discoverAndPublish(session, peers, [session.defaultDownloads], labels);
+    return discoverAndPublish(session, peers, { candidates: [session.defaultDownloads], labels });
   });
 
 /**
@@ -83,7 +83,7 @@ export const differentRootsSample = (environment: E4Environment) =>
     labels.set(created, "<launcher folder>");
     const peers = [await announced(session, "A"), await announced(session, "B", created)];
     const record = [session.defaultDownloads, created];
-    return discoverAndPublish(session, peers, record, labels);
+    return discoverAndPublish(session, peers, { candidates: record, labels });
   });
 
 /**
@@ -97,12 +97,12 @@ export const customRootSample = (environment: E4Environment) =>
     const a = await announced(session, "A");
     const b = await announced(session, "B", custom);
     const scanned = [session.defaultDownloads];
-    const foundA = await discover(session, a, scanned, labels);
-    const foundB = await discover(session, b, scanned, labels);
+    const foundA = await discover(session, a, { candidates: scanned, labels });
+    const foundB = await discover(session, b, { candidates: scanned, labels });
     const landed = (await presenceIn(custom, b.profileId))?.boot === foundB.token;
     const discovery = { A: foundA.observation, B: foundB.observation };
     const observation = { discovery, tokenInCustom: landed };
-    if (foundB.root) return judged([], observation);
+    if (foundB.matches.length > 0) return judged([], observation);
     return judged([landed ? CUSTOM_REASON : "B's token reached no folder"], observation);
   });
 

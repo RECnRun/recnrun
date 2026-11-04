@@ -3,7 +3,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { judged } from "./downloads-verdicts.ts";
 import type { Sample } from "./downloads-verdicts.ts";
 import { recordText, rootIds, runCatalog, waitForToken } from "./e4-launcher.ts";
-import type { CatalogRun, RecordEntry } from "./e4-launcher.ts";
+import type { CatalogRun, Found, RecordEntry } from "./e4-launcher.ts";
 import {
   bootstrapTabs,
   bootstrapUrl,
@@ -66,31 +66,58 @@ export async function announced(
 interface Discovered {
   peer: Peer;
   token: string;
-  /** The candidate the scan found the token in. */
-  root?: string;
+  /** Every presence the scan found carrying the token, with its candidate. */
+  matches: Found[];
   observation: Record<string, unknown>;
 }
 
 /** The launcher's bootstrap: opens the profile's page with a fresh token, then scans the candidates. */
+/** What the launcher scans and how its observations name folders; `token` makes each opening's token. */
+export interface Scan {
+  candidates: readonly string[];
+  labels: Labels;
+  token?: () => string;
+}
+
 export async function discover(
   session: E4Session,
   peer: Peer,
-  candidates: readonly string[],
-  labels: Labels,
+  { candidates, labels, token: tokens = randomUUID }: Scan,
 ): Promise<Discovered> {
-  const token = randomUUID();
+  const token = tokens();
   const opened = await session.open(peer.profile, bootstrapUrl(token));
-  const found = await waitForToken(candidates, token, SCAN_MS);
+  const matches = await waitForToken(candidates, token, SCAN_MS);
   const tabs = await bootstrapTabs(peer.profile);
   const { root: ownRoot } = await storedOf(peer.profile);
   const observation = {
     opened,
     bootstrapTabs: tabs.length,
     scanned: candidates.map((each) => labelOf(labels, each)),
-    foundIn: labelOf(labels, found?.downloads),
+    foundIn: matches.map((match) => labelOf(labels, match.downloads)),
     ownRoot: labelOf(labels, ownRoot),
   };
-  return { peer, token, root: found?.downloads, observation };
+  return { peer, token, matches, observation };
+}
+
+/**
+ * The launcher's binding of one profile: the root and the profile id its token's single presence
+ * names. The harness's own identity and folder serve only to check it.
+ */
+function bindingOf({ peer, matches }: Discovered): {
+  entry?: RecordEntry;
+  problem?: string;
+} {
+  const name = peer.profile.name;
+  const [match] = matches;
+  if (matches.length > 1) return { problem: `${name}'s token matched ${matches.length} presences` };
+  if (!match || match.downloads !== peer.downloads) {
+    return { problem: `${name}'s token was not found in its own Downloads folder` };
+  }
+  if (match.presence.profileId !== peer.profileId) {
+    return { problem: `${name}'s token led to the presence of another profile` };
+  }
+  const { profileId } = match.presence;
+  return { entry: { userDataDir: peer.profile.root, profileId, downloadsRoot: match.downloads } };
 }
 
 export const names = (peers: readonly Peer[], ids: readonly string[]) =>
@@ -165,23 +192,18 @@ export async function published(
 export async function discoverAndPublish(
   session: E4Session,
   peers: readonly Peer[],
-  candidates: readonly string[],
-  labels: Labels,
+  scan: Scan,
 ): Promise<Sample> {
+  const { labels } = scan;
   const problems: string[] = [];
   const discovery: Record<string, unknown> = {};
   const entries: RecordEntry[] = [];
   for (const peer of peers) {
-    const found = await discover(session, peer, candidates, labels);
+    const found = await discover(session, peer, scan);
     discovery[peer.profile.name] = found.observation;
-    if (found.root !== peer.downloads) {
-      problems.push(`${peer.profile.name}'s token was not found in its own Downloads folder`);
-    }
-    entries.push({
-      userDataDir: peer.profile.root,
-      profileId: peer.profileId,
-      downloadsRoot: found.root,
-    });
+    const { entry, problem } = bindingOf(found);
+    if (problem) problems.push(problem);
+    if (entry) entries.push(entry);
   }
   if (problems.length > 0) return judged(problems, { discovery });
   const { runs, ids } = await catalogEach(session, entries);
