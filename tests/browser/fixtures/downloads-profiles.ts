@@ -118,7 +118,10 @@ async function install(chrome: LaunchedChrome): Promise<void> {
 }
 
 /** Gives Chrome its own download behavior back over a client of its own, then runs `then` on it. */
-async function overOwnClient(wsEndpoint: string, then?: (client: CdpClient) => Promise<void>) {
+export async function overOwnClient(
+  wsEndpoint: string,
+  then?: (client: CdpClient) => Promise<void>,
+) {
   const client = await connectWebSocket(wsEndpoint);
   try {
     await client.send("Browser.setDownloadBehavior", { behavior: "default" });
@@ -139,7 +142,7 @@ async function installUnattended(chrome: LaunchedChrome): Promise<void> {
 }
 
 /** Playwright's default context of `browser` and the poc-d0 worker in it. */
-async function connected(browser: Browser) {
+export async function connected(browser: Browser) {
   const [context] = browser.contexts();
   if (!context) throw new Error("Chrome has no default browser context");
   const ours = (worker: Worker) => worker.url().startsWith(EXTENSION_URL);

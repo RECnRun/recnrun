@@ -12,13 +12,18 @@ const MOCK_KEYCHAIN = "--use-mock-keychain";
  * The environment the launcher scripts run under on a throwaway HOME. chrome_binary looks below
  * RECNRUN_DISCOVERY_PREFIX first, so a wrapper there stands for the installed Chrome: it keeps its own
  * path as argv[0] (`exec -a`, as Google's google-chrome script does) and adds --use-mock-keychain, so
- * the Chrome the launcher starts never asks for the owner's Chrome Safe Storage key. The request
+ * the Chrome the launcher starts never asks for the owner's Chrome Safe Storage key (and `extraFlags`,
+ * for a run that must attach to the Chrome the launcher starts). The request
  * open.sh builds is unchanged.
  */
-export async function launcherEnv(home: string): Promise<NodeJS.ProcessEnv> {
+export async function launcherEnv(
+  home: string,
+  extraFlags: readonly string[] = [],
+): Promise<NodeJS.ProcessEnv> {
   const wrapper = join(home, APP);
   await mkdir(dirname(wrapper), { recursive: true });
-  const script = `#!/bin/bash\nexec -a "$0" "${CHROME_BINARY}" ${MOCK_KEYCHAIN} "$@"\n`;
+  const flags = [MOCK_KEYCHAIN, ...extraFlags].join(" ");
+  const script = `#!/bin/bash\nexec -a "$0" "${CHROME_BINARY}" ${flags} "$@"\n`;
   await writeFile(wrapper, script, { mode: 0o755 });
   return { PATH: process.env.PATH ?? "", HOME: home, RECNRUN_DISCOVERY_PREFIX: home };
 }

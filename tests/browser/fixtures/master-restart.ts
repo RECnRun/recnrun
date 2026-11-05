@@ -144,7 +144,7 @@ export async function goneFrom(profile: DownloadsProfile, peer: DownloadsProfile
 /** Sends `message` from `from` to `to` over `from`'s own verified link, as its background would. */
 export async function sendOverLink(
   from: DownloadsProfile,
-  to: DownloadsProfile,
+  to: Pick<DownloadsProfile, "profileId" | "name">,
   message: Record<string, unknown>,
 ): Promise<void> {
   const route = { from: from.profileId, to: to.profileId };

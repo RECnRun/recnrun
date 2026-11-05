@@ -31,7 +31,7 @@ import { keepDisplayOnFailure } from "./x-display.ts";
  */
 
 /** The pids whose command line names `root` as the user data directory (Linux /proc only). */
-async function chromesOf(root: string): Promise<number[]> {
+export async function chromesOf(root: string): Promise<number[]> {
   const found: number[] = [];
   for (const name of await readdir("/proc")) {
     if (!/^\d+$/.test(name)) continue;
@@ -52,11 +52,12 @@ function chromeExecutable(): string {
  * Like Google's own google-chrome script, it keeps its path as argv[0] (`exec -a`, a bashism), so the
  * Chrome process names the binary the launcher resolved and lifecycle.sh signals it.
  */
-async function wrapper(dir: string): Promise<string> {
+async function wrapper(dir: string, flags: readonly string[] = []): Promise<string> {
   const bin = join(dir, "bin");
   await mkdir(bin);
   const sandbox = process.env.RECNRUN_TEST_CONTAINER === "1" ? " --no-sandbox" : "";
-  const script = `#!/bin/bash\nexec -a "$0" "${chromeExecutable()}"${sandbox} "$@" 2>>"${dir}/chrome.log"\n`;
+  const extra = flags.map((flag) => ` ${flag}`).join("");
+  const script = `#!/bin/bash\nexec -a "$0" "${chromeExecutable()}"${sandbox}${extra} "$@" 2>>"${dir}/chrome.log"\n`;
   // profiles.sh tries google-chrome-stable first, and the image has one in /usr/bin.
   for (const name of ["google-chrome-stable", "google-chrome"]) {
     await writeFile(join(bin, name), script);
@@ -84,7 +85,7 @@ async function keepEvidence(dir: string, rig: Rig, testInfo: TestInfo) {
 }
 
 /** poc-d0 installed in one profile of `root` and kept by one reload; the profile is registered in `record`. */
-async function installProfile(
+export async function installProfile(
   root: string,
   downloads: string,
   record: string,
@@ -104,13 +105,13 @@ async function installProfile(
 }
 
 /** The directory of a rig, the environment the launcher scripts run under, and how to remove them. */
-async function skeleton(rootBelowHome?: string) {
+export async function skeleton(rootBelowHome?: string, flags: readonly string[] = []) {
   expect((await readFile(EXTENSION_ID_FILE, "utf8")).trim()).toBe(POC_EXTENSION_ID);
   const dir = await mkdtemp(join(tmpdir(), "recnrun-launcher-"));
   const home = join(dir, "home");
   await mkdir(home);
   const env = {
-    PATH: [await wrapper(dir), process.env.PATH].join(delimiter),
+    PATH: [await wrapper(dir, flags), process.env.PATH].join(delimiter),
     HOME: home,
     DISPLAY: process.env.DISPLAY ?? "",
     // HOME moves, so the display's authority file must be named, or Chrome finds no X server.

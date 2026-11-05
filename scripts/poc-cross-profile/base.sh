@@ -145,7 +145,8 @@ template_base() {
   p_user=$root p_dir=Default
   token=$(new_token)
   # Chrome gives the URL to the instance that holds the root, or starts one on it.
-  "$chrome" "--user-data-dir=$root" --profile-directory=Default \
+  # A root that never ran would otherwise stop at Chrome's first-run dialog, and no page would open.
+  "$chrome" "--user-data-dir=$root" --profile-directory=Default --no-first-run --no-default-browser-check \
     "chrome-extension://$base_ext/bootstrap.html#template=$token&setting=$name" >/dev/null 2>&1 &
   log "pid=$!"
   looker=look_for_bound

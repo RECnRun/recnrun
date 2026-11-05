@@ -94,6 +94,8 @@ for (const shell of shells) {
     assert.deepEqual(s.argv(), [
       `--user-data-dir=${s.root()}`,
       "--profile-directory=Default",
+      "--no-first-run",
+      "--no-default-browser-check",
       `chrome-extension://${EXTENSION}/bootstrap.html#template=${token}&setting=base-v1`,
     ]);
   });
