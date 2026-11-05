@@ -4,26 +4,14 @@
 # The launcher's catalog writer (POC PLAN.md P2.3, decision 11), the single writer of
 # <out-dir>/registry.json. POSIX sh only: macOS /bin/sh and Debian dash, no JSON parser.
 #
-# Record file: the launcher's own key=value lines, one record per block, blocks separated by a
-# blank line; keys userDataDir, profileDirectory, profileId, namespace, role (master, worker,
-# template), masterFingerprint, downloadsRoot, root. Directories are absolute, use only
-# [A-Za-z0-9._:/ -], and have no .. segment; root is r plus 1 to 3 digits. Every
-# downloadsRoot is scanned; one without a root id gets the next free r<n>, written back. Any
-# byte other than printable ASCII or a newline, NUL included, exits 65 before anything is read.
+# Record file: the launcher's own key=value blocks, grammar in record.sh. Every downloadsRoot is
+# scanned; one without a root id gets the next free r<n>, written back.
 #
 # Scan: <downloadsRoot>/RECnRun/poc/<namespace>/peers/<uuid>/presence.json, nothing else, no
 # symbolic link followed at any folder below the root or at the file. Temporary files get a
-# random name and are created exclusively; a registry.json that is a folder or a link exits 73. A presence counts only in the exact bytes the extension writes,
-# JSON.stringify of a RegistrationSchema value with no spaces and keys in order:
-#   {"profileId":"<uuid>","displayName":"<name>","fingerprint":"<hex:>",
-#    "identity":{"key":"<87 base64url>","signedAt":<ms>,"signature":"<86 base64url>"},
-#    "createdAt":<ms>,"expiresAt":<ms>,"namespace":"<namespace>","boot":"<v4 uuid>"}
-# where the profile id is a lowercase v4 uuid naming its folder, the boot a lowercase v4 uuid,
-# the namespace the one asked for, the name 1 to 64 bytes with no backslash, quote, control
-# character, or edge space, the identity statement in form only (the extension verifies its
-# signature, and the registry does not carry it), the times whole numbers up to 2^53 - 1, createdAt at most 5000 ms
-# ahead of this clock, and expiresAt after now, after createdAt, and at most 60000 ms after
-# createdAt; anything else is skipped with a reason on stderr. The boot goes into the registry.
+# random name and are created exclusively; a registry.json that is a folder or a link exits 73.
+# A presence counts only in the exact bytes the extension writes (grammar in presence.sh);
+# anything else is skipped with a reason on stderr. The boot goes into the registry.
 # No value read from a file is ever run or expanded.
 #
 # Exit: 0 written, 64 wrong call, 65 invalid record, 66 no record, 73 cannot write,
@@ -37,9 +25,6 @@ nl='
 '
 tab=$(printf '\t')
 max_peers=32
-# No import from sh: CLOCK_SKEW_MS (downloads-rendezvous.ts) and PRESENCE_TTL_MS (folder-rendezvous.ts).
-clock_skew_ms=5000
-presence_ttl_ms=60000
 
 log() { printf 'catalog.sh: %s\n' "$*" >&2; }
 fail() {
@@ -48,56 +33,15 @@ fail() {
   log "$*"
   exit "$status"
 }
+here=$(dirname -- "$0")
+# shellcheck source=record.sh
+. "$here/record.sh"
+# shellcheck source=presence.sh
+. "$here/presence.sh"
+record_refuse() { fail 65 "$*"; }
 
 # --- Value checks ---------------------------------------------------------------------------
 
-# Lowercase hex in every group: a fifth hyphen means a group holds one.
-is_uuid() {
-  case $1 in *[!0-9a-f-]* | *-*-*-*-*-*) return 1 ;; esac
-  case $1 in ????????-????-????-????-????????????) return 0 ;; esac
-  return 1
-}
-is_v4() {
-  is_uuid "$1" || return 1
-  case $1 in ????????-????-4???-[89ab]???-????????????) return 0 ;; esac
-  return 1
-}
-is_namespace() {
-  case $1 in '' | *[!a-z0-9-]*) return 1 ;; esac
-  [ "${#1}" -le 40 ]
-}
-is_directory() {
-  case $1 in /*) ;; *) return 1 ;; esac
-  case $1 in *[!A-Za-z0-9._:/\ -]*) return 1 ;; esac
-  case /$1/ in */../*) return 1 ;; esac
-  [ "${#1}" -le 1024 ]
-}
-is_profile_directory() {
-  case $1 in '' | . | .. | *[!A-Za-z0-9._:\ -]*) return 1 ;; esac
-  [ "${#1}" -le 255 ]
-}
-is_fingerprint() {
-  case $1 in '' | *[!0-9A-F:]*) return 1 ;; esac
-  [ "${#1}" -le 200 ]
-}
-is_root_id() {
-  case $1 in r[0-9] | r[0-9][0-9] | r[0-9][0-9][0-9]) return 0 ;; esac
-  return 1
-}
-# RegistrySchema's TimeSchema: a safe integer, so at most Number.MAX_SAFE_INTEGER.
-is_time() {
-  case $1 in '' | *[!0-9]* | 0?*) return 1 ;; esac
-  [ "${#1}" -le 16 ] && [ "$1" -le 9007199254740991 ]
-}
-# An unpadded base64url string of exactly $2 characters.
-is_base64url() {
-  case $1 in *[!A-Za-z0-9_-]*) return 1 ;; esac
-  [ "${#1}" -eq "$2" ]
-}
-is_display_name() {
-  case $1 in '' | ' '* | *' ' | *\\* | *[[:cntrl:]]*) return 1 ;; esac
-  [ "${#1}" -le 64 ]
-}
 # A fresh name for a temporary file: no other process can plant a link at it in advance.
 random_hex() { od -An -N8 -tx1 /dev/urandom | tr -d ' \n'; }
 # Noclobber alone would still open a link to a fifo or a device, so a taken name is refused first.
@@ -154,16 +98,9 @@ if [ -L "$destination" ] || { [ -e "$destination" ] && [ ! -f "$destination" ]; 
   fail 73 'registry.json in the output directory is not a regular file'
 fi
 
+
 # Read once, so both passes see the same record.
-if [ -f "$record" ] && [ "$(wc -c <"$record" | tr -d ' ')" -gt 65536 ]; then
-  fail 65 'the record file is over 64 KiB'
-fi
-# Command substitution drops NUL bytes, so tr marks every byte outside the format before the
-# shell holds any, and one mark refuses the whole record.
-mark=$(printf '\001')
-record_text=$(tr -c '\n -~' '\001' <"$record")
-[ "${#record_text}" -le 65536 ] || fail 65 'the record file is over 64 KiB'
-case $record_text in *"$mark"*) fail 65 'the record file holds a byte other than printable ASCII or a newline' ;; esac
+record_load "$record"
 
 # --- Record ---------------------------------------------------------------------------------
 
@@ -196,35 +133,8 @@ next_free_id() {
   done
 }
 
-block_reset() {
-  b_user='' b_profile='' b_downloads='' b_root='' b_seen=' ' b_start=0
-}
-bad_value() { fail 65 "record line $lineno: invalid $1"; }
-set_key() {
-  case $b_seen in *" $1 "*) fail 65 "record line $lineno: repeated key $1" ;; esac
-  b_seen="$b_seen$1 "
-  [ -n "$2" ] || fail 65 "record line $lineno: empty value for $1"
-  case $1 in
-    userDataDir) is_directory "$2" || bad_value "$1"; b_user=$2 ;;
-    profileDirectory) is_profile_directory "$2" || bad_value "$1"; b_profile=$2 ;;
-    profileId) is_uuid "$2" || bad_value "$1" ;;
-    namespace) is_namespace "$2" || bad_value "$1" ;;
-    role) case $2 in master | worker | template) ;; *) bad_value "$1" ;; esac ;;
-    masterFingerprint) is_fingerprint "$2" || bad_value "$1" ;;
-    downloadsRoot) is_directory "$2" || bad_value "$1"; b_downloads=$2 ;;
-    root) is_root_id "$2" || bad_value "$1"; b_root=$2 ;;
-    *) fail 65 "record line $lineno: unknown key" ;;
-  esac
-}
 # Pass 1 learns the ids the record names; pass 2 numbers the other roots and rewrites.
-end_block() {
-  [ "$b_start" -ne 0 ] || return 0
-  where="record block at line $b_start"
-  if { [ -z "$b_user" ] && [ -n "$b_profile" ]; } || { [ -n "$b_user" ] && [ -z "$b_profile" ]; }; then
-    fail 65 "$where: userDataDir and profileDirectory go together"
-  fi
-  if [ -z "$b_user" ] && [ -z "$b_downloads" ]; then fail 65 "$where: names no profile or root"; fi
-  if [ -n "$b_root" ] && [ -z "$b_downloads" ]; then fail 65 "$where: root without downloadsRoot"; fi
+record_hook_block() {
   [ -n "$b_downloads" ] || return 0
   if [ "$1" = 1 ]; then
     [ -n "$b_root" ] || return 0
@@ -244,92 +154,15 @@ end_block() {
     changed=1
   fi
 }
-read_record() {
-  block_reset
-  lineno=0
-  while IFS= read -r line; do
-    lineno=$((lineno + 1))
-    if [ -z "$line" ]; then
-      end_block "$1"
-      block_reset
-      rewritten="$rewritten$nl"
-      continue
-    fi
-    [ "$b_start" -ne 0 ] || b_start=$lineno
-    case $line in *=*) ;; *) fail 65 "record line $lineno: expected key=value" ;; esac
-    set_key "${line%%=*}" "${line#*=}"
-    rewritten="$rewritten$line$nl"
-  done <<EOF
-$record_text
-EOF
-  end_block "$1"
-}
+record_hook_line() { rewritten="$rewritten$line$nl"; }
+record_hook_blank() { rewritten="$rewritten$nl"; }
 
 rewritten=
 changed=0
-read_record 1
+record_parse 1
 rewritten=
-read_record 2
+record_parse 2
 
-# --- Presences ------------------------------------------------------------------------------
-
-# Consumes the literal $1 from $rest, then the value up to the literal $2.
-take() {
-  case $rest in "$1"*) rest=${rest#"$1"} ;; *) reason="expected $1"; return 1 ;; esac
-  case $rest in *"$2"*) ;; *) reason="nothing ends the value after $1"; return 1 ;; esac
-  value=${rest%%"$2"*}
-  rest=${rest#"$value"}
-}
-# Reads the fields in the one order and form JSON.stringify gives them, checking each.
-read_presence() {
-  file=$1/presence.json
-  if [ -L "$file" ] || [ ! -f "$file" ]; then reason='no presence.json file'; return 1; fi
-  size=$(wc -c <"$file" | tr -d ' ')
-  if [ "$size" -gt 2048 ]; then reason="$size bytes, more than a presence"; return 1; fi
-  rest=$(cat -- "$file")
-  if [ "${#rest}" -ne "$size" ]; then reason='not the exact bytes of one presence'; return 1; fi
-  take '{"profileId":"' '"' || return 1
-  if [ "$value" != "$2" ]; then reason='its profileId is not its folder'; return 1; fi
-  pr_id=$value
-  take '","displayName":"' '"' || return 1
-  is_display_name "$value" || { reason='invalid displayName'; return 1; }
-  pr_name=$value
-  take '","fingerprint":"' '"' || return 1
-  is_fingerprint "$value" || { reason='invalid fingerprint'; return 1; }
-  pr_fingerprint=$value
-  take '","identity":{"key":"' '"' || return 1
-  is_base64url "$value" 87 || { reason='invalid identity key'; return 1; }
-  take '","signedAt":' ',' || return 1
-  is_time "$value" || { reason='invalid identity signedAt'; return 1; }
-  take ',"signature":"' '"' || return 1
-  is_base64url "$value" 86 || { reason='invalid identity signature'; return 1; }
-  take '"},"createdAt":' ',' || return 1
-  is_time "$value" || { reason='invalid createdAt'; return 1; }
-  pr_created=$value
-  case $rest in ',"expiresAt":'*) rest=${rest#',"expiresAt":'} ;; *) reason='expected ,"expiresAt":'; return 1 ;; esac
-  value=${rest%%[!0-9]*}
-  rest=${rest#"$value"}
-  is_time "$value" || { reason='invalid expiresAt'; return 1; }
-  pr_expires=$value
-  take ',"namespace":"' '"' || return 1
-  if [ "$value" != "$namespace" ]; then reason='another namespace'; return 1; fi
-  take '","boot":"' '"' || return 1
-  is_v4 "$value" || { reason='invalid boot'; return 1; }
-  pr_boot=$value
-  if [ "$rest" != '"}' ]; then reason='extra keys or text after boot'; return 1; fi
-  fresh
-}
-# A closed profile drops out within one TTL: no stamp ahead of the skew, no longer lifetime.
-# The two checks that need no clock come first, so their reasons do not depend on when this runs.
-fresh() {
-  if [ "$pr_expires" -le "$pr_created" ]; then reason='expiresAt is not after createdAt'; return 1; fi
-  if [ $((pr_expires - pr_created)) -gt "$presence_ttl_ms" ]; then
-    reason="it lives longer than $presence_ttl_ms ms"
-    return 1
-  fi
-  if [ "$pr_expires" -le "$now" ]; then reason='expired'; return 1; fi
-  if [ "$pr_created" -gt $((now + clock_skew_ms)) ]; then reason='createdAt is ahead of this clock'; return 1; fi
-}
 
 # Accepted presences, one "id<TAB>root<TAB>name<TAB>fingerprint<TAB>createdAt<TAB>expiresAt<TAB>boot" line each.
 peers=
@@ -387,10 +220,13 @@ scan_root() {
       log "skipped $1/$(shown "$name"): not a profile id folder"
     elif [ -L "$entry" ] || [ ! -d "$entry" ]; then
       log "skipped $1/$name: not a folder"
-    elif read_presence "$entry" "$name"; then
+    elif row=$(read_presence "$entry" "$name" "$namespace" "$now"); then
+      IFS=$tab read -r pr_id pr_name pr_fingerprint pr_created pr_expires pr_boot <<ROW
+$row
+ROW
       add_peer "$1"
     else
-      log "skipped $1/$name: $reason"
+      log "skipped $1/$name: $row"
     fi
   done
 }

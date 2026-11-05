@@ -237,11 +237,21 @@ for (const shell of shells) {
   });
 }
 
+// The libraries catalog.sh sources by a fixed name next to itself, and nothing else.
+const LIBRARIES = ["record.sh", "presence.sh"];
+const libraryPath = (name) => new URL(name, `file://${script}`);
+
 await test("the script never evaluates text as shell code", () => {
-  const text = readFileSync(script, "utf8");
-  assert.ok(text.length > 0, "catalog.sh is empty");
-  assert.doesNotMatch(text, /\beval\b/);
-  assert.doesNotMatch(text, /^\s*(\.|source)\s/m);
+  for (const path of [script, ...LIBRARIES.map(libraryPath)]) {
+    const text = readFileSync(path, "utf8");
+    assert.ok(text.length > 0, `${path} is empty`);
+    assert.doesNotMatch(text, /\beval\b/);
+  }
+  const sourced = readFileSync(script, "utf8").match(/^\s*(?:\.|source)\s.*$/gm);
+  assert.deepEqual(
+    sourced,
+    LIBRARIES.map((name) => `. "$here/${name}"`),
+  );
 });
 
 /** The value of `const <name> = <digits> [* <digits>]...;` in a TypeScript source. */
@@ -255,7 +265,7 @@ function constantIn(path, name) {
 }
 
 await test("the script's freshness bounds are the extension's constants", () => {
-  const text = readFileSync(script, "utf8");
+  const text = readFileSync(libraryPath("presence.sh"), "utf8");
   const shellValue = (name) => Number(new RegExp(`^${name}=([0-9]+)$`, "m").exec(text)?.[1]);
   assert.equal(
     shellValue("clock_skew_ms"),
