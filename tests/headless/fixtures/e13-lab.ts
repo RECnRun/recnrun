@@ -2,7 +2,7 @@ import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import type { Page } from "@playwright/test";
-import type { LoadedExtension } from "../../browser/fixtures/extension-loaders.ts";
+import { bindWorker } from "./e13-bind.ts";
 import { chromesOf, installWith, skeleton } from "../../browser/fixtures/launcher-rig.ts";
 import type { Install } from "../../browser/fixtures/launcher-rig.ts";
 import {
@@ -109,7 +109,7 @@ export const dockerProbe: Probe = {
   },
 };
 
-const dockerRig: LabRig = {
+export const dockerRig: LabRig = {
   probe: dockerProbe,
   platform: () => tempPlatform("recnrun-e13-master"),
   frame: (flags) => skeleton(undefined, flags),
@@ -260,11 +260,25 @@ export async function v1Lab(count: number, rig: LabRig = dockerRig): Promise<Lab
   const scenes = new Map<Worker, Scene>();
   let stopCatalog: () => Promise<void> = async () => undefined;
   const dispose = async () => {
-    await stopCatalog().catch(() => undefined);
-    for (const worker of workers) await quitWorker(rig.probe, worker).catch(() => undefined);
-    await group.dispose().catch(() => undefined);
-    await site.close();
-    await removeDir();
+    const failures: unknown[] = [];
+    const attempt = async (step: () => Promise<unknown>) => {
+      try {
+        await step();
+        return true;
+      } catch (error) {
+        failures.push(error);
+        return false;
+      }
+    };
+    await attempt(() => stopCatalog());
+    let allStopped = true;
+    for (const worker of workers)
+      allStopped = (await attempt(() => quitWorker(rig.probe, worker))) && allStopped;
+    await attempt(() => group.dispose());
+    await attempt(() => site.close());
+    // A root whose Chrome still runs stays for the person who reads the failure.
+    if (allStopped) await attempt(removeDir);
+    if (failures.length > 0) throw new AggregateError(failures, "E13 lab teardown failed");
   };
   try {
     await writeFile(record, `${masterBlock(master, group.downloads)}\n`);
@@ -300,8 +314,13 @@ export async function v1Lab(count: number, rig: LabRig = dockerRig): Promise<Lab
     await catalog.pass();
     stopCatalog = catalog.start();
   } catch (error) {
-    await dispose();
-    throw error;
+    const cleanup = await dispose().then(
+      () => undefined,
+      (failed: unknown) => failed,
+    );
+    throw cleanup === undefined
+      ? error
+      : new AggregateError([error, cleanup], "E13 lab setup failed");
   }
   return {
     probe: rig.probe,
@@ -319,35 +338,6 @@ export async function v1Lab(count: number, rig: LabRig = dockerRig): Promise<Lab
     stop: (worker) => quitWorker(rig.probe, worker),
     dispose,
   };
-}
-
-/**
- * The worker's side of the binding, which the local channel writes in the product: the master's
- * pin and its record, written while the installer is still attached. The master's side follows the
- * first link (bindMaster); no client is on the worker once the launcher opens it.
- */
-async function bindWorker(extension: LoadedExtension, presence: Record<string, unknown>) {
-  const { key } = presence.identity as { key: string };
-  const master = String(presence.profileId);
-  const now = Date.now();
-  const items = {
-    peerPins: {
-      [master]: {
-        fingerprint: presence.fingerprint,
-        identity: key,
-        pinnedAt: now,
-        source: "local-channel",
-      },
-    },
-    role: {
-      role: "worker",
-      masterProfileId: master,
-      masterIdentity: key,
-      boundAt: now,
-      source: "pairing",
-    },
-  };
-  await extension.evaluateInBackground(`chrome.storage.local.set(${JSON.stringify(items)})`);
 }
 
 function sceneOf(scenes: Map<Worker, Scene>, worker: Worker): Scene {
