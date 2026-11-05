@@ -17,9 +17,9 @@ Tracks [PLAN.md](PLAN.md). One line per task; the orchestrator owns `[x]`, imple
 Markers: `[ ]` not started · `[i]` implemented, awaiting the phase gate · `[x]` verified by `vp run verify` · `[!]` blocked (reason indented) · `[~]` partial (what is missing indented).
 
 **Branch:** `poc-downloads-launcher` (from `60989d6`, head of PR #19 `poc/multi-profile-mesh`)
-**Last commit:** `f6c809d4` "Record the coverage gap verify found at Gate P6" (pushed HEAD of PR #30) plus this record (`f3352830` is the pushed HEAD until the Gate P6 push below)
-**Current phase:** Gate P6 closing on 2026-11-05: P5.1–P5.6, P6.1, P6.2 landed (see their lines), the Codex review of P5+P6 applied (17 findings, 17 commits `c92aded4..fb1fa418`, [reviews/P5-P6.md](reviews/P5-P6.md)), CL17 recorded on the host; CL16 and P6.3 (V3 with the personal Default) and the CL01–CL15 host cells with the Default as master wait for the owner's manual run after P7 (owner, 2026-11-05: "Vou testar manualmente após vc terminar o gate P6 com o P7 headless"). Next: `vp run verify`, push, PR #30, then P7.1 and P7.4 on Opus.
-**Paused:** Gate P6 pushed on 2026-11-05. P7.1 and P7.4 run in an Opus session on branch `p7-headless` (worktree `.claude/worktrees/p7-headless`, from `f6c809d4`), to be rebased onto this branch before Gate P7/P8; M-P1.a, M-P2.a, M-P3.a, M-P4.a, M-P4.b, M-P5.a, and M-P6.a wait for the owner.
+**Last commit:** on `p7-headless`, "Record the three-sample E13 host run and the owner's T9 check" plus this record, over `7f2c9ad8` (pushed HEAD of PR #30, the Gate P6 record)
+**Current phase:** P7.1 and P7.4 on branch `p7-headless` (rebased onto `7f2c9ad8`, the pushed Gate P6 head) on 2026-11-05: the headless lab runner, the `OPEN_TAB` peer command, and E13 in the lab (three samples) and on the host (throwaway roots, three samples). Next: the Codex review of P7 ([reviews/P7.md](reviews/P7.md)) and `vp run verify`; P7.2, P7.3, and the push wait for the owner (Gate P7 is fused into Gate P8).
+**Paused:** not paused. Gate P6 was pushed on 2026-11-05 (`7f2c9ad8`, PR #30). M-P1.a, M-P2.a, M-P3.a, M-P4.a, M-P4.b, M-P5.a, M-P6.a, and M-P7.a wait for the owner.
 
 ## P0: Base, lab, baseline, and Chromium inventory
 
@@ -467,10 +467,10 @@ Gate P6: verify · CL16, CL17 · review of P5+P6 · push
 - [ ] P7.2 T1–T3 one root, visible and `--no-startup-window`, E11 (lab, host)
 - [ ] P7.3 T4–T5 one root, headless attempt, E12 (lab, host)
 - [i] P7.4 T6–T8 separate roots, headless workers, E13 (lab, host); T9 headless on clones
-  - red: lab negative control (no worker binding, workers opened headed): `E13.t6.workers` fail, `E13.t6.commands` fail ("The other profile did not answer in time."), run `...f7183899`; `-g "every E13 hypothesis"` alone fails "every hypothesis ran"; the command's own red/green is in `598eb4bc`
+  - red: lab negative control (no worker binding, workers opened headed): `E13.t6.workers` fail, `E13.t6.commands` fail ("The other profile did not answer in time."), run `...f7183899`; `-g "every E13 hypothesis"` alone fails "every hypothesis ran"; the command's own red/green is in the commit with subject "Add a peer command that opens a web page in a worker's tab"
   - green: `RECNRUN_EXPERIMENT_SAMPLES=smoke vp run test:headless -- tests/headless/E13-separate-roots.spec.ts` 5 passed (8.6m), 11 pass and focus/pip unavailable, run `...aae617b1`; full: `vp run test:headless` 8 passed (21.1m), the same 11 pass at three samples (bootstrap diagnostic one), run `...ca79ff4f`, [E13.md](experiments/E13.md); host: `RECNRUN_HOST_ROOTS=~/Documents/RECnRun/poc-downloads-launcher/roots vp run test:host -- tests/host/E13-separate-roots.spec.ts` 4 passed (5.9m), the five worker cells pass at three samples on Chrome 156.0.8078.80 macOS with a throwaway master, the clone cells and the diagnostic `unavailable` with the reason, run `host-2026-11-05T20-57-11.004Z`
   - pending the owner: T9 headless clones with the personal Default as controller, [M-P7.a](MANUAL_VALIDATION.md#after-p7)
-  - commit: 2b209b6d, after `598eb4bc` (the peer command); three samples per cell: the commit with subject "Take three samples per E13 cell in a full run"
+  - commit: the commit with subject "Drive headless workers with open-tab in the E13 lab and host twin", after the commit with subject "Add a peer command that opens a web page in a worker's tab"; three samples per cell: the commit with subject "Take three samples per E13 cell in a full run"
 
 Gate P7: verify · E11–E13 (review and push fused into Gate P8)
 
