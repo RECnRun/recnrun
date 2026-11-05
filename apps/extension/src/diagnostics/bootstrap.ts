@@ -2,7 +2,12 @@ import { errorMessage } from "@recnrun/domain";
 import * as v from "valibot";
 import { browser } from "wxt/browser";
 import { ask } from "@/diagnostics/poc-messages";
-import { pocLauncherAck, pocPublishPresence } from "@/messaging/poc-presence";
+import {
+  PocProvisionCloneSchema,
+  pocLauncherAck,
+  pocProvisionClone,
+  pocPublishPresence,
+} from "@/messaging/poc-presence";
 import { pocPresenceStore } from "@/storage/poc-presence-repository";
 import { pocTemplateStore } from "@/storage/poc-template-repository";
 
@@ -13,6 +18,9 @@ import { pocTemplateStore } from "@/storage/poc-template-repository";
  * ack of the attempt, the launcher's proof that this open reached the profile.
  * P5.1: a base is opened with #template=<uuid>&setting=base-v<n> instead; the page records template
  * mode and the setting, adopts no boot, asks for no presence, and acks with both fields.
+ * P5.3: a copy of a base is opened with #clone=<token>&instance=<uuid>&operation=<uuid>&
+ * namespace=<namespace>&master=<profile id>.<identity key>, in exactly that order; the page stores
+ * nothing and hands exactly those fields to its worker, which provisions, acks, and announces.
  */
 
 // Lowercase v4, as catalog.sh requires of a boot; nothing else may follow it.
@@ -29,6 +37,14 @@ const TemplateFragmentSchema = v.pipe(
 );
 const TEMPLATE_PREFIX = "#template=";
 const SETTING_KEY = "&setting=";
+const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}";
+// A role, or any key but these, never reaches the worker: the launcher's record names the role.
+const CLONE_FRAGMENT = new RegExp(
+  `^#clone=(${UUID})&instance=(${UUID})&operation=(${UUID})&namespace=([a-z][a-z0-9-]{0,31})&master=(${UUID})\\.([\\w-]{87})$`,
+);
+const CLONE_PREFIX = "#clone=";
+const CLONE_REFUSED =
+  "The address carries no #clone=<token>&instance=<uuid>&operation=<uuid>&namespace=<namespace>&master=<profile id>.<identity key>.";
 
 export interface BootstrapDependencies {
   /** `location.hash` of the page, as the launcher opened it. */
@@ -46,6 +62,14 @@ export type BootstrapResult =
   | { ok: true; token: string; acked: false; error: string }
   | { ok: true; token: string; template: true; setting: string; acked: true }
   | { ok: true; token: string; template: true; setting: string; acked: false; error: string }
+  | {
+      ok: true;
+      token: string;
+      clone: true;
+      instanceId: string;
+      operationId: string;
+      acked: true;
+    }
   | { ok: false; error: string };
 
 /** The template open of a base: the mode is stored first, so the ack never precedes it. */
@@ -65,8 +89,35 @@ async function bootstrapTemplate(
   }
 }
 
+/** The fields of a `#clone=` fragment in their one order, checked again as the message. */
+function cloneRequestOf(hash: string) {
+  const [token, instanceId, operationId, namespace, masterProfileId, masterIdentity] =
+    CLONE_FRAGMENT.exec(hash)?.slice(1) ?? [];
+  const fields = { token, instanceId, operationId, namespace, masterProfileId, masterIdentity };
+  const parsed = v.safeParse(PocProvisionCloneSchema, { type: "POC_PROVISION_CLONE", ...fields });
+  return parsed.success ? parsed.output : undefined;
+}
+
+/** The clone open of a copied base: its worker provisions and acks, or says why it refused. */
+async function bootstrapClone(
+  hash: string,
+  send: BootstrapDependencies["send"],
+): Promise<BootstrapResult> {
+  const request = cloneRequestOf(hash);
+  if (!request) return { ok: false, error: CLONE_REFUSED };
+  try {
+    const reply = await ask(send, pocProvisionClone(request));
+    if (!reply.ok) return { ok: false, error: reply.error };
+    const { token, instanceId, operationId } = request;
+    return { ok: true, token, clone: true, instanceId, operationId, acked: true };
+  } catch (error) {
+    return { ok: false, error: errorMessage(error) };
+  }
+}
+
 export async function bootstrap(deps: BootstrapDependencies): Promise<BootstrapResult> {
   const { hash, adopt, send } = deps;
+  if (hash.startsWith(CLONE_PREFIX)) return bootstrapClone(hash, send);
   if (hash.startsWith(TEMPLATE_PREFIX)) {
     return v.is(TemplateFragmentSchema, hash)
       ? bootstrapTemplate(hash, deps)

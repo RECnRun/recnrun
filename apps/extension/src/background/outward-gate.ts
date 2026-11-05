@@ -10,15 +10,25 @@ export function outwardGate(log: (entry: string) => void) {
   const outward: Outward = async (work) => {
     if (await mayAnnounce()) await work();
   };
-  /** Runs `start` unless the role is a template, which waits for a later role change. */
-  const startOutward = async <T>(start: () => Promise<T>): Promise<T | undefined> => {
-    try {
-      if (await mayAnnounce()) return await start();
-      log("role template: no announcement, discovery, or pairing");
-    } catch (error) {
-      log(errorMessage(error));
-    }
-    return undefined;
+  /**
+   * Wraps `start` so it runs once, and not while the role is a template: a call after the clone
+   * bootstrap changed the role starts it then.
+   */
+  const startOutward = <T>(start: () => Promise<T>) => {
+    let begun: Promise<T> | undefined;
+    return async (): Promise<T | undefined> => {
+      try {
+        if (!begun && !(await mayAnnounce())) {
+          log("role template: no announcement, discovery, or pairing");
+          return undefined;
+        }
+        begun ??= start();
+        return await begun;
+      } catch (error) {
+        log(errorMessage(error));
+      }
+      return undefined;
+    };
   };
   return { outward, startOutward };
 }
@@ -33,13 +43,13 @@ type Mark = (reason: PauseReason) => Promise<void>;
  * one. A failed write must not undo the user's Disconnect; the launcher then reads no pause.
  */
 export function launcherMark(
-  presence: Promise<{ mark: Mark } | undefined> | undefined,
+  presence: (() => Promise<{ mark: Mark } | undefined>) | undefined,
   log: (entry: string) => void,
 ): Mark | undefined {
   if (!presence) return undefined;
   return async (reason) => {
     try {
-      await (await presence)?.mark(reason);
+      await (await presence())?.mark(reason);
     } catch (error) {
       log(errorMessage(error));
     }

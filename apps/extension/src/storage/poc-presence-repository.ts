@@ -25,6 +25,7 @@ export function pocPresenceStore() {
   const newcomers = storage.defineItem<unknown>("session:pocNewcomers");
   return {
     namespace: () => namespace.getValue(),
+    setNamespace: (value: string) => namespace.setValue(value),
     policy: () => policy.getValue(),
     /** The session's boot if one was made; unlike `boot`, it never makes one. */
     peekBoot: async () => {

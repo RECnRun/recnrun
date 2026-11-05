@@ -80,6 +80,10 @@ export type WorkerOutcome =
   | { ok: false; reason: "not-master" | "pinned-different" }
   | { ok: false; reason: "worker-differs"; worker: BoundWorker }
   | StoreFailed;
+export type ProvisionOutcome =
+  | { ok: true; binding: Binding }
+  | { ok: false; reason: "not-template"; current: RoleRecord | null }
+  | StoreFailed;
 export type TemplateOutcome =
   | { ok: true }
   | { ok: false; reason: "master" | "worker" }
@@ -157,6 +161,25 @@ async function holdOnce(store: RoleStore): Promise<TemplateOutcome> {
   return { ok: true };
 }
 
+/** The clone bootstrap's one transition: a template becomes a worker of the master it names. */
+async function provisionOnce(
+  store: RoleStore,
+  master: Identity,
+  now: number,
+): Promise<ProvisionOutcome> {
+  const current = await store.read();
+  if (current?.role !== "template") return { ok: false, reason: "not-template", current };
+  const binding: Binding = {
+    role: "worker",
+    masterProfileId: master.profileId,
+    masterIdentity: master.identity,
+    boundAt: now,
+    source: "bootstrap",
+  };
+  await store.write(binding);
+  return { ok: true, binding };
+}
+
 async function bindWorkerOnce(
   deps: RoleDependencies,
   worker: PeerRequest,
@@ -196,20 +219,25 @@ const storeFailed = (error: unknown): StoreFailed => ({
   error: errorMessage(error),
 });
 
-/**
- * The hierarchy as this profile recorded it: the Default is the master, a worker keeps the one
- * master it was bound to, and a template does nothing outward. No message, presence, directory
- * name, or profile id order changes it; only the local channel writes it.
- */
-export function createRoles(deps: RoleDependencies) {
-  const now = deps.now ?? Date.now;
+/** Runs each piece of work after the one before it has settled. */
+function serialQueue() {
   let queue: Promise<unknown> = Promise.resolve();
-  // Each change reads before it writes, so two at once would otherwise both see no role.
-  const serial = <T>(work: () => Promise<T>): Promise<T> => {
+  return <T>(work: () => Promise<T>): Promise<T> => {
     const next = queue.then(work);
     queue = next.catch(() => {});
     return next;
   };
+}
+
+/**
+ * The hierarchy as this profile recorded it: the Default is the master, a worker keeps the one
+ * master it was bound to, and a template does nothing outward. No message, presence, directory
+ * name, or profile id order changes it; only the local channel and the clone bootstrap write it.
+ */
+export function createRoles(deps: RoleDependencies) {
+  const now = deps.now ?? Date.now;
+  // Each change reads before it writes, so two at once would otherwise both see no role.
+  const serial = serialQueue();
   const change = <T, R>(
     schema: v.GenericSchema<unknown, T>,
     input: unknown,
@@ -237,6 +265,8 @@ export function createRoles(deps: RoleDependencies) {
     becomeMaster: (self: Identity) =>
       change(IdentitySchema, self, (request) => becomeMasterOnce(deps.role, request)),
     holdAsTemplate: () => serial(() => holdOnce(deps.role)).catch(storeFailed),
+    provision: (master: Identity) =>
+      change(IdentitySchema, master, (request) => provisionOnce(deps.role, request, now())),
     bindWorker: (worker: MasterRequest) =>
       change(MasterRequestSchema, worker, (request) => bindWorkerOnce(deps, request, now())),
     mayAct: (action: OutwardAction) =>

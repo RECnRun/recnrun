@@ -59,3 +59,33 @@ describe("the stored record", () => {
     expect(v.is(RoleRecordSchema, { role: "controller" })).toBe(false);
   });
 });
+
+describe("provisioning a template", () => {
+  const masterOf = { profileId: MASTER, identity: MASTER_KEY };
+  const provisioned = { ...binding, source: "bootstrap" };
+
+  test("turns the template into a worker of that master, in one change", async () => {
+    await roles().holdAsTemplate();
+    expect(await roles().provision(masterOf)).toEqual({ ok: true, binding: provisioned });
+    expect(await roles().record()).toEqual(provisioned);
+    expect(await roles().mayAct("announce")).toBe(true);
+  });
+
+  test("refuses anything but a template, which bind keeps refusing", async () => {
+    expect(await roles().provision(masterOf)).toEqual({
+      ok: false,
+      reason: "not-template",
+      current: null,
+    });
+    await roles().holdAsTemplate();
+    expect(await roles().bind(master)).toEqual({ ok: false, reason: "template" });
+    await roles().provision(masterOf);
+    expect(await roles().provision(masterOf)).toEqual({
+      ok: false,
+      reason: "not-template",
+      current: provisioned,
+    });
+    const malformed = { profileId: MASTER, identity: "short" };
+    expect(await roles().provision(malformed)).toEqual({ ok: false, reason: "malformed" });
+  });
+});

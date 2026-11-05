@@ -33,6 +33,7 @@ import { recordingSessionRepository } from "@/storage/recording-session-reposito
 import { browserTabs } from "@/tabs/open-tabs";
 // Imported last, so the production bundle (which drops them) keeps its module order and bytes.
 import { startPocPresence } from "@/background/downloads-presence";
+import { startedOutward } from "@/background/poc-bootstrap";
 import { hello, provenHello, refuseLink } from "@/background/greeting";
 import type { Sign } from "@/background/greeting";
 import { signedIdentity } from "@/p2p/identity-key";
@@ -316,21 +317,24 @@ export function startPeers(
   const { outward, startOutward } = outwardGate(log);
   // Chrome starts the worker with the browser only for a startup listener; starting resumes.
   browser.runtime.onStartup.addListener(() => {});
-  const downloads = startOutward(async () => {
-    void folder.resume().catch((error: unknown) => log(errorMessage(error)));
-    // Downloads needs no prior choice: the profile announces itself as its worker starts, then pairs.
-    if (transport !== "downloads") return undefined;
-    return startPocPresence({ log, sign, startPairing: () => folder.start().then(notifyPages) });
-  });
+  // Downloads needs no prior choice: the profile announces itself as its worker starts, then pairs.
+  const downloads = startedOutward(
+    startOutward(async () => {
+      void folder.resume().catch((error: unknown) => log(errorMessage(error)));
+      if (transport !== "downloads") return undefined;
+      return startPocPresence({ log, sign, startPairing: () => folder.start().then(notifyPages) });
+    }),
+    transport === "downloads" && { log, sign },
+  );
   // Chrome ends the folder's grant with the last extension page, so the pages read it again.
   browser.tabs.onRemoved.addListener(notifyPages);
   const available =
     transport === "downloads"
-      ? async () => (await (await downloads)?.available()) ?? false
+      ? async () => (await (await downloads())?.available()) ?? false
       : undefined;
   const mark = launcherMark(transport === "downloads" ? downloads : undefined, log);
   const deps = requestDependencies({ channel, tabs, flows, sign }, outward, { available, mark });
-  const noticed = async (seen: { profileId: string }[]) => (await downloads)?.noticed(seen);
+  const noticed = async (seen: { profileId: string }[]) => (await downloads())?.noticed(seen);
   return {
     request: (request) => handlePeerRequest(deps, request),
     link: createLinkHandler({ channel, executor, tabs, flows, sign, noticed, mark }),

@@ -24,7 +24,7 @@ function dependencies(overrides: Partial<AckDependencies> = {}) {
       onChanged: { addListener: vi.fn(), removeListener: vi.fn() },
     },
     profileId: async () => ME,
-    identity: () => STATEMENT,
+    identity: async () => STATEMENT,
     namespace: async () => "lab",
     boot: async () => BOOT,
     now: () => NOW,
@@ -71,17 +71,29 @@ describe("writeAck", () => {
   });
 
   test("writes nothing before a presence carries an identity", async () => {
-    const { deps, written } = dependencies({ identity: () => undefined });
+    const { deps, written } = dependencies({ identity: async () => undefined });
     await expect(writeAck(deps, TOKEN)).rejects.toThrow("No presence has been published yet.");
     expect(written).toEqual([]);
   });
 
-  test("a template ack carries the template fields after the others, in this order", async () => {
+  test("a template ack has no identity and carries the template fields last", async () => {
+    // A template holds no working key or certificate, so it states none even if a presence did.
     const { deps, written } = dependencies({ boot: async () => TOKEN });
     await writeAck(deps, TOKEN, { template: true, setting: "base-v1" });
     expect(contentOf(written[0]?.url ?? "")).toBe(
-      `${bytes(TOKEN, TOKEN).slice(0, -1)},"template":true,"setting":"base-v1"}`,
+      `{"token":"${TOKEN}","profileId":"${ME}","boot":"${TOKEN}","createdAt":${NOW},"template":true,"setting":"base-v1"}`,
     );
+  });
+
+  test("a clone ack carries its identity, then the instance, the operation, and provisioned", async () => {
+    const { deps, written } = dependencies({ boot: async () => TOKEN });
+    const clone = { instanceId: ME, operationId: BOOT, provisioned: true } as const;
+    await writeAck(deps, TOKEN, clone);
+    expect(contentOf(written[0]?.url ?? "")).toBe(
+      `${bytes(TOKEN, TOKEN).slice(0, -1)},"instanceId":"${ME}","operationId":"${BOOT}","provisioned":true}`,
+    );
+    await expect(writeAck(deps, TOKEN, { ...clone, operationId: "nope" })).rejects.toThrow();
+    expect(written).toHaveLength(1);
   });
 
   test("writes nothing for a template setting outside the pattern", async () => {

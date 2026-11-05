@@ -4,7 +4,7 @@ import { downloadsWriter } from "@/background/downloads-publisher";
 import type { WriterPort } from "@/background/downloads-publisher";
 import type { BackgroundReply } from "@/messaging/background-reply";
 import { PocLauncherAckSchema } from "@/messaging/poc-presence";
-import type { AckTemplate } from "@/messaging/poc-presence";
+import type { AckClone, AckTemplate } from "@/messaging/poc-presence";
 import { TokenSchema, ackPath } from "@/p2p/downloads-rendezvous";
 import { IdentityStatementSchema } from "@/p2p/identity-key";
 import type { IdentityStatement } from "@/p2p/identity-key";
@@ -21,19 +21,24 @@ import { ProfileIdSchema } from "@/p2p/protocol";
 const AckSchema = v.strictObject({
   token: TokenSchema,
   profileId: ProfileIdSchema,
-  identity: IdentityStatementSchema,
+  // Absent only from a template's ack: a template holds no working key or certificate (P5.3).
+  identity: v.optional(IdentityStatementSchema),
   boot: v.pipe(v.string(), v.uuid()),
   createdAt: v.pipe(v.number(), v.safeInteger(), v.minValue(0)),
   // A template base's ack names the base; the launcher reads these two after the others.
   template: v.optional(v.literal(true)),
   setting: v.optional(SettingSchema),
+  // A provisioned clone's ack names the instance and the operation it answers (P5.3).
+  instanceId: v.optional(TokenSchema),
+  operationId: v.optional(TokenSchema),
+  provisioned: v.optional(v.literal(true)),
 });
 
 export interface AckDependencies {
   downloads: WriterPort;
   profileId: () => Promise<string>;
   /** The statement of the presence published last, or undefined before the first one. */
-  identity: () => IdentityStatement | undefined;
+  identity: () => Promise<IdentityStatement | undefined>;
   namespace: () => Promise<string>;
   /** The session's current boot, which equals the token only on a fresh start. */
   boot: () => Promise<string>;
@@ -44,19 +49,20 @@ export interface AckDependencies {
 export async function writeAck(
   deps: AckDependencies,
   token: string,
-  template?: AckTemplate,
+  extra?: AckTemplate | AckClone,
 ): Promise<void> {
-  const identity = deps.identity();
-  if (!identity) throw new Error("No presence has been published yet.");
+  const template = extra !== undefined && "template" in extra;
+  const identity = template ? undefined : await deps.identity();
+  if (!template && !identity) throw new Error("No presence has been published yet.");
   const profileId = await deps.profileId();
   const path = ackPath(await deps.namespace(), profileId, token);
   const ack = v.parse(AckSchema, {
     token,
     profileId,
-    identity,
+    ...(identity && { identity }),
     boot: await deps.boot(),
     createdAt: (deps.now ?? Date.now)(),
-    ...template,
+    ...extra,
   });
   const text = JSON.stringify(ack);
   await downloadsWriter(deps.downloads).write(path, text);

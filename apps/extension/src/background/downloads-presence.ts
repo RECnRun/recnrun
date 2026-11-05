@@ -1,7 +1,6 @@
 import { errorMessage } from "@recnrun/domain";
 import * as v from "valibot";
 import { browser } from "wxt/browser";
-import { createAckListener, writeAck } from "@/background/launcher-requests";
 import { writePause } from "@/background/launcher-pause";
 import type { PauseReason } from "@/background/launcher-pause";
 import { createDownloadsPairing } from "@/background/downloads-pairing";
@@ -13,12 +12,12 @@ import { createRendezvousRelay } from "@/background/rendezvous-relay";
 import { newcomerNotes, presenceRenewal } from "@/background/presence-renewal";
 import type { BackgroundReply } from "@/messaging/background-reply";
 import { PocPublishPresenceSchema } from "@/messaging/poc-presence";
-import type { AckTemplate } from "@/messaging/poc-presence";
 import { DEFAULT_NAMESPACE, NamespaceSchema, presencePath } from "@/p2p/downloads-rendezvous";
 import { downloadsTransport } from "@/p2p/downloads-transport";
 import { PRESENCE_TTL_MS } from "@/p2p/folder-rendezvous";
 import type { Presence } from "@/p2p/folder-rendezvous";
 import { registrationName } from "@/p2p/registry";
+import { storedRoles } from "@/storage/hierarchy-repository";
 import { readIdentity } from "@/storage/peer-repository";
 import type { ProfileIdentity } from "@/storage/peer-repository";
 import { pocPresenceStore } from "@/storage/poc-presence-repository";
@@ -64,9 +63,13 @@ export interface PresenceDependencies {
   published?: () => Promise<void>;
   /** POC-only renewal policy; an explicit bootstrap publication always writes. */
   renew?: () => Promise<boolean>;
+  /** Whether the stored role still lets this profile announce; a template never does. */
+  may?: () => Promise<boolean>;
 }
 
-async function namespaceOf({ namespace, log }: PresenceDependencies): Promise<string> {
+type NamespaceSource = Pick<PresenceDependencies, "namespace" | "log">;
+
+async function namespaceOf({ namespace, log }: NamespaceSource): Promise<string> {
   const stored = await namespace();
   if (stored === undefined || stored === null) return DEFAULT_NAMESPACE;
   if (v.is(NamespaceSchema, stored)) return stored;
@@ -157,7 +160,9 @@ export function startDownloadsPresence(deps: PresenceDependencies) {
   const now = deps.now ?? Date.now;
   let last = Number.NEGATIVE_INFINITY;
   let latest: Presence["identity"] | undefined;
+  const allowed = async () => (await deps.may?.()) ?? true;
   const publishNow = async () => {
+    if (!(await allowed())) throw new Error("The role template announces nothing.");
     latest = (await publish(deps)).identity;
     // Not awaited: the bootstrap page's answer waits for the presence only.
     void deps.published?.();
@@ -165,6 +170,8 @@ export function startDownloadsPresence(deps: PresenceDependencies) {
   const attempt = () => {
     last = now();
     void (async () => {
+      // A worker made a template while it runs stops here, and starts nothing either.
+      if (!(await allowed())) return;
       if ((await deps.renew?.()) ?? true) await publishNow();
       else void deps.published?.();
     })().catch((error: unknown) => deps.log(`presence: ${errorMessage(error)}`));
@@ -245,8 +252,15 @@ function pocDependencies(
     // Undefined in a build without the alarms permission.
     alarms: (browser as { alarms?: AlarmsPort }).alarms,
     published: createDownloadsPairing({ available, start: startPairing, log }),
+    may: () => storedRoles().mayAct("announce"),
   };
 }
+
+/** The namespace this profile's POC files go under: the stored one if valid, else the default. */
+export const pocNamespaceOf = (
+  store: Pick<ReturnType<typeof pocPresenceStore>, "namespace">,
+  log: (entry: string) => void,
+): Promise<string> => namespaceOf({ namespace: store.namespace, log });
 
 /**
  * The presence over Chrome's own Downloads, this profile's identity, and session storage; each
@@ -260,19 +274,6 @@ export function startPocPresence(options: PocPresenceOptions) {
   const presence = startDownloadsPresence(deps);
   const own = { extensionId: browser.runtime.id, extensionUrl: browser.runtime.getURL("/") };
   browser.runtime.onMessage.addListener(createPublishListener(presence.publish, own));
-  const ack = (token: string, template?: AckTemplate) =>
-    writeAck(
-      {
-        downloads: browser.downloads,
-        profileId: async () => (await readIdentity()).profileId,
-        identity: presence.identity,
-        namespace: () => namespaceOf(deps),
-        boot: store.boot,
-      },
-      token,
-      template,
-    );
-  browser.runtime.onMessage.addListener(createAckListener(ack, own));
   const relay = {
     downloads: browser.downloads,
     me: async () => (await readIdentity()).profileId,

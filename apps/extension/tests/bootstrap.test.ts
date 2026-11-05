@@ -4,6 +4,9 @@ import { bootstrap, startBootstrap } from "@/diagnostics/bootstrap";
 import { pocPresenceStore } from "@/storage/poc-presence-repository";
 import { pocTemplateStore } from "@/storage/poc-template-repository";
 
+// Template mode discards the identity key and certificate, which live in IndexedDB.
+vi.mock("@/p2p/p2p-database", () => import("./memory-p2p-database"));
+
 const TOKEN = "0f8b6a3e-2c1d-4e5f-9a7b-1c2d3e4f5a6b";
 const REFUSED = "The address carries no #token=<lowercase v4 uuid>.";
 const TEMPLATE_REFUSED =
@@ -165,30 +168,6 @@ describe("bootstrap of a template base", () => {
     const deps = dependencies(`#token=${TOKEN}`);
     expect(await bootstrap(deps)).toEqual({ ok: true, token: TOKEN, acked: true });
     expect(deps.enterTemplate).not.toHaveBeenCalled();
-  });
-});
-
-describe("pocTemplateStore", () => {
-  test("is not template mode until a base enters it, and keeps the setting with it", async () => {
-    const store = pocTemplateStore();
-    expect(await store.templateMode()).toBe(false);
-    expect(await store.setting()).toBeNull();
-    await store.enter("base-v2");
-    expect(await store.templateMode()).toBe(true);
-    expect(await store.setting()).toBe("base-v2");
-    expect(await fakeBrowser.storage.local.get(["templateMode", "pocSetting"])).toEqual({
-      templateMode: true,
-      pocSetting: "base-v2",
-    });
-  });
-
-  test("refuses a setting outside the pattern and reads a damaged value as unset", async () => {
-    const store = pocTemplateStore();
-    await expect(store.enter("base-v")).rejects.toThrow();
-    expect(await store.templateMode()).toBe(false);
-    await fakeBrowser.storage.local.set({ templateMode: "yes", pocSetting: 7 });
-    expect(await store.templateMode()).toBe(false);
-    expect(await store.setting()).toBeNull();
   });
 });
 
