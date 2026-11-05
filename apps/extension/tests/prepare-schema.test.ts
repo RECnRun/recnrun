@@ -1,6 +1,7 @@
 import * as v from "valibot";
 import { describe, expect, test } from "vite-plus/test";
 import { operationPath } from "@/p2p/downloads-rendezvous";
+import { MAX_CODE_LENGTH } from "@/p2p/protocol";
 import { PrepareChoiceSchema, PrepareStatusSchema, readStatus } from "@/p2p/prepare";
 
 const OP = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
@@ -32,7 +33,7 @@ describe("operationPath", () => {
 describe("PrepareChoiceSchema", () => {
   const choice = {
     operationId: OP,
-    basesDir: "/Users/me/My Bases",
+    basesDir: "/Users/me/My-Bases",
     baseName: "base-v1",
     clones: 8,
   };
@@ -41,6 +42,12 @@ describe("PrepareChoiceSchema", () => {
     { basesDir: "relative" },
     { basesDir: "/a/../b" },
     { basesDir: "/a;rm" },
+    { basesDir: "/Users/me/My Bases" },
+    { basesDir: "/a/" },
+    { basesDir: "/a//b" },
+    { basesDir: "/a/./b" },
+    { basesDir: "/" },
+    { basesDir: "/a:b" },
     { basesDir: `/${"a".repeat(1024)}` },
     { clones: 0 },
     { clones: 9 },
@@ -70,6 +77,21 @@ describe("readStatus", () => {
     JSON.stringify({ ...status, clones: [{ ...status.clones[0], name: "w9" }] }),
     JSON.stringify({ ...status, clones: [{ ...status.clones[0], boot: "nope" }] }),
   ])("reads %j as no status", (text) => expect(readStatus(text)).toBeUndefined());
+
+  test("refuses a status over the shared maximum", () => {
+    const padded = JSON.stringify({ ...status, message: "x" }) + " ".repeat(MAX_CODE_LENGTH);
+    expect(readStatus(padded)).toBeUndefined();
+  });
+
+  test("refuses a duplicate clone name or instance id", () => {
+    const other = "22222222-2222-4222-8222-222222222222";
+    const twice = (second: object) =>
+      JSON.stringify({ ...status, clones: [status.clones[0], { ...status.clones[0], ...second }] });
+    expect(readStatus(twice({}))).toBeUndefined();
+    expect(readStatus(twice({ instanceId: other }))).toBeUndefined();
+    expect(readStatus(twice({ name: "w2" }))).toBeUndefined();
+    expect(readStatus(twice({ name: "w2", instanceId: other }))).toBeDefined();
+  });
 
   test("accepts an unacked clone with an empty boot", () => {
     const text = JSON.stringify({

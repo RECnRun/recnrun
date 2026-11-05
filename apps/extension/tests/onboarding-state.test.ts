@@ -102,6 +102,32 @@ describe("onboarding reducer", () => {
     expect(view(state).phase).toBe("running");
   });
 
+  test("a done status listing one worker twice is not done", () => {
+    const one = clones(true).slice(0, 1);
+    const state = run(
+      requested,
+      {
+        type: "status",
+        status: status({ step: "done", state: "done", clones: [...one, ...one], updatedAt: 5000 }),
+      },
+      { type: "registry", peers: { [W1]: { boot: BOOT1 } } },
+    );
+    expect(view(state).phase).toBe("running");
+  });
+
+  test("a done status whose workers are not w1 to wN is not done", () => {
+    const renamed = clones(true).map((clone, index) => ({ ...clone, name: `w${index + 2}` }));
+    const state = run(
+      requested,
+      {
+        type: "status",
+        status: status({ step: "done", state: "done", clones: renamed, updatedAt: 5000 }),
+      },
+      { type: "registry", peers: { [W1]: { boot: BOOT1 }, [W2]: { boot: BOOT2 } } },
+    );
+    expect(view(state).phase).toBe("running");
+  });
+
   test("an unacked clone is never linked even when its id is in the registry", () => {
     const state = run(
       requested,

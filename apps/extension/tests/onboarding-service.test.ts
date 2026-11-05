@@ -101,6 +101,14 @@ describe("createOnboarding", () => {
     expect(s.last()?.phase).toBe("idle");
   });
 
+  test("tells the owner which paths the launcher cannot use", async () => {
+    const s = scene();
+    await vi.waitFor(() => expect(s.last()?.phase).toBe("idle"));
+    await s.onboarding.request("/Users/me/My Bases", 2);
+    expect(s.sent).toEqual([]);
+    expect(s.last()?.failure).toMatch(/letters, digits/);
+  });
+
   test("shows the background's refusal and stays idle", async () => {
     const s = scene();
     s.ports.send = async () => {

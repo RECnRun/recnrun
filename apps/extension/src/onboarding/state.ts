@@ -92,7 +92,10 @@ function phaseOf(state: OnboardingState, rows: CloneRow[]): Phase {
   if (!status) return "requested";
   if (status.state === "error") return state.retried ? "retrying" : "error";
   if (status.state === "pending-action") return "pending-action";
-  const complete = rows.length === operation.clones && rows.every((row) => row.linked);
+  const expected = Array.from({ length: operation.clones }, (_, index) => `w${index + 1}`);
+  const complete =
+    rows.every((row, index) => row.linked && row.name === expected[index]) &&
+    rows.length === expected.length;
   return status.state === "done" && complete ? "done" : "running";
 }
 
