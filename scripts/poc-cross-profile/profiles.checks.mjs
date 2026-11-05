@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { ALICE, BOB, CAROL, NAMESPACE, presence, shells } from "./lab.mjs";
+import { ALICE, BOB, CAROL, NAMESPACE, linkAt, presence, shells } from "./lab.mjs";
 
 const script = fileURLToPath(new URL("./profiles.sh", import.meta.url));
 const EX_NOT_FOUND = 66;
@@ -239,6 +239,24 @@ for (const shell of shells) {
     const result = profiles(shell, ["bind_profiles", record, NAMESPACE, EXTENSION], env());
     assert.deepEqual(lines(result.out), [`-\t${root}\tDefault\t-\tunbound`]);
   });
+
+  for (const [depth, part] of ["RECnRun", "poc", NAMESPACE, "peers", ALICE].entries()) {
+    await test(`${shell}: bind_profiles leaves a profile unbound when ${part} is a link`, (context) => {
+      const { home, env, record } = lab(context);
+      const root = join(home, "Chrome");
+      writeFileSync(record, `userDataDir=${root}\n`);
+      profile(root, "Default", { Preferences: withExtension(join(home, "Dl")) });
+      plant(join(home, "Real"), ALICE);
+      linkAt(
+        join(home, "Dl"),
+        join(home, "Real"),
+        ["RECnRun", "poc", NAMESPACE, "peers", ALICE],
+        depth,
+      );
+      const result = profiles(shell, ["bind_profiles", record, NAMESPACE, EXTENSION], env());
+      assert.deepEqual(lines(result.out), [`-\t${root}\tDefault\t-\tunbound`]);
+    });
+  }
 
   await test(`${shell}: a wrong call exits 64`, (context) => {
     const { env } = lab(context);

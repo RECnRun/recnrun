@@ -44,6 +44,16 @@ is_token() {
   [ "${#1}" -eq 36 ]
 }
 
+# True when every component $2... below the Downloads root $1 is a real folder: a link is never followed.
+plain_path() {
+  pp_path=$1
+  shift
+  for pp_part in "$@"; do
+    pp_path=$pp_path/$pp_part
+    if [ -L "$pp_path" ] || [ ! -d "$pp_path" ]; then return 1; fi
+  done
+}
+
 # --- Step 1: Preferences ---------------------------------------------------------------------
 
 # Prints the UTF-8 bytes of code point $1, a BMP value outside controls and surrogates.
@@ -182,8 +192,9 @@ downloads_root_candidates() {
 }
 # True when a presence under $1 ends in the boot $3, the way the extension writes it.
 holds_token() {
+  plain_path "$1" RECnRun poc "$2" peers || return 1
   for file in "$1/RECnRun/poc/$2/peers"/*/presence.json; do
-    if [ ! -f "$file" ] || [ -L "$file" ]; then continue; fi
+    if [ ! -f "$file" ] || [ -L "$file" ] || [ -L "${file%/presence.json}" ]; then continue; fi
     [ "$(wc -c <"$file" | tr -d ' ')" -le 2048 ] || continue
     text=$(cat -- "$file")
     case $text in *',"boot":"'"$3"'"}') return 0 ;; esac

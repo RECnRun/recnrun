@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
@@ -139,3 +139,16 @@ export const peerOf = (profileId, root) => ({
   expiresAt: EXPIRES,
   boot: PEER_BOOT,
 });
+
+/** Builds `components` below `root` as real folders except the one at `depth`, a link to the same path below `real`. */
+export function linkAt(root, real, components, depth) {
+  mkdirSync(root, { recursive: true });
+  let path = root;
+  let target = real;
+  for (const [index, part] of components.entries()) {
+    path = join(path, part);
+    target = join(target, part);
+    if (index === depth) return symlinkSync(target, path);
+    mkdirSync(path);
+  }
+}

@@ -108,7 +108,7 @@ look_for_ack() {
   while IFS= read -r candidate; do
     [ -n "$candidate" ] || continue
     folder=$candidate/RECnRun/poc/$2/acks/$3
-    if [ ! -L "$folder" ] && found_boot=$(read_ack "$folder/$4.json" "$4" "$3"); then
+    if plain_path "$candidate" RECnRun poc "$2" acks "$3" && found_boot=$(read_ack "$folder/$4.json" "$4" "$3"); then
       acked_root=$candidate acked_boot=$found_boot
       return 0
     fi

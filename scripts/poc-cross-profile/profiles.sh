@@ -160,14 +160,16 @@ extension_in_profile() {
 presences_at() {
   count=0
   first=-
-  for file in "$1/RECnRun/poc/$2/peers"/*/presence.json; do
-    is_plain_file "$file" || continue
-    id=${file%/presence.json}
-    id=${id##*/}
-    is_uuid "$id" || continue
-    count=$((count + 1))
-    [ "$first" != - ] || first=$id
-  done
+  if plain_path "$1" RECnRun poc "$2" peers; then
+    for file in "$1/RECnRun/poc/$2/peers"/*/presence.json; do
+      id=${file%/presence.json}
+      if ! is_plain_file "$file" || [ -L "$id" ]; then continue; fi
+      id=${id##*/}
+      is_uuid "$id" || continue
+      count=$((count + 1))
+      [ "$first" != - ] || first=$id
+    done
+  fi
   printf '%s %s\n' "$count" "$first"
 }
 # "<count> <profileId> <downloadsRoot>" of the first Downloads root of the profile that holds a

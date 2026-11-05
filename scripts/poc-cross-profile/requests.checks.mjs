@@ -13,7 +13,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { ALICE, NAMESPACE, shells } from "./lab.mjs";
+import { ALICE, NAMESPACE, linkAt, shells } from "./lab.mjs";
 
 const script = fileURLToPath(new URL("./open.sh", import.meta.url));
 const EX_REFUSED = 65;
@@ -269,6 +269,18 @@ for (const shell of shells) {
     assert.equal(bootLine, `boot=${boot}`);
     assert.notEqual(tokenLine, `token=${boot}`);
   });
+
+  for (const [depth, part] of ["RECnRun", "poc", NAMESPACE, "acks", ALICE].entries()) {
+    await test(`${shell}: an ack below a linked ${part} is ignored and the wait times out`, (context) => {
+      const { home, record, env } = scene(context);
+      const components = ["RECnRun", "poc", NAMESPACE, "acks", ALICE];
+      mkdirSync(join(home, "Real", ...components), { recursive: true });
+      linkAt(join(home, "Downloads"), join(home, "Real"), components, depth);
+      const result = open(shell, request(record), env());
+      assert.equal(result.code, EX_NO_ACK, result.err);
+      assert.equal(result.out, "");
+    });
+  }
 
   const ignored = [
     { title: "an ack of another token", extra: { STUB_TOKEN: OTHER_TOKEN } },
