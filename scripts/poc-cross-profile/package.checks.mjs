@@ -179,7 +179,11 @@ await test("the README names a first command the entry accepts", (context) => {
   for (const line of readme.split("\n").filter((it) => it.startsWith("sh recnrun-launcher"))) {
     assert.ok(COMMANDS.includes(line.split(" ")[2]), `${line} names a command the entry has`);
   }
-  assert.match(readme, /Gesture count: 4 per profile plus the one command/);
+  const flat = readme.replaceAll(/\s+/g, " ");
+  assert.match(flat, /Count: 4 N \+ 3 for N profiles/);
+  assert.match(flat, /gestures are estimated, not observed/);
+  assert.match(flat, /observed by the host twin: `first-run` and `status`/);
+  assert.doesNotMatch(readme, /Gesture count/);
 });
 
 await test("the README's first command, run verbatim, opens a profile; with none it exits 66", (context) => {

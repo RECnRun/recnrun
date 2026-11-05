@@ -43,7 +43,11 @@ opened twice. The launcher keeps its state in `$HOME/.recnrun/launcher` and its 
 `$HOME/.recnrun/launcher.record`, both under the namespace `lab`. Exit 0: every profile is open;
 66: no profile with the extension and a presence of its own yet; 70: a profile did not open.
 
-Gesture count: 4 per profile plus the one command, so 5 for one profile and 4 × N + 1 for N.
+Count: 4 N + 3 for N profiles, 7 for one: the 4 Load unpacked gestures per profile and the 3
+commands this README has you run (`first-run`, `status` to verify, `autostart on`). The 4 N gestures
+are estimated, not observed: the host twin installs the extension over CDP, so M-P4.b measures
+them. The commands are observed by the host twin: `first-run` and `status`; `autostart on` is
+checked against stubbed `launchctl` and `systemctl` only, so M-P4.a covers its real login.
 
 ## What the OS asks
 

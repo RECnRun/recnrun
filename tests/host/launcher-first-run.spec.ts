@@ -20,7 +20,7 @@ import type { Sample } from "../experiments/outcome.ts";
  * from its macOS folder on a throwaway root only. HOME is a folder of the root and the root sits at
  * the OS default Chrome root below it, so the command finds the profile the way it does on a
  * colleague's machine; autostart is never turned on. The diagnostic install stands in for the
- * four Load unpacked gestures; the fifth, the first command, is what runs here.
+ * four Load unpacked gestures (estimated, not observed); the first command and status run here.
  */
 
 const target = hostEnvironment.target;
@@ -33,12 +33,15 @@ const NAMESPACE = "lab";
 const COMMAND_MS = 240_000;
 const QUIT_MS = 20_000;
 const POLL_MS = 200;
+// 4 N + 3 for one profile (README "Count"): the install gestures are estimated, not observed.
 const STEPS = [
-  "Open chrome://extensions",
-  "Turn on Developer mode",
-  "Click Load unpacked",
-  "Choose the extension folder",
-  "sh recnrun-launcher first-run",
+  "estimated: Open chrome://extensions",
+  "estimated: Turn on Developer mode",
+  "estimated: Click Load unpacked",
+  "estimated: Choose the extension folder",
+  "observed: sh recnrun-launcher first-run",
+  "observed: sh recnrun-launcher status",
+  "not run on the host: sh recnrun-launcher autostart on",
 ];
 
 interface Result {
