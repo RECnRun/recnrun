@@ -15,6 +15,9 @@ import { PAGE_ENV, PAGE_FLAG, dockerProbe } from "./e13-lab.ts";
 import type { Mode, Worker } from "./e13-lab.ts";
 import { masterLinked, modeProblems } from "./e13-cells.ts";
 import { commandsSample, markerSample, tabsSample } from "./e13-remote.ts";
+import { reopenFacts } from "./e13-evidence.ts";
+import type { Moments } from "./e13-evidence.ts";
+import type { Scripted } from "../../experiments/fixtures/clones.ts";
 import { startSite } from "./e13-site.ts";
 import type { Site } from "./e13-site.ts";
 
@@ -26,6 +29,7 @@ import type { Site } from "./e13-site.ts";
  */
 
 export interface CloneLab {
+  testInfo: TestInfo;
   site: Site;
   host: LabClones;
   dir: string;
@@ -42,7 +46,7 @@ export async function cloneLab(testInfo: TestInfo): Promise<CloneLab> {
       await host.dispose();
       await site.close();
     };
-    return { site, host, dir, clones: [], dispose };
+    return { testInfo, site, host, dir, clones: [], dispose };
   } catch (error) {
     await site.close();
     throw error;
@@ -210,13 +214,23 @@ async function afterRequest(lab: CloneLab, clone: Worker, asked: Mode, running: 
 }
 
 /** What a failed headed reopen leaves to read: the launcher's words, Chrome's stderr, the lock, the processes. */
-async function reopenEvidence(lab: CloneLab, clone: Worker, stderr: string) {
-  const chromeLog = await readFile(join(dirname(lab.dir), "chrome.log"), "utf8").catch(() => "");
+async function reopenEvidence(lab: CloneLab, clone: Worker, opened: Scripted, moments: Moments) {
+  const chromeLogPath = join(dirname(lab.dir), "chrome.log");
+  const chromeLog = await readFile(chromeLogPath, "utf8").catch(() => "");
   return {
-    stderr: stderr.slice(-1500),
+    stderr: opened.stderr.slice(-1500),
     chromeLog: chromeLog.slice(-3000),
     singletonLock: await readlink(join(clone.root, "SingletonLock")).catch(() => null),
     commandLines: (await lab.host.commandLines(clone.root)).map((line) => line.slice(0, 300)),
+    ...(await reopenFacts({
+      testInfo: lab.testInfo,
+      root: clone.root,
+      downloads: clone.downloads,
+      profileId: clone.profileId,
+      launchedPid: opened.pid,
+      chromeLog: chromeLogPath,
+      moments,
+    })),
   };
 }
 
@@ -226,16 +240,19 @@ export async function exclusiveSample(lab: CloneLab): Promise<Sample> {
   if (!headlessOne || !other) throw new Error("t9.exclusive needs two clones.");
   const first = await afterRequest(lab, headlessOne, "headed", "headless");
   await lab.host.quit(other.root);
+  const quitEnded = Date.now();
+  const reopenStarted = Date.now();
   const reopened = await openClone(lab.host, lab.dir, other.name, {
     mode: "headed",
     env: { [PAGE_ENV]: lab.site.startUrl(other.marker) },
   });
+  const moments = { quitEnded, reopenStarted };
   const second =
     reopened.code === 0
       ? await afterRequest(lab, other, "headless", "headed")
       : {
           problems: [`B did not reopen headed: exit ${reopened.code}`],
-          observation: await reopenEvidence(lab, other, reopened.stderr),
+          observation: await reopenEvidence(lab, other, reopened, moments),
         };
   return judged([...first.problems, ...second.problems], {
     headlessThenHeaded: first.observation,

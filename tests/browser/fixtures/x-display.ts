@@ -80,6 +80,17 @@ export async function windowOwners(pattern: string): Promise<number[]> {
   return owners.filter((pid) => pid > 0);
 }
 
+/** The title and owning pid of every window whose name or class matches `pattern`. */
+export async function windowSummaries(pattern: string): Promise<{ title: string; pid: number }[]> {
+  const ids = (await search(pattern)).split("\n").filter(Boolean);
+  return Promise.all(
+    ids.map(async (id) => ({
+      title: await xdotool("getwindowname", id).catch(() => ""),
+      pid: await xdotool("getwindowpid", id).then(Number, () => 0),
+    })),
+  );
+}
+
 /** Polls `check` every 100 ms for up to `ms`, ten seconds unless told otherwise. */
 async function until(check: () => Promise<boolean>, what: string, ms = 10_000): Promise<void> {
   for (let left = ms / POLL_MS; left > 0; left--) {
