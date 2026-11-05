@@ -69,6 +69,10 @@ for (const shell of shells) {
       created.clones.map((it) => [it.name, it.instanceId, true]),
     );
     for (const clone of opened.clones) assert.match(clone.boot, V4);
+    for (const name of ["w1", "w2"]) {
+      const marker = readFileSync(join(s.bases, "clones", name, ".recnrun-clone"), "utf8");
+      assert.match(marker, new RegExp(`^operationId=${OPERATION}$`, "m"), "the request's id");
+    }
     assert.equal(s.launchCount(), 4, "base, template, and two clones launched Chrome once each");
     const done = call();
     assert.deepEqual(

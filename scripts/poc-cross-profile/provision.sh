@@ -22,7 +22,8 @@
 #   template     base.sh template; no ack in time (69) is pending-action: the step repeats on the next call
 #   freeze       base.sh quit, then base.sh freeze
 #   create-clone clone.sh create-clone for each w<i> (i up to clones) not created yet, in <basesDir>/clones
-#   open-clone   clone-open.sh open-clone for each w<i> without an ack boot yet
+#   open-clone   clone-open.sh open-clone for each w<i> without an ack boot yet, given the request's
+#                operationId, which its printed operationId= must repeat
 #   done
 # Every failed step writes state=error with its exit code and the last line of its stderr and stops
 # until the request folder holds a plain empty file `retry` (consumed by the next call).
@@ -270,7 +271,8 @@ create_one() {
   write_op
 }
 open_one() {
-  run_step "$pv_dir/clone-open.sh" open-clone "$rq_bases/clones" "$1" "$record" "$ns" || { step_failed $?; return 1; }
+  run_step "$pv_dir/clone-open.sh" open-clone "$rq_bases/clones" "$1" "$record" "$ns" headed "$op_id" || { step_failed $?; return 1; }
+  if [ "$(output_value operationId)" != "$op_id" ]; then sx_kind=fail sx_text='exit 70: clone-open.sh answered another operation id'; return 1; fi
   oo_boot=$(output_value boot)
   if ! is_uuid "$oo_boot"; then sx_kind=fail sx_text='exit 70: clone-open.sh printed no boot'; return 1; fi
   op_boots="$op_boots$1=$oo_boot$pv_nl"

@@ -1,5 +1,5 @@
 #!/bin/sh
-# clone-open.sh open-clone <clones-dir> <clone> <record> <namespace> [headed|headless]
+# clone-open.sh open-clone <clones-dir> <clone> <record> <namespace> [headed|headless [operationId]]
 #
 # The first opening of a clone (POC PLAN.md P5.3, decisions 10, 11, and 13), over clone.sh. POSIX sh
 # only, no JSON parser, nothing read from a file is ever run or expanded; positional arguments and one
@@ -10,6 +10,7 @@
 # (<downloadsRoot>/RECnRun/poc/<ns>/peers/<profileId>/presence.json, else 66), and starts Chrome on the
 # clone root with the bootstrap URL
 #   chrome-extension://<extensionId>/bootstrap.html#clone=<token>&instance=<instanceId>&operation=<operationId>&namespace=<ns>&master=<masterProfileId>.<masterIdentityKey>
+# The operationId is the given lowercase v4 uuid (provision.sh passes its request's), else a fresh one.
 # Then it waits for acks/<instanceId>/<token>.json under a candidate Downloads root: the closed ack
 # holds this token, instance, and operation, an identity, a boot, and "provisioned":true; any other is
 # ignored. Only that ack registers the clone: one block (role=worker, downloadsRoot the root that
@@ -137,7 +138,7 @@ start_clone() {
   chrome=$("$finder") || { log 'no Google Chrome found'; exit 66; }
   unpacked_code_present "$root" Default "$mk_ext" || exit $?
   token=$(new_token)
-  operation=$(new_instance_id) || die 70 'no native source of a v4 uuid (uuidgen or /proc)'
+  [ -n "$operation" ] || operation=$(new_instance_id) || die 70 'no native source of a v4 uuid (uuidgen or /proc)'
   url="chrome-extension://$mk_ext/bootstrap.html#clone=$token&instance=$instance&operation=$operation&namespace=$ns&master=$oc_master_id.$master_key"
   set -- "--user-data-dir=$root" --profile-directory=Default --no-first-run --no-default-browser-check "$url"
   [ "$mode" != headless ] || set -- --headless=new "$@"
@@ -168,10 +169,14 @@ reopen_registered() {
   exit "$oc_code"
 }
 open_clone() {
-  [ "$#" -ge 4 ] || die 64 'usage: clone-open.sh open-clone <clones-dir> <clone> <record> <namespace> [headed|headless]'
-  [ "$#" -le 5 ] || refuse 'a free argument: the request is the clones directory, clone, record, namespace, and mode'
-  mode=headed
+  [ "$#" -ge 4 ] || die 64 'usage: clone-open.sh open-clone <clones-dir> <clone> <record> <namespace> [headed|headless [operationId]]'
+  [ "$#" -le 6 ] || refuse 'a free argument: the request is the clones directory, clone, record, namespace, mode, and operation id'
+  mode=headed operation=''
   [ "$#" -lt 5 ] || mode=$5
+  if [ "$#" -eq 6 ]; then
+    is_v4 "$6" || refuse 'the operation id is not a lowercase v4 uuid'
+    operation=$6
+  fi
   case $mode in headed | headless) ;; *) refuse 'the mode is neither headed nor headless' ;; esac
   check_timing
   clones=$1 clone=$2 record=$3 ns=$4
@@ -199,7 +204,7 @@ open_clone() {
 }
 
 if [ -z "$co_as_library" ]; then
-  [ "$#" -ge 1 ] || die 64 'usage: clone-open.sh open-clone <clones-dir> <clone> <record> <namespace> [headed|headless]'
+  [ "$#" -ge 1 ] || die 64 'usage: clone-open.sh open-clone <clones-dir> <clone> <record> <namespace> [headed|headless [operationId]]'
   entry=$1
   shift
   case $entry in
