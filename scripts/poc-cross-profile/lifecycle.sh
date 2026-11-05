@@ -1,0 +1,259 @@
+#!/bin/sh
+# lifecycle.sh <command> [argument ...]
+#
+# The launcher's idempotence, timeouts, locks, and pause policy (POC PLAN.md P4.4, decision 11).
+# POSIX sh only, no JSON parser, nothing read from a file is ever run or expanded. Source it with
+# RECNRUN_DISCOVERY_LIB=1 to get the functions without the command entry.
+#
+#   lock <state-dir> | unlock <state-dir>   one launcher per state dir: <state-dir>/launcher.lock names
+#                                           the caller's pid ($PPID); a dead pid's lock is taken over
+#   request <state-dir> <record> <namespace> <profileId> [headed|headless]
+#   pause | resume | reset <state-dir> <profileId>
+#   stop <state-dir> <profileId> [--force]  SIGTERM to the pid the state names, only while its command
+#                                           line names the user data dir; --force adds SIGKILL
+#   status <state-dir>                      profileId status pid attempts nextAt, one line each
+#
+# State, <state-dir>/profiles/<profileId>: key=value lines with token, pid, startedAt, attempts,
+# nextAt (epoch seconds), status (opening, open, failed, paused, stopped), boot, root (the Downloads
+# root), userDataDir; any other key or value outside its grammar exits 65.
+# Pause policy: an extension signals Disconnect/Forget by going silent, which is not a crash. An open
+# profile with no fresh presence whose pid is alive and whose token ack is still on disk chose to be
+# silent: it becomes paused and is not relaunched until resume. A dead pid is a crash and relaunches.
+#
+# Environment: RECNRUN_OPEN_TIMEOUT_S (60), RECNRUN_LIFECYCLE_BACKOFF_S (5), _MAX_ATTEMPTS (5), _STOP_S (20).
+# Exit: 0 done, 64 wrong call, 65 refused, 70 failed (retry later, max attempts, or still running),
+# 73 paused, 75 busy (another launcher, or an attempt under way); open.sh's 66 and 69 pass through.
+
+lifecycle_as_library=${RECNRUN_DISCOVERY_LIB:-}
+# shellcheck source=open.sh
+RECNRUN_DISCOVERY_LIB=1 . "$(dirname -- "$0")/open.sh"
+umask 077
+# shellcheck source=lifecycle-state.sh
+. "$(dirname -- "$0")/lifecycle-state.sh"
+
+log() { printf 'lifecycle.sh: %s\n' "$*" >&2; }
+die() {
+  d_status=$1
+  shift
+  log "$*"
+  exit "$d_status"
+}
+# Runs the function $3 on the state of profile $2 in state dir $1 under the profile lock.
+mutate() {
+  state_dir "$1"
+  is_v4 "$2" || die 65 'the profile id is not a lowercase v4 uuid'
+  lc_lock=$1/profiles/$2.lock
+  take_lock "$lc_lock" "$$"
+  trap 'release_lock "$lc_lock" "$$"' EXIT
+  read_state "$1/profiles/$2"
+  "$3"
+  write_state
+}
+do_pause() { st_status=paused; }
+do_resume() { [ "$st_status" != paused ] || st_status=stopped; }
+do_reset() { st_attempts=0 st_next=0; }
+cmd_status() {
+  state_dir "$1"
+  for ss_file in "$1"/profiles/*; do
+    ss_name=${ss_file##*/}
+    is_v4 "$ss_name" || continue
+    read_state "$ss_file"
+    printf '%s %s %s %s %s\n' "$ss_name" "$st_status" "${st_pid:--}" "$st_attempts" "$st_next"
+  done
+}
+
+# --- Stop ------------------------------------------------------------------------------------
+
+# The pid must be Chrome on this user data dir; a name or a recycled pid is never enough.
+names_user_dir() {
+  [ -n "$st_user" ] || return 1
+  nu_cmd=$(ps -o command= -p "$st_pid" 2>/dev/null)
+  case $nu_cmd in *"--user-data-dir=$st_user "* | *"--user-data-dir=$st_user") return 0 ;; esac
+  return 1
+}
+stop_profile() {
+  if pid_alive "$st_pid"; then
+    names_user_dir || die 65 "pid $st_pid does not name $st_user: not signalled"
+    kill -TERM "$st_pid"
+    sp_waited=0
+    while pid_alive "$st_pid" && [ "$sp_waited" -lt "$stop_s" ]; do
+      sleep 1
+      sp_waited=$((sp_waited + 1))
+    done
+    if pid_alive "$st_pid"; then
+      [ "$stop_force" = 1 ] || die 70 "pid $st_pid still runs after $stop_s s: stop --force kills it"
+      kill -KILL "$st_pid"
+    fi
+  fi
+  st_status=stopped st_pid=''
+}
+cmd_stop() {
+  stop_s=$(setting "${RECNRUN_LIFECYCLE_STOP_S:-}" 20 RECNRUN_LIFECYCLE_STOP_S) || exit $?
+  stop_force=0
+  case ${3:-} in '') ;; --force) stop_force=1 ;; *) die 64 'usage: stop <state-dir> <profileId> [--force]' ;; esac
+  [ "$#" -le 3 ] || die 64 'usage: stop <state-dir> <profileId> [--force]'
+  mutate "$1" "$2" stop_profile
+}
+
+# --- Request ---------------------------------------------------------------------------------
+
+# A number after "key": in the presence text, else exit 1.
+number_after() {
+  na_rest=${1#*\""$2"\":}
+  [ "$na_rest" != "$1" ] || return 1
+  na_value=${na_rest%%[!0-9]*}
+  is_count "$na_value" || return 1
+  printf '%s\n' "$na_value"
+}
+# The presence a profile publishes, with catalog.sh's clock rules: unexpired, stamped at most 5 s ahead,
+# living at most 60 s.
+presence_fresh() {
+  [ -n "$st_root" ] || return 1
+  pf_file=$st_root/RECnRun/poc/$lc_ns/peers/$lc_id/presence.json
+  if [ ! -f "$pf_file" ] || [ -L "$pf_file" ]; then return 1; fi
+  [ "$(wc -c <"$pf_file" | tr -d ' ')" -le 2048 ] || return 1
+  pf_text=$(cat -- "$pf_file")
+  case $pf_text in '{"profileId":"'"$lc_id"'"'*) ;; *) return 1 ;; esac
+  pf_created=$(number_after "$pf_text" createdAt) || return 1
+  pf_expires=$(number_after "$pf_text" expiresAt) || return 1
+  pf_now="$(date +%s)000"
+  [ "$pf_expires" -gt "$pf_created" ] && [ $((pf_expires - pf_created)) -le 60000 ] || return 1
+  [ "$pf_expires" -gt "$pf_now" ] && [ "$pf_created" -le $((pf_now + 5000)) ]
+}
+ack_present() {
+  [ -n "$st_token" ] && [ -n "$st_root" ] || return 1
+  read_ack "$st_root/RECnRun/poc/$lc_ns/acks/$lc_id/$st_token.json" "$st_token" "$lc_id" >/dev/null
+}
+# An open profile is left alone while present, and paused when it is alive but silent.
+check_open() {
+  if presence_fresh; then
+    printf 'boot=%s\n' "$st_boot"
+    exit 0
+  fi
+  if pid_alive "$st_pid" && ack_present; then
+    st_status=paused
+    write_state
+    die 73 "$lc_id is alive but silent: paused by the policy, resume it to relaunch"
+  fi
+}
+# Exits unless a launch is allowed now.
+decide() {
+  case $st_status in
+    paused) die 73 "$lc_id is paused: resume it first" ;;
+    opening) [ $((lc_now - st_started)) -ge "$open_s" ] || die 75 "an open attempt of $lc_id is under way" ;;
+    open) check_open ;;
+  esac
+  [ "$st_attempts" -lt "$max_attempts" ] || die 70 "$lc_id failed $st_attempts times: reset it first"
+  [ "$st_next" -le "$lc_now" ] || die 70 "retry at $st_next"
+}
+# min(2^attempts, 64) times the base, from the clock at the failure.
+schedule_retry() {
+  sr_factor=1
+  sr_i=0
+  while [ "$sr_i" -lt "$st_attempts" ] && [ "$sr_factor" -lt 64 ]; do
+    sr_factor=$((sr_factor * 2))
+    sr_i=$((sr_i + 1))
+  done
+  st_next=$(($(date +%s) + sr_factor * backoff_s))
+}
+# Reads root=, boot=, and token= from the lines open.sh printed.
+take_result() {
+  while IFS= read -r tr_line; do
+    case $tr_line in
+      root=*) if is_directory "${tr_line#*=}"; then st_root=${tr_line#*=}; fi ;;
+      boot=*) if is_uuid "${tr_line#*=}"; then st_boot=${tr_line#*=}; fi ;;
+      token=*) if is_v4 "${tr_line#*=}"; then st_token=${tr_line#*=}; fi ;;
+    esac
+  done <<EOF
+$1
+EOF
+}
+# The pid open.sh logged on stderr, whatever the outcome.
+take_pid() {
+  st_pid=''
+  while IFS= read -r tp_line; do
+    case $tp_line in *' pid='[0-9]*) st_pid=${tp_line##* pid=} ;; esac
+  done <"$1"
+  is_count "$st_pid" || st_pid=''
+  cat -- "$1" >&2
+  rm -f -- "$1"
+}
+launch() {
+  st_status=opening st_started=$lc_now
+  write_state
+  release_lock "$lc_lock" "$$"
+  l_err=$st_file.$(lc_random).err
+  l_out=$(open_profile "$lc_record" "$lc_ns" "$lc_id" "$lc_mode" 2>"$l_err")
+  l_rc=$?
+  take_pid "$l_err"
+  case $l_rc in
+    0)
+      take_result "$l_out"
+      st_status=open st_attempts=0 st_next=0 st_user=$p_user
+      write_state
+      printf 'boot=%s\n' "$st_boot"
+      ;;
+    69)
+      st_status=failed st_attempts=$((st_attempts + 1))
+      schedule_retry
+      write_state
+      exit 69
+      ;;
+    *)
+      st_status=$l_before
+      write_state
+      exit "$l_rc"
+      ;;
+  esac
+}
+cmd_request() {
+  if [ "$#" -lt 4 ] || [ "$#" -gt 5 ]; then die 64 'usage: request <state-dir> <record> <namespace> <profileId> [headed|headless]'; fi
+  open_s=$(setting "${RECNRUN_OPEN_TIMEOUT_S:-}" 60 RECNRUN_OPEN_TIMEOUT_S) || exit $?
+  backoff_s=$(setting "${RECNRUN_LIFECYCLE_BACKOFF_S:-}" 5 RECNRUN_LIFECYCLE_BACKOFF_S) || exit $?
+  max_attempts=$(setting "${RECNRUN_LIFECYCLE_MAX_ATTEMPTS:-}" 5 RECNRUN_LIFECYCLE_MAX_ATTEMPTS) || exit $?
+  lc_record=$2 lc_ns=$3 lc_id=$4 lc_mode=${5:-headed}
+  case $lc_mode in headed | headless) ;; *) die 65 'the mode is neither headed nor headless' ;; esac
+  is_namespace "$lc_ns" || die 65 'the namespace is not a namespace'
+  is_v4 "$lc_id" || die 65 'the profile id is not a lowercase v4 uuid'
+  find_profile "$lc_record" "$lc_ns" "$lc_id"
+  validate_profile
+  state_dir "$1"
+  lc_lock=$1/profiles/$lc_id.lock
+  take_lock "$lc_lock" "$$"
+  trap 'release_lock "$lc_lock" "$$"' EXIT
+  read_state "$1/profiles/$lc_id"
+  lc_now=$(date +%s)
+  l_before=$st_status
+  [ "$l_before" != none ] || l_before=stopped
+  decide
+  launch
+}
+cmd_unlock() {
+  state_dir "$1"
+  cu_pid=
+  if [ -f "$1/launcher.lock" ]; then read -r cu_pid <"$1/launcher.lock" || :; fi
+  [ -z "$cu_pid" ] || [ "$cu_pid" = "$PPID" ] || die 75 "another launcher holds the lock (pid $cu_pid)"
+  release_lock "$1/launcher.lock" "$PPID"
+}
+
+if [ -z "$lifecycle_as_library" ]; then
+  [ "$#" -ge 2 ] || die 64 'usage: lifecycle.sh lock|unlock|request|pause|resume|reset|stop|status <state-dir> ...'
+  lc_command=$1
+  shift
+  trap 'exit 143' TERM
+  trap 'exit 130' INT
+  case $lc_command in
+    lock)
+      state_dir "$1"
+      take_lock "$1/launcher.lock" "$PPID"
+      ;;
+    unlock) cmd_unlock "$1" ;;
+    request) cmd_request "$@" ;;
+    pause) mutate "$1" "${2:-}" do_pause ;;
+    resume) mutate "$1" "${2:-}" do_resume ;;
+    reset) mutate "$1" "${2:-}" do_reset ;;
+    stop) cmd_stop "$@" ;;
+    status) cmd_status "$1" ;;
+    *) die 64 "unknown command $lc_command" ;;
+  esac
+fi
