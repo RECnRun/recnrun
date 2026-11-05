@@ -22,6 +22,7 @@ import type { Rig, Scene } from "../../experiments/fixtures/launcher-open.ts";
 import { expect, resolveChromePath } from "./chrome.ts";
 import { POC_EXTENSION_ID } from "./downloads-profiles.ts";
 import { extensionPath, loadUnpacked } from "./extension-loaders.ts";
+import type { LoadedExtension, UnpackedOptions } from "./extension-loaders.ts";
 import { keepDisplayOnFailure } from "./x-display.ts";
 
 /*
@@ -88,21 +89,40 @@ async function keepEvidence(dir: string, rig: Rig, testInfo: TestInfo) {
   ).catch(() => undefined);
 }
 
+/** What an install needs: where the profile lives, and optionally work done before the install's reload. */
+export interface Install {
+  root: string;
+  downloads: string;
+  record: string;
+  profileDirectory: string;
+  prepare?: (extension: LoadedExtension) => Promise<void>;
+  /** Launch options of the Chrome that installs; the lab's own Chrome when absent, the Mac's on the host. */
+  chrome?: Partial<UnpackedOptions>;
+}
+
 /** poc-d0 installed in one profile of `root` and kept by one reload; the profile is registered in `record`. */
-export async function installProfile(
+export const installProfile = (
   root: string,
   downloads: string,
   record: string,
   profileDirectory: string,
-): Promise<Scene> {
+) => installWith({ root, downloads, record, profileDirectory });
+
+/** installProfile that also runs `prepare` before the reload that ends the install. */
+export async function installWith(install: Install): Promise<Scene> {
+  const { root, downloads, record, profileDirectory, prepare, chrome = {} } = install;
   await mkdir(join(root, profileDirectory), { recursive: true });
   await mkdir(downloads, { recursive: true });
   const preferences = JSON.stringify(preferencesOf(downloads));
   await writeFile(join(root, profileDirectory, "Preferences"), preferences);
   const args = [`--profile-directory=${profileDirectory}`];
-  const extension = await loadUnpacked(extensionPath("poc-d0"), { userDataDir: root, args });
+  const extension = await loadUnpacked(extensionPath("poc-d0"), {
+    ...chrome,
+    userDataDir: root,
+    args: [...(chrome.args ?? []), ...args],
+  });
   try {
-    return await registerIn(extension, { root, downloads, record, profileDirectory });
+    return await registerIn(extension, { root, downloads, record, profileDirectory, prepare });
   } finally {
     await extension.close();
   }

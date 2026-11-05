@@ -466,7 +466,10 @@ Gate P6: verify · CL16, CL17 · review of P5+P6 · push
   - commit: the commit with subject "Add the headless lab runner for Chrome Stable"
 - [ ] P7.2 T1–T3 one root, visible and `--no-startup-window`, E11 (lab, host)
 - [ ] P7.3 T4–T5 one root, headless attempt, E12 (lab, host)
-- [ ] P7.4 T6–T8 separate roots, headless workers, E13 (lab, host); T9 headless on clones
+- [i] P7.4 T6–T8 separate roots, headless workers, E13 (lab, host); T9 headless on clones
+  - red: lab negative control (no worker binding, workers opened headed): `E13.t6.workers` fail, `E13.t6.commands` fail ("The other profile did not answer in time."), run `...f7183899`; `-g "every E13 hypothesis"` alone fails "every hypothesis ran"; the command's own red/green is in `391b323f`
+  - green: `RECNRUN_EXPERIMENT_SAMPLES=smoke vp run test:headless -- tests/headless/E13-separate-roots.spec.ts` 5 passed (8.6m), 11 pass and focus/pip unavailable, run `...aae617b1`, [E13.md](experiments/E13.md); host twin written and type-checked, not run (pending the orchestrator)
+  - commit: the commit with subject "Drive headless workers with open-tab in the E13 lab and host twin", after `391b323f` (the peer command)
 
 Gate P7: verify · E11–E13 (review and push fused into Gate P8)
 

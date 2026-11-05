@@ -9,7 +9,7 @@ import type { Server } from "node:http";
  */
 
 /** One request the page server saw. */
-export interface Seen {
+interface Seen {
   path: string;
   cookie: string;
   at: number;

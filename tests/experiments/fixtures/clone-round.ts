@@ -101,7 +101,7 @@ const store = (profile: DownloadsProfile, items: Record<string, unknown>) =>
 
 /** The master's side of the binding, which the local channel writes in the product: its workers and its own record. */
 export async function bindMaster(
-  host: CloneHost,
+  host: Pick<CloneHost, "master">,
   workers: Pick<DownloadsProfile, "profileId" | "name">[],
 ) {
   const master = host.master.profile;

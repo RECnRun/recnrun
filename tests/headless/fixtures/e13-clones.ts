@@ -10,7 +10,7 @@ import { createClone, openClone } from "../../experiments/fixtures/clones.ts";
 import { judged } from "../../experiments/fixtures/downloads-verdicts.ts";
 import { presenceIn } from "../../experiments/fixtures/e4-launcher.ts";
 import type { Sample } from "../../experiments/outcome.ts";
-import { PAGE_ENV, PAGE_FLAG } from "./e13-lab.ts";
+import { PAGE_ENV, PAGE_FLAG, dockerProbe } from "./e13-lab.ts";
 import type { Mode, Worker } from "./e13-lab.ts";
 import { masterLinked, modeProblems } from "./e13-cells.ts";
 import { startSite } from "./e13-site.ts";
@@ -47,6 +47,13 @@ export async function cloneLab(testInfo: TestInfo): Promise<CloneLab> {
   }
 }
 
+/** What the master asks of the clones: its dashboard and the site they load. */
+export function remoteOf(lab: CloneLab) {
+  const dashboard = lab.host.master.view?.dashboard;
+  if (!dashboard) throw new Error("The lab master has no dashboard.");
+  return { dashboard, site: lab.site };
+}
+
 /** The ack's createdAt, read from disk, minus `since`: how long until the extension answered. */
 async function ackSeconds(downloads: string, id: string, token: string, since: number) {
   const ack = JSON.parse(await readFile(ackFile(downloads, id, token), "utf8")) as {
@@ -56,7 +63,7 @@ async function ackSeconds(downloads: string, id: string, token: string, since: n
 }
 
 /** Makes clone `name` and opens it with `mode`, carrying the test page as a startup page. */
-export async function openNew(lab: CloneLab, name: string, mode: Mode) {
+async function openNew(lab: CloneLab, name: string, mode: Mode) {
   const created = await createClone(lab.host, lab.dir, name);
   const marker = created.instanceId.replaceAll("-", "");
   const started = Date.now();
@@ -88,7 +95,7 @@ export async function clonesSample(lab: CloneLab, names: string[]): Promise<Samp
     const { clone, opened, ackS } = await openNew(lab, name, "headless");
     if (opened.code !== 0)
       problems.push(`${name}: open-clone exited ${opened.code} ${opened.stderr.slice(-200)}`);
-    problems.push(...(await modeProblems(clone, "headless")));
+    problems.push(...(await modeProblems(dockerProbe, clone, "headless")));
     opens.push({ name, exit: opened.code, totalS: Math.round(opened.ms / 100) / 10, ackS });
   }
   const master = lab.host.master.profile;

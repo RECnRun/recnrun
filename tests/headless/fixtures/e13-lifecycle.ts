@@ -63,7 +63,7 @@ export async function backgroundSample(lab: Lab): Promise<Sample> {
   if (!secondUp) problems.push(`${second.name} lost its link with ${first.name}'s`);
   const again = await lab.open(first, "headless");
   if (again.code !== 0) problems.push(`relaunch exited ${again.code}: ${again.stderr.slice(-160)}`);
-  problems.push(...again.problems, ...(await modeProblems(first, "headless")));
+  problems.push(...again.problems, ...(await modeProblems(lab.probe, first, "headless")));
   const started = Date.now();
   const relinked = await masterLinked(lab, [first.profileId]);
   if (!relinked) problems.push(`the master never relinked ${first.name}`);
@@ -112,7 +112,7 @@ async function passIn(lab: Lab, mode: Mode, last: boolean) {
   const launched = await lab.open(worker, mode);
   const presence = await presenceIn(worker.downloads, worker.profileId);
   const linked = (await masterLinked(lab, [worker.profileId])) !== undefined;
-  const problems = [...launched.problems, ...(await modeProblems(worker, mode))];
+  const problems = [...launched.problems, ...(await modeProblems(lab.probe, worker, mode))];
   problems.push(...(await pageProblems(lab, worker, mode, since)));
   if (!last) await delay(FLUSH_MS);
   const pass: Pass = {

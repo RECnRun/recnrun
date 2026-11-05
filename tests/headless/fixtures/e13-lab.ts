@@ -2,19 +2,25 @@ import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import type { Page } from "@playwright/test";
-import { chromesOf, installProfile, skeleton } from "../../browser/fixtures/launcher-rig.ts";
+import type { LoadedExtension } from "../../browser/fixtures/extension-loaders.ts";
+import { chromesOf, installWith, skeleton } from "../../browser/fixtures/launcher-rig.ts";
+import type { Install } from "../../browser/fixtures/launcher-rig.ts";
 import {
   createDownloadsGroup,
   openViews,
   tempPlatform,
 } from "../../browser/fixtures/downloads-profiles.ts";
-import type { DownloadsProfile } from "../../browser/fixtures/downloads-profiles.ts";
+import type {
+  DownloadsPlatform,
+  DownloadsProfile,
+} from "../../browser/fixtures/downloads-profiles.ts";
 import { loop } from "../../browser/fixtures/catalog-loop.ts";
 import { within } from "../../browser/fixtures/trust.ts";
 import { namespaceFolder, presenceIn, runCatalog } from "../../experiments/fixtures/e4-launcher.ts";
 import { ackProblems, quit, runOpen } from "../../experiments/fixtures/launcher-open.ts";
 import type { Scene } from "../../experiments/fixtures/launcher-open.ts";
-import { NAMESPACE, folderOf } from "../../experiments/fixtures/clones.ts";
+import { windowOwners } from "../../browser/fixtures/x-display.ts";
+import { NAMESPACE, folderOf, readJson } from "../../experiments/fixtures/clones.ts";
 import { startSite } from "./e13-site.ts";
 import type { Site } from "./e13-site.ts";
 
@@ -66,9 +72,56 @@ export interface Launched {
   problems: string[];
 }
 
+/** What a rig can tell about the processes of a root: /proc and Xvfb in Docker, ps on the Mac. */
+export interface Probe {
+  commandLines(root: string): Promise<string[]>;
+  survivors(root: string): Promise<number[]>;
+  /** Visible windows of a root's processes; absent where no X server exists (the Mac). */
+  windows?(root: string): Promise<number>;
+}
+
+/** The environment a lab runs in: where roots live, how Chrome is installed, how processes are read. */
+export interface LabRig {
+  probe: Probe;
+  platform(): DownloadsPlatform;
+  /** The launcher's folder: its `dir`, the environment of the scripts (with the page flag), and the record. */
+  frame(flags: readonly string[]): Promise<{
+    dir: string;
+    env: NodeJS.ProcessEnv;
+    record: string;
+    dispose: () => Promise<void>;
+  }>;
+  install(input: Install): Promise<Scene>;
+}
+
+/** Processes of a root from /proc, and X windows of Xvfb. */
+export const dockerProbe: Probe = {
+  commandLines: async (root) =>
+    Promise.all(
+      (await chromesOf(root)).map(async (pid) =>
+        (await readFile(`/proc/${pid}/cmdline`, "utf8").catch(() => "")).replaceAll("\0", " "),
+      ),
+    ),
+  survivors: chromesOf,
+  windows: async (root) => {
+    const pids = new Set(await chromesOf(root));
+    return (await windowOwners("chrome")).filter((pid) => pids.has(pid)).length;
+  },
+};
+
+const dockerRig: LabRig = {
+  probe: dockerProbe,
+  platform: () => tempPlatform("recnrun-e13-master"),
+  frame: (flags) => skeleton(undefined, flags),
+  install: installWith,
+};
+
 export interface Lab {
+  probe: Probe;
   site: Site;
   master: DownloadsProfile;
+  /** The master as the clone rigs describe it, for the binding the local channel writes in the product. */
+  masterSide: { master: { profileId: string; downloads: string; profile: DownloadsProfile } };
   /** The master's dashboard page; reopened when a cell closes it. */
   dashboard: Page;
   workers: Worker[];
@@ -125,7 +178,7 @@ function catalogLoop(record: string, folders: string[]) {
 }
 
 /** The master's block of the launcher record: a throwaway root standing in for the personal Default. */
-export const masterBlock = (master: DownloadsProfile, downloads: string) =>
+const masterBlock = (master: DownloadsProfile, downloads: string) =>
   [
     `userDataDir=${master.root}`,
     "profileDirectory=Default",
@@ -136,8 +189,8 @@ export const masterBlock = (master: DownloadsProfile, downloads: string) =>
   ].join("\n");
 
 /** Waits for the master's first presence and opens its dashboard beside a page of the static site. */
-export async function startMaster(prefix: string, site: Site) {
-  const group = await createDownloadsGroup(tempPlatform(prefix));
+async function startMaster(rig: LabRig, site: Site) {
+  const group = await createDownloadsGroup(rig.platform());
   try {
     const master = await group.launch("Master");
     const view = await openViews(master, site.origin);
@@ -151,7 +204,7 @@ export async function startMaster(prefix: string, site: Site) {
 }
 
 /** open.sh for a hand-installed worker, with the timing of its parts. */
-export function launcherOpen(
+function launcherOpen(
   lab: Pick<Lab, "env" | "site"> & { dir: string },
   worker: Worker,
   scene: Scene,
@@ -193,10 +246,10 @@ export function launcherOpen(
 }
 
 /** The hand-installed workers of V1: poc-d0 loaded on each root and kept by one reload, then quit. */
-export async function v1Lab(count: number): Promise<Lab> {
+export async function v1Lab(count: number, rig: LabRig = dockerRig): Promise<Lab> {
   const site = await startSite();
-  const { dir, env, record, dispose: removeDir } = await skeleton(undefined, [PAGE_FLAG]);
-  const started = await startMaster("recnrun-e13-master", site).catch(async (error: unknown) => {
+  const { dir, env, record, dispose: removeDir } = await rig.frame([PAGE_FLAG]);
+  const started = await startMaster(rig, site).catch(async (error: unknown) => {
     await site.close();
     await removeDir();
     throw error;
@@ -208,17 +261,26 @@ export async function v1Lab(count: number): Promise<Lab> {
   let stopCatalog: () => Promise<void> = async () => undefined;
   const dispose = async () => {
     await stopCatalog().catch(() => undefined);
-    for (const worker of workers) await quitWorker(worker).catch(() => undefined);
+    for (const worker of workers) await quitWorker(rig.probe, worker).catch(() => undefined);
     await group.dispose().catch(() => undefined);
     await site.close();
     await removeDir();
   };
   try {
     await writeFile(record, `${masterBlock(master, group.downloads)}\n`);
+    const masterPresence = await readJson(
+      join(folderOf(group.downloads), "peers", master.profileId, "presence.json"),
+    );
     for (let index = 1; index <= count; index++) {
       const root = join(dir, `worker-${index}`);
       const downloads = join(dir, `downloads-${index}`);
-      const scene = await installProfile(root, downloads, record, "Default");
+      const scene = await rig.install({
+        root,
+        downloads,
+        record,
+        profileDirectory: "Default",
+        prepare: (extension) => bindWorker(extension, masterPresence),
+      });
       // The installer attached over CDP; the file it left must not hide a client of the launcher's open.
       await rm(join(root, "DevToolsActivePort"), { force: true });
       const worker = {
@@ -242,17 +304,50 @@ export async function v1Lab(count: number): Promise<Lab> {
     throw error;
   }
   return {
+    probe: rig.probe,
     site,
     master,
+    masterSide: {
+      master: { profileId: master.profileId, downloads: group.downloads, profile: master },
+    },
     dashboard,
     workers,
     env,
     record,
     open: (worker, mode) => launcherOpen({ env, site, dir }, worker, sceneOf(scenes, worker))(mode),
     track: (downloads) => void folders.push(downloads),
-    stop: (worker) => quitWorker(worker),
+    stop: (worker) => quitWorker(rig.probe, worker),
     dispose,
   };
+}
+
+/**
+ * The worker's side of the binding, which the local channel writes in the product: the master's
+ * pin and its record, written while the installer is still attached. The master's side follows the
+ * first link (bindMaster); no client is on the worker once the launcher opens it.
+ */
+async function bindWorker(extension: LoadedExtension, presence: Record<string, unknown>) {
+  const { key } = presence.identity as { key: string };
+  const master = String(presence.profileId);
+  const now = Date.now();
+  const items = {
+    peerPins: {
+      [master]: {
+        fingerprint: presence.fingerprint,
+        identity: key,
+        pinnedAt: now,
+        source: "local-channel",
+      },
+    },
+    role: {
+      role: "worker",
+      masterProfileId: master,
+      masterIdentity: key,
+      boundAt: now,
+      source: "pairing",
+    },
+  };
+  await extension.evaluateInBackground(`chrome.storage.local.set(${JSON.stringify(items)})`);
 }
 
 function sceneOf(scenes: Map<Worker, Scene>, worker: Worker): Scene {
@@ -262,16 +357,7 @@ function sceneOf(scenes: Map<Worker, Scene>, worker: Worker): Scene {
 }
 
 /** SIGTERM to the worker's main Chrome and until nothing of its root runs. */
-export async function quitWorker(worker: Worker): Promise<void> {
-  await quit({ survivors: () => chromesOf(worker.root) }, [worker.pid]);
+async function quitWorker(probe: Probe, worker: Worker): Promise<void> {
+  await quit({ survivors: () => probe.survivors(worker.root) }, [worker.pid]);
   worker.pid = 0;
-}
-
-/** The processes of a worker root, with their command lines. */
-export async function commandLinesOf(root: string): Promise<string[]> {
-  return Promise.all(
-    (await chromesOf(root)).map(async (pid) =>
-      (await readFile(`/proc/${pid}/cmdline`, "utf8").catch(() => "")).replaceAll("\0", " "),
-    ),
-  );
 }

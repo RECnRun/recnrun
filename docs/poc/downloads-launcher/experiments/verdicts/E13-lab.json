@@ -1,0 +1,468 @@
+[
+  {
+    "experiment": "E13",
+    "hypothesis": "E13.t6.workers",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "2 hand-installed workers, one root each, opened by open.sh headless; the master is headed on Xvfb and stands in for the personal Default, no CDP client is on any worker",
+    "debugger": "none",
+    "observations": [
+      {
+        "workers": 2,
+        "opens": [
+          {
+            "mode": "headless",
+            "exit": 0,
+            "totalS": 1,
+            "presenceS": 0.3,
+            "ackS": 0.2
+          },
+          {
+            "mode": "headless",
+            "exit": 0,
+            "totalS": 1,
+            "presenceS": 0.3,
+            "ackS": 0.2
+          }
+        ],
+        "linked": 2
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "mode": "smoke",
+    "verdict": "pass",
+    "samples": 1
+  },
+  {
+    "experiment": "E13",
+    "hypothesis": "E13.t6.commands",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "2 hand-installed workers, one root each, opened by open.sh headless; each worker is bound to the master, which opens the test page in it and activates the tab it reports; the master is headed on Xvfb and stands in for the personal Default, no CDP client is on any worker",
+    "debugger": "none",
+    "observations": [
+      {
+        "replies": [
+          {
+            "name": "Worker 1",
+            "tab": "marker:33a4876df1914c7a924abbda83207f1c",
+            "activate": "ok"
+          },
+          {
+            "name": "Worker 2",
+            "tab": "marker:b004ac0606074feb912cb5f8b8c6b4a7",
+            "activate": "ok"
+          }
+        ]
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "mode": "smoke",
+    "verdict": "pass",
+    "samples": 1
+  },
+  {
+    "experiment": "E13",
+    "hypothesis": "E13.ops.navigation",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "2 hand-installed workers, one root each, opened by open.sh headless; the master opens the start page, which navigates itself to the marker page; the master is headed on Xvfb and stands in for the personal Default, no CDP client is on any worker",
+    "debugger": "none",
+    "observations": [
+      {
+        "navigated": [
+          {
+            "name": "Worker 1",
+            "requests": [
+              "/start/33a4876df1914c7a924abbda83207f1c",
+              "/marker/33a4876df1914c7a924abbda83207f1c"
+            ],
+            "url": "http://127.0.0.1:37593/marker/33a4876df1914c7a924abbda83207f1c"
+          },
+          {
+            "name": "Worker 2",
+            "requests": [
+              "/start/b004ac0606074feb912cb5f8b8c6b4a7",
+              "/marker/b004ac0606074feb912cb5f8b8c6b4a7"
+            ],
+            "url": "http://127.0.0.1:37593/marker/b004ac0606074feb912cb5f8b8c6b4a7"
+          }
+        ]
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "mode": "smoke",
+    "verdict": "pass",
+    "samples": 1
+  },
+  {
+    "experiment": "E13",
+    "hypothesis": "E13.t7.background",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "2 hand-installed workers, one root each, opened by open.sh headless; the master has no page open; the master is headed on Xvfb and stands in for the personal Default, no CDP client is on any worker",
+    "debugger": "none",
+    "observations": [
+      {
+        "masterPages": 1,
+        "linkedWithNoPage": 2,
+        "dropS": 2.6,
+        "relinkAfterAckS": 0.3,
+        "relaunch": {
+          "mode": "headless",
+          "exit": 0,
+          "totalS": 1,
+          "presenceS": 0.3,
+          "ackS": 0.1
+        }
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "mode": "smoke",
+    "verdict": "pass",
+    "samples": 1
+  },
+  {
+    "experiment": "E13",
+    "hypothesis": "E13.focus",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "2 hand-installed workers, one root each, opened by open.sh headless; the master is headed on Xvfb and stands in for the personal Default, no CDP client is on any worker",
+    "debugger": "none",
+    "observations": [],
+    "gestures": 0,
+    "steps": [],
+    "mode": "smoke",
+    "verdict": "unavailable",
+    "error": "not applicable: headless has no window to focus and no picture-in-picture surface",
+    "samples": 0
+  },
+  {
+    "experiment": "E13",
+    "hypothesis": "E13.pip",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "2 hand-installed workers, one root each, opened by open.sh headless; the master is headed on Xvfb and stands in for the personal Default, no CDP client is on any worker",
+    "debugger": "none",
+    "observations": [],
+    "gestures": 0,
+    "steps": [],
+    "mode": "smoke",
+    "verdict": "unavailable",
+    "error": "not applicable: headless has no window to focus and no picture-in-picture surface",
+    "samples": 0
+  },
+  {
+    "experiment": "E13",
+    "hypothesis": "E13.t8.alternate",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "one hand-installed worker root opened headed, headless, headed; the master is headed on Xvfb and stands in for the personal Default, no CDP client is on any worker",
+    "debugger": "none",
+    "observations": [
+      {
+        "passes": [
+          {
+            "linked": true,
+            "cookieOnStart": "",
+            "fingerprint": "BA:70:D2:C6",
+            "mode": "headed",
+            "exit": 0,
+            "totalS": 1,
+            "presenceS": 0.3,
+            "ackS": 0.2
+          },
+          {
+            "linked": true,
+            "cookieOnStart": null,
+            "fingerprint": "BA:70:D2:C6",
+            "mode": "headless",
+            "exit": 0,
+            "totalS": 1,
+            "presenceS": 0.3,
+            "ackS": 0.1
+          },
+          {
+            "linked": true,
+            "cookieOnStart": "e13=7ed8590d103b49b9a1d3ed077a573f76",
+            "fingerprint": "BA:70:D2:C6",
+            "mode": "headed",
+            "exit": 0,
+            "totalS": 1,
+            "presenceS": 0.3,
+            "ackS": 0.2
+          }
+        ]
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "mode": "smoke",
+    "verdict": "pass",
+    "samples": 1
+  },
+  {
+    "experiment": "E13",
+    "hypothesis": "E13.t9.clones",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "2 clones of one frozen base opened by clone-open.sh headless; the master is headed on Xvfb and stands in for the personal Default, no CDP client is on any worker",
+    "debugger": "none",
+    "observations": [
+      {
+        "clones": 2,
+        "opens": [
+          {
+            "name": "A",
+            "exit": 0,
+            "totalS": 1,
+            "ackS": 0.1
+          },
+          {
+            "name": "B",
+            "exit": 0,
+            "totalS": 1,
+            "ackS": 0.2
+          }
+        ],
+        "identities": 2
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "mode": "smoke",
+    "verdict": "pass",
+    "samples": 1
+  },
+  {
+    "experiment": "E13",
+    "hypothesis": "E13.ops.tabs",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "2 clones of one frozen base opened by clone-open.sh headless; the master opens the test page in each clone; the master is headed on Xvfb and stands in for the personal Default, no CDP client is on any worker",
+    "debugger": "none",
+    "observations": [
+      {
+        "listed": [
+          {
+            "name": "A",
+            "tabs": ["marker:41c359741be049a4b837ec6682380b30"]
+          },
+          {
+            "name": "B",
+            "tabs": ["marker:0fcac6b129ae4debbda505f7adb9077e"]
+          }
+        ]
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "mode": "smoke",
+    "verdict": "pass",
+    "samples": 1
+  },
+  {
+    "experiment": "E13",
+    "hypothesis": "E13.ops.marker",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "2 clones of one frozen base opened by clone-open.sh headless; the master opens the test page in each clone; the master is headed on Xvfb and stands in for the personal Default, no CDP client is on any worker",
+    "debugger": "none",
+    "observations": [
+      {
+        "titles": [
+          {
+            "name": "A",
+            "own": true,
+            "foreign": 0
+          },
+          {
+            "name": "B",
+            "own": true,
+            "foreign": 0
+          }
+        ]
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "mode": "smoke",
+    "verdict": "pass",
+    "samples": 1
+  },
+  {
+    "experiment": "E13",
+    "hypothesis": "E13.t9.commands",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "2 clones of one frozen base opened by clone-open.sh headless; the master opens the test page in each clone; the master is headed on Xvfb and stands in for the personal Default, no CDP client is on any worker",
+    "debugger": "none",
+    "observations": [
+      {
+        "replies": [
+          {
+            "name": "A",
+            "tab": "marker:41c359741be049a4b837ec6682380b30",
+            "activate": "ok"
+          },
+          {
+            "name": "B",
+            "tab": "marker:0fcac6b129ae4debbda505f7adb9077e",
+            "activate": "ok"
+          }
+        ]
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "mode": "smoke",
+    "verdict": "pass",
+    "samples": 1
+  },
+  {
+    "experiment": "E13",
+    "hypothesis": "E13.t9.exclusive",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "2 clones of one frozen base opened by clone-open.sh headless; a running clone is asked for the other mode; the master is headed on Xvfb and stands in for the personal Default, no CDP client is on any worker",
+    "debugger": "none",
+    "observations": [
+      {
+        "headlessThenHeaded": {
+          "running": "headless",
+          "asked": "headed",
+          "outcome": "refused",
+          "exit": 69,
+          "stderr": "s: tried /tmp/recnrun-launcher-pic2KE/clones-1/A/downloads, /tmp/recnrun-launcher-pic2KE/home/Downloads, /tmp/recnrun-clones-master-downloads-DkWyt5, /tmp/recnrun-launcher-pic2KE/clones-1/B/downloads\n",
+          "mainBefore": 1,
+          "mainAfter": 1,
+          "survivorSame": true,
+          "windows": 0
+        },
+        "headedThenHeadless": {
+          "running": "headed",
+          "asked": "headless",
+          "outcome": "refused",
+          "exit": 69,
+          "stderr": "s: tried /tmp/recnrun-launcher-pic2KE/clones-1/B/downloads, /tmp/recnrun-launcher-pic2KE/home/Downloads, /tmp/recnrun-clones-master-downloads-DkWyt5, /tmp/recnrun-launcher-pic2KE/clones-1/A/downloads\n",
+          "mainBefore": 1,
+          "mainAfter": 1,
+          "survivorSame": true,
+          "windows": 2
+        }
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "mode": "smoke",
+    "verdict": "pass",
+    "samples": 1
+  },
+  {
+    "experiment": "E13",
+    "hypothesis": "E13.diag.bootstrapTab",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "1 hand-installed worker opened with open.sh's arguments in --headless=new plus a debugging port; Playwright is attached to it",
+    "debugger": "attached",
+    "verdict": "pass",
+    "samples": 1,
+    "gestures": 0,
+    "steps": [],
+    "observations": [
+      {
+        "targets": [
+          {
+            "type": "service_worker",
+            "url": "chrome-extension://omllgeochjfpkjbkpcgjmnnbncdpiedd/background.js"
+          },
+          {
+            "type": "page",
+            "url": "chrome-extension://omllgeochjfpkjbkpcgjmnnbncdpiedd/bootstrap.html#token=diagnostic"
+          },
+          {
+            "type": "browser_ui",
+            "url": "chrome://omnibox-popup.top-chrome/"
+          },
+          {
+            "type": "background_page",
+            "url": "chrome-extension://omllgeochjfpkjbkpcgjmnnbncdpiedd/offscreen.html"
+          }
+        ],
+        "own": "chrome-extension://omllgeochjfpkjbkpcgjmnnbncdpiedd/",
+        "tabs": [
+          {
+            "id": 1192113310,
+            "windowId": 1192113309,
+            "url": "chrome-extension://omllgeochjfpkjbkpcgjmnnbncdpiedd/bootstrap.html#token=diagnostic"
+          }
+        ],
+        "windows": [
+          {
+            "id": 1192113309,
+            "type": "normal",
+            "tabs": 1
+          }
+        ],
+        "shared": 0
+      }
+    ],
+    "mode": "smoke"
+  }
+]

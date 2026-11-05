@@ -116,13 +116,21 @@ async function turnOnDeveloperMode({ chrome }: LoadedExtension): Promise<void> {
 /** Waits for the first presence, reloads the build so Chrome keeps it, writes the record; returns the scene. */
 export async function registerIn(
   extension: LoadedExtension,
-  { root, downloads, record, profileDirectory }: Omit<Scene, "profileId">,
+  {
+    root,
+    downloads,
+    record,
+    profileDirectory,
+    prepare,
+  }: Omit<Scene, "profileId"> & { prepare?: (extension: LoadedExtension) => Promise<void> },
 ): Promise<Scene> {
   // connectOverCDP routes every download to Playwright's own folder; Chrome's must take the writes.
   await extension.chrome.cdp.send("Browser.setDownloadBehavior", { behavior: "default" });
   const profileId = await profileIdOf(extension);
   await until(() => readFile(presenceFile(downloads, profileId)), "the first presence", 30_000);
   await turnOnDeveloperMode(extension);
+  // The reload below closes the session, and the storage written here survives it.
+  await prepare?.(extension);
   // The reload drops the CDP install flag that makes Chrome delete the extension at its next start.
   await extension.evaluateInBackground("chrome.runtime.reload()").catch(() => undefined);
   await until(

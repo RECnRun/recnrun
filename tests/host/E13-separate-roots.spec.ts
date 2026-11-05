@@ -1,47 +1,62 @@
+import { sized } from "../experiments/samples.ts";
+import { expectEveryHypothesis } from "../experiments/outcome.ts";
+import { EXPERIMENT, HYPOTHESES, recorderOf } from "../headless/fixtures/e13-cells.ts";
+import { alternateCell, workerCells } from "../headless/fixtures/e13-flow.ts";
+import { v1Lab } from "../headless/fixtures/e13-lab.ts";
+import { hostRig, hostWhere } from "./fixtures/e13-host.ts";
 import { test } from "./fixtures/host-chrome.ts";
 import { evidence, requireHost } from "./fixtures/host-env.ts";
-import { hostEnvironment } from "./fixtures/e4-host.ts";
-import { expectEveryHypothesis, recordUnavailable } from "../experiments/outcome.ts";
-import type { Cell } from "../experiments/outcome.ts";
-import { EXPERIMENT, HYPOTHESES } from "../headless/fixtures/e13-cells.ts";
 
 /*
- * E13's host twin (POC PLAN.md P7.4): the same hypotheses on the installed Google Chrome of this Mac,
- * over throwaway roots below RECNRUN_HOST_ROOTS and RECNRUN_HOST_BASES, with a throwaway headed root
- * as master, never the personal Default. The host rig for it is not built yet: every cell is
- * recorded unavailable with that reason until the orchestrator and the owner run it, so the host
- * twin never reports a result it did not measure.
+ * E13's host twin (POC PLAN.md P7.4): the lab's worker cells on the installed Google Chrome of this
+ * Mac, over throwaway roots below RECNRUN_HOST_ROOTS, with a throwaway headed root as master and never
+ * the personal Default. The clone cells and the bootstrap-tab diagnostic need the lab's attached
+ * master or a debugging port on a worker, so they are recorded unavailable here with that reason;
+ * the owner's base is covered by the P5.5 host twin.
  */
 
-const REASON =
-  "pending: the host rig of E13 (a throwaway headed master and install.sh-installed worker roots opened by open.sh headless) is not built; the lab verdicts of E13 stand for the mechanism and the owner's host run is still to do";
+const WORKERS = sized(4, 2);
+const CLONES_REASON =
+  "not run on the host: the clone cells need a master this run can attach to, and the owner's personal Default is never launched or read; the lab verdicts and the P5.5 host twin cover clones";
+const CLONE_CELLS = ["t9.clones", "ops.tabs", "ops.marker", "t9.commands", "t9.exclusive"];
+const DIAGNOSTIC =
+  "not run on the host: the diagnostic attaches Playwright to a headless worker through a debugging port, which the owner's host runs never open on a worker";
 
-const cellOf = async (hypothesis: string): Promise<Cell> => ({
-  experiment: EXPERIMENT,
-  hypothesis,
-  chrome: await hostEnvironment.target.chrome(),
-  environment: "host",
-  install: "loadUnpacked",
-  label: "diagnostic",
-  externalClient: true,
-  variant: "poc-d0",
-  topology:
-    "a throwaway headed root as master and throwaway worker roots, no CDP client on any worker",
-  debugger: "none",
+test.describe.configure({ mode: "serial", timeout: 1_800_000 });
+
+test.beforeAll(() => {
+  requireHost();
 });
 
-test.describe("E13 on the host: headless workers on separate roots", () => {
-  test.beforeAll(() => {
-    requireHost();
-  });
+test("headless workers on separate roots: link, commands, navigation, background", async () => {
+  const lab = await v1Lab(WORKERS, hostRig);
+  try {
+    await workerCells(lab, recorderOf(hostWhere()));
+  } finally {
+    await lab.dispose();
+  }
+});
 
-  test("every hypothesis is recorded with the reason it did not run", async () => {
-    for (const hypothesis of HYPOTHESES) {
-      await recordUnavailable(await cellOf(hypothesis), REASON, evidence().directory);
-    }
-  });
+test("one worker root opened headed, headless, headed keeps its identity, cookie, and link", async () => {
+  const lab = await v1Lab(1, hostRig);
+  try {
+    await alternateCell(lab, recorderOf(hostWhere()));
+  } finally {
+    await lab.dispose();
+  }
+});
 
-  test("every E13 hypothesis left a verdict", async () => {
-    await expectEveryHypothesis(EXPERIMENT, HYPOTHESES, evidence().directory);
-  });
+test("the cells that need the lab's master are recorded with the reason they did not run", async () => {
+  const { unavailable } = recorderOf(hostWhere());
+  const topology = "clones of the frozen base opened by clone-open.sh headless";
+  for (const hypothesis of CLONE_CELLS) await unavailable(hypothesis, topology, CLONES_REASON);
+  await unavailable(
+    "diag.bootstrapTab",
+    "a hand-installed worker with a debugging port",
+    DIAGNOSTIC,
+  );
+});
+
+test("every E13 hypothesis left a verdict", async () => {
+  await expectEveryHypothesis(EXPERIMENT, HYPOTHESES, evidence().directory);
 });
