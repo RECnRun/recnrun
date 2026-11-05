@@ -31,6 +31,10 @@
 # profile of the root, and a dead main process is a crash that each profile's request relaunches.
 #
 # Environment: RECNRUN_OPEN_TIMEOUT_S (60), RECNRUN_LIFECYCLE_BACKOFF_S (5), _MAX_ATTEMPTS (5), _STOP_S (20).
+# No symbolic link is followed below the state dir (profiles) or below the Downloads root (RECnRun, poc,
+# the namespace, peers or acks, the profile folder, the file): such a presence or ack is ignored, such a
+# state dir is refused with 65.
+#
 # A pause, stop, or reset that lands while a request opens Chrome wins: the open settles under the lock,
 # writes its result only while startedAt and status=opening still name it, otherwise keeps the owner's
 # status (the pid and token stay recorded so stop can end that Chrome) and exits 73.
@@ -128,6 +132,7 @@ number_after() {
 # living at most 60 s.
 presence_fresh() {
   [ -n "$st_root" ] || return 1
+  no_link_below "$st_root" "RECnRun/poc/$lc_ns/peers/$lc_id/presence.json" || return 1
   pf_file=$st_root/RECnRun/poc/$lc_ns/peers/$lc_id/presence.json
   if [ ! -f "$pf_file" ] || [ -L "$pf_file" ]; then return 1; fi
   [ "$(wc -c <"$pf_file" | tr -d ' ')" -le 2048 ] || return 1
@@ -141,6 +146,7 @@ presence_fresh() {
 }
 ack_present() {
   [ -n "$st_token" ] && [ -n "$st_root" ] || return 1
+  no_link_below "$st_root" "RECnRun/poc/$lc_ns/acks/$lc_id/$st_token.json" || return 1
   read_ack "$st_root/RECnRun/poc/$lc_ns/acks/$lc_id/$st_token.json" "$st_token" "$lc_id" >/dev/null
 }
 # An open profile is left alone while present, and paused when it is alive but silent.

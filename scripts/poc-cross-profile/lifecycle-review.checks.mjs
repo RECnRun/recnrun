@@ -1,13 +1,14 @@
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
-import { ALICE, shells } from "./lab.mjs";
+import { ALICE, NAMESPACE, presence, shells } from "./lab.mjs";
 import { alive, env, life, scene, script } from "./lifecycle-lab.mjs";
 
 const EX_REFUSED = 65;
 const EX_BUSY = 75;
+const EX_PAUSED = 73;
 const EX_FAILED = 70;
 
 for (const shell of shells) {
@@ -129,5 +130,30 @@ for (const shell of shells) {
     assert.equal(request(shell).code, 0);
     assert.equal(field("shared"), "0");
     assert.equal(Number(field("pid")), main.pid, "not the forwarder's pid");
+  });
+
+  await test(`${shell}: a profiles folder that is a symbolic link is refused and nothing is written through it`, (context) => {
+    const { home, state, request, launches } = scene(context);
+    const elsewhere = join(home, "elsewhere");
+    mkdirSync(elsewhere);
+    symlinkSync(elsewhere, join(state, "profiles"));
+    assert.equal(request(shell).code, EX_REFUSED);
+    assert.equal(life(shell, ["status", state], {}).code, EX_REFUSED);
+    assert.equal(life(shell, ["pause", state, ALICE], {}).code, EX_REFUSED);
+    assert.equal(launches(), 0);
+    assert.equal(existsSync(join(elsewhere, ALICE)), false);
+  });
+
+  await test(`${shell}: a presence under a linked peers folder is ignored`, (context) => {
+    const { home, request, launches } = scene(context);
+    assert.equal(request(shell).code, 0);
+    const peers = join(home, "Downloads/RECnRun/poc", NAMESPACE, "peers");
+    const elsewhere = join(home, "elsewhere", ALICE);
+    mkdirSync(elsewhere, { recursive: true });
+    writeFileSync(join(elsewhere, "presence.json"), JSON.stringify(presence(ALICE)));
+    symlinkSync(join(home, "elsewhere"), peers);
+    const silent = request(shell);
+    assert.equal(silent.code, EX_PAUSED, silent.err);
+    assert.equal(launches(), 1);
   });
 }

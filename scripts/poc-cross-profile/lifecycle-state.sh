@@ -128,8 +128,19 @@ release_lock() {
   read -r rl_pid <"$1" || :
   if [ "$rl_pid" = "$2" ]; then rm -f -- "$1"; fi
 }
+# Succeeds when no component of the relative path $2 below $1 is a symbolic link (a missing one is fine).
+no_link_below() {
+  nl_path=$1
+  nl_rest=$2
+  while [ -n "$nl_rest" ]; do
+    nl_path=$nl_path/${nl_rest%%/*}
+    [ ! -L "$nl_path" ] || return 1
+    case $nl_rest in */*) nl_rest=${nl_rest#*/} ;; *) nl_rest='' ;; esac
+  done
+}
 state_dir() {
   if ! is_directory "$1" || [ ! -d "$1" ]; then die 64 'the state directory is not an existing absolute directory'; fi
+  no_link_below "$1" profiles || die 65 "$1/profiles is a symbolic link"
   mkdir -p -- "$1/profiles"
 }
 
