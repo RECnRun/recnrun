@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { hostPathIn } from "./host-paths.ts";
 import { sampleMode } from "./samples.ts";
 import { parseVerdicts } from "./schema.ts";
 import type { Verdict } from "./schema.ts";
@@ -32,6 +33,8 @@ export async function appendVerdict(
   const verdicts = await readVerdicts(directory);
   const stamped = sampleMode() === "smoke" ? { ...verdict, mode: "smoke" as const } : verdict;
   parseVerdicts([stamped]);
+  const leaked = stamped.environment === "host" ? hostPathIn(JSON.stringify(stamped)) : undefined;
+  if (leaked !== undefined) throw new Error(`A host verdict carries the host path ${leaked}`);
   await mkdir(directory, { recursive: true });
   const file = join(directory, "verdicts.json");
   await writeFile(file, `${JSON.stringify([...verdicts, stamped], null, 2)}\n`);

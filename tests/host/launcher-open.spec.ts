@@ -8,6 +8,8 @@ import { evidence } from "./fixtures/host-env.ts";
 import { hostEnvironment, hostFolder, removeFolder } from "./fixtures/e4-host.ts";
 import { extensionPath, loadUnpacked } from "../browser/fixtures/extension-loaders.ts";
 import { requireBuild } from "../experiments/file-access.ts";
+import { labelPaths } from "../experiments/host-paths.ts";
+import type { PathLabel } from "../experiments/host-paths.ts";
 import {
   OPEN_CELLS,
   openSample,
@@ -28,6 +30,7 @@ import { expectEveryHypothesis } from "../experiments/outcome.ts";
 
 const target = hostEnvironment.target;
 const run = promisify(execFile);
+const labels: PathLabel[] = [];
 
 /** The pids of Chrome processes whose command line names `root` as the user data directory. */
 async function chromesOf(root: string): Promise<number[]> {
@@ -44,6 +47,7 @@ async function hostRig(): Promise<Rig> {
   const downloads = join(root, "downloads");
   const home = join(root, "home");
   try {
+    labels.push([home, "<home>"], [root, "<root>"], [evidence().directory, "<evidence>"]);
     await mkdir(downloads);
     await mkdir(home);
     await mkdir(join(root, "Default"), { recursive: true });
@@ -76,11 +80,15 @@ test.describe("P4.3 on the host: open.sh opens a registered profile and gets its
   });
 
   test("P4.3.open.fresh: a closed profile starts and acks its token as its boot", async () => {
-    await recordOpen("P4.3.open.fresh", target, () => openSample(hostRig, false));
+    await recordOpen("P4.3.open.fresh", target, async () =>
+      labelPaths(await openSample(hostRig, false), labels),
+    );
   });
 
   test("P4.3.open.running: a second open acks the running profile's own boot", async () => {
-    await recordOpen("P4.3.open.running", target, () => openSample(hostRig, true));
+    await recordOpen("P4.3.open.running", target, async () =>
+      labelPaths(await openSample(hostRig, true), labels),
+    );
   });
 
   test("every P4.3 hypothesis left a verdict", async () => {

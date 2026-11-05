@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
@@ -10,6 +10,7 @@ import { evidence } from "./fixtures/host-env.ts";
 import { hostEnvironment, hostFolder, removeFolder } from "./fixtures/e4-host.ts";
 import { extensionPath, loadUnpacked } from "../browser/fixtures/extension-loaders.ts";
 import { requireBuild } from "../experiments/file-access.ts";
+import { labelPaths } from "../experiments/host-paths.ts";
 import { preferencesOf, readJson, register } from "../experiments/fixtures/launcher-open.ts";
 import { expectEveryHypothesis, recordHypothesis } from "../experiments/outcome.ts";
 import type { Sample } from "../experiments/outcome.ts";
@@ -171,7 +172,13 @@ async function sample(): Promise<Sample> {
   await run("node", [BUILD, out]);
   const machine = await prepare();
   try {
-    return await measure(machine, join(out, "macos"));
+    const labels = [
+      [machine.home, "<home>"],
+      [machine.downloads, "<downloads>"],
+      [dirname(machine.home), "<root>"],
+      [evidence().directory, "<evidence>"],
+    ] as const;
+    return labelPaths(await measure(machine, join(out, "macos")), labels);
   } finally {
     try {
       for (const pid of await chromesOf(machine.userDataDir)) process.kill(pid, "SIGTERM");
