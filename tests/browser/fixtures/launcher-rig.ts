@@ -93,7 +93,7 @@ async function installProfile(
 }
 
 /** The directory of a rig, the environment the launcher scripts run under, and how to remove them. */
-async function skeleton() {
+async function skeleton(rootBelowHome?: string) {
   expect((await readFile(EXTENSION_ID_FILE, "utf8")).trim()).toBe(POC_EXTENSION_ID);
   const dir = await mkdtemp(join(tmpdir(), "recnrun-launcher-"));
   const home = join(dir, "home");
@@ -110,7 +110,7 @@ async function skeleton() {
   return {
     dir,
     home,
-    root: join(dir, "Chrome"),
+    root: rootBelowHome === undefined ? join(dir, "Chrome") : join(home, rootBelowHome),
     record: join(dir, "launcher.record"),
     env,
     dispose,
@@ -147,6 +147,32 @@ export async function sharedRig(testInfo: TestInfo): Promise<SharedRig> {
   try {
     const scene = await installProfile(root, join(home, "Downloads"), record, "Default");
     const second = await installProfile(root, join(home, "Downloads-1"), record, "Profile 1");
+    const rig: SharedRig = {
+      scene,
+      second,
+      env,
+      survivors: () => chromesOf(root),
+      keep: () => keepEvidence(dir, rig, testInfo),
+      dispose,
+    };
+    return rig;
+  } catch (error) {
+    await dispose();
+    throw error;
+  }
+}
+
+/**
+ * The usual layout of a first run: the OS default Chrome root below HOME holds Default and Profile 1,
+ * each with poc-d0 installed and both downloading to ~/Downloads, and the record is empty. Chrome is quit.
+ */
+export async function firstRunRig(testInfo: TestInfo): Promise<SharedRig> {
+  const { dir, home, root, record, env, dispose } = await skeleton(".config/google-chrome");
+  try {
+    const downloads = join(home, "Downloads");
+    const scene = await installProfile(root, downloads, record, "Default");
+    const second = await installProfile(root, downloads, record, "Profile 1");
+    await rm(record);
     const rig: SharedRig = {
       scene,
       second,

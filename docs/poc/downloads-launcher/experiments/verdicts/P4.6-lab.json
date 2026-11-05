@@ -1,0 +1,47 @@
+[
+  {
+    "experiment": "P4.6",
+    "hypothesis": "P4.6.firstRun.sharedRoot",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "two profiles of one root downloading to one folder, empty record: first-run binds, registers, and opens both",
+    "debugger": "none",
+    "verdict": "pass",
+    "samples": 3,
+    "gestures": 0,
+    "steps": [],
+    "observations": [
+      {
+        "code": 0,
+        "status": [
+          "launcher stopped",
+          "b24791b0-fef4-4d9c-844d-1c7cec85646d open 1165 0 0",
+          "bc3afcaa-51f2-41e4-be05-ec828b063bef open 1165 0 0",
+          ""
+        ]
+      },
+      {
+        "code": 0,
+        "status": [
+          "launcher stopped",
+          "0094e69a-055e-4cb7-9e15-06f8ad42cc79 open 2690 0 0",
+          "a6e51c28-fd0f-43e4-924c-79f15bbaabc5 open 2690 0 0",
+          ""
+        ]
+      },
+      {
+        "code": 0,
+        "status": [
+          "launcher stopped",
+          "215f50c4-ae80-4c9c-b78b-6cc12b15a14d open 4218 0 0",
+          "7879a43e-ae64-4f69-8fa9-a97e223c587c open 4218 0 0",
+          ""
+        ]
+      }
+    ]
+  }
+]
