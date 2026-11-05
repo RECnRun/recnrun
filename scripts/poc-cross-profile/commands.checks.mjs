@@ -114,7 +114,11 @@ for (const shell of shells) {
     const scene = commandScene(context);
     assert.equal(life(shell, ["pause", scene.state, BOB], {}).code, 0);
     assert.equal(start(shell, scene, "--once").code, 0);
-    const stopped = life(shell, ["stop", scene.state, ALICE], { RECNRUN_LIFECYCLE_STOP_S: "5" });
+    const stopped = life(
+      shell,
+      ["stop", scene.state, ALICE],
+      scene.vars({ RECNRUN_LIFECYCLE_STOP_S: "5" }),
+    );
     assert.equal(stopped.code, 0, stopped.err);
     assert.equal(start(shell, scene, "--once").code, 0);
     assert.equal(scene.argv().length, 1, "the stopped profile was relaunched");

@@ -27,13 +27,26 @@ root_is_shared() {
   done <"$2"
   [ "$rs_count" -gt 1 ]
 }
+# True when the command line $1 carries --user-data-dir=<$2> as a whole argument: a root that only
+# starts with $2 (/tmp/root other) is another root, so the value must end at the next flag or the end.
+names_root() {
+  case $1 in *" --user-data-dir=$2 --"* | *" --user-data-dir=$2") return 0 ;; esac
+  return 1
+}
+# True when the command line $1 is the Chrome open.sh launches (chrome_binary, the same lookup) on the
+# user data dir $2. A Chrome started by hand from another path is refused rather than signalled.
+is_chrome_of() {
+  ic_bin=$(chrome_binary) || return 1
+  case $1 in "$ic_bin "*) ;; *) return 1 ;; esac
+  names_root "$1" "$2"
+}
 # The main Chrome process of the user data dir $1 (no --type= word): one that is not the pid open.sh
 # started, else that pid itself, which is the main when no Chrome ran on the root before.
 main_pid_of() {
   mp_self=''
   while read -r mp_pid mp_cmd; do
     case $mp_cmd in *" --type="*) continue ;; esac
-    case $mp_cmd in *"--user-data-dir=$1 "* | *"--user-data-dir=$1") ;; *) continue ;; esac
+    names_root "$mp_cmd" "$1" || continue
     if [ "$mp_pid" != "$st_pid" ]; then
       printf '%s\n' "$mp_pid"
       return 0

@@ -15,7 +15,7 @@
 #   status <state-dir>                          "launcher running pid=<n>" or "launcher stopped", then
 #                                               lifecycle.sh status
 #   stop <state-dir> [--all]                    SIGTERM to the pid in launcher.pid while its command
-#                                               line names this script; --all also stops each profile
+#                                               line is this script's start on this state dir; --all also stops each profile
 #                                               with a live pid (lifecycle.sh stop), except the
 #                                               profiles of a shared root, which it names and skips
 #   autostart on|off|status <state-dir> <record> <namespace>    see autostart.sh
@@ -140,14 +140,14 @@ cmd_start() {
 
 # --- Status and stop -------------------------------------------------------------------------
 
-# Sets lp_pid and succeeds when launcher.pid names a live process whose command line names this script.
+# Sets lp_pid and succeeds when launcher.pid names a live process running this script's start on state dir $1.
 launcher_pid() {
   lp_pid=''
   if [ ! -f "$1/launcher.pid" ] || [ -L "$1/launcher.pid" ]; then return 1; fi
   read -r lp_pid <"$1/launcher.pid" || :
   pid_alive "$lp_pid" || return 1
   lp_cmd=$(ps -o command= -p "$lp_pid" 2>/dev/null)
-  case $lp_cmd in *recnrun-launcher.sh*) return 0 ;; esac
+  case $lp_cmd in *"recnrun-launcher.sh start $1 "*) return 0 ;; esac
   return 1
 }
 launcher_status() {

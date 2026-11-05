@@ -122,9 +122,9 @@ for (const shell of shells) {
   });
 
   await test(`${shell}: a stopped profile is held until resume, then launches again`, (context) => {
-    const { state, request, launches, field } = scene(context);
+    const { state, request, vars, launches, field } = scene(context);
     assert.equal(request(shell).code, 0);
-    const stopped = life(shell, ["stop", state, ALICE], { RECNRUN_LIFECYCLE_STOP_S: "5" });
+    const stopped = life(shell, ["stop", state, ALICE], vars({ RECNRUN_LIFECYCLE_STOP_S: "5" }));
     assert.equal(stopped.code, 0, stopped.err);
     assert.equal(field("status"), "stopped");
     const held = request(shell);
@@ -139,14 +139,14 @@ for (const shell of shells) {
   });
 
   await test(`${shell}: a timed-out open keeps its pid and user data dir, so stop can end it`, (context) => {
-    const { state, root, request, field } = scene(context, { STUB_ACK: "" });
+    const { state, root, request, vars, field } = scene(context, { STUB_ACK: "" });
     const timedOut = request(shell);
     assert.equal(timedOut.code, EX_NO_ACK, timedOut.err);
     const pid = Number(field("pid"));
     assert.ok(pid > 0 && alive(pid), "the Chrome of the failed open is still running");
     assert.equal(field("userDataDir"), root);
     assert.match(life(shell, ["status", state], {}).out, new RegExp(` failed ${pid} 1 `));
-    const stopped = life(shell, ["stop", state, ALICE], { RECNRUN_LIFECYCLE_STOP_S: "5" });
+    const stopped = life(shell, ["stop", state, ALICE], vars({ RECNRUN_LIFECYCLE_STOP_S: "5" }));
     assert.equal(stopped.code, 0, stopped.err);
     assert.equal(alive(pid), false);
     assert.equal(field("status"), "stopped");
@@ -179,10 +179,10 @@ for (const shell of shells) {
   });
 
   await test(`${shell}: stop sends SIGTERM only to a process that names the user data dir`, async (context) => {
-    const { state, request, field, spawned, stateFile } = scene(context);
+    const { state, request, vars, field, spawned, stateFile } = scene(context);
     assert.equal(request(shell).code, 0);
     const pid = Number(field("pid"));
-    const stopped = life(shell, ["stop", state, ALICE], { RECNRUN_LIFECYCLE_STOP_S: "5" });
+    const stopped = life(shell, ["stop", state, ALICE], vars({ RECNRUN_LIFECYCLE_STOP_S: "5" }));
     assert.equal(stopped.code, 0, stopped.err);
     assert.equal(alive(pid), false);
     assert.equal(field("status"), "stopped");
@@ -190,17 +190,17 @@ for (const shell of shells) {
     spawned.push(bystander.pid);
     const text = readFileSync(stateFile(), "utf8").replace(/^pid=.*$/m, `pid=${bystander.pid}`);
     writeFileSync(stateFile(), text.replace(/^status=.*$/m, "status=open"));
-    const refused = life(shell, ["stop", state, ALICE], { RECNRUN_LIFECYCLE_STOP_S: "1" });
+    const refused = life(shell, ["stop", state, ALICE], vars({ RECNRUN_LIFECYCLE_STOP_S: "1" }));
     assert.equal(refused.code, EX_REFUSED);
     assert.equal(alive(bystander.pid), true);
   });
 
   await test(`${shell}: stop kills a process that ignores SIGTERM only with --force`, (context) => {
-    const { state, request, field } = scene(context, { STUB_DEAF: "1" });
+    const { state, request, vars, field } = scene(context, { STUB_DEAF: "1" });
     assert.equal(request(shell).code, 0);
     const pid = Number(field("pid"));
     const stop = (...flags) =>
-      life(shell, ["stop", state, ALICE, ...flags], { RECNRUN_LIFECYCLE_STOP_S: "1" });
+      life(shell, ["stop", state, ALICE, ...flags], vars({ RECNRUN_LIFECYCLE_STOP_S: "1" }));
     assert.equal(stop().code, EX_FAILED);
     assert.equal(alive(pid), true);
     assert.equal(field("status"), "open");
@@ -256,11 +256,11 @@ for (const shell of shells) {
   });
 
   await test(`${shell}: stop on a shared-root profile exits 70 and signals nothing`, (context) => {
-    const { state, request, field } = scene(context, {}, { shared: true });
+    const { state, request, vars, field } = scene(context, {}, { shared: true });
     assert.equal(request(shell).code, 0);
     const main = Number(field("pid"));
     assert.equal(request(shell, forward, BOB).code, 0);
-    const stopped = life(shell, ["stop", state, BOB], { RECNRUN_LIFECYCLE_STOP_S: "1" });
+    const stopped = life(shell, ["stop", state, BOB], vars({ RECNRUN_LIFECYCLE_STOP_S: "1" }));
     assert.equal(stopped.code, EX_FAILED);
     assert.match(stopped.err, /shared root .*: stopping would close every profile of it/);
     assert.equal(alive(main), true);

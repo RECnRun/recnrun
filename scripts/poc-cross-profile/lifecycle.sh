@@ -10,7 +10,8 @@
 #   request <state-dir> <record> <namespace> <profileId> [headed|headless]
 #   pause | resume | reset <state-dir> <profileId>
 #   stop <state-dir> <profileId> [--force]  SIGTERM to the pid the state names, only while its command
-#                                           line names the user data dir; --force adds SIGKILL
+#                                           line is the Chrome of open.sh on exactly the user data dir (checked again
+#                                           before SIGKILL); --force adds SIGKILL
 #   status <state-dir>                      profileId status pid attempts nextAt, one line each
 #
 # State, <state-dir>/profiles/<profileId>: key=value lines with token, pid, startedAt, attempts,
@@ -75,12 +76,11 @@ cmd_status() {
 # --- Stop ------------------------------------------------------------------------------------
 
 shared_message() { printf 'shared root %s: stopping would close every profile of it; close its window instead' "$st_user"; }
-# The pid must be Chrome on this user data dir; a name or a recycled pid is never enough.
+# The pid must be Chrome on this user data dir; a name or a recycled pid is never enough. Checked
+# again before SIGKILL, since the pid may have been recycled during the wait.
 names_user_dir() {
   [ -n "$st_user" ] || return 1
-  nu_cmd=$(ps -o command= -p "$st_pid" 2>/dev/null)
-  case $nu_cmd in *"--user-data-dir=$st_user "* | *"--user-data-dir=$st_user") return 0 ;; esac
-  return 1
+  is_chrome_of "$(ps -o command= -p "$st_pid" 2>/dev/null)" "$st_user"
 }
 stop_profile() {
   [ "$st_shared" = 0 ] || die 70 "$(shared_message)"
@@ -94,6 +94,7 @@ stop_profile() {
     done
     if pid_alive "$st_pid"; then
       [ "$stop_force" = 1 ] || die 70 "pid $st_pid still runs after $stop_s s: stop --force kills it"
+      names_user_dir || die 65 "pid $st_pid no longer names $st_user: not killed"
       kill -KILL "$st_pid"
     fi
   fi

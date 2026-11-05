@@ -38,6 +38,27 @@ s=$!
 wait $s
 `;
 
+// The real ps with a shebang script shown as the program it stands for (as an exec'd Chrome would be),
+// so the guards that read a command line meet what a real Chrome shows. STUB_PS_CMD answers the
+// command line of STUB_PS_PID (any pid when unset); from the second command line asked on,
+// STUB_PS_CMD_AFTER answers instead, which stands for a pid recycled between two guards.
+const PS = (ps) => `#!/bin/sh
+if [ "$1" = -o ] && [ "$2" = command= ] && [ "$3" = -p ] && { [ -z "\${STUB_PS_PID:-}" ] || [ "$4" = "$STUB_PS_PID" ]; }; then
+  n=$(cat "$HOME/ps-count" 2>/dev/null || echo 0)
+  printf '%s\\n' "$((n + 1))" >"$HOME/ps-count"
+  [ "$n" -eq 0 ] || [ -z "\${STUB_PS_CMD_AFTER:-}" ] || { printf '%s\\n' "$STUB_PS_CMD_AFTER"; exit 0; }
+  [ -z "\${STUB_PS_CMD:-}" ] || { printf '%s\\n' "$STUB_PS_CMD"; exit 0; }
+fi
+${ps} "$@" | sed -E -e 's,(^|[[:space:]])(/bin/|/usr/bin/)?(da)?sh /,\\1/,' -e 's,Google Chrome\\.real,Google Chrome,'
+`;
+
+function installPs(home) {
+  const real = spawnSync("sh", ["-c", "command -v ps"], { encoding: "utf8" }).stdout.trim();
+  mkdirSync(join(home, "ps-stub"));
+  writeFileSync(join(home, "ps-stub/ps"), PS(real));
+  chmodSync(join(home, "ps-stub/ps"), 0o755);
+}
+
 export const env = (extra) => ({ PATH: process.env.PATH, ...extra });
 export function life(shell, args, vars) {
   const result = spawnSync(shell, [script, ...args], {
@@ -88,6 +109,7 @@ function install(home, shared) {
 function environment(home, defaults, extra) {
   return {
     HOME: home,
+    PATH: `${join(home, "ps-stub")}:${process.env.PATH}`,
     RECNRUN_DISCOVERY_PREFIX: home,
     RECNRUN_DISCOVERY_UNAME: "Darwin",
     RECNRUN_OPEN_TIMEOUT_S: "1",
@@ -121,6 +143,7 @@ export function scene(context, defaults = {}, { shared = false } = {}) {
     rmSync(home, { recursive: true, force: true });
   });
   mkdirSync(state);
+  installPs(home);
   const { root, record } = install(home, shared);
   const vars = (extra) => environment(home, defaults, extra);
   const stateFile = (id = ALICE) => join(state, "profiles", id);
