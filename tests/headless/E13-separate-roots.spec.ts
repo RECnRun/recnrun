@@ -1,8 +1,8 @@
 import { test } from "../browser/fixtures/chrome.ts";
 import { expectEveryHypothesis, recordHypothesis } from "../experiments/outcome.ts";
 import { sized } from "../experiments/samples.ts";
-import { cloneLab, clonesSample, exclusiveSample, remoteOf } from "./fixtures/e13-clones.ts";
-import { commandsSample, markerSample, tabsSample } from "./fixtures/e13-remote.ts";
+import { cloneLab, exclusiveSample, replayed, roundSample } from "./fixtures/e13-clones.ts";
+import type { RoundOps } from "./fixtures/e13-clones.ts";
 import { EXPERIMENT, HYPOTHESES, cellOf, record, recorderOf } from "./fixtures/e13-cells.ts";
 import { bootstrapTabSample } from "./fixtures/e13-diagnostic.ts";
 import { alternateCell, workerCells } from "./fixtures/e13-flow.ts";
@@ -47,12 +47,14 @@ test("clones of the frozen base open headless, link to the master, answer, and s
   const lab = await cloneLab(testInfo);
   const topology = `${CLONES} clones of one frozen base opened by clone-open.sh headless`;
   try {
-    await record("t9.clones", topology, () => clonesSample(lab, ["A", "B", "C"].slice(0, CLONES)));
-    const remote = remoteOf(lab);
-    const opened = `${topology}; the master opens the test page in each clone`;
-    await record("ops.tabs", opened, () => tabsSample(remote, lab.clones));
-    await record("ops.marker", opened, () => markerSample(remote, lab.clones));
-    await record("t9.commands", opened, () => commandsSample(remote, lab.clones));
+    // Each round's clones are asked in that round; the ops cells replay the rounds' samples.
+    const ops: RoundOps = { tabs: [], marker: [], commands: [] };
+    const names = ["A", "B", "C"].slice(0, CLONES);
+    await record("t9.clones", topology, () => roundSample(lab, names, ops));
+    const opened = `${topology}; the master opens the test page in each clone, in every round`;
+    await record("ops.tabs", opened, replayed(ops.tabs));
+    await record("ops.marker", opened, replayed(ops.marker));
+    await record("t9.commands", opened, replayed(ops.commands));
     await record("t9.exclusive", `${topology}; a running clone is asked for the other mode`, () =>
       exclusiveSample(lab),
     );

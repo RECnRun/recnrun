@@ -13,6 +13,7 @@ import type { Sample } from "../../experiments/outcome.ts";
 import { PAGE_ENV, PAGE_FLAG, dockerProbe } from "./e13-lab.ts";
 import type { Mode, Worker } from "./e13-lab.ts";
 import { masterLinked, modeProblems } from "./e13-cells.ts";
+import { commandsSample, markerSample, tabsSample } from "./e13-remote.ts";
 import { startSite } from "./e13-site.ts";
 import type { Site } from "./e13-site.ts";
 
@@ -48,7 +49,7 @@ export async function cloneLab(testInfo: TestInfo): Promise<CloneLab> {
 }
 
 /** What the master asks of the clones: its dashboard and the site they load. */
-export function remoteOf(lab: CloneLab) {
+function remoteOf(lab: CloneLab) {
   const dashboard = lab.host.master.view?.dashboard;
   if (!dashboard) throw new Error("The lab master has no dashboard.");
   return { dashboard, site: lab.site };
@@ -124,6 +125,30 @@ export async function clonesSample(lab: CloneLab, names: string[]): Promise<Samp
   await bindMaster(lab.host, lab.clones);
   return judged(problems, { clones: lab.clones.length, opens, identities: new Set(keys).size });
 }
+
+/** The samples of the cells that run on the clones of every round, in round order. */
+export interface RoundOps {
+  tabs: Sample[];
+  marker: Sample[];
+  commands: Sample[];
+}
+
+/** One round: `clonesSample`, then the master's ops on that round's clones, kept in `ops`. */
+export async function roundSample(lab: CloneLab, names: string[], ops: RoundOps): Promise<Sample> {
+  const sample = await clonesSample(lab, names);
+  const remote = remoteOf(lab);
+  ops.tabs.push(await tabsSample(remote, lab.clones));
+  ops.marker.push(await markerSample(remote, lab.clones));
+  ops.commands.push(await commandsSample(remote, lab.clones));
+  return sample;
+}
+
+/** Hands out the kept samples one by one, to the recorder that asks for one per round. */
+export const replayed = (samples: Sample[]) => async (): Promise<Sample> => {
+  const next = samples.shift();
+  if (!next) throw new Error("A cell asked for more rounds than ran.");
+  return next;
+};
 
 /** The pids of the processes of a root that are not children (a renderer, a utility) of its main one. */
 const mainProcesses = async (root: string) =>
