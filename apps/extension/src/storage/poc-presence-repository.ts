@@ -26,6 +26,11 @@ export function pocPresenceStore() {
   return {
     namespace: () => namespace.getValue(),
     policy: () => policy.getValue(),
+    /** The session's boot if one was made; unlike `boot`, it never makes one. */
+    peekBoot: async () => {
+      const stored = await boot.getValue();
+      return v.is(BootSchema, stored) ? stored : null;
+    },
     boot: async () => {
       const stored = await boot.getValue();
       if (v.is(BootSchema, stored)) return stored;

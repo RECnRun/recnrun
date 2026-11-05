@@ -114,7 +114,13 @@ describe("startDiagnostics", () => {
         "search",
       ].sort(),
     );
-    expect(JSON.parse(pre.textContent)).toEqual({
+    const { profile, ...legacy } = JSON.parse(pre.textContent);
+    expect(profile).toMatchObject({
+      extension: { id: fakeBrowser.runtime.id, version: "0.1.0", mode: "test" },
+      templateMode: false,
+      transport: { kind: "downloads", namespace: "lab", paused: null },
+    });
+    expect(legacy).toEqual({
       extensionId: fakeBrowser.runtime.id,
       mode: "test",
       permissions: ["storage", "downloads"],

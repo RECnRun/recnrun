@@ -2,6 +2,7 @@ import { describe, expect, test, vi } from "vite-plus/test";
 import { writePause } from "@/background/launcher-pause";
 import type { PauseDependencies } from "@/background/launcher-pause";
 import type { DownloadsPort } from "@/background/downloads-publisher";
+import { pocTransportStore } from "@/storage/poc-transport-repository";
 import { FINGERPRINT, ME } from "./fake-peer";
 import { signAs } from "./test-identity";
 
@@ -44,6 +45,14 @@ describe("writePause", () => {
       expect(contentOf(written[0]?.url ?? "")).toBe(bytes(reason));
     },
   );
+
+  test("keeps the reason for the diagnostics page, and clears it on resume", async () => {
+    const { deps } = dependencies();
+    await writePause(deps, "forget");
+    expect(await pocTransportStore().paused()).toBe("forget");
+    await writePause(deps, "resumed");
+    expect(await pocTransportStore().paused()).toBeNull();
+  });
 
   test("writes under the profile's own folder, in its namespace", async () => {
     const { deps, written } = dependencies({ namespace: async () => "e9-lab" });

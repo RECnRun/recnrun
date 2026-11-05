@@ -126,3 +126,10 @@ export const discardIdentityKey = (): Promise<void> => deleteStored(STORE, KEY);
 /** This profile's statement, signed with its stored key, that `claim.fingerprint` is its certificate. */
 export const signedIdentity = async (claim: IdentityClaim): Promise<IdentityStatement> =>
   signIdentity(await identityKey(), claim);
+
+/** This profile's public identity key if one exists; unlike `identityKey`, it never creates one. */
+export async function storedIdentityKey(): Promise<string | null> {
+  const stored = await readStored(STORE, KEY);
+  if (!isKeyPair(stored)) return null;
+  return toBase64Url(await crypto.subtle.exportKey("raw", stored.publicKey));
+}

@@ -5,6 +5,7 @@ import { pausedPath } from "@/p2p/downloads-rendezvous";
 import { IdentityStatementSchema } from "@/p2p/identity-key";
 import type { IdentityStatement } from "@/p2p/identity-key";
 import { ProfileIdSchema } from "@/p2p/protocol";
+import { pocTransportStore } from "@/storage/poc-transport-repository";
 
 /*
  * P4 review (POC PLAN.md decision 11): the launcher never reads silence as intent, because a
@@ -42,4 +43,8 @@ export async function writePause(deps: PauseDependencies, reason: PauseReason): 
     createdAt: (deps.now ?? Date.now)(),
   });
   await downloadsWriter(deps.downloads).write(path, JSON.stringify(pause));
+  // The diagnostics page shows what was last stated; a failed note must not fail the statement.
+  await pocTransportStore()
+    .setPaused(reason)
+    .catch(() => {});
 }

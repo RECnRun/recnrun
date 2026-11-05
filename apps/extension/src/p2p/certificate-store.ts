@@ -27,3 +27,9 @@ export function certificateFingerprint(certificate: RTCCertificate): string | un
   const sha = certificate.getFingerprints().find(({ algorithm }) => algorithm === "sha-256");
   return sha?.value?.toUpperCase();
 }
+
+/** The fingerprint of this profile's stored certificate, if it has one; it never creates one. */
+export async function storedFingerprint(): Promise<string | null> {
+  const stored = await readStored(STORE, KEY);
+  return (stored instanceof RTCCertificate && certificateFingerprint(stored)) || null;
+}

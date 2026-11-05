@@ -1,0 +1,46 @@
+main {
+  display: grid;
+  gap: var(--space);
+  padding: var(--space);
+}
+
+section {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space);
+}
+
+h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+  color: var(--muted);
+}
+
+dl {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0;
+}
+
+dl > div {
+  display: grid;
+  grid-template-columns: minmax(10rem, 16rem) 1fr;
+  gap: var(--space);
+}
+
+dt {
+  color: var(--muted);
+}
+
+dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-variant-ligatures: none;
+}
+
+pre {
+  margin: var(--space);
+  white-space: pre-wrap;
+  color: var(--text);
+}
