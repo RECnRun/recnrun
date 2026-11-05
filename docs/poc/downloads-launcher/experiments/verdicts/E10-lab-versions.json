@@ -1,0 +1,7 @@
+{
+  "chrome": "Google Chrome 157.0.8103.38",
+  "node": "v24.21.0",
+  "pnpm": "12.14.0",
+  "playwright": "1.64.1",
+  "image": "sha256:f46d695eea594ec105fa91e2f246385c0ba890d77e8e7ed882b72d7b45c78fc3"
+}

@@ -37,6 +37,12 @@ export const LIBRARIES = [
   "profiles.sh",
   "discovery.sh",
   "autostart.sh",
+  "base.sh",
+  "base-freeze.sh",
+  "base-update.sh",
+  "install.sh",
+  "clone.sh",
+  "clone-open.sh",
   "extension-id",
 ];
 const OSES = {
