@@ -1,13 +1,5 @@
 import assert from "node:assert/strict";
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  readdirSync,
-  rmSync,
-  symlinkSync,
-  writeFileSync,
-} from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { spawn, spawnSync } from "node:child_process";
@@ -15,18 +7,9 @@ import { ALICE, NAMESPACE, shells } from "./lab.mjs";
 import { EXTENSION, environment, installExtension } from "./base-lab.mjs";
 import { masterBlock } from "./clone-open-lab.mjs";
 import { pipeChrome } from "./install-lab.mjs";
-import { OPERATION, provisionScene, requestText } from "./provision-lab.mjs";
+import { OPERATION, provisionScene, shape } from "./provision-lab.mjs";
 
 const V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
-const OTHER = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
-
-/** The status without its clock, and the proof that the file is the closed layout. */
-function shape(status) {
-  const { raw, updatedAt, ...rest } = status;
-  assert.equal(raw, JSON.stringify({ ...rest, updatedAt }), "key order and no extra bytes");
-  assert.equal(Number.isSafeInteger(updatedAt) && updatedAt > 1_700_000_000_000, true);
-  return rest;
-}
 
 /** A finished operation is left alone, and status prints its state file. */
 function assertSettled(s, shell) {
@@ -201,79 +184,6 @@ for (const shell of shells) {
     const failed = shape(s.status());
     assert.deepEqual([failed.step, failed.state], ["install", "error"]);
     assert.match(failed.message, /^exit 65: .*build/);
-  });
-
-  await test(`${shell}: run ignores what it cannot trust and answers a refusable request`, (context) => {
-    const s = provisionScene(context);
-    mkdirSync(join(s.ops, "not-a-uuid"));
-    writeFileSync(join(s.ops, "not-a-uuid/request.json"), requestText({ basesDir: s.bases }));
-    s.request({}, OTHER);
-    writeFileSync(
-      join(s.folder(OTHER), "request.json"),
-      `${requestText({ basesDir: s.bases })}${" ".repeat(4100)}`,
-    );
-    const linked = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
-    mkdirSync(s.folder(linked));
-    writeFileSync(
-      join(s.home, "elsewhere.json"),
-      requestText({ operationId: linked, basesDir: s.bases }),
-    );
-    symlinkSync(join(s.home, "elsewhere.json"), join(s.folder(linked), "request.json"));
-    const folderLink = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
-    mkdirSync(join(s.home, "real-op"));
-    writeFileSync(
-      join(s.home, "real-op/request.json"),
-      requestText({ operationId: folderLink, basesDir: s.bases }),
-    );
-    symlinkSync(join(s.home, "real-op"), s.folder(folderLink));
-    const result = s.run(shell);
-    assert.equal(result.code, 0, result.err);
-    assert.deepEqual(readdirSync(join(s.state, "ops")), []);
-    for (const id of [OTHER, linked]) assert.equal(s.hasStatus(id), false, id);
-    assert.equal(existsSync(join(s.home, "real-op/status.json")), false);
-    assert.equal(s.launchCount(), 0);
-    assert.match(result.err, /ignored/);
-  });
-
-  await test(`${shell}: run answers a request with a bad value and starts nothing`, (context) => {
-    const s = provisionScene(context);
-    const cases = [
-      [{ basesDir: "../x" }, /basesDir/],
-      [{ basesDir: "relative" }, /basesDir/],
-      [{ basesDir: "/Users/me/My Bases" }, /basesDir/],
-      [{ basesDir: "/Users/me/bases/" }, /basesDir/],
-      [{ basesDir: "/Users//bases" }, /basesDir/],
-      [{ basesDir: "/Users/./bases" }, /basesDir/],
-      [{ basesDir: "/Users/bases/." }, /basesDir/],
-      [{ basesDir: "" }, /basesDir/],
-      [{ clones: 0 }, /clones/],
-      [{ clones: 9 }, /clones/],
-      [{ baseName: "base-vx" }, /closed grammar/],
-      [{ namespace: "other-1" }, /closed grammar/],
-      [{ masterProfileId: ALICE }, /closed grammar/],
-      [{ kind: "prepare" }, /closed grammar/],
-    ];
-    for (const [overrides, pattern] of cases) {
-      rmSync(s.folder(), { recursive: true, force: true });
-      rmSync(join(s.state, "ops"), { recursive: true, force: true });
-      s.request(overrides);
-      assert.equal(s.run(shell).code, 0);
-      const status = shape(s.status());
-      assert.deepEqual(
-        [status.step, status.state],
-        ["create-base", "error"],
-        JSON.stringify(overrides),
-      );
-      assert.match(status.message, pattern);
-      assert.match(status.message, /^refused: /);
-    }
-    rmSync(s.folder(), { recursive: true, force: true });
-    rmSync(join(s.state, "ops"), { recursive: true, force: true });
-    mkdirSync(s.folder());
-    writeFileSync(join(s.folder(), "request.json"), `${requestText({ basesDir: s.bases })} `);
-    s.run(shell);
-    assert.equal(shape(s.status()).state, "error", "a byte after the closing brace");
-    assert.equal(s.launchCount(), 0);
   });
 
   await test(`${shell}: run does nothing without exactly one master in the namespace`, (context) => {

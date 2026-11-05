@@ -93,7 +93,7 @@ parse_request() {
   rq_name=$ack_value
   ack_take '","clones":' ',' || return 1
   rq_why='clones is not a whole number from 1 to 8'
-  is_count "$ack_value" && [ "$ack_value" -ge 1 ] && [ "$ack_value" -le 8 ] || return 1
+  case $ack_value in [1-8]) ;; *) return 1 ;; esac
   rq_clones=$ack_value rq_why=$rq_grammar
   ack_take ',"namespace":"' '"' && [ "$ack_value" = "$ns" ] || return 1
   ack_take '","masterProfileId":"' '"' && [ "$ack_value" = "$pv_master_id" ] || return 1

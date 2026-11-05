@@ -1,3 +1,4 @@
+import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -23,6 +24,14 @@ export const requestText = (overrides = {}) =>
     createdAt: 1_800_000_000_000,
     ...overrides,
   });
+
+/** The status without its clock, and the proof that the file is the closed layout. */
+export function shape(status) {
+  const { raw, updatedAt, ...rest } = status;
+  assert.equal(raw, JSON.stringify({ ...rest, updatedAt }), "key order and no extra bytes");
+  assert.equal(Number.isSafeInteger(updatedAt) && updatedAt > 1_700_000_000_000, true);
+  return rest;
+}
 
 /** A home with a stub Chrome, a master's Downloads root and presence, a record, and a state folder. */
 export function provisionScene(context, { downloads: given, namespace = NAMESPACE } = {}) {
