@@ -1,6 +1,7 @@
 import { errorMessage } from "@recnrun/domain";
 import * as v from "valibot";
 import type { BackgroundReply } from "@/messaging/background-reply";
+import { cloneRequestOfPage } from "@/messaging/clone-fragment";
 import { PocProvisionCloneSchema } from "@/messaging/poc-presence";
 import type { AckClone, CloneRequest } from "@/messaging/poc-presence";
 import type { IdentityStatement } from "@/p2p/identity-key";
@@ -13,8 +14,9 @@ export type { CloneRequest };
  * P5.3 (POC PLAN.md): a copied base starts as a template and becomes the instance the launcher
  * named only through its own bootstrap page: it drops the base's key, certificate, and peers,
  * takes the instance's id and namespace, binds the master, makes its own key and certificate,
- * acks, and only then announces. The role change is the commit point, so an interrupted run
- * starts over and a finished one answers again unchanged.
+ * acks, and only then announces. The role change is the last write, after the ack, so an
+ * interrupted run is still a template (which announces nothing) and starts over, and a finished
+ * one answers again unchanged.
  */
 
 export interface ProvisionDependencies {
@@ -60,6 +62,9 @@ async function provisionTemplate(deps: ProvisionDependencies, request: CloneRequ
   const { instanceId } = request;
   await deps.identity.write({ profileId: instanceId, displayName: displayNameOf(instanceId) });
   await deps.namespace.write(request.namespace);
+}
+
+async function commitRole(deps: ProvisionDependencies, request: CloneRequest) {
   const master = { profileId: request.masterProfileId, identity: request.masterIdentity };
   const provisioned = await deps.roles.provision(master);
   if (!provisioned.ok) throw new Error(`The role was not provisioned: ${provisioned.reason}.`);
@@ -71,7 +76,8 @@ export async function provisionClone(
   request: CloneRequest,
 ): Promise<void> {
   const current = await deps.roles.record();
-  if (current?.role === "template") await provisionTemplate(deps, request);
+  const fresh = current?.role === "template";
+  if (fresh) await provisionTemplate(deps, request);
   else if (current?.role === "worker") {
     const [self, namespace] = await Promise.all([deps.identity.read(), deps.namespace.read()]);
     const conflict = conflictOf(current, self, namespace, request);
@@ -84,6 +90,7 @@ export async function provisionClone(
   const { instanceId, operationId } = request;
   const identity = await deps.statement(instanceId);
   await deps.ack(request.token, identity, { instanceId, operationId, provisioned: true });
+  if (fresh) await commitRole(deps, request);
   await deps.start();
 }
 
@@ -92,17 +99,18 @@ interface Sender {
   url?: string;
 }
 
-/** The bootstrap page of `#clone=` asks for the provisioning; only the extension's own page may. */
+/** Only the launcher's clone bootstrap page, and only for the request its own address names, may ask. */
 export function createProvisionListener(
   provision: (request: CloneRequest) => Promise<void>,
   own: { extensionId: string; extensionUrl: string },
 ) {
   let queue: Promise<unknown> = Promise.resolve();
   return (message: unknown, sender: Sender, reply: (answer: BackgroundReply) => void) => {
-    const ownPage = sender.id === own.extensionId && sender.url?.startsWith(own.extensionUrl);
     const parsed = v.safeParse(PocProvisionCloneSchema, message);
-    if (!parsed.success || !ownPage) return false;
+    if (!parsed.success || sender.id !== own.extensionId) return false;
     const { type: _type, ...request } = parsed.output;
+    const named = cloneRequestOfPage(sender.url, own.extensionUrl);
+    if (!named || JSON.stringify(named) !== JSON.stringify(request)) return false;
     // One at a time: a second run would otherwise discard the key the first just made.
     const next = queue.then(() => provision(request));
     queue = next.catch(() => {});

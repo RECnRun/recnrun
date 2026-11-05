@@ -2,12 +2,8 @@ import { errorMessage } from "@recnrun/domain";
 import * as v from "valibot";
 import { browser } from "wxt/browser";
 import { ask } from "@/diagnostics/poc-messages";
-import {
-  PocProvisionCloneSchema,
-  pocLauncherAck,
-  pocProvisionClone,
-  pocPublishPresence,
-} from "@/messaging/poc-presence";
+import { CLONE_PREFIX, cloneRequestOf } from "@/messaging/clone-fragment";
+import { pocLauncherAck, pocProvisionClone, pocPublishPresence } from "@/messaging/poc-presence";
 import { pocPresenceStore } from "@/storage/poc-presence-repository";
 import { pocTemplateStore } from "@/storage/poc-template-repository";
 
@@ -37,12 +33,6 @@ const TemplateFragmentSchema = v.pipe(
 );
 const TEMPLATE_PREFIX = "#template=";
 const SETTING_KEY = "&setting=";
-const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}";
-// A role, or any key but these, never reaches the worker; NamespaceSchema checks the namespace.
-const CLONE_FRAGMENT = new RegExp(
-  `^#clone=(${UUID})&instance=(${UUID})&operation=(${UUID})&namespace=([^&]*)&master=(${UUID})\\.([\\w-]{87})$`,
-);
-const CLONE_PREFIX = "#clone=";
 const CLONE_REFUSED =
   "The address carries no #clone=<token>&instance=<uuid>&operation=<uuid>&namespace=<namespace>&master=<profile id>.<identity key>.";
 
@@ -87,15 +77,6 @@ async function bootstrapTemplate(
   } catch (error) {
     return { ok: false, error: errorMessage(error) };
   }
-}
-
-/** The fields of a `#clone=` fragment in their one order, checked again as the message. */
-function cloneRequestOf(hash: string) {
-  const [token, instanceId, operationId, namespace, masterProfileId, masterIdentity] =
-    CLONE_FRAGMENT.exec(hash)?.slice(1) ?? [];
-  const fields = { token, instanceId, operationId, namespace, masterProfileId, masterIdentity };
-  const parsed = v.safeParse(PocProvisionCloneSchema, { type: "POC_PROVISION_CLONE", ...fields });
-  return parsed.success ? parsed.output : undefined;
 }
 
 /** The clone open of a copied base: its worker provisions and acks, or says why it refused. */

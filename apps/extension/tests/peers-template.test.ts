@@ -29,10 +29,13 @@ const provision = {
 };
 
 /** Sends `message` as the extension's bootstrap page does, and collects the replies. */
-function fromBootstrap(message: unknown, replies: unknown[]) {
-  const page = { id: fakeBrowser.runtime.id, url: fakeBrowser.runtime.getURL("/bootstrap.html") };
+function fromBootstrap(message: unknown, replies: unknown[], hash = "") {
+  const url = fakeBrowser.runtime.getURL("/bootstrap.html") + hash;
+  const page = { id: fakeBrowser.runtime.id, url };
   void fakeBrowser.runtime.onMessage.trigger(message, page, (reply) => replies.push(reply));
 }
+
+const CLONE_HASH = `#clone=${TOKEN}&instance=${INSTANCE}&operation=${OPERATION}&namespace=clones&master=${MASTER}.${MASTER_KEY}`;
 
 const bodyOf = (url = "") => JSON.parse(contentOf(url)) as Record<string, unknown>;
 
@@ -80,7 +83,7 @@ describe("a stored template's worker", () => {
     startPeers({ transport: "downloads", sign: signing });
     await settles(() => expect(log).toHaveBeenCalledWith("[RECnRun peer]", silent));
     const replies: unknown[] = [];
-    fromBootstrap(provision, replies);
+    fromBootstrap(provision, replies, CLONE_HASH);
     await settles(() => expect(replies).toEqual([{ ok: true }]));
     await settles(() => expect(written).toHaveLength(2));
     const [ack, presence] = written;

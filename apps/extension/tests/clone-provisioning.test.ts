@@ -103,6 +103,24 @@ describe("provisioning a copied template", () => {
   );
 
   test.each([
+    ["the statement", "statement"],
+    ["the ack", "ack"],
+  ] as const)(
+    "leaves no worker role when %s fails, and a rerun completes",
+    async (_name, failing) => {
+      await roleRepository.write({ role: "template" });
+      const { deps } = dependencies();
+      deps[failing].mockRejectedValueOnce(new Error("boom"));
+      await expect(provisionClone(deps, request)).rejects.toThrow("boom");
+      expect(await roleRepository.read()).toEqual({ role: "template" });
+      expect(deps.start).not.toHaveBeenCalled();
+      await provisionClone(deps, request);
+      expect(await roleRepository.read()).toEqual(provisioned);
+      expect(deps.start).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  test.each([
     ["another instance", { instanceId: OTHER_INSTANCE }],
     ["another master", { masterProfileId: OTHER_MASTER }],
     ["another master key", { masterIdentity: OTHER_KEY }],
@@ -137,7 +155,9 @@ describe("provisioning a copied template", () => {
 
 describe("createProvisionListener", () => {
   const own = { extensionId: "own", extensionUrl: "chrome-extension://own/" };
-  const page = { id: "own", url: "chrome-extension://own/bootstrap.html" };
+  const hashOf = (r: CloneRequest) =>
+    `#clone=${r.token}&instance=${r.instanceId}&operation=${r.operationId}&namespace=${r.namespace}&master=${r.masterProfileId}.${r.masterIdentity}`;
+  const page = { id: "own", url: `chrome-extension://own/bootstrap.html${hashOf(request)}` };
   const message = { type: "POC_PROVISION_CLONE", ...request };
 
   test("provisions for the extension's own page with exactly the parsed fields", async () => {
@@ -159,9 +179,10 @@ describe("createProvisionListener", () => {
     });
     const listener = createProvisionListener(provision, own);
     const again = { ...message, operationId: "6a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d" };
+    const againPage = { ...page, url: `chrome-extension://own/bootstrap.html${hashOf(again)}` };
     const reply = vi.fn();
     listener(message, page, reply);
-    listener(again, page, reply);
+    listener(again, againPage, reply);
     await vi.waitFor(() => expect(order).toEqual([`start ${OPERATION}`]));
     release();
     await vi.waitFor(() => expect(reply).toHaveBeenCalledTimes(2));
@@ -189,6 +210,35 @@ describe("createProvisionListener", () => {
     ["a short master key", { ...message, masterIdentity: "short" }, page],
     ["another extension", message, { ...page, id: "stranger" }],
     ["a web page", message, { id: "own", url: "https://recnrun.com/" }],
+    [
+      "the dashboard",
+      message,
+      { ...page, url: `chrome-extension://own/dashboard.html${hashOf(request)}` },
+    ],
+    [
+      "a bootstrap page without a clone fragment",
+      message,
+      { ...page, url: "chrome-extension://own/bootstrap.html" },
+    ],
+    [
+      "a bootstrap page of a template",
+      message,
+      { ...page, url: "chrome-extension://own/bootstrap.html#template=x&setting=base-v1" },
+    ],
+    [
+      "another token than the address",
+      { ...message, token: "6a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d" },
+      page,
+    ],
+    ["another instance than the address", { ...message, instanceId: OTHER_INSTANCE }, page],
+    [
+      "another operation than the address",
+      { ...message, operationId: "6a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d" },
+      page,
+    ],
+    ["another namespace than the address", { ...message, namespace: "elsewhere" }, page],
+    ["another master than the address", { ...message, masterProfileId: OTHER_MASTER }, page],
+    ["another master key than the address", { ...message, masterIdentity: OTHER_KEY }, page],
   ])("ignores %s", (_name, sent, sender) => {
     const provision = vi.fn(async () => {});
     expect(createProvisionListener(provision, own)(sent, sender, vi.fn())).toBe(false);
