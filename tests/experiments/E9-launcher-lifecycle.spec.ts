@@ -25,6 +25,7 @@ test.describe("E9: the launcher's lifecycle rules, in the lab", () => {
     "E9.restart": "a crashed Chrome with a stale presence is relaunched with a new boot",
     "E9.stop": "stop signals the launched Chrome only and leaves no temporary file",
     "E9.pause": "a paused profile exits 73 until it is resumed",
+    "E9.sharedRoot": "a profile of a shared root stores the main pid and stop is refused",
   };
   for (const hypothesis of Object.keys(E9_CELLS) as E9Hypothesis[]) {
     test(`${hypothesis}: ${titles[hypothesis]}`, async () => {

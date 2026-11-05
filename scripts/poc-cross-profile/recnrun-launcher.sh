@@ -16,7 +16,8 @@
 #                                               lifecycle.sh status
 #   stop <state-dir> [--all]                    SIGTERM to the pid in launcher.pid while its command
 #                                               line names this script; --all also stops each profile
-#                                               with a live pid (lifecycle.sh stop)
+#                                               with a live pid (lifecycle.sh stop), except the
+#                                               profiles of a shared root, which it names and skips
 #   autostart on|off|status <state-dir> <record> <namespace>    see autostart.sh
 #
 # Environment: RECNRUN_LAUNCHER_INTERVAL_S (10), RECNRUN_LIFECYCLE_STOP_S (20), and lifecycle.sh's.
@@ -175,6 +176,10 @@ stop_profiles() {
     is_v4 "$sp_name" || continue
     read_state "$sp_file"
     pid_alive "$st_pid" || continue
+    if [ "$st_shared" = 1 ]; then
+      log "$sp_name: $(shared_message)"
+      continue
+    fi
     run_lifecycle stop "$1" "$sp_name" || sp_code=$?
   done
   return "$sp_code"

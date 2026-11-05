@@ -4,7 +4,7 @@ import { existsSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { test } from "node:test";
 import { ALICE, BOB, NAMESPACE, shells, until } from "./lab.mjs";
-import { alive, env, lines, life, script as lifecycleScript } from "./lifecycle-lab.mjs";
+import { alive, env, lines, life, scene, script as lifecycleScript } from "./lifecycle-lab.mjs";
 import { commandScene, launcher, launcherScript } from "./commands-lab.mjs";
 
 const EX_USAGE = 64;
@@ -146,6 +146,21 @@ for (const shell of shells) {
     assert.equal(alive(lost), false, "the Chrome of the timed-out open was signalled");
     assert.equal(scene.field("status"), "stopped");
     assert.equal(scene.field("status", BOB), "stopped");
+  });
+
+  await test(`${shell}: stop --all skips the profiles of a shared root and signals nothing`, (context) => {
+    const shared = scene(context, {}, { shared: true });
+    assert.equal(shared.request(shell).code, 0);
+    const forward = { STUB_PROFILE: BOB, RECNRUN_STUB_FORWARD: "1" };
+    assert.equal(shared.request(shell, forward, BOB).code, 0);
+    const main = Number(shared.field("pid", BOB));
+    const vars = shared.vars({ RECNRUN_LIFECYCLE_STOP_S: "1" });
+    const all = launcher(shell, ["stop", shared.state, "--all"], vars);
+    assert.equal(all.code, 0, all.err);
+    assert.match(all.err, new RegExp(`${BOB}: shared root .*: stopping would close every profile`));
+    assert.equal(alive(main), true);
+    assert.equal(shared.field("status", BOB), "open");
+    assert.equal(shared.field("status"), "open");
   });
 
   // A dot keeps the assignment of its own command line, so a sourced library must restore the switch.

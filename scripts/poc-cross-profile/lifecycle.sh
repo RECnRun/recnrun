@@ -15,7 +15,7 @@
 #
 # State, <state-dir>/profiles/<profileId>: key=value lines with token, pid, startedAt, attempts,
 # nextAt (epoch seconds), status (idle, opening, open, failed, paused, stopped), boot, root (the
-# Downloads root), userDataDir; any other key or value outside its grammar exits 65. userDataDir and
+# Downloads root), userDataDir, shared (1 when another record block names the same userDataDir); any other key or value outside its grammar exits 65. userDataDir and
 # pid are written when the attempt starts and the Chrome launches, so a timed-out open (69) keeps both
 # and stop can still end that Chrome.
 # Pause policy: an extension signals Disconnect/Forget by going silent, which is not a crash. An open
@@ -23,6 +23,11 @@
 # silent: it becomes paused and is not relaunched until resume. A dead pid is a crash and relaunches.
 # Stop policy: stop is the owner's decision, so a stopped profile is held like a paused one (request
 # exits 73) until resume; resume turns a paused or stopped profile into idle, which request launches.
+#
+# Shared roots: profiles of one user data dir live in one Chrome (the process singleton forwards a
+# second open to it and the new process exits), so a shared-root profile's pid is that main process,
+# found by its command line after the ack; stop is refused (70) because a signal would close every
+# profile of the root, and a dead main process is a crash that each profile's request relaunches.
 #
 # Environment: RECNRUN_OPEN_TIMEOUT_S (60), RECNRUN_LIFECYCLE_BACKOFF_S (5), _MAX_ATTEMPTS (5), _STOP_S (20).
 # Exit: 0 done, 64 wrong call, 65 refused, 70 failed (retry later, max attempts, or still running),
@@ -69,6 +74,7 @@ cmd_status() {
 
 # --- Stop ------------------------------------------------------------------------------------
 
+shared_message() { printf 'shared root %s: stopping would close every profile of it; close its window instead' "$st_user"; }
 # The pid must be Chrome on this user data dir; a name or a recycled pid is never enough.
 names_user_dir() {
   [ -n "$st_user" ] || return 1
@@ -77,6 +83,7 @@ names_user_dir() {
   return 1
 }
 stop_profile() {
+  [ "$st_shared" = 0 ] || die 70 "$(shared_message)"
   if pid_alive "$st_pid"; then
     names_user_dir || die 65 "pid $st_pid does not name $st_user: not signalled"
     kill -TERM "$st_pid"
@@ -101,6 +108,13 @@ cmd_stop() {
 }
 
 # --- Request ---------------------------------------------------------------------------------
+
+# After the ack of a shared-root profile, the pid of record is the root's main process, never the forwarder's.
+adopt_main_pid() {
+  [ "$st_shared" = 1 ] || return 0
+  am_pid=$(main_pid_of "$st_user") || return 0
+  st_pid=$am_pid
+}
 
 # A number after "key": in the presence text, else exit 1.
 number_after() {
@@ -192,6 +206,7 @@ launch() {
   case $l_rc in
     0)
       take_result "$l_out"
+      adopt_main_pid
       st_status=open st_attempts=0 st_next=0
       write_state
       printf 'boot=%s\n' "$st_boot"
@@ -225,6 +240,8 @@ cmd_request() {
   take_lock "$lc_lock" "$$"
   trap 'release_lock "$lc_lock" "$$"' EXIT
   read_state "$1/profiles/$lc_id"
+  st_shared=0
+  if root_is_shared "$p_user" "$lc_record"; then st_shared=1; fi
   lc_now=$(date +%s)
   l_before=$st_status
   [ "$l_before" != none ] || l_before=idle

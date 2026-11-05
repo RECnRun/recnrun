@@ -11,6 +11,7 @@ import {
   presenceOf,
   request,
   sample,
+  sharedRig,
   stateOf,
   unfinished,
   verb,
@@ -36,6 +37,7 @@ export const E9_CELLS = {
   "E9.restart": ["the launched Chrome killed, its presence expired, a request relaunches", 2],
   "E9.stop": ["stop signals the launched Chrome only, beside a bystander Chrome", 3],
   "E9.pause": ["a paused profile is not launched; resumed, it is", 2],
+  "E9.sharedRoot": ["two profiles of one root, Default open: the second is forwarded", 3],
 } as const;
 export type E9Hypothesis = keyof typeof E9_CELLS;
 
@@ -176,6 +178,30 @@ async function pause(rig: E9Rig, { check, seen }: Tally) {
   check((await mainsOf(rig)).length === 1, "the resumed request did not launch a Chrome");
 }
 
+async function sharedRoot(rig: E9Rig, { check, seen }: Tally) {
+  const first = await request({ ...rig, profileId: rig.firstId ?? "" });
+  const second = await request(rig);
+  const state = await stateOf(rig);
+  const mains = await mainsOf(rig);
+  seen.mains = mains;
+  seen.pid = state.pid;
+  check(first.code === 0, `the first profile's request exited ${first.code}`);
+  check(second.code === 0, `the second request exited ${second.code}: ${second.err.trim()}`);
+  check(
+    state.status === "open" && state.shared === "1",
+    `state ${state.status}, shared ${state.shared}`,
+  );
+  check(
+    mains.length === 1 && Number(state.pid) === mains[0],
+    `the pid of record ${state.pid} is not the root's one main process ${mains.join()}`,
+  );
+  const stopped = await verb(rig, "stop", { RECNRUN_LIFECYCLE_STOP_S: "2" });
+  seen.stop = stopped.code;
+  check(stopped.code === 70, `stop exited ${stopped.code}, expected 70`);
+  check(/shared root .*close its window instead/.test(stopped.err), "stop did not say why");
+  check(mains[0] !== undefined && alive(mains[0]), "stop closed the root's Chrome");
+}
+
 const BODIES: Record<
   E9Hypothesis,
   [() => Promise<E9Rig>, (rig: E9Rig, tally: Tally) => Promise<void>]
@@ -186,6 +212,7 @@ const BODIES: Record<
   "E9.restart": [installedRig, restart],
   "E9.stop": [installedRig, stop],
   "E9.pause": [installedRig, pause],
+  "E9.sharedRoot": [sharedRig, sharedRoot],
 };
 
 /** One sample of a cell: a fresh rig, the cell's body, everything stopped and removed. */

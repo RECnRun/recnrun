@@ -1,6 +1,6 @@
 #!/bin/sh
 # Locks and state files of lifecycle.sh (POC PLAN.md P4.4): the hard-link pid lock and the
-# key=value state grammar. Sourced by lifecycle.sh, which also provides log, die, and open.sh's
+# key=value state grammar, and the process lookups of shared roots. Sourced by lifecycle.sh, which also provides log, die, and open.sh's
 # is_v4, is_uuid, and is_directory.
 
 is_count() {
@@ -12,6 +12,31 @@ pid_alive() {
   kill -0 "$1" 2>/dev/null || return 1
   case $(ps -o stat= -p "$1" 2>/dev/null) in Z*) return 1 ;; esac
   return 0
+}
+# True when more than one block of the record names the user data dir $1.
+root_is_shared() {
+  rs_count=0
+  while IFS= read -r rs_line || [ -n "$rs_line" ]; do
+    [ "$rs_line" != "userDataDir=$1" ] || rs_count=$((rs_count + 1))
+  done <"$2"
+  [ "$rs_count" -gt 1 ]
+}
+# The main Chrome process of the user data dir $1 (no --type= word): one that is not the pid open.sh
+# started, else that pid itself, which is the main when no Chrome ran on the root before.
+main_pid_of() {
+  mp_self=''
+  while read -r mp_pid mp_cmd; do
+    case $mp_cmd in *" --type="*) continue ;; esac
+    case $mp_cmd in *"--user-data-dir=$1 "* | *"--user-data-dir=$1") ;; *) continue ;; esac
+    if [ "$mp_pid" != "$st_pid" ]; then
+      printf '%s\n' "$mp_pid"
+      return 0
+    fi
+    mp_self=$mp_pid
+  done <<MAIN_PIDS
+$(ps -axo pid=,command= 2>/dev/null)
+MAIN_PIDS
+  [ -n "$mp_self" ] && printf '%s\n' "$mp_self"
 }
 lc_random() { od -An -N8 -tx1 /dev/urandom | tr -d ' \n'; }
 setting() {
@@ -59,7 +84,7 @@ state_dir() {
 }
 
 state_defaults() {
-  st_token='' st_pid='' st_started=0 st_attempts=0 st_next=0 st_status=none st_boot='' st_root='' st_user=''
+  st_token='' st_pid='' st_started=0 st_attempts=0 st_next=0 st_status=none st_boot='' st_root='' st_user='' st_shared=0
 }
 state_bad() { die 65 "state file $st_file: invalid $1"; }
 # Each key has its own grammar; a free value is refused before the shell uses it.
@@ -74,6 +99,7 @@ state_set() {
     boot) [ -z "$2" ] || is_uuid "$2" || state_bad "$1"; st_boot=$2 ;;
     root) [ -z "$2" ] || is_directory "$2" || state_bad "$1"; st_root=$2 ;;
     userDataDir) [ -z "$2" ] || is_directory "$2" || state_bad "$1"; st_user=$2 ;;
+    shared) case $2 in 0 | 1) st_shared=$2 ;; *) state_bad "$1" ;; esac ;;
     *) state_bad key ;;
   esac
 }
@@ -95,8 +121,8 @@ write_state() {
   ws_tmp=$st_file.$(lc_random).tmp
   (
     set -C
-    printf 'token=%s\npid=%s\nstartedAt=%s\nattempts=%s\nnextAt=%s\nstatus=%s\nboot=%s\nroot=%s\nuserDataDir=%s\n' \
-      "$st_token" "$st_pid" "$st_started" "$st_attempts" "$st_next" "$st_status" "$st_boot" "$st_root" "$st_user" >"$ws_tmp"
+    printf 'token=%s\npid=%s\nstartedAt=%s\nattempts=%s\nnextAt=%s\nstatus=%s\nboot=%s\nroot=%s\nuserDataDir=%s\nshared=%s\n' \
+      "$st_token" "$st_pid" "$st_started" "$st_attempts" "$st_next" "$st_status" "$st_boot" "$st_root" "$st_user" "$st_shared" >"$ws_tmp"
   ) || die 73 'cannot write the state'
   mv -f -- "$ws_tmp" "$st_file" || die 73 'cannot replace the state'
 }

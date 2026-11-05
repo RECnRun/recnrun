@@ -11,13 +11,15 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { ALICE, NAMESPACE, presence } from "./lab.mjs";
+import { ALICE, BOB, NAMESPACE, presence } from "./lab.mjs";
 
 export const script = fileURLToPath(new URL("./lifecycle.sh", import.meta.url));
 const APP = "Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 
 // Logs one line per launch; writes the ack of its token when STUB_ACK is set; stays alive for
 // STUB_ALIVE seconds (deaf to SIGTERM with STUB_DEAF) so the pid rules have a process to look at.
+// With RECNRUN_STUB_FORWARD it is a forwarder: it acks and exits at once, as a Chrome does when the
+// process singleton hands its command line to the browser already running on the root.
 const STUB = `#!/bin/sh
 for a in "$@"; do last=$a; done
 printf 'launch\\n' >>"$STUB_LOG"
@@ -28,6 +30,7 @@ if [ -n "\${STUB_ACK:-}" ]; then
   mkdir -p "$dir"
   printf '%s' '{"token":"'$token'","profileId":"'$STUB_PROFILE'","identity":{"key":"K","signedAt":1,"signature":"S"},"boot":"'$token'","createdAt":1}' >"$dir/$token.json"
 fi
+[ -n "\${RECNRUN_STUB_FORWARD:-}" ] && exit 0
 [ -n "\${STUB_ALIVE:-}" ] || exit 0
 if [ -n "\${STUB_DEAF:-}" ]; then trap '' TERM; else trap 'kill $s 2>/dev/null; exit 0' TERM; fi
 sleep "$STUB_ALIVE" &
@@ -60,8 +63,8 @@ function killLeftovers(spawned, state) {
     if (alive(pid)) process.kill(pid, "SIGKILL");
 }
 
-/** The stub Chrome, a Chrome root with one profile, and the record that registers it. */
-function install(home) {
+/** The stub Chrome, a Chrome root with one profile (two with `shared`), and the record that registers it. */
+function install(home, shared) {
   const root = join(home, "Chrome");
   const record = join(home, "launcher.record");
   const chrome = join(home, APP);
@@ -70,10 +73,14 @@ function install(home) {
   chmodSync(chrome, 0o755);
   mkdirSync(join(root, "Default"), { recursive: true });
   writeFileSync(join(root, "Default/Preferences"), "{}");
-  writeFileSync(
-    record,
-    `userDataDir=${root}\nprofileDirectory=Default\nprofileId=${ALICE}\nnamespace=${NAMESPACE}\n`,
-  );
+  const block = (id, directory) =>
+    `userDataDir=${root}\nprofileDirectory=${directory}\nprofileId=${id}\nnamespace=${NAMESPACE}\n`;
+  const second = shared ? `\n${block(BOB, "Profile 1")}` : "";
+  if (shared) {
+    mkdirSync(join(root, "Profile 1"), { recursive: true });
+    writeFileSync(join(root, "Profile 1/Preferences"), "{}");
+  }
+  writeFileSync(record, block(ALICE, "Default") + second);
   return { root, record };
 }
 
@@ -103,8 +110,8 @@ function publishPresence(home) {
   writeFileSync(join(folder, "presence.json"), JSON.stringify(presence(ALICE)));
 }
 
-/** A temporary home with a stub Chrome, one registered profile, a state folder, and the environment. */
-export function scene(context, defaults = {}) {
+/** A temporary home with a stub Chrome, one registered profile (two of one root with `shared`), a state folder, and the environment. */
+export function scene(context, defaults = {}, { shared = false } = {}) {
   const home = mkdtempSync(join(tmpdir(), "recnrun-life-"));
   const state = join(home, "state");
   const log = join(home, "launches.txt");
@@ -114,7 +121,7 @@ export function scene(context, defaults = {}) {
     rmSync(home, { recursive: true, force: true });
   });
   mkdirSync(state);
-  const { root, record } = install(home);
+  const { root, record } = install(home, shared);
   const vars = (extra) => environment(home, defaults, extra);
   const stateFile = (id = ALICE) => join(state, "profiles", id);
   return {

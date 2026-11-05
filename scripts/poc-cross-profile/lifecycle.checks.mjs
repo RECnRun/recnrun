@@ -12,6 +12,8 @@ const EX_FAILED = 70;
 const EX_PAUSED = 73;
 const EX_BUSY = 75;
 const EX_NO_ACK = 69;
+// A forwarder: the Chrome of the request exits at once, the root's own Chrome keeps the profile.
+const forward = { STUB_PROFILE: BOB, RECNRUN_STUB_FORWARD: "1" };
 
 for (const shell of shells) {
   await test(`${shell}: a lock held by a live pid is respected and a dead pid's is taken over`, (context) => {
@@ -237,6 +239,45 @@ for (const shell of shells) {
       assert.equal(life(shell, ["status", state], {}).code, EX_REFUSED, bad);
     }
     assert.equal(launches(), 0);
+  });
+
+  await test(`${shell}: a shared-root profile stores the root's main pid, not the forwarder's`, (context) => {
+    const { request, launches, field } = scene(context, {}, { shared: true });
+    assert.equal(request(shell).code, 0);
+    const main = Number(field("pid"));
+    assert.ok(alive(main), "the first profile's Chrome is the root's main process");
+    const forwarded = request(shell, forward, BOB);
+    assert.equal(forwarded.code, 0, forwarded.err);
+    assert.equal(launches(), 2);
+    assert.equal(field("status", BOB), "open");
+    assert.equal(field("shared", BOB), "1");
+    assert.equal(Number(field("pid", BOB)), main, "the pid of record is the main process");
+    assert.equal(field("shared"), "1");
+  });
+
+  await test(`${shell}: stop on a shared-root profile exits 70 and signals nothing`, (context) => {
+    const { state, request, field } = scene(context, {}, { shared: true });
+    assert.equal(request(shell).code, 0);
+    const main = Number(field("pid"));
+    assert.equal(request(shell, forward, BOB).code, 0);
+    const stopped = life(shell, ["stop", state, BOB], { RECNRUN_LIFECYCLE_STOP_S: "1" });
+    assert.equal(stopped.code, EX_FAILED);
+    assert.match(stopped.err, /shared root .*: stopping would close every profile of it/);
+    assert.equal(alive(main), true);
+    assert.equal(field("status", BOB), "open");
+    assert.equal(field("pid", BOB), String(main));
+  });
+
+  await test(`${shell}: a dead main process of a shared root relaunches each profile`, async (context) => {
+    const { request, launches, field } = scene(context, {}, { shared: true });
+    assert.equal(request(shell).code, 0);
+    assert.equal(request(shell, forward, BOB).code, 0);
+    const main = Number(field("pid", BOB));
+    process.kill(main, "SIGKILL");
+    await until(() => !alive(main));
+    assert.equal(request(shell, forward, BOB).code, 0);
+    assert.equal(launches(), 3, "a dead main is a crash for the profile that asks");
+    assert.equal(field("status", BOB), "open");
   });
 
   await test(`${shell}: a wrong call exits 64 and a bad mode 65`, (context) => {

@@ -7,7 +7,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 import { resolveChromePath } from "../browser/fixtures/chrome.ts";
 import { loadUnpacked, extensionPath } from "../browser/fixtures/extension-loaders.ts";
-import { preferencesOf, register } from "./fixtures/launcher-open.ts";
+import { preferencesOf, register, registerIn } from "./fixtures/launcher-open.ts";
 import type { Sample } from "./outcome.ts";
 
 /*
@@ -33,6 +33,8 @@ export interface E9Rig {
   record: string;
   state: string;
   profileId: string;
+  /** The first profile of a two-profile root (`profileId` is then the second's). */
+  firstId?: string;
   env: NodeJS.ProcessEnv;
 }
 
@@ -131,6 +133,35 @@ export async function installedRig(): Promise<E9Rig> {
   } catch (error) {
     await dispose(rig);
     throw error;
+  } finally {
+    await extension.close();
+  }
+}
+
+/** Two profiles of one root, `Default` (`firstId`) and `Profile 1` (`profileId`), each with poc-d0 installed; Chrome quit. */
+export async function sharedRig(): Promise<E9Rig> {
+  const rig = await skeleton();
+  const second = join(rig.dir, "home/Downloads-1");
+  try {
+    const first = await installedIn(rig, "Default", rig.downloads);
+    await mkdir(join(rig.root, "Profile 1"), { recursive: true });
+    await mkdir(second, { recursive: true });
+    const prefs = JSON.stringify(preferencesOf(second));
+    await writeFile(join(rig.root, "Profile 1/Preferences"), prefs);
+    return { ...rig, firstId: first, profileId: await installedIn(rig, "Profile 1", second) };
+  } catch (error) {
+    await dispose(rig);
+    throw error;
+  }
+}
+
+/** poc-d0 installed in one profile of the rig's root and registered; returns its profile id. */
+async function installedIn(rig: E9Rig, profileDirectory: string, downloads: string) {
+  const args = [`--profile-directory=${profileDirectory}`];
+  const extension = await loadUnpacked(extensionPath("poc-d0"), { userDataDir: rig.root, args });
+  try {
+    const target = { root: rig.root, downloads, record: rig.record, profileDirectory };
+    return (await registerIn(extension, target)).profileId;
   } finally {
     await extension.close();
   }
