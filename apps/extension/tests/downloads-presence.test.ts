@@ -268,6 +268,20 @@ describe("startDownloadsPresence with chrome.alarms", () => {
     expect(await fakeBrowser.alarms.get(ALARM)).toBeUndefined();
   });
 
+  test("hands a failed attempt's message to `failed`, and nothing on success", async () => {
+    const failed = vi.fn();
+    const { downloads } = fakeDownloads();
+    downloads.download.mockRejectedValueOnce(new Error("disk full"));
+    const { deps, log } = dependencies({ downloads, failed, alarms: undefined });
+    const presence = startDownloadsPresence(deps);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(failed).toHaveBeenCalledWith("disk full");
+    expect(log).toHaveBeenCalledWith("presence: disk full");
+    await vi.advanceTimersByTimeAsync(HALF_TTL);
+    presence.stop();
+    expect(failed).toHaveBeenCalledTimes(1);
+  });
+
   test("logs an alarm Chrome refuses, and still wrote at start", async () => {
     const alarms = {
       ...fakeBrowser.alarms,

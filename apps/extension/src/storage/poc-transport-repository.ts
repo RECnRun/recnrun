@@ -27,6 +27,8 @@ export function pocTransportStore() {
       const stored = v.safeParse(PausedSchema, await paused.getValue());
       return stored.success ? stored.output : null;
     },
+    /** The presence writer's last failure; a later success leaves it, so the page shows what went wrong. */
+    recordError: (message: string) => lastError.setValue({ at: Date.now(), message }),
     /** `resumed` clears the pause, as the launcher reads it. */
     setPaused: (reason: Paused | "resumed") =>
       paused.setValue(reason === "resumed" ? null : reason),

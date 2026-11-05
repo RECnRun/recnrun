@@ -16,3 +16,12 @@ test("reads a stored error and ignores a value that fits no schema", async () =>
   expect(await pocTransportStore().lastError()).toBeNull();
   expect(await pocTransportStore().paused()).toBeNull();
 });
+
+test("records the last error with the time it happened", async () => {
+  await pocTransportStore().recordError("write failed");
+  const error = await pocTransportStore().lastError();
+  expect(error?.message).toBe("write failed");
+  expect(error?.at).toBeGreaterThan(0);
+  await pocTransportStore().recordError("again");
+  expect((await pocTransportStore().lastError())?.message).toBe("again");
+});

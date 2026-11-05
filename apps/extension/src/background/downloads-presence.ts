@@ -21,6 +21,7 @@ import { storedRoles } from "@/storage/hierarchy-repository";
 import { readIdentity } from "@/storage/peer-repository";
 import type { ProfileIdentity } from "@/storage/peer-repository";
 import { pocPresenceStore } from "@/storage/poc-presence-repository";
+import { pocTransportStore } from "@/storage/poc-transport-repository";
 
 /*
  * P2.2 (POC PLAN.md): each POC profile announces itself through Downloads as its worker starts,
@@ -65,6 +66,8 @@ export interface PresenceDependencies {
   renew?: () => Promise<boolean>;
   /** Whether the stored role still lets this profile announce; a template never does. */
   may?: () => Promise<boolean>;
+  /** Told the message of each failed attempt, after it is logged (the diagnostics page's last error). */
+  failed?: (message: string) => void;
 }
 
 type NamespaceSource = Pick<PresenceDependencies, "namespace" | "log">;
@@ -174,7 +177,11 @@ export function startDownloadsPresence(deps: PresenceDependencies) {
       if (!(await allowed())) return;
       if ((await deps.renew?.()) ?? true) await publishNow();
       else void deps.published?.();
-    })().catch((error: unknown) => deps.log(`presence: ${errorMessage(error)}`));
+    })().catch((error: unknown) => {
+      const message = errorMessage(error);
+      deps.log(`presence: ${message}`);
+      deps.failed?.(message);
+    });
   };
   attempt();
   // The alarm that restarted the worker arrives just after the startup renewal check.
@@ -253,6 +260,10 @@ function pocDependencies(
     alarms: (browser as { alarms?: AlarmsPort }).alarms,
     published: createDownloadsPairing({ available, start: startPairing, log }),
     may: () => storedRoles().mayAct("announce"),
+    failed: (message) =>
+      void pocTransportStore()
+        .recordError(message)
+        .catch(() => false),
   };
 }
 
