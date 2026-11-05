@@ -17,6 +17,7 @@
 open_as_library=${RECNRUN_DISCOVERY_LIB:-}
 # shellcheck source=profiles.sh
 RECNRUN_DISCOVERY_LIB=1 . "$(dirname -- "$0")/profiles.sh"
+RECNRUN_DISCOVERY_LIB=$open_as_library # a dot keeps its own assignment: give back what this script saw
 here=$(dirname -- "$0")
 
 log() { printf 'open.sh: %s\n' "$*" >&2; }
@@ -152,7 +153,10 @@ start_chrome() {
   [ "$mode" != headless ] || set -- --headless=new "$@"
   "$chrome" "$@" >/dev/null 2>&1 &
   log "pid=$!"
+  launched "$!"
 }
+# Called with the pid right after the launch; a script that sources this one redefines it.
+launched() { :; }
 open_profile() {
   [ "$#" -ge 3 ] || { log 'usage: open.sh open <record> <namespace> <profileId> [headed|headless]'; exit 64; }
   [ "$#" -le 4 ] || refuse 'a free argument: the request is the record, namespace, profile id, and mode'

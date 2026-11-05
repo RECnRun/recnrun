@@ -7,7 +7,8 @@
 #   start <state-dir> <record> <namespace> [--once]
 #       takes the launcher lock, then every RECNRUN_LAUNCHER_INTERVAL_S (10) requests, headed, each
 #       profile the record registers in the namespace (lifecycle.sh request). It opens no other
-#       profile and leaves a paused one alone. Exits 73, 75, 69, and 70 of a request are logged, not
+#       profile and leaves a paused or stopped one alone until lifecycle.sh resume (the owner's stop
+#       is never undone by the next pass). Exits 73, 75, 69, and 70 of a request are logged, not
 #       errors; 65 and 66 are logged once and the profile skipped until the launcher restarts.
 #       --once runs one pass; otherwise it runs in the foreground, writes <state-dir>/launcher.pid,
 #       and ends cleanly on SIGTERM.
@@ -24,6 +25,7 @@
 la_as_library=${RECNRUN_DISCOVERY_LIB:-}
 # shellcheck source=lifecycle.sh
 RECNRUN_DISCOVERY_LIB=1 . "$(dirname -- "$0")/lifecycle.sh"
+RECNRUN_DISCOVERY_LIB=$la_as_library # a dot keeps its own assignment: give back what this script saw
 # shellcheck source=autostart.sh
 . "$(dirname -- "$0")/autostart.sh"
 la_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)
@@ -73,8 +75,7 @@ cleanup() {
   if [ -f "$la_state/launcher.pid" ]; then read -r cu_named <"$la_state/launcher.pid" || :; fi
   if [ "$cu_named" = "$$" ]; then rm -f -- "$la_state/launcher.pid"; fi
 }
-# The sourced libraries leave RECNRUN_DISCOVERY_LIB=1 exported in some shells, which would make the child a library.
-run_lifecycle() { RECNRUN_DISCOVERY_LIB='' /bin/sh "$la_dir/lifecycle.sh" "$@"; }
+run_lifecycle() { /bin/sh "$la_dir/lifecycle.sh" "$@"; }
 # One lifecycle.sh request, in the background so a SIGTERM ends the wait at once.
 request_profile() {
   run_lifecycle request "$1" "$2" "$3" "$4" headed &

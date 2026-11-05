@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { existsSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { test } from "node:test";
 import { ALICE, BOB, NAMESPACE, shells, until } from "./lab.mjs";
-import { alive, lines, life } from "./lifecycle-lab.mjs";
+import { alive, env, lines, life, script as lifecycleScript } from "./lifecycle-lab.mjs";
 import { commandScene, launcher, launcherScript } from "./commands-lab.mjs";
 
 const EX_USAGE = 64;
@@ -110,12 +110,28 @@ for (const shell of shells) {
     assert.equal(status(shell, scene).out.split("\n")[0], "launcher stopped");
   });
 
-  await test(`${shell}: stop --all also ends the profiles that run`, (context) => {
+  await test(`${shell}: start --once leaves a stopped profile alone until it is resumed`, (context) => {
     const scene = commandScene(context);
     assert.equal(life(shell, ["pause", scene.state, BOB], {}).code, 0);
     assert.equal(start(shell, scene, "--once").code, 0);
+    const stopped = life(shell, ["stop", scene.state, ALICE], { RECNRUN_LIFECYCLE_STOP_S: "5" });
+    assert.equal(stopped.code, 0, stopped.err);
+    assert.equal(start(shell, scene, "--once").code, 0);
+    assert.equal(scene.argv().length, 1, "the stopped profile was relaunched");
+    assert.equal(scene.field("status"), "stopped");
+    assert.equal(life(shell, ["resume", scene.state, ALICE], {}).code, 0);
+    assert.equal(start(shell, scene, "--once").code, 0);
+    assert.equal(scene.argv().length, 2);
+    assert.equal(scene.field("status"), "open");
+  });
+
+  await test(`${shell}: stop --all also ends the profiles that run, a timed-out open included`, (context) => {
+    const scene = commandScene(context);
+    assert.equal(start(shell, scene, "--once").code, 0);
     const pid = Number(scene.field("pid"));
-    assert.ok(alive(pid));
+    const lost = Number(scene.field("pid", BOB));
+    assert.equal(scene.field("status", BOB), "failed", "BOB never acks");
+    assert.ok(alive(pid) && alive(lost));
     const stop = (...flags) =>
       launcher(
         shell,
@@ -127,6 +143,26 @@ for (const shell of shells) {
     const all = stop("--all");
     assert.equal(all.code, 0, all.err);
     assert.equal(alive(pid), false);
+    assert.equal(alive(lost), false, "the Chrome of the timed-out open was signalled");
     assert.equal(scene.field("status"), "stopped");
+    assert.equal(scene.field("status", BOB), "stopped");
   });
+
+  // A dot keeps the assignment of its own command line, so a sourced library must restore the switch.
+  for (const script of [lifecycleScript, launcherScript]) {
+    await test(`${shell}: sourcing ${basename(script)} does not leave the library switch behind`, (context) => {
+      const scene = commandScene(context);
+      assert.equal(life(shell, ["pause", scene.state, ALICE], {}).code, 0);
+      const probe =
+        'set -- status "$1"; . "$0"; printf "lib=[%s]\\n" "${RECNRUN_DISCOVERY_LIB:-}"; ';
+      const child = `${shell} "$0" status "$1"`;
+      const result = spawnSync(shell, ["-c", `${probe}${child}`, script, scene.state], {
+        encoding: "utf8",
+        env: env(scene.vars()),
+      });
+      assert.equal(result.status, 0, result.stderr);
+      assert.match(result.stdout, /^lib=\[\]$/m, result.stdout);
+      assert.match(result.stdout, new RegExp(`^${ALICE} paused - 0 0$`, "m"), result.stdout);
+    });
+  }
 }

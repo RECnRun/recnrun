@@ -14,11 +14,15 @@
 #   status <state-dir>                      profileId status pid attempts nextAt, one line each
 #
 # State, <state-dir>/profiles/<profileId>: key=value lines with token, pid, startedAt, attempts,
-# nextAt (epoch seconds), status (opening, open, failed, paused, stopped), boot, root (the Downloads
-# root), userDataDir; any other key or value outside its grammar exits 65.
+# nextAt (epoch seconds), status (idle, opening, open, failed, paused, stopped), boot, root (the
+# Downloads root), userDataDir; any other key or value outside its grammar exits 65. userDataDir and
+# pid are written when the attempt starts and the Chrome launches, so a timed-out open (69) keeps both
+# and stop can still end that Chrome.
 # Pause policy: an extension signals Disconnect/Forget by going silent, which is not a crash. An open
 # profile with no fresh presence whose pid is alive and whose token ack is still on disk chose to be
 # silent: it becomes paused and is not relaunched until resume. A dead pid is a crash and relaunches.
+# Stop policy: stop is the owner's decision, so a stopped profile is held like a paused one (request
+# exits 73) until resume; resume turns a paused or stopped profile into idle, which request launches.
 #
 # Environment: RECNRUN_OPEN_TIMEOUT_S (60), RECNRUN_LIFECYCLE_BACKOFF_S (5), _MAX_ATTEMPTS (5), _STOP_S (20).
 # Exit: 0 done, 64 wrong call, 65 refused, 70 failed (retry later, max attempts, or still running),
@@ -27,6 +31,7 @@
 lifecycle_as_library=${RECNRUN_DISCOVERY_LIB:-}
 # shellcheck source=open.sh
 RECNRUN_DISCOVERY_LIB=1 . "$(dirname -- "$0")/open.sh"
+RECNRUN_DISCOVERY_LIB=$lifecycle_as_library # a dot keeps its own assignment: give back what this script saw
 umask 077
 # shellcheck source=lifecycle-state.sh
 . "$(dirname -- "$0")/lifecycle-state.sh"
@@ -50,7 +55,7 @@ mutate() {
   write_state
 }
 do_pause() { st_status=paused; }
-do_resume() { [ "$st_status" != paused ] || st_status=stopped; }
+do_resume() { case $st_status in paused | stopped) st_status=idle ;; esac; }
 do_reset() { st_attempts=0 st_next=0; }
 cmd_status() {
   state_dir "$1"
@@ -139,7 +144,7 @@ check_open() {
 # Exits unless a launch is allowed now.
 decide() {
   case $st_status in
-    paused) die 73 "$lc_id is paused: resume it first" ;;
+    paused | stopped) die 73 "$lc_id is $st_status: resume it first" ;;
     opening) [ $((lc_now - st_started)) -ge "$open_s" ] || die 75 "an open attempt of $lc_id is under way" ;;
     open) check_open ;;
   esac
@@ -168,28 +173,26 @@ take_result() {
 $1
 EOF
 }
-# The pid open.sh logged on stderr, whatever the outcome.
-take_pid() {
-  st_pid=''
-  while IFS= read -r tp_line; do
-    case $tp_line in *' pid='[0-9]*) st_pid=${tp_line##* pid=} ;; esac
-  done <"$1"
-  is_count "$st_pid" || st_pid=''
-  cat -- "$1" >&2
-  rm -f -- "$1"
+# open.sh calls this inside the command substitution, so the pid reaches the state before the ack wait.
+launched() {
+  is_count "$1" || return 0
+  st_pid=$1
+  write_state
 }
 launch() {
-  st_status=opening st_started=$lc_now
+  st_status=opening st_started=$lc_now st_pid='' st_user=$p_user
   write_state
   release_lock "$lc_lock" "$$"
   l_err=$st_file.$(lc_random).err
   l_out=$(open_profile "$lc_record" "$lc_ns" "$lc_id" "$lc_mode" 2>"$l_err")
   l_rc=$?
-  take_pid "$l_err"
+  cat -- "$l_err" >&2
+  rm -f -- "$l_err"
+  read_state "$st_file"
   case $l_rc in
     0)
       take_result "$l_out"
-      st_status=open st_attempts=0 st_next=0 st_user=$p_user
+      st_status=open st_attempts=0 st_next=0
       write_state
       printf 'boot=%s\n' "$st_boot"
       ;;
@@ -224,7 +227,7 @@ cmd_request() {
   read_state "$1/profiles/$lc_id"
   lc_now=$(date +%s)
   l_before=$st_status
-  [ "$l_before" != none ] || l_before=stopped
+  [ "$l_before" != none ] || l_before=idle
   decide
   launch
 }

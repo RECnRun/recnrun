@@ -85,6 +85,12 @@ async function backoff(rig: E9Rig, { check, seen }: Tally) {
   check(Number(state.nextAt) > Math.floor(Date.now() / 1000), "nextAt is not in the future");
   check(second.code === 70, `the second request exited ${second.code}, expected 70`);
   check((await mainsOf(rig)).join() === before.join(), "the second request started a Chrome");
+  // The timed-out Chrome is still running; stop must end it through the pid the failed open recorded.
+  const pid = await pidOf(rig);
+  check(pid > 0 && alive(pid), "the state does not name the timed-out Chrome");
+  const stopped = await verb(rig, "stop", { RECNRUN_LIFECYCLE_STOP_S: "20" });
+  check(stopped.code === 0, `stop exited ${stopped.code}: ${stopped.err.trim().slice(-200)}`);
+  check(!alive(pid) && (await mainsOf(rig)).length === 0, "stop left the timed-out Chrome running");
 }
 
 /** Waits until the last presence the dead Chrome wrote has expired by lifecycle.sh's clock. */
@@ -140,6 +146,10 @@ async function stop(rig: E9Rig, { check, seen }: Tally) {
     );
     check(other.pid !== undefined && alive(other.pid), "stop touched the bystander Chrome");
     check((await stateOf(rig)).status === "stopped", "the state is not stopped");
+    const held = await request(rig);
+    seen.heldCode = held.code;
+    check(held.code === 73, `a request after stop exited ${held.code}, expected 73`);
+    check((await mainsOf(rig)).length === 0, "a request after stop launched a Chrome");
     check(
       (await unfinished(rig)).length === 0,
       `unfinished downloads: ${(await unfinished(rig)).join(", ")}`,

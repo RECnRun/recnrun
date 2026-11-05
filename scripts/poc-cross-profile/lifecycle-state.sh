@@ -70,7 +70,7 @@ state_set() {
     startedAt) is_count "$2" || state_bad "$1"; st_started=$2 ;;
     attempts) is_count "$2" || state_bad "$1"; st_attempts=$2 ;;
     nextAt) is_count "$2" || state_bad "$1"; st_next=$2 ;;
-    status) case $2 in opening | open | failed | paused | stopped) st_status=$2 ;; *) state_bad "$1" ;; esac ;;
+    status) case $2 in idle | opening | open | failed | paused | stopped) st_status=$2 ;; *) state_bad "$1" ;; esac ;;
     boot) [ -z "$2" ] || is_uuid "$2" || state_bad "$1"; st_boot=$2 ;;
     root) [ -z "$2" ] || is_directory "$2" || state_bad "$1"; st_root=$2 ;;
     userDataDir) [ -z "$2" ] || is_directory "$2" || state_bad "$1"; st_user=$2 ;;

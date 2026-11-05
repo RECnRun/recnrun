@@ -119,6 +119,37 @@ for (const shell of shells) {
     assert.equal(launches(), 1);
   });
 
+  await test(`${shell}: a stopped profile is held until resume, then launches again`, (context) => {
+    const { state, request, launches, field } = scene(context);
+    assert.equal(request(shell).code, 0);
+    const stopped = life(shell, ["stop", state, ALICE], { RECNRUN_LIFECYCLE_STOP_S: "5" });
+    assert.equal(stopped.code, 0, stopped.err);
+    assert.equal(field("status"), "stopped");
+    const held = request(shell);
+    assert.equal(held.code, EX_PAUSED);
+    assert.match(held.err, /stopped: resume it first/);
+    assert.equal(launches(), 1, "a stopped profile is never relaunched");
+    assert.equal(life(shell, ["resume", state, ALICE], {}).code, 0);
+    assert.equal(field("status"), "idle");
+    assert.equal(life(shell, ["status", state], {}).out, `${ALICE} idle - 0 0\n`);
+    assert.equal(request(shell).code, 0);
+    assert.equal(launches(), 2);
+  });
+
+  await test(`${shell}: a timed-out open keeps its pid and user data dir, so stop can end it`, (context) => {
+    const { state, root, request, field } = scene(context, { STUB_ACK: "" });
+    const timedOut = request(shell);
+    assert.equal(timedOut.code, EX_NO_ACK, timedOut.err);
+    const pid = Number(field("pid"));
+    assert.ok(pid > 0 && alive(pid), "the Chrome of the failed open is still running");
+    assert.equal(field("userDataDir"), root);
+    assert.match(life(shell, ["status", state], {}).out, new RegExp(` failed ${pid} 1 `));
+    const stopped = life(shell, ["stop", state, ALICE], { RECNRUN_LIFECYCLE_STOP_S: "5" });
+    assert.equal(stopped.code, 0, stopped.err);
+    assert.equal(alive(pid), false);
+    assert.equal(field("status"), "stopped");
+  });
+
   await test(`${shell}: an executor that is alive and silent is paused, not relaunched`, async (context) => {
     const { request, launches, field } = scene(context);
     assert.equal(request(shell).code, 0);

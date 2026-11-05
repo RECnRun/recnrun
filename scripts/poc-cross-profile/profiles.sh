@@ -27,6 +27,7 @@
 as_library=${RECNRUN_DISCOVERY_LIB:-}
 # shellcheck source=discovery.sh
 RECNRUN_DISCOVERY_LIB=1 . "$(dirname -- "$0")/discovery.sh"
+RECNRUN_DISCOVERY_LIB=$as_library # a dot keeps its own assignment: give back what this script saw
 nl='
 '
 tab=$(printf '\t')
