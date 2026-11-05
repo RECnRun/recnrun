@@ -31,6 +31,10 @@
 # profile of the root, and a dead main process is a crash that each profile's request relaunches.
 #
 # Environment: RECNRUN_OPEN_TIMEOUT_S (60), RECNRUN_LIFECYCLE_BACKOFF_S (5), _MAX_ATTEMPTS (5), _STOP_S (20).
+# A pause, stop, or reset that lands while a request opens Chrome wins: the open settles under the lock,
+# writes its result only while startedAt and status=opening still name it, otherwise keeps the owner's
+# status (the pid and token stay recorded so stop can end that Chrome) and exits 73.
+#
 # Exit: 0 done, 64 wrong call, 65 refused, 70 failed (retry later, max attempts, or still running),
 # 73 paused, 75 busy (another launcher, or an attempt under way); open.sh's 66 and 69 pass through.
 
@@ -41,6 +45,8 @@ RECNRUN_DISCOVERY_LIB=$lifecycle_as_library # a dot keeps its own assignment: gi
 umask 077
 # shellcheck source=lifecycle-state.sh
 . "$(dirname -- "$0")/lifecycle-state.sh"
+# shellcheck source=lifecycle-launch.sh
+. "$(dirname -- "$0")/lifecycle-launch.sh"
 
 log() { printf 'lifecycle.sh: %s\n' "$*" >&2; }
 die() {
@@ -110,13 +116,6 @@ cmd_stop() {
 
 # --- Request ---------------------------------------------------------------------------------
 
-# After every ack the pid of record is the root's main process, never a forwarder's: a root already
-# running Chrome hands the open to it and the new process exits, shared or not.
-adopt_main_pid() {
-  am_pid=$(main_pid_of "$st_user") || return 0
-  st_pid=$am_pid
-}
-
 # A number after "key": in the presence text, else exit 1.
 number_after() {
   na_rest=${1#*\""$2"\":}
@@ -165,65 +164,6 @@ decide() {
   esac
   [ "$st_attempts" -lt "$max_attempts" ] || die 70 "$lc_id failed $st_attempts times: reset it first"
   [ "$st_next" -le "$lc_now" ] || die 70 "retry at $st_next"
-}
-# min(2^attempts, 64) times the base, from the clock at the failure.
-schedule_retry() {
-  sr_factor=1
-  sr_i=0
-  while [ "$sr_i" -lt "$st_attempts" ] && [ "$sr_factor" -lt 64 ]; do
-    sr_factor=$((sr_factor * 2))
-    sr_i=$((sr_i + 1))
-  done
-  st_next=$(($(date +%s) + sr_factor * backoff_s))
-}
-# Reads root=, boot=, and token= from the lines open.sh printed.
-take_result() {
-  while IFS= read -r tr_line; do
-    case $tr_line in
-      root=*) if is_directory "${tr_line#*=}"; then st_root=${tr_line#*=}; fi ;;
-      boot=*) if is_uuid "${tr_line#*=}"; then st_boot=${tr_line#*=}; fi ;;
-      token=*) if is_v4 "${tr_line#*=}"; then st_token=${tr_line#*=}; fi ;;
-    esac
-  done <<EOF
-$1
-EOF
-}
-# open.sh calls this inside the command substitution, so the pid reaches the state before the ack wait.
-launched() {
-  is_pid "$1" || return 0
-  st_pid=$1
-  write_state
-}
-launch() {
-  st_status=opening st_started=$lc_now st_pid='' st_user=$p_user
-  write_state
-  release_lock "$lc_lock" "$$"
-  l_err=$st_file.$(lc_random).err
-  l_out=$(open_profile "$lc_record" "$lc_ns" "$lc_id" "$lc_mode" 2>"$l_err")
-  l_rc=$?
-  cat -- "$l_err" >&2
-  rm -f -- "$l_err"
-  read_state "$st_file"
-  case $l_rc in
-    0)
-      take_result "$l_out"
-      adopt_main_pid
-      st_status=open st_attempts=0 st_next=0
-      write_state
-      printf 'boot=%s\n' "$st_boot"
-      ;;
-    69)
-      st_status=failed st_attempts=$((st_attempts + 1))
-      schedule_retry
-      write_state
-      exit 69
-      ;;
-    *)
-      st_status=$l_before
-      write_state
-      exit "$l_rc"
-      ;;
-  esac
 }
 cmd_request() {
   if [ "$#" -lt 4 ] || [ "$#" -gt 5 ]; then die 64 'usage: request <state-dir> <record> <namespace> <profileId> [headed|headless]'; fi

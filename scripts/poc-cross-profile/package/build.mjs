@@ -28,6 +28,7 @@ export const LIBRARIES = [
   "first-run.sh",
   "lifecycle.sh",
   "lifecycle-state.sh",
+  "lifecycle-launch.sh",
   "open.sh",
   "record.sh",
   "profiles.sh",
