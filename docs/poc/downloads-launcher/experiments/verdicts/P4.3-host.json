@@ -1,0 +1,68 @@
+[
+  {
+    "experiment": "P4.3",
+    "hypothesis": "P4.3.open.fresh",
+    "chrome": "Google Chrome 156.0.8078.80",
+    "environment": "host",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "one registered profile, closed: open.sh starts Chrome and gets the ack",
+    "debugger": "none",
+    "observations": [
+      {
+        "fresh": {
+          "code": 0,
+          "root": "/Users/dannyelcf/Documents/RECnRun/poc-downloads-launcher/roots/host-2026-11-05T00-49-19.660Z/launcher-open-1/downloads",
+          "boot": "fc676d0a-3c77-4418-9ce1-631dadac9fc6",
+          "token": "fc676d0a-3c77-4418-9ce1-631dadac9fc6",
+          "pid": 49629,
+          "ms": 1146
+        }
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "mode": "smoke",
+    "verdict": "pass",
+    "samples": 1
+  },
+  {
+    "experiment": "P4.3",
+    "hypothesis": "P4.3.open.running",
+    "chrome": "Google Chrome 156.0.8078.80",
+    "environment": "host",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "one registered profile, running: a second open.sh meets its boot",
+    "debugger": "none",
+    "verdict": "pass",
+    "samples": 1,
+    "gestures": 0,
+    "steps": [],
+    "observations": [
+      {
+        "fresh": {
+          "code": 0,
+          "root": "/Users/dannyelcf/Documents/RECnRun/poc-downloads-launcher/roots/host-2026-11-05T00-49-19.660Z/launcher-open-2/downloads",
+          "boot": "6380be15-14db-42ce-be58-06a2e44e9629",
+          "token": "6380be15-14db-42ce-be58-06a2e44e9629",
+          "pid": 49954,
+          "ms": 1124
+        },
+        "running": {
+          "code": 0,
+          "root": "/Users/dannyelcf/Documents/RECnRun/poc-downloads-launcher/roots/host-2026-11-05T00-49-19.660Z/launcher-open-2/downloads",
+          "boot": "6380be15-14db-42ce-be58-06a2e44e9629",
+          "token": "7f018407-8c5c-433a-9890-3eef0b0a93f2",
+          "pid": 50057,
+          "ms": 1119
+        }
+      }
+    ],
+    "mode": "smoke"
+  }
+]
