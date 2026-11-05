@@ -135,6 +135,7 @@ EOF
 start_clone() {
   finder=chrome_binary # by name: ShellCheck would read a bare call as a forgotten "$@"
   chrome=$("$finder") || { log 'no Google Chrome found'; exit 66; }
+  unpacked_code_present "$root" Default "$mk_ext" || exit $?
   token=$(new_token)
   operation=$(new_instance_id) || die 70 'no native source of a v4 uuid (uuidgen or /proc)'
   url="chrome-extension://$mk_ext/bootstrap.html#clone=$token&instance=$instance&operation=$operation&namespace=$ns&master=$oc_master_id.$master_key"

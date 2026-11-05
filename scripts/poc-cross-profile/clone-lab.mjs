@@ -114,7 +114,7 @@ export function cloneScene(context) {
 export function frozenBase(s, shell, name = "base-v1") {
   assert.equal(s.create(shell, name).code, 0);
   const root = s.root(name);
-  installExtension(root);
+  installExtension(root, { unpacked: true });
   const args = (command, ...rest) => [command, s.bases, name, ...rest];
   const acked = s.run(shell, args("template", NAMESPACE), name, { STUB_ACK: "good" });
   assert.equal(acked.code, 0, acked.err);

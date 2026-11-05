@@ -61,7 +61,8 @@ base_line() {
     3:profileId=*) is_v4 "$bl_value" ;;
     4:namespace=*) mk_namespace=$bl_value && is_namespace "$bl_value" ;;
     5:frozenAt=*) is_count "$bl_value" ;;
-    6:install=*) [ "$bl_value" = packed ] || [ "$bl_value" = unpacked ] ;;
+    6:install=*) mk_install=$bl_value && { [ "$bl_value" = packed ] || [ "$bl_value" = unpacked ]; } ;;
+    7:unpackedPath=*) [ "$mk_install" = unpacked ] && is_plain_root "$bl_value" ;;
     *) return 1 ;;
   esac
 }
@@ -70,13 +71,14 @@ read_base_marker() {
   rb_file=$root/.recnrun-base
   is_plain_file "$rb_file" || refuse "$root is not a frozen base: no .recnrun-base"
   [ "$(wc -c <"$rb_file" | tr -d ' ')" -le 2048 ] || refuse "$rb_file is over 2 KiB"
-  mk_extension='' mk_namespace=''
+  mk_extension='' mk_namespace='' mk_install=''
   rb_index=0
   while IFS= read -r rb_line || [ -n "$rb_line" ]; do
     rb_index=$((rb_index + 1))
     base_line "$rb_index" "$rb_line" || refuse "$rb_file line $rb_index is not in the freeze grammar"
   done <"$rb_file"
-  [ "$rb_index" -eq 6 ] || refuse "$rb_file does not have the six lines of a freeze"
+  # An unpacked base may carry its build folder as a seventh line (CL13); open-clone checks it.
+  [ "$rb_index" -eq 6 ] || [ "$rb_index" -eq 7 ] || refuse "$rb_file does not have the six lines of a freeze, or seven with unpackedPath"
 }
 # Up to three paths below $1 that are a symbolic link or a multiply linked file, Singleton markers aside.
 stray_links() {

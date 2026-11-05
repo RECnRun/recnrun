@@ -65,6 +65,8 @@ for (const shell of shells) {
       [...good.slice(0, 2), "profileId=nope", ...good.slice(3)],
       [...good.slice(0, 5), "install=other"],
       [...good.slice(0, 4), "frozenAt=1x", good[5]],
+      [...good.slice(0, 5), "install=packed", `unpackedPath=${s.home}`],
+      [...good, "unpackedPath=relative/build"],
     ];
     for (const rows of bad) {
       writeFileSync(join(s.root(), MARKER), `${rows.join("\n")}\n`);
@@ -72,6 +74,15 @@ for (const shell of shells) {
       assert.equal(result.code, EX_REFUSED, `${rows.join(" | ")}: ${result.err}`);
       assert.match(result.err, /freeze grammar|six lines/);
     }
+    writeFileSync(join(s.root(), MARKER), `${[...good, `unpackedPath=${s.home}`].join("\n")}\n`);
+    mkdirSync(join(s.root(), "Default"));
+    assert.equal(
+      s.copyTo(shell).code,
+      EX_COPY,
+      "a seventh line names the build of an unpacked install; open-clone checks it exists",
+    );
+    for (const partial of partials(s.clones)) rmSync(join(s.clones, partial), { recursive: true });
+    rmSync(join(s.root(), "Default"), { recursive: true });
     writeFileSync(join(s.root(), MARKER), `${good.join("\n")}\n`);
     mkdirSync(join(s.root(), "Default"));
     assert.equal(s.copyTo(shell).code, EX_COPY, "a frozen base without Preferences fails the copy");

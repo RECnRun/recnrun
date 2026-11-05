@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
+import { join, resolve } from "node:path";
 import { test } from "node:test";
 import { IDENTITY, NAMESPACE, shells } from "./lab.mjs";
 import { EXTENSION, MARKER } from "./base-lab.mjs";
@@ -266,5 +273,20 @@ for (const shell of shells) {
     assert.equal(lost.code, 65, lost.err);
     assert.match(lost.err, /provisioned/);
     assert.equal(s.launches(), launched);
+  });
+
+  await test(`${shell}: open-clone refuses 66 while the unpacked build of the clone is gone (CL13)`, (context) => {
+    const s = openScene(context, shell);
+    const build = resolve(s.bases, "../unpacked-build");
+    const before = s.launches();
+    renameSync(build, `${build}-away`);
+    const missing = s.open();
+    assert.equal(missing.code, 66, missing.err);
+    assert.match(missing.err, new RegExp(`unpacked code missing: ${build}\n`));
+    assert.equal(s.launches(), before, "nothing started Chrome");
+    renameSync(`${build}-away`, build);
+    const restored = s.open([s.clones, "c1", s.record, NAMESPACE], { RECNRUN_OPEN_TIMEOUT_S: "1" });
+    assert.equal(restored.code, 69, restored.err);
+    assert.equal(s.launches(), before + 1, "the restored build opens");
   });
 }
