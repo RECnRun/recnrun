@@ -1,4 +1,5 @@
-import { describe, expect, test, vi } from "vite-plus/test";
+import { afterEach, describe, expect, test, vi } from "vite-plus/test";
+import { browser } from "wxt/browser";
 import { writePause } from "@/background/launcher-pause";
 import type { PauseDependencies } from "@/background/launcher-pause";
 import type { DownloadsPort } from "@/background/downloads-publisher";
@@ -34,6 +35,10 @@ const contentOf = (url: string) => decodeURIComponent(url.slice(url.indexOf(",")
 const bytes = (reason: string) =>
   JSON.stringify({ profileId: ME, reason, identity: STATEMENT, createdAt: NOW });
 
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
 describe("writePause", () => {
   test.each(["disconnect", "forget", "resumed"] as const)(
     "writes the %s statement with its keys in a fixed order, replacing an earlier one",
@@ -52,6 +57,13 @@ describe("writePause", () => {
     expect(await pocTransportStore().paused()).toBe("forget");
     await writePause(deps, "resumed");
     expect(await pocTransportStore().paused()).toBeNull();
+  });
+
+  test("still writes the statement when the diagnostics note cannot be stored", async () => {
+    vi.spyOn(browser.storage.local, "set").mockRejectedValue(new Error("quota exceeded"));
+    const { deps, written } = dependencies();
+    await expect(writePause(deps, "disconnect")).resolves.toBeUndefined();
+    expect(contentOf(written[0]?.url ?? "")).toBe(bytes("disconnect"));
   });
 
   test("writes under the profile's own folder, in its namespace", async () => {
