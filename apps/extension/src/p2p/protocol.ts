@@ -13,6 +13,18 @@ const text = (max: number) => v.pipe(v.string(), v.maxLength(max));
 export const ProfileIdSchema = v.pipe(v.string(), v.uuid());
 const MessageIdSchema = v.pipe(v.string(), v.uuid());
 const TabIdSchema = v.pipe(v.number(), v.integer(), v.minValue(0));
+const MAX_URL_LENGTH = 2048;
+
+/** Whether `url` is an http or https address; a peer opens nothing else (no chrome://, extension, file, or script URL). */
+export function isWebUrl(url: string): boolean {
+  try {
+    return ["http:", "https:"].includes(new URL(url).protocol);
+  } catch {
+    return false;
+  }
+}
+
+export const WebUrlSchema = v.pipe(v.string(), v.maxLength(MAX_URL_LENGTH), v.check(isWebUrl));
 export const FingerprintSchema = v.pipe(v.string(), v.regex(/^[0-9A-F:]+$/), v.maxLength(200));
 
 const envelope = {
@@ -81,6 +93,7 @@ const PeerMessageSchema = v.variant("type", [
   message("TABS_SNAPSHOT", { ...reply, ...SharedTabsSchema.entries }),
   message("TABS_CHANGED", SharedTabsSchema.entries),
   message("ACTIVATE_TAB", { tabId: TabIdSchema }),
+  message("OPEN_TAB", { url: WebUrlSchema }),
   message("SESSION_START", { tabId: TabIdSchema }),
   message("SESSION_SET_STATUS", { status: v.picklist(["recording", "paused"]) }),
   message("SESSION_STOP", {}),

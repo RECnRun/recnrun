@@ -7,6 +7,15 @@ export async function focusTab(tabId: number): Promise<void> {
   if (tab?.windowId !== undefined) await browser.windows.update(tab.windowId, { focused: true });
 }
 
+/** Opens `url` in the background of a normal window, never an incognito one, which no peer sees. */
+export async function openTab(url: string): Promise<void> {
+  const windows = await browser.windows.getAll({ windowTypes: ["normal"] });
+  const home = windows.find((each) => !each.incognito && !each.alwaysOnTop);
+  if (home?.id === undefined)
+    await browser.windows.create({ url, incognito: false, type: "normal", focused: false });
+  else await browser.tabs.create({ windowId: home.id, url, active: false });
+}
+
 /** Chrome rejects an unknown id; the fake browser resolves nothing for it. */
 async function ensureOpen(tabId: number): Promise<void> {
   const tab = await browser.tabs.get(tabId).catch(() => undefined);

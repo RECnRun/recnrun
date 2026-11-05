@@ -32,6 +32,24 @@ describe("peerMessage", () => {
     expect(parsePeerFrame(frameOf(first))).toEqual(first);
   });
 
+  test("parses OPEN_TAB with a web address", () => {
+    const built = peerMessage("OPEN_TAB", route, { url: "http://127.0.0.1:8080/a?b=1#c" });
+    expect(parsePeerFrame(frameOf(built))).toEqual(built);
+  });
+
+  test.each([
+    "chrome://settings/",
+    "chrome-extension://abcdefghijklmnopabcdefghijklmnop/dashboard.html",
+    "javascript:alert(1)",
+    "file:///etc/passwd",
+    "data:text/html,x",
+    "not a url",
+    `https://shop.test/${"a".repeat(2100)}`,
+  ])("drops OPEN_TAB for %s", (url) => {
+    const built = peerMessage("OPEN_TAB", route, { url });
+    expect(parsePeerFrame(frameOf(built))).toBeUndefined();
+  });
+
   test("carries replies and tab snapshots", () => {
     const ask = peerMessage("GET_TABS", route, {});
     const snapshot = peerMessage("TABS_SNAPSHOT", route, {

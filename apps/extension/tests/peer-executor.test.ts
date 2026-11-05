@@ -6,6 +6,7 @@ import type { ExecutorDependencies } from "@/background/executor";
 import type { BrowserTabs, OpenTab } from "@/ports/tabs";
 import { memoryRecordingStore } from "./fake-extension";
 import {
+  answering,
   PEER,
   PEER_HELLO,
   STRANGER,
@@ -16,6 +17,7 @@ import {
 import { PRIVATE } from "./fake-tabs";
 
 const TAB_CLOSED = "That tab is not open anymore.";
+const NOT_WEB = "Only http and https pages can be opened.";
 
 const running = (tabId: number, status: RecordingSession["status"] = "recording") => ({
   tabId,
@@ -133,6 +135,74 @@ describe("tab commands", () => {
     expect(results()[0]?.payload).toMatchObject({ ok: false, reason: TAB_CLOSED });
     expect(await activeTabId()).toBeUndefined();
   });
+});
+
+describe("opening tabs", () => {
+  test("opens a web page in a tab of a normal window, without taking the focus", async () => {
+    const { deps, results } = executor({ tabs: [] });
+    const command = fromPeer("OPEN_TAB", { url: "https://shop.example/cart" });
+    await execute(command, deps);
+    expect(results()).toEqual([
+      { to: PEER, type: "COMMAND_RESULT", payload: { requestId: command.id, ok: true } },
+    ]);
+    const opened = await fakeBrowser.tabs.query({ url: "https://shop.example/cart" });
+    expect(opened).toHaveLength(1);
+    expect(opened[0]?.active).toBe(false);
+  });
+
+  test("opens it in the first normal window that is not incognito or the PiP window", async () => {
+    vi.spyOn(fakeBrowser.windows, "getAll").mockImplementation(
+      answering(() => [
+        { id: 5, incognito: true, alwaysOnTop: false },
+        { id: 6, incognito: false, alwaysOnTop: true },
+        { id: 7, incognito: false, alwaysOnTop: false },
+      ]),
+    );
+    const create = vi.spyOn(fakeBrowser.tabs, "create");
+    const { deps } = executor({ tabs: [] });
+    await execute(fromPeer("OPEN_TAB", { url: "https://shop.example/" }), deps);
+    expect(create).toHaveBeenCalledWith({
+      windowId: 7,
+      url: "https://shop.example/",
+      active: false,
+    });
+  });
+
+  test("opens a normal window of its own when only incognito windows are open", async () => {
+    vi.spyOn(fakeBrowser.windows, "getAll").mockImplementation(
+      answering(() => [{ id: 5, incognito: true, alwaysOnTop: false }]),
+    );
+    const create = vi.spyOn(fakeBrowser.tabs, "create");
+    const createWindow = vi.spyOn(fakeBrowser.windows, "create");
+    const { deps, results } = executor({ tabs: [] });
+    await execute(fromPeer("OPEN_TAB", { url: "https://shop.example/" }), deps);
+    expect(create).not.toHaveBeenCalled();
+    expect(createWindow).toHaveBeenCalledWith({
+      url: "https://shop.example/",
+      incognito: false,
+      type: "normal",
+      focused: false,
+    });
+    expect(results()[0]?.payload).toMatchObject({ ok: true });
+  });
+
+  test("answers with the reason when the browser cannot open the tab", async () => {
+    vi.spyOn(fakeBrowser.tabs, "create").mockRejectedValue(new Error("No window with id: 1."));
+    const { deps, results } = executor({ tabs: [] });
+    await execute(fromPeer("OPEN_TAB", { url: "https://shop.example/" }), deps);
+    expect(results()[0]?.payload).toMatchObject({ ok: false, reason: "No window with id: 1." });
+  });
+
+  test.each(["chrome://settings/", "chrome-extension://abc/bootstrap.html", "file:///etc/passwd"])(
+    "refuses to open %s",
+    async (url) => {
+      const { deps, results } = executor({ tabs: [] });
+      const before = (await fakeBrowser.tabs.query({})).length;
+      await execute(fromPeer("OPEN_TAB", { url }), deps);
+      expect(results()[0]?.payload).toMatchObject({ ok: false, reason: NOT_WEB });
+      expect(await fakeBrowser.tabs.query({})).toHaveLength(before);
+    },
+  );
 });
 
 describe("starting a session", () => {

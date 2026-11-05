@@ -200,6 +200,7 @@ const HANDLERS: Handlers = {
   "folder-release": (deps) => releaseFolder(deps),
   tabs: (deps, { peer }) => peerTabs(deps, peer),
   activate: (deps, { peer, tabId }) => ask(deps, peer, "ACTIVATE_TAB", { tabId }),
+  "open-tab": (deps, { peer, url }) => ask(deps, peer, "OPEN_TAB", { url }),
   "session-start": (deps, { peer, tabId }) => startRemote(deps, peer, tabId),
   "session-set": (deps, { peer, status: next }) =>
     ask(deps, peer, "SESSION_SET_STATUS", { status: next }),

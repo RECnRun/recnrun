@@ -14,6 +14,7 @@ const SESSION = { tabId: 0, status: "recording" as const, banked: 0, since: 1 };
 const PAYLOADS = {
   ACTIVATE_TAB: { tabId: 0 },
   SESSION_START: { tabId: 0 },
+  OPEN_TAB: { url: "https://shop.test/" },
   SESSION_SET_STATUS: { status: "paused" },
   SESSION_STOP: {},
   HELLO: PEER_HELLO,
@@ -91,6 +92,7 @@ test.each(Object.entries(PAYLOADS))(
 const REQUESTS = [
   { type: "activate", peer: PEER, tabId: 0 },
   { type: "session-start", peer: PEER, tabId: 0 },
+  { type: "open-tab", peer: PEER, url: "https://shop.test/" },
   { type: "session-set", peer: PEER, status: "paused" },
   { type: "session-stop", peer: PEER },
 ] as const satisfies readonly PeerRequest[];
