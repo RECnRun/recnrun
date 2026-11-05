@@ -8,8 +8,9 @@ import {
   rm,
   writeFile,
 } from "node:fs/promises";
+import { realpathSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
-import { delimiter, join } from "node:path";
+import { basename, delimiter, dirname, join } from "node:path";
 import type { TestInfo } from "@playwright/test";
 import {
   EXTENSION_ID_FILE,
@@ -40,12 +41,22 @@ async function chromesOf(root: string): Promise<number[]> {
   return found;
 }
 
-/** A wrapper first on PATH, so the launcher finds `google-chrome` and the container's Chrome gets its flag. */
+/** The Chrome executable itself: Google's google-chrome script sits next to it and would reset argv[0]. */
+function chromeExecutable(): string {
+  const resolved = realpathSync(resolveChromePath());
+  return basename(resolved) === "google-chrome" ? join(dirname(resolved), "chrome") : resolved;
+}
+
+/**
+ * A wrapper first on PATH, so the launcher finds `google-chrome` and the container's Chrome gets its flag.
+ * Like Google's own google-chrome script, it keeps its path as argv[0] (`exec -a`, a bashism), so the
+ * Chrome process names the binary the launcher resolved and lifecycle.sh signals it.
+ */
 async function wrapper(dir: string): Promise<string> {
   const bin = join(dir, "bin");
   await mkdir(bin);
   const sandbox = process.env.RECNRUN_TEST_CONTAINER === "1" ? " --no-sandbox" : "";
-  const script = `#!/bin/sh\nexec "${resolveChromePath()}"${sandbox} "$@" 2>>"${dir}/chrome.log"\n`;
+  const script = `#!/bin/bash\nexec -a "$0" "${chromeExecutable()}"${sandbox} "$@" 2>>"${dir}/chrome.log"\n`;
   // profiles.sh tries google-chrome-stable first, and the image has one in /usr/bin.
   for (const name of ["google-chrome-stable", "google-chrome"]) {
     await writeFile(join(bin, name), script);

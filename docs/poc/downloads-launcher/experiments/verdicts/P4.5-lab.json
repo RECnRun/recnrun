@@ -10,28 +10,58 @@
     "variant": "poc-d0",
     "topology": "one registered profile, closed: start --once opens it, status lists it, stop --all ends it",
     "debugger": "none",
+    "observations": [
+      {
+        "started": 0,
+        "stopped": 0,
+        "status": ["launcher stopped", "038a0e9c-ceb0-49b3-90c6-2cf00229e86a open 801 0 0", ""],
+        "pid": 801
+      },
+      {
+        "started": 0,
+        "stopped": 0,
+        "status": ["launcher stopped", "da3098d1-7bc5-40b6-85b7-9232a036b4a7 open 1579 0 0", ""],
+        "pid": 1579
+      },
+      {
+        "started": 0,
+        "stopped": 0,
+        "status": ["launcher stopped", "13c9f77e-ae6e-4b14-abf0-8199f7e8ba29 open 2354 0 0", ""],
+        "pid": 2354
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "P4.5",
+    "hypothesis": "P4.5.commands.catalog",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "two profiles of one root, closed: start --once passes leave a registry.json holding both in each Downloads folder",
+    "debugger": "none",
     "verdict": "pass",
     "samples": 3,
     "gestures": 0,
     "steps": [],
     "observations": [
       {
-        "started": 0,
-        "stopped": 0,
-        "status": ["launcher stopped", "5962136c-bf20-4c06-8773-961cb145c54e open 777 0 0", ""],
-        "pid": 777
+        "passes": 1,
+        "peers": 2
       },
       {
-        "started": 0,
-        "stopped": 0,
-        "status": ["launcher stopped", "bd585324-856a-4693-acc2-aa54467a00e9 open 1479 0 0", ""],
-        "pid": 1479
+        "passes": 1,
+        "peers": 2
       },
       {
-        "started": 0,
-        "stopped": 0,
-        "status": ["launcher stopped", "e76abdca-59e3-4b29-b34d-edc4e8e63aad open 2185 0 0", ""],
-        "pid": 2185
+        "passes": 1,
+        "peers": 2
       }
     ]
   }
