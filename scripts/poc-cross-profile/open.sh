@@ -19,8 +19,11 @@
 # POC builds pin). Environment: RECNRUN_OPEN_TIMEOUT_S (60) and RECNRUN_OPEN_POLL_S (1) bound the wait; RECNRUN_DISCOVERY_PREFIX and RECNRUN_DISCOVERY_UNAME as in profiles.sh.
 # A main Chrome already running on the root in the other mode (headed vs --headless) is refused at once
 # (65), never handed a second launch: the process singleton would forward it and no ack would come.
+# A bootstrap that cannot produce its ack writes a failure ack for the same token instead (the closed
+# grammar of read_failure_ack: failedStep and a short error, no identity); it is logged, never ignored.
 # Exit: 0 acked, 64 wrong call, 65 refused request (the other mode already runs on the root), 66 no
-# Chrome or extension id or the unpacked build's folder is gone, 69 no ack in time.
+# Chrome or extension id or the unpacked build's folder is gone, 69 no ack in time, 71 the profile
+# answered with a failure ack (Chrome ran; its bootstrap page failed at the step and error logged).
 
 # profiles.sh reuses the name as_library, so this one stays apart.
 open_as_library=${RECNRUN_DISCOVERY_LIB:-}
@@ -131,6 +134,31 @@ read_ack() {
   [ "$ack_rest" = '}' ] || return 1
   printf '%s\n' "$ack_boot"
 }
+# Sets fail_step and fail_error when the whole file $1 is the closed grammar of the failure ack that
+# the extension writes for token $2 and profile $3 when its bootstrap cannot produce the ack:
+# {"token":T,"profileId":P,"failedStep":S,"error":E,"createdAt":N}. S is adopt, publish, or ack; E is
+# 1 to 200 characters of letters, digits, space, and . , : ; ( ) _ / = - only, so it is safe to log.
+read_failure_ack() {
+  if [ ! -f "$1" ] || [ -L "$1" ]; then return 1; fi
+  size=$(wc -c <"$1" | tr -d ' ')
+  [ "$size" -le 4096 ] || return 1
+  ack_rest=$(cat -- "$1")
+  [ "${#ack_rest}" -eq "$size" ] || return 1
+  ack_take '{"token":"' '"' || return 1
+  [ "$ack_value" = "$2" ] || return 1
+  ack_take '","profileId":"' '"' || return 1
+  [ "$ack_value" = "$3" ] || return 1
+  ack_take '","failedStep":"' '"' || return 1
+  case $ack_value in adopt | publish | ack) fe_step=$ack_value ;; *) return 1 ;; esac
+  ack_take '","error":"' '"' || return 1
+  [ -n "$ack_value" ] && [ "${#ack_value}" -le 200 ] || return 1
+  [ -z "$(printf '%s' "$ack_value" | LC_ALL=C tr -d 'A-Za-z0-9 .,:;()_/=-')" ] || return 1
+  fe_error=$ack_value
+  ack_take '","createdAt":' '}' || return 1
+  is_time "$ack_value" || return 1
+  [ "$ack_rest" = '}' ] || return 1
+  fail_step=$fe_step fail_error=$fe_error
+}
 # One look under every candidate Downloads root for the ack of token $4 of profile $3 in namespace
 # $2 (record $1); sets acked_root and acked_boot, else leaves the roots tried in $tried.
 look_for_ack() {
@@ -140,6 +168,10 @@ look_for_ack() {
     folder=$candidate/RECnRun/poc/$2/acks/$3
     if plain_path "$candidate" RECnRun poc "$2" acks "$3" && found_boot=$(read_ack "$folder/$4.json" "$4" "$3"); then
       acked_root=$candidate acked_boot=$found_boot
+      return 0
+    fi
+    if plain_path "$candidate" RECnRun poc "$2" acks "$3" && read_failure_ack "$folder/$4.json" "$4" "$3"; then
+      acked_root=$candidate
       return 0
     fi
     tried="$tried${tried:+, }$candidate"
@@ -160,6 +192,10 @@ look_for_bound() {
         id=${folder##*/}
         is_v4 "$id" || continue
         plain_path "$candidate" RECnRun poc "$1" acks "$id" || continue
+        if read_failure_ack "$folder/$2.json" "$2" "$id"; then
+          acked_id=$id acked_root=$candidate
+          return 0
+        fi
         found_boot=$(read_ack "$folder/$2.json" "$2" "$id" "${3:-}") || continue
         acked_id=$id acked_root=$candidate acked_boot=$found_boot
         return 0
@@ -170,6 +206,10 @@ look_for_bound() {
 $candidates
 EOF
   return 1
+}
+# Exits 71 when the ack found is a failure ack: the bootstrap page failed and said where.
+exit_on_failure_ack() {
+  [ -z "$fail_step" ] || { log "bootstrap failed at $fail_step: $fail_error"; exit 71; }
 }
 # Whole seconds, the poll at least 1; sets limit and step.
 check_timing() {
@@ -182,6 +222,7 @@ check_timing() {
 # on every look, since Chrome flushes it late.
 wait_for_ack() {
   waited=0
+  fail_step='' fail_error=''
   while :; do
     tried=
     if "$looker" "$@"; then return 0; fi
@@ -237,6 +278,7 @@ open_profile() {
     log "no ack for $token within $limit s: tried ${tried:-no candidate}"
     exit 69
   fi
+  exit_on_failure_ack
   printf 'root=%s\nboot=%s\ntoken=%s\n' "$acked_root" "$acked_boot" "$token"
 }
 
@@ -260,6 +302,7 @@ bind_profile() {
     log "no ack for $token within $limit s: tried ${tried:-no candidate}"
     exit 69
   fi
+  exit_on_failure_ack
   printf 'profileId=%s\nroot=%s\nboot=%s\ntoken=%s\n' "$acked_id" "$acked_root" "$acked_boot" "$token"
 }
 

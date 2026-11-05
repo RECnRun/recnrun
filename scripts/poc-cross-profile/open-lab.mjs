@@ -8,6 +8,7 @@ import { ALICE, NAMESPACE } from "./lab.mjs";
 const script = fileURLToPath(new URL("./open.sh", import.meta.url));
 export const EX_REFUSED = 65;
 export const EX_NO_ACK = 69;
+export const EX_BOOTSTRAP_FAILED = 71;
 export const BOB = "22222222-2222-4222-8222-222222222222";
 export const OTHER_TOKEN = "99999999-9999-4999-8999-999999999999";
 export const EXTENSION = readFileSync(new URL("./extension-id", import.meta.url), "utf8").trim();
@@ -34,6 +35,7 @@ case \${STUB_SHAPE:-good} in
   nested) body=$head'{"key":"'$KEY'","signedAt":1,"signature":"'$SIG'","boot":"'$boot'"},"createdAt":1}' ;;
   noident) body='{"token":"'$token'","profileId":"'$STUB_PROFILE'","boot":"'$boot'","createdAt":1}' ;;
   freeident) body=$head'{"key":"K","signedAt":1,"signature":"S"},"boot":"'$boot'","createdAt":1}' ;;
+  failure) body='{"token":"'$token'","profileId":"'$STUB_PROFILE'","failedStep":"'\${STUB_STEP:-publish}'","error":"'\${STUB_ERROR-The offscreen document did not answer.}'","createdAt":1}' ;;
 esac
 dir=$STUB_ROOT/RECnRun/poc/$STUB_NS/acks/$STUB_PROFILE
 mkdir -p "$dir"
