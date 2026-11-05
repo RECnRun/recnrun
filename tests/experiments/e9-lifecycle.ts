@@ -32,11 +32,11 @@ import type { VerdictTarget } from "./fixtures/downloads-verdicts.ts";
 /** Each cell, its topology, and its full sample count. */
 export const E9_CELLS = {
   "E9.duplicate": ["three requests on one closed profile: two together, one during the open", 3],
-  "E9.idempotent": ["a request on a running profile with a fresh presence", 2],
-  "E9.backoff": ["a registered root whose Chrome never acks: failed, then refused until nextAt", 2],
-  "E9.restart": ["the launched Chrome killed, its presence expired, a request relaunches", 2],
+  "E9.idempotent": ["a request on a running profile with a fresh presence", 3],
+  "E9.backoff": ["a registered root whose Chrome never acks: failed, then refused until nextAt", 3],
+  "E9.restart": ["the launched Chrome killed, its presence expired, a request relaunches", 3],
   "E9.stop": ["stop signals the launched Chrome only, beside a bystander Chrome", 3],
-  "E9.pause": ["a paused profile is not launched; resumed, it is", 2],
+  "E9.pause": ["a paused profile is not launched; resumed, it is", 3],
   "E9.sharedRoot": ["two profiles of one root, Default open: the second is forwarded", 3],
 } as const;
 export type E9Hypothesis = keyof typeof E9_CELLS;

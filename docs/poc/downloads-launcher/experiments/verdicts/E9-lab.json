@@ -39,16 +39,19 @@
     "debugger": "none",
     "observations": [
       {
-        "boots": ["15adbfb6-7e45-49c5-aaa9-7237159ce519", "15adbfb6-7e45-49c5-aaa9-7237159ce519"]
+        "boots": ["7418d92f-cdb9-4816-a2d2-7bb785c949e0", "7418d92f-cdb9-4816-a2d2-7bb785c949e0"]
       },
       {
-        "boots": ["46ceb0a4-ea70-479e-9fe7-f201dee11109", "46ceb0a4-ea70-479e-9fe7-f201dee11109"]
+        "boots": ["bb89da11-d73d-4fc8-b4af-bbf3f7a423b0", "bb89da11-d73d-4fc8-b4af-bbf3f7a423b0"]
+      },
+      {
+        "boots": ["8f246940-88a7-45ee-8379-9ef34d42e886", "8f246940-88a7-45ee-8379-9ef34d42e886"]
       }
     ],
     "gestures": 0,
     "steps": [],
     "verdict": "pass",
-    "samples": 2
+    "samples": 3
   },
   {
     "experiment": "E9",
@@ -65,34 +68,50 @@
       {
         "state": {
           "token": "",
-          "pid": "3677",
-          "startedAt": "1793842555",
+          "pid": "4065",
+          "startedAt": "1793864123",
           "attempts": "1",
-          "nextAt": "1793842679",
+          "nextAt": "1793864246",
           "status": "failed",
           "boot": "",
           "root": "",
-          "userDataDir": "/tmp/recnrun-e9-VZr1sT/Chrome"
+          "userDataDir": "/tmp/recnrun-e9-w4nfEz/Chrome",
+          "shared": "0"
         }
       },
       {
         "state": {
           "token": "",
-          "pid": "4088",
-          "startedAt": "1793842560",
+          "pid": "4478",
+          "startedAt": "1793864127",
           "attempts": "1",
-          "nextAt": "1793842683",
+          "nextAt": "1793864250",
           "status": "failed",
           "boot": "",
           "root": "",
-          "userDataDir": "/tmp/recnrun-e9-WeGXPC/Chrome"
+          "userDataDir": "/tmp/recnrun-e9-an6ztj/Chrome",
+          "shared": "0"
+        }
+      },
+      {
+        "state": {
+          "token": "",
+          "pid": "4886",
+          "startedAt": "1793864131",
+          "attempts": "1",
+          "nextAt": "1793864254",
+          "status": "failed",
+          "boot": "",
+          "root": "",
+          "userDataDir": "/tmp/recnrun-e9-QUoMiS/Chrome",
+          "shared": "0"
         }
       }
     ],
     "gestures": 0,
     "steps": [],
     "verdict": "pass",
-    "samples": 2
+    "samples": 3
   },
   {
     "experiment": "E9",
@@ -107,16 +126,19 @@
     "debugger": "none",
     "observations": [
       {
-        "boots": ["d1ab4c98-3f79-4760-861c-58396d4b35d6", "a1b5628f-32d6-445e-b0a1-108ebb6f0b1d"]
+        "boots": ["93babd07-c9be-47cd-8f8a-e74e638f975d", "70b4e0ef-f4e4-484a-a314-548a06986335"]
       },
       {
-        "boots": ["e61c46be-106c-46f4-843f-044a84ef7611", "1f166a99-7602-438b-9726-0fd41b4aa0c5"]
+        "boots": ["db2de9e1-602f-4aea-83d6-1118e5ea0a30", "5e1a7dae-c935-4d9e-a975-ed56786458bb"]
+      },
+      {
+        "boots": ["c0275564-5c30-4b0f-a4b3-72f8a9429f32", "ef1ee45c-b464-49a5-80e1-199fcd04fa3e"]
       }
     ],
     "gestures": 0,
     "steps": [],
     "verdict": "pass",
-    "samples": 2
+    "samples": 3
   },
   {
     "experiment": "E9",
@@ -131,15 +153,15 @@
     "debugger": "none",
     "observations": [
       {
-        "ms": 1013,
+        "ms": 1035,
         "heldCode": 73
       },
       {
-        "ms": 1029,
+        "ms": 1045,
         "heldCode": 73
       },
       {
-        "ms": 1028,
+        "ms": 1060,
         "heldCode": 73
       }
     ],
@@ -159,16 +181,52 @@
     "variant": "poc-d0",
     "topology": "a paused profile is not launched; resumed, it is",
     "debugger": "none",
-    "verdict": "pass",
-    "samples": 2,
-    "gestures": 0,
-    "steps": [],
     "observations": [
       {
         "refused": 73
       },
       {
         "refused": 73
+      },
+      {
+        "refused": 73
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "E9",
+    "hypothesis": "E9.sharedRoot",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "two profiles of one root, Default open: the second is forwarded",
+    "debugger": "none",
+    "verdict": "pass",
+    "samples": 3,
+    "gestures": 0,
+    "steps": [],
+    "observations": [
+      {
+        "mains": [13821],
+        "pid": "13821",
+        "stop": 70
+      },
+      {
+        "mains": [14946],
+        "pid": "14946",
+        "stop": 70
+      },
+      {
+        "mains": [16079],
+        "pid": "16079",
+        "stop": 70
       }
     ]
   }
