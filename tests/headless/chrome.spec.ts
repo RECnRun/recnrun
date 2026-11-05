@@ -4,7 +4,7 @@ import { basename } from "node:path";
 import { promisify } from "node:util";
 import type { TestInfo } from "@playwright/test";
 import { expect, launchChrome, test } from "../browser/fixtures/chrome.ts";
-import { labRig } from "../browser/fixtures/launcher-rig.ts";
+import { chromesOf, labRig } from "../browser/fixtures/launcher-rig.ts";
 import { windowOwners } from "../browser/fixtures/x-display.ts";
 import { ackProblems, quit, runOpen } from "../experiments/fixtures/launcher-open.ts";
 import type { Opened } from "../experiments/fixtures/launcher-open.ts";
@@ -21,26 +21,37 @@ const MODE = "headless";
 const commandLine = async (pid: number) =>
   (await readFile(`/proc/${pid}/cmdline`, "utf8")).split("\0").filter(Boolean);
 
-/** A fresh poc-d0 root opened by `open.sh ... headless`; Chrome is stopped and the root removed after `body`. */
+/** Stops the pid and confirms nothing of the root runs; on failure keeps the evidence and the root. */
+async function stopOrKeep(rig: Awaited<ReturnType<typeof labRig>>, pid: number) {
+  try {
+    await quit(rig, [pid]);
+  } catch (cause) {
+    await rig.keep?.().catch(() => undefined);
+    throw new Error(`Chrome survived on ${rig.scene.root}; the root is kept.`, { cause });
+  }
+  await rig.dispose();
+}
+
+/** A fresh poc-d0 root opened by `open.sh ... headless`; Chrome is always stopped, then the root removed. */
 async function withOpened(
   testInfo: TestInfo,
   env: NodeJS.ProcessEnv,
   body: (opened: Opened, root: string) => Promise<void>,
 ) {
   const rig = await labRig(testInfo);
+  let pid = 0;
   try {
     const opened = await runOpen({ scene: rig.scene, env: { ...rig.env, ...env } }, MODE);
+    pid = opened.pid;
     expect(opened.code, opened.stderr).toBe(0);
     expect(opened.pid).toBeGreaterThan(0);
     expect(await ackProblems(rig.scene, opened)).toEqual([]);
     await body(opened, rig.scene.root);
-    await quit(rig, [opened.pid]);
-    expect(await rig.survivors(), "Chrome left running on the root").toEqual([]);
   } catch (error) {
     await rig.keep?.().catch(() => undefined);
     throw error;
   } finally {
-    await rig.dispose();
+    await stopOrKeep(rig, pid);
   }
 }
 
@@ -75,6 +86,19 @@ test.describe("open.sh ... headless starts Google Chrome Stable in its native he
       const owners = await windowOwners("chrome");
       expect(owners.filter((owner) => pids.has(owner))).toEqual([]);
     });
+  });
+
+  test("a failing body still stops the Chrome it opened", async ({ browserName }, testInfo) => {
+    expect(browserName).toBeDefined();
+    let root = "";
+    await expect(
+      withOpened(testInfo, {}, async (_opened, opened) => {
+        root = opened;
+        throw new Error("forced failure");
+      }),
+    ).rejects.toThrow("forced failure");
+    expect(root).not.toBe("");
+    expect(await chromesOf(root), "Chrome left running on the removed root").toEqual([]);
   });
 
   test("diagnostic: Browser.getVersion in headless reports the product", async ({
