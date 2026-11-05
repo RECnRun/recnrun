@@ -12,24 +12,26 @@
     "debugger": "none",
     "verdict": "pass",
     "samples": 1,
-    "gestures": 5,
+    "gestures": 7,
     "steps": [
-      "Open chrome://extensions",
-      "Turn on Developer mode",
-      "Click Load unpacked",
-      "Choose the extension folder",
-      "sh recnrun-launcher first-run"
+      "estimated: Open chrome://extensions",
+      "estimated: Turn on Developer mode",
+      "estimated: Click Load unpacked",
+      "estimated: Choose the extension folder",
+      "observed: sh recnrun-launcher first-run",
+      "observed: sh recnrun-launcher status",
+      "not run on the host: sh recnrun-launcher autostart on"
     ],
     "observations": [
       {
         "command": "sh recnrun-launcher first-run",
         "first": {
           "code": 0,
-          "stdout": "abd1f031-5bde-42fe-8706-d3d8c5700e05 open\nnext: sh recnrun-launcher autostart on /Users/dannyelcf/Documents/RECnRun/poc-downloads-launcher/roots/host-2026-11-05T01-41-14.089Z/launcher-first-run-1/home/.recnrun/launcher /Users/dannyelcf/Documents/RECnRun/poc-downloads-launcher/roots/host-2026-11-05T01-41-14.089Z/launcher-first-run-1/home/.recnrun/launcher.record lab\n",
-          "stderr": "first-run.sh: abd1f031-5bde-42fe-8706-d3d8c5700e05: registered (Default of /Users/dannyelcf/Documents/RECnRun/poc-downloads-launcher/roots/host-2026-11-05T01-41-14.089Z/launcher-first-run-1/home/Library/Application Support/Google/Chrome)\nlifecycle.sh: pid=1838\nboot=07222f81-f65c-4ca1-84cc-45a1f626d5cb\n"
+          "stdout": "fc183b74-c2c8-40dc-9000-e87ae37aab02 open\nnext: sh recnrun-launcher autostart on <home>/.recnrun/launcher <home>/.recnrun/launcher.record lab\n",
+          "stderr": "first-run.sh: fc183b74-c2c8-40dc-9000-e87ae37aab02: registered (Default of <home>/Library/Application Support/Google/Chrome)\nlifecycle.sh: pid=55320\nboot=54ff2905-b460-48ae-923a-5d9499a6322a\nrecnrun-launcher.sh: catalog.sh for <downloads>: exit 0\n"
         },
-        "status": "launcher stopped\nabd1f031-5bde-42fe-8706-d3d8c5700e05 open 1838 0 0\n",
-        "acked": ["07222f81-f65c-4ca1-84cc-45a1f626d5cb.json"]
+        "status": "launcher stopped\nfc183b74-c2c8-40dc-9000-e87ae37aab02 open 55320 0 0\n",
+        "acked": ["54ff2905-b460-48ae-923a-5d9499a6322a.json"]
       }
     ],
     "mode": "smoke"
