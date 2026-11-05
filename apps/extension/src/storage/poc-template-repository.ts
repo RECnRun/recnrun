@@ -32,8 +32,9 @@ const TRANSIENT = [
 /** Clears what a profile learned of its peers, so no copy of it pairs, links, or answers as it did. */
 export async function clearTransientPeerState(): Promise<void> {
   await storage.removeItems([...TRANSIENT]);
-  // The template's own presence error would otherwise travel in the base to every clone.
+  // The template's own presence error and pause would otherwise travel in the base to every clone.
   await pocTransportStore().clearError();
+  await pocTransportStore().clearPaused();
 }
 
 /** The identity key and the DTLS certificate: a template holds no working pair of them. */

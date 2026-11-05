@@ -141,3 +141,10 @@ test("clearing the transient peer state also drops the recorded transport error"
   await clearTransientPeerState();
   expect(await pocTransportStore().lastError()).toBeNull();
 });
+
+test("clearing the transient peer state also drops the template's stored pause", async () => {
+  await pocTransportStore().setPaused("disconnect");
+  await clearTransientPeerState();
+  expect(await pocTransportStore().paused()).toBeNull();
+  expect((await fakeBrowser.storage.local.get("pocPaused")).pocPaused).toBeUndefined();
+});

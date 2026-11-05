@@ -31,6 +31,8 @@ export function pocTransportStore() {
     recordError: (message: string) => lastError.setValue({ at: Date.now(), message }),
     /** A copy starts without the error its template recorded. */
     clearError: () => lastError.removeValue(),
+    /** A copy starts without the pause its template stored. */
+    clearPaused: () => paused.removeValue(),
     /** `resumed` clears the pause, as the launcher reads it. */
     setPaused: (reason: Paused | "resumed") =>
       paused.setValue(reason === "resumed" ? null : reason),
