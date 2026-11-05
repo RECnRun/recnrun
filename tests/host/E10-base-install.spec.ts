@@ -132,7 +132,13 @@ async function cleanBase() {
   await writeFile(join(root, "Default/Preferences"), pin);
   const home = join(bases, "home");
   await mkdir(home);
-  labels.push([home, "<home>"], [root, "<root>"], [bases, "<bases>"]);
+  // The build lives under the checkout, a host path a verdict may not carry.
+  labels.push(
+    [home, "<home>"],
+    [root, "<root>"],
+    [bases, "<bases>"],
+    [extensionPath("poc-d0"), "<build>"],
+  );
   return { bases, root, home, env: { ...(await launcherEnv(home)), RECNRUN_OPEN_TIMEOUT_S: "60" } };
 }
 
