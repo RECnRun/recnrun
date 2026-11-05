@@ -15,7 +15,7 @@
 #
 # State, <state-dir>/profiles/<profileId>: key=value lines with token, pid, startedAt, attempts,
 # nextAt (epoch seconds), status (idle, opening, open, failed, paused, stopped), boot, root (the
-# Downloads root), userDataDir, shared (1 when another record block names the same userDataDir); any other key or value outside its grammar exits 65. userDataDir and
+# Downloads root), userDataDir, shared (1 when another record block names the same userDataDir); any other key or value outside its grammar exits 65. Numbers are canonical decimal (no leading zero, a pid above zero, attempts at most the maximum). userDataDir and
 # pid are written when the attempt starts and the Chrome launches, so a timed-out open (69) keeps both
 # and stop can still end that Chrome.
 # Pause policy: an extension signals Disconnect/Forget by going silent, which is not a crash. An open
@@ -189,7 +189,7 @@ EOF
 }
 # open.sh calls this inside the command substitution, so the pid reaches the state before the ack wait.
 launched() {
-  is_count "$1" || return 0
+  is_pid "$1" || return 0
   st_pid=$1
   write_state
 }
@@ -240,6 +240,7 @@ cmd_request() {
   take_lock "$lc_lock" "$$"
   trap 'release_lock "$lc_lock" "$$"' EXIT
   read_state "$1/profiles/$lc_id"
+  [ "$st_attempts" -le "$max_attempts" ] || state_bad 'attempts (above the maximum: reset it)'
   st_shared=0
   if root_is_shared "$p_user" "$lc_record"; then st_shared=1; fi
   lc_now=$(date +%s)

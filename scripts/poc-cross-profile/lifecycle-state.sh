@@ -3,12 +3,18 @@
 # key=value state grammar, and the process lookups of shared roots. Sourced by lifecycle.sh, which also provides log, die, and open.sh's
 # is_v4, is_uuid, and is_directory.
 
+# Canonical decimal only: a leading zero would be read as octal by the shell's arithmetic.
 is_count() {
-  case $1 in '' | *[!0-9]*) return 1 ;; esac
+  case $1 in '' | 0?* | *[!0-9]*) [ "$1" = 0 ] || return 1 ;; esac
   [ "${#1}" -le 16 ]
 }
+# A pid is a positive count; kill -0 0 would signal the caller's own process group.
+is_pid() {
+  [ "$1" != 0 ] || return 1
+  is_count "$1"
+}
 pid_alive() {
-  is_count "$1" || return 1
+  is_pid "$1" || return 1
   kill -0 "$1" 2>/dev/null || return 1
   case $(ps -o stat= -p "$1" 2>/dev/null) in Z*) return 1 ;; esac
   return 0
@@ -59,7 +65,7 @@ take_lock() {
     lk_pid=
     if [ -f "$1" ] && [ ! -L "$1" ]; then read -r lk_pid <"$1" || lk_pid=gone; fi
     [ "$lk_pid" != gone ] || continue
-    is_count "$lk_pid" || { rm -f -- "$lk_mine"; die 65 "$1 does not name a pid"; }
+    is_pid "$lk_pid" || { rm -f -- "$lk_mine"; die 65 "$1 does not name a pid"; }
     if pid_alive "$lk_pid"; then
       rm -f -- "$lk_mine"
       die 75 "another launcher holds $1 (pid $lk_pid)"
@@ -91,9 +97,9 @@ state_bad() { die 65 "state file $st_file: invalid $1"; }
 state_set() {
   case $1 in
     token) [ -z "$2" ] || is_v4 "$2" || state_bad "$1"; st_token=$2 ;;
-    pid) [ -z "$2" ] || is_count "$2" || state_bad "$1"; st_pid=$2 ;;
+    pid) [ -z "$2" ] || is_pid "$2" || state_bad "$1"; st_pid=$2 ;;
     startedAt) is_count "$2" || state_bad "$1"; st_started=$2 ;;
-    attempts) is_count "$2" || state_bad "$1"; st_attempts=$2 ;;
+    attempts) is_count "$2" || state_bad "$1"; [ "${#2}" -le 6 ] || state_bad "$1"; st_attempts=$2 ;;
     nextAt) is_count "$2" || state_bad "$1"; st_next=$2 ;;
     status) case $2 in idle | opening | open | failed | paused | stopped) st_status=$2 ;; *) state_bad "$1" ;; esac ;;
     boot) [ -z "$2" ] || is_uuid "$2" || state_bad "$1"; st_boot=$2 ;;
