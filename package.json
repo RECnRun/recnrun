@@ -27,6 +27,7 @@
     "test:scripts": "node scripts/test-container.mjs test:scripts:local",
     "test:scripts:local": "node --test scripts/check-docs.checks.mjs scripts/test-host.checks.mjs scripts/poc-cross-profile/*.checks.mjs",
     "test:hooks": "node --test scripts/agent-hooks/*.checks.mjs scripts/git-hooks/*.checks.mjs",
+    "poc:package": "vp run extension#build:poc-d0 && node scripts/poc-cross-profile/package/build.mjs",
     "build:poc": "vp run extension#build:poc-d0 && vp run extension#build:poc-d1 && vp run extension#build:poc-d2",
     "test:extension-manifest": "vp run build:poc && vp run extension#test:manifest",
     "deps": "depcruise packages tests --config .dependency-cruiser.cjs && depcruise apps/website --config .dependency-cruiser.cjs --ts-config apps/website/tsconfig.deps.json && depcruise apps/extension --config .dependency-cruiser.cjs --ts-config apps/extension/tsconfig.deps.json",

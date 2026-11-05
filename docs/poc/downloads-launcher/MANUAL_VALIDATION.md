@@ -69,6 +69,8 @@ Everything in [PLAN.md](PLAN.md) that needs a person. The owner authorized Claud
 
 - **M-P4.a Autostart after an OS login.** `sh scripts/poc-cross-profile/recnrun-launcher.sh autostart on <state-dir> <record> <namespace>` (absolute paths without spaces; `<state-dir>` an existing folder, `<record>` the launcher record), log out and back in (or restart), confirm the LaunchAgent started the launcher without a command and that `sh scripts/poc-cross-profile/recnrun-launcher.sh status <state-dir>` reports `launcher running`; then `sh scripts/poc-cross-profile/recnrun-launcher.sh autostart off <state-dir> <record> <namespace>` and confirm it did not start on the next login.
   Result: …
+- **M-P4.b First run from the package (macOS).** Run `vp run poc:package` and copy `dist/poc-launcher/macos` to a folder whose path has no space (for example `~/recnrun-launcher`). Follow its `README.md` only: verify `MANIFEST`, then in a Chrome profile open `chrome://extensions`, turn on Developer mode, click Load unpacked and choose its `extension` folder, then run the README's first command from the folder. Record the gestures counted (the README says 4 per profile plus the command), every prompt macOS or Chrome showed, and whether the profile ended open (`sh recnrun-launcher status "$HOME/.recnrun/launcher"`).
+  Result: …
 
 ## After P5
 
