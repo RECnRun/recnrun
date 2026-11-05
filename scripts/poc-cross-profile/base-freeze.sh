@@ -62,6 +62,7 @@ freeze_base() {
   fz_code=
   if [ "$install" = unpacked ]; then
     fz_path=$(unpacked_path_of "$fz_root" Default "$4") || refuse "no usable path in the settings entry of $4"
+    is_plain_root "$fz_path" || refuse "the build path $fz_path is not an absolute path of letters, digits, dot, underscore, hyphen, and slash: clone.sh would refuse the marker"
     fz_code=$(printf 'unpackedPath=%s\n' "$fz_path")
   fi
   (

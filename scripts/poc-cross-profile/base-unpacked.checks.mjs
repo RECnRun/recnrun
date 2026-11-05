@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, readFileSync, renameSync } from "node:fs";
+import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { NAMESPACE, shells } from "./lab.mjs";
@@ -44,5 +44,22 @@ for (const shell of shells) {
     assert.equal(rows[5], "install=packed");
     assert.equal(rows.length, 6);
     assert.equal(existsSync(join(packed.root(), "Default/Extensions")), true);
+  });
+
+  await test(`${shell}: freeze refuses an unpacked build whose path the clone commands would refuse`, (context) => {
+    const s = baseScene(context);
+    assert.equal(s.create(shell).code, 0);
+    const build = installExtension(s.root(), { unpacked: true });
+    const spaced = join(s.home, "my build");
+    renameSync(build, spaced);
+    const file = join(s.root(), "Default/Preferences");
+    writeFileSync(file, readFileSync(file, "utf8").replace(build, spaced));
+    const ack = { STUB_ACK: "good" };
+    const template = s.run(shell, ["template", s.bases, "base-v1", NAMESPACE], "base-v1", ack);
+    assert.equal(template.code, 0, template.err);
+    const frozen = s.run(shell, ["freeze", s.bases, "base-v1", NAMESPACE, EXTENSION], "base-v1");
+    assert.equal(frozen.code, 65, frozen.err);
+    assert.match(frozen.err, /build path/);
+    assert.equal(existsSync(join(s.root(), MARKER)), false, "nothing is frozen");
   });
 }

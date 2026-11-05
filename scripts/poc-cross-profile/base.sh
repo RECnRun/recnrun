@@ -26,7 +26,7 @@
 #                 template ack of <name>, and the Preferences, writes <root>/.recnrun-base:
 #                 setting, extensionId, profileId, namespace, frozenAt (epoch seconds), install
 #                 (packed or unpacked), then for unpacked unpackedPath (the build folder the settings
-#                 entry names), one key=value per line; the same freeze again changes nothing.
+#                 entry names; refused unless it is a plain root path), one key=value per line; the same freeze again changes nothing.
 #   update        the next base (CL14), from a frozen <from> that no process names to a <to> that does not
 #                 exist: the whole root is copied in <bases-dir>/.<to>.partial-<16 hex>, verified with
 #                 diff -r, loses the Singleton markers, downloads/RECnRun, and .recnrun-base (it is not
