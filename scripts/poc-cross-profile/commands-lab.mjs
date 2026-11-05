@@ -104,3 +104,13 @@ export function commandScene(context, defaults = {}) {
       : [];
   return { ...base, roots, argv, calls, stubs: stubBin(base.home) };
 }
+
+/** Gives each listed profile of the record a Downloads root and creates the namespace folder the catalog writes into. */
+export function registerDownloads(scene, roots, namespace = "lab-1") {
+  let text = readFileSync(scene.record, "utf8");
+  for (const [id, directory] of Object.entries(roots)) {
+    text = text.replace(`profileId=${id}\n`, `profileId=${id}\ndownloadsRoot=${directory}\n`);
+    mkdirSync(join(directory, "RECnRun/poc", namespace), { recursive: true });
+  }
+  writeFileSync(scene.record, text);
+}

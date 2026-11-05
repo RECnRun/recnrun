@@ -10,6 +10,9 @@
 #       profile and leaves a paused or stopped one alone until lifecycle.sh resume (the owner's stop
 #       is never undone by the next pass). Exits 73, 75, 69, and 70 of a request are logged, not
 #       errors; 65 and 66 are logged once and the profile skipped until the launcher restarts.
+#       After the requests of each pass it runs catalog.sh once per distinct downloadsRoot the
+#       record registers in the namespace (the extension finds its peers only through the
+#       registry.json it writes); its exits are logged, not errors.
 #       --once runs one pass; otherwise it runs in the foreground, writes <state-dir>/launcher.pid,
 #       and ends cleanly on SIGTERM.
 #   status <state-dir>                          "launcher running pid=<n>" or "launcher stopped", then
@@ -65,6 +68,34 @@ record_profile_ids() {
   emit_block
 }
 
+# Prints each distinct downloadsRoot of the profile blocks in namespace $2, in record order.
+emit_root() {
+  if [ "$rr_ns" != "$rr_want" ] || [ -z "$rr_dir" ]; then return 0; fi
+  if ! is_record_directory "$rr_dir"; then
+    log 'skipped a Downloads root that is not a record directory'
+    return 0
+  fi
+  case $rr_seen in *"|$rr_dir|"*) return 0 ;; esac
+  rr_seen="$rr_seen$rr_dir|"
+  printf '%s\n' "$rr_dir"
+}
+record_downloads_roots() {
+  if [ ! -f "$1" ] || [ ! -r "$1" ]; then return 1; fi
+  [ "$(wc -c <"$1" | tr -d ' ')" -le 65536 ] || return 1
+  rr_want=$2 rr_seen='|' rr_dir='' rr_ns=''
+  while IFS= read -r rr_line || [ -n "$rr_line" ]; do
+    case $rr_line in
+      '')
+        emit_root
+        rr_dir='' rr_ns=''
+        ;;
+      downloadsRoot=*) rr_dir=${rr_line#*=} ;;
+      namespace=*) rr_ns=${rr_line#*=} ;;
+    esac
+  done <"$1"
+  emit_root
+}
+
 # --- Start -----------------------------------------------------------------------------------
 
 la_child=''
@@ -94,6 +125,28 @@ request_profile() {
     *) log "$4: exit $rq_code" ;;
   esac
 }
+# One catalog.sh run for the Downloads root $3, in the background so a SIGTERM ends the wait at once.
+catalog_root() {
+  /bin/sh "$la_dir/catalog.sh" "$1" "$2" "$3/RECnRun/poc/$2" &
+  la_child=$!
+  wait "$la_child"
+  ct_code=$?
+  la_child=''
+  case $ct_code in
+    0) log "catalog.sh for $3: exit 0" ;;
+    73 | 75) log "catalog.sh for $3: exit $ct_code, not an error" ;;
+    *) log "catalog.sh for $3: exit $ct_code" ;;
+  esac
+}
+run_catalog() {
+  pass_roots=$(record_downloads_roots "$1" "$2") || return 0
+  while IFS= read -r pass_root; do
+    [ -n "$pass_root" ] || continue
+    catalog_root "$1" "$2" "$pass_root"
+  done <<EOF
+$pass_roots
+EOF
+}
 run_pass() {
   if ! pass_ids=$(record_profile_ids "$2" "$3"); then
     log "cannot read the record $2"
@@ -106,6 +159,7 @@ run_pass() {
   done <<EOF
 $pass_ids
 EOF
+  run_catalog "$2" "$3"
 }
 cmd_start() {
   la_once=0

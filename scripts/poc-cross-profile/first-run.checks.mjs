@@ -32,9 +32,11 @@ for (const shell of shells) {
         "profileDirectory=Default",
         `profileId=${ALICE}`,
         "namespace=lab",
-        `downloadsRoot=${scene.home}/Downloads\n`,
+        `downloadsRoot=${scene.home}/Downloads`,
+        "root=r1\n", // the catalog pass of start --once numbered the root
       ].join("\n"),
     ]);
+    assert.ok(existsSync(`${scene.home}/Downloads/RECnRun/poc/lab/registry.json`));
     assert.equal(scene.launches(), 1);
     assert.equal(scene.field("status"), "open");
   });

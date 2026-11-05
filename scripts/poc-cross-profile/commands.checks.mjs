@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { test } from "node:test";
 import { ALICE, BOB, NAMESPACE, shells, until } from "./lab.mjs";
 import { alive, env, lines, life, scene, script as lifecycleScript } from "./lifecycle-lab.mjs";
-import { commandScene, launcher, launcherScript } from "./commands-lab.mjs";
+import { commandScene, launcher, launcherScript, registerDownloads } from "./commands-lab.mjs";
 
 const EX_USAGE = 64;
 const EX_REFUSED = 65;
@@ -184,4 +184,63 @@ for (const shell of shells) {
       assert.match(result.stdout, new RegExp(`^${ALICE} paused - 0 0$`, "m"), result.stdout);
     });
   }
+}
+
+const registryOf = (downloads) => join(downloads, "RECnRun/poc", NAMESPACE, "registry.json");
+const catalogRuns = (stderr) =>
+  lines(stderr).filter((line) => line.startsWith("recnrun-launcher.sh: catalog.sh for "));
+
+for (const shell of shells) {
+  await test(`${shell}: start --once writes the registry and a second pass rewrites it`, (context) => {
+    const scene = commandScene(context);
+    const downloads = join(scene.home, "Downloads");
+    registerDownloads(scene, { [ALICE]: downloads });
+    scene.publish();
+    const first = start(shell, scene, "--once");
+    assert.equal(first.code, 0, first.err);
+    const registry = JSON.parse(readFileSync(registryOf(downloads), "utf8"));
+    assert.equal(registry.version, 1);
+    assert.equal(registry.namespace, NAMESPACE);
+    assert.ok(Object.keys(registry.peers).includes(ALICE), JSON.stringify(registry));
+    assert.equal(catalogRuns(first.err).length, 1, first.err);
+    writeFileSync(registryOf(downloads), JSON.stringify({ ...registry, writtenAt: 1 }));
+    const second = start(shell, scene, "--once");
+    assert.equal(second.code, 0, second.err);
+    assert.ok(JSON.parse(readFileSync(registryOf(downloads), "utf8")).writtenAt > 1);
+  });
+
+  await test(`${shell}: start --once runs the catalog once per Downloads root, also when every profile is open`, (context) => {
+    const scene = commandScene(context);
+    const downloads = join(scene.home, "Downloads");
+    const other = join(scene.home, "Downloads-other");
+    registerDownloads(scene, { [ALICE]: downloads, [BOB]: downloads });
+    assert.equal(start(shell, scene, "--once").code, 0);
+    const again = start(shell, scene, "--once");
+    assert.equal(catalogRuns(again.err).length, 1, "two profiles on one root: one catalog run");
+    mkdirSync(join(other, "RECnRun/poc", NAMESPACE), { recursive: true });
+    // The first runs wrote root=r1 into the block; a profile moved to another root is a new block.
+    const blocks = readFileSync(scene.record, "utf8").split("\n\n");
+    const moved = blocks.map((it) =>
+      it.includes(`profileId=${BOB}`)
+        ? it.replace(/^root=.*\n?/m, "").replace(downloads, other)
+        : it,
+    );
+    writeFileSync(scene.record, moved.join("\n\n"));
+    const split = start(shell, scene, "--once");
+    assert.equal(catalogRuns(split.err).length, 2, split.err);
+    assert.equal(existsSync(registryOf(other)), true, split.err);
+  });
+
+  await test(`${shell}: a catalog that cannot write is logged, not fatal`, (context) => {
+    const scene = commandScene(context);
+    const missing = join(scene.home, "Downloads-missing");
+    const text = readFileSync(scene.record, "utf8");
+    writeFileSync(
+      scene.record,
+      text.replace(`profileId=${BOB}\n`, `profileId=${BOB}\ndownloadsRoot=${missing}\n`),
+    );
+    const result = start(shell, scene, "--once");
+    assert.equal(result.code, 0, result.err);
+    assert.match(result.err, /catalog\.sh for .*: exit 73, not an error/);
+  });
 }
