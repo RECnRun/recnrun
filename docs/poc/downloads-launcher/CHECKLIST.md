@@ -17,7 +17,7 @@ Tracks [PLAN.md](PLAN.md). One line per task; the orchestrator owns `[x]`, imple
 Markers: `[ ]` not started · `[i]` implemented, awaiting the phase gate · `[x]` verified by `vp run verify` · `[!]` blocked (reason indented) · `[~]` partial (what is missing indented).
 
 **Branch:** `poc-downloads-launcher` (from `60989d6`, head of PR #19 `poc/multi-profile-mesh`)
-**Last commit:** `fb1fa418` "Record the shell review fixes under Gate P6" plus this gate record (`f3352830` is the pushed HEAD until the Gate P6 push below)
+**Last commit:** `550b06eb` "Record the Codex review of P5 and P6 and the Gate P6 state" plus the coverage tests and this line (`f3352830` is the pushed HEAD until the Gate P6 push below)
 **Current phase:** Gate P6 closing on 2026-11-05: P5.1–P5.6, P6.1, P6.2 landed (see their lines), the Codex review of P5+P6 applied (17 findings, 17 commits `c92aded4..fb1fa418`, [reviews/P5-P6.md](reviews/P5-P6.md)), CL17 recorded on the host; CL16 and P6.3 (V3 with the personal Default) and the CL01–CL15 host cells with the Default as master wait for the owner's manual run after P7 (owner, 2026-11-05: "Vou testar manualmente após vc terminar o gate P6 com o P7 headless"). Next: `vp run verify`, push, PR #30, then P7.1 and P7.4 on Opus.
 **Paused:** not paused; Gate P6 verify and push in flight on 2026-11-05 (this commit). Resume with P7.1 (PLAN.md §P7) once the push and the CI run are recorded on the Gate P6 lines; M-P1.a, M-P2.a, M-P3.a, M-P4.a, M-P4.b, M-P5.a, and M-P6.a wait for the owner.
 
@@ -432,7 +432,8 @@ Gate P5: verify · CL01–CL15 over three rounds (review and push fused into Gat
 
 Gate P6: verify · CL16, CL17 · review of P5+P6 · push
 
-- verify: pending this run (recorded on the next line once it exits 0)
+- verify: the run on `550b06eb` failed only the per-file coverage floor (15 metrics in six extension files, three of them P6.1's onboarding wiring at 0%); tests added in the next commit (142 files, 1394 extension tests); the passing run is recorded on the next line
+- verify: pending the run on the coverage commit
 - host: CL17 recorded by P6.2 (`host-2026-11-05T15-36-58.186Z`); CL16 and the CL01–CL15 cells with the personal Default as master are the owner's manual run after P7 (M-P6.a); the lab twins of CL01–CL17 passed in the 3-round pass `df54fc64` and in the smoke runs of the review fixes (`2026-11-05T16-36-04.680Z-86efce09-83cb-4316-abd3-e2af6a308149` shell group: onboarding, clones, E10; `2026-11-05T16-11-07.209Z-d8aa3b74-2b89-4c6d-ab2f-43161cfe8019` extension group: diagnostics, cross-root-link, clones, onboarding, template-silence)
 - review: Codex `gpt-6.1-sol` high, 2026-11-05, one run over `f3352830..aff9c0f7` (P5.1–P5.6, P6.1, P6.2): 17 findings (blockers 14 and 16, nit 17), all 17 applied with red/green by two agents, none rejected, plus the shell half of finding 4 named by a second Codex run that checked the summary; full text [reviews/P5-P6.md](reviews/P5-P6.md)
 - review: finding 16: provision.sh ends the setup Chrome (base.sh quit) before install.sh, and the onboarding lab installs through the real install.sh — commit b15f7274
