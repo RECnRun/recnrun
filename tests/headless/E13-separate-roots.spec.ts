@@ -42,25 +42,19 @@ test("clones of the frozen base open headless, link to the master, answer, and s
   browserName,
 }, testInfo) => {
   test.skip(browserName === "firefox", "Chrome only");
+  // Three rounds of clones and three exclusivity samples take longer than the config's ten minutes.
+  test.setTimeout(sized(1_500_000, 600_000));
   const lab = await cloneLab(testInfo);
   const topology = `${CLONES} clones of one frozen base opened by clone-open.sh headless`;
   try {
-    await record(
-      "t9.clones",
-      topology,
-      () => clonesSample(lab, ["A", "B", "C"].slice(0, CLONES)),
-      1,
-    );
+    await record("t9.clones", topology, () => clonesSample(lab, ["A", "B", "C"].slice(0, CLONES)));
     const remote = remoteOf(lab);
     const opened = `${topology}; the master opens the test page in each clone`;
-    await record("ops.tabs", opened, () => tabsSample(remote, lab.clones), 1);
-    await record("ops.marker", opened, () => markerSample(remote, lab.clones), 1);
-    await record("t9.commands", opened, () => commandsSample(remote, lab.clones), 1);
-    await record(
-      "t9.exclusive",
-      `${topology}; a running clone is asked for the other mode`,
-      () => exclusiveSample(lab),
-      1,
+    await record("ops.tabs", opened, () => tabsSample(remote, lab.clones));
+    await record("ops.marker", opened, () => markerSample(remote, lab.clones));
+    await record("t9.commands", opened, () => commandsSample(remote, lab.clones));
+    await record("t9.exclusive", `${topology}; a running clone is asked for the other mode`, () =>
+      exclusiveSample(lab),
     );
   } finally {
     await lab.dispose();

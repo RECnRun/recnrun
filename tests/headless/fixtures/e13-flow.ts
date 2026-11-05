@@ -20,24 +20,19 @@ const NO_WINDOW =
 /** t6, ops.navigation, t7, focus, pip over `lab.workers`, all opened headless. */
 export async function workerCells(lab: Lab, { record, unavailable }: Recorder) {
   const topology = v1Topology(lab.workers.length);
-  await record("t6.workers", topology, () => workersSample(lab), 1);
+  await record("t6.workers", topology, () => workersSample(lab));
   await record(
     "t6.commands",
     `${topology}; each worker is bound to the master, which opens the test page in it and activates the tab it reports`,
     () => commandsSample(lab, lab.workers),
-    1,
   );
   await record(
     "ops.navigation",
     `${topology}; the master opens the start page, which navigates itself to the marker page`,
     () => navigationSample(lab, lab.workers),
-    1,
   );
-  await record(
-    "t7.background",
-    `${topology}; the master has no page open`,
-    () => backgroundSample(lab),
-    1,
+  await record("t7.background", `${topology}; the master has no page open`, () =>
+    backgroundSample(lab),
   );
   await unavailable("focus", topology, NO_WINDOW);
   await unavailable("pip", topology, NO_WINDOW);
@@ -49,6 +44,5 @@ export async function alternateCell(lab: Lab, { record }: Recorder) {
     "t8.alternate",
     "one hand-installed worker root opened headed, headless, headed",
     () => alternateSample(lab),
-    1,
   );
 }

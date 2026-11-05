@@ -87,8 +87,17 @@ async function openNew(lab: CloneLab, name: string, mode: Mode) {
   return { clone, opened, ackS: ack };
 }
 
+/** Ends the previous sample's clones and gives this one a fresh clones directory, so names repeat. */
+async function freshRound(lab: CloneLab) {
+  if (lab.clones.length === 0) return;
+  for (const clone of lab.clones) await lab.host.quit(clone.root);
+  lab.clones.length = 0;
+  lab.dir = await lab.host.clonesDir();
+}
+
 /** t9.clones: each clone is headless, provisioned, linked to the master, with an identity of its own. */
 export async function clonesSample(lab: CloneLab, names: string[]): Promise<Sample> {
+  await freshRound(lab);
   const problems: string[] = [];
   const opens: Record<string, unknown>[] = [];
   for (const name of names) {
