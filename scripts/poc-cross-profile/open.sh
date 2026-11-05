@@ -1,5 +1,6 @@
 #!/bin/sh
 # open.sh open <record> <namespace> <profileId> [headed|headless]
+# open.sh bind <userDataDir> <profileDirectory> <namespace> [headed|headless]
 #
 # One open attempt of the launcher (POC PLAN.md P4.3): starts Chrome on a registered profile with
 # a fresh token in the bootstrap URL, then waits for the ack that carries the token. The request
@@ -7,6 +8,11 @@
 # of the record and its Preferences must exist, so a typo never creates a profile. A pid, an exit
 # code, or a window is no proof: only the ack file counts. POSIX sh only, no JSON parser, nothing
 # read from a file is ever run or expanded. Source it with RECNRUN_DISCOVERY_LIB=1 for the functions.
+#
+# `bind` is the same request for a profile the record does not hold yet (the first run of a root
+# shared by several profiles): it takes the paths from its arguments, checked with the record
+# grammar, and the profile id from the ack that carries its token, in any profile folder of the
+# namespace under a candidate Downloads root. It prints profileId= first.
 #
 # Output: pid=<n> on stderr at once; on stdout root=<downloadsRoot>, boot=<uuid>, token=<uuid>.
 # The extension id is the first line of the file `extension-id` next to this script (the id the
@@ -118,6 +124,29 @@ $candidates
 EOF
   return 1
 }
+# One look under every candidate Downloads root for the ack of token $2 of any profile in namespace
+# $1; sets acked_id, acked_root, and acked_boot. The record is not read: no block holds the profile.
+look_for_bound() {
+  candidates=$(downloads_root_candidates "$p_user" "$p_dir" /nonexistent "$1")
+  while IFS= read -r candidate; do
+    [ -n "$candidate" ] || continue
+    if plain_path "$candidate" RECnRun poc "$1" acks; then
+      for folder in "$candidate/RECnRun/poc/$1/acks"/*/; do
+        folder=${folder%/}
+        id=${folder##*/}
+        is_v4 "$id" || continue
+        plain_path "$candidate" RECnRun poc "$1" acks "$id" || continue
+        found_boot=$(read_ack "$folder/$2.json" "$2" "$id") || continue
+        acked_id=$id acked_root=$candidate acked_boot=$found_boot
+        return 0
+      done
+    fi
+    tried="$tried${tried:+, }$candidate"
+  done <<EOF
+$candidates
+EOF
+  return 1
+}
 # Whole seconds, the poll at least 1; sets limit and step.
 check_timing() {
   limit=${RECNRUN_OPEN_TIMEOUT_S:-60}
@@ -125,13 +154,13 @@ check_timing() {
   case $limit in *[!0-9]*) log 'RECNRUN_OPEN_TIMEOUT_S must be whole seconds'; exit 64 ;; esac
   case $step in *[!0-9]* | 0) log 'RECNRUN_OPEN_POLL_S must be whole seconds, at least 1'; exit 64 ;; esac
 }
-# Waits up to $limit seconds for the ack; the Preferences read repeats on every look, since Chrome
-# flushes it late.
+# Waits up to $limit seconds for the ack with the look named in $looker; the Preferences read repeats
+# on every look, since Chrome flushes it late.
 wait_for_ack() {
   waited=0
   while :; do
     tried=
-    if look_for_ack "$@"; then return 0; fi
+    if "$looker" "$@"; then return 0; fi
     [ "$waited" -lt "$limit" ] || return 1
     sleep "$step"
     waited=$((waited + step))
@@ -166,11 +195,35 @@ open_profile() {
   validate_profile
   token=$(new_token)
   start_chrome "$token"
+  looker=look_for_ack
   if ! wait_for_ack "$1" "$2" "$3" "$token"; then
     log "no ack for $token within $limit s: tried ${tried:-no candidate}"
     exit 69
   fi
   printf 'root=%s\nboot=%s\ntoken=%s\n' "$acked_root" "$acked_boot" "$token"
+}
+
+# The same request for a profile the record does not hold yet: the ack names the profile id.
+bind_profile() {
+  [ "$#" -ge 3 ] || { log 'usage: open.sh bind <userDataDir> <profileDirectory> <namespace> [headed|headless]'; exit 64; }
+  [ "$#" -le 4 ] || refuse 'a free argument: the request is the user data directory, profile directory, namespace, and mode'
+  mode=headed
+  [ "$#" -lt 4 ] || mode=$4
+  case $mode in headed | headless) ;; *) refuse 'the mode is neither headed nor headless' ;; esac
+  check_timing
+  is_record_directory "$1" || refuse 'the user data directory is not a plain absolute directory'
+  is_profile_directory "$2" || refuse 'the profile directory is not a profile directory name'
+  is_namespace "$3" || refuse 'the namespace is not a namespace'
+  p_user=$1 p_dir=$2
+  validate_profile
+  token=$(new_token)
+  start_chrome "$token"
+  looker=look_for_bound
+  if ! wait_for_ack "$3" "$token"; then
+    log "no ack for $token within $limit s: tried ${tried:-no candidate}"
+    exit 69
+  fi
+  printf 'profileId=%s\nroot=%s\nboot=%s\ntoken=%s\n' "$acked_id" "$acked_root" "$acked_boot" "$token"
 }
 
 if [ -z "$open_as_library" ]; then
@@ -179,6 +232,7 @@ if [ -z "$open_as_library" ]; then
   shift
   case $entry in
     open) open_profile "$@" ;;
+    bind) bind_profile "$@" ;;
     *) log "unknown command $entry"; exit 64 ;;
   esac
 fi
