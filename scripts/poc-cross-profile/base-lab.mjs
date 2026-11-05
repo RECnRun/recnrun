@@ -2,9 +2,12 @@ import { spawnSync } from "node:child_process";
 import {
   chmodSync,
   existsSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
+  readlinkSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
@@ -156,11 +159,45 @@ export function baseScene(context) {
   };
 }
 
-/** Puts the extension into the base's Preferences the way an unpacked install does, keeping the pin. */
-export function installExtension(root) {
-  writeFileSync(
-    join(root, "Default/Preferences"),
-    `{"download":{"default_directory":"${root}/downloads","prompt_for_download":false},` +
-      `"extensions":{"settings":{"${EXTENSION}":{"path":"/x"}}}}`,
-  );
+/**
+ * Puts the extension into the base the way Chrome records it, keeping the Downloads pin: packed
+ * (a version folder, the default) or unpacked (a settings entry whose `path` is a build folder
+ * with a manifest, returned).
+ */
+export function installExtension(root, { unpacked = false } = {}) {
+  const pin = `"download":{"default_directory":"${root}/downloads","prompt_for_download":false}`;
+  const build = join(root, "../../unpacked-build");
+  if (unpacked) {
+    mkdirSync(build, { recursive: true });
+    writeFileSync(join(build, "manifest.json"), "{}");
+  } else {
+    mkdirSync(join(root, "Default/Extensions", EXTENSION, "1.0_0"), { recursive: true });
+    writeFileSync(join(root, "Default/Extensions", EXTENSION, "1.0_0/manifest.json"), "{}");
+  }
+  const entry = unpacked ? `,"extensions":{"settings":{"${EXTENSION}":{"path":"${build}"}}}` : "";
+  writeFileSync(join(root, "Default/Preferences"), `{${pin}${entry}}`);
+  return build;
+}
+
+/** Every path below `dir` (links not followed) with its kind, size, and mtime: what a listing shows. */
+export function listing(dir) {
+  const rows = [];
+  for (const name of readdirSync(dir, { recursive: true, encoding: "utf8" }).sort()) {
+    const info = lstatSync(join(dir, name));
+    rows.push(`${name} ${info.isDirectory() ? "d" : info.size} ${info.mtimeMs}`);
+  }
+  return rows;
+}
+
+/** Path to content (a link as `l:<target>`, a directory as `d`) of everything below `dir`. */
+export function contents(dir) {
+  const files = new Map();
+  for (const name of readdirSync(dir, { recursive: true, encoding: "utf8" })) {
+    const info = lstatSync(join(dir, name));
+    let value = "d";
+    if (info.isSymbolicLink()) value = `l:${readlinkSync(join(dir, name))}`;
+    else if (info.isFile()) value = `f:${readFileSync(join(dir, name), "latin1")}`;
+    files.set(name, value);
+  }
+  return files;
 }

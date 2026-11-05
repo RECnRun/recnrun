@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { ALICE, NAMESPACE, linkAt, shells } from "./lab.mjs";
@@ -15,6 +15,8 @@ import {
   request,
   scene,
 } from "./open-lab.mjs";
+
+const EX_NOT_FOUND = 66;
 
 for (const shell of shells) {
   await test(`${shell}: a free argument is refused and Chrome never runs`, (context) => {
@@ -184,6 +186,33 @@ for (const shell of shells) {
     const [, bootLine, tokenLine] = lines(result.out);
     assert.equal(bootLine, `boot=${boot}`);
     assert.notEqual(tokenLine, `token=${boot}`);
+  });
+
+  await test(`${shell}: open follows the unpacked build: refused while its folder is gone, open again once it is back or moved`, (context) => {
+    const { home, root, record, argv, env } = scene(context);
+    const build = join(home, "build");
+    const settings = (path) =>
+      writeFileSync(
+        join(root, "Default/Preferences"),
+        `{"extensions":{"settings":{"${EXTENSION}":{"path":"${path}","state":1}}}}`,
+      );
+    mkdirSync(build);
+    writeFileSync(join(build, "manifest.json"), "{}");
+    settings(build);
+    assert.equal(open(shell, request(record), env()).code, 0, "the build is there");
+    rmSync(argv);
+    renameSync(build, `${build}-away`);
+    const gone = open(shell, request(record), env());
+    assert.equal(gone.code, EX_NOT_FOUND, gone.err);
+    assert.match(gone.err, new RegExp(`unpacked code missing: ${build}\\n`));
+    assert.equal(existsSync(argv), false, "Chrome never started");
+    renameSync(`${build}-away`, build);
+    assert.equal(open(shell, request(record), env()).code, 0, "restored");
+    rmSync(argv);
+    renameSync(build, `${build}-moved`);
+    settings(`${build}-moved`);
+    assert.equal(open(shell, request(record), env()).code, 0, "moved, with the new path loaded");
+    assert.ok(existsSync(argv));
   });
 
   for (const [depth, part] of ["RECnRun", "poc", NAMESPACE, "acks", ALICE].entries()) {

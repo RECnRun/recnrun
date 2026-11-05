@@ -58,10 +58,16 @@ freeze_base() {
   install=$(extension_in_profile "$fz_root" Default "$4") || refuse "extension $4 is not installed in $fz_root/Default"
   find_template_ack "$fz_root" "$3" "$fz_name"
   [ -n "$ack_profile" ] || refuse "no template ack of $fz_name below the Downloads root of $fz_root"
+  # An unpacked base depends on its build folder (CL13): the marker keeps where it was frozen from.
+  fz_code=
+  if [ "$install" = unpacked ]; then
+    fz_path=$(unpacked_path_of "$fz_root" Default "$4") || refuse "no usable path in the settings entry of $4"
+    fz_code=$(printf 'unpackedPath=%s\n' "$fz_path")
+  fi
   (
     set -C
-    printf 'setting=%s\nextensionId=%s\nprofileId=%s\nnamespace=%s\nfrozenAt=%s\ninstall=%s\n' \
-      "$fz_name" "$4" "$ack_profile" "$3" "$(date +%s)" "$install" >"$marker"
+    printf 'setting=%s\nextensionId=%s\nprofileId=%s\nnamespace=%s\nfrozenAt=%s\ninstall=%s\n%s' \
+      "$fz_name" "$4" "$ack_profile" "$3" "$(date +%s)" "$install" "${fz_code:+$fz_code$nl}" >"$marker"
   ) || die 73 "cannot write $marker"
   cat -- "$marker"
 }

@@ -1,47 +1,19 @@
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { chmodSync, mkdirSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
-import { fileURLToPath } from "node:url";
 import { ALICE, BOB, CAROL, NAMESPACE, linkAt, presence, shells } from "./lab.mjs";
+import { lab, lines, profile, profiles } from "./profiles-lab.mjs";
 
-const script = fileURLToPath(new URL("./profiles.sh", import.meta.url));
 const EX_NOT_FOUND = 66;
 const EXTENSION = "abcdefghijklmnopabcdefghijklmnop";
 const DECOY = "abcdefghijklmnopabcdefghijklmnoo";
 const MAC_CHROME = "Library/Application Support/Google/Chrome";
 
-function profiles(shell, args, env) {
-  const result = spawnSync(shell, [script, ...args], {
-    encoding: "utf8",
-    env: { PATH: process.env.PATH, ...env },
-  });
-  return { code: result.status, out: result.stdout, err: result.stderr };
-}
-const lines = (text) => text.split("\n").filter((line) => line !== "");
-
-/** A temporary home that stands in for the machine: HOME and the probe prefix point at it. */
-function lab(context) {
-  const home = mkdtempSync(join(tmpdir(), "recnrun-profiles-"));
-  context.after(() => rmSync(home, { recursive: true, force: true }));
-  const env = (extra = {}) => ({
-    HOME: home,
-    RECNRUN_DISCOVERY_PREFIX: home,
-    RECNRUN_DISCOVERY_UNAME: "Darwin",
-    ...extra,
-  });
-  return { home, env, record: join(home, "launcher.record") };
-}
 function executable(path) {
   mkdirSync(join(path, ".."), { recursive: true });
   writeFileSync(path, "#!/bin/sh\n");
   chmodSync(path, 0o755);
-}
-function profile(root, name, files = { Preferences: "{}" }) {
-  mkdirSync(join(root, name), { recursive: true });
-  for (const [file, text] of Object.entries(files)) writeFileSync(join(root, name, file), text);
 }
 function plant(root, id, boot = "55555555-5555-4555-8555-555555555555") {
   const folder = join(root, "RECnRun/poc", NAMESPACE, "peers", id);

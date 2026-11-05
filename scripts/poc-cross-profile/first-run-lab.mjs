@@ -9,8 +9,17 @@ const firstRunScript = fileURLToPath(new URL("./first-run.sh", import.meta.url))
 const EXTENSION = "omllgeochjfpkjbkpcgjmnnbncdpiedd";
 const DEFAULT_ROOT = "Library/Application Support/Google/Chrome";
 
-const withExtension = (directory) =>
-  `{"extensions":{"settings":{"${EXTENSION}":{"path":"/x"}}},"download":{"default_directory":"${directory}"}}`;
+// The unpacked build's folder must exist: the launcher refuses to open a profile whose code is gone.
+const withExtension = (directory, build) =>
+  `{"extensions":{"settings":{"${EXTENSION}":{"path":"${build}"}}},"download":{"default_directory":"${directory}"}}`;
+
+function installExtensions(home, root, downloads, shared) {
+  const build = join(home, "unpacked-build");
+  mkdirSync(build);
+  writeFileSync(join(build, "manifest.json"), "{}");
+  writeFileSync(join(root, "Default/Preferences"), withExtension(downloads, build));
+  if (shared) writeFileSync(join(root, "Profile 1/Preferences"), withExtension(downloads, build));
+}
 
 /** The file the stub Chrome reads to answer each profile directory with an id; `ids` null writes none. */
 function stubIds(home, ids) {
@@ -39,8 +48,7 @@ export function firstRunScene(context, namespace = "lab", { shared = false } = {
   mkdirSync(join(base.home, "Library/Application Support/Google"), { recursive: true });
   renameSync(base.root, root);
   const downloads = join(base.home, "Downloads");
-  writeFileSync(join(root, "Default/Preferences"), withExtension(downloads));
-  if (shared) writeFileSync(join(root, "Profile 1/Preferences"), withExtension(downloads));
+  installExtensions(base.home, root, downloads, shared);
   rmSync(base.record);
   const folderOf = (id) => join(downloads, "RECnRun/poc", namespace, "peers", id);
   const publish = (id = ALICE) => {

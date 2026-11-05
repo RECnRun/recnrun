@@ -209,7 +209,7 @@ for (const shell of shells) {
   await test(`${shell}: freeze writes the marker once, never touches Default, and refuses another setting`, (context) => {
     const s = baseScene(context);
     assert.equal(s.create(shell).code, 0);
-    installExtension(s.root());
+    const build = installExtension(s.root(), { unpacked: true });
     const acked = s.run(shell, ["template", s.bases, "base-v1", NAMESPACE], "base-v1", {
       STUB_ACK: "good",
     });
@@ -232,7 +232,8 @@ for (const shell of shells) {
     const stamp = Number(/^frozenAt=(\d+)$/.exec(rows[4])?.[1]);
     assert.ok(stamp >= before && stamp <= before + 60, rows[4]);
     assert.equal(rows[5], "install=unpacked");
-    assert.equal(rows.length, 6);
+    assert.equal(rows[6], `unpackedPath=${build}`);
+    assert.equal(rows.length, 7);
     assert.equal(frozen.out, text);
     assert.equal(readFileSync(join(s.root(), "Default/Preferences"), "utf8"), preferences);
     const time = statSync(marker).mtimeMs;

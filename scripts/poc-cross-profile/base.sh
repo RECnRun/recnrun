@@ -3,6 +3,7 @@
 # base.sh template <bases-dir> <name> <namespace>
 # base.sh quit <bases-dir> <name>
 # base.sh freeze <bases-dir> <name> <namespace> <extensionId>
+# base.sh update <bases-dir> <from> <to> <namespace>
 #
 # The clean base of the clones (POC PLAN.md P5.1, decisions 10 and 11): a Chrome user data root the
 # owner prepares once and freezes, which create-clone copies whole. Layout: <bases-dir>/<name>/
@@ -24,10 +25,19 @@
 #   freeze        refuses while any process names the root; with the extension in Default, a
 #                 template ack of <name>, and the Preferences, writes <root>/.recnrun-base:
 #                 setting, extensionId, profileId, namespace, frozenAt (epoch seconds), install
-#                 (packed or unpacked), one key=value per line; the same freeze again changes nothing.
+#                 (packed or unpacked), then for unpacked unpackedPath (the build folder the settings
+#                 entry names), one key=value per line; the same freeze again changes nothing.
+#   update        the next base (CL14), from a frozen <from> that no process names to a <to> that does not
+#                 exist: the whole root is copied in <bases-dir>/.<to>.partial-<16 hex>, verified with
+#                 diff -r, loses the Singleton markers, downloads/RECnRun, and .recnrun-base (it is not
+#                 frozen), has only download.default_directory rewritten to <to>/downloads, is published
+#                 with one rename, and Chrome starts on it as create-base does; the owner updates the
+#                 unpacked build there, then runs template, quit, and freeze for <to>. <from> and the
+#                 clones made from it are only read. stdout root=, copyS=; exit 70 for a failed copy.
 #
 # Environment: RECNRUN_OPEN_TIMEOUT_S (60) and RECNRUN_OPEN_POLL_S (1) bound the template wait,
-# RECNRUN_LIFECYCLE_STOP_S (20) the quit; RECNRUN_DISCOVERY_PREFIX and RECNRUN_DISCOVERY_UNAME as in profiles.sh.
+# RECNRUN_LIFECYCLE_STOP_S (20) the quit; an unpacked base whose build folder is gone is refused by
+# template with 66; RECNRUN_DISCOVERY_PREFIX and RECNRUN_DISCOVERY_UNAME as in profiles.sh.
 # Exit: 0 done, 64 wrong call, 65 refused, 66 no Chrome or extension id, 69 no template ack in time,
 # 70 a process still names the root, 73 the root exists or cannot be written, 75 a process holds the root.
 
@@ -39,6 +49,8 @@ RECNRUN_DISCOVERY_LIB=$base_as_library # a dot keeps its own assignment: give ba
 . "$(dirname -- "$0")/lifecycle-state.sh"
 # shellcheck source=base-freeze.sh
 . "$(dirname -- "$0")/base-freeze.sh"
+# shellcheck source=base-update.sh
+. "$(dirname -- "$0")/base-update.sh"
 
 log() { printf 'base.sh: %s\n' "$*" >&2; }
 die() {
@@ -90,6 +102,13 @@ HOLDERS
   return 0
 }
 
+# Chrome on $root at the pages where the owner loads or updates the extension; not waited for.
+open_setup_pages() {
+  "$1" "--user-data-dir=$root" --profile-directory=Default --no-first-run --no-default-browser-check \
+    chrome://extensions/ chrome://version/ >/dev/null 2>&1 &
+  log "pid=$!"
+}
+
 # --- create-base -----------------------------------------------------------------------------
 
 create_base() {
@@ -105,9 +124,7 @@ create_base() {
     set -C
     printf '{"download":{"default_directory":"%s/downloads","directory_upgrade":true,"prompt_for_download":false}}' "$root" >"$root/Default/Preferences"
   ) || die 73 'cannot write Default/Preferences'
-  "$chrome" "--user-data-dir=$root" --profile-directory=Default --no-first-run --no-default-browser-check \
-    chrome://extensions/ chrome://version/ >/dev/null 2>&1 &
-  log "pid=$!"
+  open_setup_pages "$chrome"
   printf 'root=%s\n' "$root"
 }
 
@@ -123,6 +140,7 @@ template_base() {
   base_ext=
   if [ -f "$here/extension-id" ]; then base_ext=$(head -n 1 "$here/extension-id"); fi
   is_extension_id "$base_ext" || die 66 'no valid extension id next to this script'
+  unpacked_code_present "$root" Default "$base_ext" || exit $?
   check_timing
   p_user=$root p_dir=Default
   token=$(new_token)
@@ -166,7 +184,7 @@ quit_base() {
 }
 
 if [ -z "$base_as_library" ]; then
-  [ "$#" -ge 1 ] || die 64 'usage: base.sh create-base|template|quit|freeze [argument ...]'
+  [ "$#" -ge 1 ] || die 64 'usage: base.sh create-base|template|quit|freeze|update [argument ...]'
   entry=$1
   shift
   case $entry in
@@ -174,6 +192,7 @@ if [ -z "$base_as_library" ]; then
     template) template_base "$@" ;;
     quit) quit_base "$@" ;;
     freeze) freeze_base "$@" ;;
+    update) update_base "$@" ;;
     *) die 64 "unknown command $entry" ;;
   esac
 fi

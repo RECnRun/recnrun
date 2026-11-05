@@ -17,7 +17,8 @@
 # Output: pid=<n> on stderr at once; on stdout root=<downloadsRoot>, boot=<uuid>, token=<uuid>.
 # The extension id is the first line of the file `extension-id` next to this script (the id the
 # POC builds pin). Environment: RECNRUN_OPEN_TIMEOUT_S (60) and RECNRUN_OPEN_POLL_S (1) bound the wait; RECNRUN_DISCOVERY_PREFIX and RECNRUN_DISCOVERY_UNAME as in profiles.sh.
-# Exit: 0 acked, 64 wrong call, 65 refused request, 66 no Chrome or extension id, 69 no ack in time.
+# Exit: 0 acked, 64 wrong call, 65 refused request, 66 no Chrome or extension id or the unpacked build's
+# folder is gone, 69 no ack in time.
 
 # profiles.sh reuses the name as_library, so this one stays apart.
 open_as_library=${RECNRUN_DISCOVERY_LIB:-}
@@ -71,6 +72,7 @@ validate_profile() {
   p_ext=
   if [ -f "$here/extension-id" ]; then p_ext=$(head -n 1 "$here/extension-id"); fi
   is_extension_id "$p_ext" || { log 'no valid extension id'; exit 66; }
+  unpacked_code_present "$p_user" "$p_dir" "$p_ext" || exit $? # CL13: Chrome disables an unpacked build whose folder is gone
 }
 
 # --- The ack ---------------------------------------------------------------------------------

@@ -86,8 +86,14 @@ export const lines = (text) => text.split("\n").filter((line) => line !== "");
 function killLeftovers(spawned, state) {
   const file = join(state, "profiles", ALICE);
   const named = existsSync(file) ? /^pid=(\d+)$/m.exec(readFileSync(file, "utf8")) : null;
-  for (const pid of [...spawned, ...(named ? [Number(named[1])] : [])])
-    if (alive(pid)) process.kill(pid, "SIGKILL");
+  for (const pid of [...spawned, ...(named ? [Number(named[1])] : [])]) {
+    try {
+      process.kill(pid, "SIGKILL");
+    } catch (error) {
+      // A process that is already gone is the goal; a scene's own cleanup may have just killed it.
+      if (error.code !== "ESRCH") throw error;
+    }
+  }
 }
 
 /** The stub Chrome, a Chrome root with one profile (two with `shared`), and the record that registers it. */

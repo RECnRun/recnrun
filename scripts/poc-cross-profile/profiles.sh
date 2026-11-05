@@ -10,6 +10,10 @@
 #   chrome_roots <record>                               the OS default user data root, then the record's
 #   profiles_in_root <root>                             profile directory names, Default first, then sorted
 #   extension_in_profile <root> <profileDirectory> <id> prints packed or unpacked, else exits 1
+#   unpacked_path_of <root> <profileDirectory> <id>     the `path` of an unpacked install's settings entry
+#                                                       (a relative one resolved below the profile), else exits 1
+#   unpacked_code_present <root> <profileDirectory> <id> exit 66 and `unpacked code missing: <path>` when
+#                                                       that folder or its manifest.json is gone (CL13)
 #   bind_profiles <record> <namespace> <id>             one line per profile that has the extension:
 #                                                       <profileId> TAB <root> TAB <profileDirectory> TAB
 #                                                       <downloadsRoot> TAB distinct|shared|unbound
@@ -21,7 +25,8 @@
 #
 # Environment: RECNRUN_DISCOVERY_PREFIX goes before every absolute path probed for Chrome and
 # before each PATH entry (a fixture root for the checks); RECNRUN_DISCOVERY_UNAME overrides `uname -s`.
-# Exit: 0 done, 1 extension_in_profile found nothing, 64 wrong call, 66 chrome_binary found none.
+# Exit: 0 done, 1 extension_in_profile or unpacked_path_of found nothing, 64 wrong call, 66 chrome_binary found
+# none or the unpacked code is missing.
 
 # Read before sourcing: `.` keeps the variable assignment of its own command line in some shells.
 as_library=${RECNRUN_DISCOVERY_LIB:-}
@@ -160,6 +165,38 @@ extension_in_profile() {
   return 1
 }
 
+# The settings entry is the text after `"<id>":{` up to the next extension's entry; its first `"path"` is
+# the install's. A path with an escape, or none, is unknown (exit 1) rather than guessed.
+settings_path() {
+  sp_entry=$(sed -n "s/.*\"$3\":{//p" "$1" | sed 's/"[a-p]\{32\}":{.*//')
+  sp_path=$(printf '%s\n' "$sp_entry" | grep -o -m 1 '"path":"[^"]*"' | head -n 1)
+  sp_path=${sp_path#'"path":"'}
+  sp_path=${sp_path%'"'}
+  case $sp_path in '' | *\\*) return 1 ;; /*) ;; *) sp_path=$2/$sp_path ;; esac
+  printf '%s\n' "$sp_path"
+}
+unpacked_path_of() {
+  [ "$#" -eq 3 ] || return 64
+  up_kind=$(extension_in_profile "$@") || return $?
+  [ "$up_kind" = unpacked ] || return 1
+  for up_file in "$1/$2/Preferences" "$1/$2/Secure Preferences"; do
+    is_plain_file "$up_file" && settings_path "$up_file" "$1/$2" "$3" && return 0
+  done
+  return 1
+}
+# CL13: an unpacked install runs from a folder outside the profile, and Chrome disables it when
+# that folder is gone; the id is re-read from the settings entry, so a moved build loaded again is fine.
+unpacked_code_present() {
+  [ "$#" -eq 3 ] || return 64
+  ucp_path=$(unpacked_path_of "$@")
+  ucp_status=$?
+  [ "$ucp_status" -ne 1 ] || return 0
+  [ "$ucp_status" -eq 0 ] || return "$ucp_status"
+  if [ -d "$ucp_path" ] && [ -f "$ucp_path/manifest.json" ]; then return 0; fi
+  log "unpacked code missing: $ucp_path"
+  return 66
+}
+
 # --- Bindings --------------------------------------------------------------------------------
 
 # True when the presence file $1 begins with the profile id $2 of its folder, the way the extension writes it.
@@ -263,7 +300,7 @@ if [ -z "$as_library" ]; then
   entry=$1
   shift
   case $entry in
-    chrome_binary | chrome_roots | profiles_in_root | extension_in_profile | bind_profiles)
+    chrome_binary | chrome_roots | profiles_in_root | extension_in_profile | unpacked_path_of | unpacked_code_present | bind_profiles)
       "$entry" "$@"
       status=$?
       [ "$status" -ne 64 ] || log "wrong arguments for $entry"
