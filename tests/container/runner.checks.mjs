@@ -32,6 +32,7 @@ await test("forwards arguments literally and runs the current workspace in an is
   assert.equal(build.at(-1), root.replace(/\/$/, ""));
   const create = result.calls.find(([command]) => command === "create");
   assert.ok(create.includes("--init"));
+  assert.ok(!create.some((option) => option.startsWith("--cpu-shares")));
   assert.ok(create.includes("--shm-size=2g"));
   assert.ok(create.includes(`RECNRUN_RUN_ID=${basename(result.artifacts)}`));
   // The managed-policy install writes /etc only when this marker says it runs in the container.
@@ -57,6 +58,8 @@ await test("runs the experiments of verify in smoke mode and leaves the experime
   assert.equal(verify.code, 0, verify.output);
   const verifyCreate = verify.calls.find(([command]) => command === "create");
   assert.ok(verifyCreate.includes("RECNRUN_EXPERIMENT_SAMPLES=smoke"));
+  // The long gate yields the CPU to a concurrent pre-commit unit run, so a commit never waits on it.
+  assert.ok(verifyCreate.includes("--cpu-shares=256"));
   const experiments = await launch(context, "success", [], "test:experiments:local");
   assert.equal(experiments.code, 0, experiments.output);
   const create = experiments.calls.find(([command]) => command === "create");

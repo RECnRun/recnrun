@@ -136,6 +136,9 @@ async function ensureNetwork() {
   return 1;
 }
 
+// The full gates yield the CPU under contention, so a pre-commit unit run beside them stays short.
+const yielding = new Set(["verify:local", "test:local"]);
+
 async function startTests() {
   const environment = containerEnvironment();
 
@@ -144,6 +147,7 @@ async function startTests() {
       "create",
       "--init",
       "--shm-size=2g",
+      ...(yielding.has(task) ? ["--cpu-shares=256"] : []),
       "--name",
       container,
       "--label",
