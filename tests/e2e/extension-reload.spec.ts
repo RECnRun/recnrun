@@ -93,8 +93,13 @@ test.describe("with a DevTools port", () => {
       ((await cdp.send("Target.getTargets")) as { targetInfos: TargetInfo[] }).targetInfos.filter(
         ({ type, url }) => type === "service_worker" && url.startsWith("chrome-extension://"),
       );
-    for (const { targetId } of await workers()) await cdp.send("Target.closeTarget", { targetId });
-    await expect.poll(async () => (await workers()).length).toBe(0);
+    const stopped = new Set((await workers()).map(({ targetId }) => targetId));
+    expect(stopped.size).toBeGreaterThan(0);
+    for (const targetId of stopped) await cdp.send("Target.closeTarget", { targetId });
+    // The open dashboard may wake a new worker at once; the stopped one must be gone.
+    await expect
+      .poll(async () => (await workers()).some(({ targetId }) => stopped.has(targetId)))
+      .toBe(false);
     await remote.close();
 
     const record = tabItem(dashboard, page.url()).getByRole("button", { name: "Record" });
