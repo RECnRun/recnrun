@@ -52,6 +52,11 @@ is_count() {
   case $1 in '' | *[!0-9]*) return 1 ;; esac
   [ "${#1}" -le 15 ]
 }
+# True when the marker file $1 is at most 2 KiB of printable ASCII and newlines (a NUL or any other
+# byte would be dropped or reinterpreted by the shell's line reader).
+marker_bytes_ok() {
+  [ "$(wc -c <"$1" | tr -d ' ')" -le 2048 ] && [ "$(LC_ALL=C tr -d '\040-\176\n' <"$1" | wc -c | tr -d ' ')" -eq 0 ]
+}
 # One line of a marker file in the grammar of decision 10: $1 its number, $2 the line.
 base_line() {
   bl_value=${2#*=}
@@ -70,7 +75,7 @@ base_line() {
 read_base_marker() {
   rb_file=$root/.recnrun-base
   is_plain_file "$rb_file" || refuse "$root is not a frozen base: no .recnrun-base"
-  [ "$(wc -c <"$rb_file" | tr -d ' ')" -le 2048 ] || refuse "$rb_file is over 2 KiB"
+  marker_bytes_ok "$rb_file" || refuse "$rb_file is over 2 KiB or holds a byte other than printable ASCII and newline"
   mk_extension='' mk_namespace='' mk_install=''
   rb_index=0
   while IFS= read -r rb_line || [ -n "$rb_line" ]; do
@@ -187,6 +192,7 @@ create_clone() {
 # Sets lc_base, lc_id, and lc_created when $1 is a published clone whose marker parses, else returns 1;
 # the three provisioning lines clone-open.sh appends (11 to 13) are part of the grammar.
 read_clone_marker() {
+  marker_bytes_ok "$1" || return 1
   rc_index=0 lc_base='' lc_id='' lc_created=''
   while IFS= read -r rc_line || [ -n "$rc_line" ]; do
     rc_index=$((rc_index + 1))

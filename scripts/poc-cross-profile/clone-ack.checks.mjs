@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { NAMESPACE, shells } from "./lab.mjs";
@@ -62,6 +62,34 @@ for (const shell of shells) {
       });
       assert.equal(result.code, 69, result.err);
       assert.equal(s.recordText().includes("role=worker"), false);
+    });
+  }
+
+  const bytes = [
+    ["a NUL byte", "\0"],
+    ["a byte over 126", "\u0080"],
+    ["a carriage return", "\r"],
+  ];
+  for (const [title, junk] of bytes) {
+    await test(`${shell}: a marker with ${title} in a value is no marker for list-clones, open-clone, or create-clone`, (context) => {
+      const s = openScene(context, shell);
+      const clone = join(s.root, ".recnrun-clone");
+      writeFileSync(
+        clone,
+        readFileSync(clone, "latin1").replace("role=worker", `role=worker${junk}`),
+        "latin1",
+      );
+      assert.equal(s.clone(shell, ["list-clones", s.clones]).out, "", "not listed");
+      const opened = s.open();
+      assert.equal(opened.code, 65, opened.err);
+      const base = join(s.bases, "base-v1", ".recnrun-base");
+      writeFileSync(
+        base,
+        readFileSync(base, "latin1").replace("install=unpacked", `install=unpacked${junk}`),
+        "latin1",
+      );
+      const made = s.copyTo(shell, "base-v1", "c2");
+      assert.equal(made.code, 65, made.err);
     });
   }
 }
