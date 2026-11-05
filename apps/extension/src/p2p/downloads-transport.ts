@@ -129,11 +129,10 @@ const listed = (registry: Registry | undefined, { me, now }: Reading): RegistryP
     (peer) => peer.profileId !== me && peer.expiresAt > now,
   );
 
-/** Where a listed peer's files are read: my root when it shares it, else the path of its root. */
+/** Where a listed peer's files are read: my root when the catalog shows it shares it, else its root's path. */
 function baseOf(registry: Registry | undefined, { me, at }: Reading, peer: RegistryPeer) {
-  const mine = registry?.peers[me];
-  if (mine?.root === peer.root) return at.root;
-  return registry?.roots[peer.root] ?? (mine ? undefined : at.root);
+  if (registry?.peers[me]?.root === peer.root) return at.root;
+  return registry?.roots[peer.root];
 }
 
 /** The listed peers this profile can read, each with the reading of its own root. */

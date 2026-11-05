@@ -114,6 +114,17 @@ describe("downloadsTransport", () => {
     expect(read.mock.calls[0]?.[0]).toBe(`file://${DOWNLOADS_ROOT}/RECnRun/poc/lab/registry.json`);
   });
 
+  test("reads no file of a listed peer whose root has no path, when it is itself unlisted", async () => {
+    const { disk, read, transport } = shared();
+    await transport(PEER).announce(presence(PEER));
+    const catalog = catalogOf(disk.files);
+    const peer = catalog.peers[PEER];
+    if (peer) catalog.peers[PEER] = { ...peer, root: "r2" };
+    disk.files.set(registryPath(NAMESPACE), JSON.stringify(catalog));
+    expect(await transport().look()).toEqual({ presences: [], signals: [] });
+    expect(read.mock.calls.some(([url]) => url.includes(`peers/${PEER}`))).toBe(false);
+  });
+
   test("counts a presence only in its owner's folder", async () => {
     const { disk, transport, sync } = shared();
     await transport(PEER).announce(presence(PEER));
