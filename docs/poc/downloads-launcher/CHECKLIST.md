@@ -431,6 +431,15 @@ Gate P5: verify · CL01–CL15 over three rounds (review and push fused into Gat
 
 Gate P6: verify · CL16, CL17 · review of P5+P6 · push
 
+- review: finding 4: the bases directory takes the launcher's canonical path grammar and the dashboard says why it refuses one — commit 8d9f50c8
+- review: finding 6: a status is done only for unique workers named w1 to wN — commit 8d9f50c8
+- review: finding 7: the status reader refuses a file over the shared maximum — commit 8d9f50c8
+- review: finding 8: the clone bootstrap fragment takes every NamespaceSchema namespace — commit 257a9f12
+- review: finding 9: the worker role is written last, after the statement and the ack — commit d4bb1ca2
+- review: finding 10: the provisioning listener requires the clone bootstrap page whose fragment names the request — commit d4bb1ca2
+- review: finding 11: clearing the transient peer state also drops the stored pause — commit e9af5b65
+- review: finding 13: a listed peer's files are read only under a root the catalog maps or shares — commit df7c6c61
+
 ## P7: Silent and headless execution
 
 - [ ] P7.1 Headless lab runner `vp run test:headless`

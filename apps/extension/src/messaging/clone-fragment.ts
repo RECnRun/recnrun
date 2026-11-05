@@ -29,7 +29,8 @@ export function cloneRequestOfPage(
   try {
     const page = new URL(url ?? "");
     const own = new URL(extensionUrl);
-    if (page.origin !== own.origin || page.pathname !== "/bootstrap.html") return undefined;
+    if (page.origin !== own.origin || page.pathname !== "/bootstrap.html" || page.search)
+      return undefined;
     return cloneRequestOf(page.hash);
   } catch {
     return undefined;

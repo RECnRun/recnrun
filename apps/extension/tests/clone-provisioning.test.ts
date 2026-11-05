@@ -226,6 +226,11 @@ describe("createProvisionListener", () => {
       { ...page, url: "chrome-extension://own/bootstrap.html#template=x&setting=base-v1" },
     ],
     [
+      "a bootstrap address with a query",
+      message,
+      { ...page, url: page.url.replace("bootstrap.html", "bootstrap.html?x=1") },
+    ],
+    [
       "another token than the address",
       { ...message, token: "6a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d" },
       page,
