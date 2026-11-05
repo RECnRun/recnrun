@@ -25,8 +25,8 @@ import type { VerdictTarget } from "./fixtures/downloads-verdicts.ts";
 
 /*
  * The cells of E9 (POC PLAN.md P4.4): scripts/poc-cross-profile/lifecycle.sh drives real Chrome
- * roots. The silent-but-alive pause rule is not here: an open.sh-launched Chrome has no CDP client
- * to silence its presence, so lifecycle.checks.mjs covers it.
+ * roots. The pause statement of Disconnect/Forget is not here: it needs a master linked over
+ * Downloads, which this single-profile rig lacks, so lifecycle-pause.checks.mjs covers it.
  */
 
 /** Each cell, its topology, and its full sample count. */
