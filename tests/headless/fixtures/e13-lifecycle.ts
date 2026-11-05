@@ -15,6 +15,9 @@ import type { Lab, Launched, Mode, Worker } from "./e13-lab.ts";
 const READ_MS = 90_000;
 // Chrome writes a persistent cookie to disk within about 30 s (CHROMIUM.md group 17).
 const FLUSH_MS = 35_000;
+// Links must hold at every check over this interval, not at one instant.
+const HOLD_MS = 10_000;
+const HOLD_STEP_MS = 1_000;
 const DASHBOARD = `chrome-extension://${POC_EXTENSION_ID}/dashboard.html`;
 
 /** Until the master no longer holds a verified link with `peer`; the milliseconds it took. */
@@ -25,6 +28,16 @@ async function droppedBy(lab: Lab, peer: string) {
     READ_MS,
   );
   return gone ? Date.now() - started : undefined;
+}
+
+/** The peers of `peers` the master did not hold a verified link with at some check over `HOLD_MS`. */
+async function heldProblems(lab: Lab, peers: string[], when: string): Promise<string[]> {
+  const lost = new Set<string>();
+  for (const end = Date.now() + HOLD_MS; Date.now() < end; await delay(HOLD_STEP_MS)) {
+    const linked = await linkedPeers(lab.master);
+    for (const peer of peers) if (!linked.includes(peer)) lost.add(peer);
+  }
+  return [...lost].map((peer) => `the link to ${peer} was lost ${when}`);
 }
 
 /** Closes every page of the master but one blank page, which keeps its window; the dashboard is gone. */
@@ -54,24 +67,25 @@ export async function backgroundSample(lab: Lab): Promise<Sample> {
   if (!(await masterLinked(lab, ids))) problems.push("the workers never linked");
   const blank = await closeMasterPages(lab);
   const pagesOpen = lab.master.context.pages().length;
-  const stillLinked = (await linkedPeers(lab.master)).length;
+  problems.push(...(await heldProblems(lab, ids, "with no page on the master")));
   const oldPid = first.pid;
   await lab.stop(first);
   const dropMs = await droppedBy(lab, first.profileId);
   if (dropMs === undefined) problems.push(`the link to ${first.name} did not drop`);
-  const secondUp = (await linkedPeers(lab.master)).includes(second.profileId);
-  if (!secondUp) problems.push(`${second.name} lost its link with ${first.name}'s`);
+  const others = lab.workers.filter((worker) => worker !== first).map((worker) => worker.profileId);
+  problems.push(...(await heldProblems(lab, others, `after ${first.name} stopped`)));
   const again = await lab.open(first, "headless");
   if (again.code !== 0) problems.push(`relaunch exited ${again.code}: ${again.stderr.slice(-160)}`);
   problems.push(...again.problems, ...(await modeProblems(lab.probe, first, "headless")));
   const started = Date.now();
-  const relinked = await masterLinked(lab, [first.profileId]);
-  if (!relinked) problems.push(`the master never relinked ${first.name}`);
+  const relinked = await masterLinked(lab, ids);
+  if (!relinked) problems.push(`the master never relinked every worker after ${first.name}`);
   if (first.pid === oldPid) problems.push("the relaunched worker kept the old process");
   await reopenDashboard(lab, blank);
   return judged(problems, {
     masterPages: pagesOpen,
-    linkedWithNoPage: stillLinked,
+    linkedWithNoPage: ids.length,
+    heldS: HOLD_MS / 1000,
     dropS: seconds(dropMs),
     relinkAfterAckS: seconds(Date.now() - started),
     relaunch: timingOf(again),
