@@ -136,6 +136,18 @@ const mainProcesses = async (root: string) =>
     )
   ).filter(({ line }) => !isChildProcess(line));
 
+/** open.sh's exit when the root already runs the other mode. */
+const OTHER_MODE_REFUSED = 65;
+
+/** The refusal's exit and the one running process it must leave untouched. */
+function refusalProblems(code: number, before: number[], after: Set<number>) {
+  const problems: string[] = [];
+  if (code !== OTHER_MODE_REFUSED) problems.push(`exit ${code}, not the other-mode refusal`);
+  if (before.length !== 1) problems.push(`${before.length} main processes before the request`);
+  if (!before.every((pid) => after.has(pid))) problems.push("the running process was replaced");
+  return problems;
+}
+
 /** What a running clone looks like after the launcher was asked to open it in the other mode. */
 async function afterRequest(lab: CloneLab, clone: Worker, asked: Mode, running: Mode) {
   const before = (await mainProcesses(clone.root)).map(({ pid }) => pid);
@@ -145,7 +157,7 @@ async function afterRequest(lab: CloneLab, clone: Worker, asked: Mode, running: 
   const headless = after.some(({ line }) => line.includes("--headless"));
   const pids = new Set(after.map(({ pid }) => pid));
   const windows = (await windowOwners("chrome")).filter((pid) => pids.has(pid)).length;
-  const problems: string[] = [];
+  const problems = refusalProblems(result.code, before, pids);
   if (after.length !== 1) problems.push(`${after.length} main processes after the request`);
   if (headless !== (running === "headless"))
     problems.push(`the running mode changed from ${running}`);
