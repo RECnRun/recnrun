@@ -77,6 +77,11 @@ Everything in [PLAN.md](PLAN.md) that needs a person. The owner authorized Claud
 - **M-P5.a Install in the base by hand (V2).** `Load unpacked` of the same build into the base root opened by `create-base`; record the gestures. V3 (P6.2) replaces this step by the automatic installation; both results are kept.
   Result: …
 
+## After P6
+
+- **M-P6.a V3 end to end and the Default as master (CL16, CL01–CL15).** Owner's run after Gate P6 and P7 headless (owner, 2026-11-05). With the `poc-d0` build loaded unpacked only in the personal Default (M-P1.a) and `R=$HOME/.recnrun/launcher.record` holding the Default's master block: start the launcher loop on `R` (`sh scripts/poc-cross-profile/recnrun-launcher.sh start <state-dir> "$R" <namespace>`), open the Default's dashboard, type a bases folder under `$HOME/Documents/RECnRun/poc-downloads-launcher` and 2 in the Prepare workers section, press Prepare, and let the loop advance one step per pass; answer the template gesture when the step shows pending-action. Expect Done only when both clones appear linked, never for the template's ack (CL16). Then run the host twin of the clone matrix against those clones with the Default as master: `RECNRUN_HOST_ROOTS=... RECNRUN_HOST_BASES=$HOME/Documents/RECnRun/poc-downloads-launcher RECNRUN_HOST_RECORD="$R" vp run test:host -- tests/host/clones.spec.ts` (prerequisites on the P5.5 `host (run B)` line of [CHECKLIST.md](CHECKLIST.md)), and record the run id under `.artifacts/evidence/host/`. The personal Default is never killed, read, or copied by anything but the owner's own gestures.
+  Result: …
+
 ## After P9
 
 - **M-P9.a Sleep and wake.** With the Default and two workers linked, close the lid (or `pmset sleepnow`) for two minutes, wake, and record from the diagnostics files the link repair time and that no opening loop occurred.
