@@ -17,8 +17,8 @@ Tracks [PLAN.md](PLAN.md). One line per task; the orchestrator owns `[x]`, imple
 Markers: `[ ]` not started · `[i]` implemented, awaiting the phase gate · `[x]` verified by `vp run verify` · `[!]` blocked (reason indented) · `[~]` partial (what is missing indented).
 
 **Branch:** `poc-downloads-launcher` (from `60989d6`, head of PR #19 `poc/multi-profile-mesh`)
-**Last commit:** `40355b04` "Install the extension in a clean base over the DevTools pipe" (after P5.5, P5.6, P6.2; `f3352830` is the pushed HEAD)
-**Current phase:** P5 in progress since 2026-11-05: P5.1 (`6c2c6374`), P5.2 (`20936c34`), P5.3 (`ba7b34e1` run A, `2093674d` run B), P5.4 (`9cb60dec`), P5.6 (`73a0c77c` + `2cf921bf`), P5.5 (`13102acc` run A cross-root, `99382945` run B matrix, `da4d300c` lastError fix; 3-round pass `df54fc64` all pass), P6.2 (`40355b04`, E10 lab all pass) landed; next P6.1 (Sonnet agent running), then host cells CL01–CL17 and P6.3 with the owner; host cells CL01–CL07, CL15 pending the orchestrator with the owner present
+**Last commit:** `cbfbcd6a` "Add the Prepare workers onboarding to the dashboard and launcher" (after P5.5, P5.6, P6.1, P6.2; `f3352830` is the pushed HEAD)
+**Current phase:** P5 in progress since 2026-11-05: P5.1 (`6c2c6374`), P5.2 (`20936c34`), P5.3 (`ba7b34e1` run A, `2093674d` run B), P5.4 (`9cb60dec`), P5.6 (`73a0c77c` + `2cf921bf`), P5.5 (`13102acc` run A cross-root, `99382945` run B matrix, `da4d300c` lastError fix; 3-round pass `df54fc64` all pass), P6.2 (`40355b04`, E10 lab all pass) P6.1 (`cbfbcd6a`, onboarding lab all pass) landed; production build byte-identical to `f3352830`; next the Codex review of P5+P6, host cells CL01–CL17 and P6.3 with the owner, then verify and push (Gate P6); host cells CL01–CL07, CL15 pending the orchestrator with the owner present
 **Paused:** 2026-11-05 after Gate P4 closed: `vp run verify` on the closing commit, `poc-downloads-launcher` pushed to PR #30 (the Gate P4 block below has the runs). Resume with P5 (PLAN.md §P5): read the P5 paragraph and CL01–CL15, then P5.1; M-P4.a and M-P4.b wait for the owner.
 
 ## P0: Base, lab, baseline, and Chromium inventory
