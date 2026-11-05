@@ -209,6 +209,10 @@ for (const shell of shells) {
     { title: "an ack whose boot sits inside the identity", extra: { STUB_SHAPE: "nested" } },
     { title: "an ack with bytes after the closing brace", extra: { STUB_SHAPE: "trailing" } },
     { title: "an ack without createdAt", extra: { STUB_SHAPE: "nocreated" } },
+    {
+      title: "an ack without an identity (only a template ack may omit it)",
+      extra: { STUB_SHAPE: "noident" },
+    },
     { title: "an ack whose identity holds free values", extra: { STUB_SHAPE: "freeident" } },
   ];
   for (const { title, extra } of ignored) {

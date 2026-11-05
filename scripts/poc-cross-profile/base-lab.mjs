@@ -19,8 +19,13 @@ const APP = "Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 export const EXTENSION = readFileSync(new URL("./extension-id", import.meta.url), "utf8").trim();
 export const MARKER = ".recnrun-base";
 
-// Records its argv; on a template URL writes the ack STUB_ACK names (good, or plain for one without
-// the template fields); stays alive STUB_ALIVE seconds (deaf to SIGTERM with STUB_DEAF).
+const IDENT = `"identity":{"key":"${"B".repeat(87)}","signedAt":1,"signature":"${"S".repeat(86)}"}`;
+
+// Records its argv; on a template URL writes the ack STUB_ACK names (good: the template ack, which
+// carries no identity; plain: a token ack without the template fields); on a clone URL, when STUB_CLONE
+// is set, writes the clone ack (unprovisioned drops the provisioned field, symlink and oversize change the file; STUB_BODY_*
+// change one value of the body); on a token URL, when STUB_REOPEN is set, writes the token ack of open.sh; stays
+// alive STUB_ALIVE seconds (deaf to SIGTERM with STUB_DEAF).
 const STUB = `#!/bin/sh
 printf '%s\\n' "$@" >"$STUB_ARGV"
 printf 'launch\\n' >>"$STUB_LOG"
@@ -34,8 +39,38 @@ case $last in
       dir=$STUB_ROOT/RECnRun/poc/$STUB_NS/acks/$STUB_PROFILE
       mkdir -p "$dir"
       tail=
-      [ "$STUB_ACK" != good ] || tail=',"template":true,"setting":"'\${STUB_SETTING:-$setting}'"'
-      printf '%s' '{"token":"'$token'","profileId":"'$STUB_PROFILE'","identity":{"key":"${"B".repeat(87)}","signedAt":1,"signature":"${"S".repeat(86)}"},"boot":"'$token'","createdAt":1'"$tail"'}' >"$dir/$token.json"
+      ident=',${IDENT}'
+      [ "$STUB_ACK" != good ] || { tail=',"template":true,"setting":"'\${STUB_SETTING:-$setting}'"'; ident=; }
+      printf '%s' '{"token":"'$token'","profileId":"'$STUB_PROFILE'"'"$ident"',"boot":"'$token'","createdAt":1'"$tail"'}' >"$dir/$token.json"
+    fi
+    ;;
+  *'#clone='*)
+    rest=\${last#*#clone=}
+    token=\${rest%%&*}
+    rest=\${rest#*&instance=}
+    instance=\${rest%%&*}
+    rest=\${rest#*&operation=}
+    operation=\${rest%%&*}
+    if [ -n "\${STUB_CLONE:-}" ]; then
+      dir=$STUB_ROOT/RECnRun/poc/$STUB_NS/acks/$instance
+      mkdir -p "$dir"
+      prov=',"provisioned":true'
+      [ "$STUB_CLONE" != unprovisioned ] || prov=
+      id=\${STUB_BODY_INSTANCE:-$instance}
+      body='{"token":"'\${STUB_BODY_TOKEN:-$token}'","profileId":"'$id'",${IDENT},"boot":"'$token'","instanceId":"'$id'","operationId":"'\${STUB_BODY_OPERATION:-$operation}'"'"$prov"',"createdAt":1}'
+      case $STUB_CLONE in
+        symlink) printf '%s' "$body" >"$STUB_ROOT/real.json"; ln -s "$STUB_ROOT/real.json" "$dir/$token.json" ;;
+        oversize) { printf '%s' "$body"; head -c 5000 /dev/zero | tr '\\0' ' '; } >"$dir/$token.json" ;;
+        *) printf '%s' "$body" >"$dir/$token.json" ;;
+      esac
+    fi
+    ;;
+  *'#token='*)
+    token=\${last#*#token=}
+    if [ -n "\${STUB_REOPEN:-}" ]; then
+      dir=$STUB_ROOT/RECnRun/poc/$STUB_NS/acks/$STUB_PROFILE
+      mkdir -p "$dir"
+      printf '%s' '{"token":"'$token'","profileId":"'$STUB_PROFILE'",${IDENT},"boot":"'$token'","createdAt":1}' >"$dir/$token.json"
     fi
     ;;
 esac

@@ -31,6 +31,7 @@ case \${STUB_SHAPE:-good} in
   trailing) body=$head$ident',"boot":"'$boot'","createdAt":1}x' ;;
   nocreated) body=$head$ident',"boot":"'$boot'"}' ;;
   nested) body=$head'{"key":"'$KEY'","signedAt":1,"signature":"'$SIG'","boot":"'$boot'"},"createdAt":1}' ;;
+  noident) body='{"token":"'$token'","profileId":"'$STUB_PROFILE'","boot":"'$boot'","createdAt":1}' ;;
   freeident) body=$head'{"key":"K","signedAt":1,"signature":"S"},"boot":"'$boot'","createdAt":1}' ;;
 esac
 dir=$STUB_ROOT/RECnRun/poc/$STUB_NS/acks/$STUB_PROFILE

@@ -82,10 +82,19 @@ ack_take() {
   ack_value=${ack_rest%%"$2"*}
   ack_rest=${ack_rest#"$ack_value"}
 }
+# Consumes the identity statement of an ack, in form only: sh has no crypto, and the extension
+# verifies identities (PLAN decision 13).
+read_ack_identity() {
+  ack_take '","identity":{"key":"' '"' || return 1
+  is_base64url "$ack_value" 87 || return 1
+  ack_take '","signedAt":' ',' || return 1
+  is_time "$ack_value" || return 1
+  ack_take ',"signature":"' '"' || return 1
+  is_base64url "$ack_value" 86
+}
 # Prints the boot of the ack $1 when the whole file is the closed grammar launcher-requests.ts writes
 # for token $2 and profile $3; with a setting $4 (base.sh template) it must also end with
-# `,"template":true,"setting":"$4"`, and without one it must not. The identity is checked in form only: sh has no crypto, and the
-# extension verifies identities (PLAN decision 13).
+# `,"template":true,"setting":"$4"` and may omit the identity, which a token ack never may.
 read_ack() {
   if [ ! -f "$1" ] || [ -L "$1" ]; then return 1; fi
   size=$(wc -c <"$1" | tr -d ' ')
@@ -96,13 +105,12 @@ read_ack() {
   [ "$ack_value" = "$2" ] || return 1
   ack_take '","profileId":"' '"' || return 1
   [ "$ack_value" = "$3" ] || return 1
-  ack_take '","identity":{"key":"' '"' || return 1
-  is_base64url "$ack_value" 87 || return 1
-  ack_take '","signedAt":' ',' || return 1
-  is_time "$ack_value" || return 1
-  ack_take ',"signature":"' '"' || return 1
-  is_base64url "$ack_value" 86 || return 1
-  ack_take '"},"boot":"' '"' || return 1
+  ack_boot_at='"},"boot":"'
+  case ${4:-}:$ack_rest in
+    ?*:'","boot":"'*) ack_boot_at='","boot":"' ;;
+    *) read_ack_identity || return 1 ;;
+  esac
+  ack_take "$ack_boot_at" '"' || return 1
   is_uuid "$ack_value" || return 1
   ack_boot=$ack_value
   ack_end='}'

@@ -25,7 +25,8 @@
 #
 # .recnrun-clone, one key=value per line in this order: base, clone, instanceId (lowercase v4 uuid
 # from uuidgen or /proc), namespace, extensionId, role=worker, createdAt (epoch seconds), copyS,
-# physicalKiB (du -sk), logicalBytes (the files of the copy without this marker).
+# physicalKiB (du -sk), logicalBytes (the files of the copy without this marker). clone-open.sh appends
+# provisionedAt, operationId, and masterProfileId once the clone acked its first opening.
 #
 # Exit: 0 done, 64 wrong call, 65 refused, 70 the copy failed or is not what the base was, 73 the
 # destination exists, 75 a process names the base root.
@@ -181,7 +182,8 @@ create_clone() {
 
 # --- list-clones and discard-partial ---------------------------------------------------------
 
-# Sets lc_base, lc_id, and lc_created when $1 is a published clone whose marker parses, else returns 1.
+# Sets lc_base, lc_id, and lc_created when $1 is a published clone whose marker parses, else returns 1;
+# the three provisioning lines clone-open.sh appends (11 to 13) are part of the grammar.
 read_clone_marker() {
   rc_index=0 lc_base='' lc_id='' lc_created=''
   while IFS= read -r rc_line || [ -n "$rc_line" ]; do
@@ -195,11 +197,13 @@ read_clone_marker() {
       5:extensionId=*) is_extension_id "$rc_value" ;;
       6:role=worker) true ;;
       7:createdAt=*) is_count "$rc_value" && lc_created=$rc_value ;;
-      8:copyS=* | 9:physicalKiB=* | 10:logicalBytes=*) is_count "$rc_value" ;;
+      8:copyS=* | 9:physicalKiB=* | 10:logicalBytes=* | 11:provisionedAt=*) is_count "$rc_value" ;;
+      12:operationId=*) is_v4 "$rc_value" ;;
+      13:masterProfileId=*) is_v4 "$rc_value" ;;
       *) false ;;
     esac || return 1
   done <"$1"
-  [ "$rc_index" -eq 10 ]
+  [ "$rc_index" -eq 10 ] || [ "$rc_index" -eq 13 ]
 }
 list_clones() {
   [ "$#" -eq 1 ] || die 64 'usage: clone.sh list-clones <clones-dir>'
