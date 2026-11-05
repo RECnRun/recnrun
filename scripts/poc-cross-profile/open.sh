@@ -67,19 +67,38 @@ validate_profile() {
 
 # --- The ack ---------------------------------------------------------------------------------
 
-# Prints the boot of the ack $1 when it is a regular small file of token $2 and profile $3.
+# Consumes the literal $1 from $ack_rest, then the value up to the literal $2 into $ack_value.
+ack_take() {
+  case $ack_rest in "$1"*) ack_rest=${ack_rest#"$1"} ;; *) return 1 ;; esac
+  case $ack_rest in *"$2"*) ;; *) return 1 ;; esac
+  ack_value=${ack_rest%%"$2"*}
+  ack_rest=${ack_rest#"$ack_value"}
+}
+# Prints the boot of the ack $1 when the whole file is the closed grammar launcher-requests.ts writes
+# for token $2 and profile $3. The identity is checked in form only: sh has no crypto, and the
+# extension verifies identities (PLAN decision 13).
 read_ack() {
   if [ ! -f "$1" ] || [ -L "$1" ]; then return 1; fi
-  [ "$(wc -c <"$1" | tr -d ' ')" -le 4096 ] || return 1
-  text=$(cat -- "$1")
-  case $text in
-    '{"token":"'"$2"'","profileId":"'"$3"'","identity":{'*) ;;
-    *) return 1 ;;
-  esac
-  rest=${text#*'"boot":"'}
-  [ "$rest" != "$text" ] || return 1
-  ack_boot=${rest%%'"'*}
-  is_uuid "$ack_boot" || return 1
+  size=$(wc -c <"$1" | tr -d ' ')
+  [ "$size" -le 4096 ] || return 1
+  ack_rest=$(cat -- "$1")
+  [ "${#ack_rest}" -eq "$size" ] || return 1
+  ack_take '{"token":"' '"' || return 1
+  [ "$ack_value" = "$2" ] || return 1
+  ack_take '","profileId":"' '"' || return 1
+  [ "$ack_value" = "$3" ] || return 1
+  ack_take '","identity":{"key":"' '"' || return 1
+  is_base64url "$ack_value" 87 || return 1
+  ack_take '","signedAt":' ',' || return 1
+  is_time "$ack_value" || return 1
+  ack_take ',"signature":"' '"' || return 1
+  is_base64url "$ack_value" 86 || return 1
+  ack_take '"},"boot":"' '"' || return 1
+  is_uuid "$ack_value" || return 1
+  ack_boot=$ack_value
+  ack_take '","createdAt":' '}' || return 1
+  is_time "$ack_value" || return 1
+  [ "$ack_rest" = '}' ] || return 1
   printf '%s\n' "$ack_boot"
 }
 # One look under every candidate Downloads root for the ack of token $4 of profile $3 in namespace

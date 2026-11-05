@@ -28,7 +28,7 @@ if [ -n "\${STUB_ACK:-}" ]; then
   sleep "\${STUB_DELAY:-0}"
   dir=$STUB_ROOT/RECnRun/poc/$STUB_NS/acks/$STUB_PROFILE
   mkdir -p "$dir"
-  printf '%s' '{"token":"'$token'","profileId":"'$STUB_PROFILE'","identity":{"key":"K","signedAt":1,"signature":"S"},"boot":"'$token'","createdAt":1}' >"$dir/$token.json"
+  printf '%s' '{"token":"'$token'","profileId":"'$STUB_PROFILE'","identity":{"key":"BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB","signedAt":1,"signature":"SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS"},"boot":"'$token'","createdAt":1}' >"$dir/$token.json"
 fi
 [ -n "\${RECNRUN_STUB_FORWARD:-}" ] && exit 0
 [ -n "\${STUB_ALIVE:-}" ] || exit 0

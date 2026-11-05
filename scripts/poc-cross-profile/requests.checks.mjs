@@ -26,12 +26,23 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{1
 
 // Records its argv and, when STUB_ROOT is set, writes an ack for the token in its URL after a delay.
 const STUB = `#!/bin/sh
+KEY=${"B".repeat(87)}
+SIG=${"S".repeat(86)}
 for a in "$@"; do last=$a; done
 printf '%s\\n' "$@" >"$STUB_ARGV"
 [ -n "\${STUB_ROOT:-}" ] || exit 0
 sleep "\${STUB_DELAY:-1}"
 token=\${STUB_TOKEN:-\${last#*token=}}
-body='{"token":"'\${STUB_BODY_TOKEN:-$token}'","profileId":"'\${STUB_BODY_PROFILE:-$STUB_PROFILE}'","identity":{"key":"K","signedAt":1,"signature":"S"},"boot":"'\${STUB_BOOT:-$token}'","createdAt":1}'
+boot=\${STUB_BOOT:-$token}
+ident='{"key":"'$KEY'","signedAt":1,"signature":"'$SIG'"}'
+head='{"token":"'\${STUB_BODY_TOKEN:-$token}'","profileId":"'\${STUB_BODY_PROFILE:-$STUB_PROFILE}'","identity":'
+case \${STUB_SHAPE:-good} in
+  good) body=$head$ident',"boot":"'$boot'","createdAt":1}' ;;
+  trailing) body=$head$ident',"boot":"'$boot'","createdAt":1}x' ;;
+  nocreated) body=$head$ident',"boot":"'$boot'"}' ;;
+  nested) body=$head'{"key":"'$KEY'","signedAt":1,"signature":"'$SIG'","boot":"'$boot'"},"createdAt":1}' ;;
+  freeident) body=$head'{"key":"K","signedAt":1,"signature":"S"},"boot":"'$boot'","createdAt":1}' ;;
+esac
 dir=$STUB_ROOT/RECnRun/poc/$STUB_NS/acks/$STUB_PROFILE
 mkdir -p "$dir"
 case \${STUB_KIND:-good} in
@@ -267,6 +278,10 @@ for (const shell of shells) {
     { title: "an ack behind a symbolic link", extra: { STUB_KIND: "symlink" } },
     { title: "an oversize ack", extra: { STUB_KIND: "oversize" } },
     { title: "an ack with a boot that is not a uuid", extra: { STUB_BOOT: "boot" } },
+    { title: "an ack whose boot sits inside the identity", extra: { STUB_SHAPE: "nested" } },
+    { title: "an ack with bytes after the closing brace", extra: { STUB_SHAPE: "trailing" } },
+    { title: "an ack without createdAt", extra: { STUB_SHAPE: "nocreated" } },
+    { title: "an ack whose identity holds free values", extra: { STUB_SHAPE: "freeident" } },
   ];
   for (const { title, extra } of ignored) {
     await test(`${shell}: ${title} is ignored and the wait times out listing the roots`, (context) => {

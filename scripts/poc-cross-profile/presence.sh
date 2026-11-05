@@ -18,16 +18,6 @@
 clock_skew_ms=5000
 presence_ttl_ms=60000
 
-# RegistrySchema's TimeSchema: a safe integer, so at most Number.MAX_SAFE_INTEGER.
-is_time() {
-  case $1 in '' | *[!0-9]* | 0?*) return 1 ;; esac
-  [ "${#1}" -le 16 ] && [ "$1" -le 9007199254740991 ]
-}
-# An unpadded base64url string of exactly $2 characters.
-is_base64url() {
-  case $1 in *[!A-Za-z0-9_-]*) return 1 ;; esac
-  [ "${#1}" -eq "$2" ]
-}
 is_display_name() {
   case $1 in '' | ' '* | *' ' | *\\* | *[[:cntrl:]]*) return 1 ;; esac
   [ "${#1}" -le 64 ]
