@@ -240,6 +240,12 @@ for (const shell of shells) {
     const cases = [
       [{ basesDir: "../x" }, /basesDir/],
       [{ basesDir: "relative" }, /basesDir/],
+      [{ basesDir: "/Users/me/My Bases" }, /basesDir/],
+      [{ basesDir: "/Users/me/bases/" }, /basesDir/],
+      [{ basesDir: "/Users//bases" }, /basesDir/],
+      [{ basesDir: "/Users/./bases" }, /basesDir/],
+      [{ basesDir: "/Users/bases/." }, /basesDir/],
+      [{ basesDir: "" }, /basesDir/],
       [{ clones: 0 }, /clones/],
       [{ clones: 9 }, /clones/],
       [{ baseName: "base-vx" }, /closed grammar/],

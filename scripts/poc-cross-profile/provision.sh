@@ -74,6 +74,11 @@ find_master_block() {
 
 # --- The request -----------------------------------------------------------------------------
 
+# The grammar the base commands accept for a bases directory, without empty or dot segments or a final slash.
+is_bases_dir() {
+  is_plain_root "$1" || return 1
+  case $1 in / | */ | *//* | */./* | */.) return 1 ;; esac
+}
 # Sets rq_* from the request file $1 of operation $2, else rq_why and failure (the file itself is fine).
 parse_request() {
   rq_grammar='the request is not in the closed grammar'
@@ -81,8 +86,8 @@ parse_request() {
   ack_rest=$(cat -- "$1")
   ack_take '{"operationId":"' '"' && [ "$ack_value" = "$2" ] || return 1
   ack_take '","kind":"prepare-workers","basesDir":"' '"' || return 1
-  rq_why='basesDir is not an absolute directory of the record grammar'
-  is_record_directory "$ack_value" || return 1
+  rq_why='basesDir is not an absolute path of letters, digits, dot, underscore, hyphen, and slash, without empty or dot segments or a final slash'
+  is_bases_dir "$ack_value" || return 1
   rq_bases=$ack_value rq_why=$rq_grammar
   ack_take '","baseName":"' '"' && is_base_name "$ack_value" || return 1
   rq_name=$ack_value
