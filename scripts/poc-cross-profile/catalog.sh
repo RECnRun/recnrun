@@ -213,7 +213,18 @@ frozen_downloads_root() {
   case $1 in */downloads) ;; *) return 1 ;; esac
   [ -e "${1%/downloads}/.recnrun-base" ] || [ -L "${1%/downloads}/.recnrun-base" ]
 }
+# True when $1 is the Downloads root of a clone.sh copy that is not published yet.
+partial_downloads_root() {
+  case $1 in */downloads) ;; *) return 1 ;; esac
+  pd_root=${1%/downloads}
+  case ${pd_root##*/} in .?*.partial-*) return 0 ;; esac
+  return 1
+}
 scan_root() {
+  if partial_downloads_root "$2"; then
+    log "skipped $1: the Downloads root of an unpublished clone copy"
+    return 0
+  fi
   if frozen_downloads_root "$2"; then
     log "skipped $1: the Downloads root of a frozen base"
     return 0

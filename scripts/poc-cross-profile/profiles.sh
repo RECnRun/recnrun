@@ -47,6 +47,8 @@ is_extension_id() {
 is_plain_file() { [ -f "$1" ] && [ ! -L "$1" ]; }
 # A frozen base (base.sh freeze) carries this file; the launcher opens and enumerates no such root.
 is_base_root() { [ -e "$1/.recnrun-base" ] || [ -L "$1/.recnrun-base" ]; }
+# The temporary copy clone.sh makes of a base (.<clone>.partial-<hex>) is never an executor either.
+is_partial_root() { case ${1##*/} in .?*.partial-*) return 0 ;; esac; return 1; }
 # An existing directory the tab-separated rows can carry.
 is_listable() {
   is_directory "$1" || return 1
@@ -116,6 +118,7 @@ chrome_roots() {
     case "$nl$seen" in *"$nl$root$nl"*) continue ;; esac
     seen=$seen$root$nl
     if is_base_root "$root"; then log "skipped $root: a frozen base is not an executor"; continue; fi
+    if is_partial_root "$root"; then log "skipped $root: an unpublished clone copy is not an executor"; continue; fi
     printf '%s\n' "$root"
   done
 }

@@ -24,7 +24,9 @@
 #   autostart on|off|status <state-dir> <record> <namespace>    see autostart.sh
 #
 # Not a command of this script: base.sh (create-base, template, quit, freeze) prepares the clean base of
-# the clones (POC PLAN.md P5.1); open.sh, first-run.sh, and catalog.sh skip a root it froze.
+# the clones (POC PLAN.md P5.1) and clone.sh (create-clone, list-clones, discard-partial) copies it
+# (P5.2); open.sh, first-run.sh, and catalog.sh skip a root base.sh froze and a copy clone.sh has not
+# published.
 #
 # Environment: RECNRUN_LAUNCHER_INTERVAL_S (10), RECNRUN_LIFECYCLE_STOP_S (20), and lifecycle.sh's.
 # Exit: 0 done, 64 wrong call, 65 refused, 70 failed, 75 busy (another launcher holds the lock).

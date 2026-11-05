@@ -66,6 +66,7 @@ find_profile() {
 validate_profile() {
   [ -d "$p_user" ] || refuse 'userDataDir is not an existing directory'
   ! is_base_root "$p_user" || refuse 'a frozen base is not an executor'
+  ! is_partial_root "$p_user" || refuse 'an unpublished clone copy is not an executor'
   is_plain_file "$p_user/$p_dir/Preferences" || refuse 'the profile has no Preferences: open never creates one'
   p_ext=
   if [ -f "$here/extension-id" ]; then p_ext=$(head -n 1 "$here/extension-id"); fi

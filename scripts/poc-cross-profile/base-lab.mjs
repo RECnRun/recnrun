@@ -63,7 +63,7 @@ function makeHome(context, spawned) {
 }
 
 /** The environment of one run: the fixture home, the stub's settings, and the lab's timing. */
-function environment(home, name, extra) {
+export function environment(home, name, extra) {
   return env({
     HOME: home,
     PATH: `${join(home, "ps-stub")}:${process.env.PATH}`,
