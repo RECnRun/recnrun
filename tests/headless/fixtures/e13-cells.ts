@@ -3,7 +3,8 @@ import { access } from "node:fs/promises";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { resolveChromePath } from "../../browser/fixtures/chrome.ts";
-import { linkedPeers } from "../../browser/fixtures/downloads-profiles.ts";
+import { linkedPeers, storedIn } from "../../browser/fixtures/downloads-profiles.ts";
+import { bindMaster } from "../../experiments/fixtures/clone-round.ts";
 import { within } from "../../browser/fixtures/trust.ts";
 import { judged } from "../../experiments/fixtures/downloads-verdicts.ts";
 import { recordHypothesis, recordUnavailable } from "../../experiments/outcome.ts";
@@ -135,6 +136,29 @@ export async function masterLinked(lab: Pick<Lab, "master">, peers: string[], ms
     const linked = await linkedPeers(lab.master);
     return peers.every((peer) => linked.includes(peer)) ? linked : undefined;
   }, ms);
+}
+
+/**
+ * The master's side of the binding, which the local channel writes in the product, written once the
+ * workers are linked; then the stored master role and the bound workers are read back.
+ */
+export async function bindMasterSide(lab: Lab): Promise<{ problems: string[]; bound: number }> {
+  const problems: string[] = [];
+  try {
+    await bindMaster(lab.masterSide, lab.workers);
+  } catch (error) {
+    problems.push(`the master could not be bound: ${String(error)}`);
+  }
+  const worker = lab.master.serviceWorker;
+  const role = (await storedIn(worker, "local", "role")) as { role?: string } | undefined;
+  const bound = (await storedIn(worker, "local", "boundWorkers")) as
+    | Record<string, unknown>
+    | undefined;
+  if (role?.role !== "master") problems.push("the master holds no master role");
+  for (const each of lab.workers)
+    if (!bound || !(each.profileId in bound))
+      problems.push(`${each.name} is not among the master's bound workers`);
+  return { problems, bound: Object.keys(bound ?? {}).length };
 }
 
 const openProblems = (launched: Launched[], workers: Worker[]) =>

@@ -1,6 +1,8 @@
 import { commandsSample, navigationSample } from "./e13-remote.ts";
 import { alternateSample, backgroundSample } from "./e13-lifecycle.ts";
-import { workersSample } from "./e13-cells.ts";
+import { judged } from "../../experiments/fixtures/downloads-verdicts.ts";
+import type { Sample } from "../../experiments/outcome.ts";
+import { bindMasterSide, workersSample } from "./e13-cells.ts";
 import type { recorderOf } from "./e13-cells.ts";
 import type { Lab } from "./e13-lab.ts";
 
@@ -17,6 +19,14 @@ const v1Topology = (count: number) =>
 const NO_WINDOW =
   "not applicable: headless has no window to focus and no picture-in-picture surface";
 
+/** commands, with the master bound to the workers first, as the product binds it. */
+async function boundCommands(lab: Lab): Promise<Sample> {
+  const { problems, bound } = await bindMasterSide(lab);
+  const sample = await commandsSample(lab, lab.workers);
+  const all = sample.ok ? problems : [...problems, sample.error ?? "a command failed"];
+  return judged(all, { boundWorkers: bound, ...sample.observation });
+}
+
 /** t6, ops.navigation, t7, focus, pip over `lab.workers`, all opened headless. */
 export async function workerCells(lab: Lab, { record, unavailable }: Recorder) {
   const topology = v1Topology(lab.workers.length);
@@ -24,7 +34,7 @@ export async function workerCells(lab: Lab, { record, unavailable }: Recorder) {
   await record(
     "t6.commands",
     `${topology}; each worker is bound to the master, which opens the test page in it and activates the tab it reports`,
-    () => commandsSample(lab, lab.workers),
+    () => boundCommands(lab),
   );
   await record(
     "ops.navigation",
