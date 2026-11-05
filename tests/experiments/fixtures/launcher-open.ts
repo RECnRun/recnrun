@@ -3,6 +3,7 @@ import { readFile, readdir, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
+import { connectWebSocket, openPage } from "../../browser/fixtures/cdp-client.ts";
 import { attachExtension } from "../../browser/fixtures/extension-loaders.ts";
 import type { LoadedExtension } from "../../browser/fixtures/extension-loaders.ts";
 import { recordHypothesis } from "../outcome.ts";
@@ -74,10 +75,9 @@ const presenceFile = (downloads: string, profileId: string) =>
 export const readJson = async (path: string) =>
   JSON.parse(await readFile(path, "utf8")) as Record<string, unknown>;
 
-/** Preferences for a root: Developer mode stays on, or Chrome disables an unpacked build once reloaded. */
+/** Preferences for a root; Developer mode is not here, since Windows and macOS reset a hand-written value (CHROMIUM.md group 16). */
 export const preferencesOf = (downloads: string) => ({
   download: { prompt_for_download: false, default_directory: downloads, directory_upgrade: true },
-  extensions: { ui: { developer_mode: true } },
 });
 
 const profileIdOf = (extension: LoadedExtension) =>
@@ -87,6 +87,28 @@ const profileIdOf = (extension: LoadedExtension) =>
     );
     return typeof id === "string" ? id : undefined;
   }, "poc-d0 stored no profile id");
+
+/** Developer mode through Chrome's own toggle: after the reload the build is an ordinary unpacked one and needs it (CHROMIUM.md group 16). */
+async function turnOnDeveloperMode({ chrome }: LoadedExtension): Promise<void> {
+  const client = await connectWebSocket(chrome.wsEndpoint);
+  const page = await openPage(client, "chrome://extensions/").catch((error: unknown) => {
+    client.close();
+    throw error;
+  });
+  try {
+    await page.evaluate(
+      "chrome.developerPrivate.updateProfileConfiguration({ inDeveloperMode: true })",
+    );
+    const on = "chrome.developerPrivate.getProfileConfiguration().then((c) => c.inDeveloperMode)";
+    await until(
+      async () => ((await page.evaluate(on)) === true ? true : undefined),
+      "Developer mode",
+    );
+  } finally {
+    await page.close();
+    client.close();
+  }
+}
 
 /** Waits for the first presence, reloads the build so Chrome keeps it, writes the record; returns the scene. */
 export async function register(
@@ -99,6 +121,7 @@ export async function register(
   await extension.chrome.cdp.send("Browser.setDownloadBehavior", { behavior: "default" });
   const profileId = await profileIdOf(extension);
   await until(() => readFile(presenceFile(downloads, profileId)), "the first presence", 30_000);
+  await turnOnDeveloperMode(extension);
   // The reload drops the CDP install flag that makes Chrome delete the extension at its next start.
   await extension.evaluateInBackground("chrome.runtime.reload()").catch(() => undefined);
   await until(
