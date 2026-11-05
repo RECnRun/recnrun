@@ -185,22 +185,31 @@ write_status() {
 
 # --- The steps -------------------------------------------------------------------------------
 
-pv_child=''
-# Runs `sh $1 ...` in the background, so a SIGTERM ends the wait; stdout and stderr go to files.
+pv_child='' pv_run=''
+# Ends the private folder of the last step.
+drop_run() {
+  [ -z "$pv_run" ] || rm -rf -- "$pv_run"
+  pv_run=''
+}
+# Runs `sh $1 ...` in the background, so a SIGTERM ends the wait; stdout and stderr go to files in a
+# private folder made for this call (mkdir fails when the name exists, so no planted link is followed).
 run_step() {
-  RECNRUN_DISCOVERY_LIB='' /bin/sh "$@" >"$pv_state/ops/.run.out" 2>"$pv_state/ops/.run.err" &
+  drop_run
+  pv_run=$pv_state/ops/.run.$(lc_random)
+  mkdir -m 700 -- "$pv_run" || { pv_run=''; log "cannot make a private folder in $pv_state/ops"; return 73; }
+  RECNRUN_DISCOVERY_LIB='' /bin/sh "$@" >"$pv_run/out" 2>"$pv_run/err" &
   pv_child=$!
   wait "$pv_child"
   rs_code=$?
   pv_child=''
   return "$rs_code"
 }
-last_error_line() { clean_message "$(grep -v '^[[:space:]]*$' "$pv_state/ops/.run.err" | tail -n 1)"; }
+last_error_line() { clean_message "$(grep -v '^[[:space:]]*$' "$pv_run/err" 2>/dev/null | tail -n 1)"; }
 # The value of key $1 in the stdout of the last step, else failure.
 output_value() {
   while IFS= read -r ov_line || [ -n "$ov_line" ]; do
     case $ov_line in "$1="*) printf '%s' "${ov_line#*=}"; return 0 ;; esac
-  done <"$pv_state/ops/.run.out"
+  done <"$pv_run/out"
   return 1
 }
 # Outcome of the step: sx_kind ok, pending, or fail; sx_text the message.
@@ -340,7 +349,7 @@ advance_op() {
 
 cleanup() {
   [ -z "$pv_child" ] || kill -TERM "$pv_child" 2>/dev/null
-  rm -f -- "$pv_state/ops/.run.out" "$pv_state/ops/.run.err"
+  drop_run
   release_lock "$pv_state/provision.lock" "$$"
 }
 cmd_run() {

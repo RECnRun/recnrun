@@ -1,5 +1,13 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { spawn, spawnSync } from "node:child_process";
@@ -174,6 +182,20 @@ for (const shell of shells) {
     const installed = shape(s.status());
     assert.deepEqual([installed.step, installed.state], ["install", "running"]);
     assert.equal(installed.message, "installed the extension in the base");
+  });
+
+  await test(`${shell}: a link at a predictable output path is never followed`, (context) => {
+    const s = provisionScene(context);
+    s.request();
+    mkdirSync(join(s.state, "ops"));
+    const victim = join(s.home, "victim.txt");
+    writeFileSync(victim, "precious");
+    for (const name of [".run.out", ".run.err"]) symlinkSync(victim, join(s.state, "ops", name));
+    assert.equal(s.run(shell).code, 0);
+    assert.equal(readFileSync(victim, "utf8"), "precious");
+    assert.equal(shape(s.status()).message, "created base-v1");
+    const left = readdirSync(join(s.state, "ops")).filter((name) => name.startsWith(".run."));
+    assert.deepEqual(left.sort(), [".run.err", ".run.out"], "only the planted links remain");
   });
 
   await test(`${shell}: a failed install.sh is an error with its exit code and last line`, (context) => {
