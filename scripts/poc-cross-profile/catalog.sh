@@ -208,7 +208,16 @@ rendezvous_folder() {
     if [ ! -d "$folder" ]; then reason="$part is not a folder"; return 1; fi
   done
 }
+# True when $1 is the Downloads root a frozen base pins (<root>/downloads next to .recnrun-base).
+frozen_downloads_root() {
+  case $1 in */downloads) ;; *) return 1 ;; esac
+  [ -e "${1%/downloads}/.recnrun-base" ] || [ -L "${1%/downloads}/.recnrun-base" ]
+}
 scan_root() {
+  if frozen_downloads_root "$2"; then
+    log "skipped $1: the Downloads root of a frozen base"
+    return 0
+  fi
   if ! rendezvous_folder "$2"; then
     if [ -n "$reason" ]; then log "skipped $1: $reason"; fi
     return 0

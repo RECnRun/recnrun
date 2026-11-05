@@ -2,14 +2,19 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vite-plus/tes
 import { fakeBrowser } from "wxt/testing/fake-browser";
 import { bootstrap, startBootstrap } from "@/diagnostics/bootstrap";
 import { pocPresenceStore } from "@/storage/poc-presence-repository";
+import { pocTemplateStore } from "@/storage/poc-template-repository";
 
 const TOKEN = "0f8b6a3e-2c1d-4e5f-9a7b-1c2d3e4f5a6b";
 const REFUSED = "The address carries no #token=<lowercase v4 uuid>.";
+const TEMPLATE_REFUSED =
+  "The address carries no #template=<lowercase v4 uuid>&setting=base-v<number>.";
+const TEMPLATE = `#template=${TOKEN}&setting=base-v1`;
 
 function dependencies(hash: string, reply: unknown = { ok: true }) {
   return {
     hash,
     adopt: vi.fn(async (_token: string) => {}),
+    enterTemplate: vi.fn(async (_setting: string) => {}),
     send: vi.fn(async (_message: unknown) => reply),
   };
 }
@@ -73,6 +78,7 @@ describe("bootstrap", () => {
     "#token=0f8b6a3e-2c1d-1e5f-9a7b-1c2d3e4f5a6b",
     "#token=0f8b6a3e-2c1d-4e5f-7a7b-1c2d3e4f5a6b",
     `#boot=${TOKEN}`,
+    `#setting=base-v1&template=${TOKEN}`,
     `#token=${TOKEN}#token=${TOKEN}`,
   ])("refuses the fragment %j, storing and sending nothing", async (hash) => {
     const deps = dependencies(hash);
@@ -92,7 +98,122 @@ describe("bootstrap", () => {
   });
 });
 
+describe("bootstrap of a template base", () => {
+  test("enters template mode, then acks with the template fields, adopting no boot and asking for no presence", async () => {
+    const deps = dependencies(TEMPLATE);
+    expect(await bootstrap(deps)).toEqual({
+      ok: true,
+      token: TOKEN,
+      template: true,
+      setting: "base-v1",
+      acked: true,
+    });
+    expect(deps.enterTemplate).toHaveBeenCalledWith("base-v1");
+    expect(deps.adopt).not.toHaveBeenCalled();
+    expect(deps.send).toHaveBeenCalledTimes(1);
+    expect(deps.send).toHaveBeenCalledWith({
+      type: "POC_LAUNCHER_ACK",
+      token: TOKEN,
+      template: true,
+      setting: "base-v1",
+    });
+    const [entered] = deps.enterTemplate.mock.invocationCallOrder;
+    const [ack] = deps.send.mock.invocationCallOrder;
+    expect(entered).toBeLessThan(ack ?? 0);
+  });
+
+  test("says the ack was not written, and sends nothing when template mode could not be stored", async () => {
+    const failed = {
+      ...dependencies(TEMPLATE),
+      send: vi.fn(async () => ({ ok: false, error: "No presence has been published yet." })),
+    };
+    expect(await bootstrap(failed)).toEqual({
+      ok: true,
+      token: TOKEN,
+      template: true,
+      setting: "base-v1",
+      acked: false,
+      error: "No presence has been published yet.",
+    });
+    const unstored = dependencies(TEMPLATE);
+    unstored.enterTemplate.mockRejectedValue(new Error("quota"));
+    expect(await bootstrap(unstored)).toEqual({ ok: false, error: "quota" });
+    expect(unstored.send).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    `#template=${TOKEN}`,
+    `#template=${TOKEN}&setting=`,
+    `#template=${TOKEN}&setting=base-v`,
+    `#template=${TOKEN}&setting=base-v1x`,
+    `#template=${TOKEN}&setting=Base-v1`,
+    `#template=${TOKEN}&setting=../base-v1`,
+    `#template=${TOKEN}&setting=base-v1&next=1`,
+    `#template=${TOKEN}&setting=base-v1 `,
+    `#template=${TOKEN.toUpperCase()}&setting=base-v1`,
+    "#template=0f8b6a3e-2c1d-1e5f-9a7b-1c2d3e4f5a6b&setting=base-v1",
+    `#template=${TOKEN}&setting=base-v1#token=${TOKEN}`,
+  ])("refuses the fragment %j, storing and sending nothing", async (hash) => {
+    const deps = dependencies(hash);
+    expect(await bootstrap(deps)).toEqual({ ok: false, error: TEMPLATE_REFUSED });
+    expect(deps.enterTemplate).not.toHaveBeenCalled();
+    expect(deps.adopt).not.toHaveBeenCalled();
+    expect(deps.send).not.toHaveBeenCalled();
+  });
+
+  test("keeps the token fragment as it was", async () => {
+    const deps = dependencies(`#token=${TOKEN}`);
+    expect(await bootstrap(deps)).toEqual({ ok: true, token: TOKEN, acked: true });
+    expect(deps.enterTemplate).not.toHaveBeenCalled();
+  });
+});
+
+describe("pocTemplateStore", () => {
+  test("is not template mode until a base enters it, and keeps the setting with it", async () => {
+    const store = pocTemplateStore();
+    expect(await store.templateMode()).toBe(false);
+    expect(await store.setting()).toBeNull();
+    await store.enter("base-v2");
+    expect(await store.templateMode()).toBe(true);
+    expect(await store.setting()).toBe("base-v2");
+    expect(await fakeBrowser.storage.local.get(["templateMode", "pocSetting"])).toEqual({
+      templateMode: true,
+      pocSetting: "base-v2",
+    });
+  });
+
+  test("refuses a setting outside the pattern and reads a damaged value as unset", async () => {
+    const store = pocTemplateStore();
+    await expect(store.enter("base-v")).rejects.toThrow();
+    expect(await store.templateMode()).toBe(false);
+    await fakeBrowser.storage.local.set({ templateMode: "yes", pocSetting: 7 });
+    expect(await store.templateMode()).toBe(false);
+    expect(await store.setting()).toBeNull();
+  });
+});
+
 describe("startBootstrap", () => {
+  test("a template page stores the mode and setting, acks with them, and leaves the boot and presence alone", async () => {
+    const send = vi
+      .spyOn(fakeBrowser.runtime, "sendMessage")
+      .mockResolvedValue({ ok: true } as never);
+    const shown = { textContent: "" };
+
+    await startBootstrap(pageWith(TEMPLATE, shown));
+
+    expect(await pocTemplateStore().templateMode()).toBe(true);
+    expect(await pocTemplateStore().setting()).toBe("base-v1");
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send).toHaveBeenCalledWith({
+      type: "POC_LAUNCHER_ACK",
+      token: TOKEN,
+      template: true,
+      setting: "base-v1",
+    });
+    expect(await fakeBrowser.storage.session.get("pocBoot")).toEqual({});
+    expect(JSON.parse(shown.textContent)).toMatchObject({ ok: true, template: true, acked: true });
+  });
+
   test("keeps the token in session storage, asks the background, and shows the result", async () => {
     const send = vi
       .spyOn(fakeBrowser.runtime, "sendMessage")

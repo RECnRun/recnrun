@@ -76,6 +76,20 @@ describe("writeAck", () => {
     expect(written).toEqual([]);
   });
 
+  test("a template ack carries the template fields after the others, in this order", async () => {
+    const { deps, written } = dependencies({ boot: async () => TOKEN });
+    await writeAck(deps, TOKEN, { template: true, setting: "base-v1" });
+    expect(contentOf(written[0]?.url ?? "")).toBe(
+      `${bytes(TOKEN, TOKEN).slice(0, -1)},"template":true,"setting":"base-v1"}`,
+    );
+  });
+
+  test("writes nothing for a template setting outside the pattern", async () => {
+    const { deps, written } = dependencies();
+    await expect(writeAck(deps, TOKEN, { template: true, setting: "base-v" })).rejects.toThrow();
+    expect(written).toEqual([]);
+  });
+
   test("stamps the time of the write by default", async () => {
     vi.useFakeTimers({ now: NOW });
     const { deps, written } = dependencies({ now: undefined });
@@ -98,10 +112,23 @@ describe("createAckListener", () => {
     expect(ack).toHaveBeenCalledWith(TOKEN);
   });
 
+  test("hands the template fields of the request to the ack", async () => {
+    const ack = vi.fn(async (_token: string, _template?: unknown) => {});
+    const reply = vi.fn();
+    const template = { template: true, setting: "base-v1" };
+    expect(createAckListener(ack, own)({ ...request, ...template }, page, reply)).toBe(true);
+    await vi.waitFor(() => expect(reply).toHaveBeenCalledWith({ ok: true }));
+    expect(ack).toHaveBeenCalledWith(TOKEN, template);
+  });
+
   test.each([
     ["another message", { type: "POC_PUBLISH_PRESENCE" }, page],
     ["an extra key", { ...request, boot: TOKEN }, page],
     ["a malformed token", { ...request, token: "nope" }, page],
+    ["a template flag without a setting", { ...request, template: true }, page],
+    ["a setting without the template flag", { ...request, setting: "base-v1" }, page],
+    ["a setting outside the pattern", { ...request, template: true, setting: "x" }, page],
+    ["a false template flag", { ...request, template: false, setting: "base-v1" }, page],
     ["another extension", request, { ...page, id: "stranger" }],
     ["a web page", request, { id: "own", url: "https://recnrun.com/" }],
   ])("ignores %s", (_name, message, sender) => {

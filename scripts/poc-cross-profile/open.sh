@@ -65,6 +65,7 @@ find_profile() {
 # The registered values reach a command line only after these checks.
 validate_profile() {
   [ -d "$p_user" ] || refuse 'userDataDir is not an existing directory'
+  ! is_base_root "$p_user" || refuse 'a frozen base is not an executor'
   is_plain_file "$p_user/$p_dir/Preferences" || refuse 'the profile has no Preferences: open never creates one'
   p_ext=
   if [ -f "$here/extension-id" ]; then p_ext=$(head -n 1 "$here/extension-id"); fi
@@ -81,7 +82,8 @@ ack_take() {
   ack_rest=${ack_rest#"$ack_value"}
 }
 # Prints the boot of the ack $1 when the whole file is the closed grammar launcher-requests.ts writes
-# for token $2 and profile $3. The identity is checked in form only: sh has no crypto, and the
+# for token $2 and profile $3; with a setting $4 (base.sh template) it must also end with
+# `,"template":true,"setting":"$4"`, and without one it must not. The identity is checked in form only: sh has no crypto, and the
 # extension verifies identities (PLAN decision 13).
 read_ack() {
   if [ ! -f "$1" ] || [ -L "$1" ]; then return 1; fi
@@ -102,8 +104,15 @@ read_ack() {
   ack_take '"},"boot":"' '"' || return 1
   is_uuid "$ack_value" || return 1
   ack_boot=$ack_value
-  ack_take '","createdAt":' '}' || return 1
+  ack_end='}'
+  [ -z "${4:-}" ] || ack_end=,
+  ack_take '","createdAt":' "$ack_end" || return 1
   is_time "$ack_value" || return 1
+  if [ -n "${4:-}" ]; then
+    ack_take ',"template":true,"setting":"' '"' || return 1
+    [ "$ack_value" = "$4" ] || return 1
+    ack_rest=${ack_rest#\"}
+  fi
   [ "$ack_rest" = '}' ] || return 1
   printf '%s\n' "$ack_boot"
 }
@@ -125,7 +134,7 @@ EOF
   return 1
 }
 # One look under every candidate Downloads root for the ack of token $2 of any profile in namespace
-# $1; sets acked_id, acked_root, and acked_boot. The record is not read: no block holds the profile.
+# $1 (a template ack of setting $3, when given); sets acked_id, acked_root, and acked_boot. The record is not read: no block holds the profile.
 look_for_bound() {
   candidates=$(downloads_root_candidates "$p_user" "$p_dir" /nonexistent "$1")
   while IFS= read -r candidate; do
@@ -136,7 +145,7 @@ look_for_bound() {
         id=${folder##*/}
         is_v4 "$id" || continue
         plain_path "$candidate" RECnRun poc "$1" acks "$id" || continue
-        found_boot=$(read_ack "$folder/$2.json" "$2" "$id") || continue
+        found_boot=$(read_ack "$folder/$2.json" "$2" "$id" "${3:-}") || continue
         acked_id=$id acked_root=$candidate acked_boot=$found_boot
         return 0
       done

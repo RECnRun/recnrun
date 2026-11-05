@@ -13,6 +13,7 @@ import { createRendezvousRelay } from "@/background/rendezvous-relay";
 import { newcomerNotes, presenceRenewal } from "@/background/presence-renewal";
 import type { BackgroundReply } from "@/messaging/background-reply";
 import { PocPublishPresenceSchema } from "@/messaging/poc-presence";
+import type { AckTemplate } from "@/messaging/poc-presence";
 import { DEFAULT_NAMESPACE, NamespaceSchema, presencePath } from "@/p2p/downloads-rendezvous";
 import { downloadsTransport } from "@/p2p/downloads-transport";
 import { PRESENCE_TTL_MS } from "@/p2p/folder-rendezvous";
@@ -259,7 +260,7 @@ export function startPocPresence(options: PocPresenceOptions) {
   const presence = startDownloadsPresence(deps);
   const own = { extensionId: browser.runtime.id, extensionUrl: browser.runtime.getURL("/") };
   browser.runtime.onMessage.addListener(createPublishListener(presence.publish, own));
-  const ack = (token: string) =>
+  const ack = (token: string, template?: AckTemplate) =>
     writeAck(
       {
         downloads: browser.downloads,
@@ -269,6 +270,7 @@ export function startPocPresence(options: PocPresenceOptions) {
         boot: store.boot,
       },
       token,
+      template,
     );
   browser.runtime.onMessage.addListener(createAckListener(ack, own));
   const relay = {

@@ -4,9 +4,11 @@ import { downloadsWriter } from "@/background/downloads-publisher";
 import type { WriterPort } from "@/background/downloads-publisher";
 import type { BackgroundReply } from "@/messaging/background-reply";
 import { PocLauncherAckSchema } from "@/messaging/poc-presence";
+import type { AckTemplate } from "@/messaging/poc-presence";
 import { TokenSchema, ackPath } from "@/p2p/downloads-rendezvous";
 import { IdentityStatementSchema } from "@/p2p/identity-key";
 import type { IdentityStatement } from "@/p2p/identity-key";
+import { SettingSchema } from "@/p2p/poc-setting";
 import { ProfileIdSchema } from "@/p2p/protocol";
 
 /*
@@ -22,6 +24,9 @@ const AckSchema = v.strictObject({
   identity: IdentityStatementSchema,
   boot: v.pipe(v.string(), v.uuid()),
   createdAt: v.pipe(v.number(), v.safeInteger(), v.minValue(0)),
+  // A template base's ack names the base; the launcher reads these two after the others.
+  template: v.optional(v.literal(true)),
+  setting: v.optional(SettingSchema),
 });
 
 export interface AckDependencies {
@@ -36,7 +41,11 @@ export interface AckDependencies {
 }
 
 /** Writes the ack of one attempt under this profile's own folder, replacing an earlier one. */
-export async function writeAck(deps: AckDependencies, token: string): Promise<void> {
+export async function writeAck(
+  deps: AckDependencies,
+  token: string,
+  template?: AckTemplate,
+): Promise<void> {
   const identity = deps.identity();
   if (!identity) throw new Error("No presence has been published yet.");
   const profileId = await deps.profileId();
@@ -47,6 +56,7 @@ export async function writeAck(deps: AckDependencies, token: string): Promise<vo
     identity,
     boot: await deps.boot(),
     createdAt: (deps.now ?? Date.now)(),
+    ...template,
   });
   const text = JSON.stringify(ack);
   await downloadsWriter(deps.downloads).write(path, text);
@@ -59,14 +69,19 @@ interface Sender {
 
 /** The bootstrap page asks, once the presence is out, for the ack of the token it was opened with. */
 export function createAckListener(
-  ack: (token: string) => Promise<void>,
+  ack: (token: string, template?: AckTemplate) => Promise<void>,
   own: { extensionId: string; extensionUrl: string },
 ) {
   return (message: unknown, sender: Sender, reply: (answer: BackgroundReply) => void) => {
     const ownPage = sender.id === own.extensionId && sender.url?.startsWith(own.extensionUrl);
     const parsed = v.safeParse(PocLauncherAckSchema, message);
     if (!parsed.success || !ownPage) return false;
-    ack(parsed.output.token).then(
+    const { token, ...rest } = parsed.output;
+    const sent =
+      "template" in rest
+        ? ack(token, { template: rest.template, setting: rest.setting })
+        : ack(token);
+    sent.then(
       () => reply({ ok: true }),
       (error: unknown) => reply({ ok: false, error: errorMessage(error) }),
     );

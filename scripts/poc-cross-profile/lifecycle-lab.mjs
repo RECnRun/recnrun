@@ -58,7 +58,7 @@ fi
 ${ps} "$@" | sed -E -e 's,(^|[[:space:]])(/bin/|/usr/bin/)?(da)?sh /,\\1/,' -e 's,Google Chrome\\.real,Google Chrome,'
 `;
 
-function installPs(home) {
+export function installPs(home) {
   const real = spawnSync("sh", ["-c", "command -v ps"], { encoding: "utf8" }).stdout.trim();
   mkdirSync(join(home, "ps-stub"));
   writeFileSync(join(home, "ps-stub/ps"), PS(real));
