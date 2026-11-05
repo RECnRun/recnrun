@@ -19,12 +19,15 @@ open_as_library=${RECNRUN_DISCOVERY_LIB:-}
 RECNRUN_DISCOVERY_LIB=1 . "$(dirname -- "$0")/profiles.sh"
 RECNRUN_DISCOVERY_LIB=$open_as_library # a dot keeps its own assignment: give back what this script saw
 here=$(dirname -- "$0")
+# shellcheck source=record.sh
+. "$here/record.sh"
 
 log() { printf 'open.sh: %s\n' "$*" >&2; }
 refuse() {
   log "refused: $*"
   exit 65
 }
+record_refuse() { refuse "$*"; }
 
 # --- The token -------------------------------------------------------------------------------
 
@@ -36,52 +39,26 @@ new_token() {
   printf '%s-%s-4%s-%s%s-%s\n' "$(slice 1-8)" "$(slice 9-12)" "$(slice 14-16)" "$variant" \
     "$(slice 18-20)" "$(slice 21-32)"
 }
-# Lowercase hex, version 4, variant 8 to b.
-is_v4() {
-  is_uuid "$1" || return 1
-  case $1 in ????????-????-4???-[89ab]???-????????????) return 0 ;; esac
-  return 1
-}
-
 # --- The registered profile ------------------------------------------------------------------
 
-# Fields of the record block being read; a block is closed by a blank line or the end of the file.
-block_reset() {
-  b_user=''
-  b_dir=''
-  b_id=''
-  b_namespace=''
-}
-# True when the closed block registers the profile; only the first block that names the id counts.
-settle() {
-  [ "$b_id" = "$1" ] || return 1
-  [ "$b_namespace" = "$2" ] || refuse 'the profile is registered in another namespace'
-  p_user=$b_user p_dir=$b_dir
+# The first block that names the profile counts, but the whole record is valid before any is used.
+record_hook_block() {
+  [ "$b_id" = "$want_id" ] && [ -z "$sel_found" ] || return 0
+  sel_found=1 sel_ns=$b_ns sel_user=$b_user sel_dir=$b_profile
 }
 # Sets p_user and p_dir from the record, or refuses.
 find_profile() {
   if [ ! -f "$1" ] || [ ! -r "$1" ]; then refuse 'the record is not a readable file'; fi
-  [ "$(wc -c <"$1" | tr -d ' ')" -le 65536 ] || refuse 'the record is over 64 KiB'
-  block_reset
-  while IFS= read -r line || [ -n "$line" ]; do
-    case $line in
-      '')
-        settle "$3" "$2" && return 0
-        block_reset
-        ;;
-      userDataDir=*) b_user=${line#*=} ;;
-      profileDirectory=*) b_dir=${line#*=} ;;
-      profileId=*) b_id=${line#*=} ;;
-      namespace=*) b_namespace=${line#*=} ;;
-    esac
-  done <"$1"
-  settle "$3" "$2" && return 0
-  refuse 'the profile is not registered in the record'
+  want_id=$3 sel_found='' sel_ns='' sel_user='' sel_dir=''
+  record_load "$1"
+  record_parse 1
+  [ -n "$sel_found" ] || refuse 'the profile is not registered in the record'
+  [ "$sel_ns" = "$2" ] || refuse 'the profile is registered in another namespace'
+  p_user=$sel_user p_dir=$sel_dir
 }
 # The registered values reach a command line only after these checks.
 validate_profile() {
-  if ! is_directory "$p_user" || [ ! -d "$p_user" ]; then refuse 'userDataDir is not an existing absolute directory'; fi
-  is_profile_directory "$p_dir" || refuse 'profileDirectory is not a profile directory name'
+  [ -d "$p_user" ] || refuse 'userDataDir is not an existing directory'
   is_plain_file "$p_user/$p_dir/Preferences" || refuse 'the profile has no Preferences: open never creates one'
   p_ext=
   if [ -f "$here/extension-id" ]; then p_ext=$(head -n 1 "$here/extension-id"); fi

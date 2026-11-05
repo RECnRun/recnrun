@@ -8,7 +8,7 @@
 #
 # The caller defines record_refuse <message>, which must not return, and may define the hooks
 # record_hook_line (a line kept, in $line), record_hook_blank, and record_hook_block <pass>
-# (a closed, valid block: b_user, b_profile, b_downloads, b_root, b_start).
+# (a closed, valid block: b_user, b_profile, b_id, b_ns, b_downloads, b_root, b_start).
 
 # Lowercase hex in every group: a fifth hyphen means a group holds one.
 is_uuid() {
@@ -62,7 +62,7 @@ record_load() {
 }
 
 record_reset() {
-  b_user='' b_profile='' b_downloads='' b_root='' b_seen=' ' b_start=0
+  b_user='' b_profile='' b_id='' b_ns='' b_downloads='' b_root='' b_seen=' ' b_start=0
 }
 bad_value() { record_refuse "record line $lineno: invalid $1"; }
 set_key() {
@@ -72,8 +72,8 @@ set_key() {
   case $1 in
     userDataDir) is_record_directory "$2" || bad_value "$1"; b_user=$2 ;;
     profileDirectory) is_profile_directory "$2" || bad_value "$1"; b_profile=$2 ;;
-    profileId) is_uuid "$2" || bad_value "$1" ;;
-    namespace) is_namespace "$2" || bad_value "$1" ;;
+    profileId) is_uuid "$2" || bad_value "$1"; b_id=$2 ;;
+    namespace) is_namespace "$2" || bad_value "$1"; b_ns=$2 ;;
     role) case $2 in master | worker | template) ;; *) bad_value "$1" ;; esac ;;
     masterFingerprint) is_fingerprint "$2" || bad_value "$1" ;;
     downloadsRoot) is_record_directory "$2" || bad_value "$1"; b_downloads=$2 ;;
@@ -90,6 +90,8 @@ record_end_block() {
   fi
   if [ -z "$b_user" ] && [ -z "$b_downloads" ]; then record_refuse "$where: names no profile or root"; fi
   if [ -n "$b_root" ] && [ -z "$b_downloads" ]; then record_refuse "$where: root without downloadsRoot"; fi
+  if [ -n "$b_user" ] && [ -z "$b_id" ]; then record_refuse "$where: userDataDir without profileId"; fi
+  if [ -n "$b_user" ] && [ -z "$b_ns" ]; then record_refuse "$where: userDataDir without namespace"; fi
   record_hook_block "$1"
 }
 # Walks record_text once for pass $1, which only the block hook reads.

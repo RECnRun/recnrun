@@ -112,6 +112,11 @@ for (const shell of shells) {
       [`downloadsRoot=${rootA}\nroot=r1\n\ndownloadsRoot=${home}\nroot=r1\n`, /r1/],
       [`downloadsRoot=${rootA}\nroot=r1\n\ndownloadsRoot=${rootA}\nroot=r2\n`, /two ids/],
       [`userDataDir=${home}/Chrome\n`, /profileDirectory/],
+      [
+        `userDataDir=${home}/Chrome\nprofileDirectory=Default\nnamespace=${NAMESPACE}\n`,
+        /profileId/,
+      ],
+      [`userDataDir=${home}/Chrome\nprofileDirectory=Default\nprofileId=${ALICE}\n`, /namespace/],
       [`userDataDir=${home}/Chrome\nprofileDirectory=a/b\n`, /profileDirectory/],
       [`downloadsRoot=${rootA}\nrole=admin\n`, /role/],
       [`role=worker\n`, /names no/],

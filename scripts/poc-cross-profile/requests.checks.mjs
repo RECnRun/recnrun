@@ -126,6 +126,56 @@ for (const shell of shells) {
     assert.equal(existsSync(argv), false);
   });
 
+  const badRecords = [
+    { title: "an unknown key", extra: (block) => `${block}\ncommand=rm` },
+    { title: "a repeated key", extra: (block) => `${block}\nrole=master\nrole=worker` },
+    {
+      title: "a later block that is invalid",
+      extra: (block) =>
+        `${block}\n\nuserDataDir=relative\nprofileDirectory=Default\nprofileId=${BOB}\nnamespace=${NAMESPACE}`,
+    },
+    {
+      title: "a later block without a profile id",
+      extra: (block) =>
+        `${block}\n\nuserDataDir=/tmp/x\nprofileDirectory=Default\nnamespace=${NAMESPACE}`,
+    },
+    {
+      title: "a later block without a namespace",
+      extra: (block) =>
+        `${block}\n\nuserDataDir=/tmp/x\nprofileDirectory=Default\nprofileId=${BOB}`,
+    },
+  ];
+  for (const { title, extra } of badRecords) {
+    await test(`${shell}: a record with ${title} is refused before Chrome runs`, (context) => {
+      const { record, argv, env, block } = scene(context);
+      writeFileSync(record, `${extra(block(ALICE))}\n`);
+      const result = open(shell, request(record), env());
+      assert.equal(result.code, EX_REFUSED, result.err);
+      assert.equal(existsSync(argv), false);
+    });
+  }
+
+  for (const [title, name] of [
+    ["a quote", 'Chrome"quoted'],
+    ["a command substitution", "Chrome$(id)"],
+    ["a backtick", "Chrome`id`"],
+    ["a backslash", "Chrome\\root"],
+  ]) {
+    await test(`${shell}: a userDataDir with ${title} is refused although the folder exists`, (context) => {
+      const { home, record, argv, env, block } = scene(context);
+      const root = join(home, name);
+      mkdirSync(join(root, "Default"), { recursive: true });
+      writeFileSync(join(root, "Default/Preferences"), "{}");
+      writeFileSync(
+        record,
+        `${block(ALICE).replace(/^userDataDir=.*$/m, () => `userDataDir=${root}`)}\n`,
+      );
+      const result = open(shell, request(record), env());
+      assert.equal(result.code, EX_REFUSED, result.err);
+      assert.equal(existsSync(argv), false);
+    });
+  }
+
   await test(`${shell}: a mode outside headed and headless is refused`, (context) => {
     const { record, argv, env } = scene(context);
     for (const mode of ["", "Headed", "--headless", "headless;id"])
