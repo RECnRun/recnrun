@@ -65,6 +65,10 @@ async function frozenBase(dir: string, env: NodeJS.ProcessEnv) {
 export interface LabClones extends CloneHost {
   /** Saves evidence of a failed run. */
   keep(): Promise<void>;
+  /** A clone root whose Chrome no CDP client reached: `dispose` still ends it. */
+  watch(root: string): void;
+  /** SIGTERM to the Chrome of a watched root, then until nothing names it. */
+  quit(root: string): Promise<void>;
   dispose(): Promise<void>;
 }
 
@@ -79,8 +83,12 @@ const masterBlock = (root: string, profileId: string, downloads: string) =>
   ].join("\n");
 
 /** The base, the master, and the catalog loop the launcher would run over the record. */
-export async function labClones(testInfo: TestInfo, baseURL: string): Promise<LabClones> {
-  const { dir, env, dispose: removeDir } = await skeleton(undefined, DEBUGGING);
+export async function labClones(
+  testInfo: TestInfo,
+  baseURL: string,
+  flags: readonly string[] = DEBUGGING,
+): Promise<LabClones> {
+  const { dir, env, dispose: removeDir } = await skeleton(undefined, flags);
   const browsers = new Map<DownloadsProfile, Browser>();
   const group = await createDownloadsGroup(tempPlatform("recnrun-clones-master"));
   const folders: string[] = [group.downloads];
@@ -161,6 +169,8 @@ export async function labClones(testInfo: TestInfo, baseURL: string): Promise<La
         });
       },
       keep: async () => undefined,
+      watch: (root) => void (roots.includes(root) || roots.push(root)),
+      quit: (root) => endChrome(root, processes),
       dispose,
     };
   } catch (error) {

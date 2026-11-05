@@ -133,8 +133,17 @@ export async function createClone(host: CloneHost, clones: string, name: string)
 }
 
 /** `clone-open.sh open-clone`, which also reopens a clone the record already registers. */
-export const openClone = (host: CloneHost, clones: string, name: string) =>
-  runScript("clone-open.sh", ["open-clone", clones, name, host.record, NAMESPACE], host.env);
+export const openClone = (
+  host: CloneHost,
+  clones: string,
+  name: string,
+  { mode, env = {} }: { mode?: "headed" | "headless"; env?: NodeJS.ProcessEnv } = {},
+) =>
+  runScript(
+    "clone-open.sh",
+    ["open-clone", clones, name, host.record, NAMESPACE, ...(mode ? [mode] : [])],
+    { ...host.env, ...env },
+  );
 
 /** The file at `path` as JSON. */
 export const readJson = async (path: string) =>

@@ -64,7 +64,7 @@ export async function withPair(prefix: string, body: (pair: Pair) => Promise<voi
 }
 
 /** The pin `profile` holds for `peer`, if any. */
-export async function pinOf(profile: DownloadsProfile, peer: DownloadsProfile) {
+export async function pinOf(profile: DownloadsProfile, peer: Pick<DownloadsProfile, "profileId">) {
   const pins = (await storedIn(profile.serviceWorker, "local", "peerPins")) as
     | Record<string, Pin>
     | undefined;

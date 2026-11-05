@@ -100,7 +100,10 @@ const store = (profile: DownloadsProfile, items: Record<string, unknown>) =>
   );
 
 /** The master's side of the binding, which the local channel writes in the product: its workers and its own record. */
-async function bindMaster(host: CloneHost, workers: DownloadsProfile[]) {
+export async function bindMaster(
+  host: CloneHost,
+  workers: Pick<DownloadsProfile, "profileId" | "name">[],
+) {
   const master = host.master.profile;
   if (!master) return;
   const presence = await readJson(
