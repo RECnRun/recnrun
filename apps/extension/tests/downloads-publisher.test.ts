@@ -177,6 +177,47 @@ describe("downloadsWriter", () => {
     });
   });
 
+  test("a rewrite of a path waits until Chrome settled the last write to it, in any writer", async () => {
+    const { downloads, finish } = fakeDownloads();
+    const path = "RECnRun/poc/lab/peers/x/presence.json";
+    const first = await downloadsWriter(downloads).write(path, "1");
+    // Another writer over the same Downloads, as the bootstrap page's publication is.
+    const second = downloadsWriter(downloads).write(path, "2");
+    const other = await downloadsWriter(downloads).write("RECnRun/poc/lab/acks/x/t.json", "3");
+    await vi.waitFor(() => expect(downloads.search).toHaveBeenCalled());
+    expect(downloads.download.mock.calls.map(([{ filename }]) => filename)).toEqual([
+      path,
+      "RECnRun/poc/lab/acks/x/t.json",
+    ]);
+    finish(first, "complete");
+    expect(await second).toBe(3);
+    expect(other).toBe(2);
+  });
+
+  test("a rewrite goes ahead once the last write is gone from history or its wait ran out", async () => {
+    vi.useFakeTimers();
+    try {
+      const { downloads } = fakeDownloads();
+      const writer = downloadsWriter(downloads);
+      const path = "RECnRun/poc/lab/peers/x/offer-y.json";
+      await writer.write(path, "1");
+      const second = writer.write(path, "2");
+      await vi.advanceTimersByTimeAsync(9_999);
+      expect(downloads.download).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(await second).toBe(2);
+      // An item erased from history has settled: its path is free at once.
+      downloads.search.mockResolvedValue([]);
+      const erased = "RECnRun/poc/lab/peers/x/answer-y.json";
+      await writer.write(erased, "3");
+      const again = writer.write(erased, "4");
+      await vi.advanceTimersByTimeAsync(0);
+      expect(await again).toBe(4);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   test("erases an item's file, if Chrome still has one, and then the item", async () => {
     const { downloads } = fakeDownloads();
     const eraser = {

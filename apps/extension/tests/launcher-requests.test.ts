@@ -17,6 +17,11 @@ function dependencies(overrides: Partial<AckDependencies> = {}) {
   const deps: AckDependencies = {
     downloads: {
       download: vi.fn(async (options: Written) => written.push(options)),
+      // Every write has settled, so a rewrite of the same path goes ahead at once.
+      search: vi.fn(async ({ id = 0 }: { id?: number }) => [
+        { id, filename: "", state: "complete" },
+      ]),
+      onChanged: { addListener: vi.fn(), removeListener: vi.fn() },
     },
     profileId: async () => ME,
     identity: () => STATEMENT,

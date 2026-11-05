@@ -19,6 +19,7 @@ function relay(items: DownloadItem[] = []) {
   const downloads = {
     download: vi.fn(async () => 7),
     search: vi.fn(async ({ id }: { id?: number }) => items.filter((item) => item.id === id)),
+    onChanged: { addListener: vi.fn(), removeListener: vi.fn() },
     removeFile: vi.fn(async () => {}),
     erase: vi.fn(async () => [7]),
   };

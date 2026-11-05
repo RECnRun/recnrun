@@ -198,7 +198,27 @@ async function quitRoot(root: string, pids: number[]): Promise<void> {
 const readJson = async (path: string) =>
   JSON.parse(await readFile(path, "utf8")) as Record<string, unknown>;
 
-/** The ack of `opened` on disk: the extension's bytes, for the profile, the token, and the boot printed. */
+/** Chrome's temporary files in the Downloads root: each is a download whose target is not settled. */
+const unfinished = async (downloads: string) =>
+  (await readdir(downloads)).filter((name) => name.startsWith(".com.google.Chrome."));
+
+/** The presence on disk carries `boot`, waiting for a rewrite still under way. */
+async function checkPresence(scene: Prepared, boot: string): Promise<void> {
+  const bootOf = async () => (await readJson(presenceFile(scene.downloads, scene.profileId))).boot;
+  await until(async () => ((await bootOf()) === boot ? true : undefined), "presence").catch(
+    () => undefined,
+  );
+  expect(await bootOf().catch(String), "the presence carries the adopted boot").toBe(boot);
+}
+
+/** No download is left unfinished: a second overwrite of a reserved path leaves one (CHROMIUM.md group 15). */
+async function checkSettled(downloads: string): Promise<void> {
+  const settled = async () => ((await unfinished(downloads)).length === 0 ? true : undefined);
+  await until(settled, "unfinished downloads").catch(() => undefined);
+  expect(await unfinished(downloads), "every download settled").toEqual([]);
+}
+
+/** The ack of `opened` on disk (the extension's bytes, for the profile, the token, and the boot printed), and the presence of that boot. */
 async function checkAck(scene: Prepared, opened: Opened): Promise<void> {
   const folder = join(scene.downloads, "RECnRun/poc", NAMESPACE, "acks", scene.profileId);
   const ackFile = join(folder, `${opened.token}.json`);
@@ -210,6 +230,7 @@ async function checkAck(scene: Prepared, opened: Opened): Promise<void> {
     scene.profileId,
     opened.boot,
   ]);
+  await checkPresence(scene, opened.boot);
 }
 
 /** What a failed run leaves to read: the display, Chrome's stderr, the settings, and the Downloads tree. */
@@ -243,11 +264,6 @@ test("open.sh opens a second root's profile, gets the ack of its token, and a ru
     expect(first.token).toMatch(UUID);
     expect(first.boot).toBe(first.token);
     await checkAck(scene, first);
-    // Observed, not asserted: the presence stays at the previous session's boot (P4.3 run B report).
-    const presence = await readJson(presenceFile(scene.downloads, scene.profileId)).catch(
-      (): Record<string, unknown> => ({}),
-    );
-    const seen = `presence boot ${String(presence.boot)}, ack boot ${first.boot}`;
 
     const second = await open(scene);
     pids.push(second.pid);
@@ -255,7 +271,8 @@ test("open.sh opens a second root's profile, gets the ack of its token, and a ru
     expect(second.token).not.toBe(first.token);
     expect(second.boot).toBe(first.boot);
     await checkAck(scene, second);
-    const description = `${seen}; fresh start acked in ${first.ms} ms, running profile in ${second.ms} ms`;
+    await checkSettled(scene.downloads);
+    const description = `fresh start acked in ${first.ms} ms, running profile in ${second.ms} ms`;
     testInfo.annotations.push({ type: "ack", description });
     console.log(`launcher-open: ${description}`);
   } catch (error) {

@@ -78,19 +78,47 @@ export interface DownloadsEraser {
   erase(query: { id: number }): Promise<number[]>;
 }
 
-/** Writes rendezvous files through Downloads, replacing each without asking; erases with `eraser` only. */
-export function downloadsWriter(
-  downloads: Pick<DownloadsPort, "download">,
-  eraser?: DownloadsEraser,
-): DownloadsWriter {
+/** What a writer needs of chrome.downloads: writing, and watching a write settle. */
+export type WriterPort = Pick<DownloadsPort, "download" | "search" | "onChanged">;
+
+// A data: write settles in milliseconds; one stuck longer must not hold its path forever.
+const REWRITE_WAIT_MS = 10_000;
+/** The last write of each path still settling, per Downloads, shared by every writer over it. */
+const settling = new WeakMap<WriterPort, Map<string, Promise<void>>>();
+
+function settlingOf(downloads: WriterPort): Map<string, Promise<void>> {
+  const known = settling.get(downloads);
+  if (known) return known;
+  const created = new Map<string, Promise<void>>();
+  settling.set(downloads, created);
+  return created;
+}
+
+/**
+ * Writes rendezvous files through Downloads, replacing each without asking; erases with `eraser`
+ * only. A rewrite waits for the last write to its path: Chrome asks where to save an overwrite
+ * of a path another download still reserves (CHROMIUM.md group 15).
+ */
+export function downloadsWriter(downloads: WriterPort, eraser?: DownloadsEraser): DownloadsWriter {
   return {
-    write: (path, text) =>
-      downloads.download({
-        url: dataUrl(text),
-        filename: path,
-        saveAs: false,
-        conflictAction: "overwrite",
-      }),
+    write: (path, text) => {
+      const pending = settlingOf(downloads);
+      const started = (pending.get(path) ?? Promise.resolve()).then(() =>
+        downloads.download({
+          url: dataUrl(text),
+          filename: path,
+          saveAs: false,
+          conflictAction: "overwrite",
+        }),
+      );
+      const done = started.then(
+        (id) => settled(downloads, id, REWRITE_WAIT_MS),
+        () => undefined,
+      );
+      pending.set(path, done);
+      void done.then(() => pending.get(path) === done && pending.delete(path));
+      return started;
+    },
     erase: async (id) => {
       if (!eraser) throw new Error("This writer erases nothing.");
       // The file may be gone already or unfinished; the history entry goes either way.
@@ -100,8 +128,12 @@ export function downloadsWriter(
   };
 }
 
-/** Resolves once the item leaves `in_progress`, or after `ms`, whichever comes first. */
-export function settled(downloads: DownloadsPort, id: number, ms: number): Promise<void> {
+/** Resolves once the item leaves `in_progress` or history, or after `ms`, whichever comes first. */
+export function settled(
+  downloads: Pick<DownloadsPort, "search" | "onChanged">,
+  id: number,
+  ms: number,
+): Promise<void> {
   return new Promise((resolve) => {
     const done = () => {
       clearTimeout(timer);
@@ -114,7 +146,9 @@ export function settled(downloads: DownloadsPort, id: number, ms: number): Promi
     const timer = setTimeout(done, ms);
     downloads.onChanged.addListener(listener);
     // The item may have settled before the listener was added.
-    void downloads.search({ id }).then(([item]) => item && item.state !== "in_progress" && done());
+    void downloads
+      .search({ id })
+      .then(([item]) => (!item || item.state !== "in_progress") && done());
   });
 }
 

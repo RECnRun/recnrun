@@ -1,11 +1,7 @@
 import { errorMessage } from "@recnrun/domain";
 import * as v from "valibot";
 import { downloadsWriter } from "@/background/downloads-publisher";
-import type {
-  DownloadItem,
-  DownloadsEraser,
-  DownloadsPort,
-} from "@/background/downloads-publisher";
+import type { DownloadItem, DownloadsEraser, WriterPort } from "@/background/downloads-publisher";
 import { OFFSCREEN_PAGE } from "@/background/listener";
 import type { BackgroundReply } from "@/messaging/background-reply";
 import { PocRendezvousRequestSchema } from "@/messaging/poc-rendezvous";
@@ -22,7 +18,7 @@ import { ProfileIdSchema } from "@/p2p/protocol";
 const SIGNAL_NAME = /^(offer|answer)-([0-9a-f-]{36})\.json$/;
 
 export interface RelayDependencies {
-  downloads: Pick<DownloadsPort, "download" | "search"> & DownloadsEraser;
+  downloads: WriterPort & DownloadsEraser;
   /** This profile's id. */
   me: () => Promise<string>;
   /** The namespace the presence joined, validated. */

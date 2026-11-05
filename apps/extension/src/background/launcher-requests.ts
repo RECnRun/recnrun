@@ -1,7 +1,7 @@
 import { errorMessage } from "@recnrun/domain";
 import * as v from "valibot";
 import { downloadsWriter } from "@/background/downloads-publisher";
-import type { DownloadsPort } from "@/background/downloads-publisher";
+import type { WriterPort } from "@/background/downloads-publisher";
 import type { BackgroundReply } from "@/messaging/background-reply";
 import { PocLauncherAckSchema } from "@/messaging/poc-presence";
 import { TokenSchema, ackPath } from "@/p2p/downloads-rendezvous";
@@ -25,7 +25,7 @@ const AckSchema = v.strictObject({
 });
 
 export interface AckDependencies {
-  downloads: Pick<DownloadsPort, "download">;
+  downloads: WriterPort;
   profileId: () => Promise<string>;
   /** The statement of the presence published last, or undefined before the first one. */
   identity: () => IdentityStatement | undefined;

@@ -34,7 +34,7 @@ export interface DownloadsContext {
 
 /** Chrome's Downloads, as the transport writes through it. */
 export interface DownloadsWriter {
-  /** Writes `text` at `path` under the Downloads root, replacing it, and returns the item's id. */
+  /** Writes `text` at `path` under the Downloads root, replacing it once the last write there settled, and returns the item's id. */
   write: (path: string, text: string) => Promise<number>;
   /** Removes the file and the history entry of an item this profile wrote. */
   erase: (id: number) => Promise<void>;
