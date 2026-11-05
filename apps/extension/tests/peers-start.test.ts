@@ -20,7 +20,7 @@ import {
   answering,
   fakeOffscreen,
 } from "./fake-peer";
-import { signAs } from "./test-identity";
+import { quiesce, signAs, signing } from "./test-identity";
 
 const ROOT = "/home/me/Downloads";
 const manifest = { manifest_version: 3 as const, name: "RECnRun", version: "0.1.0" };
@@ -73,7 +73,8 @@ beforeEach(() => {
   fakeBrowser.reset();
 });
 
-afterEach(() => {
+afterEach(async () => {
+  await quiesce();
   vi.restoreAllMocks();
 });
 
@@ -82,7 +83,7 @@ describe("startPeers", () => {
     const { written } = await background();
     expect(await folderPairingRepository.read()).toBeNull();
 
-    startPeers({ transport: "downloads", sign: signAs });
+    startPeers({ transport: "downloads", sign: signing });
 
     await settles(() => expect(written).toHaveLength(1));
     expect(written[0]).toMatchObject({
@@ -102,7 +103,7 @@ describe("startPeers", () => {
 
   test("the Downloads variant starts pairing on its own once it learned its root, with no page open", async () => {
     const { link } = await background();
-    startPeers({ transport: "downloads", sign: signAs });
+    startPeers({ transport: "downloads", sign: signing });
     await settles(() =>
       expect(link.commands).toEqual([
         { type: "folder-watch", profileId: ME, displayName: "Laptop" },
@@ -122,7 +123,7 @@ describe("startPeers", () => {
     vi.mocked(fakeBrowser.downloads.search).mockImplementation(
       answering(() => [{ id: 1, filename: renamed, state: "complete" }]),
     );
-    const peers = startPeers({ transport: "downloads", sign: signAs });
+    const peers = startPeers({ transport: "downloads", sign: signing });
     await settles(() =>
       expect(log).toHaveBeenCalledWith(
         "[RECnRun peer]",
@@ -140,7 +141,7 @@ describe("startPeers", () => {
   test("the Downloads variant keeps the profiles the user disconnected when it starts pairing", async () => {
     const { link } = await background();
     await folderPairingRepository.write({ paused: [PEER] });
-    startPeers({ transport: "downloads", sign: signAs });
+    startPeers({ transport: "downloads", sign: signing });
     // The resume of a profile that waited before, then the start once the root is known.
     await settles(() => expect(link.commands).toHaveLength(2));
     expect(new Set(link.commands.map((each) => each.type))).toEqual(new Set(["folder-watch"]));
@@ -149,13 +150,13 @@ describe("startPeers", () => {
 
   test("the folder variant writes nothing to Downloads and waits in the folder only once chosen", async () => {
     const { link, written } = await background();
-    startPeers({ transport: "folder", sign: signAs });
+    startPeers({ transport: "folder", sign: signing });
     await new Promise((resolve) => setTimeout(resolve, 20));
     expect(written).toEqual([]);
     expect(link.commands).toEqual([]);
 
     await folderPairingRepository.write({});
-    startPeers({ transport: "folder", sign: signAs });
+    startPeers({ transport: "folder", sign: signing });
     await settles(() =>
       expect(link.commands).toEqual([
         { type: "folder-watch", profileId: ME, displayName: "Laptop" },
@@ -174,7 +175,7 @@ describe("startPeers", () => {
       identity: PEER_IDENTITY,
     };
     await authorizedPeersRepository.set(PEER, desk);
-    const routes = startPeers({ transport: "downloads", sign: signAs });
+    const routes = startPeers({ transport: "downloads", sign: signing });
     await routes.link({
       type: "state",
       peer: PEER,
@@ -192,9 +193,9 @@ describe("the presence startPeers writes", () => {
   test("keeps one boot per browser session, learns the root, and joins the stored namespace", async () => {
     const { written } = await background();
     await fakeBrowser.storage.local.set({ pocNamespace: "e4-common" });
-    startPeers({ transport: "downloads", sign: signAs });
+    startPeers({ transport: "downloads", sign: signing });
     await settles(() => expect(written).toHaveLength(1));
-    startPeers({ transport: "downloads", sign: signAs });
+    startPeers({ transport: "downloads", sign: signing });
     await settles(() => expect(written).toHaveLength(2));
 
     const [first, again] = written.map((each) => registrationOf(each.url));
@@ -211,7 +212,7 @@ describe("the presence startPeers writes", () => {
   test("writes at once, with the boot the bootstrap page stored, when that page asks", async () => {
     const { written } = await background();
     const token = "0f8b6a3e-2c1d-4e5f-9a7b-1c2d3e4f5a6b";
-    startPeers({ transport: "downloads", sign: signAs });
+    startPeers({ transport: "downloads", sign: signing });
     await settles(() => expect(written).toHaveLength(1));
     await pocPresenceStore().adoptBoot(token);
     const page = { id: fakeBrowser.runtime.id, url: fakeBrowser.runtime.getURL("/bootstrap.html") };
@@ -229,7 +230,7 @@ describe("the presence startPeers writes", () => {
   test("acknowledges the launcher's attempt with the presence's identity and the session's boot", async () => {
     const { written } = await background();
     const token = "0f8b6a3e-2c1d-4e5f-9a7b-1c2d3e4f5a6b";
-    startPeers({ transport: "downloads", sign: signAs });
+    startPeers({ transport: "downloads", sign: signing });
     await settles(() => expect(written).toHaveLength(1));
     await pocPresenceStore().adoptBoot(token);
     const page = { id: fakeBrowser.runtime.id, url: fakeBrowser.runtime.getURL("/bootstrap.html") };
@@ -256,8 +257,8 @@ describe("the presence startPeers writes", () => {
     vi.spyOn(fakeBrowser.runtime, "sendMessage").mockImplementation(
       answering(() => replies.shift()),
     );
-    startPeers({ transport: "downloads", sign: signAs });
-    startPeers({ transport: "downloads", sign: signAs });
+    startPeers({ transport: "downloads", sign: signing });
+    startPeers({ transport: "downloads", sign: signing });
     await settles(() => {
       expect(log).toHaveBeenCalledWith("[RECnRun peer]", "presence: No certificate.");
       expect(log).toHaveBeenCalledWith(
@@ -272,7 +273,7 @@ describe("the presence startPeers writes", () => {
 describe("the transport a page sees", () => {
   test("the Downloads variant tells its pages it pairs through Downloads once Chrome reported the root", async () => {
     await background();
-    const peers = startPeers({ transport: "downloads", sign: signAs });
+    const peers = startPeers({ transport: "downloads", sign: signing });
     await settles(async () =>
       expect(await peers.request({ type: "status" })).toMatchObject({
         folder: "none",
@@ -289,7 +290,7 @@ describe("a stored template", () => {
     const { link, written, log } = await background();
     await roleStores().role.write({ role: "template" });
     await folderPairingRepository.write({});
-    const peers = startPeers({ transport: "downloads", sign: signAs });
+    const peers = startPeers({ transport: "downloads", sign: signing });
     await settles(() => expect(log).toHaveBeenCalledWith("[RECnRun peer]", silent));
     const page = { id: fakeBrowser.runtime.id, url: fakeBrowser.runtime.getURL("/bootstrap.html") };
     const replies: unknown[] = [];
@@ -310,13 +311,13 @@ describe("a stored template", () => {
   test("a profile without a stored role still announces", async () => {
     const { written } = await background();
     expect(await roleStores().role.read()).toBeNull();
-    startPeers({ transport: "downloads", sign: signAs });
+    startPeers({ transport: "downloads", sign: signing });
     await settles(() => expect(written).toHaveLength(1));
   });
 
   test("a catalog sighting notes a profile no record knows for one renewal", async () => {
     await background();
-    const routes = startPeers({ transport: "downloads", sign: signAs });
+    const routes = startPeers({ transport: "downloads", sign: signing });
     const stranger = {
       profileId: STRANGER,
       displayName: "Desk",

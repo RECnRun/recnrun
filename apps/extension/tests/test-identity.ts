@@ -26,3 +26,22 @@ export async function signAs(
 export async function identityOf(name: string): Promise<string> {
   return (await signAs({ profileId: name, fingerprint: "AB" }, name)).key;
 }
+
+let inFlight = 0;
+
+/** `signAs`, counted while it runs, so `quiesce` knows a presence is still on its way. */
+export const signing: typeof signAs = async (...args) => {
+  inFlight++;
+  try {
+    return await signAs(...args);
+  } finally {
+    inFlight--;
+  }
+};
+
+/** Lets every presence a test started finish, so its writes never reach the next test's spies. */
+export async function quiesce() {
+  // Past a signature the flow is microtasks only, which one timer turn drains.
+  do await new Promise((resolve) => setTimeout(resolve, 0));
+  while (inFlight > 0);
+}
