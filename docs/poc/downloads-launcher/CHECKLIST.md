@@ -460,7 +460,10 @@ Gate P6: verify · CL16, CL17 · review of P5+P6 · push
 
 ## P7: Silent and headless execution
 
-- [ ] P7.1 Headless lab runner `vp run test:headless`
+- [i] P7.1 Headless lab runner `vp run test:headless`
+  - red: `vp run test:headless` with the spec in headed mode failed 2 of 3 (open.sh exit 69 "no ack within 60 s" with DISPLAY empty; headed Chrome owned X windows); `vp run test:container` without the package script: AssertionError, fail 1
+  - green: `vp run test:headless` 3 passed (1.1m); `vp run test:container` fail 0; Chrome 157.0.8103.38, `Browser.getVersion` product `Chrome/157.0.8103.38`
+  - commit: the commit with subject "Add the headless lab runner for Chrome Stable"
 - [ ] P7.2 T1–T3 one root, visible and `--no-startup-window`, E11 (lab, host)
 - [ ] P7.3 T4–T5 one root, headless attempt, E12 (lab, host)
 - [ ] P7.4 T6–T8 separate roots, headless workers, E13 (lab, host); T9 headless on clones

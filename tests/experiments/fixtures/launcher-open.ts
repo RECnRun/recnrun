@@ -166,9 +166,12 @@ export function parseOpened(stdout: string, stderr: string) {
 }
 
 /** One `open.sh open`, run without a shell string; a non-zero exit is a result, not a throw. */
-export function runOpen({ scene, env }: Pick<Rig, "scene" | "env">): Promise<Opened> {
+export function runOpen(
+  { scene, env }: Pick<Rig, "scene" | "env">,
+  mode?: "headed" | "headless",
+): Promise<Opened> {
   const started = Date.now();
-  const args = [OPEN, "open", scene.record, NAMESPACE, scene.profileId];
+  const args = [OPEN, "open", scene.record, NAMESPACE, scene.profileId, ...(mode ? [mode] : [])];
   const options = { env: { ...env, RECNRUN_OPEN_TIMEOUT_S: String(OPEN_TIMEOUT_S) } };
   return new Promise((resolve) => {
     execFile("sh", args, { ...options, encoding: "utf8" }, (error, stdout, stderr) => {

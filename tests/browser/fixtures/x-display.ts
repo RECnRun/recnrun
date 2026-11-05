@@ -50,6 +50,15 @@ async function search(title: string): Promise<string | undefined> {
   }
 }
 
+/** The pids that own a window whose name or class matches `pattern` (empty when no window does). */
+export async function windowOwners(pattern: string): Promise<number[]> {
+  const ids = ((await search(pattern)) ?? "").split("\n").filter(Boolean);
+  const owners = await Promise.all(
+    ids.map((id) => xdotool("getwindowpid", id).then(Number, () => 0)),
+  );
+  return owners.filter((pid) => pid > 0);
+}
+
 /** Polls `check` every 100 ms for up to `ms`, ten seconds unless told otherwise. */
 async function until(check: () => Promise<boolean>, what: string, ms = 10_000): Promise<void> {
   for (let left = ms / POLL_MS; left > 0; left--) {

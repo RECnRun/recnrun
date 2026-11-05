@@ -25,21 +25,22 @@ Update the relevant doc when a change alters what it describes.
 
 Vite+ (`vp`) is the only toolchain. `vp <name>` runs a built-in command and `vp run <name>` runs a `package.json` script or `vite.config.ts` task, so they can differ: `vp test` is plain Vitest, while `vp run test` is the project suite. Vite+ docs are in `node_modules/vite-plus/docs`. Run `vp env doctor` when setup or package-manager behavior looks wrong.
 
-| Command                                           | Purpose                                                              |
-| ------------------------------------------------- | -------------------------------------------------------------------- |
-| `vp install`                                      | After pulling, before starting work                                  |
-| `vp run dev`                                      | Website (port 5173) and extension dev build in Chrome, together      |
-| `vp run dev:website`, `vp run dev:extension`      | One of them alone; the extension's Chrome keeps a persistent profile |
-| `vp run clean`                                    | Delete builds, artifacts, caches, and the dev Chrome profile         |
-| `vp check` (`--fix` to format)                    | Format (Oxfmt), lint (Oxlint), and type check while editing          |
-| `vp run deps`                                     | Architecture boundaries (dependency-cruiser)                         |
-| `vp run test:unit`, `test:components`, `test:e2e` | One test layer: Node, Vitest Browser Mode, Playwright with extension |
-| `vp run test:browser`                             | Google Chrome Stable in Docker: install methods, the mesh            |
-| `vp run test:experiments`                         | POC hypotheses that write verdicts under `.artifacts/evidence/`      |
-| `vp run test:host -- <spec>`                      | Host only: the Mac's Google Chrome; needs `RECNRUN_HOST_ROOTS`       |
-| `vp run test:scripts`                             | Launcher shell checks in Docker: dash, ShellCheck, package scan      |
-| `vp run test:host -- scripts`                     | The same checks on the Mac: macOS `/bin/sh`, ShellCheck if installed |
-| `vp run test`                                     | All five layers                                                      |
+| Command                                           | Purpose                                                                 |
+| ------------------------------------------------- | ----------------------------------------------------------------------- |
+| `vp install`                                      | After pulling, before starting work                                     |
+| `vp run dev`                                      | Website (port 5173) and extension dev build in Chrome, together         |
+| `vp run dev:website`, `vp run dev:extension`      | One of them alone; the extension's Chrome keeps a persistent profile    |
+| `vp run clean`                                    | Delete builds, artifacts, caches, and the dev Chrome profile            |
+| `vp check` (`--fix` to format)                    | Format (Oxfmt), lint (Oxlint), and type check while editing             |
+| `vp run deps`                                     | Architecture boundaries (dependency-cruiser)                            |
+| `vp run test:unit`, `test:components`, `test:e2e` | One test layer: Node, Vitest Browser Mode, Playwright with extension    |
+| `vp run test:browser`                             | Google Chrome Stable in Docker: install methods, the mesh               |
+| `vp run test:experiments`                         | POC hypotheses that write verdicts under `.artifacts/evidence/`         |
+| `vp run test:headless`                            | Chrome Stable `--headless` in Docker, launcher-started; smoke in verify |
+| `vp run test:host -- <spec>`                      | Host only: the Mac's Google Chrome; needs `RECNRUN_HOST_ROOTS`          |
+| `vp run test:scripts`                             | Launcher shell checks in Docker: dash, ShellCheck, package scan         |
+| `vp run test:host -- scripts`                     | The same checks on the Mac: macOS `/bin/sh`, ShellCheck if installed    |
+| `vp run test`                                     | All five layers                                                         |
 
 | `vp run test:coverage` | Coverage with thresholds |
 | `vp run dead-code`, `vp run duplication` | Knip; jscpd |
