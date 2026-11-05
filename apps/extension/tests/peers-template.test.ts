@@ -4,6 +4,8 @@ import { startPeers } from "@/background/peers";
 import { writeStored } from "@/p2p/p2p-database";
 import { roleStores } from "@/storage/hierarchy-repository";
 import { identityRepository } from "@/storage/peer-repository";
+import { clearTransientPeerState } from "@/storage/poc-template-repository";
+import { pocTransportStore } from "@/storage/poc-transport-repository";
 import { ME } from "./fake-peer";
 import { resetStored, storedKeys } from "./memory-p2p-database";
 import { background, contentOf, registrationOf, settles } from "./peers-start-fixture";
@@ -129,4 +131,10 @@ describe("a worker that becomes a template while it runs", () => {
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(written).toHaveLength(2);
   });
+});
+
+test("clearing the transient peer state also drops the recorded transport error", async () => {
+  await pocTransportStore().recordError("The role template announces nothing.");
+  await clearTransientPeerState();
+  expect(await pocTransportStore().lastError()).toBeNull();
 });

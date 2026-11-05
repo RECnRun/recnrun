@@ -29,6 +29,8 @@ export function pocTransportStore() {
     },
     /** The presence writer's last failure; a later success leaves it, so the page shows what went wrong. */
     recordError: (message: string) => lastError.setValue({ at: Date.now(), message }),
+    /** A copy starts without the error its template recorded. */
+    clearError: () => lastError.removeValue(),
     /** `resumed` clears the pause, as the launcher reads it. */
     setPaused: (reason: Paused | "resumed") =>
       paused.setValue(reason === "resumed" ? null : reason),

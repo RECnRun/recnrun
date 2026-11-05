@@ -25,3 +25,9 @@ test("records the last error with the time it happened", async () => {
   await pocTransportStore().recordError("again");
   expect((await pocTransportStore().lastError())?.message).toBe("again");
 });
+
+test("clears the recorded error", async () => {
+  await pocTransportStore().recordError("write failed");
+  await pocTransportStore().clearError();
+  expect(await pocTransportStore().lastError()).toBeNull();
+});

@@ -5,6 +5,7 @@ import { discardIdentityKey } from "@/p2p/identity-key";
 import { SettingSchema } from "@/p2p/poc-setting";
 import type { TemplateOutcome } from "@/p2p/roles";
 import { storedRoles } from "@/storage/hierarchy-repository";
+import { pocTransportStore } from "@/storage/poc-transport-repository";
 
 /*
  * What a template base keeps (POC PLAN.md P5.1, P5.3): the role `template`, which gates everything
@@ -29,7 +30,11 @@ const TRANSIENT = [
 ] as const;
 
 /** Clears what a profile learned of its peers, so no copy of it pairs, links, or answers as it did. */
-export const clearTransientPeerState = (): Promise<void> => storage.removeItems([...TRANSIENT]);
+export async function clearTransientPeerState(): Promise<void> {
+  await storage.removeItems([...TRANSIENT]);
+  // The template's own presence error would otherwise travel in the base to every clone.
+  await pocTransportStore().clearError();
+}
 
 /** The identity key and the DTLS certificate: a template holds no working pair of them. */
 export async function discardWorkingIdentity(): Promise<void> {
