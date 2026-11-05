@@ -1,4 +1,5 @@
-import { readFile } from "node:fs/promises";
+import { readFile, readlink } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import type { TestInfo } from "@playwright/test";
 import { isChildProcess } from "../../browser/fixtures/clone-attach.ts";
 import { labClones } from "../../browser/fixtures/clone-rig.ts";
@@ -208,6 +209,17 @@ async function afterRequest(lab: CloneLab, clone: Worker, asked: Mode, running: 
   };
 }
 
+/** What a failed headed reopen leaves to read: the launcher's words, Chrome's stderr, the lock, the processes. */
+async function reopenEvidence(lab: CloneLab, clone: Worker, stderr: string) {
+  const chromeLog = await readFile(join(dirname(lab.dir), "chrome.log"), "utf8").catch(() => "");
+  return {
+    stderr: stderr.slice(-1500),
+    chromeLog: chromeLog.slice(-3000),
+    singletonLock: await readlink(join(clone.root, "SingletonLock")).catch(() => null),
+    commandLines: (await lab.host.commandLines(clone.root)).map((line) => line.slice(0, 300)),
+  };
+}
+
 /** t9.exclusive: one clone is never visible and headless at once, whichever mode it started in. */
 export async function exclusiveSample(lab: CloneLab): Promise<Sample> {
   const [headlessOne, other] = lab.clones;
@@ -221,7 +233,10 @@ export async function exclusiveSample(lab: CloneLab): Promise<Sample> {
   const second =
     reopened.code === 0
       ? await afterRequest(lab, other, "headless", "headed")
-      : { problems: [`B did not reopen headed: ${reopened.stderr.slice(-200)}`], observation: {} };
+      : {
+          problems: [`B did not reopen headed: exit ${reopened.code}`],
+          observation: await reopenEvidence(lab, other, reopened.stderr),
+        };
   return judged([...first.problems, ...second.problems], {
     headlessThenHeaded: first.observation,
     headedThenHeadless: second.observation,
