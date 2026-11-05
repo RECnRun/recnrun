@@ -241,7 +241,7 @@ export interface Tally {
 }
 type Body = (rig: E9Rig, tally: Tally) => Promise<void>;
 
-/** One sample: build the rig, run the body, stop what it launched, and leave nothing behind. */
+/** One sample: build the rig, run the body, stop what it launched, and leave nothing behind; a throw from the body is a harness error and propagates. */
 export async function sample(setup: () => Promise<E9Rig>, body: Body): Promise<Sample> {
   const rig = await setup();
   const problems: string[] = [];
@@ -249,8 +249,6 @@ export async function sample(setup: () => Promise<E9Rig>, body: Body): Promise<S
   const check = (ok: boolean, text: string) => ok || problems.push(text);
   try {
     await body(rig, { check, seen });
-  } catch (error) {
-    problems.push(String(error));
   } finally {
     problems.push(...(await shutdown(rig)));
     check((await chromesOf(rig.root)).length === 0, "something of the root still runs");
