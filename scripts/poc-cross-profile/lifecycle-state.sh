@@ -51,7 +51,28 @@ setting() {
   printf '%s\n' "$s_value"
 }
 
-# Hard link of a file naming the holder: atomic, and a signal cannot orphan a lock that names no one.
+# A dead holder's lock is replaced by one reclaimer at a time: the holder of <lock>.reclaim, taken
+# with the same hard link, re-reads the stale lock, removes it only while it still names the dead pid,
+# and links its own. The one window left is two reclaimers of a reclaimer that died mid-takeover.
+reclaim_lock() {
+  rc_lock=$1.reclaim
+  rc_tries=0
+  while [ "$rc_tries" -lt 3 ]; do
+    rc_tries=$((rc_tries + 1))
+    if ln -- "$lk_mine" "$rc_lock" 2>/dev/null; then return 0; fi
+    rc_pid=
+    if [ -f "$rc_lock" ] && [ ! -L "$rc_lock" ]; then read -r rc_pid <"$rc_lock" || rc_pid=gone; fi
+    [ "$rc_pid" != gone ] || continue
+    is_pid "$rc_pid" || { rm -f -- "$lk_mine"; die 65 "$rc_lock does not name a pid"; }
+    if pid_alive "$rc_pid"; then
+      rm -f -- "$lk_mine"
+      die 75 "another launcher is taking over $1 (pid $rc_pid)"
+    fi
+    rm -f -- "$rc_lock"
+  done
+  rm -f -- "$lk_mine"
+  die 75 "cannot take over $1"
+}
 take_lock() {
   lk_mine=$1.mine.$$
   printf '%s\n' "$2" >"$lk_mine"
@@ -70,10 +91,13 @@ take_lock() {
       rm -f -- "$lk_mine"
       die 75 "another launcher holds $1 (pid $lk_pid)"
     fi
-    # A rival that took over in between would lose its lock to this rm; the window is two commands wide.
+    reclaim_lock "$1"
     lk_again=
     read -r lk_again <"$1" 2>/dev/null || :
     if [ "$lk_again" = "$lk_pid" ]; then rm -f -- "$1"; fi
+    if ln -- "$lk_mine" "$1" 2>/dev/null; then lk_won=1; else lk_won=0; fi
+    rm -f -- "$1.reclaim"
+    [ "$lk_won" = 0 ] || { rm -f -- "$lk_mine"; return 0; }
   done
   rm -f -- "$lk_mine"
   die 75 "cannot take $1"
