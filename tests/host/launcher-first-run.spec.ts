@@ -8,6 +8,12 @@ import { hostUnpackedOptions } from "./fixtures/host-chrome.ts";
 import { test } from "./fixtures/host-chrome.ts";
 import { evidence } from "./fixtures/host-env.ts";
 import { hostEnvironment, hostFolder, removeFolder } from "./fixtures/e4-host.ts";
+import {
+  chromesOf,
+  commandLineOf,
+  keychainProblems,
+  launcherEnv,
+} from "./fixtures/launcher-host.ts";
 import { extensionPath, loadUnpacked } from "../browser/fixtures/extension-loaders.ts";
 import { requireBuild } from "../experiments/file-access.ts";
 import { labelPaths } from "../experiments/host-paths.ts";
@@ -21,6 +27,8 @@ import type { Sample } from "../experiments/outcome.ts";
  * the OS default Chrome root below it, so the command finds the profile the way it does on a
  * colleague's machine; autostart is never turned on. The diagnostic install stands in for the
  * four Load unpacked gestures (estimated, not observed); the first command and status run here.
+ * The Chrome the commands resolve is the wrapper of launcherEnv, which adds --use-mock-keychain so
+ * the owner's keychain is never asked.
  */
 
 const target = hostEnvironment.target;
@@ -55,9 +63,8 @@ async function outcome(
   program: string,
   args: string[],
   cwd: string,
-  home: string,
+  env: NodeJS.ProcessEnv,
 ): Promise<Result> {
-  const env = { PATH: process.env.PATH ?? "", HOME: home };
   try {
     const done = await run(program, args, { cwd, env, timeout: COMMAND_MS });
     return { code: 0, ...done };
@@ -65,15 +72,6 @@ async function outcome(
     const failed = error as { code?: number; stdout?: string; stderr?: string };
     return { code: failed.code ?? 1, stdout: failed.stdout ?? "", stderr: failed.stderr ?? "" };
   }
-}
-
-/** The pids of Chrome processes whose command line names `root` as the user data directory. */
-async function chromesOf(root: string): Promise<number[]> {
-  const { stdout } = await run("ps", ["-axo", "pid=,command="], { maxBuffer: 64 * 1024 * 1024 });
-  return stdout
-    .split("\n")
-    .filter((line) => line.includes(`--user-data-dir=${root}`))
-    .map((line) => Number(line.trim().split(/\s+/)[0]));
 }
 
 /** The words of the README's first fenced command, from its "First command" section. */
@@ -95,6 +93,7 @@ interface Machine {
   userDataDir: string;
   profileId: string;
   downloads: string;
+  env: NodeJS.ProcessEnv;
   dispose(): Promise<void>;
 }
 
@@ -119,7 +118,8 @@ async function prepare(): Promise<Machine> {
       const { profileId } = await register(extension, userDataDir, downloads, record);
       // The first command writes the real record; the registration helper's one must not exist.
       await rm(record);
-      return { home, userDataDir, profileId, downloads, dispose: () => removeFolder(root) };
+      const env = await launcherEnv(home);
+      return { home, userDataDir, profileId, downloads, env, dispose: () => removeFolder(root) };
     } finally {
       await extension.close();
     }
@@ -143,7 +143,7 @@ async function measure(machine: Machine, folder: string): Promise<Sample> {
   const readme = await readFile(join(folder, "README.md"), "utf8");
   const [program, ...args] = firstCommand(readme);
   if (program !== "sh") throw new Error(`The first command starts with ${String(program)}, not sh`);
-  const first = await outcome(program, args, folder, machine.home);
+  const first = await outcome(program, args, folder, machine.env);
   const problems: string[] = [];
   if (first.code !== 0) problems.push(`the first command exited ${first.code}: ${first.stderr}`);
   if (!first.stdout.startsWith(`${machine.profileId} open\n`))
@@ -153,11 +153,12 @@ async function measure(machine: Machine, folder: string): Promise<Sample> {
   if (acked.length === 0) problems.push(`no ack under ${acks}`);
   else await readJson(join(acks, acked[0] ?? ""));
   const [, ...statusArgs] = readmeCommand(readme, "status", machine.home);
-  const status = await outcome("sh", statusArgs, folder, machine.home);
-  if (!new RegExp(`^${machine.profileId} open `, "m").test(status.stdout))
-    problems.push(`status was ${JSON.stringify(status.stdout)}`);
+  const status = await outcome("sh", statusArgs, folder, machine.env);
+  const listed = new RegExp(`^${machine.profileId} open (\\d+) `, "m").exec(status.stdout);
+  if (!listed) problems.push(`status was ${JSON.stringify(status.stdout)}`);
+  else problems.push(...keychainProblems(await commandLineOf(Number(listed[1])), machine.home));
   const [, ...stopArgs] = readmeCommand(readme, "stop", machine.home);
-  const stop = await outcome("sh", stopArgs, folder, machine.home);
+  const stop = await outcome("sh", stopArgs, folder, machine.env);
   if (stop.code !== 0) problems.push(`stop exited ${stop.code}: ${stop.stderr}`);
   await quit(machine).catch((error: unknown) => problems.push(String(error)));
   const observation = {

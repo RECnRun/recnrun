@@ -1,11 +1,15 @@
-import { execFile } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { promisify } from "node:util";
 import { hostUnpackedOptions } from "./fixtures/host-chrome.ts";
 import { test } from "./fixtures/host-chrome.ts";
 import { evidence } from "./fixtures/host-env.ts";
 import { hostEnvironment, hostFolder, removeFolder } from "./fixtures/e4-host.ts";
+import {
+  chromesOf,
+  commandLineOf,
+  keychainProblems,
+  launcherEnv,
+} from "./fixtures/launcher-host.ts";
 import { extensionPath, loadUnpacked } from "../browser/fixtures/extension-loaders.ts";
 import { requireBuild } from "../experiments/file-access.ts";
 import { labelPaths } from "../experiments/host-paths.ts";
@@ -23,23 +27,14 @@ import { expectEveryHypothesis } from "../experiments/outcome.ts";
 /*
  * P4.3's host twin: open.sh on the installed Google Chrome of this Mac, on a throwaway root only.
  * The root pins its Downloads root inside itself, so discovery's first step finds it with plutil;
- * HOME is a folder of the root, so the bounded find never reads the owner's home. open.sh starts
- * Chrome as the launcher does (no offscreen or mock-keychain flags: the request takes none), and
- * the run stops only the pid it printed.
+ * HOME is a folder of the root, so the bounded find never reads the owner's home. open.sh builds
+ * the request as the launcher does (no offscreen flag); the Chrome it resolves is the wrapper of
+ * launcherEnv, which adds --use-mock-keychain so the owner's keychain is never asked, and the run
+ * stops only the pid it printed.
  */
 
 const target = hostEnvironment.target;
-const run = promisify(execFile);
 const labels: PathLabel[] = [];
-
-/** The pids of Chrome processes whose command line names `root` as the user data directory. */
-async function chromesOf(root: string): Promise<number[]> {
-  const { stdout } = await run("ps", ["-axo", "pid=,command="], { maxBuffer: 64 * 1024 * 1024 });
-  return stdout
-    .split("\n")
-    .filter((line) => line.includes(`--user-data-dir=${root}`))
-    .map((line) => Number(line.trim().split(/\s+/)[0]));
-}
 
 /** poc-d0 installed on a fresh throwaway root, reloaded so Chrome keeps it, and quit. */
 async function hostRig(): Promise<Rig> {
@@ -59,7 +54,8 @@ async function hostRig(): Promise<Rig> {
       const scene = await register(extension, root, downloads, join(root, "launcher.record"));
       return {
         scene,
-        env: { PATH: process.env.PATH ?? "", HOME: home },
+        env: await launcherEnv(home),
+        inspect: async (opened) => keychainProblems(await commandLineOf(opened.pid), home),
         survivors: () => chromesOf(root),
         dispose: () => removeFolder(root),
       };

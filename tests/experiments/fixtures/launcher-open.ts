@@ -56,6 +56,8 @@ export interface Rig {
   survivors(): Promise<number[]>;
   /** Saves what a failed sample leaves to read. */
   keep?(): Promise<void>;
+  /** Problems with the Chrome a successful open started, read while it runs (the host twin's flag). */
+  inspect?(opened: Opened): Promise<string[]>;
   dispose(): Promise<void>;
 }
 
@@ -241,6 +243,7 @@ async function measure(rig: Rig, again: boolean, pids: number[]): Promise<Sample
   const observation: Record<string, unknown> = { fresh: { ...first, stderr: undefined } };
   const problems = openProblems(downloads, first);
   if (first.code === 0) problems.push(...(await ackProblems(rig.scene, first)));
+  if (first.code === 0) problems.push(...((await rig.inspect?.(first)) ?? []));
   if (again && first.code === 0) {
     const second = await runOpen(rig);
     pids.push(second.pid);

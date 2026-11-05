@@ -15,10 +15,10 @@
         "fresh": {
           "code": 0,
           "root": "<root>/downloads",
-          "boot": "9a4a9c10-8e4a-413b-88e5-ecf872215d9e",
-          "token": "9a4a9c10-8e4a-413b-88e5-ecf872215d9e",
-          "pid": 53518,
-          "ms": 1140
+          "boot": "9d607ab4-757e-4813-82a7-54b03389da00",
+          "token": "9d607ab4-757e-4813-82a7-54b03389da00",
+          "pid": 72889,
+          "ms": 1104
         }
       }
     ],
@@ -48,18 +48,18 @@
         "fresh": {
           "code": 0,
           "root": "<root>/downloads",
-          "boot": "e85c81aa-7ada-433b-8bdb-59ff0d5111f6",
-          "token": "e85c81aa-7ada-433b-8bdb-59ff0d5111f6",
-          "pid": 54309,
-          "ms": 1148
+          "boot": "6af2c39e-b331-4683-8a60-0495b660412d",
+          "token": "6af2c39e-b331-4683-8a60-0495b660412d",
+          "pid": 73505,
+          "ms": 1141
         },
         "running": {
           "code": 0,
           "root": "<root>/downloads",
-          "boot": "e85c81aa-7ada-433b-8bdb-59ff0d5111f6",
-          "token": "8e2448cc-88bd-4586-9fc8-29a0f3291f46",
-          "pid": 54415,
-          "ms": 1130
+          "boot": "6af2c39e-b331-4683-8a60-0495b660412d",
+          "token": "ba46d12c-2ee5-4e14-947a-3a3486f1e2d6",
+          "pid": 73656,
+          "ms": 1117
         }
       }
     ],

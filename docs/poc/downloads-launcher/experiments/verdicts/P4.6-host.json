@@ -27,11 +27,11 @@
         "command": "sh recnrun-launcher first-run",
         "first": {
           "code": 0,
-          "stdout": "fc183b74-c2c8-40dc-9000-e87ae37aab02 open\nnext: sh recnrun-launcher autostart on <home>/.recnrun/launcher <home>/.recnrun/launcher.record lab\n",
-          "stderr": "first-run.sh: fc183b74-c2c8-40dc-9000-e87ae37aab02: registered (Default of <home>/Library/Application Support/Google/Chrome)\nlifecycle.sh: pid=55320\nboot=54ff2905-b460-48ae-923a-5d9499a6322a\nrecnrun-launcher.sh: catalog.sh for <downloads>: exit 0\n"
+          "stdout": "f946e296-5116-49d0-aa5a-b9206f80c9df open\nnext: sh recnrun-launcher autostart on <home>/.recnrun/launcher <home>/.recnrun/launcher.record lab\n",
+          "stderr": "first-run.sh: f946e296-5116-49d0-aa5a-b9206f80c9df: registered (Default of <home>/Library/Application Support/Google/Chrome)\nlifecycle.sh: pid=75128\nboot=c7f639d5-a96d-4900-a027-8e7001d541a7\nrecnrun-launcher.sh: catalog.sh for <downloads>: exit 0\n"
         },
-        "status": "launcher stopped\nfc183b74-c2c8-40dc-9000-e87ae37aab02 open 55320 0 0\n",
-        "acked": ["54ff2905-b460-48ae-923a-5d9499a6322a.json"]
+        "status": "launcher stopped\nf946e296-5116-49d0-aa5a-b9206f80c9df open 75128 0 0\n",
+        "acked": ["c7f639d5-a96d-4900-a027-8e7001d541a7.json"]
       }
     ],
     "mode": "smoke"
