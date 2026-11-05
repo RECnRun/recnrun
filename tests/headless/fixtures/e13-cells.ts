@@ -35,6 +35,7 @@ export const HYPOTHESES = [
   "E13.t9.clones",
   "E13.t9.commands",
   "E13.t9.exclusive",
+  "E13.diag.bootstrapTab",
 ] as const;
 
 const READ_MS = 90_000;
@@ -122,13 +123,13 @@ export interface Tab {
 }
 
 /** The tabs `peer` last reported to the master's dashboard `page`; empty when the request fails. */
-export async function tabsOf(page: Lab["dashboard"], peer: string): Promise<Tab[]> {
+async function tabsOf(page: Lab["dashboard"], peer: string): Promise<Tab[]> {
   const reply = await askPeers(page, { type: "tabs", peer });
   return reply.ok ? ((reply.result as { tabs?: Tab[] }).tabs ?? []) : [];
 }
 
 /** True when `tab` is the bootstrap page of the last open of `worker`: its fragment is that open's token. */
-export const ownsTab = (tab: Tab, worker: Pick<Worker, "token">) =>
+const ownsTab = (tab: Tab, worker: Pick<Worker, "token">) =>
   worker.token !== "" && (tab.url ?? "").includes(`bootstrap.html#token=${worker.token}`);
 
 /** The worker's own tab, as the master's `tabs` request lists it; the only tab a headless worker has. */

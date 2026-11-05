@@ -1,9 +1,8 @@
 import { readFile } from "node:fs/promises";
 import type { TestInfo } from "@playwright/test";
+import { isChildProcess } from "../../browser/fixtures/clone-attach.ts";
 import { labClones } from "../../browser/fixtures/clone-rig.ts";
 import type { LabClones } from "../../browser/fixtures/clone-rig.ts";
-import { askPeers } from "../../browser/fixtures/master-restart.ts";
-import { within } from "../../browser/fixtures/trust.ts";
 import { windowOwners } from "../../browser/fixtures/x-display.ts";
 import { chromesOf } from "../../browser/fixtures/launcher-rig.ts";
 import { ackFile, bindMaster } from "../../experiments/fixtures/clone-round.ts";
@@ -13,7 +12,7 @@ import { presenceIn } from "../../experiments/fixtures/e4-launcher.ts";
 import type { Sample } from "../../experiments/outcome.ts";
 import { PAGE_ENV, PAGE_FLAG } from "./e13-lab.ts";
 import type { Mode, Worker } from "./e13-lab.ts";
-import { masterLinked, modeProblems, ownsTab, tabsOf } from "./e13-cells.ts";
+import { masterLinked, modeProblems } from "./e13-cells.ts";
 import { startSite } from "./e13-site.ts";
 import type { Site } from "./e13-site.ts";
 
@@ -23,8 +22,6 @@ import type { Site } from "./e13-site.ts";
  * is the lab's headed Playwright Chrome. The binding the local channel writes in the product is
  * written to the master's storage by the harness, as in P5.5.
  */
-
-const READ_MS = 90_000;
 
 export interface CloneLab {
   site: Site;
@@ -112,66 +109,6 @@ export async function clonesSample(lab: CloneLab, names: string[]): Promise<Samp
   return judged(problems, { clones: lab.clones.length, opens, identities: new Set(keys).size });
 }
 
-/** t9.commands: the master's `activate` of a clone's tab, as the bound master of that clone. */
-export async function cloneCommandsSample(lab: CloneLab): Promise<Sample> {
-  const problems: string[] = [];
-  const view = lab.host.master.view;
-  if (!view) throw new Error("The lab master has no dashboard.");
-  const replies: unknown[] = [];
-  for (const clone of lab.clones) {
-    const tabs = await tabsOf(view.dashboard, clone.profileId);
-    const tab = tabs.find((each) => ownsTab(each, clone)) ?? tabs[0];
-    if (!tab) {
-      problems.push(`${clone.name}: no tab`);
-      continue;
-    }
-    const activated = await askPeers(view.dashboard, {
-      type: "activate",
-      peer: clone.profileId,
-      tabId: tab.id,
-    });
-    replies.push({ name: clone.name, ok: activated.ok, titles: tabs.map((each) => each.title) });
-    if (!activated.ok) problems.push(`${clone.name}: ${activated.error}`);
-  }
-  return judged(problems, { replies });
-}
-
-/** ops.tabs: the bound master lists the tabs of every clone, the bootstrap page among them. */
-export async function cloneTabsSample(lab: CloneLab): Promise<Sample> {
-  const view = lab.host.master.view;
-  if (!view) throw new Error("The lab master has no dashboard.");
-  const problems: string[] = [];
-  const counts: Record<string, number> = {};
-  const urls: Record<string, (string | undefined)[]> = {};
-  for (const clone of lab.clones) {
-    const tabs = await tabsOf(view.dashboard, clone.profileId);
-    counts[clone.name] = tabs.length;
-    urls[clone.name] = tabs.map((tab) => tab.url);
-    if (tabs.length === 0) problems.push(`${clone.name}: the master lists no tab`);
-  }
-  return judged(problems, { tabs: counts, urls });
-}
-
-/** The marker of a clone, read from the master's remote tab list: its bootstrap page carries the clone's own token. */
-export async function cloneMarkerSample(lab: CloneLab): Promise<Sample> {
-  const problems: string[] = [];
-  const view = lab.host.master.view;
-  if (!view) throw new Error("The lab master has no dashboard.");
-  const titles: Record<string, string | undefined> = {};
-  for (const clone of lab.clones) {
-    const answered = async () => {
-      const tabs = await tabsOf(view.dashboard, clone.profileId);
-      return tabs.find((tab) => ownsTab(tab, clone))?.url;
-    };
-    titles[clone.name] = await within(answered, READ_MS);
-    if (titles[clone.name] === undefined) problems.push(`${clone.name}: no tab with its own token`);
-  }
-  return judged(problems, { titles });
-}
-
-// Chrome's child processes carry this in their command line; it is read here, never passed to Chrome.
-const CHILD_PROCESS = ["-", "-type="].join("-");
-
 /** The pids of the processes of a root that are not children (a renderer, a utility) of its main one. */
 const mainProcesses = async (root: string) =>
   (
@@ -181,7 +118,7 @@ const mainProcesses = async (root: string) =>
         line: await readFile(`/proc/${pid}/cmdline`, "utf8").catch(() => ""),
       })),
     )
-  ).filter(({ line }) => !line.includes(CHILD_PROCESS));
+  ).filter(({ line }) => !isChildProcess(line));
 
 /** What a running clone looks like after the launcher was asked to open it in the other mode. */
 async function afterRequest(lab: CloneLab, clone: Worker, asked: Mode, running: Mode) {
@@ -210,6 +147,10 @@ async function afterRequest(lab: CloneLab, clone: Worker, asked: Mode, running: 
       mainAfter: after.length,
       survivorSame: before.every((pid) => pids.has(pid)),
       windows,
+      // Which processes counted as main, when more than one did.
+      ...(after.length === 1
+        ? {}
+        : { mainLines: after.map(({ line }) => line.replaceAll("\0", " ").slice(0, 160)) }),
     },
   };
 }

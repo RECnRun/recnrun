@@ -1,13 +1,11 @@
 import { test } from "../browser/fixtures/chrome.ts";
-import { expectEveryHypothesis, recordUnavailable } from "../experiments/outcome.ts";
-import { sized } from "../experiments/samples.ts";
 import {
-  cloneCommandsSample,
-  cloneLab,
-  cloneMarkerSample,
-  cloneTabsSample,
-  clonesSample,
-} from "./fixtures/e13-clones.ts";
+  expectEveryHypothesis,
+  recordHypothesis,
+  recordUnavailable,
+} from "../experiments/outcome.ts";
+import { sized } from "../experiments/samples.ts";
+import { cloneLab, clonesSample } from "./fixtures/e13-clones.ts";
 import { exclusiveSample } from "./fixtures/e13-clones.ts";
 import {
   EXPERIMENT,
@@ -17,6 +15,7 @@ import {
   record,
   workersSample,
 } from "./fixtures/e13-cells.ts";
+import { bootstrapTabSample } from "./fixtures/e13-diagnostic.ts";
 import { alternateSample, backgroundSample } from "./fixtures/e13-lifecycle.ts";
 import { v1Lab } from "./fixtures/e13-lab.ts";
 
@@ -89,14 +88,10 @@ test("clones of the frozen base open headless, link to the master, answer, and s
       () => clonesSample(lab, ["A", "B", "C"].slice(0, CLONES)),
       1,
     );
-    await record("ops.tabs", topology, () => cloneTabsSample(lab), 1);
-    await record("ops.marker", topology, () => cloneMarkerSample(lab), 1);
-    await record(
-      "t9.commands",
-      `${topology}; the harness writes the master's binding`,
-      () => cloneCommandsSample(lab),
-      1,
-    );
+    const noTab =
+      "not observable: a headless clone's only tab is its bootstrap page, the extension's own page, which the product never shares (tabs/open-tabs.ts toBrowserTabs; E13.diag.bootstrapTab); headless Chrome takes one target (chrome/app/chrome_main.cc ChromeMain) and no peer command opens a tab";
+    for (const hypothesis of ["ops.tabs", "ops.marker", "t9.commands"])
+      await recordUnavailable(await cellOf(hypothesis, topology), noTab);
     await record(
       "t9.exclusive",
       `${topology}; a running clone is asked for the other mode`,
@@ -106,6 +101,17 @@ test("clones of the frozen base open headless, link to the master, answer, and s
   } finally {
     await lab.dispose();
   }
+});
+
+test("diagnostic: a headless worker's only target is its bootstrap tab, which it does not share", async () => {
+  const topology =
+    "1 hand-installed worker opened with open.sh's arguments in --headless=new plus a debugging port; Playwright is attached to it";
+  const cell = {
+    ...(await cellOf("diag.bootstrapTab", "")),
+    topology,
+    debugger: "attached" as const,
+  };
+  await recordHypothesis(cell, bootstrapTabSample, { full: 1 });
 });
 
 test("every E13 hypothesis left a verdict", async () => {
