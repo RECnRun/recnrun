@@ -27,7 +27,7 @@ const IDENT = `"identity":{"key":"${"B".repeat(87)}","signedAt":1,"signature":"$
 // Records its argv; on a template URL writes the ack STUB_ACK names (good: the template ack, which
 // carries no identity; plain: a token ack without the template fields); on a clone URL, when STUB_CLONE
 // is set, writes the clone ack (unprovisioned drops the provisioned field, symlink and oversize change the file; STUB_BODY_*
-// change one value of the body); on a token URL, when STUB_REOPEN is set, writes the token ack of open.sh; stays
+// change one value of the body, STUB_IDENT the identity member, STUB_PRE and STUB_POST the bytes around it); on a token URL, when STUB_REOPEN is set, writes the token ack of open.sh; stays
 // alive STUB_ALIVE seconds (deaf to SIGTERM with STUB_DEAF).
 const STUB = `#!/bin/sh
 printf '%s\\n' "$@" >"$STUB_ARGV"
@@ -60,7 +60,9 @@ case $last in
       prov=',"provisioned":true'
       [ "$STUB_CLONE" != unprovisioned ] || prov=
       id=\${STUB_BODY_INSTANCE:-$instance}
-      body='{"token":"'\${STUB_BODY_TOKEN:-$token}'","profileId":"'$id'",${IDENT},"boot":"'$token'","instanceId":"'$id'","operationId":"'\${STUB_BODY_OPERATION:-$operation}'"'"$prov"',"createdAt":1}'
+      cident='${IDENT}'
+      [ -z "\${STUB_IDENT+x}" ] || cident=$STUB_IDENT
+      body="\${STUB_PRE:-}"'{"token":"'\${STUB_BODY_TOKEN:-$token}'","profileId":"'$id'",'"$cident"',"boot":"'$token'","createdAt":1,"instanceId":"'$id'","operationId":"'\${STUB_BODY_OPERATION:-$operation}'"'"$prov"'}'"\${STUB_POST:-}"
       case $STUB_CLONE in
         symlink) printf '%s' "$body" >"$STUB_ROOT/real.json"; ln -s "$STUB_ROOT/real.json" "$dir/$token.json" ;;
         oversize) { printf '%s' "$body"; head -c 5000 /dev/zero | tr '\\0' ' '; } >"$dir/$token.json" ;;

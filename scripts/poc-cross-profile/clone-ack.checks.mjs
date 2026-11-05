@@ -40,4 +40,28 @@ for (const shell of shells) {
     }
     assert.equal(s.launches(), before);
   });
+
+  const loose = [
+    { title: "wrapped in bytes that are no JSON", extra: { STUB_PRE: "junk " } },
+    { title: "followed by a trailing byte", extra: { STUB_POST: "\n" } },
+    { title: "with an empty identity", extra: { STUB_IDENT: '"identity":{}' } },
+    {
+      title: "with an identity of a short key",
+      extra: {
+        STUB_IDENT: `"identity":{"key":"B","signedAt":1,"signature":"${"S".repeat(86)}"}`,
+      },
+    },
+  ];
+  for (const { title, extra } of loose) {
+    await test(`${shell}: a clone ack ${title} registers nothing`, (context) => {
+      const s = openScene(context, shell);
+      const result = s.open(undefined, {
+        RECNRUN_OPEN_TIMEOUT_S: "1",
+        STUB_CLONE: "good",
+        ...extra,
+      });
+      assert.equal(result.code, 69, result.err);
+      assert.equal(s.recordText().includes("role=worker"), false);
+    });
+  }
 }

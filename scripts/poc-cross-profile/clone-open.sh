@@ -94,22 +94,24 @@ find_master() {
 
 # --- The ack ---------------------------------------------------------------------------------
 
-# Prints the boot of the clone ack $1 when it is a small plain file that holds, as plain substrings of
-# the fixed grammar, this token, instance, and operation, an identity, and "provisioned":true.
+# Prints the boot of the clone ack $1 when the whole file is the closed grammar launcher-requests.ts
+# writes for a provisioned clone, in key order: token, profileId, identity, boot, createdAt, instanceId,
+# operationId, provisioned; the token, instance, and operation are this opening's.
 read_clone_ack() {
   if [ ! -f "$1" ] || [ -L "$1" ]; then return 1; fi
   size=$(wc -c <"$1" | tr -d ' ')
   [ "$size" -le 4096 ] || return 1
-  rca_text=$(cat -- "$1")
-  [ "${#rca_text}" -eq "$size" ] || return 1
-  for rca_part in "\"token\":\"$token\"" "\"profileId\":\"$instance\"" '"identity":{' \
-    "\"instanceId\":\"$instance\"" "\"operationId\":\"$operation\"" '"provisioned":true'; do
-    case $rca_text in *"$rca_part"*) ;; *) return 1 ;; esac
-  done
-  case $rca_text in *'"boot":"'*) ;; *) return 1 ;; esac
-  rca_rest=${rca_text#*'"boot":"'}
-  rca_boot=${rca_rest%%\"*}
-  is_uuid "$rca_boot" || return 1
+  ack_rest=$(cat -- "$1")
+  [ "${#ack_rest}" -eq "$size" ] || return 1
+  ack_take '{"token":"' '"' && [ "$ack_value" = "$token" ] || return 1
+  ack_take '","profileId":"' '"' && [ "$ack_value" = "$instance" ] || return 1
+  read_ack_identity || return 1
+  ack_take '"},"boot":"' '"' && is_uuid "$ack_value" || return 1
+  rca_boot=$ack_value
+  ack_take '","createdAt":' ',' && is_time "$ack_value" || return 1
+  ack_take ',"instanceId":"' '"' && [ "$ack_value" = "$instance" ] || return 1
+  ack_take '","operationId":"' '"' && [ "$ack_value" = "$operation" ] || return 1
+  [ "$ack_rest" = '","provisioned":true}' ] || return 1
   printf '%s\n' "$rca_boot"
 }
 # One look under every candidate Downloads root, the clone's pinned one first; sets acked_root and
