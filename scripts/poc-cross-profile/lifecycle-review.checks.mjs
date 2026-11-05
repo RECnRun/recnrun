@@ -3,11 +3,12 @@ import { spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
-import { shells } from "./lab.mjs";
-import { env, life, scene, script } from "./lifecycle-lab.mjs";
+import { ALICE, shells } from "./lab.mjs";
+import { alive, env, life, scene, script } from "./lifecycle-lab.mjs";
 
 const EX_REFUSED = 65;
 const EX_BUSY = 75;
+const EX_FAILED = 70;
 
 for (const shell of shells) {
   await test(`${shell}: a counter that is not canonical decimal is refused before any effect`, (context) => {
@@ -85,5 +86,48 @@ for (const shell of shells) {
       assert.equal(existsSync(`${lock}.reclaim`), false);
       assert.equal(spawnSync("rm", ["-f", lock]).status, 0);
     }
+  });
+
+  const siblings = [
+    { title: "Profile 1", name: "Profile 1", withPreferences: true, shared: "1" },
+    { title: "Profile 12", name: "Profile 12", withPreferences: true, shared: "1" },
+    { title: "System Profile", name: "System Profile", withPreferences: true, shared: "0" },
+    { title: "Guest Profile", name: "Guest Profile", withPreferences: true, shared: "0" },
+    {
+      title: "a Profile 1 folder without Preferences",
+      name: "Profile 1",
+      withPreferences: false,
+      shared: "0",
+    },
+  ];
+  for (const { title, name, withPreferences, shared } of siblings) {
+    await test(`${shell}: ${title} beside the registered profile makes shared=${shared}`, (context) => {
+      const { state, root, vars, request, field } = scene(context);
+      mkdirSync(join(root, name));
+      if (withPreferences) writeFileSync(join(root, name, "Preferences"), "{}");
+      assert.equal(request(shell).code, 0);
+      assert.equal(field("shared"), shared);
+      const pid = Number(field("pid"));
+      const stopped = life(shell, ["stop", state, ALICE], vars({ RECNRUN_LIFECYCLE_STOP_S: "5" }));
+      if (shared === "1") {
+        assert.equal(stopped.code, EX_FAILED, stopped.err);
+        assert.equal(alive(pid), true, "nothing was signalled");
+      } else {
+        assert.equal(stopped.code, 0, stopped.err);
+        assert.equal(alive(pid), false);
+      }
+    });
+  }
+
+  await test(`${shell}: a profile opened into a Chrome already on its root records that Chrome's pid`, (context) => {
+    const { root, request, field, spawned } = scene(context, { RECNRUN_STUB_FORWARD: "1" });
+    // The root's own Chrome, running before the request; the stub of the request forwards and exits.
+    const main = spawn("sh", ["-c", "sleep 30; :", "sh", `--user-data-dir=${root}`], {
+      stdio: "ignore",
+    });
+    spawned.push(main.pid);
+    assert.equal(request(shell).code, 0);
+    assert.equal(field("shared"), "0");
+    assert.equal(Number(field("pid")), main.pid, "not the forwarder's pid");
   });
 }

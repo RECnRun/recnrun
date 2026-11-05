@@ -16,7 +16,7 @@
 #
 # State, <state-dir>/profiles/<profileId>: key=value lines with token, pid, startedAt, attempts,
 # nextAt (epoch seconds), status (idle, opening, open, failed, paused, stopped), boot, root (the
-# Downloads root), userDataDir, shared (1 when another record block names the same userDataDir); any other key or value outside its grammar exits 65. Numbers are canonical decimal (no leading zero, a pid above zero, attempts at most the maximum). userDataDir and
+# Downloads root), userDataDir, shared (1 when another record block names the same userDataDir or the folder holds another profile: Default or Profile <n> with a Preferences file); any other key or value outside its grammar exits 65. Numbers are canonical decimal (no leading zero, a pid above zero, attempts at most the maximum). userDataDir and
 # pid are written when the attempt starts and the Chrome launches, so a timed-out open (69) keeps both
 # and stop can still end that Chrome.
 # Pause policy: an extension signals Disconnect/Forget by going silent, which is not a crash. An open
@@ -26,8 +26,8 @@
 # exits 73) until resume; resume turns a paused or stopped profile into idle, which request launches.
 #
 # Shared roots: profiles of one user data dir live in one Chrome (the process singleton forwards a
-# second open to it and the new process exits), so a shared-root profile's pid is that main process,
-# found by its command line after the ack; stop is refused (70) because a signal would close every
+# second open to it and the new process exits), so the pid of any profile is that main process after
+# its ack (shared or not: the person may have the root open already), found by its command line; stop is refused (70) because a signal would close every
 # profile of the root, and a dead main process is a crash that each profile's request relaunches.
 #
 # Environment: RECNRUN_OPEN_TIMEOUT_S (60), RECNRUN_LIFECYCLE_BACKOFF_S (5), _MAX_ATTEMPTS (5), _STOP_S (20).
@@ -110,9 +110,9 @@ cmd_stop() {
 
 # --- Request ---------------------------------------------------------------------------------
 
-# After the ack of a shared-root profile, the pid of record is the root's main process, never the forwarder's.
+# After every ack the pid of record is the root's main process, never a forwarder's: a root already
+# running Chrome hands the open to it and the new process exits, shared or not.
 adopt_main_pid() {
-  [ "$st_shared" = 1 ] || return 0
   am_pid=$(main_pid_of "$st_user") || return 0
   st_pid=$am_pid
 }

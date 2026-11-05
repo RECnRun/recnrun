@@ -19,13 +19,20 @@ pid_alive() {
   case $(ps -o stat= -p "$1" 2>/dev/null) in Z*) return 1 ;; esac
   return 0
 }
-# True when more than one block of the record names the user data dir $1.
+# True when the user data dir $1 is shared: the record $2 names it in more than one block, or the
+# folder holds more than one Chrome profile (Default, Profile <n> with a Preferences file; System
+# Profile and Guest Profile are not profiles a person opens), because a signal closes them all.
 root_is_shared() {
   rs_count=0
   while IFS= read -r rs_line || [ -n "$rs_line" ]; do
     [ "$rs_line" != "userDataDir=$1" ] || rs_count=$((rs_count + 1))
   done <"$2"
-  [ "$rs_count" -gt 1 ]
+  [ "$rs_count" -le 1 ] || return 0
+  rs_dirs=0
+  for rs_dir in "$1/Default" "$1"/Profile\ [0-9]*; do
+    [ ! -f "$rs_dir/Preferences" ] || rs_dirs=$((rs_dirs + 1))
+  done
+  [ "$rs_dirs" -gt 1 ]
 }
 # True when the command line $1 carries --user-data-dir=<$2> as a whole argument: a root that only
 # starts with $2 (/tmp/root other) is another root, so the value must end at the next flag or the end.
