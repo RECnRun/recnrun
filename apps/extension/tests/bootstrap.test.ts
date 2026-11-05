@@ -66,10 +66,14 @@ describe("bootstrap", () => {
     });
   });
 
-  test("asks for no ack when the presence failed", async () => {
+  test("asks for no ack when the presence failed twice, and reports the failure instead", async () => {
     const deps = dependencies(`#token=${TOKEN}`, { ok: false, error: "Invalid filename" });
     expect(await bootstrap(deps)).toEqual({ ok: false, error: "Invalid filename" });
-    expect(deps.send).toHaveBeenCalledTimes(1);
+    expect(deps.send.mock.calls.map(([message]) => (message as { type: string }).type)).toEqual([
+      "POC_PUBLISH_PRESENCE",
+      "POC_PUBLISH_PRESENCE",
+      "POC_LAUNCHER_FAILURE",
+    ]);
   });
 
   test.each([

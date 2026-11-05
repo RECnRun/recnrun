@@ -21,7 +21,7 @@ type Listener = (
 
 const written: Written[] = [];
 
-/** The listeners the bootstrap registers, in registration order: ack, provision, prepare. */
+/** The listeners the bootstrap registers, in registration order: ack, failure, provision, prepare. */
 function bootstrapped(presence: Awaited<ReturnType<Parameters<typeof startedOutward>[0]>>) {
   const listeners: Listener[] = [];
   vi.spyOn(browser.runtime.onMessage, "addListener").mockImplementation((listener) => {
@@ -74,12 +74,12 @@ describe("startedOutward", () => {
   });
 
   test("with poc, answers the ack, the provisioning and the prepare request", () => {
-    expect(bootstrapped(fakePresence(STATEMENT)).listeners).toHaveLength(3);
+    expect(bootstrapped(fakePresence(STATEMENT)).listeners).toHaveLength(4);
   });
 
   test("refuses the prepare request of a profile that is not the master", async () => {
     const { listeners } = bootstrapped(fakePresence(STATEMENT));
-    expect(await ask(listeners[2])).toEqual({
+    expect(await ask(listeners[3])).toEqual({
       ok: false,
       error: "Only the master prepares workers.",
     });
@@ -95,14 +95,14 @@ describe("startedOutward", () => {
       source: "pairing",
     });
     const { listeners } = bootstrapped(fakePresence(STATEMENT));
-    expect(await ask(listeners[2])).toMatchObject({ ok: false });
+    expect(await ask(listeners[3])).toMatchObject({ ok: false });
     expect(written).toEqual([]);
   });
 
   test("the master writes the request under the identity of the latest presence", async () => {
     await roleRepository.write({ role: "master", profileId: MASTER, identity: MASTER_KEY });
     const { listeners } = bootstrapped(fakePresence(STATEMENT));
-    expect(await ask(listeners[2])).toEqual({ ok: true });
+    expect(await ask(listeners[3])).toEqual({ ok: true });
     expect(written).toHaveLength(1);
     expect(written[0]?.filename).toBe(`RECnRun/poc/lab/ops/${OP}/request.json`);
     const body = decodeURIComponent((written[0]?.url ?? "").split(",").slice(1).join(","));
@@ -112,7 +112,7 @@ describe("startedOutward", () => {
   test("the master has nothing to state before a presence was published", async () => {
     await roleRepository.write({ role: "master", profileId: MASTER, identity: MASTER_KEY });
     const { listeners } = bootstrapped(undefined);
-    expect(await ask(listeners[2])).toEqual({
+    expect(await ask(listeners[3])).toEqual({
       ok: false,
       error: "No presence has been published yet.",
     });

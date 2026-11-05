@@ -4,9 +4,13 @@ import { OFFSCREEN_PAGE } from "@/background/listener";
 import { BackgroundReplySchema } from "@/messaging/background-reply";
 import { linkCommandMessage } from "@/messaging/peer-messages";
 import type { LinkCommand } from "@/messaging/peer-messages";
+import { bounded } from "@/p2p/bounded";
 import { PocFingerprintResultSchema, pocFingerprintRequest } from "@/messaging/poc-fingerprint";
 import { PocLivenessResultSchema, pocLivenessRequest } from "@/messaging/poc-liveness";
 import type { LinkLiveness } from "@/messaging/poc-liveness";
+
+// Inside the 10 s the bootstrap page gives one presence publish.
+const OFFSCREEN_MS = 4_000;
 
 let creating: Promise<void> | undefined;
 // Read through a function, so a check after an await is not narrowed to the value before it.
@@ -61,12 +65,22 @@ export async function askLink(command: LinkCommand): Promise<unknown> {
 }
 
 /** A POC request the offscreen document answers, creating the document first. */
-async function askOffscreen<T>(request: unknown, schema: v.GenericSchema<unknown, T>): Promise<T> {
+async function askOnce<T>(request: unknown, schema: v.GenericSchema<unknown, T>): Promise<T> {
   await ensureOffscreen();
   const reply = v.safeParse(BackgroundReplySchema, await browser.runtime.sendMessage(request));
   if (!reply.success) throw new Error("The offscreen document did not answer.");
   if (!reply.output.ok) throw new Error(reply.output.error);
   return v.parse(schema, reply.output.result);
+}
+
+/** Bounded; a stall or failure closes the document, so the caller's retry recreates it. */
+async function askOffscreen<T>(request: unknown, schema: v.GenericSchema<unknown, T>): Promise<T> {
+  try {
+    return await bounded(askOnce(request, schema), OFFSCREEN_MS, "The offscreen document");
+  } catch (error) {
+    await bounded(closeOffscreen(), OFFSCREEN_MS, "Closing the offscreen document").catch(() => {});
+    throw error;
+  }
 }
 
 /** The offscreen document's certificate fingerprint, creating the document first. */
