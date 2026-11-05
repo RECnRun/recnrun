@@ -1,0 +1,77 @@
+[
+  {
+    "experiment": "P4.3.shared",
+    "hypothesis": "P4.3.open.sharedRoot",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "two profiles of one root: Default running, open.sh for Profile 1",
+    "debugger": "none",
+    "observations": [
+      {
+        "mainPid": 1114,
+        "forwarderPid": 1352,
+        "secondMs": 1044,
+        "secondBoot": "its fresh token"
+      },
+      {
+        "mainPid": 2247,
+        "forwarderPid": 2487,
+        "secondMs": 1042,
+        "secondBoot": "its fresh token"
+      },
+      {
+        "mainPid": 3364,
+        "forwarderPid": 3608,
+        "secondMs": 1046,
+        "secondBoot": "its fresh token"
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "P4.3.shared",
+    "hypothesis": "P4.3.open.sharedRunning",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "the same, then a second open.sh for Profile 1 while it runs",
+    "debugger": "none",
+    "verdict": "pass",
+    "samples": 3,
+    "gestures": 0,
+    "steps": [],
+    "observations": [
+      {
+        "mainPid": 4498,
+        "forwarderPid": 4738,
+        "secondMs": 1049,
+        "secondBoot": "its fresh token",
+        "thirdBootKept": true
+      },
+      {
+        "mainPid": 5724,
+        "forwarderPid": 5966,
+        "secondMs": 1045,
+        "secondBoot": "its fresh token",
+        "thirdBootKept": true
+      },
+      {
+        "mainPid": 6955,
+        "forwarderPid": 7193,
+        "secondMs": 1046,
+        "secondBoot": "its fresh token",
+        "thirdBootKept": true
+      }
+    ]
+  }
+]

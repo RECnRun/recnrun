@@ -1,0 +1,35 @@
+[
+  {
+    "experiment": "E9",
+    "hypothesis": "E9.sharedRoot",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "two profiles of one root, Default open: the second is forwarded",
+    "debugger": "none",
+    "verdict": "pass",
+    "samples": 3,
+    "gestures": 0,
+    "steps": [],
+    "observations": [
+      {
+        "mains": [991],
+        "pid": "991",
+        "stop": 70
+      },
+      {
+        "mains": [2217],
+        "pid": "2217",
+        "stop": 70
+      },
+      {
+        "mains": [3452],
+        "pid": "3452",
+        "stop": 70
+      }
+    ]
+  }
+]
