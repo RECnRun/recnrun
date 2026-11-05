@@ -17,8 +17,10 @@
 # Output: pid=<n> on stderr at once; on stdout root=<downloadsRoot>, boot=<uuid>, token=<uuid>.
 # The extension id is the first line of the file `extension-id` next to this script (the id the
 # POC builds pin). Environment: RECNRUN_OPEN_TIMEOUT_S (60) and RECNRUN_OPEN_POLL_S (1) bound the wait; RECNRUN_DISCOVERY_PREFIX and RECNRUN_DISCOVERY_UNAME as in profiles.sh.
-# Exit: 0 acked, 64 wrong call, 65 refused request, 66 no Chrome or extension id or the unpacked build's
-# folder is gone, 69 no ack in time.
+# A main Chrome already running on the root in the other mode (headed vs --headless) is refused at once
+# (65), never handed a second launch: the process singleton would forward it and no ack would come.
+# Exit: 0 acked, 64 wrong call, 65 refused request (the other mode already runs on the root), 66 no
+# Chrome or extension id or the unpacked build's folder is gone, 69 no ack in time.
 
 # profiles.sh reuses the name as_library, so this one stays apart.
 open_as_library=${RECNRUN_DISCOVERY_LIB:-}
@@ -28,6 +30,8 @@ RECNRUN_DISCOVERY_LIB=$open_as_library # a dot keeps its own assignment: give ba
 here=$(dirname -- "$0")
 # shellcheck source=record.sh
 . "$here/record.sh"
+# shellcheck source=lifecycle-state.sh
+. "$here/lifecycle-state.sh"
 
 log() { printf 'open.sh: %s\n' "$*" >&2; }
 refuse() {
@@ -189,8 +193,21 @@ wait_for_ack() {
 
 # --- The request -----------------------------------------------------------------------------
 
+# One visible and one headless Chrome never share a root: refuses when the main process on $p_user runs the other mode.
+refuse_other_mode() {
+  st_pid=''
+  rm_pid=$(main_pid_of "$p_user") || return 0
+  [ -n "$rm_pid" ] || return 0
+  rm_cmd=$(ps -o command= -p "$rm_pid" 2>/dev/null)
+  case $rm_cmd in
+    *" --headless"*) rm_running=headless ;;
+    *) rm_running=headed ;;
+  esac
+  [ "$rm_running" = "$mode" ] || refuse "$p_user already runs $rm_running; quit it before opening it $mode"
+}
 # Chrome runs in the background with separate words, never through a shell string.
 start_chrome() {
+  refuse_other_mode
   finder=chrome_binary # by name: ShellCheck would read a bare call as a forgotten "$@"
   chrome=$("$finder") || { log 'no Google Chrome found'; exit 66; }
   url=chrome-extension://$p_ext/bootstrap.html#token=$1

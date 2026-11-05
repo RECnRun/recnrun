@@ -21,7 +21,7 @@
 #
 # A clone the record already registers is an ordinary reopen: open.sh open runs and its output and
 # status are this script's. Environment: RECNRUN_OPEN_TIMEOUT_S (60) and RECNRUN_OPEN_POLL_S (1).
-# Exit: 0 acked, 64 wrong call, 65 refused, 66 no Chrome or no master presence, 69 no ack in time,
+# Exit: 0 acked, 64 wrong call, 65 refused (a reopen in the other mode than the one running included), 66 no Chrome or no master presence, 69 no ack in time,
 # 70 the record or marker could not be written, 75 a process names the clone root.
 
 co_as_library=${RECNRUN_DISCOVERY_LIB:-}

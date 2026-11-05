@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -19,6 +19,7 @@ const STUB = `#!/bin/sh
 KEY=${"B".repeat(87)}
 SIG=${"S".repeat(86)}
 for a in "$@"; do last=$a; done
+[ -z "\${STUB_HOLD:-}" ] || { sleep "$STUB_HOLD"; exit 0; }
 printf '%s\\n' "$@" >"$STUB_ARGV"
 [ -n "\${STUB_ROOT:-}" ] || exit 0
 sleep "\${STUB_DELAY:-1}"
@@ -87,6 +88,15 @@ export function scene(context, { blocks } = {}) {
     STUB_DELAY: "0",
     ...extra,
   });
-  return { home, root, record, argv, env, block };
+  return { home, root, record, argv, env, block, chrome };
+}
+
+/** A main Chrome process on the scene's root (the stub, held for a while) with the given flags. */
+export function holdChrome(context, { home, root, chrome }, ...flags) {
+  const child = spawn(chrome, [`--user-data-dir=${root}`, ...flags], {
+    env: { PATH: process.env.PATH, STUB_HOLD: "30", STUB_ARGV: join(home, "held.txt") },
+    stdio: "ignore",
+  });
+  context.after(() => child.kill());
 }
 export const request = (record, id = ALICE, ...rest) => ["open", record, NAMESPACE, id, ...rest];

@@ -84,7 +84,7 @@ Everything in [PLAN.md](PLAN.md) that needs a person. The owner authorized Claud
 
 ## After P7
 
-- **M-P7.a Headless clones with the Default as controller (T9).** Owner's run after P7, with the clones of M-P6.a (owner, 2026-11-05). Quit the clones, then open each one with `clone-open.sh ... headless` and confirm that `ps` shows `--headless` and no window appears. In the Default's dashboard, confirm each clone is listed as linked. In the dashboard's DevTools console, run `chrome.runtime.sendMessage({ type: "peer", request: { type: "open-tab", peer: "<clone profile id>", url: "https://example.com/" } })` for each clone; the clone's tab list then shows `Example Domain`, and Activate answers ok. Asking a running headless clone for headed exits 69 and leaves one main process. Record the open times, and whether every clone linked and answered. [E13.md](experiments/E13.md) has the lab result.
+- **M-P7.a Headless clones with the Default as controller (T9).** Owner's run after P7, with the clones of M-P6.a (owner, 2026-11-05). Quit the clones, then open each one with `clone-open.sh ... headless` and confirm that `ps` shows `--headless` and no window appears. In the Default's dashboard, confirm each clone is listed as linked. In the dashboard's DevTools console, run `chrome.runtime.sendMessage({ type: "peer", request: { type: "open-tab", peer: "<clone profile id>", url: "https://example.com/" } })` for each clone; the clone's tab list then shows `Example Domain`, and Activate answers ok. Asking a running headless clone for headed exits 65 and leaves one main process. Record the open times, and whether every clone linked and answered. [E13.md](experiments/E13.md) has the lab result.
   Result: …
 
 ## After P9
