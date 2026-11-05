@@ -65,7 +65,7 @@ test("clones of the frozen base open headless, link to the master, answer, and s
 
 test("diagnostic: a headless worker's only target is its bootstrap tab, which it does not share", async () => {
   const topology =
-    "1 hand-installed worker opened with open.sh's arguments in --headless=new plus a debugging port; Playwright is attached to it";
+    "1 hand-installed worker opened by open.sh headless with a debugging port added; Playwright is attached to it, and the master reads the tabs it shares";
   const cell = {
     ...(await cellOf("diag.bootstrapTab", "")),
     topology,

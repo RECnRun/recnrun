@@ -1,23 +1,30 @@
-import { spawn } from "node:child_process";
-import { readFile, rm } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { chromium } from "@playwright/test";
 import { POC_EXTENSION_ID } from "../../browser/fixtures/downloads-profiles.ts";
-import { chromesOf, installProfile, skeleton } from "../../browser/fixtures/launcher-rig.ts";
+import { askPeers } from "../../browser/fixtures/master-restart.ts";
 import { within } from "../../browser/fixtures/trust.ts";
 import { judged } from "../../experiments/fixtures/downloads-verdicts.ts";
 import type { Sample } from "../../experiments/outcome.ts";
-import { quit } from "../../experiments/fixtures/launcher-open.ts";
+import { bindMasterSide, masterLinked } from "./e13-cells.ts";
+import { dockerRig, v1Lab } from "./e13-lab.ts";
+import type { Lab, LabRig } from "./e13-lab.ts";
 
 /*
- * E13's diagnostic cell (POC PLAN.md P7.4, R10): one worker opened with open.sh's own arguments in
- * --headless=new, plus a debugging port, so the lab reads what its only target is and what the
- * extension's tabs API and the product's shared-tab filter make of it. No verdict of a worker
- * without a client rests on this cell.
+ * E13's diagnostic cell (POC PLAN.md P7.4, R10): one worker opened by open.sh, its own arguments
+ * plus a debugging port, so the lab reads what its only target is and what the product shares of
+ * it: the master asks the worker for its tabs over the verified link, as the dashboard does. No
+ * verdict of a worker without a client rests on this cell.
  */
 
 const ENDPOINT_MS = 30_000;
-const PAGE_MS = 30_000;
+const BOOTSTRAP = `chrome-extension://${POC_EXTENSION_ID}/bootstrap.html`;
+
+/** The lab's rig with a debugging port on the launcher's Chrome, which the diagnostic alone allows. */
+const debuggable = (rig: LabRig): LabRig => ({
+  ...rig,
+  frame: (flags) => rig.frame([...flags, "--remote-debugging-port=0"]),
+});
 
 async function endpointOf(root: string) {
   const read = async () => {
@@ -30,84 +37,62 @@ async function endpointOf(root: string) {
   return found;
 }
 
-interface Listed {
-  own: string;
-  tabs: { id?: number; windowId: number; url?: string }[];
-  windows: { id?: number; type?: string; tabs: number }[];
+interface Target {
+  type: string;
+  url: string;
 }
 
-interface PageChrome {
-  tabs: { query(filter: object): Promise<{ id?: number; windowId: number; url?: string }[]> };
-  windows: {
-    getAll(filter: object): Promise<{ id?: number; type?: string; tabs?: unknown[] }[]>;
-  };
-  runtime: { getURL(path: string): string };
+interface Shared {
+  tabs?: { url?: string }[];
 }
 
-/** What the extension's own page reads: every tab, the normal windows, and its own origin. */
-const listInPage = async (): Promise<Listed> => {
-  const { chrome } = globalThis as unknown as { chrome: PageChrome };
-  const tabs = await chrome.tabs.query({});
-  const windows = await chrome.windows.getAll({ populate: true, windowTypes: ["normal"] });
-  return {
-    own: chrome.runtime.getURL("/"),
-    tabs: tabs.map(({ id, windowId, url }) => ({ id, windowId, url })),
-    windows: windows.map(({ id, type, tabs: each = [] }) => ({ id, type, tabs: each.length })),
-  };
-};
+/** Every page target must be the bootstrap tab, exactly one, and the product must share none. */
+function targetProblems(targets: Target[], token: string, shared: Shared["tabs"]): string[] {
+  const problems: string[] = [];
+  const pages = targets.filter(({ type }) => type === "page");
+  const [only] = pages;
+  if (pages.length !== 1) problems.push(`${pages.length} page targets, not exactly one`);
+  if (only && !only.url.startsWith(BOOTSTRAP)) problems.push(`the page target is ${only.url}`);
+  if (only && !only.url.includes(token)) problems.push("the page target does not carry the token");
+  if (shared === undefined) problems.push("the master got no tabs of the worker");
+  else if (shared.length !== 0) problems.push(`the product shares ${shared.length} tab(s)`);
+  return problems;
+}
 
-/** diag.bootstrapTab: the bootstrap target is a tab of a normal window, and the shared tabs leave it out. */
+/** diag.bootstrapTab: the worker's only page target is its bootstrap tab, and the product shares nothing. */
 export async function bootstrapTabSample(): Promise<Sample> {
-  const rig = await skeleton(undefined, ["--remote-debugging-port=0"]);
-  const root = join(rig.dir, "worker");
+  const lab = await v1Lab(1, debuggable(dockerRig));
   try {
-    await installProfile(root, join(rig.dir, "downloads"), rig.record, "Default");
-    await rm(join(root, "DevToolsActivePort"), { force: true });
-    const url = `chrome-extension://${POC_EXTENSION_ID}/bootstrap.html#token=diagnostic`;
-    const args = ["--headless=new", `--user-data-dir=${root}`, "--profile-directory=Default"];
-    const child = spawn(
-      join(rig.dir, "bin", "google-chrome"),
-      [...args, "--no-first-run", "--no-default-browser-check", url],
-      { env: rig.env, stdio: "ignore" },
-    );
-    try {
-      return await observe(root);
-    } finally {
-      await quit({ survivors: () => chromesOf(root) }, [child.pid ?? 0]);
-    }
+    return await observe(lab);
   } finally {
-    await rig.dispose();
+    await lab.dispose();
   }
 }
 
-async function observe(root: string): Promise<Sample> {
+async function observe(lab: Lab) {
+  const [worker] = lab.workers;
+  if (!worker) throw new Error("The diagnostic has no worker.");
+  const opened = await lab.open(worker, "headless");
+  if (opened.code !== 0)
+    return judged([`open exited ${opened.code} ${opened.stderr.slice(-160)}`], {});
+  const problems: string[] = [];
+  // A client that attaches earlier changes the download behavior the rendezvous needs, so it waits.
+  if (!(await masterLinked(lab, [worker.profileId]))) problems.push("the master never linked it");
+  problems.push(...(await bindMasterSide(lab)).problems);
+  const reply = await askPeers(lab.dashboard, { type: "tabs", peer: worker.profileId });
+  const shared = reply.ok ? (reply.result as Shared).tabs : undefined;
+  const targets = await targetsOf(worker.root);
+  problems.push(...targetProblems(targets, worker.token, shared));
+  return judged(problems, { targets, shared: shared?.length ?? null });
+}
+
+/** The targets of the worker, read over the debugging port by a client that attaches last. */
+async function targetsOf(root: string): Promise<Target[]> {
   const browser = await chromium.connectOverCDP(await endpointOf(root));
   try {
     const cdp = await browser.newBrowserCDPSession();
-    const { targetInfos } = (await cdp.send("Target.getTargets")) as {
-      targetInfos: { type: string; url: string }[];
-    };
-    const targets = targetInfos.map(({ type, url }) => ({ type, url }));
-    const page = await within(
-      async () =>
-        browser
-          .contexts()
-          .flatMap((context) => context.pages())
-          .find((each) => each.url().includes("bootstrap.html")),
-      PAGE_MS,
-    );
-    if (!page) return judged(["no bootstrap page target"], { targets });
-    const listed = await page.evaluate(listInPage);
-    // tabs/open-tabs.ts toBrowserTabs: the extension's own pages are nothing to record.
-    const shared = listed.tabs.filter(
-      (tab) => tab.id !== undefined && !tab.url?.startsWith(listed.own),
-    );
-    const problems: string[] = [];
-    const bootstrap = listed.tabs.filter((tab) => tab.url?.includes("bootstrap.html"));
-    if (bootstrap.length !== 1) problems.push("tabs.query does not list the bootstrap page once");
-    if (listed.windows.every((each) => each.tabs === 0)) problems.push("no normal window holds it");
-    if (shared.length !== 0) problems.push("the shared tabs keep a page");
-    return judged(problems, { targets, ...listed, shared: shared.length });
+    const { targetInfos } = (await cdp.send("Target.getTargets")) as { targetInfos: Target[] };
+    return targetInfos.map(({ type, url }) => ({ type, url }));
   } finally {
     await browser.close().catch(() => undefined);
   }
