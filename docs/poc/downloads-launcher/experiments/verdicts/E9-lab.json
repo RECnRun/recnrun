@@ -1,0 +1,172 @@
+[
+  {
+    "experiment": "E9",
+    "hypothesis": "E9.duplicate",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "three requests on one closed profile: two together, one during the open",
+    "debugger": "none",
+    "observations": [
+      {
+        "codes": [0, 75, 75]
+      },
+      {
+        "codes": [0, 75, 75]
+      },
+      {
+        "codes": [0, 75, 75]
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "E9",
+    "hypothesis": "E9.idempotent",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "a request on a running profile with a fresh presence",
+    "debugger": "none",
+    "observations": [
+      {
+        "boots": ["5cba4187-4c16-4ffd-a438-b2abeba60aa4", "5cba4187-4c16-4ffd-a438-b2abeba60aa4"]
+      },
+      {
+        "boots": ["0f86db4b-e98e-4012-95de-3b3eb86340cc", "0f86db4b-e98e-4012-95de-3b3eb86340cc"]
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 2
+  },
+  {
+    "experiment": "E9",
+    "hypothesis": "E9.backoff",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "a registered root whose Chrome never acks: failed, then refused until nextAt",
+    "debugger": "none",
+    "observations": [
+      {
+        "state": {
+          "token": "",
+          "pid": "3578",
+          "startedAt": "1793839895",
+          "attempts": "1",
+          "nextAt": "1793840018",
+          "status": "failed",
+          "boot": "",
+          "root": "",
+          "userDataDir": ""
+        }
+      },
+      {
+        "state": {
+          "token": "",
+          "pid": "3954",
+          "startedAt": "1793839899",
+          "attempts": "1",
+          "nextAt": "1793840022",
+          "status": "failed",
+          "boot": "",
+          "root": "",
+          "userDataDir": ""
+        }
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 2
+  },
+  {
+    "experiment": "E9",
+    "hypothesis": "E9.restart",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "the launched Chrome killed, its presence expired, a request relaunches",
+    "debugger": "none",
+    "observations": [
+      {
+        "boots": ["806f3e0c-8a60-4bf8-8cd0-b50fd918f78a", "2dc07152-63cc-4291-922c-fdfe77142a73"]
+      },
+      {
+        "boots": ["19b42faa-15ab-4ab0-ba8c-da8e8e4518d3", "3f70bedd-1b2c-45b7-ad51-a742d704990b"]
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 2
+  },
+  {
+    "experiment": "E9",
+    "hypothesis": "E9.stop",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "stop signals the launched Chrome only, beside a bystander Chrome",
+    "debugger": "none",
+    "observations": [
+      {
+        "ms": 1022
+      },
+      {
+        "ms": 1032
+      },
+      {
+        "ms": 1029
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "E9",
+    "hypothesis": "E9.pause",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "a paused profile is not launched; resumed, it is",
+    "debugger": "none",
+    "verdict": "pass",
+    "samples": 2,
+    "gestures": 0,
+    "steps": [],
+    "observations": [
+      {
+        "refused": 73
+      },
+      {
+        "refused": 73
+      }
+    ]
+  }
+]
