@@ -67,7 +67,7 @@ Everything in [PLAN.md](PLAN.md) that needs a person. The owner authorized Claud
 
 ## After P4
 
-- **M-P4.a Autostart after an OS login.** `recnrun-launcher autostart on`, log out and back in (or restart), confirm the LaunchAgent started the launcher without a command and that `status` reports it; then `autostart off` and confirm it did not start on the next login.
+- **M-P4.a Autostart after an OS login.** `sh scripts/poc-cross-profile/recnrun-launcher.sh autostart on <state-dir> <record> <namespace>` (absolute paths without spaces; `<state-dir>` an existing folder, `<record>` the launcher record), log out and back in (or restart), confirm the LaunchAgent started the launcher without a command and that `sh scripts/poc-cross-profile/recnrun-launcher.sh status <state-dir>` reports `launcher running`; then `sh scripts/poc-cross-profile/recnrun-launcher.sh autostart off <state-dir> <record> <namespace>` and confirm it did not start on the next login.
   Result: …
 
 ## After P5

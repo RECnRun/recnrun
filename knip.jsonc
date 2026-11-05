@@ -4,7 +4,7 @@
   "ignoreDependencies": ["oxfmt", "@swc/core"],
   // iproute2 tools of the test image; tests/browser/no-egress.spec.ts reads the route and the tc drop counter.
   // mkfifo (coreutils, and macOS) holds catalog.sh's lock in scripts/poc-cross-profile/catalog-guards.checks.mjs.
-  "ignoreBinaries": ["ip", "tc", "mkfifo", "shellcheck", "readlink"],
+  "ignoreBinaries": ["ip", "tc", "mkfifo", "shellcheck", "readlink", "plutil", "systemd-analyze"],
   "workspaces": {
     ".": {
       // scripts/test-host.mjs names playwright.host.config.ts, which no package script does.
