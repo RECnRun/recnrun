@@ -1,10 +1,11 @@
+import * as v from "valibot";
 import { errorMessage, toggled } from "@recnrun/domain";
 import type { RecordingSession } from "@recnrun/domain";
 import type { PeerChannel } from "@/background/peer-channel";
 import { focusTab, openTab, startSession } from "@/background/session-requests";
 import { isCommand } from "@/p2p/authorization";
 import type { Command } from "@/p2p/authorization";
-import { isWebUrl } from "@/p2p/protocol";
+import { WebUrlSchema } from "@/p2p/protocol";
 import type { PeerMessage, SharedTabs } from "@/p2p/protocol";
 import type { RecordingStore } from "@/ports/recording-store";
 import type { BrowserTabs } from "@/ports/tabs";
@@ -87,7 +88,7 @@ async function activate(tabId: number, deps: ExecutorDependencies): Promise<Outc
 }
 
 async function open(url: string): Promise<Outcome> {
-  if (!isWebUrl(url)) return refused(NOT_WEB);
+  if (!v.is(WebUrlSchema, url)) return refused(NOT_WEB);
   await openTab(url);
   return OK;
 }

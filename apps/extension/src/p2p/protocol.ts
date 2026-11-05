@@ -16,7 +16,7 @@ const TabIdSchema = v.pipe(v.number(), v.integer(), v.minValue(0));
 const MAX_URL_LENGTH = 2048;
 
 /** Whether `url` is an http or https address; a peer opens nothing else (no chrome://, extension, file, or script URL). */
-export function isWebUrl(url: string): boolean {
+function isWebUrl(url: string): boolean {
   try {
     return ["http:", "https:"].includes(new URL(url).protocol);
   } catch {
