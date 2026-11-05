@@ -187,3 +187,48 @@ write_state() {
   ) || die 73 'cannot write the state'
   mv -f -- "$ws_tmp" "$st_file" || die 73 'cannot replace the state'
 }
+
+# --- The pause statement ---------------------------------------------------------------------
+
+# Succeeds, with the reason in pause_reason, when file $1 is exactly the paused.json of profile $2 that
+# the extension writes (launcher-pause.ts): a small regular file, keys profileId, reason (disconnect,
+# forget, or resumed), identity (form only, as in the ack), createdAt, in that order, no other byte.
+read_pause_statement() {
+  if [ ! -f "$1" ] || [ -L "$1" ]; then return 1; fi
+  rp_size=$(wc -c <"$1" | tr -d ' ')
+  [ "$rp_size" -le 4096 ] || return 1
+  ack_value=
+  ack_rest=$(cat -- "$1")
+  [ "${#ack_rest}" -eq "$rp_size" ] || return 1
+  ack_take '{"profileId":"' '"' || return 1
+  [ "$ack_value" = "$2" ] || return 1
+  ack_take '","reason":"' '"' || return 1
+  case $ack_value in disconnect | forget | resumed) pause_reason=$ack_value ;; *) return 1 ;; esac
+  ack_take '","identity":{"key":"' '"' || return 1
+  is_base64url "$ack_value" 87 || return 1
+  ack_take '","signedAt":' ',' || return 1
+  is_time "$ack_value" || return 1
+  ack_take ',"signature":"' '"' || return 1
+  is_base64url "$ack_value" 86 || return 1
+  ack_take '"},"createdAt":' '}' || return 1
+  is_time "$ack_value" || return 1
+  [ "$ack_rest" = '}' ]
+}
+# Succeeds, with pause_file and pause_reason set, when profile $2 states in namespace $1 below the
+# Downloads root $3 that it left its peers on purpose. A resumed statement is not a pause.
+pause_stated() {
+  [ -n "$3" ] || return 1
+  no_link_below "$3" "RECnRun/poc/$1/peers/$2/paused.json" || return 1
+  pause_file=$3/RECnRun/poc/$1/peers/$2/paused.json
+  read_pause_statement "$pause_file" "$2" || return 1
+  [ "$pause_reason" != resumed ]
+}
+# The same in any namespace of the root, since resume is not given one.
+pause_stated_anywhere() {
+  for psa_dir in "$2"/RECnRun/poc/*; do
+    psa_ns=${psa_dir##*/}
+    is_namespace "$psa_ns" || continue
+    pause_stated "$psa_ns" "$1" "$2" && return 0
+  done
+  return 1
+}

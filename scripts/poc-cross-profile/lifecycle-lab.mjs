@@ -11,7 +11,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { ALICE, BOB, NAMESPACE, presence } from "./lab.mjs";
+import { ALICE, BOB, IDENTITY, NAMESPACE, presence } from "./lab.mjs";
 
 export const script = fileURLToPath(new URL("./lifecycle.sh", import.meta.url));
 const APP = "Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
@@ -138,6 +138,21 @@ function publishPresence(home) {
   writeFileSync(join(folder, "presence.json"), JSON.stringify(presence(ALICE)));
 }
 
+/** Writes the paused.json of the profile where the extension would; `text` replaces its exact bytes. */
+function publishPause(home, reason, text) {
+  const folder = join(home, "Downloads/RECnRun/poc", NAMESPACE, "peers", ALICE);
+  mkdirSync(folder, { recursive: true });
+  const bytes = JSON.stringify({
+    profileId: ALICE,
+    reason,
+    identity: IDENTITY,
+    createdAt: Date.now(),
+  });
+  const file = join(folder, "paused.json");
+  writeFileSync(file, text ?? bytes);
+  return file;
+}
+
 /** A temporary home with a stub Chrome, one registered profile (two of one root with `shared`), a state folder, and the environment. */
 export function scene(context, defaults = {}, { shared = false } = {}) {
   const home = mkdtempSync(join(tmpdir(), "recnrun-life-"));
@@ -162,6 +177,7 @@ export function scene(context, defaults = {}, { shared = false } = {}) {
     stateFile,
     spawned,
     publish: () => publishPresence(home),
+    mark: (reason, text) => publishPause(home, reason, text),
     request: (shell, extra, id = ALICE, ...rest) =>
       life(shell, ["request", state, record, NAMESPACE, id, ...rest], vars(extra)),
     launches: () => (existsSync(log) ? lines(readFileSync(log, "utf8")).length : 0),

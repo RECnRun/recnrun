@@ -19,9 +19,12 @@
 # Downloads root), userDataDir, shared (1 when another record block names the same userDataDir or the folder holds another profile: Default or Profile <n> with a Preferences file); any other key or value outside its grammar exits 65. Numbers are canonical decimal (no leading zero, a pid above zero, attempts at most the maximum). userDataDir and
 # pid are written when the attempt starts and the Chrome launches, so a timed-out open (69) keeps both
 # and stop can still end that Chrome.
-# Pause policy: an extension signals Disconnect/Forget by going silent, which is not a crash. An open
-# profile with no fresh presence whose pid is alive and whose token ack is still on disk chose to be
-# silent: it becomes paused and is not relaunched until resume. A dead pid is a crash and relaunches.
+# Pause policy: the extension states it, silence never does. A profile that was disconnected or forgotten
+# writes <root>/RECnRun/poc/<namespace>/peers/<profileId>/paused.json (reason disconnect or forget, or resumed
+# once it is back); a request that finds such a statement, in its exact bytes and behind no link, marks the
+# profile paused (73) whether or not it has a presence or a live pid, and resume is refused (65) while the
+# file stands. Without the statement a fresh presence or a live pid leaves an open profile alone (a healthy
+# linked profile goes silent on purpose), and a dead pid is a crash and relaunches.
 # Stop policy: stop is the owner's decision, so a stopped profile is held like a paused one (request
 # exits 73) until resume; resume turns a paused or stopped profile into idle, which request launches.
 #
@@ -63,6 +66,7 @@ die() {
 mutate() {
   state_dir "$1"
   is_v4 "$2" || die 65 'the profile id is not a lowercase v4 uuid'
+  lc_id=$2
   lc_lock=$1/profiles/$2.lock
   take_lock "$lc_lock" "$$"
   trap 'release_lock "$lc_lock" "$$"' EXIT
@@ -71,7 +75,13 @@ mutate() {
   write_state
 }
 do_pause() { st_status=paused; }
-do_resume() { case $st_status in paused | stopped) st_status=idle ;; esac; }
+do_resume() {
+  case $st_status in paused | stopped) ;; *) return 0 ;; esac
+  if pause_stated_anywhere "$lc_id" "$st_root"; then
+    die 65 "$pause_file states $pause_reason: reconnect the profile in the extension, or delete the file, then resume"
+  fi
+  st_status=idle
+}
 do_reset() { st_attempts=0 st_next=0; }
 cmd_status() {
   state_dir "$1"
@@ -144,21 +154,23 @@ presence_fresh() {
   [ "$pf_expires" -gt "$pf_created" ] && [ $((pf_expires - pf_created)) -le 60000 ] || return 1
   [ "$pf_expires" -gt "$pf_now" ] && [ "$pf_created" -le $((pf_now + 5000)) ]
 }
-ack_present() {
-  [ -n "$st_token" ] && [ -n "$st_root" ] || return 1
-  no_link_below "$st_root" "RECnRun/poc/$lc_ns/acks/$lc_id/$st_token.json" || return 1
-  read_ack "$st_root/RECnRun/poc/$lc_ns/acks/$lc_id/$st_token.json" "$st_token" "$lc_id" >/dev/null
-}
-# An open profile is left alone while present, and paused when it is alive but silent.
+# An open profile is held when it stated the pause, else left alone while it lives or has a fresh
+# presence; only a dead pid is a crash. Silence is never read as intent: a healthy linked profile
+# stops publishing on purpose (P3.6).
 check_open() {
+  if pause_stated "$lc_ns" "$lc_id" "$st_root"; then
+    st_status=paused
+    write_state
+    die 73 "$lc_id stated $pause_reason in $pause_file: resume it after it reconnects, or delete the file"
+  fi
   if presence_fresh; then
     printf 'boot=%s\n' "$st_boot"
     exit 0
   fi
-  if pid_alive "$st_pid" && ack_present; then
-    st_status=paused
-    write_state
-    die 73 "$lc_id is alive but silent: paused by the policy, resume it to relaunch"
+  if pid_alive "$st_pid"; then
+    log "$lc_id is open but silent: left alone"
+    printf 'boot=%s\n' "$st_boot"
+    exit 0
   fi
 }
 # Exits unless a launch is allowed now.

@@ -8,7 +8,6 @@ import { alive, env, life, scene, script } from "./lifecycle-lab.mjs";
 
 const EX_REFUSED = 65;
 const EX_BUSY = 75;
-const EX_PAUSED = 73;
 const EX_FAILED = 70;
 
 for (const shell of shells) {
@@ -153,7 +152,8 @@ for (const shell of shells) {
     writeFileSync(join(elsewhere, "presence.json"), JSON.stringify(presence(ALICE)));
     symlinkSync(join(home, "elsewhere"), peers);
     const silent = request(shell);
-    assert.equal(silent.code, EX_PAUSED, silent.err);
+    assert.equal(silent.code, 0, silent.err);
+    assert.match(silent.err, /open but silent/);
     assert.equal(launches(), 1);
   });
 }

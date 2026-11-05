@@ -152,19 +152,6 @@ for (const shell of shells) {
     assert.equal(field("status"), "stopped");
   });
 
-  await test(`${shell}: an executor that is alive and silent is paused, not relaunched`, async (context) => {
-    const { request, launches, field } = scene(context);
-    assert.equal(request(shell).code, 0);
-    const pid = Number(field("pid"));
-    assert.ok(alive(pid));
-    const silent = request(shell);
-    assert.equal(silent.code, EX_PAUSED, silent.err);
-    assert.equal(field("status"), "paused");
-    assert.equal(launches(), 1);
-    process.kill(pid, "SIGKILL");
-    await until(() => !alive(pid));
-  });
-
   await test(`${shell}: a dead pid with no presence is a crash and relaunches`, async (context) => {
     const { request, launches, field } = scene(context);
     assert.equal(request(shell).code, 0);
