@@ -468,7 +468,8 @@ Gate P6: verify · CL16, CL17 · review of P5+P6 · push
 - [ ] P7.3 T4–T5 one root, headless attempt, E12 (lab, host)
 - [i] P7.4 T6–T8 separate roots, headless workers, E13 (lab, host); T9 headless on clones
   - red: lab negative control (no worker binding, workers opened headed): `E13.t6.workers` fail, `E13.t6.commands` fail ("The other profile did not answer in time."), run `...f7183899`; `-g "every E13 hypothesis"` alone fails "every hypothesis ran"; the command's own red/green is in `598eb4bc`
-  - green: `RECNRUN_EXPERIMENT_SAMPLES=smoke vp run test:headless -- tests/headless/E13-separate-roots.spec.ts` 5 passed (8.6m), 11 pass and focus/pip unavailable, run `...aae617b1`; full: `vp run test:headless` 8 passed (21.1m), the same 11 pass at three samples (bootstrap diagnostic one), run `...ca79ff4f`, [E13.md](experiments/E13.md); host twin written and type-checked, not run (pending the orchestrator)
+  - green: `RECNRUN_EXPERIMENT_SAMPLES=smoke vp run test:headless -- tests/headless/E13-separate-roots.spec.ts` 5 passed (8.6m), 11 pass and focus/pip unavailable, run `...aae617b1`; full: `vp run test:headless` 8 passed (21.1m), the same 11 pass at three samples (bootstrap diagnostic one), run `...ca79ff4f`, [E13.md](experiments/E13.md); host: `RECNRUN_HOST_ROOTS=~/Documents/RECnRun/poc-downloads-launcher/roots vp run test:host -- tests/host/E13-separate-roots.spec.ts` 4 passed (5.9m), the five worker cells pass at three samples on Chrome 156.0.8078.80 macOS with a throwaway master, the clone cells and the diagnostic `unavailable` with the reason, run `host-2026-11-05T20-57-11.004Z`
+  - pending the owner: T9 headless clones with the personal Default as controller, [M-P7.a](MANUAL_VALIDATION.md#after-p7)
   - commit: 2b209b6d, after `598eb4bc` (the peer command); three samples per cell: the commit with subject "Take three samples per E13 cell in a full run"
 
 Gate P7: verify · E11–E13 (review and push fused into Gate P8)
