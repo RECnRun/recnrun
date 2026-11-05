@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 import { connectWebSocket, openPage } from "../../browser/fixtures/cdp-client.ts";
+import { interruptChrome } from "../../browser/fixtures/chrome-quit.ts";
 import { attachExtension } from "../../browser/fixtures/extension-loaders.ts";
 import type { LoadedExtension } from "../../browser/fixtures/extension-loaders.ts";
 import { recordHypothesis } from "../outcome.ts";
@@ -267,19 +268,9 @@ async function measure(rig: Rig, again: boolean, pids: number[]): Promise<Sample
   return { ok: problems.length === 0, ...error, observation };
 }
 
-/** SIGTERM to the pids open.sh printed, then waits until nothing of the root runs. */
+/** SIGINT to the pids open.sh printed (0 when it printed none), then until nothing of the root runs. */
 export async function quit(rig: Pick<Rig, "survivors">, pids: number[]): Promise<void> {
-  for (const pid of pids) {
-    // pid 0 means open.sh printed none, and kill(0) would signal the whole process group.
-    if (pid <= 0) continue;
-    try {
-      process.kill(pid, "SIGTERM");
-    } catch {
-      // Already gone: the second open's process hands over to the first and exits.
-    }
-  }
-  const gone = async () => ((await rig.survivors()).length === 0 ? true : undefined);
-  await until(gone, "Chrome of the root left", QUIT_MS);
+  await interruptChrome(pids, () => rig.survivors(), QUIT_MS);
 }
 
 /** One sample: prepare a rig, measure, stop only the Chrome open.sh spawned, and leave nothing behind. */

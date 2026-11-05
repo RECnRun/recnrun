@@ -131,7 +131,7 @@ export interface Lab {
   open(worker: Worker, mode: Mode): Promise<Launched>;
   /** Tells the catalog loop about a Downloads root. */
   track(downloads: string): void;
-  /** SIGTERM to the worker's Chrome, then until nothing names its root. */
+  /** SIGINT to the worker's Chrome, then until nothing names its root. */
   stop(worker: Worker): Promise<void>;
   dispose(): Promise<void>;
 }
@@ -346,7 +346,7 @@ function sceneOf(scenes: Map<Worker, Scene>, worker: Worker): Scene {
   return scene;
 }
 
-/** SIGTERM to the worker's main Chrome and until nothing of its root runs. */
+/** SIGINT to the worker's main Chrome and until nothing of its root runs. */
 async function quitWorker(probe: Probe, worker: Worker): Promise<void> {
   await quit({ survivors: () => probe.survivors(worker.root) }, [worker.pid]);
   worker.pid = 0;

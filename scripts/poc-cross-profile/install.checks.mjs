@@ -158,8 +158,9 @@ for (const shell of shells) {
     writeBase(s.bases);
     const result = s.install(shell, { STUB_REPLY: "linger" });
     assert.equal(result.code, 0, result.err);
-    assert.match(result.err, /still runs 2 s after Browser.close: SIGTERM/);
-    assert.deepEqual(s.launches(), ["launch", "term"]);
+    assert.match(result.err, /still runs 2 s after Browser.close: SIGINT/);
+    assert.match(result.err, /ended by SIGINT/);
+    assert.deepEqual(s.launches(), ["launch", "int"]);
     assert.equal(alive(pidOf(result)), false);
   });
 }

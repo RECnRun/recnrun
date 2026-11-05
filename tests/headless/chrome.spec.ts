@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { readFile, readlink } from "node:fs/promises";
+import { readFile, readdir, readlink } from "node:fs/promises";
 import { basename } from "node:path";
 import { promisify } from "node:util";
 import type { TestInfo } from "@playwright/test";
@@ -20,6 +20,10 @@ const MODE = "headless";
 /** The NUL-separated command line of a process, as `ps` shows it. */
 const commandLine = async (pid: number) =>
   (await readFile(`/proc/${pid}/cmdline`, "utf8")).split("\0").filter(Boolean);
+
+/** The process singleton files Chrome keeps in a root while it runs. */
+const singletonsOf = async (root: string) =>
+  (await readdir(root)).filter((name) => name.startsWith("Singleton")).sort();
 
 /** Stops the pid and confirms nothing of the root runs; on failure keeps the evidence and the root. */
 async function stopOrKeep(rig: Awaited<ReturnType<typeof labRig>>, pid: number) {
@@ -86,6 +90,34 @@ test.describe("open.sh ... headless starts Google Chrome Stable in its native he
       const owners = await windowOwners("chrome");
       expect(owners.filter((owner) => pids.has(owner))).toEqual([]);
     });
+  });
+
+  test("the harness's quit runs Chrome's full shutdown: no Singleton file stays in the root", async ({
+    browserName,
+  }, testInfo) => {
+    expect(browserName).toBeDefined();
+    const rig = await labRig(testInfo);
+    let pid = 0;
+    try {
+      const opened = await runOpen({ scene: rig.scene, env: rig.env }, MODE);
+      pid = opened.pid;
+      expect(opened.code, opened.stderr).toBe(0);
+      expect(await ackProblems(rig.scene, opened)).toEqual([]);
+      expect(await singletonsOf(rig.scene.root)).toEqual([
+        "SingletonCookie",
+        "SingletonLock",
+        "SingletonSocket",
+      ]);
+      await quit(rig, [pid]);
+      pid = 0;
+      // ProcessSingleton::Cleanup unlinks them only on the normal shutdown path.
+      expect(await singletonsOf(rig.scene.root)).toEqual([]);
+    } catch (error) {
+      await rig.keep?.().catch(() => undefined);
+      throw error;
+    } finally {
+      await stopOrKeep(rig, pid);
+    }
   });
 
   test("a failing body still stops the Chrome it opened", async ({ browserName }, testInfo) => {

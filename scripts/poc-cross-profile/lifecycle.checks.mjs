@@ -165,12 +165,14 @@ for (const shell of shells) {
     assert.notEqual(Number(field("pid")), pid);
   });
 
-  await test(`${shell}: stop sends SIGTERM only to a process that names the user data dir`, async (context) => {
-    const { state, request, vars, field, spawned, stateFile } = scene(context);
+  await test(`${shell}: stop sends SIGINT only to a process that names the user data dir`, async (context) => {
+    const { state, request, vars, field, spawned, stateFile, signals } = scene(context);
     assert.equal(request(shell).code, 0);
     const pid = Number(field("pid"));
     const stopped = life(shell, ["stop", state, ALICE], vars({ RECNRUN_LIFECYCLE_STOP_S: "5" }));
     assert.equal(stopped.code, 0, stopped.err);
+    assert.match(stopped.err, new RegExp(`pid ${pid} ended by SIGINT`));
+    assert.deepEqual(signals(), ["int"], "Chrome's normal shutdown, not SIGTERM's SessionEnding");
     assert.equal(alive(pid), false);
     assert.equal(field("status"), "stopped");
     const bystander = spawn("sleep", ["30"], { stdio: "ignore" });
@@ -182,7 +184,7 @@ for (const shell of shells) {
     assert.equal(alive(bystander.pid), true);
   });
 
-  await test(`${shell}: stop kills a process that ignores SIGTERM only with --force`, (context) => {
+  await test(`${shell}: stop kills a process that outlives SIGINT only with --force`, (context) => {
     const { state, request, vars, field } = scene(context, { STUB_DEAF: "1" });
     assert.equal(request(shell).code, 0);
     const pid = Number(field("pid"));
@@ -191,7 +193,9 @@ for (const shell of shells) {
     assert.equal(stop().code, EX_FAILED);
     assert.equal(alive(pid), true);
     assert.equal(field("status"), "open");
-    assert.equal(stop("--force").code, 0);
+    const forced = stop("--force");
+    assert.equal(forced.code, 0, forced.err);
+    assert.match(forced.err, new RegExp(`pid ${pid} ended by SIGKILL`));
     assert.equal(alive(pid), false);
     assert.equal(field("status"), "stopped");
     assert.equal(stop("--hard").code, 64);

@@ -1,8 +1,8 @@
 import { readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
-import { setTimeout as delay } from "node:timers/promises";
 import { chromium } from "@playwright/test";
 import type { Browser } from "@playwright/test";
+import { interruptChrome } from "./chrome-quit.ts";
 import { connected, overOwnClient } from "./downloads-profiles.ts";
 import type { DownloadsProfile } from "./downloads-profiles.ts";
 import type { LaunchedChrome } from "./chrome.ts";
@@ -77,14 +77,9 @@ export async function attachTo(
   return profile;
 }
 
-/** SIGTERM to the main Chrome of `root`, Chrome's orderly quit, and until nothing names the root. */
+/** SIGINT to the main Chrome of `root`, Chrome's normal shutdown, and until nothing names the root. */
 export async function endChrome(root: string, processes: Processes) {
   const pid = await processes.pidOf(root);
-  if (pid !== undefined) process.kill(pid, "SIGTERM");
-  const deadline = Date.now() + EXIT_MS;
-  while ((await processes.alive(root)).length > 0) {
-    if (Date.now() > deadline) throw new Error(`Chrome still names ${root} after ${EXIT_MS} ms`);
-    await delay(200);
-  }
+  await interruptChrome(pid === undefined ? [] : [pid], () => processes.alive(root), EXIT_MS);
   await rm(join(root, "DevToolsActivePort"), { force: true });
 }

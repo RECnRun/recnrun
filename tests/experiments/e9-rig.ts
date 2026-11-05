@@ -6,6 +6,7 @@ import { delimiter, join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 import { resolveChromePath } from "../browser/fixtures/chrome.ts";
+import { interruptChrome } from "../browser/fixtures/chrome-quit.ts";
 import { loadUnpacked, extensionPath } from "../browser/fixtures/extension-loaders.ts";
 import { preferencesOf, register, registerIn } from "./fixtures/launcher-open.ts";
 import type { Sample } from "./outcome.ts";
@@ -224,14 +225,11 @@ export const presenceOf = (rig: E9Rig) =>
 export const unfinished = async (rig: E9Rig) =>
   (await readdir(rig.downloads)).filter((name) => name.startsWith(".com.google.Chrome."));
 
-/** SIGTERM to the pid the state names and to the main processes of the root, then SIGKILL for stragglers. */
+/** SIGINT to the pid the state names and to the main processes of the root, then SIGKILL for stragglers. */
 async function shutdown(rig: E9Rig): Promise<string[]> {
-  const pids = new Set([await pidOf(rig), ...(await chromesOf(rig.root, true))]);
-  for (const pid of pids) if (pid > 0 && alive(pid)) process.kill(pid, "SIGTERM");
-  const gone = async () => ((await chromesOf(rig.root)).length === 0 ? true : undefined);
-  if (await waitFor(gone, QUIT_MS)) return [];
-  for (const pid of await chromesOf(rig.root)) process.kill(pid, "SIGKILL");
-  return ["Chrome of the root survived SIGTERM"];
+  const pids = [...new Set([await pidOf(rig), ...(await chromesOf(rig.root, true))])];
+  const ended = await interruptChrome(pids, () => chromesOf(rig.root), QUIT_MS);
+  return ended === "SIGINT" ? [] : ["Chrome of the root survived SIGINT"];
 }
 
 /** What a body states: `check` records a problem unless `ok`, `seen` becomes the observation. */

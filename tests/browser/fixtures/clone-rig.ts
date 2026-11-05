@@ -67,7 +67,7 @@ export interface LabClones extends CloneHost {
   keep(): Promise<void>;
   /** A clone root whose Chrome no CDP client reached: `dispose` still ends it. */
   watch(root: string): void;
-  /** SIGTERM to the Chrome of a watched root, then until nothing names it. */
+  /** SIGINT to the Chrome of a watched root, then until nothing names it. */
   quit(root: string): Promise<void>;
   dispose(): Promise<void>;
 }

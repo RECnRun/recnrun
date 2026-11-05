@@ -28,8 +28,11 @@ const IDENT = `"identity":{"key":"${"B".repeat(87)}","signedAt":1,"signature":"$
 // carries no identity; plain: a token ack without the template fields); on a clone URL, when STUB_CLONE
 // is set, writes the clone ack (unprovisioned drops the provisioned field, symlink and oversize change the file; STUB_BODY_*
 // change one value of the body, STUB_IDENT the identity member, STUB_PRE and STUB_POST the bytes around it); on a token URL, when STUB_REOPEN is set, writes the token ack of open.sh; stays
-// alive STUB_ALIVE seconds (deaf to SIGTERM with STUB_DEAF).
+// alive STUB_ALIVE seconds, logging SIGINT or SIGTERM to $HOME/signals.txt (deaf to both with STUB_DEAF).
+// A background sh inherits SIGINT ignored and cannot trap it, while Chrome installs its own handler:
+// the stub restarts itself once through perl with SIGINT at its default action.
 const STUB = `#!/bin/sh
+[ -n "\${STUB_SIGNALS:-}" ] || exec /usr/bin/perl -e '$SIG{INT} = "DEFAULT"; $ENV{STUB_SIGNALS} = 1; exec @ARGV or die' /bin/sh "$0" "$@"
 printf '%s\\n' "$@" >"$STUB_ARGV"
 printf 'launch\\n' >>"$STUB_LOG"
 for a in "$@"; do last=$a; done
@@ -80,7 +83,12 @@ case $last in
     ;;
 esac
 [ -n "\${STUB_ALIVE:-}" ] || exit 0
-if [ -n "\${STUB_DEAF:-}" ]; then trap '' TERM; else trap 'kill $s 2>/dev/null; exit 0' TERM; fi
+if [ -n "\${STUB_DEAF:-}" ]; then
+  trap '' INT TERM
+else
+  trap 'printf "int\\n" >>"$HOME/signals.txt"; kill $s 2>/dev/null; exit 0' INT
+  trap 'printf "term\\n" >>"$HOME/signals.txt"; kill $s 2>/dev/null; exit 0' TERM
+fi
 sleep "$STUB_ALIVE" &
 s=$!
 wait $s
@@ -153,6 +161,8 @@ export function baseScene(context) {
     root: (name = "base-v1") => join(bases, name),
     argv: () => settled(join(home, "argv.txt")),
     launchCount: () => readLines(join(home, "launches.txt")).length,
+    /** The signals the stub Chrome caught, int or term, one line each. */
+    signals: () => readLines(join(home, "signals.txt")),
     create: (shell, name = "base-v1", extra = {}) => {
       const result = run(shell, ["create-base", bases, name], name, extra);
       if (result.code === 0) settled(join(home, "launches.txt"));

@@ -58,7 +58,7 @@ export interface CloneHost {
   commandLines(root: string): Promise<string[]>;
   /** Attaches Playwright to the Chrome running on a clone root. */
   attach(root: string, name: string, instanceId: string): Promise<DownloadsProfile>;
-  /** Detaches, ends the Chrome of `root` with SIGTERM, and waits until nothing names it. */
+  /** Detaches, ends the Chrome of `root` with SIGINT, and waits until nothing names it. */
   stop(profile: DownloadsProfile): Promise<void>;
   /** Tells the launcher's catalog loop about a Downloads root the record now names. */
   track(downloads: string): void;

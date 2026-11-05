@@ -142,6 +142,10 @@ async function settingsEntry(root: string) {
   return undefined;
 }
 
+/** The process singleton files of a root; Chrome's normal shutdown removes them (ProcessSingleton::Cleanup). */
+const singletonsOf = async (root: string) =>
+  (await readdir(root)).filter((name) => name.startsWith("Singleton")).sort();
+
 /** A sample from named checks: it passes when none failed, and names each that did. */
 function sampleOf(checks: Record<string, boolean>, observation: Record<string, unknown>): Sample {
   const failed = Object.entries(checks).flatMap(([name, ok]) => (ok ? [] : [name]));
@@ -157,6 +161,7 @@ async function relaunch(bases: string, root: string, env: NodeJS.ProcessEnv): Pr
   const pid = /pid=(\d+)/.exec(started.err)?.[1] ?? "0";
   const flags = await commandLine(pid);
   const quit = await script("base.sh", ["quit", bases, NAME], env);
+  const singletons = await singletonsOf(root);
   const after = await settingsEntry(root);
   const downloads = await readdir(join(root, "downloads"), { recursive: true }).catch(() => []);
   return sampleOf(
@@ -165,8 +170,9 @@ async function relaunch(bases: string, root: string, env: NodeJS.ProcessEnv): Pr
       downloadsInsideBase: started.out.root === `${root}/downloads`,
       noDebuggingFlag: !/remote-debugging|unsafe-extension-debugging/.test(flags),
       quit: quit.code === 0,
+      noSingletonAfterQuit: singletons.length === 0,
     },
-    { template: started, quit: { code: quit.code, err: quit.err }, after, downloads },
+    { template: started, quit: { code: quit.code, err: quit.err }, singletons, after, downloads },
   );
 }
 
@@ -184,6 +190,7 @@ async function chain(): Promise<Record<(typeof CELLS)[number], Sample>> {
     );
     const entry = await settingsEntry(root);
     const left = await chromesOf(root);
+    const singletons = await singletonsOf(root);
     const load = sampleOf(
       {
         noExtensionBefore: before === undefined,
@@ -192,8 +199,9 @@ async function chain(): Promise<Record<(typeof CELLS)[number], Sample>> {
         unpackedFromBuild: entry?.location === 4 && entry.path === build,
         cdpFlagDropped: typeof entry?.flags === "number" && (entry.flags & INSTALLED_VIA_CDP) === 0,
         chromeClosed: left.length === 0,
+        noSingletonAfterClose: singletons.length === 0,
       },
-      { install: installed, entry, left },
+      { install: installed, entry, left, singletons },
     );
     const first = await relaunch(bases, root, env);
     const second = await relaunch(bases, root, env);
