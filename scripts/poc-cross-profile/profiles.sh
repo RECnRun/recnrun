@@ -15,7 +15,7 @@
 #                                                       <downloadsRoot> TAB distinct|shared|unbound
 #
 # A directory name is never a display name. A binding names a Downloads root only when a presence
-# sits there; a root two profiles reach (or that holds several presences) is shared, and its
+# that names its own folder's profile sits there; a root two profiles reach (or that holds several presences) is shared, and its
 # binding waits for the token ack. The bounded find of discovery.sh is not used here: without a
 # token it would attribute any presence under $HOME to a profile.
 #
@@ -156,6 +156,12 @@ extension_in_profile() {
 
 # --- Bindings --------------------------------------------------------------------------------
 
+# True when the presence file $1 begins with the profile id $2 of its folder, the way the extension writes it.
+names_folder() {
+  IFS= read -r head <"$1" || [ -n "$head" ] || return 1
+  case $head in "{\"profileId\":\"$2\""*) return 0 ;; esac
+  return 1
+}
 # Prints "<count> <first profileId>" of the presences below Downloads root $1.
 presences_at() {
   count=0
@@ -166,6 +172,7 @@ presences_at() {
       if ! is_plain_file "$file" || [ -L "$id" ]; then continue; fi
       id=${id##*/}
       is_uuid "$id" || continue
+      names_folder "$file" "$id" || continue
       count=$((count + 1))
       [ "$first" != - ] || first=$id
     done

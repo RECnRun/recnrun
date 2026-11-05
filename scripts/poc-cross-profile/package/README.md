@@ -38,10 +38,12 @@ sh recnrun-launcher first-run
 
 It registers each profile that has the extension, opens it, waits for the extension's own
 acknowledgement, and prints `<profile id> open` per profile, then the autostart command to run
-next. Run it again after you prepare another profile; a profile that is already registered is not
+next. Profiles that download to the same folder (the usual layout) are bound by that
+acknowledgement: Chrome starts on each with a one-time token and the profile id comes from the
+extension's answer, so nothing is written for a profile that does not answer. Run it again after you prepare another profile; a profile that is already registered is not
 opened twice. The launcher keeps its state in `$HOME/.recnrun/launcher` and its record in
 `$HOME/.recnrun/launcher.record`, both under the namespace `lab`. Exit 0: every profile is open;
-66: no profile with the extension and a presence of its own yet; 70: a profile did not open.
+66: no profile has the extension; 70: a profile did not open or did not acknowledge.
 
 Count: 4 N + 3 for N profiles, 7 for one: the 4 Load unpacked gestures per profile and the 3
 commands this README has you run (`first-run`, `status` to verify, `autostart on`). The 4 N gestures

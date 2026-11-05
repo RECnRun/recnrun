@@ -21,9 +21,15 @@ const APP = "Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 // With RECNRUN_STUB_FORWARD it is a forwarder: it acks and exits at once, as a Chrome does when the
 // process singleton hands its command line to the browser already running on the root.
 const STUB = `#!/bin/sh
-for a in "$@"; do last=$a; done
+for a in "$@"; do last=$a; case $a in --profile-directory=*) directory=\${a#*=} ;; esac; done
 printf 'launch\\n' >>"$STUB_LOG"
 token=\${last#*token=}
+# STUB_IDS_FILE maps "<profile directory>=<profileId>" lines: a directory it does not list never acks.
+if [ -n "\${STUB_IDS_FILE:-}" ]; then
+  STUB_PROFILE=
+  while IFS= read -r entry; do case $entry in "$directory="*) STUB_PROFILE=\${entry#*=} ;; esac; done <"$STUB_IDS_FILE"
+  [ -n "$STUB_PROFILE" ] || STUB_ACK=
+fi
 if [ -n "\${STUB_ACK:-}" ]; then
   sleep "\${STUB_DELAY:-0}"
   dir=$STUB_ROOT/RECnRun/poc/$STUB_NS/acks/$STUB_PROFILE

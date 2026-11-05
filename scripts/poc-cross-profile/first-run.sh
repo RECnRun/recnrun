@@ -11,13 +11,17 @@
 # namespace lab (the POC extension's own). Both paths are made of letters, digits, dot, underscore,
 # hyphen, and slash only, which is what `autostart on` accepts.
 #
-# A profile is registered only when its binding is distinct (profiles.sh bind_profiles): the
-# extension is installed and exactly one presence sits in a Downloads root no other profile
-# reaches. An unbound profile has not run the extension yet; a shared one waits for its token ack.
+# A profile with a distinct binding (profiles.sh bind_profiles) is registered from its presence: the
+# extension is installed and exactly one presence sits in a Downloads root no other profile reaches.
+# A shared profile (several profiles download to one folder, the usual layout) and an unbound one
+# (no presence yet) are bound by a token ack instead: `open.sh bind` starts Chrome on the profile and
+# takes the profileId and the Downloads root from the ack that carries its token. That Chrome is
+# left running. A profile that does not ack is left out and the run exits 70 naming it; the record
+# never gets a profile the extension did not ack.
 #
 # Output: one line per profile, `<profileId> <status>`, then the autostart command to run next.
 # Exit: 0 every registered profile is open, 64 wrong call, 65 refused path, 66 no profile to
-# register and none registered, 70 a profile did not open.
+# register and none registered, 70 a profile did not open or did not ack its binding.
 
 fr_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)
 # shellcheck source=profiles.sh
@@ -88,9 +92,54 @@ register_profile() {
   } >>"$fr_record" || die 70 "cannot write $fr_record"
   log "$rp_id: registered ($rp_name of $rp_root)"
 }
-# Registers each distinct profile; sets fr_ids to the ids of those, one per line.
+# Prints the profileId of the block that holds this root and profile directory, if the record has one.
+registered_id() {
+  [ -f "$fr_record" ] || return 1
+  rg_user='' rg_dir='' rg_id=''
+  while IFS= read -r rg_line || [ -n "$rg_line" ]; do
+    case $rg_line in
+      '') rg_user='' rg_dir='' rg_id='' ;;
+      userDataDir=*) rg_user=${rg_line#userDataDir=} ;;
+      profileDirectory=*) rg_dir=${rg_line#profileDirectory=} ;;
+      profileId=*) rg_id=${rg_line#profileId=} ;;
+    esac
+    if [ "$rg_user" = "$1" ] && [ "$rg_dir" = "$2" ] && [ -n "$rg_id" ]; then
+      printf '%s\n' "$rg_id"
+      return 0
+    fi
+  done <"$fr_record"
+  return 1
+}
+# Binds a profile with no distinct binding through its token ack and registers it with the acked
+# id and root; a profile that does not ack goes to fr_left and a registered one is left alone.
+bind_row() {
+  br_root=$1 br_name=$2
+  if br_id=$(registered_id "$br_root" "$br_name"); then
+    log "$br_id: already registered ($br_name of $br_root)"
+    fr_ids=$fr_ids$br_id$nl
+    return 0
+  fi
+  br_out=$(RECNRUN_DISCOVERY_LIB='' /bin/sh "$fr_dir/open.sh" bind "$br_root" "$br_name" "$fr_ns") || br_out=''
+  br_id='' br_downloads=''
+  while IFS= read -r br_line; do
+    case $br_line in
+      profileId=*) br_id=${br_line#profileId=} ;;
+      root=*) br_downloads=${br_line#root=} ;;
+    esac
+  done <<EOF
+$br_out
+EOF
+  if [ -z "$br_id" ] || [ -z "$br_downloads" ]; then
+    log "$br_name of $br_root: did not ack the bootstrap token, left out"
+    fr_left=$fr_left$br_name$nl
+    return 0
+  fi
+  register_profile "$br_id" "$br_root" "$br_name" "$br_downloads"
+  fr_ids=$fr_ids$br_id$nl
+}
+# Registers each distinct profile and binds the others; sets fr_ids to the ids of those, one per line.
 register_all() {
-  fr_ids=''
+  fr_ids='' fr_left=''
   fr_rows=$(bind_profiles "$fr_record" "$fr_ns" "$fr_ext") || die 70 'cannot read the profiles'
   while IFS="$tab" read -r ra_id ra_root ra_name ra_downloads ra_kind; do
     case $ra_kind in
@@ -98,8 +147,7 @@ register_all() {
         register_profile "$ra_id" "$ra_root" "$ra_name" "$ra_downloads"
         fr_ids=$fr_ids$ra_id$nl
         ;;
-      shared) log "$ra_name of $ra_root: shares its Downloads root with another profile, skipped" ;;
-      unbound) log "$ra_name of $ra_root: has the extension but no presence yet, open this profile once and run first-run again" ;;
+      shared | unbound) bind_row "$ra_root" "$ra_name" ;;
     esac
   done <<EOF
 $fr_rows
@@ -141,8 +189,12 @@ fr_arguments "$@"
 umask 077
 mkdir -p -- "$fr_state" "$(dirname -- "$fr_record")" || die 70 'cannot create the state directory'
 register_all
-[ -n "$fr_ids" ] || die 66 'no profile with the extension and a presence of its own: load the extension in a profile, let Chrome run, and try again'
+if [ -z "$fr_ids" ]; then
+  [ -z "$fr_left" ] || die 70 "no profile acked: $(printf '%s' "$fr_left" | tr "$nl" ' ')"
+  die 66 'no profile with the extension: load the extension in a profile and try again'
+fi
 open_registered
 report
 if [ "$fr_failed" -ne 0 ]; then die 70 'a profile did not open; see the lines above'; fi
+[ -z "$fr_left" ] || die 70 "a profile did not ack and is not registered: $(printf '%s' "$fr_left" | tr "$nl" ' ')"
 printf 'next: sh recnrun-launcher autostart on %s %s %s\n' "$fr_state" "$fr_record" "$fr_ns"

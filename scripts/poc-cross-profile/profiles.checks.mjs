@@ -230,6 +230,30 @@ for (const shell of shells) {
     );
   });
 
+  await test(`${shell}: bind_profiles counts a presence only when it names its folder's profile`, (context) => {
+    const { home, env, record } = lab(context);
+    const root = join(home, "Chrome");
+    const dl = (name) => join(home, name);
+    writeFileSync(record, `userDataDir=${root}\n`);
+    profile(root, "Default", { Preferences: withExtension(dl("DlA")) });
+    profile(root, "Profile 2", { Preferences: withExtension(dl("DlB")) });
+    plant(dl("DlA"), ALICE);
+    plant(dl("DlA"), BOB);
+    // A second presence that names another profile than its folder does not make the root shared.
+    const forged = join(dl("DlA"), "RECnRun/poc", NAMESPACE, "peers", BOB, "presence.json");
+    writeFileSync(forged, JSON.stringify(presence(CAROL)));
+    plant(dl("DlB"), CAROL);
+    writeFileSync(
+      join(dl("DlB"), "RECnRun/poc", NAMESPACE, "peers", CAROL, "presence.json"),
+      "not a presence",
+    );
+    const result = profiles(shell, ["bind_profiles", record, NAMESPACE, EXTENSION], env());
+    assert.deepEqual(lines(result.out), [
+      `${ALICE}\t${root}\tDefault\t${dl("DlA")}\tdistinct`,
+      `-\t${root}\tProfile 2\t-\tunbound`,
+    ]);
+  });
+
   await test(`${shell}: bind_profiles takes only a presence folder that is a uuid`, (context) => {
     const { home, env, record } = lab(context);
     const root = join(home, "Chrome");
