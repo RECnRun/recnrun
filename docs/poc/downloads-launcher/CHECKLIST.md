@@ -431,14 +431,25 @@ Gate P5: verify · CL01–CL15 over three rounds (review and push fused into Gat
 
 Gate P6: verify · CL16, CL17 · review of P5+P6 · push
 
-- review: finding 4: the bases directory takes the launcher's canonical path grammar and the dashboard says why it refuses one — commit 8d9f50c8
-- review: finding 6: a status is done only for unique workers named w1 to wN — commit 8d9f50c8
-- review: finding 7: the status reader refuses a file over the shared maximum — commit 8d9f50c8
-- review: finding 8: the clone bootstrap fragment takes every NamespaceSchema namespace — commit 257a9f12
-- review: finding 9: the worker role is written last, after the statement and the ack — commit d4bb1ca2
-- review: finding 10: the provisioning listener requires the clone bootstrap page whose fragment names the request — commit d4bb1ca2
-- review: finding 11: clearing the transient peer state also drops the stored pause — commit e9af5b65
-- review: finding 13: a listed peer's files are read only under a root the catalog maps or shares — commit df7c6c61
+- review: Codex read-only review of `f3352830..aff9c0f7` on 2026-11-05 (17 findings: blockers 14 and 16, nit 17; log `scratchpad/codex-p5p6.log`); all 17 fixed below with red/green, plus the shell half of finding 4 found by a Codex cross-check of the summary
+- review: finding 16: provision.sh ends the setup Chrome (base.sh quit) before install.sh, and the onboarding lab installs through the real install.sh — commit b15f7274
+- review: finding 4 (shell): provision.sh refuses a basesDir the base commands reject (spaces, empty or dot segments, final slash) — commit 71eaec13
+- review: finding 5: the clone count is exactly one character 1 to 8 — commit ec970911
+- review: finding 15: each provision step writes its output in a private mkdir -m 700 folder — commit 9dcebf0c
+- review: finding 12: open-clone takes the request's operation id and provision.sh checks the printed one — commit e54477e7
+- review: finding 1: read_clone_ack is a closed grammar in the writer's key order — commit bf63b317
+- review: finding 2: both marker readers check the raw bytes (size and printable ASCII) — commit 99919316
+- review: finding 3: freeze refuses an unpacked build path the clone commands reject — commit 1f040c65
+- review: finding 14: base.sh update refuses links in the source and removes a copy that holds one — commit 3eacab5f
+- review: finding 17: CHROMIUM.md group 17 names the paths that end Chrome — commit 2bcb131a
+- review: finding 4: the bases directory takes the launcher's canonical path grammar and the dashboard says why it refuses one — commit c92aded4
+- review: finding 6: a status is done only for unique workers named w1 to wN — commit c92aded4
+- review: finding 7: the status reader refuses a file over the shared maximum — commit c92aded4
+- review: finding 8: the clone bootstrap fragment takes every NamespaceSchema namespace — commit 8cfe8a57
+- review: finding 9: the worker role is written last, after the statement and the ack — commit 5a4bd285
+- review: finding 10: the provisioning listener requires the clone bootstrap page whose fragment names the request — commit 5a4bd285
+- review: finding 11: clearing the transient peer state also drops the stored pause — commit 7a277845
+- review: finding 13: a listed peer's files are read only under a root the catalog maps or shares — commit 8c17b6aa
 
 ## P7: Silent and headless execution
 
