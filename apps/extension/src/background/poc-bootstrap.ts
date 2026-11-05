@@ -7,10 +7,12 @@ import type { Sign } from "@/background/greeting";
 import { createAckListener, writeAck } from "@/background/launcher-requests";
 import type { AckDependencies } from "@/background/launcher-requests";
 import { closeOffscreen, offscreenFingerprint } from "@/background/link";
+import { createPrepareListener } from "@/background/poc-prepare";
 import type { AckTemplate } from "@/messaging/poc-presence";
 import type { IdentityStatement } from "@/p2p/identity-key";
 import { storedRoles } from "@/storage/hierarchy-repository";
 import { identityRepository, readIdentity } from "@/storage/peer-repository";
+import { pocOnboardingStore } from "@/storage/poc-onboarding-repository";
 import { pocPresenceStore } from "@/storage/poc-presence-repository";
 import { clearTransientPeerState, discardWorkingIdentity } from "@/storage/poc-template-repository";
 
@@ -25,7 +27,8 @@ interface PocBootstrapOptions {
 
 /**
  * The bootstrap page's requests a POC worker answers whatever its role (POC PLAN.md P4.3, P5.1,
- * P5.3): the launcher's ack, a template's included, and the provisioning of a copied template.
+ * P5.3, P6.1): the launcher's ack, a template's included, the provisioning of a copied template, and
+ * the master's "Prepare workers" request.
  */
 function startPocBootstrap({ log, sign, presence, start }: PocBootstrapOptions): void {
   const store = pocPresenceStore();
@@ -62,6 +65,21 @@ function startPocBootstrap({ log, sign, presence, start }: PocBootstrapOptions):
   };
   const provision = createProvisionListener((request) => provisionClone(deps, request), own);
   browser.runtime.onMessage.addListener(provision);
+  const roles = storedRoles();
+  const prepare = createPrepareListener(
+    {
+      downloads: browser.downloads,
+      masterProfileId: async () => {
+        const record = await roles.record();
+        return record?.role === "master" ? record.profileId : undefined;
+      },
+      identity: latest,
+      namespace: () => pocNamespaceOf(store, log),
+      written: pocOnboardingStore().written,
+    },
+    own,
+  );
+  browser.runtime.onMessage.addListener(prepare);
 }
 
 type PocPresence = ReturnType<typeof startPocPresence>;

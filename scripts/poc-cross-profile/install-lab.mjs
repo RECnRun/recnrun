@@ -5,6 +5,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  renameSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
@@ -85,6 +86,18 @@ function furnish(home) {
   mkdirSync(join(chrome, ".."), { recursive: true });
   writeFileSync(chrome, STUB);
   chmodSync(chrome, 0o755);
+}
+
+/** Puts the pipe stub as Chrome in `home` (a lab that already has another stub) and returns a build with a manifest. */
+export function pipeChrome(home) {
+  const build = join(home, "build");
+  mkdirSync(build, { recursive: true });
+  writeFileSync(join(build, "manifest.json"), "{}");
+  const chrome = join(home, APP);
+  writeFileSync(`${chrome}.pipe`, STUB);
+  chmodSync(`${chrome}.pipe`, 0o755);
+  renameSync(`${chrome}.pipe`, chrome); // a rename replaces a stub that may still be running
+  return build;
 }
 
 /** A temporary home with the pipe stub as Chrome, a bases folder, a build, and a ps that shows the stub. */

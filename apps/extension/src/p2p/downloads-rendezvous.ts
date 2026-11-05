@@ -36,6 +36,20 @@ export function registryPath(namespace: string): string {
   return `${namespaceFolder(namespace)}/registry.json`;
 }
 
+/** One file of a "Prepare workers" operation, in the folder the launcher scans (POC PLAN.md decision 11). */
+export function operationPath(
+  namespace: string,
+  operationId: string,
+  file: "request.json" | "status.json" | "retry",
+): string {
+  if (!v.is(TokenSchema, operationId)) {
+    throw new Error(
+      `Invalid operation id ${JSON.stringify(operationId)}: use a lowercase v4 uuid.`,
+    );
+  }
+  return `${namespaceFolder(namespace)}/ops/${operationId}/${file}`;
+}
+
 /** A profile id as a path segment, which only a uuid may be. */
 function profileSegment(profileId: string): string {
   if (!v.is(ProfileIdSchema, profileId)) {

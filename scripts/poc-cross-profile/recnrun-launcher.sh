@@ -10,7 +10,8 @@
 #       profile and leaves a paused or stopped one alone until lifecycle.sh resume (the owner's stop
 #       is never undone by the next pass). Exits 73, 75, 69, and 70 of a request are logged, not
 #       errors; 65 and 66 are logged once and the profile skipped until the launcher restarts.
-#       After the requests of each pass it runs catalog.sh once per distinct downloadsRoot the
+#       After the requests of each pass it runs provision.sh once (the master's "Prepare workers" operations,
+#       one step per operation, P6.1; exits are logged), then catalog.sh once per distinct downloadsRoot the
 #       record registers in the namespace (the extension finds its peers only through the
 #       registry.json it writes); its exits are logged, not errors.
 #       --once runs one pass; otherwise it runs in the foreground, writes <state-dir>/launcher.pid,
@@ -25,7 +26,7 @@
 #
 # Not a command of this script: base.sh (create-base, template, quit, freeze, update) prepares the clean
 # base of the clones (POC PLAN.md P5.1; update copies a frozen base to the next one, P5.6) and clone.sh (create-clone, list-clones, discard-partial) copies it
-# (P5.2); clone-open.sh (open-clone) opens and provisions a clone the first time (P5.3), or reopens one
+# (P5.2); provision.sh (run, status) chains them for the master's "Prepare workers" request (P6.1); clone-open.sh (open-clone) opens and provisions a clone the first time (P5.3), or reopens one
 # the record registers; open.sh, first-run.sh, and catalog.sh skip a root base.sh froze and a copy clone.sh has not
 # published.
 #
@@ -144,6 +145,15 @@ catalog_root() {
     *) log "catalog.sh for $3: exit $ct_code" ;;
   esac
 }
+# One provision.sh run (the master's "Prepare workers" operations, one step each), in the background so a SIGTERM ends the wait.
+run_provision() {
+  /bin/sh "$la_dir/provision.sh" run "$1" "$2" "$3" &
+  la_child=$!
+  wait "$la_child"
+  pv_code=$?
+  la_child=''
+  case $pv_code in 0) ;; 75) log "provision.sh: exit $pv_code, not an error" ;; *) log "provision.sh: exit $pv_code" ;; esac
+}
 run_catalog() {
   pass_roots=$(record_downloads_roots "$1" "$2") || return 0
   while IFS= read -r pass_root; do
@@ -165,6 +175,7 @@ run_pass() {
   done <<EOF
 $pass_ids
 EOF
+  run_provision "$1" "$2" "$3"
   run_catalog "$2" "$3"
 }
 cmd_start() {

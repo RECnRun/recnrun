@@ -260,7 +260,16 @@ await test("LIBRARIES holds every script the shipped scripts source or run", () 
       assert.ok(LIBRARIES.includes(library), `${name} uses ${library}, which is not in LIBRARIES`);
     }
   }
-  for (const library of ["catalog.sh", "presence.sh", "record.sh", "roots.sh"]) {
+  for (const library of [
+    "catalog.sh",
+    "presence.sh",
+    "record.sh",
+    "roots.sh",
+    "provision.sh",
+    "base.sh",
+    "clone.sh",
+    "clone-open.sh",
+  ]) {
     assert.ok(LIBRARIES.includes(library), `${library} ships`);
   }
   // V3: the launcher prepares the base and its clones on the colleague's machine.

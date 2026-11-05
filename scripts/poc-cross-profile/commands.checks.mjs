@@ -6,6 +6,7 @@ import { test } from "node:test";
 import { ALICE, BOB, NAMESPACE, shells, until } from "./lab.mjs";
 import { alive, env, lines, life, scene, script as lifecycleScript } from "./lifecycle-lab.mjs";
 import { commandScene, launcher, launcherScript, registerDownloads } from "./commands-lab.mjs";
+import { requestText } from "./provision-lab.mjs";
 
 const EX_USAGE = 64;
 const EX_REFUSED = 65;
@@ -184,6 +185,40 @@ for (const shell of shells) {
       assert.match(result.stdout, new RegExp(`^${ALICE} paused - 0 0$`, "m"), result.stdout);
     });
   }
+}
+
+const OPERATION = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+
+for (const shell of shells) {
+  await test(`${shell}: start --once runs provision.sh once per pass for the master's requests`, (context) => {
+    const scene = commandScene(context);
+    const downloads = join(scene.home, "Downloads");
+    registerDownloads(scene, { [ALICE]: downloads });
+    writeFileSync(
+      scene.record,
+      readFileSync(scene.record, "utf8").replace(
+        "profileId=" + ALICE,
+        `profileId=${ALICE}\nrole=master`,
+      ),
+    );
+    const folder = join(downloads, "RECnRun/poc", NAMESPACE, "ops", OPERATION);
+    mkdirSync(folder, { recursive: true });
+    // clones=9 is refused by the request grammar, so the pass answers without starting anything.
+    writeFileSync(
+      join(folder, "request.json"),
+      requestText({
+        operationId: OPERATION,
+        basesDir: scene.home,
+        clones: 9,
+        masterProfileId: ALICE,
+      }),
+    );
+    const result = start(shell, scene, "--once");
+    assert.equal(result.code, 0, result.err);
+    const answer = JSON.parse(readFileSync(join(folder, "status.json"), "utf8"));
+    assert.deepEqual([answer.step, answer.state], ["create-base", "error"]);
+    assert.match(answer.message, /^refused: clones/);
+  });
 }
 
 const registryOf = (downloads) => join(downloads, "RECnRun/poc", NAMESPACE, "registry.json");

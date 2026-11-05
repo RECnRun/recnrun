@@ -41,6 +41,7 @@ export const LIBRARIES = [
   "base-freeze.sh",
   "base-update.sh",
   "install.sh",
+  "provision.sh",
   "clone.sh",
   "clone-open.sh",
   "extension-id",
