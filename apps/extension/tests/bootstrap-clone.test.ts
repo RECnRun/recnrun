@@ -53,6 +53,15 @@ describe("bootstrap of a clone", () => {
     expect(deps.enterTemplate).not.toHaveBeenCalled();
   });
 
+  test.each(["1lab", "a".repeat(33), "a".repeat(40), "7"])(
+    "hands a namespace of the shared grammar (%s) to its worker",
+    async (namespace) => {
+      const deps = dependencies(CLONE.replace("namespace=clones", `namespace=${namespace}`));
+      expect(await bootstrap(deps)).toMatchObject({ ok: true, clone: true });
+      expect(deps.send).toHaveBeenCalledWith({ ...PROVISION, namespace });
+    },
+  );
+
   test("shows the worker's refusal, a conflicting identity included", async () => {
     const conflict = "conflicting identity: provisioned as 55555555-5555-4555-8555-555555555555";
     const deps = dependencies(CLONE, { ok: false, error: conflict });
@@ -71,8 +80,8 @@ describe("bootstrap of a clone", () => {
     `#clone=${TOKEN}&instance=${INSTANCE}&operation=${OPERATION}&namespace=clones`,
     `#clone=${TOKEN}&instance=${INSTANCE}&operation=${OPERATION.toUpperCase()}&namespace=clones&master=${MASTER}.${MASTER_KEY}`,
     `#clone=${TOKEN}&instance=${INSTANCE}&operation=${OPERATION}&namespace=Clones&master=${MASTER}.${MASTER_KEY}`,
-    `#clone=${TOKEN}&instance=${INSTANCE}&operation=${OPERATION}&namespace=1clones&master=${MASTER}.${MASTER_KEY}`,
-    `#clone=${TOKEN}&instance=${INSTANCE}&operation=${OPERATION}&namespace=${"a".repeat(33)}&master=${MASTER}.${MASTER_KEY}`,
+    `#clone=${TOKEN}&instance=${INSTANCE}&operation=${OPERATION}&namespace=-bad_&master=${MASTER}.${MASTER_KEY}`,
+    `#clone=${TOKEN}&instance=${INSTANCE}&operation=${OPERATION}&namespace=${"a".repeat(41)}&master=${MASTER}.${MASTER_KEY}`,
     `#clone=${TOKEN}&instance=${INSTANCE}&operation=${OPERATION}&namespace=../x&master=${MASTER}.${MASTER_KEY}`,
     `#clone=${TOKEN}&instance=${INSTANCE}&operation=${OPERATION}&namespace=clones&master=${MASTER}.${MASTER_KEY.slice(1)}`,
     `#clone=${TOKEN}&instance=${INSTANCE}&operation=${OPERATION}&namespace=clones&master=${MASTER}`,

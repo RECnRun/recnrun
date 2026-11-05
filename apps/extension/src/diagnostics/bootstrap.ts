@@ -38,9 +38,9 @@ const TemplateFragmentSchema = v.pipe(
 const TEMPLATE_PREFIX = "#template=";
 const SETTING_KEY = "&setting=";
 const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}";
-// A role, or any key but these, never reaches the worker: the launcher's record names the role.
+// A role, or any key but these, never reaches the worker; NamespaceSchema checks the namespace.
 const CLONE_FRAGMENT = new RegExp(
-  `^#clone=(${UUID})&instance=(${UUID})&operation=(${UUID})&namespace=([a-z][a-z0-9-]{0,31})&master=(${UUID})\\.([\\w-]{87})$`,
+  `^#clone=(${UUID})&instance=(${UUID})&operation=(${UUID})&namespace=([^&]*)&master=(${UUID})\\.([\\w-]{87})$`,
 );
 const CLONE_PREFIX = "#clone=";
 const CLONE_REFUSED =
