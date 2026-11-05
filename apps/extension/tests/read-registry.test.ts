@@ -22,6 +22,7 @@ const registry = (namespace = "lab", extra: Record<string, unknown> = {}) => ({
   namespace,
   writtenAt: NOW - 1000,
   launcher: { boot: BOOT },
+  roots: { r1: ROOT },
   peers: { [ME]: { ...peer(ME), ...extra }, [PEER]: peer(PEER) },
 });
 

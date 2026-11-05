@@ -150,6 +150,7 @@ describe("verify", () => {
       namespace: "lab",
       writtenAt: NOW,
       launcher: { boot },
+      roots: { r1: "/home/me/Downloads" },
       peers: {
         [PEER]: {
           profileId: PEER,

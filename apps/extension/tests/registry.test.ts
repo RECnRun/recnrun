@@ -45,10 +45,21 @@ function registry(overrides: Partial<Registry> = {}): Registry {
     namespace: "lab-1",
     writtenAt: NOW - 1000,
     launcher: { boot: BOOT },
+    roots: { r1: "/Users/me/Downloads", r2: "/Users/me/RECnRun/clones/b/downloads" },
     peers: { [PEER]: peer(PEER), [ME]: peer(ME, "r2") },
     ...overrides,
   };
 }
+
+/** A root path of 1024 characters, the longest the catalog writes. */
+const LONGEST_PATH = `/${"x".repeat(1023)}`;
+
+/** Each path with a short title, so a long one does not fill the report. */
+const titled = (paths: string[]) =>
+  paths.map((path) => [
+    path.length > 40 ? `of ${path.length} characters` : JSON.stringify(path),
+    path,
+  ]);
 
 /** A uuid per index, so a test can make as many distinct peers as it needs. */
 const profileIdAt = (index: number) =>
@@ -182,8 +193,51 @@ describe("RegistrySchema", () => {
     expect(v.is(RegistrySchema, registry({ peers: peers(33) }))).toBe(false);
   });
 
+  test("lists a peer whose root the catalog names no path for", () => {
+    const unmapped = registry({ roots: { r1: "/Users/me/Downloads" } });
+    expect(v.parse(RegistrySchema, unmapped).peers[ME]?.root).toBe("r2");
+  });
+
+  test.each(
+    titled([
+      "/Users/me/Downloads",
+      "/tmp/recnrun A/downloads",
+      "C:/Users/me/Downloads",
+      "/a.b_c-d:e",
+      LONGEST_PATH,
+    ]),
+  )("accepts the root path %s", (_title, path) => {
+    expect(v.is(RegistrySchema, registry({ roots: { r1: path } }))).toBe(true);
+  });
+
+  test.each(
+    titled([
+      "",
+      "/",
+      "Downloads",
+      "./Downloads",
+      "/Users/me/Downloads/",
+      "/Users/me/../Downloads",
+      "/Users/me/..",
+      "C:\\Users\\me",
+      "//host/share",
+      "/Users/./me",
+      '/Users/"me"',
+      "/Users/me\nx",
+      "/Users/m\u00e9",
+      `${LONGEST_PATH}x`,
+    ]),
+  )("refuses the root path %s", (_title, path) => {
+    expect(v.is(RegistrySchema, registry({ roots: { r1: path } }))).toBe(false);
+  });
+
+  test("refuses a root path filed under a key that is not a root id", () => {
+    expect(v.is(RegistrySchema, registry({ roots: { root1: "/tmp/a" } as never }))).toBe(false);
+  });
+
   test.each([
     ["an unknown key", { ...registry(), path: "/tmp" }],
+    ["no roots", (({ roots: _roots, ...rest }) => rest)(registry())],
     ["another version", { ...registry(), version: 2 }],
     [
       "a peer with a path",
@@ -205,6 +259,7 @@ describe("the catalog scripts/poc-cross-profile/catalog.sh writes", () => {
     );
     const registry = v.parse(RegistrySchema, JSON.parse(readFileSync(sample, "utf8")));
     expect(Object.values(registry.peers).map((each) => each.root)).toEqual(["r1", "r2"]);
+    expect(Object.keys(registry.roots)).toEqual(["r1", "r2"]);
   });
 });
 

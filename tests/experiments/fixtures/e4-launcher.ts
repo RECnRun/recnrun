@@ -57,6 +57,7 @@ const RegistryFileSchema = v.strictObject({
   namespace: v.literal(NAMESPACE),
   writtenAt: Time,
   launcher: v.strictObject({ boot: Uuid, fingerprint: v.optional(v.string()) }),
+  roots: v.record(v.pipe(v.string(), v.regex(/^r[0-9]{1,3}$/)), v.string()),
   peers: v.record(Uuid, RegistryPeerSchema),
 });
 type RegistryFile = v.InferOutput<typeof RegistryFileSchema>;

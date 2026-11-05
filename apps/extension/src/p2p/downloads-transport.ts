@@ -18,8 +18,9 @@ import type { RendezvousTransport } from "@/p2p/rendezvous-transport";
 
 /*
  * The Downloads rendezvous (POC PLAN.md §5 and decision 11): each profile writes its files
- * through chrome.downloads under its own folder, and reads the others' through file:// from the
- * Downloads root Chrome reported, for the peers the launcher's catalog lists.
+ * through chrome.downloads under its own folder, and reads the others' through file:// for the
+ * peers the launcher's catalog lists: under its own Downloads root, or the path the catalog maps
+ * a peer's root to.
  */
 
 type Registration = v.InferOutput<typeof RegistrationSchema>;
@@ -128,10 +129,19 @@ const listed = (registry: Registry | undefined, { me, now }: Reading): RegistryP
     (peer) => peer.profileId !== me && peer.expiresAt > now,
   );
 
-/** The listed peers this profile can read: under its own root, once the catalog lists it. */
-function readable(registry: Registry | undefined, reading: Reading): RegistryPeer[] {
-  const mine = registry?.peers[reading.me];
-  return listed(registry, reading).filter((peer) => !mine || peer.root === mine.root);
+/** Where a listed peer's files are read: my root when it shares it, else the path of its root. */
+function baseOf(registry: Registry | undefined, { me, at }: Reading, peer: RegistryPeer) {
+  const mine = registry?.peers[me];
+  if (mine?.root === peer.root) return at.root;
+  return registry?.roots[peer.root] ?? (mine ? undefined : at.root);
+}
+
+/** The listed peers this profile can read, each with the reading of its own root. */
+function readable(registry: Registry | undefined, reading: Reading) {
+  return listed(registry, reading).flatMap((peer) => {
+    const root = baseOf(registry, reading, peer);
+    return root === undefined ? [] : [{ peer, under: { ...reading, at: { ...reading.at, root } } }];
+  });
 }
 
 /** What the others left for this profile, read peer by peer as the catalog lists them. */
@@ -139,11 +149,11 @@ function createDownloadsReads() {
   const sift = createSightingFilter();
   const presenceOf = createPresenceReader();
   const catalog = createCatalogReader();
-  const sightingOf = async (reading: Reading, owner: string): Promise<Sighting> => {
+  const sightingOf = async (reading: Reading, owner: string, under: Reading): Promise<Sighting> => {
     const [presence, offers, answers, mine] = await Promise.all([
-      presenceOf(reading, owner),
-      signalOf(reading, owner, "offer"),
-      signalOf(reading, owner, "answer"),
+      presenceOf(under, owner),
+      signalOf(under, owner, "offer"),
+      signalOf(under, owner, "answer"),
       // This profile's own answer to the peer, so a relaunch knows the offer it answered.
       signalOf(reading, reading.me, "answer", owner),
     ]);
@@ -152,7 +162,9 @@ function createDownloadsReads() {
   return {
     look: async (reading: Reading) => {
       const peers = readable(await catalog(reading), reading);
-      const sightings = await Promise.all(peers.map((peer) => sightingOf(reading, peer.profileId)));
+      const sightings = await Promise.all(
+        peers.map(({ peer, under }) => sightingOf(reading, peer.profileId, under)),
+      );
       return sift({
         presences: sightings.flatMap((each) => each.presences),
         signals: sightings.flatMap((each) => each.signals),

@@ -72,11 +72,20 @@ for (const shell of shells) {
       namespace: NAMESPACE,
       writtenAt: 1_800_000_000_500,
       launcher: { boot: BOOT },
+      roots: { r1: rootA, r2: rootB },
       peers: {
         [ALICE]: { ...peerOf(ALICE, "r1"), displayName: "José's Mac" },
         [BOB]: peerOf(BOB, "r2"),
       },
     });
+    assert.deepEqual(Object.keys(registry), [
+      "version",
+      "namespace",
+      "writtenAt",
+      "launcher",
+      "roots",
+      "peers",
+    ]);
     const written = readFileSync(record, "utf8");
     assert.equal(
       written,
@@ -84,7 +93,8 @@ for (const shell of shells) {
         .replace(`${rootA}\n`, `${rootA}\nroot=r1\n`)
         .replace(`${rootB}\n`, `${rootB}\nroot=r2\n`),
     );
-    sample("registry.sample.json", `${JSON.stringify(registry, null, 2)}\n`);
+    const portable = JSON.stringify(registry, null, 2).replaceAll(home, "/tmp/recnrun-catalog");
+    sample("registry.sample.json", `${portable}\n`);
     sample("launcher.sample.record", written.replaceAll(home, "/tmp/recnrun-catalog"));
     assert.deepEqual(run(shell, [record, NAMESPACE, out]), { code: 0, stderr: "" });
     assert.equal(readFileSync(record, "utf8"), written, "a second run keeps the ids");

@@ -260,7 +260,7 @@ await test("LIBRARIES holds every script the shipped scripts source or run", () 
       assert.ok(LIBRARIES.includes(library), `${name} uses ${library}, which is not in LIBRARIES`);
     }
   }
-  for (const library of ["catalog.sh", "presence.sh", "record.sh"]) {
+  for (const library of ["catalog.sh", "presence.sh", "record.sh", "roots.sh"]) {
     assert.ok(LIBRARIES.includes(library), `${library} ships`);
   }
 });

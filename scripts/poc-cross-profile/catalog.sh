@@ -4,15 +4,15 @@
 # The launcher's catalog writer (POC PLAN.md P2.3, decision 11), the single writer of
 # <out-dir>/registry.json. POSIX sh only: macOS /bin/sh and Debian dash, no JSON parser.
 #
-# Record file: the launcher's own key=value blocks, grammar in record.sh. Every downloadsRoot is
-# scanned; one without a root id gets the next free r<n>, written back.
+# Record file: key=value blocks, grammar in record.sh. Every downloadsRoot is scanned; one without
+# a root id gets the next free r<n>, written back; "roots" maps each id to its path (roots.sh).
 #
 # Scan: <downloadsRoot>/RECnRun/poc/<namespace>/peers/<uuid>/presence.json, nothing else, no
 # symbolic link followed at any folder below the root or at the file. Temporary files get a
 # random name and are created exclusively; a registry.json that is a folder or a link exits 73.
 # A presence counts only in the exact bytes the extension writes (grammar in presence.sh);
-# anything else is skipped with a reason on stderr. The boot goes into the registry.
-# No value read from a file is ever run or expanded.
+# anything else is skipped with a reason on stderr. No value read from a file is ever run or
+# expanded. The boot goes into the registry.
 #
 # Exit: 0 written, 64 wrong call, 65 invalid record, 66 no record, 73 cannot write,
 # 75 another run holds <out-dir>/.catalog.lock (nothing written).
@@ -38,6 +38,8 @@ here=$(dirname -- "$0")
 . "$here/record.sh"
 # shellcheck source=presence.sh
 . "$here/presence.sh"
+# shellcheck source=roots.sh
+. "$here/roots.sh"
 record_refuse() { fail 65 "$*"; }
 
 # --- Value checks ---------------------------------------------------------------------------
@@ -98,7 +100,6 @@ if [ -L "$destination" ] || { [ -e "$destination" ] && [ ! -f "$destination" ]; 
   fail 73 'registry.json in the output directory is not a regular file'
 fi
 
-
 # Read once, so both passes see the same record.
 record_load "$record"
 
@@ -136,6 +137,7 @@ next_free_id() {
 # Pass 1 learns the ids the record names; pass 2 numbers the other roots and rewrites.
 record_hook_block() {
   [ -n "$b_downloads" ] || return 0
+  is_root_path "$b_downloads" || fail 65 "$where: downloadsRoot has an empty or . segment"
   if [ "$1" = 1 ]; then
     [ -n "$b_root" ] || return 0
     id_of "$b_downloads"
@@ -162,7 +164,6 @@ changed=0
 record_parse 1
 rewritten=
 record_parse 2
-
 
 # Accepted presences, one "id<TAB>root<TAB>name<TAB>fingerprint<TAB>createdAt<TAB>expiresAt<TAB>boot" line each.
 peers=
@@ -269,7 +270,7 @@ EOF
 }
 [ -n "$boot" ] || new_boot
 
-json="{\"version\":1,\"namespace\":\"$namespace\",\"writtenAt\":$now,\"launcher\":{\"boot\":\"$boot\"},\"peers\":{"
+json="{\"version\":1,\"namespace\":\"$namespace\",\"writtenAt\":$now,\"launcher\":{\"boot\":\"$boot\"},$(roots_json "$map"),\"peers\":{"
 separator=
 while IFS="$tab" read -r p_id p_root p_name p_fingerprint p_created p_expires p_boot; do
   [ -n "$p_id" ] || continue

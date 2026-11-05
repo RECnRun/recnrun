@@ -243,7 +243,7 @@ for (const shell of shells) {
 }
 
 // The libraries catalog.sh sources by a fixed name next to itself, and nothing else.
-const LIBRARIES = ["record.sh", "presence.sh"];
+const LIBRARIES = ["record.sh", "presence.sh", "roots.sh"];
 const libraryPath = (name) => new URL(name, `file://${script}`);
 
 await test("the script never evaluates text as shell code", () => {

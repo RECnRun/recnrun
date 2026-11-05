@@ -143,6 +143,77 @@ describe("downloadsTransport", () => {
   });
 });
 
+describe("peers in different Downloads roots", () => {
+  const CLONE_ROOT = "/home/lab/RECnRun/clones/b/downloads";
+  const answer = { ...offer, kind: "answer" as const, profileId: PEER, to: ME };
+
+  /** The master ME under r1 and the clone PEER under r2, with one catalog the launcher copies to both. */
+  function split(roots: Record<string, string>) {
+    const master = downloadsDisk();
+    const clone = downloadsDisk(CLONE_ROOT);
+    const read = vi.fn(async (url: string) => (await master.read(url)) ?? clone.read(url));
+    const over = (me: string, disk: typeof master, root: string) =>
+      downloadsTransport({
+        me,
+        context: async () => ({ namespace: NAMESPACE, root }),
+        boot: async () => BOOT,
+        writer: disk.writer,
+        read,
+      });
+    const sync = () => {
+      const [first, second] = [catalogOf(master.files, "r1"), catalogOf(clone.files, "r2")];
+      const registry = { ...first, roots, peers: { ...first.peers, ...second.peers } };
+      for (const disk of [master, clone]) {
+        disk.files.set(registryPath(NAMESPACE), JSON.stringify(registry));
+      }
+    };
+    const mine = over(ME, master, DOWNLOADS_ROOT);
+    const theirs = over(PEER, clone, CLONE_ROOT);
+    return { master, clone, read, mine, theirs, sync };
+  }
+
+  test("see each other's presence and signals under the paths the catalog maps", async () => {
+    const { master, clone, read, mine, theirs, sync } = split({
+      r1: DOWNLOADS_ROOT,
+      r2: CLONE_ROOT,
+    });
+    await mine.announce(presence(ME));
+    await theirs.announce(presence(PEER));
+    await mine.publish(offer);
+    await theirs.publish(answer);
+    sync();
+    const seenByMe = await mine.look();
+    expect(seenByMe.presences.map((each) => each.profileId)).toEqual([PEER]);
+    expect(seenByMe.signals.map((each) => each.kind)).toEqual(["answer"]);
+    read.mockClear();
+    const seenByThem = await theirs.look();
+    expect(seenByThem.presences.map((each) => each.profileId)).toEqual([ME]);
+    expect(seenByThem.signals.map(({ kind, profileId }) => [kind, profileId])).toEqual([
+      ["offer", ME],
+      ["answer", PEER],
+    ]);
+    const urls = read.mock.calls.map(([url]) => url);
+    expect(urls).toContain(
+      `file://${DOWNLOADS_ROOT}/RECnRun/poc/lab/peers/${ME}/offer-${PEER}.json`,
+    );
+    // Its own answer to the master stays under its own root.
+    expect(urls).toContain(`file://${CLONE_ROOT}/RECnRun/poc/lab/peers/${PEER}/answer-${ME}.json`);
+    expect([...master.files.keys()].some((path) => path.includes(`peers/${PEER}`))).toBe(false);
+    expect([...clone.files.keys()].some((path) => path.includes(`peers/${ME}`))).toBe(false);
+  });
+
+  test("see nothing of a peer whose root the catalog maps to no path, though it lists it", async () => {
+    const { read, mine, theirs, sync } = split({ r1: DOWNLOADS_ROOT });
+    await mine.announce(presence(ME));
+    await theirs.announce(presence(PEER));
+    await theirs.publish(answer);
+    sync();
+    expect((await mine.discover()).map((peer) => peer.profileId)).toEqual([PEER]);
+    expect(await mine.look()).toEqual({ presences: [], signals: [] });
+    expect(read.mock.calls.some(([url]) => url.includes(`peers/${PEER}`))).toBe(false);
+  });
+});
+
 describe("a peer's presence, with the bounds catalog.sh applies", () => {
   const PEER_PRESENCE = `RECnRun/poc/lab/peers/${PEER}/presence.json`;
   /** What a fresh transport sees of PEER once its presence claims these times. */

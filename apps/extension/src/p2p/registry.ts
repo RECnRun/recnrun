@@ -8,9 +8,9 @@ import { FingerprintSchema, ProfileIdSchema } from "@/p2p/protocol";
 
 /*
  * The catalog of the Downloads rendezvous (POC PLAN.md decision 11): what an extension registers
- * for the launcher, and the registry.json the launcher alone writes back. Neither carries a path:
- * the launcher learns a Downloads root by finding a profile's file under it, and names each root
- * it knows with an opaque id.
+ * for the launcher, and the registry.json the launcher alone writes back. A registration carries
+ * no path: the launcher learns a Downloads root from its record, names it with an opaque id, and
+ * publishes the id's path in `roots`.
  */
 
 /** The catalog outlives two presence periods, so one missed launcher pass drops nobody. */
@@ -68,8 +68,27 @@ export const RegistrationSchema = v.pipe(
   ),
 );
 
-/** The launcher's opaque name for one Downloads root it knows, never the path itself. */
+/** The launcher's opaque name for one Downloads root it knows, as peers name it. */
 export const RootIdSchema = v.pipe(v.string(), v.regex(/^r[0-9]{1,3}$/));
+
+/** Every segment after the leading / or drive is one fileUrlFor accepts: never empty, . or .. */
+const plainSegments = (path: string) =>
+  path
+    .replace(/^[A-Za-z]:/, "")
+    .split("/")
+    .slice(1)
+    .every((segment) => segment !== "" && segment !== "." && segment !== "..");
+
+/**
+ * The absolute path the launcher learned for a root, in the record's charset (record.sh):
+ * 1 to 1024 characters of [A-Za-z0-9._:/ -], from / or a drive, with no trailing slash.
+ */
+const RootPathSchema = v.pipe(
+  v.string(),
+  v.maxLength(1024),
+  v.regex(/^([A-Za-z]:)?\/[A-Za-z0-9._:/ -]*$/),
+  v.check(plainSegments, "A root path has no empty, . or .. segment."),
+);
 
 const RegistryPeerSchema = v.strictObject({
   profileId: ProfileIdSchema,
@@ -90,6 +109,8 @@ export const RegistrySchema = v.strictObject({
   namespace: NamespaceSchema,
   writtenAt: TimeSchema,
   launcher: v.strictObject({ boot: BootSchema, fingerprint: v.optional(FingerprintSchema) }),
+  /** Where each root is, so an extension reads a listed peer's files under its peer's root. */
+  roots: v.record(RootIdSchema, RootPathSchema),
   peers: v.pipe(
     v.record(ProfileIdSchema, RegistryPeerSchema),
     v.maxEntries(MAX_REGISTRY_PEERS),

@@ -32,6 +32,7 @@ export const LIBRARIES = [
   "open.sh",
   "record.sh",
   "presence.sh",
+  "roots.sh",
   "catalog.sh",
   "profiles.sh",
   "discovery.sh",

@@ -61,7 +61,7 @@ const LAUNCHER_BOOT = "88888888-8888-4888-8888-888888888888";
 const PRESENCE_PATH = /^RECnRun\/poc\/lab\/peers\/([0-9a-f-]{36})\/presence\.json$/;
 
 /** One Downloads root on disk, and Chrome's items over it, which remove the file they wrote. */
-export function downloadsDisk() {
+export function downloadsDisk(root = DOWNLOADS_ROOT) {
   const files = new Map<string, string>();
   const items = new Map<number, string>();
   let next = 0;
@@ -78,7 +78,7 @@ export function downloadsDisk() {
     },
   };
   const read = async (url: string) =>
-    [...files].find(([path]) => fileUrlFor(`${DOWNLOADS_ROOT}/${path}`) === url)?.[1];
+    [...files].find(([path]) => fileUrlFor(`${root}/${path}`) === url)?.[1];
   return { files, items, writer, read };
 }
 
@@ -93,7 +93,8 @@ export function catalogOf(files: Map<string, string>, root = "r1"): Registry {
     peers[profileId] = { profileId, displayName, fingerprint, root, lastSeenAt, expiresAt, boot };
   }
   const launcher = { boot: LAUNCHER_BOOT };
-  return { version: 1, namespace: NAMESPACE, writtenAt: Date.now(), launcher, peers };
+  const roots = { [root]: DOWNLOADS_ROOT };
+  return { version: 1, namespace: NAMESPACE, writtenAt: Date.now(), launcher, roots, peers };
 }
 
 /** The POC builds' Downloads, every profile under one root, and the launcher between passes. */
