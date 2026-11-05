@@ -66,6 +66,10 @@ async function keepEvidence(dir: string, rig: Rig, testInfo: TestInfo) {
     (): Record<string, unknown> => ({}),
   );
   await writeFile(testInfo.outputPath("extensions.json"), JSON.stringify(prefs.extensions ?? {}));
+  await copyFile(
+    join(root, "Default/Secure Preferences"),
+    testInfo.outputPath("secure.json"),
+  ).catch(() => undefined);
 }
 
 /** poc-d0 installed on a fresh root, reloaded so Chrome keeps it, and quit; the launcher opens it. */
