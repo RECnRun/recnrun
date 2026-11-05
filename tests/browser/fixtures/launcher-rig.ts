@@ -52,12 +52,16 @@ function chromeExecutable(): string {
  * Like Google's own google-chrome script, it keeps its path as argv[0] (`exec -a`, a bashism), so the
  * Chrome process names the binary the launcher resolved and lifecycle.sh signals it.
  */
+export function chromeScript(dir: string, flags: readonly string[] = []): string {
+  const sandbox = process.env.RECNRUN_TEST_CONTAINER === "1" ? " --no-sandbox" : "";
+  const extra = flags.map((flag) => ` ${flag}`).join("");
+  return `#!/bin/bash\nexec -a "$0" "${chromeExecutable()}"${sandbox}${extra} "$@" 2>>"${dir}/chrome.log"\n`;
+}
+
 async function wrapper(dir: string, flags: readonly string[] = []): Promise<string> {
   const bin = join(dir, "bin");
   await mkdir(bin);
-  const sandbox = process.env.RECNRUN_TEST_CONTAINER === "1" ? " --no-sandbox" : "";
-  const extra = flags.map((flag) => ` ${flag}`).join("");
-  const script = `#!/bin/bash\nexec -a "$0" "${chromeExecutable()}"${sandbox}${extra} "$@" 2>>"${dir}/chrome.log"\n`;
+  const script = chromeScript(dir, flags);
   // profiles.sh tries google-chrome-stable first, and the image has one in /usr/bin.
   for (const name of ["google-chrome-stable", "google-chrome"]) {
     await writeFile(join(bin, name), script);

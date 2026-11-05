@@ -1,10 +1,13 @@
 import { mkdir, readFile, rm, stat } from "node:fs/promises";
+import { homedir } from "node:os";
 import { join } from "node:path";
 import { labEnvironment } from "../experiments/fixtures/e4-lab.ts";
 import { expectEveryHypothesis, recordHypothesis } from "../experiments/outcome.ts";
 import type { Cell, Sample } from "../experiments/outcome.ts";
 import { sized } from "../experiments/samples.ts";
 import { expect, test } from "./fixtures/chrome.ts";
+import { extensionPath } from "./fixtures/extension-loaders.ts";
+import { chromeScript } from "./fixtures/launcher-rig.ts";
 import {
   announceClone,
   catalogPass,
@@ -21,8 +24,9 @@ import { within } from "./fixtures/trust.ts";
  * POC PLAN.md P6.1 (CL16) on Google Chrome Stable: the master's dashboard section "Prepare
  * workers" writes request.json through chrome.downloads and shows the launcher's status.json and
  * registry.json. The launcher side is the real provision.sh, run step by step as the loop would run
- * it with catalog.sh between steps. Chrome on the base and the clones is the lab's stub; the base
- * already holds the extension (installBase), so the install step is the no-op until P6.2.
+ * it with catalog.sh between steps. Chrome on the base and the clones is the lab's stub, which acks as
+ * the extension would; the create-base stub stays open on the base, as Chrome does, and the install
+ * step runs the real install.sh on the container's Chrome (the DevTools pipe), as E10 does.
  */
 
 const EXPERIMENT = "P6.1";
@@ -50,13 +54,26 @@ interface Stage {
   step: string;
   /** Runs before the launcher's pass. */
   before?: (scene: MasterScene) => void;
+  /** Runs after the launcher's pass. */
+  after?: (scene: MasterScene) => void;
   /** The stub Chrome's environment for the pass. */
   env?: (scene: MasterScene) => Record<string, string>;
 }
 
 const STAGES: Stage[] = [
-  { step: "create-base" },
-  { step: "install", before: (scene) => void scene.rig.installBase() },
+  { step: "create-base", env: () => ({ STUB_ALIVE: "120" }) },
+  {
+    step: "install",
+    before: ({ rig }) => rig.realChrome(chromeScript(rig.home)),
+    env: ({ rig }) => ({
+      RECNRUN_EXTENSION_BUILD: extensionPath("poc-d0"),
+      RECNRUN_OPEN_TIMEOUT_S: "60",
+      TMPDIR: rig.home,
+      DISPLAY: process.env.DISPLAY ?? "",
+      XAUTHORITY: process.env.XAUTHORITY ?? join(homedir(), ".Xauthority"),
+    }),
+    after: ({ rig }) => rig.stubChrome(),
+  },
   {
     step: "template",
     env: ({ rig }) => ({ STUB_ACK: "good", STUB_ROOT: join(rig.bases, "base-v1", "downloads") }),
@@ -70,6 +87,7 @@ const STAGES: Stage[] = [
 async function pass(scene: MasterScene, stage?: Stage): Promise<number | null> {
   if (stage) stage.before?.(scene);
   const result = scene.rig.run(stage?.env?.(scene));
+  stage?.after?.(scene);
   await catalogPass(scene);
   return result.code;
 }

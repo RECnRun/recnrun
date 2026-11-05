@@ -15,9 +15,10 @@
 # clone.<name> = instance id, boot.<name> = ack boot) and advances by ONE step per call, so the
 # launcher loop stays responsive and a crash leaves a resumable state:
 #   create-base  base.sh create-base <basesDir> <baseName>
-#   install      nothing when the extension is already in the base, else install.sh install-base
-#                <basesDir> <baseName> <ns> <build-dir> (build-dir: RECNRUN_EXTENSION_BUILD or
-#                <this dir>/extension); its exit code and last stderr line fail the step
+#   install      nothing when the extension is already in the base, else base.sh quit (the Chrome
+#                create-base left open) and install.sh install-base <basesDir> <baseName> <ns>
+#                <build-dir> (build-dir: RECNRUN_EXTENSION_BUILD or <this dir>/extension); the exit code
+#                and last stderr line of either fail the step
 #   template     base.sh template; no ack in time (69) is pending-action: the step repeats on the next call
 #   freeze       base.sh quit, then base.sh freeze
 #   create-clone clone.sh create-clone for each w<i> (i up to clones) not created yet, in <basesDir>/clones
@@ -216,6 +217,8 @@ step_install() {
     sx_text='the extension is already in the base'
     return 0
   fi
+  # create-base left Chrome open on the setup pages, and install.sh refuses a root a process holds.
+  run_step "$pv_dir/base.sh" quit "$rq_bases" "$rq_name" || { step_failed $?; return 0; }
   run_step "$pv_dir/install.sh" install-base "$rq_bases" "$rq_name" "$ns" "${RECNRUN_EXTENSION_BUILD:-$pv_dir/extension}" || { step_failed $?; return 0; }
   sx_text='installed the extension in the base'
 }

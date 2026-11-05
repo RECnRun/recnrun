@@ -31,7 +31,8 @@ interface ProvisionRig {
   folder(id: string): string;
   launchCount(): number;
   run(extra?: Record<string, string>): { code: number | null; out: string; err: string };
-  installBase(): string;
+  realChrome(script: string): void;
+  stubChrome(): void;
   dispose(): void;
 }
 

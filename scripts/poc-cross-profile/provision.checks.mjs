@@ -10,8 +10,9 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
+import { spawn, spawnSync } from "node:child_process";
 import { ALICE, NAMESPACE, shells } from "./lab.mjs";
-import { EXTENSION, installExtension } from "./base-lab.mjs";
+import { EXTENSION, environment, installExtension } from "./base-lab.mjs";
 import { masterBlock } from "./clone-open-lab.mjs";
 import { pipeChrome } from "./install-lab.mjs";
 import { OPERATION, provisionScene, requestText } from "./provision-lab.mjs";
@@ -163,6 +164,33 @@ for (const shell of shells) {
       readFileSync(join(s.root(), "Default/Secure Preferences"), "utf8"),
       /"location":4/,
     );
+  });
+
+  await test(`${shell}: install ends the Chrome create-base left on the base before it installs`, (context) => {
+    const s = provisionScene(context);
+    s.request();
+    assert.equal(s.run(shell).code, 0);
+    // The base's setup Chrome stays open on the root, as it does after create-base.
+    const chrome = join(s.home, "Applications/Google Chrome.app/Contents/MacOS/Google Chrome");
+    const holder = spawn(chrome, [`--user-data-dir=${s.root()}`, "--profile-directory=Default"], {
+      stdio: "ignore",
+      env: environment(s.home, "base-v1", { STUB_ALIVE: "20" }),
+    });
+    s.spawned.push(holder.pid);
+    spawnSync("sleep", ["0.5"]);
+    const build = pipeChrome(s.home);
+    const pipe = {
+      STUB_MESSAGES: join(s.home, "messages"),
+      STUB_EXTENSION: EXTENSION,
+      STUB_BUILD: build,
+      TMPDIR: s.home,
+      RECNRUN_EXTENSION_BUILD: build,
+    };
+    const result = s.run(shell, pipe);
+    assert.equal(result.code, 0, result.err);
+    const installed = shape(s.status());
+    assert.deepEqual([installed.step, installed.state], ["install", "running"]);
+    assert.equal(installed.message, "installed the extension in the base");
   });
 
   await test(`${shell}: a failed install.sh is an error with its exit code and last line`, (context) => {
