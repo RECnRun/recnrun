@@ -6,7 +6,8 @@ import { fileURLToPath } from "node:url";
 import { recordHypothesis } from "../outcome.ts";
 import type { Cell } from "../outcome.ts";
 import type { Sample, VerdictTarget } from "./downloads-verdicts.ts";
-import { readJson } from "./launcher-open.ts";
+import { readJson, until } from "./launcher-open.ts";
+import type { SharedPair } from "./launcher-shared.ts";
 import type { Rig } from "./launcher-open.ts";
 
 /*
@@ -99,6 +100,46 @@ async function measure(rig: Rig, pids: number[]): Promise<Sample> {
   return { ok: problems.length === 0, ...error, observation };
 }
 
+const CATALOG_MS = 40_000;
+
+/** The ids a registry.json holds as peers; none while it is missing or unreadable. */
+async function registryPeers(downloads: string): Promise<string[]> {
+  const file = join(downloads, "RECnRun/poc", NAMESPACE, "registry.json");
+  const registry = await readJson(file).catch((): Record<string, unknown> => ({}));
+  return Object.keys((registry.peers as Record<string, unknown> | undefined) ?? {}).sort();
+}
+
+/**
+ * Two profiles of one root, each with a Downloads folder of its own: passes of `start --once` open
+ * both and must leave a registry.json holding both in each folder, the only way the extension
+ * finds its peers. A launcher-opened Chrome has no CDP client, so the peer list is the registry's.
+ */
+async function measureCatalog(rig: SharedPair, pids: number[]): Promise<Sample> {
+  const scenes = [rig.scene, rig.second];
+  const state = join(dirname(rig.scene.record), "state");
+  await mkdir(state);
+  const wanted = scenes.map((scene) => scene.profileId).sort();
+  let passes = 0;
+  let last = "";
+  const both = async () => {
+    passes += 1;
+    const ran = await launcher(rig, ["start", state, rig.scene.record, NAMESPACE, flag("once")]);
+    last = `pass ${passes} exited ${ran.code}: ${ran.stderr.slice(-300)}`;
+    for (const scene of scenes) {
+      const pid = Number((await stateOf(join(state, "profiles", scene.profileId))).pid);
+      if (pid > 0) pids.push(pid);
+    }
+    const held = await Promise.all(scenes.map((scene) => registryPeers(scene.downloads)));
+    return held.every((peers) => peers.join() === wanted.join()) ? held : undefined;
+  };
+  const held = await until(both, "a registry holding both profiles", CATALOG_MS).catch(
+    () => undefined,
+  );
+  const error =
+    held === undefined ? { error: `no registry held ${wanted.join(", ")}; ${last}` } : {};
+  return { ok: held !== undefined, ...error, observation: { passes, peers: wanted.length } };
+}
+
 /** SIGTERM to a pid that may already be gone: stop --all ended it. */
 function terminate(pid: number): void {
   try {
@@ -109,11 +150,14 @@ function terminate(pid: number): void {
 }
 
 /** One sample: prepare a rig, run the three commands, and leave nothing of the root behind. */
-export async function commandsSample(setup: () => Promise<Rig>): Promise<Sample> {
+async function sampleOf<R extends Rig>(
+  setup: () => Promise<R>,
+  run: (rig: R, pids: number[]) => Promise<Sample>,
+): Promise<Sample> {
   const rig = await setup();
   const pids: number[] = [];
   try {
-    const sample = await measure(rig, pids).catch(async (error: unknown) => {
+    const sample = await run(rig, pids).catch(async (error: unknown) => {
       await rig.keep?.().catch(() => undefined);
       throw error;
     });
@@ -129,10 +173,16 @@ export async function commandsSample(setup: () => Promise<Rig>): Promise<Sample>
   }
 }
 
-/** The cell of P4.5, with its topology. */
+export const commandsSample = (setup: () => Promise<Rig>) => sampleOf(setup, measure);
+/** One sample on two profiles of one root, for the catalog the launcher writes. */
+export const catalogSample = (setup: () => Promise<SharedPair>) => sampleOf(setup, measureCatalog);
+
+/** The cells of P4.5, with their topologies. */
 export const COMMAND_CELLS = {
   "P4.5.commands.once":
     "one registered profile, closed: start --once opens it, status lists it, stop --all ends it",
+  "P4.5.commands.catalog":
+    "two profiles of one root, closed: start --once passes leave a registry.json holding both in each Downloads folder",
 } as const;
 export type CommandHypothesis = keyof typeof COMMAND_CELLS;
 

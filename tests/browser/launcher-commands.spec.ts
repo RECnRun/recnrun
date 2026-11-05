@@ -1,12 +1,13 @@
 import { labEnvironment } from "../experiments/fixtures/e4-lab.ts";
 import {
   COMMAND_CELLS,
+  catalogSample,
   commandsSample,
   recordCommands,
 } from "../experiments/fixtures/launcher-commands.ts";
 import { expectEveryHypothesis } from "../experiments/outcome.ts";
 import { expect, test } from "./fixtures/chrome.ts";
-import { labRig } from "./fixtures/launcher-rig.ts";
+import { labRig, sharedRig } from "./fixtures/launcher-rig.ts";
 
 /*
  * POC PLAN.md P4.5 on Google Chrome Stable: recnrun-launcher.sh `start --once` opens a registered
@@ -22,6 +23,15 @@ test.describe("recnrun-launcher.sh start, status, and stop on a second root", ()
     expect(browserName).toBeDefined();
     await recordCommands("P4.5.commands.once", labEnvironment.target, () =>
       commandsSample(() => labRig(testInfo)),
+    );
+  });
+
+  test("P4.5.commands.catalog: start --once leaves a registry.json holding both profiles of a root", async ({
+    browserName,
+  }, testInfo) => {
+    expect(browserName).toBeDefined();
+    await recordCommands("P4.5.commands.catalog", labEnvironment.target, () =>
+      catalogSample(() => sharedRig(testInfo)),
     );
   });
 

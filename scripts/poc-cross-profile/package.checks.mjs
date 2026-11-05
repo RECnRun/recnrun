@@ -250,3 +250,25 @@ for (const shell of shells) {
     assert.match(status.stdout, new RegExp(`${ALICE} open `));
   });
 }
+
+await test("LIBRARIES holds every script the shipped scripts source or run", () => {
+  const reference = /(?:^|\s)(?:\.|\/bin\/sh)\s+"[^\n]*?\/([\w-]+\.sh)"/gm;
+  const shipped = ["package/recnrun-launcher", ...LIBRARIES.filter((name) => name.endsWith(".sh"))];
+  for (const name of shipped) {
+    const text = readFileSync(join(here, name), "utf8");
+    for (const [, library] of text.matchAll(reference)) {
+      assert.ok(LIBRARIES.includes(library), `${name} uses ${library}, which is not in LIBRARIES`);
+    }
+  }
+  for (const library of ["catalog.sh", "presence.sh", "record.sh"]) {
+    assert.ok(LIBRARIES.includes(library), `${library} ships`);
+  }
+});
+
+await test("the README says the launcher keeps the catalog", (context) => {
+  const { macos } = builtPackage(scratch(context));
+  assert.match(
+    readFileSync(join(macos, "README.md"), "utf8").replaceAll(/\s+/g, " "),
+    /registry\.json/,
+  );
+});
