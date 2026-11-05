@@ -1,0 +1,38 @@
+[
+  {
+    "experiment": "P4.5",
+    "hypothesis": "P4.5.commands.once",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "one registered profile, closed: start --once opens it, status lists it, stop --all ends it",
+    "debugger": "none",
+    "verdict": "pass",
+    "samples": 3,
+    "gestures": 0,
+    "steps": [],
+    "observations": [
+      {
+        "started": 0,
+        "stopped": 0,
+        "status": ["launcher stopped", "5962136c-bf20-4c06-8773-961cb145c54e open 777 0 0", ""],
+        "pid": 777
+      },
+      {
+        "started": 0,
+        "stopped": 0,
+        "status": ["launcher stopped", "bd585324-856a-4693-acc2-aa54467a00e9 open 1479 0 0", ""],
+        "pid": 1479
+      },
+      {
+        "started": 0,
+        "stopped": 0,
+        "status": ["launcher stopped", "e76abdca-59e3-4b29-b34d-edc4e8e63aad open 2185 0 0", ""],
+        "pid": 2185
+      }
+    ]
+  }
+]
