@@ -45,7 +45,7 @@ export function firstRunScene(context, namespace = "lab", { shared = false } = {
   const folderOf = (id) => join(downloads, "RECnRun/poc", namespace, "peers", id);
   const publish = (id = ALICE) => {
     mkdirSync(folderOf(id), { recursive: true });
-    writeFileSync(join(folderOf(id), "presence.json"), JSON.stringify(presence(id)));
+    writeFileSync(join(folderOf(id), "presence.json"), JSON.stringify(presence(id, { namespace })));
   };
   publish();
   if (shared) publish(BOB);

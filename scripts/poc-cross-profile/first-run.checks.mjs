@@ -119,6 +119,7 @@ const recordBlock = (scene, id, directory) =>
     `profileId=${id}`,
     "namespace=lab",
     `downloadsRoot=${scene.home}/Downloads`,
+    "root=r1", // the catalog pass of first-run numbered the shared root
   ].join("\n");
 const trimmed = (record) => blocks(record).map((block) => block.trimEnd());
 
