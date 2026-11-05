@@ -44,7 +44,7 @@ const CLONE_REFUSED =
   "The address carries no #clone=<token>&instance=<uuid>&operation=<uuid>&namespace=<namespace>&master=<profile id>.<identity key>.";
 
 /** How long each step of a token bootstrap may take; open.sh waits 60 s by default for the ack. */
-export interface BootstrapLimits {
+interface BootstrapLimits {
   adoptMs: number;
   /** For each of the two tries of the presence. */
   publishMs: number;

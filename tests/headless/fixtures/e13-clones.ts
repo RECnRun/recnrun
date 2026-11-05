@@ -102,7 +102,7 @@ async function freshRound(lab: CloneLab) {
 }
 
 /** t9.clones: each clone is headless, provisioned, linked to the master, with an identity of its own. */
-export async function clonesSample(lab: CloneLab, names: string[]): Promise<Sample> {
+async function clonesSample(lab: CloneLab, names: string[]): Promise<Sample> {
   await freshRound(lab);
   const problems: string[] = [];
   const opens: Record<string, unknown>[] = [];
