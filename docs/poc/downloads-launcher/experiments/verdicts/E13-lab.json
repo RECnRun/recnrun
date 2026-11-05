@@ -8,35 +8,116 @@
     "label": "diagnostic",
     "externalClient": true,
     "variant": "poc-d0",
-    "topology": "2 hand-installed workers, one root each, opened by open.sh headless; the master is headed on Xvfb and stands in for the personal Default, no CDP client is on any worker",
+    "topology": "4 hand-installed workers, one root each, opened by open.sh headless; the master is headed on Xvfb and stands in for the personal Default, no CDP client is on any worker",
     "debugger": "none",
     "observations": [
       {
-        "workers": 2,
+        "workers": 4,
         "opens": [
           {
             "mode": "headless",
             "exit": 0,
-            "totalS": 1,
+            "totalS": 1.1,
             "presenceS": 0.3,
             "ackS": 0.2
           },
           {
             "mode": "headless",
             "exit": 0,
+            "totalS": 1.1,
+            "presenceS": 0.5,
+            "ackS": 0.3
+          },
+          {
+            "mode": "headless",
+            "exit": 0,
+            "totalS": 1.1,
+            "presenceS": 0.5,
+            "ackS": 0.3
+          },
+          {
+            "mode": "headless",
+            "exit": 0,
             "totalS": 1,
-            "presenceS": 0.3,
-            "ackS": 0.2
+            "presenceS": 0.5,
+            "ackS": 0.3
           }
         ],
-        "linked": 2
+        "linked": 4
+      },
+      {
+        "workers": 4,
+        "opens": [
+          {
+            "mode": "headless",
+            "exit": 0,
+            "totalS": 1.1,
+            "presenceS": 0.5,
+            "ackS": 0.3
+          },
+          {
+            "mode": "headless",
+            "exit": 0,
+            "totalS": 1.1,
+            "presenceS": 0.5,
+            "ackS": 0.3
+          },
+          {
+            "mode": "headless",
+            "exit": 0,
+            "totalS": 1.1,
+            "presenceS": 0.5,
+            "ackS": 0.3
+          },
+          {
+            "mode": "headless",
+            "exit": 0,
+            "totalS": 1.1,
+            "presenceS": 0.5,
+            "ackS": 0.3
+          }
+        ],
+        "linked": 4
+      },
+      {
+        "workers": 4,
+        "opens": [
+          {
+            "mode": "headless",
+            "exit": 0,
+            "totalS": 1,
+            "presenceS": 0.5,
+            "ackS": 0.3
+          },
+          {
+            "mode": "headless",
+            "exit": 0,
+            "totalS": 1,
+            "presenceS": 0.3,
+            "ackS": 0.3
+          },
+          {
+            "mode": "headless",
+            "exit": 0,
+            "totalS": 1,
+            "presenceS": 0.5,
+            "ackS": 0.3
+          },
+          {
+            "mode": "headless",
+            "exit": 0,
+            "totalS": 1,
+            "presenceS": 0.3,
+            "ackS": 0.3
+          }
+        ],
+        "linked": 4
       }
     ],
     "gestures": 0,
     "steps": [],
-    "mode": "smoke",
     "verdict": "pass",
-    "samples": 1
+    "samples": 3
   },
   {
     "experiment": "E13",
@@ -47,19 +128,77 @@
     "label": "diagnostic",
     "externalClient": true,
     "variant": "poc-d0",
-    "topology": "2 hand-installed workers, one root each, opened by open.sh headless; each worker is bound to the master, which opens the test page in it and activates the tab it reports; the master is headed on Xvfb and stands in for the personal Default, no CDP client is on any worker",
+    "topology": "4 hand-installed workers, one root each, opened by open.sh headless; each worker is bound to the master, which opens the test page in it and activates the tab it reports; the master is headed on Xvfb and stands in for the personal Default, no CDP client is on any worker",
     "debugger": "none",
     "observations": [
       {
         "replies": [
           {
             "name": "Worker 1",
-            "tab": "marker:33a4876df1914c7a924abbda83207f1c",
+            "tab": "marker:4aa9629db8b74929a39c14e9071e46b1",
             "activate": "ok"
           },
           {
             "name": "Worker 2",
-            "tab": "marker:b004ac0606074feb912cb5f8b8c6b4a7",
+            "tab": "marker:e9b961ded3344034b83a12047aa5cad2",
+            "activate": "ok"
+          },
+          {
+            "name": "Worker 3",
+            "tab": "marker:999cda445102457db9e81c8d1e5e62fd",
+            "activate": "ok"
+          },
+          {
+            "name": "Worker 4",
+            "tab": "marker:da712be5320e4ab581a75348ec563e16",
+            "activate": "ok"
+          }
+        ]
+      },
+      {
+        "replies": [
+          {
+            "name": "Worker 1",
+            "tab": "marker:4aa9629db8b74929a39c14e9071e46b1",
+            "activate": "ok"
+          },
+          {
+            "name": "Worker 2",
+            "tab": "marker:e9b961ded3344034b83a12047aa5cad2",
+            "activate": "ok"
+          },
+          {
+            "name": "Worker 3",
+            "tab": "marker:999cda445102457db9e81c8d1e5e62fd",
+            "activate": "ok"
+          },
+          {
+            "name": "Worker 4",
+            "tab": "marker:da712be5320e4ab581a75348ec563e16",
+            "activate": "ok"
+          }
+        ]
+      },
+      {
+        "replies": [
+          {
+            "name": "Worker 1",
+            "tab": "marker:4aa9629db8b74929a39c14e9071e46b1",
+            "activate": "ok"
+          },
+          {
+            "name": "Worker 2",
+            "tab": "marker:e9b961ded3344034b83a12047aa5cad2",
+            "activate": "ok"
+          },
+          {
+            "name": "Worker 3",
+            "tab": "marker:999cda445102457db9e81c8d1e5e62fd",
+            "activate": "ok"
+          },
+          {
+            "name": "Worker 4",
+            "tab": "marker:da712be5320e4ab581a75348ec563e16",
             "activate": "ok"
           }
         ]
@@ -67,9 +206,8 @@
     ],
     "gestures": 0,
     "steps": [],
-    "mode": "smoke",
     "verdict": "pass",
-    "samples": 1
+    "samples": 3
   },
   {
     "experiment": "E13",
@@ -80,7 +218,7 @@
     "label": "diagnostic",
     "externalClient": true,
     "variant": "poc-d0",
-    "topology": "2 hand-installed workers, one root each, opened by open.sh headless; the master opens the start page, which navigates itself to the marker page; the master is headed on Xvfb and stands in for the personal Default, no CDP client is on any worker",
+    "topology": "4 hand-installed workers, one root each, opened by open.sh headless; the master opens the start page, which navigates itself to the marker page; the master is headed on Xvfb and stands in for the personal Default, no CDP client is on any worker",
     "debugger": "none",
     "observations": [
       {
@@ -88,27 +226,114 @@
           {
             "name": "Worker 1",
             "requests": [
-              "/start/33a4876df1914c7a924abbda83207f1c",
-              "/marker/33a4876df1914c7a924abbda83207f1c"
+              "/start/4aa9629db8b74929a39c14e9071e46b1",
+              "/marker/4aa9629db8b74929a39c14e9071e46b1"
             ],
-            "url": "http://127.0.0.1:37593/marker/33a4876df1914c7a924abbda83207f1c"
+            "url": "http://127.0.0.1:40191/marker/4aa9629db8b74929a39c14e9071e46b1"
           },
           {
             "name": "Worker 2",
             "requests": [
-              "/start/b004ac0606074feb912cb5f8b8c6b4a7",
-              "/marker/b004ac0606074feb912cb5f8b8c6b4a7"
+              "/start/e9b961ded3344034b83a12047aa5cad2",
+              "/marker/e9b961ded3344034b83a12047aa5cad2"
             ],
-            "url": "http://127.0.0.1:37593/marker/b004ac0606074feb912cb5f8b8c6b4a7"
+            "url": "http://127.0.0.1:40191/marker/e9b961ded3344034b83a12047aa5cad2"
+          },
+          {
+            "name": "Worker 3",
+            "requests": [
+              "/start/999cda445102457db9e81c8d1e5e62fd",
+              "/marker/999cda445102457db9e81c8d1e5e62fd"
+            ],
+            "url": "http://127.0.0.1:40191/marker/999cda445102457db9e81c8d1e5e62fd"
+          },
+          {
+            "name": "Worker 4",
+            "requests": [
+              "/start/da712be5320e4ab581a75348ec563e16",
+              "/marker/da712be5320e4ab581a75348ec563e16"
+            ],
+            "url": "http://127.0.0.1:40191/marker/da712be5320e4ab581a75348ec563e16"
+          }
+        ]
+      },
+      {
+        "navigated": [
+          {
+            "name": "Worker 1",
+            "requests": [
+              "/start/4aa9629db8b74929a39c14e9071e46b1",
+              "/marker/4aa9629db8b74929a39c14e9071e46b1"
+            ],
+            "url": "http://127.0.0.1:40191/marker/4aa9629db8b74929a39c14e9071e46b1"
+          },
+          {
+            "name": "Worker 2",
+            "requests": [
+              "/start/e9b961ded3344034b83a12047aa5cad2",
+              "/marker/e9b961ded3344034b83a12047aa5cad2"
+            ],
+            "url": "http://127.0.0.1:40191/marker/e9b961ded3344034b83a12047aa5cad2"
+          },
+          {
+            "name": "Worker 3",
+            "requests": [
+              "/start/999cda445102457db9e81c8d1e5e62fd",
+              "/marker/999cda445102457db9e81c8d1e5e62fd"
+            ],
+            "url": "http://127.0.0.1:40191/marker/999cda445102457db9e81c8d1e5e62fd"
+          },
+          {
+            "name": "Worker 4",
+            "requests": [
+              "/start/da712be5320e4ab581a75348ec563e16",
+              "/marker/da712be5320e4ab581a75348ec563e16"
+            ],
+            "url": "http://127.0.0.1:40191/marker/da712be5320e4ab581a75348ec563e16"
+          }
+        ]
+      },
+      {
+        "navigated": [
+          {
+            "name": "Worker 1",
+            "requests": [
+              "/start/4aa9629db8b74929a39c14e9071e46b1",
+              "/marker/4aa9629db8b74929a39c14e9071e46b1"
+            ],
+            "url": "http://127.0.0.1:40191/marker/4aa9629db8b74929a39c14e9071e46b1"
+          },
+          {
+            "name": "Worker 2",
+            "requests": [
+              "/start/e9b961ded3344034b83a12047aa5cad2",
+              "/marker/e9b961ded3344034b83a12047aa5cad2"
+            ],
+            "url": "http://127.0.0.1:40191/marker/e9b961ded3344034b83a12047aa5cad2"
+          },
+          {
+            "name": "Worker 3",
+            "requests": [
+              "/start/999cda445102457db9e81c8d1e5e62fd",
+              "/marker/999cda445102457db9e81c8d1e5e62fd"
+            ],
+            "url": "http://127.0.0.1:40191/marker/999cda445102457db9e81c8d1e5e62fd"
+          },
+          {
+            "name": "Worker 4",
+            "requests": [
+              "/start/da712be5320e4ab581a75348ec563e16",
+              "/marker/da712be5320e4ab581a75348ec563e16"
+            ],
+            "url": "http://127.0.0.1:40191/marker/da712be5320e4ab581a75348ec563e16"
           }
         ]
       }
     ],
     "gestures": 0,
     "steps": [],
-    "mode": "smoke",
     "verdict": "pass",
-    "samples": 1
+    "samples": 3
   },
   {
     "experiment": "E13",
@@ -119,28 +344,53 @@
     "label": "diagnostic",
     "externalClient": true,
     "variant": "poc-d0",
-    "topology": "2 hand-installed workers, one root each, opened by open.sh headless; the master has no page open; the master is headed on Xvfb and stands in for the personal Default, no CDP client is on any worker",
+    "topology": "4 hand-installed workers, one root each, opened by open.sh headless; the master has no page open; the master is headed on Xvfb and stands in for the personal Default, no CDP client is on any worker",
     "debugger": "none",
     "observations": [
       {
         "masterPages": 1,
-        "linkedWithNoPage": 2,
-        "dropS": 2.6,
-        "relinkAfterAckS": 0.3,
+        "linkedWithNoPage": 4,
+        "dropS": 3.3,
+        "relinkAfterAckS": 1.1,
         "relaunch": {
           "mode": "headless",
           "exit": 0,
           "totalS": 1,
           "presenceS": 0.3,
-          "ackS": 0.1
+          "ackS": 0.2
+        }
+      },
+      {
+        "masterPages": 1,
+        "linkedWithNoPage": 4,
+        "dropS": 3.1,
+        "relinkAfterAckS": 0.8,
+        "relaunch": {
+          "mode": "headless",
+          "exit": 0,
+          "totalS": 1,
+          "presenceS": 0.3,
+          "ackS": 0.2
+        }
+      },
+      {
+        "masterPages": 1,
+        "linkedWithNoPage": 4,
+        "dropS": 2.8,
+        "relinkAfterAckS": 1.1,
+        "relaunch": {
+          "mode": "headless",
+          "exit": 0,
+          "totalS": 1,
+          "presenceS": 0.3,
+          "ackS": 0.2
         }
       }
     ],
     "gestures": 0,
     "steps": [],
-    "mode": "smoke",
     "verdict": "pass",
-    "samples": 1
+    "samples": 3
   },
   {
     "experiment": "E13",
@@ -151,12 +401,11 @@
     "label": "diagnostic",
     "externalClient": true,
     "variant": "poc-d0",
-    "topology": "2 hand-installed workers, one root each, opened by open.sh headless; the master is headed on Xvfb and stands in for the personal Default, no CDP client is on any worker",
+    "topology": "4 hand-installed workers, one root each, opened by open.sh headless; the master is headed on Xvfb and stands in for the personal Default, no CDP client is on any worker",
     "debugger": "none",
     "observations": [],
     "gestures": 0,
     "steps": [],
-    "mode": "smoke",
     "verdict": "unavailable",
     "error": "not applicable: headless has no window to focus and no picture-in-picture surface",
     "samples": 0
@@ -170,12 +419,11 @@
     "label": "diagnostic",
     "externalClient": true,
     "variant": "poc-d0",
-    "topology": "2 hand-installed workers, one root each, opened by open.sh headless; the master is headed on Xvfb and stands in for the personal Default, no CDP client is on any worker",
+    "topology": "4 hand-installed workers, one root each, opened by open.sh headless; the master is headed on Xvfb and stands in for the personal Default, no CDP client is on any worker",
     "debugger": "none",
     "observations": [],
     "gestures": 0,
     "steps": [],
-    "mode": "smoke",
     "verdict": "unavailable",
     "error": "not applicable: headless has no window to focus and no picture-in-picture surface",
     "samples": 0
@@ -197,7 +445,7 @@
           {
             "linked": true,
             "cookieOnStart": "",
-            "fingerprint": "BA:70:D2:C6",
+            "fingerprint": "6A:55:6D:9C",
             "mode": "headed",
             "exit": 0,
             "totalS": 1,
@@ -207,17 +455,85 @@
           {
             "linked": true,
             "cookieOnStart": null,
-            "fingerprint": "BA:70:D2:C6",
+            "fingerprint": "6A:55:6D:9C",
             "mode": "headless",
             "exit": 0,
             "totalS": 1,
             "presenceS": 0.3,
-            "ackS": 0.1
+            "ackS": 0.2
           },
           {
             "linked": true,
-            "cookieOnStart": "e13=7ed8590d103b49b9a1d3ed077a573f76",
-            "fingerprint": "BA:70:D2:C6",
+            "cookieOnStart": "e13=a2e3e8301a854fafaf1aed187a071544",
+            "fingerprint": "6A:55:6D:9C",
+            "mode": "headed",
+            "exit": 0,
+            "totalS": 1,
+            "presenceS": 0.3,
+            "ackS": 0.2
+          }
+        ]
+      },
+      {
+        "passes": [
+          {
+            "linked": true,
+            "cookieOnStart": "e13=a2e3e8301a854fafaf1aed187a071544",
+            "fingerprint": "6A:55:6D:9C",
+            "mode": "headed",
+            "exit": 0,
+            "totalS": 1,
+            "presenceS": 0.3,
+            "ackS": 0.2
+          },
+          {
+            "linked": true,
+            "cookieOnStart": null,
+            "fingerprint": "6A:55:6D:9C",
+            "mode": "headless",
+            "exit": 0,
+            "totalS": 1,
+            "presenceS": 0.3,
+            "ackS": 0.2
+          },
+          {
+            "linked": true,
+            "cookieOnStart": "e13=a2e3e8301a854fafaf1aed187a071544",
+            "fingerprint": "6A:55:6D:9C",
+            "mode": "headed",
+            "exit": 0,
+            "totalS": 1,
+            "presenceS": 0.3,
+            "ackS": 0.2
+          }
+        ]
+      },
+      {
+        "passes": [
+          {
+            "linked": true,
+            "cookieOnStart": "e13=a2e3e8301a854fafaf1aed187a071544",
+            "fingerprint": "6A:55:6D:9C",
+            "mode": "headed",
+            "exit": 0,
+            "totalS": 1,
+            "presenceS": 0.3,
+            "ackS": 0.2
+          },
+          {
+            "linked": true,
+            "cookieOnStart": null,
+            "fingerprint": "6A:55:6D:9C",
+            "mode": "headless",
+            "exit": 0,
+            "totalS": 1.1,
+            "presenceS": 0.3,
+            "ackS": 0.2
+          },
+          {
+            "linked": true,
+            "cookieOnStart": "e13=a2e3e8301a854fafaf1aed187a071544",
+            "fingerprint": "6A:55:6D:9C",
             "mode": "headed",
             "exit": 0,
             "totalS": 1,
@@ -229,9 +545,8 @@
     ],
     "gestures": 0,
     "steps": [],
-    "mode": "smoke",
     "verdict": "pass",
-    "samples": 1
+    "samples": 3
   },
   {
     "experiment": "E13",
@@ -242,11 +557,35 @@
     "label": "diagnostic",
     "externalClient": true,
     "variant": "poc-d0",
-    "topology": "2 clones of one frozen base opened by clone-open.sh headless; the master is headed on Xvfb and stands in for the personal Default, no CDP client is on any worker",
+    "topology": "3 clones of one frozen base opened by clone-open.sh headless; the master is headed on Xvfb and stands in for the personal Default, no CDP client is on any worker",
     "debugger": "none",
     "observations": [
       {
-        "clones": 2,
+        "clones": 3,
+        "opens": [
+          {
+            "name": "A",
+            "exit": 0,
+            "totalS": 1.1,
+            "ackS": 0.1
+          },
+          {
+            "name": "B",
+            "exit": 0,
+            "totalS": 1,
+            "ackS": 0.1
+          },
+          {
+            "name": "C",
+            "exit": 0,
+            "totalS": 1,
+            "ackS": 0.1
+          }
+        ],
+        "identities": 3
+      },
+      {
+        "clones": 3,
         "opens": [
           {
             "name": "A",
@@ -258,17 +597,46 @@
             "name": "B",
             "exit": 0,
             "totalS": 1,
+            "ackS": 0.1
+          },
+          {
+            "name": "C",
+            "exit": 0,
+            "totalS": 1,
+            "ackS": 0.1
+          }
+        ],
+        "identities": 3
+      },
+      {
+        "clones": 3,
+        "opens": [
+          {
+            "name": "A",
+            "exit": 0,
+            "totalS": 1.1,
+            "ackS": 0.2
+          },
+          {
+            "name": "B",
+            "exit": 0,
+            "totalS": 1.1,
+            "ackS": 0.4
+          },
+          {
+            "name": "C",
+            "exit": 0,
+            "totalS": 1,
             "ackS": 0.2
           }
         ],
-        "identities": 2
+        "identities": 3
       }
     ],
     "gestures": 0,
     "steps": [],
-    "mode": "smoke",
     "verdict": "pass",
-    "samples": 1
+    "samples": 3
   },
   {
     "experiment": "E13",
@@ -279,27 +647,62 @@
     "label": "diagnostic",
     "externalClient": true,
     "variant": "poc-d0",
-    "topology": "2 clones of one frozen base opened by clone-open.sh headless; the master opens the test page in each clone; the master is headed on Xvfb and stands in for the personal Default, no CDP client is on any worker",
+    "topology": "3 clones of one frozen base opened by clone-open.sh headless; the master opens the test page in each clone; the master is headed on Xvfb and stands in for the personal Default, no CDP client is on any worker",
     "debugger": "none",
     "observations": [
       {
         "listed": [
           {
             "name": "A",
-            "tabs": ["marker:41c359741be049a4b837ec6682380b30"]
+            "tabs": ["marker:7f164b3425124f87bdd42af2f616f3bc"]
           },
           {
             "name": "B",
-            "tabs": ["marker:0fcac6b129ae4debbda505f7adb9077e"]
+            "tabs": ["marker:6e8dc27619334a5cae30a77ea2356e46"]
+          },
+          {
+            "name": "C",
+            "tabs": ["marker:f39ea9270e0c408b8d2757d2161f7d84"]
+          }
+        ]
+      },
+      {
+        "listed": [
+          {
+            "name": "A",
+            "tabs": ["marker:7f164b3425124f87bdd42af2f616f3bc"]
+          },
+          {
+            "name": "B",
+            "tabs": ["marker:6e8dc27619334a5cae30a77ea2356e46"]
+          },
+          {
+            "name": "C",
+            "tabs": ["marker:f39ea9270e0c408b8d2757d2161f7d84"]
+          }
+        ]
+      },
+      {
+        "listed": [
+          {
+            "name": "A",
+            "tabs": ["marker:7f164b3425124f87bdd42af2f616f3bc"]
+          },
+          {
+            "name": "B",
+            "tabs": ["marker:6e8dc27619334a5cae30a77ea2356e46"]
+          },
+          {
+            "name": "C",
+            "tabs": ["marker:f39ea9270e0c408b8d2757d2161f7d84"]
           }
         ]
       }
     ],
     "gestures": 0,
     "steps": [],
-    "mode": "smoke",
     "verdict": "pass",
-    "samples": 1
+    "samples": 3
   },
   {
     "experiment": "E13",
@@ -310,7 +713,7 @@
     "label": "diagnostic",
     "externalClient": true,
     "variant": "poc-d0",
-    "topology": "2 clones of one frozen base opened by clone-open.sh headless; the master opens the test page in each clone; the master is headed on Xvfb and stands in for the personal Default, no CDP client is on any worker",
+    "topology": "3 clones of one frozen base opened by clone-open.sh headless; the master opens the test page in each clone; the master is headed on Xvfb and stands in for the personal Default, no CDP client is on any worker",
     "debugger": "none",
     "observations": [
       {
@@ -324,15 +727,57 @@
             "name": "B",
             "own": true,
             "foreign": 0
+          },
+          {
+            "name": "C",
+            "own": true,
+            "foreign": 0
+          }
+        ]
+      },
+      {
+        "titles": [
+          {
+            "name": "A",
+            "own": true,
+            "foreign": 0
+          },
+          {
+            "name": "B",
+            "own": true,
+            "foreign": 0
+          },
+          {
+            "name": "C",
+            "own": true,
+            "foreign": 0
+          }
+        ]
+      },
+      {
+        "titles": [
+          {
+            "name": "A",
+            "own": true,
+            "foreign": 0
+          },
+          {
+            "name": "B",
+            "own": true,
+            "foreign": 0
+          },
+          {
+            "name": "C",
+            "own": true,
+            "foreign": 0
           }
         ]
       }
     ],
     "gestures": 0,
     "steps": [],
-    "mode": "smoke",
     "verdict": "pass",
-    "samples": 1
+    "samples": 3
   },
   {
     "experiment": "E13",
@@ -343,19 +788,62 @@
     "label": "diagnostic",
     "externalClient": true,
     "variant": "poc-d0",
-    "topology": "2 clones of one frozen base opened by clone-open.sh headless; the master opens the test page in each clone; the master is headed on Xvfb and stands in for the personal Default, no CDP client is on any worker",
+    "topology": "3 clones of one frozen base opened by clone-open.sh headless; the master opens the test page in each clone; the master is headed on Xvfb and stands in for the personal Default, no CDP client is on any worker",
     "debugger": "none",
     "observations": [
       {
         "replies": [
           {
             "name": "A",
-            "tab": "marker:41c359741be049a4b837ec6682380b30",
+            "tab": "marker:7f164b3425124f87bdd42af2f616f3bc",
             "activate": "ok"
           },
           {
             "name": "B",
-            "tab": "marker:0fcac6b129ae4debbda505f7adb9077e",
+            "tab": "marker:6e8dc27619334a5cae30a77ea2356e46",
+            "activate": "ok"
+          },
+          {
+            "name": "C",
+            "tab": "marker:f39ea9270e0c408b8d2757d2161f7d84",
+            "activate": "ok"
+          }
+        ]
+      },
+      {
+        "replies": [
+          {
+            "name": "A",
+            "tab": "marker:7f164b3425124f87bdd42af2f616f3bc",
+            "activate": "ok"
+          },
+          {
+            "name": "B",
+            "tab": "marker:6e8dc27619334a5cae30a77ea2356e46",
+            "activate": "ok"
+          },
+          {
+            "name": "C",
+            "tab": "marker:f39ea9270e0c408b8d2757d2161f7d84",
+            "activate": "ok"
+          }
+        ]
+      },
+      {
+        "replies": [
+          {
+            "name": "A",
+            "tab": "marker:7f164b3425124f87bdd42af2f616f3bc",
+            "activate": "ok"
+          },
+          {
+            "name": "B",
+            "tab": "marker:6e8dc27619334a5cae30a77ea2356e46",
+            "activate": "ok"
+          },
+          {
+            "name": "C",
+            "tab": "marker:f39ea9270e0c408b8d2757d2161f7d84",
             "activate": "ok"
           }
         ]
@@ -363,9 +851,8 @@
     ],
     "gestures": 0,
     "steps": [],
-    "mode": "smoke",
     "verdict": "pass",
-    "samples": 1
+    "samples": 3
   },
   {
     "experiment": "E13",
@@ -376,7 +863,7 @@
     "label": "diagnostic",
     "externalClient": true,
     "variant": "poc-d0",
-    "topology": "2 clones of one frozen base opened by clone-open.sh headless; a running clone is asked for the other mode; the master is headed on Xvfb and stands in for the personal Default, no CDP client is on any worker",
+    "topology": "3 clones of one frozen base opened by clone-open.sh headless; a running clone is asked for the other mode; the master is headed on Xvfb and stands in for the personal Default, no CDP client is on any worker",
     "debugger": "none",
     "observations": [
       {
@@ -385,7 +872,7 @@
           "asked": "headed",
           "outcome": "refused",
           "exit": 69,
-          "stderr": "s: tried /tmp/recnrun-launcher-pic2KE/clones-1/A/downloads, /tmp/recnrun-launcher-pic2KE/home/Downloads, /tmp/recnrun-clones-master-downloads-DkWyt5, /tmp/recnrun-launcher-pic2KE/clones-1/B/downloads\n",
+          "stderr": "wnloads, /tmp/recnrun-launcher-Dx5hJq/home/Downloads, /tmp/recnrun-clones-master-downloads-zuoOT4, /tmp/recnrun-launcher-Dx5hJq/clones-3/B/downloads, /tmp/recnrun-launcher-Dx5hJq/clones-3/C/downloads\n",
           "mainBefore": 1,
           "mainAfter": 1,
           "survivorSame": true,
@@ -396,7 +883,55 @@
           "asked": "headless",
           "outcome": "refused",
           "exit": 69,
-          "stderr": "s: tried /tmp/recnrun-launcher-pic2KE/clones-1/B/downloads, /tmp/recnrun-launcher-pic2KE/home/Downloads, /tmp/recnrun-clones-master-downloads-DkWyt5, /tmp/recnrun-launcher-pic2KE/clones-1/A/downloads\n",
+          "stderr": "wnloads, /tmp/recnrun-launcher-Dx5hJq/home/Downloads, /tmp/recnrun-clones-master-downloads-zuoOT4, /tmp/recnrun-launcher-Dx5hJq/clones-3/A/downloads, /tmp/recnrun-launcher-Dx5hJq/clones-3/C/downloads\n",
+          "mainBefore": 1,
+          "mainAfter": 1,
+          "survivorSame": true,
+          "windows": 2
+        }
+      },
+      {
+        "headlessThenHeaded": {
+          "running": "headless",
+          "asked": "headed",
+          "outcome": "refused",
+          "exit": 69,
+          "stderr": "wnloads, /tmp/recnrun-launcher-Dx5hJq/home/Downloads, /tmp/recnrun-clones-master-downloads-zuoOT4, /tmp/recnrun-launcher-Dx5hJq/clones-3/B/downloads, /tmp/recnrun-launcher-Dx5hJq/clones-3/C/downloads\n",
+          "mainBefore": 1,
+          "mainAfter": 1,
+          "survivorSame": true,
+          "windows": 0
+        },
+        "headedThenHeadless": {
+          "running": "headed",
+          "asked": "headless",
+          "outcome": "refused",
+          "exit": 69,
+          "stderr": "wnloads, /tmp/recnrun-launcher-Dx5hJq/home/Downloads, /tmp/recnrun-clones-master-downloads-zuoOT4, /tmp/recnrun-launcher-Dx5hJq/clones-3/A/downloads, /tmp/recnrun-launcher-Dx5hJq/clones-3/C/downloads\n",
+          "mainBefore": 1,
+          "mainAfter": 1,
+          "survivorSame": true,
+          "windows": 2
+        }
+      },
+      {
+        "headlessThenHeaded": {
+          "running": "headless",
+          "asked": "headed",
+          "outcome": "refused",
+          "exit": 69,
+          "stderr": "wnloads, /tmp/recnrun-launcher-Dx5hJq/home/Downloads, /tmp/recnrun-clones-master-downloads-zuoOT4, /tmp/recnrun-launcher-Dx5hJq/clones-3/B/downloads, /tmp/recnrun-launcher-Dx5hJq/clones-3/C/downloads\n",
+          "mainBefore": 1,
+          "mainAfter": 1,
+          "survivorSame": true,
+          "windows": 0
+        },
+        "headedThenHeadless": {
+          "running": "headed",
+          "asked": "headless",
+          "outcome": "refused",
+          "exit": 69,
+          "stderr": "wnloads, /tmp/recnrun-launcher-Dx5hJq/home/Downloads, /tmp/recnrun-clones-master-downloads-zuoOT4, /tmp/recnrun-launcher-Dx5hJq/clones-3/A/downloads, /tmp/recnrun-launcher-Dx5hJq/clones-3/C/downloads\n",
           "mainBefore": 1,
           "mainAfter": 1,
           "survivorSame": true,
@@ -406,9 +941,8 @@
     ],
     "gestures": 0,
     "steps": [],
-    "mode": "smoke",
     "verdict": "pass",
-    "samples": 1
+    "samples": 3
   },
   {
     "experiment": "E13",
@@ -448,21 +982,20 @@
         "own": "chrome-extension://omllgeochjfpkjbkpcgjmnnbncdpiedd/",
         "tabs": [
           {
-            "id": 1192113310,
-            "windowId": 1192113309,
+            "id": 971755344,
+            "windowId": 971755343,
             "url": "chrome-extension://omllgeochjfpkjbkpcgjmnnbncdpiedd/bootstrap.html#token=diagnostic"
           }
         ],
         "windows": [
           {
-            "id": 1192113309,
+            "id": 971755343,
             "type": "normal",
             "tabs": 1
           }
         ],
         "shared": 0
       }
-    ],
-    "mode": "smoke"
+    ]
   }
 ]
