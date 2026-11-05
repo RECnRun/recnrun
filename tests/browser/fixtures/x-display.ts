@@ -42,17 +42,38 @@ function searchOutcome(error: unknown): string | undefined {
   throw error;
 }
 
-async function search(title: string): Promise<string | undefined> {
-  try {
-    return await xdotool("search", title);
-  } catch (error) {
-    return searchOutcome(error);
+/** Thrown when every attempt of a search hit BadWindow, so "no window" cannot be told from "unknown". */
+export class InconclusiveSearchError extends Error {}
+
+/** Retries `attempt` while it is inconclusive (undefined) up to `ms`, then throws instead of reporting no windows. */
+export async function conclusive(
+  attempt: () => Promise<string | undefined>,
+  ms = 5_000,
+  pollMs = POLL_MS,
+): Promise<string> {
+  for (let left = Math.max(1, Math.ceil(ms / pollMs)); left > 0; left--) {
+    const found = await attempt();
+    if (found !== undefined) return found;
+    await delay(pollMs);
   }
+  throw new InconclusiveSearchError(
+    "xdotool search stayed inconclusive (BadWindow) until the deadline.",
+  );
+}
+
+async function search(title: string): Promise<string> {
+  return conclusive(async () => {
+    try {
+      return await xdotool("search", title);
+    } catch (error) {
+      return searchOutcome(error);
+    }
+  });
 }
 
 /** The pids that own a window whose name or class matches `pattern` (empty when no window does). */
 export async function windowOwners(pattern: string): Promise<number[]> {
-  const ids = ((await search(pattern)) ?? "").split("\n").filter(Boolean);
+  const ids = (await search(pattern)).split("\n").filter(Boolean);
   const owners = await Promise.all(
     ids.map((id) => xdotool("getwindowpid", id).then(Number, () => 0)),
   );
@@ -73,7 +94,8 @@ export async function windowShows(title: string, ms?: number): Promise<boolean> 
   try {
     await until(async () => Boolean(await search(title)), `the window "${title}" to show`, ms);
     return true;
-  } catch {
+  } catch (error) {
+    if (error instanceof InconclusiveSearchError) throw error;
     return false;
   }
 }
