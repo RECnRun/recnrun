@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { readFile, readdir, stat, writeFile } from "node:fs/promises";
+import { appendFile, readFile, readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
@@ -34,6 +34,7 @@ export interface Scene {
   downloads: string;
   record: string;
   profileId: string;
+  profileDirectory: string;
 }
 
 /** What one `open.sh open` printed and how it ended; `pid` is Chrome's, from stderr. */
@@ -59,7 +60,7 @@ export interface Rig {
 }
 
 /** Polls `read` until it gives a value or `ms` pass. */
-async function until<T>(read: () => Promise<T | undefined>, what: string, ms = READY_MS) {
+export async function until<T>(read: () => Promise<T | undefined>, what: string, ms = READY_MS) {
   const deadline = Date.now() + ms;
   for (;;) {
     const value = await read().catch(() => undefined);
@@ -111,11 +112,9 @@ async function turnOnDeveloperMode({ chrome }: LoadedExtension): Promise<void> {
 }
 
 /** Waits for the first presence, reloads the build so Chrome keeps it, writes the record; returns the scene. */
-export async function register(
+export async function registerIn(
   extension: LoadedExtension,
-  root: string,
-  downloads: string,
-  record: string,
+  { root, downloads, record, profileDirectory }: Omit<Scene, "profileId">,
 ): Promise<Scene> {
   // connectOverCDP routes every download to Playwright's own folder; Chrome's must take the writes.
   await extension.chrome.cdp.send("Browser.setDownloadBehavior", { behavior: "default" });
@@ -130,14 +129,24 @@ export async function register(
   ).catch(() => undefined);
   const block = [
     `userDataDir=${root}`,
-    "profileDirectory=Default",
+    `profileDirectory=${profileDirectory}`,
     `profileId=${profileId}`,
     `namespace=${NAMESPACE}`,
     `downloadsRoot=${downloads}`,
   ];
-  await writeFile(record, `${block.join("\n")}\n`);
-  return { root, downloads, record, profileId };
+  // A second profile's block is appended after a blank line, as the record keeps them.
+  const known = await readFile(record, "utf8").catch(() => "");
+  await appendFile(record, `${known === "" ? "" : "\n"}${block.join("\n")}\n`);
+  return { root, downloads, record, profileId, profileDirectory };
 }
+
+/** `register` for the Default profile of `root`. */
+export const register = (
+  extension: LoadedExtension,
+  root: string,
+  downloads: string,
+  record: string,
+) => registerIn(extension, { root, downloads, record, profileDirectory: "Default" });
 
 /** The `key=value` lines of stdout and the `pid=` of stderr. */
 export function parseOpened(stdout: string, stderr: string) {
@@ -155,7 +164,7 @@ export function parseOpened(stdout: string, stderr: string) {
 }
 
 /** One `open.sh open`, run without a shell string; a non-zero exit is a result, not a throw. */
-function runOpen({ scene, env }: Rig): Promise<Opened> {
+export function runOpen({ scene, env }: Pick<Rig, "scene" | "env">): Promise<Opened> {
   const started = Date.now();
   const args = [OPEN, "open", scene.record, NAMESPACE, scene.profileId];
   const options = { env: { ...env, RECNRUN_OPEN_TIMEOUT_S: String(OPEN_TIMEOUT_S) } };
@@ -184,7 +193,7 @@ export function openProblems(downloads: string, opened: Opened, previous?: Opene
 }
 
 /** The ack file of the open on disk and the presence of its boot; each failed expectation is a problem. */
-async function ackProblems(scene: Scene, opened: Opened): Promise<string[]> {
+export async function ackProblems(scene: Scene, opened: Opened): Promise<string[]> {
   const folder = join(scene.downloads, "RECnRun/poc", NAMESPACE, "acks", scene.profileId);
   const file = join(folder, `${opened.token}.json`);
   try {
@@ -217,7 +226,7 @@ async function presenceProblems(scene: Scene, boot: string): Promise<string[]> {
 const unfinished = async (downloads: string) =>
   (await readdir(downloads)).filter((name) => name.startsWith(".com.google.Chrome."));
 
-async function settledProblems(downloads: string): Promise<string[]> {
+export async function settledProblems(downloads: string): Promise<string[]> {
   const settled = async () => ((await unfinished(downloads)).length === 0 ? true : undefined);
   await until(settled, "unfinished downloads").catch(() => undefined);
   const left = await unfinished(downloads);
@@ -245,8 +254,10 @@ async function measure(rig: Rig, again: boolean, pids: number[]): Promise<Sample
 }
 
 /** SIGTERM to the pids open.sh printed, then waits until nothing of the root runs. */
-async function quit(rig: Rig, pids: number[]): Promise<void> {
+export async function quit(rig: Pick<Rig, "survivors">, pids: number[]): Promise<void> {
   for (const pid of pids) {
+    // pid 0 means open.sh printed none, and kill(0) would signal the whole process group.
+    if (pid <= 0) continue;
     try {
       process.kill(pid, "SIGTERM");
     } catch {

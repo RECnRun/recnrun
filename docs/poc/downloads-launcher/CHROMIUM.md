@@ -59,6 +59,8 @@ Hypothesis (§5 row 2, §9 T2/T3): `--no-startup-window` loads the requested pro
 
 Not inventoried: what keeps a `--no-startup-window` browser process alive when no debugging flag is present and no window exists (the `KeepAliveRegistry` origins, background mode). E11 (T2) measures it with `ps`; a worker process that exits after startup refutes T2 as specified.
 
+Predictions: a command line with `--profile-directory=<other>` sent to a Chrome already running on the same root is forwarded by the singleton and the sender exits at once. Observed headed in the lab (Google Chrome 157.0.8103.38, `P4.3.open.sharedRoot`, 3 of 3): `open.sh` for a second profile of a root whose Chrome runs printed a `pid=` that was gone within the wait, the ack of its token arrived about 1.04 s after the launch, and the root's main process (another pid, still running) held both profiles.
+
 ## 3. Process singleton per `--user-data-dir`
 
 Hypothesis (§5 row 3, §9 T4/T5): the lock is per data root, not per `--profile-directory`; a second launch on a root in use is handed off, and on a different root it is independent.
