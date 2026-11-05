@@ -2,6 +2,8 @@ import { errorMessage } from "@recnrun/domain";
 import * as v from "valibot";
 import { browser } from "wxt/browser";
 import { createAckListener, writeAck } from "@/background/launcher-requests";
+import { writePause } from "@/background/launcher-pause";
+import type { PauseReason } from "@/background/launcher-pause";
 import { createDownloadsPairing } from "@/background/downloads-pairing";
 import { downloadsWriter, settled } from "@/background/downloads-publisher";
 import type { DownloadsPort } from "@/background/downloads-publisher";
@@ -195,21 +197,36 @@ export function createPublishListener(
   };
 }
 
+/** States the launcher's pause policy, with the identity of the presence published last. */
+function pocPause(
+  deps: PresenceDependencies,
+  presence: { identity: () => Presence["identity"] | undefined },
+) {
+  return (reason: PauseReason) =>
+    writePause(
+      {
+        downloads: browser.downloads,
+        profileId: async () => (await readIdentity()).profileId,
+        // Silent renewal may have left no presence this session, so the statement is made anew.
+        identity: async () => presence.identity() ?? (await presenceOf(deps, Date.now())).identity,
+        namespace: () => namespaceOf(deps),
+      },
+      reason,
+    );
+}
+
 interface PocPresenceOptions {
   log: (entry: string) => void;
   sign: Sign;
   startPairing: () => Promise<void>;
 }
 
-/**
- * The presence over Chrome's own Downloads, this profile's identity, and session storage; each
- * presence written once the root is known calls `startPairing`, the folder flow's start.
- * `available` tells whether Chrome reported the root yet.
- */
-export function startPocPresence({ log, sign, startPairing }: PocPresenceOptions) {
-  const store = pocPresenceStore();
-  const available = async () => (await store.root.read()) !== null;
-  const deps: PresenceDependencies = {
+function pocDependencies(
+  { log, sign, startPairing }: PocPresenceOptions,
+  store: ReturnType<typeof pocPresenceStore>,
+  available: () => Promise<boolean>,
+): PresenceDependencies {
+  return {
     downloads: browser.downloads,
     identity: readIdentity,
     fingerprint: offscreenFingerprint,
@@ -226,12 +243,19 @@ export function startPocPresence({ log, sign, startPairing }: PocPresenceOptions
     log,
     // Undefined in a build without the alarms permission.
     alarms: (browser as { alarms?: AlarmsPort }).alarms,
-    published: createDownloadsPairing({
-      available,
-      start: startPairing,
-      log,
-    }),
+    published: createDownloadsPairing({ available, start: startPairing, log }),
   };
+}
+
+/**
+ * The presence over Chrome's own Downloads, this profile's identity, and session storage; each
+ * presence written once the root is known calls `startPairing`, the folder flow's start.
+ * `available` tells whether Chrome reported the root yet.
+ */
+export function startPocPresence(options: PocPresenceOptions) {
+  const store = pocPresenceStore();
+  const available = async () => (await store.root.read()) !== null;
+  const deps = pocDependencies(options, store, available);
   const presence = startDownloadsPresence(deps);
   const own = { extensionId: browser.runtime.id, extensionUrl: browser.runtime.getURL("/") };
   browser.runtime.onMessage.addListener(createPublishListener(presence.publish, own));
@@ -255,5 +279,10 @@ export function startPocPresence({ log, sign, startPairing }: PocPresenceOptions
     root: () => store.root.read(),
   };
   browser.runtime.onMessage.addListener(createRendezvousRelay(relay, own));
-  return { ...presence, available, noticed: newcomerNotes(store.newcomers) };
+  return {
+    ...presence,
+    available,
+    mark: pocPause(deps, presence),
+    noticed: newcomerNotes(store.newcomers),
+  };
 }

@@ -1,3 +1,4 @@
+import type { PauseReason } from "@/background/launcher-pause";
 import type { PeerChannel } from "@/background/peer-channel";
 import type { LinkCommand, PeerRequest } from "@/messaging/peer-messages";
 import type { RendezvousStatus } from "@/messaging/peer-results";
@@ -43,6 +44,8 @@ export interface PeerRequestDependencies {
     /** Whether the POC builds' Downloads root is known; absent where the folder carries pairing. */
     downloadsAvailable?: () => Promise<boolean>;
   };
+  /** POC builds only: tells the launcher this profile left its peers on purpose, or is back. */
+  launcher?: { mark: (reason: PauseReason) => Promise<void> };
 }
 
 type Deps = PeerRequestDependencies;
@@ -142,17 +145,24 @@ async function close(deps: Deps, peer: string) {
 }
 
 /** The user ends one link, so the folder leaves that peer alone until Reconnect. */
-async function disconnect(deps: Deps, peer: string) {
+async function disconnect(deps: Deps, peer: string, reason: PauseReason = "disconnect") {
+  await deps.launcher?.mark(reason);
   await deps.folder.pause(peer);
   await close(deps, peer);
 }
 
 /** Forgetting keeps the pause, so a profile still in the folder does not pair again at once. */
 async function forget(deps: Deps, peer: string) {
-  await disconnect(deps, peer);
+  await disconnect(deps, peer, "forget");
   await deps.authorized.set(peer, null);
   await deps.mirror.set(peer, null);
   await deps.tabs.set(peer, null);
+}
+
+/** The profile is back among its peers, so the launcher may relaunch it after a crash again. */
+async function resume(deps: Deps, unpause: () => Promise<void>) {
+  await unpause();
+  await deps.launcher?.mark("resumed");
 }
 
 /** The peers whose link is verified now. */
@@ -183,9 +193,9 @@ const HANDLERS: Handlers = {
   status: (deps) => status(deps),
   rename: (deps, { displayName }) => rename(deps, displayName),
   disconnect: (deps, { peer }) => disconnect(deps, peer),
-  reconnect: (deps, { peer }) => deps.folder.unpause(peer),
+  reconnect: (deps, { peer }) => resume(deps, () => deps.folder.unpause(peer)),
   forget: (deps, { peer }) => forget(deps, peer),
-  "pair-again": (deps) => deps.folder.unpauseAll(),
+  "pair-again": (deps) => resume(deps, () => deps.folder.unpauseAll()),
   "folder-pair": (deps) => deps.folder.start(),
   "folder-release": (deps) => releaseFolder(deps),
   tabs: (deps, { peer }) => peerTabs(deps, peer),

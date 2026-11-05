@@ -49,6 +49,11 @@ export function presencePath(namespace: string, profileId: string): string {
   return `${namespaceFolder(namespace)}/peers/${profileSegment(profileId)}/presence.json`;
 }
 
+/** Where a profile states, for the launcher, that it left its master on purpose or returned. */
+export function pausedPath(namespace: string, profileId: string): string {
+  return `${namespaceFolder(namespace)}/peers/${profileSegment(profileId)}/paused.json`;
+}
+
 /** The lowercase v4 uuid the launcher gives each open attempt; nothing else may name an ack. */
 export const TokenSchema = v.pipe(
   v.string(),

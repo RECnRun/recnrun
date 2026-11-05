@@ -1,73 +1,19 @@
-import * as v from "valibot";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vite-plus/test";
 import { fakeBrowser } from "wxt/testing/fake-browser";
 import { startPeers } from "@/background/peers";
-import { PresenceSchema } from "@/p2p/folder-rendezvous";
 import {
   authorizedPeersRepository,
   folderPairingRepository,
-  identityRepository,
   peerPinsRepository,
 } from "@/storage/peer-repository";
 import { roleStores } from "@/storage/hierarchy-repository";
 import { pocPresenceStore } from "@/storage/poc-presence-repository";
-import {
-  FINGERPRINT,
-  ME,
-  PEER,
-  PEER_IDENTITY,
-  STRANGER,
-  answering,
-  fakeOffscreen,
-} from "./fake-peer";
+import { FINGERPRINT, ME, PEER, PEER_IDENTITY, STRANGER, answering } from "./fake-peer";
+import { ROOT, background, registrationOf, settles } from "./peers-start-fixture";
 import { quiesce, signAs, signing } from "./test-identity";
-
-const ROOT = "/home/me/Downloads";
-const manifest = { manifest_version: 3 as const, name: "RECnRun", version: "0.1.0" };
-const RegistrationSchema = v.strictObject({
-  ...PresenceSchema.entries,
-  namespace: v.string(),
-  boot: v.string(),
-});
-
-/** chrome.downloads over the fake browser: each write lands under ROOT and completes at once. */
-function fakeDownloads() {
-  const written: { url: string; filename: string; saveAs: boolean; conflictAction: string }[] = [];
-  vi.spyOn(fakeBrowser.downloads, "download").mockImplementation(
-    answering((options) => written.push(options as (typeof written)[number])),
-  );
-  vi.spyOn(fakeBrowser.downloads, "search").mockImplementation(
-    answering((query) => {
-      const { id = 0 } = query as { id?: number };
-      const options = written[id - 1];
-      return options ? [{ id, filename: `${ROOT}/${options.filename}`, state: "complete" }] : [];
-    }),
-  );
-  // The fake browser has no downloads.onChanged; every item here has settled already.
-  for (const method of ["addListener", "removeListener"] as const)
-    vi.spyOn(fakeBrowser.downloads.onChanged, method).mockImplementation(() => {});
-  return written;
-}
-
-/** The fake browser with this profile's identity, the offscreen document, and Downloads. */
-async function background() {
-  vi.spyOn(fakeBrowser.runtime, "getManifest").mockReturnValue(manifest);
-  vi.spyOn(console, "debug").mockImplementation(() => {});
-  for (const event of ["onMoved", "onAttached"] as const)
-    vi.spyOn(fakeBrowser.tabs[event], "addListener").mockImplementation(() => {});
-  await identityRepository.write({ profileId: ME, displayName: "Laptop" });
-  return { link: fakeOffscreen(), written: fakeDownloads(), log: vi.mocked(console.debug) };
-}
-
-const registrationOf = (url: string) => v.parse(RegistrationSchema, JSON.parse(contentOf(url)));
 
 const dashboards = async () =>
   (await fakeBrowser.tabs.query({})).filter((tab) => tab.url?.endsWith("/dashboard.html"));
-
-const contentOf = (url: string) => decodeURIComponent(url.slice(url.indexOf(",") + 1));
-
-// The first presence signs with a key made in fake IndexedDB; under a Docker run that outlasts 1 s.
-const settles = (check: () => unknown) => vi.waitFor(check, { timeout: 5_000 });
 
 beforeEach(() => {
   fakeBrowser.reset();
@@ -91,7 +37,7 @@ describe("startPeers", () => {
       saveAs: false,
       conflictAction: "overwrite",
     });
-    const presence = v.parse(RegistrationSchema, JSON.parse(contentOf(written[0]?.url ?? "")));
+    const presence = registrationOf(written[0]?.url ?? "");
     expect(presence).toMatchObject({
       profileId: ME,
       displayName: "Laptop",

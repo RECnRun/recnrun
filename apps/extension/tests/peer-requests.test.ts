@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vite-plus/test";
+import { describe, expect, test, vi } from "vite-plus/test";
 import { handlePeerRequest } from "@/background/peer-requests";
 import { ME, PEER, STRANGER } from "./fake-peer";
 import { TAB, VERIFIED, identity, other, peer, requests, withOther } from "./peer-requests-fixture";
@@ -168,5 +168,37 @@ describe("one peer at a time", () => {
     await deps.link.set(STRANGER, { state: "failed", verified: false });
     await handlePeerRequest(deps, { type: "folder-release" });
     expect(deps.folder.release).toHaveBeenCalledOnce();
+  });
+
+  describe("the launcher's pause policy", () => {
+    const marked = async () => {
+      const paired = await withOther();
+      const mark = vi.fn(async () => {});
+      return { ...paired, mark, deps: { ...paired.deps, launcher: { mark } } };
+    };
+
+    test("disconnect states the pause, never forget's reason", async () => {
+      const { deps, mark } = await marked();
+      await handlePeerRequest(deps, { type: "disconnect", peer: PEER });
+      expect(mark.mock.calls).toEqual([["disconnect"]]);
+    });
+
+    test("forget states the pause once, with its own reason", async () => {
+      const { deps, mark } = await marked();
+      await handlePeerRequest(deps, { type: "forget", peer: PEER });
+      expect(mark.mock.calls).toEqual([["forget"]]);
+    });
+
+    test.each(["reconnect", "pair-again"] as const)("%s states the return", async (type) => {
+      const { deps, mark } = await marked();
+      await handlePeerRequest(deps, { type, peer: PEER });
+      expect(mark.mock.calls).toEqual([["resumed"]]);
+    });
+
+    test("a build without the launcher disconnects as before", async () => {
+      const { deps } = await withOther();
+      await handlePeerRequest(deps, { type: "disconnect", peer: PEER });
+      expect(await deps.link.get(PEER)).toMatchObject({ reason: "closed-here" });
+    });
   });
 });

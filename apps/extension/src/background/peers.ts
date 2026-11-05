@@ -3,6 +3,9 @@ import * as v from "valibot";
 import { browser } from "wxt/browser";
 import { execute, sessionStatus, sharedTabs } from "@/background/executor";
 import type { ExecutorDependencies } from "@/background/executor";
+import type { PauseReason } from "@/background/launcher-pause";
+import { launcherMark, outwardGate } from "@/background/outward-gate";
+import type { Outward } from "@/background/outward-gate";
 import { askLink, closeOffscreen } from "@/background/link";
 import type { MeshPairingFlow } from "@/background/mesh-pairing";
 import { createPairingFlows, trusted } from "@/background/pairing-flows";
@@ -26,7 +29,6 @@ import {
   remoteControllerRepository,
   remoteRecordingsRepository,
 } from "@/storage/peer-repository";
-import { storedRoles } from "@/storage/hierarchy-repository";
 import { recordingSessionRepository } from "@/storage/recording-session-repository";
 import { browserTabs } from "@/tabs/open-tabs";
 // Imported last, so the production bundle (which drops them) keeps its module order and bytes.
@@ -107,8 +109,10 @@ async function linkDown(
 }
 
 type StateEvent = Extract<LinkEvent, { type: "state" }>;
+type Mark = (reason: PauseReason) => Promise<void>;
 
-async function linkUp(event: StateEvent, channel: PeerChannel, flows: PairingFlows, sign: Sign) {
+async function linkUp(event: StateEvent, context: LinkContext) {
+  const { channel, flows, sign, mark } = context;
   // DTLS proved the other side holds this certificate; only the one accepted and pinned may talk.
   if (!(await trusted(event, flows.trust))) {
     log("closed a link whose certificate is not the accepted one");
@@ -116,13 +120,20 @@ async function linkUp(event: StateEvent, channel: PeerChannel, flows: PairingFlo
   }
   await peerLinksRepository.set(event.peer, { state: "connected", verified: true });
   await flows.folder.linked(event.peer);
+  await mark?.("resumed");
   await hello(channel, event.peer, sign);
   await flows.mesh.announce();
   notifyPages();
 }
 
 /** The peer said it closes the link on purpose, so this side closes too, without waiting for ICE. */
-async function closedByPeer(channel: PeerChannel, peer: string, mesh: MeshPairingFlow) {
+async function closedByPeer(
+  channel: PeerChannel,
+  peer: string,
+  mesh: MeshPairingFlow,
+  mark?: Mark,
+) {
+  await mark?.("disconnect");
   await peerLinksRepository.set(peer, {
     state: "disconnected",
     verified: false,
@@ -139,9 +150,12 @@ interface LinkContext {
   flows: PairingFlows;
   sign: Sign;
   noticed?: (seen: { profileId: string }[]) => Promise<void>;
+  /** POC builds only: states to the launcher that this profile left its peers, or is back. */
+  mark?: Mark;
 }
 
-function createLinkHandler({ channel, executor, tabs, flows, sign, noticed }: LinkContext) {
+function createLinkHandler(context: LinkContext) {
+  const { channel, executor, tabs, flows, noticed, mark } = context;
   const onFrame = async (frame: string, peer: string) => {
     tap?.push(frame);
     const received = await channel.receive(frame, peer);
@@ -154,7 +168,7 @@ function createLinkHandler({ channel, executor, tabs, flows, sign, noticed }: Li
       return;
     }
     const { message } = received;
-    if (message.type === "BYE") return closedByPeer(channel, message.from, flows.mesh);
+    if (message.type === "BYE") return closedByPeer(channel, message.from, flows.mesh, mark);
     if (message.type === "HELLO" && !(await provenHello(message))) {
       log(`closed the link to ${peer}, whose HELLO no valid signature by its identity vouches for`);
       return refuseLink(peer);
@@ -170,7 +184,7 @@ function createLinkHandler({ channel, executor, tabs, flows, sign, noticed }: Li
       await noticed?.(event.presences).catch((error: unknown) => log(errorMessage(error)));
       return flows.folder.seen(event);
     }
-    if (event.state === "connected") return linkUp(event, channel, flows, sign);
+    if (event.state === "connected") return linkUp(event, context);
     if (event.state !== "connecting") return linkDown(event.peer, event.state, channel, flows.mesh);
     await peerLinksRepository.set(event.peer, { state: "connecting", verified: false });
     notifyPages();
@@ -232,34 +246,10 @@ function watchExecutor(channel: PeerChannel, executor: ExecutorDependencies) {
 
 const FolderStatusSchema = v.object({ access: FolderAccessSchema });
 
-/** The stored role's gate on everything outward; an unreadable role permits nothing. */
-function outwardGate() {
-  const roles = storedRoles();
-  const mayAnnounce = async () =>
-    (await roles.mayAct("announce")) && (await roles.mayAct("discover"));
-  const outward: Outward = async (work) => {
-    if (await mayAnnounce()) await work();
-  };
-  /** Runs `start` unless the role is a template, which waits for a later role change. */
-  const startOutward = async <T>(start: () => Promise<T>): Promise<T | undefined> => {
-    try {
-      if (await mayAnnounce()) return await start();
-      log("role template: no announcement, discovery, or pairing");
-    } catch (error) {
-      log(errorMessage(error));
-    }
-    return undefined;
-  };
-  return { outward, startOutward };
-}
-
-/** What a profile does outward only if its stored role lets it: a template does none of it. */
-type Outward = (work: () => Promise<void>) => Promise<void>;
-
 function requestDependencies(
   { channel, tabs, flows, sign }: Omit<LinkContext, "executor">,
   outward: Outward,
-  downloadsAvailable?: () => Promise<boolean>,
+  { available: downloadsAvailable, mark }: { available?: () => Promise<boolean>; mark?: Mark },
 ): PeerRequestDependencies {
   const { folder, mesh } = flows;
   // Reconnect also asks the peers linked already, which need no folder.
@@ -288,6 +278,7 @@ function requestDependencies(
       release: closeOffscreen,
       ...(downloadsAvailable && { downloadsAvailable }),
     },
+    ...(mark && { launcher: { mark } }),
   };
 }
 
@@ -322,7 +313,7 @@ export function startPeers(
   watchExecutor(channel, executor);
   const flows = createPairingFlows(channel, transport, log, sign);
   const { folder } = flows;
-  const { outward, startOutward } = outwardGate();
+  const { outward, startOutward } = outwardGate(log);
   // Chrome starts the worker with the browser only for a startup listener; starting resumes.
   browser.runtime.onStartup.addListener(() => {});
   const downloads = startOutward(async () => {
@@ -337,10 +328,11 @@ export function startPeers(
     transport === "downloads"
       ? async () => (await (await downloads)?.available()) ?? false
       : undefined;
-  const deps = requestDependencies({ channel, tabs, flows, sign }, outward, available);
+  const mark = launcherMark(transport === "downloads" ? downloads : undefined, log);
+  const deps = requestDependencies({ channel, tabs, flows, sign }, outward, { available, mark });
   const noticed = async (seen: { profileId: string }[]) => (await downloads)?.noticed(seen);
   return {
     request: (request) => handlePeerRequest(deps, request),
-    link: createLinkHandler({ channel, executor, tabs, flows, sign, noticed }),
+    link: createLinkHandler({ channel, executor, tabs, flows, sign, noticed, mark }),
   };
 }
