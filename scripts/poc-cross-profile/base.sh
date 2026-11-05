@@ -32,7 +32,8 @@
 #                 diff -r, loses the Singleton markers, downloads/RECnRun, and .recnrun-base (it is not
 #                 frozen), has only download.default_directory rewritten to <to>/downloads, is published
 #                 with one rename, and Chrome starts on it as create-base does; the owner updates the
-#                 unpacked build there, then runs template, quit, and freeze for <to>. <from> and the
+#                 unpacked build there, then runs template, quit, and freeze for <to>. A source holding a symbolic or
+#                 hard link outside the Singleton markers is refused before the copy, and a copy that holds one is removed. <from> and the
 #                 clones made from it are only read. stdout root=, copyS=; exit 70 for a failed copy.
 #
 # Environment: RECNRUN_OPEN_TIMEOUT_S (60) and RECNRUN_OPEN_POLL_S (1) bound the template wait,

@@ -85,15 +85,6 @@ read_base_marker() {
   # An unpacked base may carry its build folder as a seventh line (CL13); open-clone checks it.
   [ "$rb_index" -eq 6 ] || [ "$rb_index" -eq 7 ] || refuse "$rb_file does not have the six lines of a freeze, or seven with unpackedPath"
 }
-# Up to three paths below $1 that are a symbolic link or a multiply linked file, Singleton markers aside.
-stray_links() {
-  find "$1" \( -type l -o -type f -links +1 \) ! -path "$1/SingletonLock" ! -path "$1/SingletonCookie" \
-    ! -path "$1/SingletonSocket" | head -n 3
-}
-refuse_stray_links() {
-  rs_found=$(stray_links "$1")
-  [ -z "$rs_found" ] || "$2" "a symbolic or hard link outside the Singleton markers in $1: $(printf '%s' "$rs_found" | tr '\n' ' ')"
-}
 check_clones_dir() {
   if [ ! -d "$1" ] || [ -L "$1" ]; then refuse 'the clones directory is not a plain existing directory'; fi
   is_plain_root "$1" || refuse 'the clones directory is not an absolute path of letters, digits, dot, underscore, hyphen, and slash'

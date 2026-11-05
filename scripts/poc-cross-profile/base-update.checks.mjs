@@ -6,55 +6,19 @@ import {
   mkdirSync,
   readdirSync,
   readFileSync,
-  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { NAMESPACE, shells } from "./lab.mjs";
-import {
-  EXTENSION,
-  MARKER,
-  baseScene,
-  contents,
-  environment,
-  installExtension,
-  listing,
-} from "./base-lab.mjs";
+import { EXTENSION, MARKER, contents, environment, listing } from "./base-lab.mjs";
+import { frozenScene } from "./base-update-lab.mjs";
 
 const EX_USAGE = 64;
 const EX_REFUSED = 65;
 const EX_COPY = 70;
 const lines = (text) => text.split("\n").filter(Boolean);
 const SINGLETONS = ["SingletonLock", "SingletonCookie", "SingletonSocket"];
-
-/** A frozen base-v1 with the stray parts of a used root, and a clones folder that holds one clone. */
-function frozenScene(context, shell) {
-  const s = baseScene(context);
-  assert.equal(s.create(shell).code, 0);
-  const root = s.root();
-  const build = installExtension(root, { unpacked: true });
-  mkdirSync(join(root, "Default/Local Storage/leveldb"), { recursive: true });
-  mkdirSync(join(root, "downloads/RECnRun/poc"), { recursive: true });
-  writeFileSync(join(root, "Local State"), '{"profile":{}}');
-  writeFileSync(join(root, "Default/Local Storage/leveldb/LOCK"), "");
-  writeFileSync(join(root, "downloads/keep.txt"), "kept");
-  writeFileSync(join(root, "downloads/RECnRun/poc/x.json"), "{}");
-  for (const name of SINGLETONS) symlinkSync("host-123", join(root, name));
-  const template = s.run(shell, ["template", s.bases, "base-v1", NAMESPACE], "base-v1", {
-    STUB_ACK: "good",
-  });
-  assert.equal(template.code, 0, template.err);
-  const freeze = s.run(shell, ["freeze", s.bases, "base-v1", NAMESPACE, EXTENSION], "base-v1");
-  assert.equal(freeze.code, 0, freeze.err);
-  const clones = join(s.home, "clones");
-  mkdirSync(join(clones, "c1/Default"), { recursive: true });
-  writeFileSync(join(clones, "c1/Default/Preferences"), "{}");
-  writeFileSync(join(clones, "c1/.recnrun-clone"), "base=base-v1\n");
-  const update = (to = "base-v2", ns = NAMESPACE, extra = {}) =>
-    s.run(shell, ["update", s.bases, "base-v1", to, ns], to, extra);
-  return { s, root, build, clones, update };
-}
 
 for (const shell of shells) {
   await test(`${shell}: update copies a frozen base to a new root, opens it for the owner, and leaves old clones alone`, (context) => {

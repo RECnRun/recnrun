@@ -5,6 +5,11 @@
 # beside the destination, diff -r, one rename) on its own, so the two scripts stay independent.
 
 up_fail() { die 70 "$1: interrupted copy kept at $up_temp"; }
+# A link in the copy is never followed: the copy is removed (rm does not follow links) and the update fails.
+up_discard() {
+  rm -rf -- "$up_temp"
+  die 70 "$1: the copy was removed"
+}
 # The namespace= value of the freeze marker $1, empty when it has none.
 marker_namespace() {
   mn_value=
@@ -37,11 +42,13 @@ up_rewrite() {
 up_copy() {
   up_temp=$bases/.$up_to.partial-$(lc_random)
   if [ -e "$up_temp" ] || [ -L "$up_temp" ]; then die 73 "$up_temp exists"; fi
+  refuse_stray_links "$root" refuse
   up_start=$(date +%s)
   if command -v ditto >/dev/null 2>&1; then ditto "$root" "$up_temp" || up_fail 'the copy failed'; else cp -R -p "$root" "$up_temp" || up_fail 'the copy failed'; fi
   up_secs=$(($(date +%s) - up_start))
   up_diff=$(diff -r -q -x SingletonLock -x SingletonCookie -x SingletonSocket "$root" "$up_temp" 2>&1)
   [ -z "$up_diff" ] || up_fail "the copy differs from the base ($(printf '%s' "$up_diff" | head -n 1))"
+  refuse_stray_links "$up_temp" up_discard
   rm -f -- "$up_temp/SingletonLock" "$up_temp/SingletonCookie" "$up_temp/SingletonSocket" "$up_temp/.recnrun-base"
   rm -rf -- "$up_temp/downloads/RECnRun"
   up_rewrite

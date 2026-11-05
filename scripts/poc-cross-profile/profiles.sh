@@ -63,6 +63,17 @@ is_listable() {
 system_name() { printf '%s' "${RECNRUN_DISCOVERY_UNAME:-$(uname -s)}"; }
 is_runnable() { [ -f "$1" ] && [ -x "$1" ]; }
 
+# --- Links -----------------------------------------------------------------------------------
+
+# Up to three paths below $1 that are a symbolic link or a multiply linked file, Singleton markers aside.
+stray_links() {
+  find "$1" \( -type l -o -type f -links +1 \) ! -path "$1/SingletonLock" ! -path "$1/SingletonCookie" \
+    ! -path "$1/SingletonSocket" | head -n 3
+}
+refuse_stray_links() {
+  rs_found=$(stray_links "$1")
+  [ -z "$rs_found" ] || "$2" "a symbolic or hard link outside the Singleton markers in $1: $(printf '%s' "$rs_found" | tr '\n' ' ')"
+}
 # --- Chrome ----------------------------------------------------------------------------------
 
 chrome_binary() {
