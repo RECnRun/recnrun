@@ -135,5 +135,6 @@ cmd_open_clone() {
   st_shared=0
   if root_is_shared "$p_user" "$lc_record"; then st_shared=1; fi
   l_before=idle
+  lc_control=1
   launch
 }

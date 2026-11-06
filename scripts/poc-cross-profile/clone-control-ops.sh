@@ -48,20 +48,22 @@ put_op() {
 }
 
 # Fails when a request newer than the one in hand was already handled for the clone, else records this
-# one as the newest: a late old click, delivered in a later pass, can never undo a newer one.
+# one as the newest: a late old click, delivered in a later pass, can never undo a newer one. The order is
+# the one of a scan: createdAt, then the request id.
 accept_request() {
   ar_file=$cc_state/control/newest-$rq_instance
-  ar_newest=0
-  if [ -f "$ar_file" ] && [ ! -L "$ar_file" ]; then read -r ar_newest <"$ar_file" || :; fi
-  case $ar_newest in '' | *[!0-9]*) ar_newest=0 ;; esac
-  if [ "$rq_created" -lt "$ar_newest" ]; then
+  ar_newest=0 ar_newest_id=''
+  if [ -f "$ar_file" ] && [ ! -L "$ar_file" ]; then read -r ar_newest ar_newest_id <"$ar_file" || :; fi
+  case $ar_newest in '' | *[!0-9]*) ar_newest=0 ar_newest_id='' ;; esac
+  ar_lower=$(printf '%s\n%s\n' "$rq_id" "$ar_newest_id" | LC_ALL=C sort | head -n 1)
+  if [ "$rq_created" -lt "$ar_newest" ] || { [ "$rq_created" -eq "$ar_newest" ] && [ "$rq_id" != "$ar_newest_id" ] && [ "$ar_lower" = "$rq_id" ]; }; then
     rq_why='the request is older than a request already handled for the clone'
     return 1
   fi
   ar_tmp=$cc_state/control/.newest.$(lc_random).tmp
   (
     set -C
-    printf '%s\n' "$rq_created" >"$ar_tmp"
+    printf '%s %s\n' "$rq_created" "$rq_id" >"$ar_tmp"
   ) || die 73 "cannot write $ar_tmp"
   mv -f -- "$ar_tmp" "$ar_file" || die 73 'cannot record the newest request'
 }

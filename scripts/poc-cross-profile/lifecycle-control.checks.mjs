@@ -223,4 +223,24 @@ for (const shell of shells) {
     assert.equal(s.field("status"), "stopped");
     assert.equal(s.field("pid"), "");
   });
+
+  await test(`${shell}: an opener does not start Chrome when the record changed after the check`, async (context) => {
+    const s = scene(context);
+    assert.equal(close(shell, s).code, 0);
+    const lock = join(s.state, "profiles", `${ALICE}.lock`);
+    writeFileSync(join(s.home, "hold"), "");
+    const opener = spawn(
+      shell,
+      [script, "open-clone", s.state, s.record, NAMESPACE, ALICE, "headed"],
+      { stdio: "ignore", env: s.vars({ STUB_HOLD_LOCK: lock }) },
+    );
+    const ended = new Promise((resolve) => opener.on("close", resolve));
+    for (let waited = 0; !existsSync(join(s.home, "held")) && waited < 100; waited++)
+      await sleep(100);
+    assert.equal(existsSync(join(s.home, "held")), true, "the opener never reached its launch");
+    writeFileSync(s.record, readFileSync(s.record, "utf8").replace("role=worker", "role=master"));
+    rmSync(join(s.home, "hold"));
+    assert.notEqual(await ended, 0);
+    assert.equal(s.launches(), 0);
+  });
 }
