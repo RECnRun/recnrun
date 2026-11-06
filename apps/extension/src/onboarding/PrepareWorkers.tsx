@@ -50,7 +50,7 @@ function Fields(props: {
         id="prepare-bases-dir"
         data-field="bases-dir"
         value={props.basesDir}
-        placeholder="/Users/you/RECnRun/bases"
+        placeholder="Leave blank for ~/RECnRun/bases"
         onInput={(event) => props.setBasesDir(event.currentTarget.value)}
       />
       <label for="prepare-clones">Workers</label>

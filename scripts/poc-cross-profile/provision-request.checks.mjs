@@ -58,7 +58,6 @@ for (const shell of shells) {
       [{ basesDir: "/Users//bases" }, /basesDir/],
       [{ basesDir: "/Users/./bases" }, /basesDir/],
       [{ basesDir: "/Users/bases/." }, /basesDir/],
-      [{ basesDir: "" }, /basesDir/],
       [{ clones: 0 }, /clones/],
       [{ clones: 9 }, /clones/],
       [{ baseName: "base-vx" }, /closed grammar/],
@@ -97,6 +96,47 @@ for (const shell of shells) {
     writeFileSync(join(s.folder(), "request.json"), `${requestText({ basesDir: s.bases })} `);
     s.run(shell);
     assert.equal(shape(s.status()).state, "error", "a byte after the closing brace");
+    assert.equal(s.launchCount(), 0);
+  });
+
+  await test(`${shell}: run creates a missing bases folder under the home and takes a blank one as ~/RECnRun/bases`, (context) => {
+    const s = provisionScene(context);
+    rmSync(s.bases, { recursive: true });
+    const first = (overrides) => {
+      rmSync(join(s.state, "ops"), { recursive: true, force: true });
+      s.request(overrides);
+      assert.equal(s.run(shell).code, 0);
+      return shape(s.status());
+    };
+    const blank = first({ basesDir: "" });
+    assert.deepEqual(
+      [blank.step, blank.state, blank.message],
+      ["create-base", "running", "created base-v1"],
+    );
+    assert.equal(
+      existsSync(join(s.home, "RECnRun/bases/base-v1/Default")),
+      true,
+      "the default folder",
+    );
+    const nested = join(s.home, "deep/new/bases");
+    const explicit = first({ basesDir: nested });
+    assert.equal(explicit.state, "running", explicit.message);
+    assert.equal(existsSync(join(nested, "base-v1/Default")), true, "a missing folder is created");
+  });
+
+  await test(`${shell}: run refuses to create a bases folder outside the home or through a link`, (context) => {
+    const s = provisionScene(context);
+    mkdirSync(join(s.home, "real"));
+    symlinkSync(join(s.home, "real"), join(s.home, "link"));
+    for (const basesDir of ["/recnrun-no-such-root/bases", join(s.home, "link/bases")]) {
+      rmSync(join(s.state, "ops"), { recursive: true, force: true });
+      s.request({ basesDir });
+      assert.equal(s.run(shell).code, 0);
+      const status = shape(s.status());
+      assert.deepEqual([status.step, status.state], ["create-base", "error"], basesDir);
+    }
+    assert.equal(existsSync(join(s.home, "real/bases")), false);
+    assert.equal(existsSync("/recnrun-no-such-root"), false);
     assert.equal(s.launchCount(), 0);
   });
 }

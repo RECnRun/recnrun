@@ -16,7 +16,7 @@ const BASES_DIR_MESSAGE =
   "Use an absolute folder path of letters, digits, dot, underscore, hyphen, and slash only (no spaces, no empty, . or .. parts, no trailing slash).";
 
 /** The folders that hold the bases: the launcher's canonical path grammar (is_plain_root). */
-export const BasesDirSchema = v.pipe(
+const PathSchema = v.pipe(
   v.string(),
   v.maxLength(1024),
   v.regex(/^(\/[A-Za-z0-9._-]+)+$/, BASES_DIR_MESSAGE),
@@ -25,6 +25,9 @@ export const BasesDirSchema = v.pipe(
     BASES_DIR_MESSAGE,
   ),
 );
+
+/** A path, or "" for the launcher's default ($HOME/RECnRun/bases, which it creates). */
+export const BasesDirSchema = v.union([v.literal(""), PathSchema]);
 
 export const ClonesSchema = v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(MAX_CLONES));
 

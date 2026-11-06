@@ -38,6 +38,8 @@ describe("PrepareChoiceSchema", () => {
     clones: 8,
   };
   test("accepts the closed grammar", () => expect(v.is(PrepareChoiceSchema, choice)).toBe(true));
+  test("accepts a blank bases folder, the launcher's default", () =>
+    expect(v.is(PrepareChoiceSchema, { ...choice, basesDir: "" })).toBe(true));
   test.each([
     { basesDir: "relative" },
     { basesDir: "/a/../b" },

@@ -14,7 +14,8 @@
 # request keeps <state-dir>/ops/<operationId> (key=value lines: step, state, startedAt, message,
 # clone.<name> = instance id, boot.<name> = ack boot) and advances by ONE step per call, so the
 # launcher loop stays responsive and a crash leaves a resumable state:
-#   create-base  base.sh create-base <basesDir> <baseName>
+#   create-base  base.sh create-base <basesDir> <baseName>; a blank basesDir is $HOME/RECnRun/bases, and a missing
+#                folder below $HOME is created first (never through a link; outside $HOME it is refused)
 #   install      nothing when the extension is already in the base, else base.sh quit (the Chrome
 #                create-base left open) and install.sh install-base <basesDir> <baseName> <ns>
 #                <build-dir> (build-dir: RECNRUN_EXTENSION_BUILD or <this dir>/extension); the exit code
@@ -88,6 +89,8 @@ parse_request() {
   ack_take '{"operationId":"' '"' && [ "$ack_value" = "$2" ] || return 1
   ack_take '","kind":"prepare-workers","basesDir":"' '"' || return 1
   rq_why='basesDir is not an absolute path of letters, digits, dot, underscore, hyphen, and slash, without empty or dot segments or a final slash'
+  # A blank folder means the default, outside the folders macOS protects (Documents, Desktop, Downloads).
+  [ -n "$ack_value" ] || ack_value=$HOME/RECnRun/bases
   is_bases_dir "$ack_value" || return 1
   rq_bases=$ack_value rq_why=$rq_grammar
   ack_take '","baseName":"' '"' && is_base_name "$ack_value" || return 1
@@ -218,7 +221,21 @@ step_failed() {
   sx_kind=fail
   sx_text="exit $1: $(last_error_line)"
 }
+# Creates the missing folders of the bases directory below $HOME, one at a time and never through a link;
+# a missing path outside $HOME is refused. An existing directory is left to base.sh's own checks.
+ensure_bases_dir() {
+  [ ! -e "$rq_bases" ] && [ ! -L "$rq_bases" ] || return 0
+  case $rq_bases in "$HOME"/*) ;; *) return 1 ;; esac
+  eb_path=$HOME eb_rest=${rq_bases#"$HOME"/}
+  while [ -n "$eb_rest" ]; do
+    eb_path=$eb_path/${eb_rest%%/*}
+    case $eb_rest in */*) eb_rest=${eb_rest#*/} ;; *) eb_rest='' ;; esac
+    [ ! -L "$eb_path" ] || return 1
+    [ -d "$eb_path" ] || mkdir -- "$eb_path" || return 1
+  done
+}
 step_create_base() {
+  ensure_bases_dir || { sx_kind=fail sx_text='exit 73: cannot create the bases folder below the home'; return 0; }
   run_step "$pv_dir/base.sh" create-base "$rq_bases" "$rq_name" || { step_failed $?; return 0; }
   sx_text="created $rq_name"
 }
