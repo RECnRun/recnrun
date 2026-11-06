@@ -68,7 +68,7 @@ await test("the scanner reports a missing root", () => {
 });
 
 const OS_FOLDERS = ["macos", "linux"];
-const COMMANDS = ["first-run", "start", "status", "stop", "autostart"];
+const COMMANDS = ["first-run", "install", "start", "status", "stop", "autostart"];
 const EX_NONE = 66;
 const files = (directory) =>
   readdirSync(directory, { recursive: true, withFileTypes: true })

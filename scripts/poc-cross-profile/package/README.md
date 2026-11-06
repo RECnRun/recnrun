@@ -45,6 +45,18 @@ opened twice. Each pass of the launcher, `first-run` included, also writes the c
 `$HOME/.recnrun/launcher.record`, both under the namespace `lab`. Exit 0: every profile is open;
 66: no profile has the extension; 70: a profile did not open or did not acknowledge.
 
+To do both steps with one command, run `install` instead of `first-run` and `autostart on`:
+
+```
+sh recnrun-launcher install
+```
+
+It runs `first-run` and, only when every profile is open and the Default is the master, turns
+autostart on with the same state directory, record, and namespace; it prints `autostart on` as its last line.
+Exit 0: every profile is open and autostart is on; 64: wrong arguments; 65: a refused path; 66: no
+profile has the extension; 70: a profile did not open or acknowledge, the Default did not become the
+master, or `autostart on` failed (the profiles stay open; run `install` again).
+
 Count: 4 N + 3 for N profiles, 7 for one: the 4 Load unpacked gestures per profile and the 3
 commands this README has you run (`first-run`, `status` to verify, `autostart on`). The 4 N gestures
 are estimated, not observed: the host twin installs the extension over CDP, so M-P4.b measures

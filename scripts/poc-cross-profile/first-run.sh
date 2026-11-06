@@ -1,5 +1,5 @@
 #!/bin/sh
-# first-run.sh [<state-dir> <record> <namespace>]
+# first-run.sh [--autostart] [<state-dir> <record> <namespace>]
 #
 # The launcher's first run (POC PLAN.md P4.6): registers each profile that has the extension and a
 # presence of its own, then opens every registered profile of the namespace once and checks that
@@ -25,8 +25,13 @@
 # record only after that ack. A failed claim exits 70; the next run asks again.
 #
 # Output: one line per profile, `<profileId> <status>`, then the autostart command to run next.
-# Exit: 0 every registered profile is open, 64 wrong call, 65 refused path, 66 no profile to
-# register and none registered, 70 a profile did not open or did not ack its binding.
+# With --autostart (the entry's `install`) the run ends by running `autostart on` with the same state
+# dir, record, and namespace, only when every profile is open and the Default is the master, and
+# prints `autostart on` instead of the next line.
+# Exit: 0 every registered profile is open (and autostart is on with --autostart), 64 wrong call,
+# 65 refused path, 66 no profile to register and none registered, 70 a profile did not open or did
+# not ack its binding, the Default did not become the master, or autostart on failed (the profiles
+# stay open and the next run only repeats the autostart).
 
 fr_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)
 # shellcheck source=profiles.sh
@@ -66,7 +71,7 @@ fr_arguments() {
     3)
       fr_state=$1 fr_record=$2 fr_ns=$3
       ;;
-    *) die 64 'usage: first-run.sh [<state-dir> <record> <namespace>]' ;;
+    *) die 64 'usage: first-run.sh [--autostart] [<state-dir> <record> <namespace>]' ;;
   esac
   is_unit_path "$fr_state" || die 65 'the state directory is not an absolute path of plain characters'
   is_unit_path "$fr_record" || die 65 'the record is not an absolute path of plain characters'
@@ -240,6 +245,11 @@ $fr_ids
 EOF
 }
 
+fr_autostart=0
+if [ "${1:-}" = --autostart ]; then
+  fr_autostart=1
+  shift
+fi
 fr_arguments "$@"
 umask 077
 mkdir -p -- "$fr_state" "$(dirname -- "$fr_record")" || die 70 'cannot create the state directory'
@@ -254,4 +264,10 @@ report
 if [ "$fr_failed" -ne 0 ]; then die 70 'a profile did not open; see the lines above'; fi
 [ "$fr_master_failed" -eq 0 ] || die 70 'the Default did not become the master; see the lines above'
 [ -z "$fr_left" ] || die 70 "a profile did not ack and is not registered: $(printf '%s' "$fr_left" | tr "$nl" ' ')"
-printf 'next: sh recnrun-launcher autostart on %s %s %s\n' "$fr_state" "$fr_record" "$fr_ns"
+if [ "$fr_autostart" -eq 0 ]; then
+  printf 'next: sh recnrun-launcher autostart on %s %s %s\n' "$fr_state" "$fr_record" "$fr_ns"
+  exit 0
+fi
+RECNRUN_DISCOVERY_LIB='' /bin/sh "$fr_dir/recnrun-launcher.sh" autostart on "$fr_state" "$fr_record" "$fr_ns" >&2 ||
+  die 70 'autostart on failed; the profiles stay open, run install again after fixing it'
+printf 'autostart on\n'
