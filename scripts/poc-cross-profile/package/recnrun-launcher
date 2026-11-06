@@ -1,0 +1,12 @@
+#!/bin/sh
+# The package's one entry point: first-run is first-run.sh, install is first-run.sh --autostart, every other command is recnrun-launcher.sh.
+here=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P) || exit 70
+if [ "${1:-}" = first-run ]; then
+  shift
+  exec /bin/sh "$here/first-run.sh" "$@"
+fi
+if [ "${1:-}" = install ]; then
+  shift
+  exec /bin/sh "$here/first-run.sh" --autostart "$@"
+fi
+exec /bin/sh "$here/recnrun-launcher.sh" "$@"

@@ -1,9 +1,13 @@
 import { describe, expect, test, vi } from "vite-plus/test";
 import { createPairing } from "@/background/pairing";
 import type { LinkCommand } from "@/messaging/peer-messages";
+import { signerOf } from "@/p2p/identity-key";
 import { PAIRING_TTL_MS, decodePairing, encodePairing } from "@/p2p/pairing-code";
+import { createPins } from "@/p2p/pins";
+import type { Pin } from "@/p2p/pins";
 import type { AuthorizedPeer } from "@/storage/peer-repository";
 import { memoryRecords } from "./fake-peer";
+import { identityOf, signAs } from "./test-identity";
 
 const NOW = 1_700_000_000_000;
 const A = { profileId: "11111111-1111-4111-8111-111111111111", displayName: "Work" };
@@ -13,6 +17,10 @@ const FP_B = "BB:BB";
 const C = { profileId: "33333333-3333-4333-8333-333333333333", displayName: "Lab" };
 const FP_C = "CC:CC";
 const STRANGER = "44444444-4444-4444-8444-444444444444";
+const KEY_A = await identityOf(A.profileId);
+const KEY_B = await identityOf(B.profileId);
+const KEY_C = await identityOf(C.profileId);
+const FORGER = await identityOf("forger");
 const sdpWith = (fingerprint: string) => `v=0\r\na=fingerprint:sha-256 ${fingerprint}\r\n`;
 
 interface PendingOffer {
@@ -31,14 +39,17 @@ function side(identity: typeof A, fingerprint: string, clock = { now: NOW }) {
   });
   const authorized = memoryRecords<AuthorizedPeer>();
   const pending = memoryRecords<PendingOffer>();
+  const pinned = memoryRecords<Pin>();
   const flow = createPairing({
     askLink,
     identity: async () => identity,
     authorized,
     pending,
+    pins: createPins(pinned),
+    sign: signAs,
     now: () => clock.now,
   });
-  return { ...flow, askLink, authorized, pending, clock };
+  return { ...flow, askLink, authorized, pending, pinned, clock };
 }
 
 async function offered() {
@@ -49,7 +60,7 @@ async function offered() {
 }
 
 describe("a full pairing", () => {
-  test("authorizes each other, each pinned to the other's certificate", async () => {
+  test("authorizes each other, with the certificate and the key that signed it", async () => {
     const { a, b, offer } = await offered();
     const pairingId = decodePairing(offer, NOW).pairingId;
     expect(await a.pending.get(B.profileId)).toEqual({
@@ -66,7 +77,9 @@ describe("a full pairing", () => {
       peer: A.profileId,
       sdp: sdpWith(FP_A),
     });
-    expect(await b.authorized.all()).toEqual({ [A.profileId]: { ...A, fingerprint: FP_A } });
+    expect(await b.authorized.all()).toEqual({
+      [A.profileId]: { ...A, fingerprint: FP_A, identity: KEY_A },
+    });
     expect(decodePairing(answer, NOW)).toMatchObject({ kind: "answer", pairingId, ...B });
 
     expect(await a.accept(answer)).toEqual({});
@@ -75,7 +88,9 @@ describe("a full pairing", () => {
       peer: B.profileId,
       sdp: sdpWith(FP_B),
     });
-    expect(await a.authorized.all()).toEqual({ [B.profileId]: { ...B, fingerprint: FP_B } });
+    expect(await a.authorized.all()).toEqual({
+      [B.profileId]: { ...B, fingerprint: FP_B, identity: KEY_B },
+    });
     expect(await a.pending.all()).toEqual({});
   });
 
@@ -86,8 +101,8 @@ describe("a full pairing", () => {
     const { code: toC } = await a.createOffer(C.profileId);
     await a.accept((await c.accept(toC)).code ?? "");
     expect(await a.authorized.all()).toEqual({
-      [B.profileId]: { ...B, fingerprint: FP_B },
-      [C.profileId]: { ...C, fingerprint: FP_C },
+      [B.profileId]: { ...B, fingerprint: FP_B, identity: KEY_B },
+      [C.profileId]: { ...C, fingerprint: FP_C, identity: KEY_C },
     });
   });
 
@@ -109,10 +124,76 @@ describe("a full pairing", () => {
       identity: async () => A,
       authorized: memoryRecords<AuthorizedPeer>(),
       pending: memoryRecords<PendingOffer>(),
+      pins: createPins(memoryRecords<Pin>()),
+      sign: signAs,
     });
     const before = Date.now();
     const { expiresAt } = decodePairing((await flow.createOffer(B.profileId)).code);
     expect(expiresAt).toBeGreaterThanOrEqual(before + PAIRING_TTL_MS);
+  });
+
+  test("each code carries its maker's statement for the certificate its SDP names", async () => {
+    const { b, offer } = await offered();
+    const { identity } = decodePairing(offer, NOW);
+    expect(await signerOf(identity, { profileId: A.profileId, fingerprint: FP_A })).toBe(KEY_A);
+    const { code: answer = "" } = await b.accept(offer);
+    const claim = { profileId: B.profileId, fingerprint: FP_B };
+    expect(await signerOf(decodePairing(answer, NOW).identity, claim)).toBe(KEY_B);
+  });
+
+  test("makes no code for an SDP with no certificate fingerprint", async () => {
+    const a = side(A, FP_A);
+    a.askLink.mockResolvedValueOnce({ sdp: "v=0\r\n" });
+    await expect(a.createOffer(B.profileId)).rejects.toThrow(
+      "The link made an SDP with no certificate fingerprint.",
+    );
+    expect(await a.pending.all()).toEqual({});
+  });
+});
+
+describe("pinned identities", () => {
+  const OTHER: Pin = {
+    fingerprint: "EE:EE",
+    pinnedAt: 1,
+    source: "local-channel",
+    identity: FORGER,
+  };
+
+  test("accepting a code pins nothing, since only the handshake proves its certificate", async () => {
+    const { a, b, offer } = await offered();
+    await a.accept((await b.accept(offer)).code ?? "");
+    expect(await a.pinned.all()).toEqual({});
+    expect(await b.pinned.all()).toEqual({});
+  });
+
+  test("accepts a renewed certificate's code that the pinned key signed", async () => {
+    const { b, offer } = await offered();
+    await b.pinned.set(A.profileId, { ...OTHER, identity: KEY_A });
+    expect((await b.accept(offer)).code).toBeTruthy();
+    expect(b.askLink).toHaveBeenCalledWith(expect.objectContaining({ type: "answer" }));
+  });
+
+  test("refuses an offer for a pinned profile that another key signed, before any connection", async () => {
+    const { b, offer } = await offered();
+    await b.pinned.set(A.profileId, OTHER);
+    await expect(b.accept(offer)).rejects.toThrow(
+      `Refused a code from ${A.profileId}: its pinned identity did not sign its certificate.`,
+    );
+    expect(b.askLink).not.toHaveBeenCalled();
+    expect(await b.authorized.all()).toEqual({});
+    expect(await b.pinned.get(A.profileId)).toEqual(OTHER);
+  });
+
+  test("refuses such an answer before it reaches the link, and the offer still waits", async () => {
+    const { a, b, offer } = await offered();
+    const { code: answer = "" } = await b.accept(offer);
+    await a.pinned.set(B.profileId, OTHER);
+    await expect(a.accept(answer)).rejects.toThrow(
+      "its pinned identity did not sign its certificate.",
+    );
+    expect(a.askLink.mock.calls.map(([command]) => command.type)).toEqual(["offer"]);
+    expect(await a.authorized.all()).toEqual({});
+    expect(Object.keys(await a.pending.all())).toEqual([B.profileId]);
   });
 });
 
@@ -152,16 +233,40 @@ describe("refused codes", () => {
     expect(await a.authorized.all()).toEqual({});
   });
 
-  test("refuses a code without a certificate fingerprint", async () => {
-    const b = side(B, FP_B);
-    const code = encodePairing({
+  const codeOf = async (sdp: string, signedFor: string, as = A.profileId) =>
+    encodePairing({
       kind: "offer",
       pairingId: "66666666-6666-4666-8666-666666666666",
       ...A,
       expiresAt: NOW + PAIRING_TTL_MS,
-      sdp: "v=0\r\n",
+      sdp,
+      identity: await signAs({ profileId: A.profileId, fingerprint: signedFor }, as),
     });
+
+  test("refuses a code without a certificate fingerprint", async () => {
+    const b = side(B, FP_B);
+    const code = await codeOf("v=0\r\n", FP_A);
     await expect(b.accept(code)).rejects.toThrow("The code has no certificate fingerprint.");
     expect(await b.authorized.all()).toEqual({});
+  });
+
+  test("refuses a code whose statement names another certificate or another profile", async () => {
+    const b = side(B, FP_B);
+    const expected = `Refused a code from ${A.profileId}: no valid signature names its certificate.`;
+    await expect(b.accept(await codeOf(sdpWith(FP_A), "EE:EE"))).rejects.toThrow(expected);
+    const elsewhere = await signAs({ profileId: STRANGER, fingerprint: FP_A });
+    const decoded = decodePairing(await codeOf(sdpWith(FP_A), FP_A), NOW);
+    await expect(b.accept(encodePairing({ ...decoded, identity: elsewhere }))).rejects.toThrow(
+      expected,
+    );
+    expect(b.askLink).not.toHaveBeenCalled();
+    expect(await b.authorized.all()).toEqual({});
+  });
+
+  test("a first meeting accepts whichever key signed the code, for the link to pin", async () => {
+    const b = side(B, FP_B);
+    await b.accept(await codeOf(sdpWith(FP_A), FP_A, "forger"));
+    expect(await b.authorized.get(A.profileId)).toMatchObject({ identity: FORGER });
+    expect(await b.pinned.all()).toEqual({});
   });
 });

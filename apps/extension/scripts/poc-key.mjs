@@ -1,0 +1,4 @@
+// Only the public key is pinned: unpacked and CRX3 installs of the POC need no private key, and nothing signs with it.
+export const POC_PUBLIC_KEY =
+  "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtXL2ctY5au+dcDRB777DoAosqxdTjIgn4c9NnvVQM4ru2bO88hpHexGXAVRxtUYMLiO18toOkJkwM5Wh5EuoaWOaGw/s0MlwF7GjItoQiUir0boSfYSpx6JMfvyXTNyRKeZ4OLxPi5kIxUcQIydCLGM9QQNqWKcdrdnSRI+05A/tKarJvKLW9uNKzlztdJIoLP/82o4azJT+7+tokogia+wjx6lfZSpewJEEawHibHm3595paT2UDYEOBWL9ohQH3jbxM6JNM/9W8BG4xkemwYIfz23izmRqI7Di+BuJIeBnlUWiv3AICu/SVB2kDCVPHvBRewYHMBfFQO2xjKxjUQIDAQAB";
+export const POC_EXTENSION_ID = "omllgeochjfpkjbkpcgjmnnbncdpiedd";

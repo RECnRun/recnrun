@@ -1,0 +1,708 @@
+[
+  {
+    "experiment": "E4",
+    "hypothesis": "E4.a.commonRoot",
+    "chrome": "Google Chrome 156.0.8078.80",
+    "environment": "host",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "two profiles, OS default",
+    "debugger": "none",
+    "observations": [
+      {
+        "discovery": {
+          "A": {
+            "opened": {
+              "code": 0,
+              "stopped": false
+            },
+            "bootstrapTabs": 1,
+            "scanned": ["<default Downloads>"],
+            "foundIn": ["<default Downloads>"],
+            "ownRoot": "<default Downloads>"
+          },
+          "B": {
+            "opened": {
+              "code": 0,
+              "stopped": false
+            },
+            "bootstrapTabs": 1,
+            "scanned": ["<default Downloads>"],
+            "foundIn": ["<default Downloads>"],
+            "ownRoot": "<default Downloads>"
+          }
+        },
+        "rootIds": {
+          "<default Downloads>": "r1"
+        },
+        "catalog": {
+          "<default Downloads>": {
+            "code": 0,
+            "stderr": "",
+            "listed": ["A", "B"],
+            "roots": {
+              "B": "r1",
+              "A": "r1"
+            }
+          }
+        },
+        "reads": {
+          "A": {
+            "reason": "fresh",
+            "listed": ["A", "B"]
+          },
+          "B": {
+            "reason": "fresh",
+            "listed": ["A", "B"]
+          }
+        }
+      },
+      {
+        "discovery": {
+          "A": {
+            "opened": {
+              "code": 0,
+              "stopped": false
+            },
+            "bootstrapTabs": 1,
+            "scanned": ["<default Downloads>"],
+            "foundIn": ["<default Downloads>"],
+            "ownRoot": "<default Downloads>"
+          },
+          "B": {
+            "opened": {
+              "code": 0,
+              "stopped": false
+            },
+            "bootstrapTabs": 1,
+            "scanned": ["<default Downloads>"],
+            "foundIn": ["<default Downloads>"],
+            "ownRoot": "<default Downloads>"
+          }
+        },
+        "rootIds": {
+          "<default Downloads>": "r1"
+        },
+        "catalog": {
+          "<default Downloads>": {
+            "code": 0,
+            "stderr": "",
+            "listed": ["A", "B"],
+            "roots": {
+              "B": "r1",
+              "A": "r1"
+            }
+          }
+        },
+        "reads": {
+          "A": {
+            "reason": "fresh",
+            "listed": ["A", "B"]
+          },
+          "B": {
+            "reason": "fresh",
+            "listed": ["A", "B"]
+          }
+        }
+      },
+      {
+        "discovery": {
+          "A": {
+            "opened": {
+              "code": 0,
+              "stopped": false
+            },
+            "bootstrapTabs": 1,
+            "scanned": ["<default Downloads>"],
+            "foundIn": ["<default Downloads>"],
+            "ownRoot": "<default Downloads>"
+          },
+          "B": {
+            "opened": {
+              "code": 0,
+              "stopped": false
+            },
+            "bootstrapTabs": 1,
+            "scanned": ["<default Downloads>"],
+            "foundIn": ["<default Downloads>"],
+            "ownRoot": "<default Downloads>"
+          }
+        },
+        "rootIds": {
+          "<default Downloads>": "r1"
+        },
+        "catalog": {
+          "<default Downloads>": {
+            "code": 0,
+            "stderr": "",
+            "listed": ["A", "B"],
+            "roots": {
+              "B": "r1",
+              "A": "r1"
+            }
+          }
+        },
+        "reads": {
+          "A": {
+            "reason": "fresh",
+            "listed": ["A", "B"]
+          },
+          "B": {
+            "reason": "fresh",
+            "listed": ["A", "B"]
+          }
+        }
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "E4",
+    "hypothesis": "E4.b.differentRoots",
+    "chrome": "Google Chrome 156.0.8078.80",
+    "environment": "host",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "two profiles, OS default and a launcher folder",
+    "debugger": "none",
+    "observations": [
+      {
+        "discovery": {
+          "A": {
+            "opened": {
+              "code": 0,
+              "stopped": false
+            },
+            "bootstrapTabs": 1,
+            "scanned": ["<default Downloads>", "<launcher folder>"],
+            "foundIn": ["<default Downloads>"],
+            "ownRoot": "<default Downloads>"
+          },
+          "B": {
+            "opened": {
+              "code": 0,
+              "stopped": false
+            },
+            "bootstrapTabs": 1,
+            "scanned": ["<default Downloads>", "<launcher folder>"],
+            "foundIn": ["<launcher folder>"],
+            "ownRoot": "<launcher folder>"
+          }
+        },
+        "rootIds": {
+          "<default Downloads>": "r1",
+          "<launcher folder>": "r2"
+        },
+        "catalog": {
+          "<default Downloads>": {
+            "code": 0,
+            "stderr": "",
+            "listed": ["A", "B"],
+            "roots": {
+              "A": "r1",
+              "B": "r2"
+            }
+          },
+          "<launcher folder>": {
+            "code": 0,
+            "stderr": "",
+            "listed": ["A", "B"],
+            "roots": {
+              "A": "r1",
+              "B": "r2"
+            }
+          }
+        },
+        "reads": {
+          "A": {
+            "reason": "fresh",
+            "listed": ["A", "B"]
+          },
+          "B": {
+            "reason": "fresh",
+            "listed": ["A", "B"]
+          }
+        }
+      },
+      {
+        "discovery": {
+          "A": {
+            "opened": {
+              "code": 0,
+              "stopped": false
+            },
+            "bootstrapTabs": 1,
+            "scanned": ["<default Downloads>", "<launcher folder>"],
+            "foundIn": ["<default Downloads>"],
+            "ownRoot": "<default Downloads>"
+          },
+          "B": {
+            "opened": {
+              "code": 0,
+              "stopped": false
+            },
+            "bootstrapTabs": 1,
+            "scanned": ["<default Downloads>", "<launcher folder>"],
+            "foundIn": ["<launcher folder>"],
+            "ownRoot": "<launcher folder>"
+          }
+        },
+        "rootIds": {
+          "<default Downloads>": "r1",
+          "<launcher folder>": "r2"
+        },
+        "catalog": {
+          "<default Downloads>": {
+            "code": 0,
+            "stderr": "",
+            "listed": ["A", "B"],
+            "roots": {
+              "A": "r1",
+              "B": "r2"
+            }
+          },
+          "<launcher folder>": {
+            "code": 0,
+            "stderr": "",
+            "listed": ["A", "B"],
+            "roots": {
+              "A": "r1",
+              "B": "r2"
+            }
+          }
+        },
+        "reads": {
+          "A": {
+            "reason": "fresh",
+            "listed": ["A", "B"]
+          },
+          "B": {
+            "reason": "fresh",
+            "listed": ["A", "B"]
+          }
+        }
+      },
+      {
+        "discovery": {
+          "A": {
+            "opened": {
+              "code": 0,
+              "stopped": false
+            },
+            "bootstrapTabs": 1,
+            "scanned": ["<default Downloads>", "<launcher folder>"],
+            "foundIn": ["<default Downloads>"],
+            "ownRoot": "<default Downloads>"
+          },
+          "B": {
+            "opened": {
+              "code": 0,
+              "stopped": false
+            },
+            "bootstrapTabs": 1,
+            "scanned": ["<default Downloads>", "<launcher folder>"],
+            "foundIn": ["<launcher folder>"],
+            "ownRoot": "<launcher folder>"
+          }
+        },
+        "rootIds": {
+          "<default Downloads>": "r1",
+          "<launcher folder>": "r2"
+        },
+        "catalog": {
+          "<default Downloads>": {
+            "code": 0,
+            "stderr": "",
+            "listed": ["A", "B"],
+            "roots": {
+              "A": "r1",
+              "B": "r2"
+            }
+          },
+          "<launcher folder>": {
+            "code": 0,
+            "stderr": "",
+            "listed": ["A", "B"],
+            "roots": {
+              "A": "r1",
+              "B": "r2"
+            }
+          }
+        },
+        "reads": {
+          "A": {
+            "reason": "fresh",
+            "listed": ["A", "B"]
+          },
+          "B": {
+            "reason": "fresh",
+            "listed": ["A", "B"]
+          }
+        }
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "E4",
+    "hypothesis": "E4.b.customRoot",
+    "chrome": "Google Chrome 156.0.8078.80",
+    "environment": "host",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "two profiles, OS default and an unrecorded custom folder",
+    "debugger": "none",
+    "observations": [
+      {
+        "discovery": {
+          "A": {
+            "opened": {
+              "code": 0,
+              "stopped": false
+            },
+            "bootstrapTabs": 1,
+            "scanned": ["<default Downloads>"],
+            "foundIn": ["<default Downloads>"],
+            "ownRoot": "<default Downloads>"
+          },
+          "B": {
+            "opened": {
+              "code": 0,
+              "stopped": false
+            },
+            "bootstrapTabs": 1,
+            "scanned": ["<default Downloads>"],
+            "foundIn": [],
+            "ownRoot": "<custom folder>"
+          }
+        },
+        "tokenInCustom": true
+      },
+      {
+        "discovery": {
+          "A": {
+            "opened": {
+              "code": 0,
+              "stopped": false
+            },
+            "bootstrapTabs": 1,
+            "scanned": ["<default Downloads>"],
+            "foundIn": ["<default Downloads>"],
+            "ownRoot": "<default Downloads>"
+          },
+          "B": {
+            "opened": {
+              "code": 0,
+              "stopped": false
+            },
+            "bootstrapTabs": 1,
+            "scanned": ["<default Downloads>"],
+            "foundIn": [],
+            "ownRoot": "<custom folder>"
+          }
+        },
+        "tokenInCustom": true
+      },
+      {
+        "discovery": {
+          "A": {
+            "opened": {
+              "code": 0,
+              "stopped": false
+            },
+            "bootstrapTabs": 1,
+            "scanned": ["<default Downloads>"],
+            "foundIn": ["<default Downloads>"],
+            "ownRoot": "<default Downloads>"
+          },
+          "B": {
+            "opened": {
+              "code": 0,
+              "stopped": false
+            },
+            "bootstrapTabs": 1,
+            "scanned": ["<default Downloads>"],
+            "foundIn": [],
+            "ownRoot": "<custom folder>"
+          }
+        },
+        "tokenInCustom": true
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "fail",
+    "error": "root outside the scanned candidates | root outside the scanned candidates | root outside the scanned candidates",
+    "samples": 3
+  },
+  {
+    "experiment": "E4",
+    "hypothesis": "E4.b.closedProfile",
+    "chrome": "Google Chrome 156.0.8078.80",
+    "environment": "host",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "two profiles, OS default, one quit",
+    "debugger": "none",
+    "observations": [
+      {
+        "afterQuit": {
+          "code": 0,
+          "stderr": "",
+          "listed": ["A", "B"],
+          "roots": {
+            "A": "r1",
+            "B": "r1"
+          }
+        },
+        "afterExpiry": {
+          "code": 0,
+          "stderr": "catalog.sh: skipped r1/B: expired",
+          "listed": ["A"],
+          "roots": {
+            "A": "r1"
+          }
+        },
+        "readByA": {
+          "reason": "fresh",
+          "listed": ["A"]
+        },
+        "expiry": "forced"
+      },
+      {
+        "afterQuit": {
+          "code": 0,
+          "stderr": "",
+          "listed": ["A", "B"],
+          "roots": {
+            "A": "r1",
+            "B": "r1"
+          }
+        },
+        "afterExpiry": {
+          "code": 0,
+          "stderr": "catalog.sh: skipped r1/B: expired",
+          "listed": ["A"],
+          "roots": {
+            "A": "r1"
+          }
+        },
+        "readByA": {
+          "reason": "fresh",
+          "listed": ["A"]
+        },
+        "expiry": "forced"
+      },
+      {
+        "afterQuit": {
+          "code": 0,
+          "stderr": "",
+          "listed": ["A", "B"],
+          "roots": {
+            "A": "r1",
+            "B": "r1"
+          }
+        },
+        "afterExpiry": {
+          "code": 0,
+          "stderr": "catalog.sh: skipped r1/B: expired",
+          "listed": ["A"],
+          "roots": {
+            "A": "r1"
+          }
+        },
+        "readByA": {
+          "reason": "fresh",
+          "listed": ["A"]
+        },
+        "expiry": "forced"
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "E4",
+    "hypothesis": "E4.c.preferences",
+    "chrome": "Google Chrome 156.0.8078.80",
+    "environment": "host",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "one profile on its own folder, one on the OS default where real",
+    "debugger": "none",
+    "observations": [
+      {
+        "json": {
+          "P": "<own folder>"
+        },
+        "native": {
+          "value": "<own folder>"
+        }
+      },
+      {
+        "json": {
+          "P": "<own folder>"
+        },
+        "native": {
+          "value": "<own folder>"
+        }
+      },
+      {
+        "json": {
+          "P": "<own folder>"
+        },
+        "native": {
+          "value": "<own folder>"
+        }
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "E4",
+    "hypothesis": "E4.d.manualPath",
+    "chrome": "Google Chrome 156.0.8078.80",
+    "environment": "host",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "two profiles, two typed folders",
+    "debugger": "none",
+    "verdict": "pass",
+    "samples": 3,
+    "gestures": 0,
+    "steps": [],
+    "observations": [
+      {
+        "rootIds": {
+          "<typed folder A>": "r1",
+          "<typed folder B>": "r2"
+        },
+        "catalog": {
+          "<typed folder A>": {
+            "code": 0,
+            "stderr": "",
+            "listed": ["A", "B"],
+            "roots": {
+              "A": "r1",
+              "B": "r2"
+            }
+          },
+          "<typed folder B>": {
+            "code": 0,
+            "stderr": "",
+            "listed": ["A", "B"],
+            "roots": {
+              "A": "r1",
+              "B": "r2"
+            }
+          }
+        },
+        "reads": {
+          "A": {
+            "reason": "fresh",
+            "listed": ["A", "B"]
+          },
+          "B": {
+            "reason": "fresh",
+            "listed": ["A", "B"]
+          }
+        }
+      },
+      {
+        "rootIds": {
+          "<typed folder A>": "r1",
+          "<typed folder B>": "r2"
+        },
+        "catalog": {
+          "<typed folder A>": {
+            "code": 0,
+            "stderr": "",
+            "listed": ["A", "B"],
+            "roots": {
+              "A": "r1",
+              "B": "r2"
+            }
+          },
+          "<typed folder B>": {
+            "code": 0,
+            "stderr": "",
+            "listed": ["A", "B"],
+            "roots": {
+              "A": "r1",
+              "B": "r2"
+            }
+          }
+        },
+        "reads": {
+          "A": {
+            "reason": "fresh",
+            "listed": ["A", "B"]
+          },
+          "B": {
+            "reason": "fresh",
+            "listed": ["A", "B"]
+          }
+        }
+      },
+      {
+        "rootIds": {
+          "<typed folder A>": "r1",
+          "<typed folder B>": "r2"
+        },
+        "catalog": {
+          "<typed folder A>": {
+            "code": 0,
+            "stderr": "",
+            "listed": ["A", "B"],
+            "roots": {
+              "A": "r1",
+              "B": "r2"
+            }
+          },
+          "<typed folder B>": {
+            "code": 0,
+            "stderr": "",
+            "listed": ["A", "B"],
+            "roots": {
+              "A": "r1",
+              "B": "r2"
+            }
+          }
+        },
+        "reads": {
+          "A": {
+            "reason": "fresh",
+            "listed": ["A", "B"]
+          },
+          "B": {
+            "reason": "fresh",
+            "listed": ["A", "B"]
+          }
+        }
+      }
+    ]
+  }
+]

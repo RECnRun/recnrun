@@ -1,9 +1,12 @@
 import { vi } from "vite-plus/test";
 import { fakeBrowser } from "wxt/testing/fake-browser";
 import { startPeers } from "@/background/peers";
+import type { PeersOptions } from "@/background/peers";
 import type { PeerMessage } from "@/p2p/protocol";
+import { storedRoles } from "@/storage/hierarchy-repository";
 import { authorizedPeersRepository, identityRepository } from "@/storage/peer-repository";
-import { FINGERPRINT, ME, PEER, fakeOffscreen } from "./fake-peer";
+import { FINGERPRINT, ME, PEER, PEER_IDENTITY, fakeOffscreen } from "./fake-peer";
+import { signAs } from "./test-identity";
 
 const manifest = { manifest_version: 3 as const, name: "RECnRun", version: "0.1.0" };
 
@@ -11,11 +14,21 @@ const manifest = { manifest_version: 3 as const, name: "RECnRun", version: "0.1.
 export const tappedFrames = (): string[] =>
   (globalThis as { recnrunPeerFrames?: string[] }).recnrunPeerFrames ?? [];
 
+/** Binds this profile to PEER as its master, as the local channel would once the pair is linked. */
+export const bindToPeer = () =>
+  storedRoles().bind({ profileId: PEER, identity: PEER_IDENTITY, source: "pairing" });
+
 /**
  * The background's peer half over the fake browser and offscreen document, with this profile's
- * identity stored and, unless told otherwise, the peer authorized with FINGERPRINT.
+ * identity stored and, unless told otherwise, the peer authorized with FINGERPRINT and its key.
  */
-export async function peerBackground({ authorized = true } = {}) {
+export async function peerBackground({
+  authorized = true,
+  transport = "folder",
+}: {
+  authorized?: boolean;
+  transport?: PeersOptions["transport"];
+} = {}) {
   vi.spyOn(fakeBrowser.runtime, "getManifest").mockReturnValue(manifest);
   // The fake browser has no tabs.onMoved or tabs.onAttached; these stand in for them.
   const moved: (() => void)[] = [];
@@ -32,8 +45,9 @@ export async function peerBackground({ authorized = true } = {}) {
       profileId: PEER,
       displayName: "Desk",
       fingerprint: FINGERPRINT,
+      identity: PEER_IDENTITY,
     });
-  const routes = startPeers();
+  const routes = startPeers({ transport, sign: signAs });
   // Null stands for a link that reported no certificate.
   const connect = (remoteFingerprint: string | null = FINGERPRINT, peer = PEER) =>
     routes.link({

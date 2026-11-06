@@ -2,11 +2,18 @@
   // The Oxc Zed extension requires a direct oxfmt dependency to find its LSP executable.
   // dependency-cruiser loads @swc/core by name for its "swc" parser.
   "ignoreDependencies": ["oxfmt", "@swc/core"],
+  // iproute2 tools of the test image; tests/browser/no-egress.spec.ts reads the route and the tc drop counter.
+  // mkfifo (coreutils, and macOS) holds catalog.sh's lock in scripts/poc-cross-profile/catalog-guards.checks.mjs.
+  "ignoreBinaries": ["ip", "tc", "mkfifo", "shellcheck", "readlink", "plutil", "systemd-analyze"],
   "workspaces": {
     ".": {
+      // scripts/test-host.mjs names playwright.host.config.ts, which no package script does.
+      "playwright": { "config": ["playwright*.config.ts"] },
       "entry": [
         "scripts/agent-hooks/*.mjs",
         "scripts/git-hooks/*.mjs",
+        "scripts/*.checks.mjs",
+        "scripts/poc-cross-profile/*.checks.mjs",
         "tests/container/*.checks.mjs",
       ],
     },

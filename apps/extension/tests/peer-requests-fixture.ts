@@ -8,6 +8,7 @@ import {
   FINGERPRINT,
   ME,
   PEER,
+  PEER_IDENTITY,
   STRANGER,
   fromPeer,
   memoryRecords,
@@ -20,12 +21,14 @@ export const peer: AuthorizedPeer = {
   profileId: PEER,
   displayName: "Desk",
   fingerprint: FINGERPRINT,
+  identity: PEER_IDENTITY,
 };
 /** A second paired profile. */
 export const other: AuthorizedPeer = {
   profileId: STRANGER,
   displayName: "Studio",
   fingerprint: "12:34:56",
+  identity: PEER_IDENTITY,
 };
 export const VERIFIED: PeerLink = { state: "connected", verified: true };
 export const TAB = {

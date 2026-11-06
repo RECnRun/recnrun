@@ -1,0 +1,68 @@
+[
+  {
+    "experiment": "P4.3",
+    "hypothesis": "P4.3.open.fresh",
+    "chrome": "Google Chrome 156.0.8078.80",
+    "environment": "host",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "one registered profile, closed: open.sh starts Chrome and gets the ack",
+    "debugger": "none",
+    "observations": [
+      {
+        "fresh": {
+          "code": 0,
+          "root": "<root>/downloads",
+          "boot": "9d607ab4-757e-4813-82a7-54b03389da00",
+          "token": "9d607ab4-757e-4813-82a7-54b03389da00",
+          "pid": 72889,
+          "ms": 1104
+        }
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "mode": "smoke",
+    "verdict": "pass",
+    "samples": 1
+  },
+  {
+    "experiment": "P4.3",
+    "hypothesis": "P4.3.open.running",
+    "chrome": "Google Chrome 156.0.8078.80",
+    "environment": "host",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "one registered profile, running: a second open.sh meets its boot",
+    "debugger": "none",
+    "verdict": "pass",
+    "samples": 1,
+    "gestures": 0,
+    "steps": [],
+    "observations": [
+      {
+        "fresh": {
+          "code": 0,
+          "root": "<root>/downloads",
+          "boot": "6af2c39e-b331-4683-8a60-0495b660412d",
+          "token": "6af2c39e-b331-4683-8a60-0495b660412d",
+          "pid": 73505,
+          "ms": 1141
+        },
+        "running": {
+          "code": 0,
+          "root": "<root>/downloads",
+          "boot": "6af2c39e-b331-4683-8a60-0495b660412d",
+          "token": "ba46d12c-2ee5-4e14-947a-3a3486f1e2d6",
+          "pid": 73656,
+          "ms": 1117
+        }
+      }
+    ],
+    "mode": "smoke"
+  }
+]

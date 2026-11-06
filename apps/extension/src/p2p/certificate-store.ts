@@ -1,8 +1,8 @@
-import { readStored, writeStored } from "@/p2p/p2p-database";
+import { deleteStored, readStored, writeStored } from "@/p2p/p2p-database";
 
 const STORE = "certificates";
 const KEY = "link";
-/** Renewed a day before Chrome would refuse it; a new certificate needs a new pairing. */
+/** Renewed a day before Chrome would refuse it; peers follow it by the identity key's statement. */
 const MARGIN_MS = 24 * 60 * 60 * 1000;
 
 /**
@@ -18,8 +18,24 @@ export async function persistentCertificate(now = Date.now()): Promise<RTCCertif
   return created;
 }
 
+/** Stores `certificate` as this profile's, for the next document that starts to load (P3.3 lab). */
+export const storeCertificate = (certificate: RTCCertificate): Promise<void> =>
+  writeStored(STORE, KEY, certificate);
+
+/**
+ * Forgets this profile's certificate, so the next document makes its own: a template holds none,
+ * and a clone must never present its base's (P5.3).
+ */
+export const discardCertificate = (): Promise<void> => deleteStored(STORE, KEY);
+
 /** The certificate's SHA-256 fingerprint, written as an SDP writes it. */
 export function certificateFingerprint(certificate: RTCCertificate): string | undefined {
   const sha = certificate.getFingerprints().find(({ algorithm }) => algorithm === "sha-256");
   return sha?.value?.toUpperCase();
+}
+
+/** The fingerprint of this profile's stored certificate, if it has one; it never creates one. */
+export async function storedFingerprint(): Promise<string | null> {
+  const stored = await readStored(STORE, KEY);
+  return (stored instanceof RTCCertificate && certificateFingerprint(stored)) || null;
 }

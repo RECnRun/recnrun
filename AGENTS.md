@@ -7,7 +7,7 @@ RECnRun records and replays browser sessions for developers. The extension store
 - `packages/domain`: `@recnrun/domain`, Valibot schemas and types for Recording and the stored Snapshot.
 - `packages/bridge`: `@recnrun/bridge`, the versioned `window.postMessage` protocol between the website and the extension's content script.
 - `packages/brand`: `@recnrun/brand`, the Mona Sans font and the stylesheets both apps import.
-- `tests/`: Playwright end-to-end tests (`tests/e2e`) and Docker runner checks (`tests/container`).
+- `tests/`: Playwright end-to-end tests (`tests/e2e`), the POC lab on Google Chrome Stable (`tests/browser`, its experiments in `tests/experiments`, and their harness unit tests in `tests/*.test.ts`), and Docker runner checks (`tests/container`).
 
 Durable decisions live in `docs/`:
 
@@ -17,6 +17,7 @@ Durable decisions live in `docs/`:
 - [BRAND.md](docs/BRAND.md): logo, palette, contrast, typography, and CSS tokens.
 - [POCS.md](docs/POCS.md): proofs of concept behind architecture decisions, and what they found.
 - [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md): problems that took investigation, their causes, and their solutions.
+- [poc/downloads-launcher/PLAN.md](docs/poc/downloads-launcher/PLAN.md): the plan of the Downloads rendezvous, native launcher, headless, and cloning POC, with its [CHECKLIST.md](docs/poc/downloads-launcher/CHECKLIST.md) (progress and resume protocol) and [MANUAL_VALIDATION.md](docs/poc/downloads-launcher/MANUAL_VALIDATION.md) (checks that need a person).
 
 Update the relevant doc when a change alters what it describes.
 
@@ -24,22 +25,30 @@ Update the relevant doc when a change alters what it describes.
 
 Vite+ (`vp`) is the only toolchain. `vp <name>` runs a built-in command and `vp run <name>` runs a `package.json` script or `vite.config.ts` task, so they can differ: `vp test` is plain Vitest, while `vp run test` is the project suite. Vite+ docs are in `node_modules/vite-plus/docs`. Run `vp env doctor` when setup or package-manager behavior looks wrong.
 
-| Command                                                    | Purpose                                                              |
-| ---------------------------------------------------------- | -------------------------------------------------------------------- |
-| `vp install`                                               | After pulling, before starting work                                  |
-| `vp run dev`                                               | Website (port 5173) and extension dev build in Chrome, together      |
-| `vp run dev:website`, `vp run dev:extension`               | One of them alone; the extension's Chrome keeps a persistent profile |
-| `vp run clean`                                             | Delete builds, artifacts, caches, and the dev Chrome profile         |
-| `vp check` (`--fix` to format)                             | Format (Oxfmt), lint (Oxlint), and type check while editing          |
-| `vp run deps`                                              | Architecture boundaries (dependency-cruiser)                         |
-| `vp run test:unit`, `test:components`, `test:e2e`          | One test layer: Node, Vitest Browser Mode, Playwright with extension |
-| `vp run test`                                              | All three layers                                                     |
-| `vp run test:coverage`                                     | Coverage with thresholds                                             |
-| `vp run dead-code`, `vp run duplication`                   | Knip; jscpd                                                          |
-| `vp run test:e2e -- tests/e2e/dashboard-tab.spec.ts -g ''` | Targeted Playwright run (arguments go after `--`)                    |
-| `vp run verify`                                            | Full gate (`vp run ready` is an alias)                               |
+| Command                                           | Purpose                                                                 |
+| ------------------------------------------------- | ----------------------------------------------------------------------- |
+| `vp install`                                      | After pulling, before starting work                                     |
+| `vp run dev`                                      | Website (port 5173) and extension dev build in Chrome, together         |
+| `vp run dev:website`, `vp run dev:extension`      | One of them alone; the extension's Chrome keeps a persistent profile    |
+| `vp run clean`                                    | Delete builds, artifacts, caches, and the dev Chrome profile            |
+| `vp check` (`--fix` to format)                    | Format (Oxfmt), lint (Oxlint), and type check while editing             |
+| `vp run deps`                                     | Architecture boundaries (dependency-cruiser)                            |
+| `vp run test:unit`, `test:components`, `test:e2e` | One test layer: Node, Vitest Browser Mode, Playwright with extension    |
+| `vp run test:browser`                             | Google Chrome Stable in Docker: install methods, the mesh               |
+| `vp run test:experiments`                         | POC hypotheses that write verdicts under `.artifacts/evidence/`         |
+| `vp run test:headless`                            | Chrome Stable `--headless` in Docker, launcher-started; smoke in verify |
+| `vp run test:host -- <spec>`                      | Host only: the Mac's Google Chrome; needs `RECNRUN_HOST_ROOTS`          |
+| `vp run test:scripts`                             | Launcher shell checks in Docker: dash, ShellCheck, package scan         |
+| `vp run test:host -- scripts`                     | The same checks on the Mac: macOS `/bin/sh`, ShellCheck if installed    |
+| `vp run test`                                     | All five layers                                                         |
 
-Test commands and `verify` run in Docker, so start Docker Desktop first. If Docker fails, the command fails; it never falls back to host browsers. `:local` variants (`vp run test:e2e:local`) and the built-in `vp test` run on the host and are for debugging only. Logs and failure artifacts are in `.artifacts/docker/<run-id>/`.
+| `vp run test:coverage` | Coverage with thresholds |
+| `vp run dead-code`, `vp run duplication` | Knip; jscpd |
+| `vp run docs:check` | Relative Markdown links and anchors resolve |
+| `vp run test:e2e -- tests/e2e/dashboard-tab.spec.ts -g ''` | Targeted Playwright run (arguments go after `--`) |
+| `vp run verify` | Full gate (`vp run ready` is an alias) |
+
+Test commands and `verify` run in Docker, on an internal Docker network with no route out, and each container filters its own egress to `lo`, so start Docker Desktop first. If Docker fails, the command fails; it never falls back to host browsers. `:local` variants (`vp run test:e2e:local`) and the built-in `vp test` run on the host and are for debugging only. Logs and failure artifacts are in `.artifacts/docker/<run-id>/`.
 
 ## Rules
 
@@ -64,13 +73,15 @@ Test commands and `verify` run in Docker, so start Docker Desktop first. If Dock
   - check, and lint with warnings as errors;
   - architecture boundaries;
   - all test layers;
-  - container and hook checks;
+  - container, hook, and script checks;
   - coverage (at least 90% lines, statements, and functions; 85% branches overall, and at least 80% lines, statements, and functions; 75% branches in every file that has executable code), and a check that the measured files are every `.ts`/`.tsx` under `apps/*/src` and `packages/*/src` except tests, the entrypoints, and `main.tsx`;
   - Knip and jscpd (at most 4% duplication);
+  - `docs:check` (every relative Markdown link and anchor resolves);
   - workspace builds and the production manifest guard.
 - When a gate fails, fix the cause. Never lower thresholds, delete or skip tests, exclude code from analysis, add `@ts-ignore`/`@ts-nocheck`, disable lint rules, or loosen `.dependency-cruiser.cjs` to pass.
 - An architecture change (a new layer, package, or allowed dependency) updates `docs/ARCHITECTURE.md` and `.dependency-cruiser.cjs` in the same change, with the reason.
 - Never bypass Git hooks: no `--no-verify`/`-n`, `VP_GIT_HOOKS=0`, `HUSKY=0`, `core.hooksPath` changes, or `vp hooks disable`. Agent hooks in `scripts/agent-hooks/` deny these and run `vp check` and `vp run deps` when you stop (after three consecutive failures they let you stop with a warning; Git hooks still gate the commit).
+- The pre-push hook (`scripts/git-hooks/pre-push.mjs`) requires every commit the push sends to be verified: a `vp run verify` that exits 0 with a clean working tree before and after writes `.artifacts/verified/<HEAD sha>`. The hook reads the pushed commits from Git's stdin; one with a marker is skipped, the clean HEAD without one runs `vp run verify` now, and any other commit (one that is not HEAD, or HEAD with a dirty tree, untracked files included) fails the push until verify passes on that commit. A delete push needs nothing. This is the hook's own cache, not a bypass.
 - Keep TypeScript strict and prefer `unknown` with narrowing over `any`. Lint caps `complexity` at 10, `sonarjs/cognitive-complexity` at 15, nesting depth at 3, functions at 50 lines and 15 statements (150 lines and 30 statements in tests), files at 300 lines, and parameters at 4; it rejects identical functions, a string literal repeated three times in `apps/*/src` or `packages/*/src`, and conditions the types already decide (`typescript/no-unnecessary-condition`), and requires `vite-plus` imports over `vite`/`vitest`.
 - In app source and tests, import from `src` through the `@/` alias, never with `../` paths (lint rejects them). `./` imports are fine.
 - Validate every message and stored value with the `@recnrun/domain` or `@recnrun/bridge` schemas at the boundary where it enters; the content script never touches storage.

@@ -1,9 +1,10 @@
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { createWriteStream } from "node:fs";
-import { mkdir, readFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { cleanHead, recordVerified } from "./verified-commit.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url)).replace(/\/$/, "");
 const [task, ...forwarded] = process.argv.slice(2);
@@ -14,8 +15,14 @@ const tasks = new Set([
   "test:unit:local",
   "test:components:local",
   "test:e2e:local",
+  "test:browser:local",
+  "test:experiments:local",
+  "test:headless:local",
   "test:coverage:local",
+  "test:scripts:local",
 ]);
+// An internal bridge keeps eth0 for WebRTC host candidates and routes nothing out (POC P1.0).
+const network = "recnrun-tests";
 const runId = `${new Date().toISOString().replaceAll(":", "-")}-${randomUUID()}`;
 const artifacts = resolve(
   process.env.RECNRUN_TEST_ARTIFACTS ?? join(root, ".artifacts/docker"),
@@ -23,6 +30,7 @@ const artifacts = resolve(
 );
 const container = `recnrun-tests-${randomUUID()}`;
 let log;
+let image;
 let activeChild;
 let created = false;
 let interrupted = 0;
@@ -88,19 +96,67 @@ async function buildImage() {
   return { code: 0, stdout: (await readFile(imageFile, "utf8")).trim() };
 }
 
-async function startTests(image) {
-  const environment = ["CI", "DEBUG", "FORCE_COLOR"].flatMap((key) =>
+function containerEnvironment() {
+  const forwarded = ["CI", "DEBUG", "FORCE_COLOR", "RECNRUN_EXPERIMENT_SAMPLES"];
+  const environment = forwarded.flatMap((key) =>
     process.env[key] === undefined ? [] : ["--env", `${key}=${process.env[key]}`],
   );
+  // The gate checks that every experiment still runs; evidence comes from test:experiments in full.
+  if (task === "verify:local" && process.env.RECNRUN_EXPERIMENT_SAMPLES === undefined) {
+    environment.push("--env", "RECNRUN_EXPERIMENT_SAMPLES=smoke");
+  }
+  // Fixtures that write system files (the managed policy) require this marker of the container.
+  environment.push("--env", "RECNRUN_TEST_CONTAINER=1");
+  // Experiments name their evidence directory after the run (tests/experiments/verdicts.ts).
+  environment.push("--env", `RECNRUN_RUN_ID=${runId}`);
+  return environment;
+}
+
+async function isInternalNetwork() {
+  const inspected = await docker(["network", "inspect", "--format", "{{.Internal}}", network], {
+    quiet: true,
+  });
+  return inspected.code === 0 ? inspected.stdout === "true" : undefined;
+}
+
+/** Creates the shared network once; it stays for concurrent runs, so cleanup never removes it. */
+async function ensureNetwork() {
+  let internal = await isInternalNetwork();
+  if (internal === undefined) {
+    // A concurrent run may create it first; the second inspect settles the race.
+    await docker(["network", "create", "--internal", network], { quiet: true });
+    internal = await isInternalNetwork();
+  }
+  if (internal) return 0;
+  message(
+    internal === undefined
+      ? `Could not create the Docker network ${network}.`
+      : `The Docker network ${network} routes out; remove it with \`docker network rm ${network}\`.`,
+  );
+  return 1;
+}
+
+// The full gates yield the CPU under contention, so a pre-commit unit run beside them stays short.
+const yielding = new Set(["verify:local", "test:local"]);
+
+async function startTests() {
+  const environment = containerEnvironment();
+
   const result = await docker(
     [
       "create",
       "--init",
       "--shm-size=2g",
+      ...(yielding.has(task) ? ["--cpu-shares=256"] : []),
       "--name",
       container,
       "--label",
       "com.recnrun.tests=true",
+      "--network",
+      network,
+      // The image's entry adds the on-link default route WebRTC needs (test-container-entry.sh).
+      "--cap-add",
+      "NET_ADMIN",
       ...environment,
       image,
       task,
@@ -125,9 +181,15 @@ async function startTests(image) {
 
 async function collectArtifacts() {
   let code = 0;
-  for (const directory of ["coverage", "test-results", "playwright-report"]) {
+  const directories = [
+    ["coverage", "coverage"],
+    ["test-results", "test-results"],
+    ["playwright-report", "playwright-report"],
+    [".artifacts/evidence", "evidence"],
+  ];
+  for (const [directory, exported] of directories) {
     try {
-      const destination = join(artifacts, directory);
+      const destination = join(artifacts, exported);
       await mkdir(destination, { recursive: true });
       const result = await docker(["cp", `${container}:/workspace/${directory}/.`, destination], {
         quiet: true,
@@ -138,18 +200,45 @@ async function collectArtifacts() {
       code = 1;
     }
   }
-  return code;
+  const versions = await collectVersions();
+  return code || versions;
+}
+
+async function collectVersions() {
+  const destination = join(artifacts, "versions.json");
+  try {
+    const result = await docker(["cp", `${container}:/opt/recnrun/versions.json`, destination], {
+      quiet: true,
+    });
+    if (result.code !== 0) throw new Error(`docker cp exited ${result.code}`);
+    const versions = JSON.parse(await readFile(destination, "utf8"));
+    await writeFile(destination, `${JSON.stringify({ ...versions, image }, null, 2)}\n`);
+    return 0;
+  } catch (error) {
+    message(`Could not export the image's versions.json: ${error.message}`);
+    return 1;
+  }
 }
 
 async function executeTests() {
   const available = await requireDocker();
   if (available !== 0 || interrupted) return available || interrupted;
-  const image = await buildImage();
-  if (image.code !== 0 || interrupted) return image.code || interrupted;
-  return startTests(image.stdout);
+  const built = await buildImage();
+  if (built.code !== 0 || interrupted) return built.code || interrupted;
+  image = built.stdout;
+  const networked = await ensureNetwork();
+  if (networked !== 0 || interrupted) return networked || interrupted;
+  return startTests();
 }
 
-async function finish(code) {
+// The pre-push hook skips verify for a commit whose full, unmodified verify passed on a clean tree.
+async function recordPass(before) {
+  if (process.exitCode !== 0 || task !== "verify:local" || args.length) return;
+  const marker = await recordVerified(root, before, runId);
+  if (marker) message(`Verify passed on clean commit ${before}: ${marker}`);
+}
+
+async function finish(code, before) {
   await stopping;
   if (created) {
     const exported = await collectArtifacts();
@@ -158,13 +247,23 @@ async function finish(code) {
     code ||= exported || removed.code;
   }
   process.exitCode = interrupted || code;
+  await recordPass(before);
   process.removeListener("SIGINT", interrupt);
   process.removeListener("SIGTERM", interrupt);
   await new Promise((done) => log.end(done));
 }
 
+// POC PLAN.md P0.5: the host layer drives the installed Google Chrome of the Mac on purpose.
+const hostTasks = new Set(["test:host", "test:host:local"]);
+
 async function run() {
+  if (hostTasks.has(task)) {
+    throw new Error(
+      "test:host runs Google Chrome on the macOS host and never in Docker; run `vp run test:host` with RECNRUN_HOST_ROOTS set.",
+    );
+  }
   if (!tasks.has(task)) throw new Error(`Unknown container test task: ${task}`);
+  const before = task === "verify:local" ? cleanHead(root) : undefined;
   if (process.env.RECNRUN_TEST_CONTAINER === "1") {
     throw new Error("Use the :local test tasks inside the test container.");
   }
@@ -177,7 +276,7 @@ async function run() {
     message(`Running ${task} in Docker. Artifacts: ${artifacts}`);
     code = await executeTests();
   } finally {
-    await finish(code);
+    await finish(code, before);
   }
 }
 

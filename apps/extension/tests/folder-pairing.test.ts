@@ -1,63 +1,22 @@
-import { describe, expect, test, vi } from "vite-plus/test";
-import { createFolderPairing, decideFolderSteps } from "@/background/folder-pairing";
-import type { LinkCommand } from "@/messaging/peer-messages";
-import type { Presence, Seen, SignalFile } from "@/p2p/folder-rendezvous";
-import { PAIRING_TTL_MS, encodePairing } from "@/p2p/pairing-code";
-import type { FolderActed, FolderPairing, PeerLink, PendingOffer } from "@/storage/peer-repository";
-import { ME, PEER, STRANGER, memoryRecords, memoryRepository } from "./fake-peer";
-
-const NOW = 1_700_000_000_000;
-const OFFER_ID = "44444444-4444-4444-8444-444444444444";
-const OTHER_ID = "55555555-5555-4555-8555-555555555555";
-const FINGERPRINTS: Record<string, string> = {
-  [ME]: "11:11",
-  [PEER]: "22:22",
-  [STRANGER]: "33:33",
-};
-
-const presence = (profileId: string, createdAt = NOW - 1000): Presence => ({
-  profileId,
-  displayName: `Profile ${profileId.slice(0, 1)}`,
-  fingerprint: FINGERPRINTS[profileId] ?? "",
-  createdAt,
-  expiresAt: NOW + 60_000,
-});
-
-interface SignalOptions {
-  pairingId?: string;
-  fingerprint?: string;
-  codeFrom?: string;
-  expiresAt?: number;
-}
-
-/** A signal `from` made for `to`, whose code announces `from`'s certificate unless told otherwise. */
-function signal(kind: SignalFile["kind"], from: string, to: string, options: SignalOptions = {}) {
-  const { pairingId = OFFER_ID, codeFrom = from, expiresAt = NOW + PAIRING_TTL_MS } = options;
-  const fingerprint = options.fingerprint ?? FINGERPRINTS[from] ?? "";
-  const code = encodePairing({
-    kind,
-    pairingId,
-    profileId: codeFrom,
-    displayName: "Profile",
-    expiresAt,
-    sdp: `v=0\r\na=fingerprint:sha-256 ${fingerprint}\r\n`,
-  });
-  return { kind, pairingId, profileId: from, to, expiresAt, code } satisfies SignalFile;
-}
-
-const seen = (presences: Presence[], signals: SignalFile[] = []): Seen => ({ presences, signals });
-const pendingFor = (to: string, expiresAt = NOW + 1000): PendingOffer => ({
-  pairingId: OFFER_ID,
-  expiresAt,
-  to,
-  code: "offer-code",
-});
+import { describe, expect, test } from "vite-plus/test";
+import { decideFolderSteps } from "@/background/folder-pairing";
+import type { Seen } from "@/p2p/folder-rendezvous";
+import { PAIRING_TTL_MS } from "@/p2p/pairing-code";
+import type { Pin } from "@/p2p/pins";
+import type { AnsweredOffers } from "@/storage/answered-repository";
+import type { FolderActed, PendingOffer } from "@/storage/peer-repository";
+import { ME, PEER, STRANGER } from "./fake-peer";
+import { folderPairing } from "./folder-fakes";
+import { NOW, OFFER_ID, OTHER_ID, pendingFor, presence, seen, signal } from "./folder-sightings";
+import type { SignalOptions } from "./folder-sightings";
+import { identityOf, signAs } from "./test-identity";
 const situation = (me: string, sighting: Seen) => ({
   me,
   seen: sighting,
   skip: [] as string[],
   pending: {} as Record<string, PendingOffer>,
   acted: {} as Record<string, FolderActed>,
+  answered: {} as Record<string, AnsweredOffers>,
   now: NOW,
 });
 
@@ -87,6 +46,14 @@ describe("decideFolderSteps", () => {
     const answer = signal("answer", PEER, ME);
     const answered = { ...waiting, seen: seen([presence(PEER)], [answer]) };
     expect(decideFolderSteps(answered)).toEqual([{ type: "connect", answer }]);
+  });
+
+  test("offers again once its offer went unanswered for a retry period, as a restarted answerer leaves it", () => {
+    const madeAgo = (ms: number) => ({ [PEER]: pendingFor(PEER, NOW - ms + PAIRING_TTL_MS) });
+    const waiting = { ...situation(ME, seen([presence(PEER)])), pending: madeAgo(29_999) };
+    expect(decideFolderSteps(waiting)).toEqual([]);
+    const unanswered = { ...waiting, pending: madeAgo(30_000) };
+    expect(decideFolderSteps(unanswered)).toEqual([{ type: "offer", to: presence(PEER) }]);
   });
 
   test("offers again when its offer expired, and an offer to another profile does not count", () => {
@@ -125,6 +92,25 @@ describe("decideFolderSteps", () => {
     expect(decideFolderSteps(again)).toEqual([{ type: "answer", offer: newer }]);
   });
 
+  test("leaves an offer it answered before the browser relaunched", () => {
+    const offer = signal("offer", PEER, STRANGER);
+    const answered = { [PEER]: [{ pairingId: OFFER_ID, expiresAt: offer.expiresAt }] };
+    const relaunched = { ...situation(STRANGER, seen([presence(PEER)], [offer])), answered };
+    expect(decideFolderSteps(relaunched)).toEqual([]);
+  });
+
+  test("leaves an offer whose answer of its own it finds on disk, though it kept no record", () => {
+    const offer = signal("offer", PEER, STRANGER);
+    const mine = signal("answer", STRANGER, PEER);
+    expect(decideFolderSteps(situation(STRANGER, seen([presence(PEER)], [offer, mine])))).toEqual(
+      [],
+    );
+    const other = signal("answer", STRANGER, PEER, { pairingId: OTHER_ID });
+    expect(decideFolderSteps(situation(STRANGER, seen([presence(PEER)], [offer, other])))).toEqual([
+      { type: "answer", offer },
+    ]);
+  });
+
   test("gives the link time after connecting before it offers again", () => {
     const sighting = seen([presence(PEER)]);
     const acted = { [PEER]: { pairingId: OFFER_ID, at: NOW - 29_999 } };
@@ -159,47 +145,6 @@ describe("decideFolderSteps", () => {
   });
 });
 
-/** The background's folder pairing over fakes, as profile `me`, whose link is idle. */
-function folderPairing(
-  initial: FolderPairing | null = {},
-  me = ME,
-  initialActed: Record<string, FolderActed> = {},
-) {
-  const commands: LinkCommand[] = [];
-  const askLink = vi.fn(async (command: LinkCommand) => void commands.push(command));
-  const pending = memoryRecords<PendingOffer>();
-  const offer = signal("offer", me, PEER);
-  const answer = signal("answer", me, PEER);
-  const pairing = {
-    createOffer: vi.fn(async (to: string) => {
-      await pending.set(to, {
-        pairingId: OFFER_ID,
-        expiresAt: NOW + PAIRING_TTL_MS,
-        to,
-        code: offer.code,
-      });
-      return { code: offer.code };
-    }),
-    accept: vi.fn(async (_code: string): Promise<{ code?: string }> => ({ code: answer.code })),
-  };
-  const state = memoryRepository<FolderPairing>(initial);
-  const acted = memoryRecords<FolderActed>(initialActed);
-  const link = memoryRecords<PeerLink>();
-  const log = vi.fn();
-  const flow = createFolderPairing({
-    askLink,
-    identity: async () => ({ profileId: me, displayName: "Laptop" }),
-    pairing,
-    pending,
-    link,
-    acted,
-    state,
-    log,
-    now: () => NOW,
-  });
-  return { flow, commands, pairing, state, acted, link, pending, log, offer, answer };
-}
-
 describe("createFolderPairing", () => {
   test("starts and resumes waiting in the folder as this profile", async () => {
     const { flow, commands, state } = folderPairing(null);
@@ -221,6 +166,46 @@ describe("createFolderPairing", () => {
     expect(commands).toEqual([{ type: "folder-publish", signal: offer }]);
   });
 
+  const pin = async (identity: string): Promise<Pin> => ({
+    fingerprint: "EE:EE",
+    pinnedAt: 1,
+    source: "local-channel",
+    identity: await identityOf(identity),
+  });
+
+  test("offers nothing to a presence another key signed for a pinned profile", async () => {
+    const { flow, commands, pairing, pinned, log } = folderPairing();
+    await pinned.set(PEER, await pin("forger"));
+    await flow.seen(seen([presence(PEER)]));
+    expect(pairing.createOffer).not.toHaveBeenCalled();
+    expect(commands).toEqual([]);
+    expect(log.mock.calls).toEqual([
+      [
+        `folder pairing: no offer to ${PEER}: its certificate is signed by another identity than the one pinned`,
+      ],
+    ]);
+  });
+
+  test("offers nothing to a presence no valid statement vouches for", async () => {
+    const { flow, pairing, log } = folderPairing();
+    const unsigned = {
+      ...presence(PEER),
+      identity: await signAs({ profileId: PEER, fingerprint: "99:99" }),
+    };
+    await flow.seen(seen([unsigned]));
+    expect(pairing.createOffer).not.toHaveBeenCalled();
+    expect(log.mock.calls).toEqual([
+      [`folder pairing: no offer to ${PEER}: no valid signature names its certificate`],
+    ]);
+  });
+
+  test("offers to a renewed certificate's presence that the pinned key signed", async () => {
+    const { flow, pairing, pinned } = folderPairing();
+    await pinned.set(PEER, await pin(PEER));
+    await flow.seen(seen([presence(PEER)]));
+    expect(pairing.createOffer).toHaveBeenCalledWith(PEER);
+  });
+
   test("answers an offer, publishing the answer for the offerer", async () => {
     const { flow, commands, pairing, acted, answer } = folderPairing({}, STRANGER);
     const made = signal("offer", PEER, STRANGER);
@@ -228,6 +213,31 @@ describe("createFolderPairing", () => {
     expect(pairing.accept).toHaveBeenCalledWith(made.code);
     expect(commands).toEqual([{ type: "folder-publish", signal: answer }]);
     expect(await acted.all()).toEqual({ [PEER]: { pairingId: OFFER_ID, at: NOW } });
+  });
+
+  test("remembers an answer past a relaunch until its offer expires, forgetting expired ones", async () => {
+    const { flow, pairing, answered } = folderPairing({}, STRANGER);
+    await answered.set(ME, [{ pairingId: OTHER_ID, expiresAt: NOW }]);
+    const made = signal("offer", PEER, STRANGER);
+    await flow.seen(seen([presence(PEER)], [made]));
+    expect(await answered.all()).toEqual({
+      [PEER]: [{ pairingId: OFFER_ID, expiresAt: made.expiresAt }],
+    });
+    // A relaunch keeps local storage and nothing else.
+    const relaunched = folderPairing({}, STRANGER);
+    await relaunched.answered.set(PEER, [{ pairingId: OFFER_ID, expiresAt: made.expiresAt }]);
+    await relaunched.flow.seen(seen([presence(PEER)], [made]));
+    expect(relaunched.pairing.accept).not.toHaveBeenCalled();
+    expect(pairing.accept).toHaveBeenCalledOnce();
+  });
+
+  test("keeps no answer it could not publish, so a relaunch answers that offer", async () => {
+    const { flow, askLink, answered, log } = folderPairing({}, STRANGER);
+    // As a browser quitting before the answer reached the disk.
+    askLink.mockRejectedValueOnce(new Error("Quit."));
+    await flow.seen(seen([presence(PEER)], [signal("offer", PEER, STRANGER)]));
+    expect(log).toHaveBeenCalledWith("folder pairing: Quit.");
+    expect(await answered.all()).toEqual({});
   });
 
   test("connects with the answer to its offer", async () => {
@@ -293,5 +303,25 @@ describe("createFolderPairing", () => {
     await flow.seen(seen([presence(PEER), presence(STRANGER)]));
     expect(log).toHaveBeenCalledWith("folder pairing: No link.");
     expect(pairing.createOffer.mock.calls).toEqual([[PEER], [STRANGER]]);
+  });
+});
+
+describe("the offers answered before a relaunch", () => {
+  test("leaves a still-valid earlier offer alone after answering a later one and relaunching", async () => {
+    const first = folderPairing({}, STRANGER);
+    const a = signal("offer", PEER, STRANGER);
+    const b = signal("offer", PEER, STRANGER, { pairingId: OTHER_ID });
+    await first.flow.seen(seen([presence(PEER)], [a]));
+    await first.flow.seen(seen([presence(PEER)], [b]));
+    expect(first.pairing.accept).toHaveBeenCalledTimes(2);
+    // A relaunch keeps local storage and nothing else.
+    const relaunched = folderPairing({}, STRANGER);
+    for (const [peer, kept] of Object.entries(await first.answered.all()))
+      await relaunched.answered.set(peer, kept);
+    // Only the answer to B is on disk, so only the record can say A was answered.
+    await relaunched.flow.seen(
+      seen([presence(PEER)], [a, signal("answer", STRANGER, PEER, { pairingId: OTHER_ID })]),
+    );
+    expect(relaunched.pairing.accept).not.toHaveBeenCalled();
   });
 });

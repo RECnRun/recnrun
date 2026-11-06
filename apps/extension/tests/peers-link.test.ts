@@ -11,8 +11,18 @@ import {
   pendingOffersRepository,
   remoteRecordingsRepository,
 } from "@/storage/peer-repository";
-import { FINGERPRINT, ME, PEER, STRANGER, fromPeer } from "./fake-peer";
+import {
+  FINGERPRINT,
+  ME,
+  PEER,
+  PEER_HELLO,
+  PEER_IDENTITY,
+  PEER_STATEMENT,
+  STRANGER,
+  fromPeer,
+} from "./fake-peer";
 import { peerBackground, tappedFrames } from "./peer-background";
+import { signAs } from "./test-identity";
 
 const session = { tabId: 4, status: "recording" as const, banked: 0, since: 1 };
 const MISMATCH = { state: "failed", verified: false, reason: "certificate" };
@@ -197,14 +207,14 @@ describe("the peer's tabs", () => {
     await receive(fromPeer("TABS_CHANGED", { tabs: [tab], currentId: 3 }));
     await routes.link({ type: "state", peer: PEER, state: "disconnected" });
     // A worker that slept starts again with nothing in memory and the same storage.
-    const woken = startPeers();
+    const woken = startPeers({ transport: "folder", sign: signAs });
     expect(await woken.request({ type: "tabs", peer: PEER })).toEqual({
       tabs: [tab],
       currentId: 3,
     });
     // A new link starts from the peer's next report.
     await connect();
-    await receive(fromPeer("HELLO", { displayName: "Desk", extensionVersion: "0.1.0" }));
+    await receive(fromPeer("HELLO", PEER_HELLO));
     expect(await fakeBrowser.storage.session.get("peerTabs")).toEqual({ peerTabs: {} });
   });
 });
@@ -228,6 +238,7 @@ describe("the folder", () => {
     profileId: PEER,
     displayName: "Desk",
     fingerprint: FINGERPRINT,
+    identity: PEER_STATEMENT,
     createdAt: 1,
     expiresAt: Date.now() + 60_000,
   };
@@ -296,7 +307,13 @@ describe("the folder", () => {
     await routes.link(sighting);
     expect(link.commands).toContainEqual({ type: "offer", peer: PEER });
     const { displayName, fingerprint } = presence;
-    await authorizedPeersRepository.set(PEER, { profileId: PEER, displayName, fingerprint });
+    const identity = PEER_IDENTITY;
+    await authorizedPeersRepository.set(PEER, {
+      profileId: PEER,
+      displayName,
+      fingerprint,
+      identity,
+    });
     // Accepting the answer ends the pending offer before the link comes up.
     await pendingOffersRepository.set(PEER, null);
     await connect();

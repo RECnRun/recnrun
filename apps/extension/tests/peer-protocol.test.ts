@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vite-plus/test";
 import { MAX_FRAME_LENGTH, parsePeerFrame, peerMessage } from "@/p2p/protocol";
+import { PEER_IDENTITY, PEER_STATEMENT } from "./fake-peer";
 
 const route = {
   from: "11111111-1111-4111-8111-111111111111",
@@ -31,6 +32,24 @@ describe("peerMessage", () => {
     expect(parsePeerFrame(frameOf(first))).toEqual(first);
   });
 
+  test("parses OPEN_TAB with a web address", () => {
+    const built = peerMessage("OPEN_TAB", route, { url: "http://127.0.0.1:8080/a?b=1#c" });
+    expect(parsePeerFrame(frameOf(built))).toEqual(built);
+  });
+
+  test.each([
+    "chrome://settings/",
+    "chrome-extension://abcdefghijklmnopabcdefghijklmnop/dashboard.html",
+    "javascript:alert(1)",
+    "file:///etc/passwd",
+    "data:text/html,x",
+    "not a url",
+    `https://shop.test/${"a".repeat(2100)}`,
+  ])("drops OPEN_TAB for %s", (url) => {
+    const built = peerMessage("OPEN_TAB", route, { url });
+    expect(parsePeerFrame(frameOf(built))).toBeUndefined();
+  });
+
   test("carries replies and tab snapshots", () => {
     const ask = peerMessage("GET_TABS", route, {});
     const snapshot = peerMessage("TABS_SNAPSHOT", route, {
@@ -53,7 +72,12 @@ describe("peerMessage", () => {
 });
 
 describe("pairing through the mesh", () => {
-  const member = { profileId: route.to, displayName: "Desk", fingerprint: "AB:CD" };
+  const member = {
+    profileId: route.to,
+    displayName: "Desk",
+    fingerprint: "AB:CD",
+    identity: PEER_IDENTITY,
+  };
   const relayed = { origin: route.from, target: route.to };
 
   test("carries whom a profile reaches, and signals and invitations for another", () => {
@@ -65,11 +89,14 @@ describe("pairing through the mesh", () => {
       expect(parsePeerFrame(frameOf(message))).toEqual(message);
   });
 
-  test("drops a member without a certificate fingerprint, or a signal without a target", () => {
-    const unpinned = { ...member, fingerprint: "not a fingerprint" };
-    expect(parsePeerFrame(frameOf(peerMessage("MEMBERS", route, { members: [unpinned] })))).toBe(
-      undefined,
-    );
+  test("drops a member without a certificate fingerprint or identity key, or a signal without a target", () => {
+    for (const unpinned of [
+      { ...member, fingerprint: "not a fingerprint" },
+      { ...member, identity: "not an identity key" },
+    ])
+      expect(parsePeerFrame(frameOf(peerMessage("MEMBERS", route, { members: [unpinned] })))).toBe(
+        undefined,
+      );
     const { target: _target, ...untargeted } = peerMessage("INVITE", route, relayed);
     expect(parsePeerFrame(frameOf(untargeted))).toBeUndefined();
   });
@@ -104,7 +131,8 @@ describe("parsePeerFrame", () => {
   });
 
   test("drops an oversized frame without parsing it", () => {
-    const hello = peerMessage("HELLO", route, { displayName: "A", extensionVersion: "1" });
+    const payload = { displayName: "A", extensionVersion: "1", identity: PEER_STATEMENT };
+    const hello = peerMessage("HELLO", route, payload);
     const padded = frameOf(hello).padEnd(MAX_FRAME_LENGTH + 1, " ");
     expect(parsePeerFrame(padded)).toBeUndefined();
     expect(parsePeerFrame(padded.slice(0, MAX_FRAME_LENGTH))).toEqual(hello);

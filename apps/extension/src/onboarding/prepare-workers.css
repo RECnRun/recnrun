@@ -1,0 +1,47 @@
+#prepare-workers,
+#clone-control {
+  max-width: 48rem;
+  margin: calc(var(--space) * 2) auto;
+  padding: 0 var(--space);
+}
+
+.prepare-workers {
+  display: grid;
+  gap: 0.5rem;
+  justify-items: start;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space);
+}
+
+.prepare-workers h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.prepare-workers p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.prepare-workers [role="alert"] {
+  color: var(--link);
+}
+
+.prepare-workers input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.prepare-workers table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.prepare-workers th,
+.prepare-workers td {
+  border-bottom: 1px solid var(--border);
+  padding: 0.25rem 0.5rem;
+  text-align: left;
+}

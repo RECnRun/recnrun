@@ -1,0 +1,1238 @@
+[
+  {
+    "experiment": "E1",
+    "hypothesis": "E1.unpacked.default",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "single-root",
+    "debugger": "none",
+    "observations": [
+      {
+        "extensionId": "omllgeochjfpkjbkpcgjmnnbncdpiedd",
+        "pinned": true,
+        "fileSchemeAccess": true,
+        "rendered": true,
+        "fetch": {
+          "ok": true,
+          "status": 200,
+          "matches": true,
+          "text": "RECnRun E1 probe: read through file:// by the extension\n"
+        },
+        "pref": {
+          "newAllowFileAccess": true,
+          "file": "Preferences",
+          "creationFlags": 32806,
+          "keys": [
+            "account_extension_type",
+            "active_permissions",
+            "commands",
+            "content_settings",
+            "creation_flags",
+            "disable_reasons",
+            "filtered_service_worker_events",
+            "first_install_time",
+            "from_webstore",
+            "granted_permissions",
+            "has_started_service_worker",
+            "incognito_content_settings",
+            "incognito_preferences",
+            "install_time_for_action_metric",
+            "last_update_time",
+            "location",
+            "newAllowFileAccess",
+            "path",
+            "preferences",
+            "regular_only_preferences",
+            "service_worker_registration_info",
+            "serviceworkerevents",
+            "was_installed_by_default",
+            "was_installed_by_oem",
+            "was_pinned_by_default",
+            "withholding_permissions"
+          ]
+        },
+        "gestures": 0
+      },
+      {
+        "extensionId": "omllgeochjfpkjbkpcgjmnnbncdpiedd",
+        "pinned": true,
+        "fileSchemeAccess": true,
+        "rendered": true,
+        "fetch": {
+          "ok": true,
+          "status": 200,
+          "matches": true,
+          "text": "RECnRun E1 probe: read through file:// by the extension\n"
+        },
+        "pref": {
+          "newAllowFileAccess": true,
+          "file": "Preferences",
+          "creationFlags": 32806,
+          "keys": [
+            "account_extension_type",
+            "active_permissions",
+            "commands",
+            "content_settings",
+            "creation_flags",
+            "disable_reasons",
+            "filtered_service_worker_events",
+            "first_install_time",
+            "from_webstore",
+            "granted_permissions",
+            "has_started_service_worker",
+            "incognito_content_settings",
+            "incognito_preferences",
+            "install_time_for_action_metric",
+            "last_update_time",
+            "location",
+            "newAllowFileAccess",
+            "path",
+            "preferences",
+            "regular_only_preferences",
+            "service_worker_registration_info",
+            "serviceworkerevents",
+            "was_installed_by_default",
+            "was_installed_by_oem",
+            "was_pinned_by_default",
+            "withholding_permissions"
+          ]
+        },
+        "gestures": 0
+      },
+      {
+        "extensionId": "omllgeochjfpkjbkpcgjmnnbncdpiedd",
+        "pinned": true,
+        "fileSchemeAccess": true,
+        "rendered": true,
+        "fetch": {
+          "ok": true,
+          "status": 200,
+          "matches": true,
+          "text": "RECnRun E1 probe: read through file:// by the extension\n"
+        },
+        "pref": {
+          "newAllowFileAccess": true,
+          "file": "Preferences",
+          "creationFlags": 32806,
+          "keys": [
+            "account_extension_type",
+            "active_permissions",
+            "commands",
+            "content_settings",
+            "creation_flags",
+            "disable_reasons",
+            "filtered_service_worker_events",
+            "first_install_time",
+            "from_webstore",
+            "granted_permissions",
+            "has_started_service_worker",
+            "incognito_content_settings",
+            "incognito_preferences",
+            "install_time_for_action_metric",
+            "last_update_time",
+            "location",
+            "newAllowFileAccess",
+            "path",
+            "preferences",
+            "regular_only_preferences",
+            "service_worker_registration_info",
+            "serviceworkerevents",
+            "was_installed_by_default",
+            "was_installed_by_oem",
+            "was_pinned_by_default",
+            "withholding_permissions"
+          ]
+        },
+        "gestures": 0
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "fail",
+    "error": "after the install, fileSchemeAccess true, fetch read the probe | after the install, fileSchemeAccess true, fetch read the probe | after the install, fileSchemeAccess true, fetch read the probe",
+    "samples": 3
+  },
+  {
+    "experiment": "E1",
+    "hypothesis": "E1.unpacked.toggleOff",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "single-root",
+    "debugger": "none",
+    "observations": [
+      {
+        "extensionId": "omllgeochjfpkjbkpcgjmnnbncdpiedd",
+        "initial": {
+          "fileSchemeAccess": true,
+          "rendered": true,
+          "fetch": {
+            "ok": true,
+            "status": 200,
+            "matches": true,
+            "text": "RECnRun E1 probe: read through file:// by the extension\n"
+          }
+        },
+        "after": {
+          "fileSchemeAccess": false,
+          "rendered": false,
+          "fetch": {
+            "ok": false,
+            "name": "TypeError",
+            "message": "Failed to fetch"
+          }
+        },
+        "methods": ["xdotool", "xdotool"],
+        "pref": {
+          "newAllowFileAccess": false,
+          "file": "Preferences",
+          "creationFlags": 38,
+          "keys": [
+            "account_extension_type",
+            "active_permissions",
+            "commands",
+            "content_settings",
+            "creation_flags",
+            "filtered_service_worker_events",
+            "first_install_time",
+            "from_webstore",
+            "granted_permissions",
+            "has_started_service_worker",
+            "incognito_content_settings",
+            "incognito_preferences",
+            "install_time_for_action_metric",
+            "last_update_time",
+            "location",
+            "newAllowFileAccess",
+            "path",
+            "preferences",
+            "regular_only_preferences",
+            "service_worker_registration_info",
+            "serviceworkerevents",
+            "was_installed_by_default",
+            "was_installed_by_oem",
+            "was_pinned_by_default",
+            "withholding_permissions"
+          ]
+        },
+        "gestures": 2,
+        "steps": [
+          "xdotool: Developer mode on at chrome://extensions",
+          "xdotool: \"Allow access to file URLs\" off at chrome://extensions"
+        ]
+      },
+      {
+        "extensionId": "omllgeochjfpkjbkpcgjmnnbncdpiedd",
+        "initial": {
+          "fileSchemeAccess": true,
+          "rendered": true,
+          "fetch": {
+            "ok": true,
+            "status": 200,
+            "matches": true,
+            "text": "RECnRun E1 probe: read through file:// by the extension\n"
+          }
+        },
+        "after": {
+          "fileSchemeAccess": false,
+          "rendered": false,
+          "fetch": {
+            "ok": false,
+            "name": "TypeError",
+            "message": "Failed to fetch"
+          }
+        },
+        "methods": ["xdotool", "xdotool"],
+        "pref": {
+          "newAllowFileAccess": false,
+          "file": "Preferences",
+          "creationFlags": 38,
+          "keys": [
+            "account_extension_type",
+            "active_permissions",
+            "commands",
+            "content_settings",
+            "creation_flags",
+            "filtered_service_worker_events",
+            "first_install_time",
+            "from_webstore",
+            "granted_permissions",
+            "has_started_service_worker",
+            "incognito_content_settings",
+            "incognito_preferences",
+            "install_time_for_action_metric",
+            "last_update_time",
+            "location",
+            "newAllowFileAccess",
+            "path",
+            "preferences",
+            "regular_only_preferences",
+            "service_worker_registration_info",
+            "serviceworkerevents",
+            "was_installed_by_default",
+            "was_installed_by_oem",
+            "was_pinned_by_default",
+            "withholding_permissions"
+          ]
+        },
+        "gestures": 2,
+        "steps": [
+          "xdotool: Developer mode on at chrome://extensions",
+          "xdotool: \"Allow access to file URLs\" off at chrome://extensions"
+        ]
+      },
+      {
+        "extensionId": "omllgeochjfpkjbkpcgjmnnbncdpiedd",
+        "initial": {
+          "fileSchemeAccess": true,
+          "rendered": true,
+          "fetch": {
+            "ok": true,
+            "status": 200,
+            "matches": true,
+            "text": "RECnRun E1 probe: read through file:// by the extension\n"
+          }
+        },
+        "after": {
+          "fileSchemeAccess": false,
+          "rendered": false,
+          "fetch": {
+            "ok": false,
+            "name": "TypeError",
+            "message": "Failed to fetch"
+          }
+        },
+        "methods": ["xdotool", "xdotool"],
+        "pref": {
+          "newAllowFileAccess": false,
+          "file": "Preferences",
+          "creationFlags": 38,
+          "keys": [
+            "account_extension_type",
+            "active_permissions",
+            "commands",
+            "content_settings",
+            "creation_flags",
+            "filtered_service_worker_events",
+            "first_install_time",
+            "from_webstore",
+            "granted_permissions",
+            "has_started_service_worker",
+            "incognito_content_settings",
+            "incognito_preferences",
+            "install_time_for_action_metric",
+            "last_update_time",
+            "location",
+            "newAllowFileAccess",
+            "path",
+            "preferences",
+            "regular_only_preferences",
+            "service_worker_registration_info",
+            "serviceworkerevents",
+            "was_installed_by_default",
+            "was_installed_by_oem",
+            "was_pinned_by_default",
+            "withholding_permissions"
+          ]
+        },
+        "gestures": 2,
+        "steps": [
+          "xdotool: Developer mode on at chrome://extensions",
+          "xdotool: \"Allow access to file URLs\" off at chrome://extensions"
+        ]
+      }
+    ],
+    "gestures": 2,
+    "steps": [
+      "xdotool: Developer mode on at chrome://extensions",
+      "xdotool: \"Allow access to file URLs\" off at chrome://extensions"
+    ],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "E1",
+    "hypothesis": "E1.unpacked.toggleOn",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "single-root",
+    "debugger": "none",
+    "observations": [
+      {
+        "extensionId": "omllgeochjfpkjbkpcgjmnnbncdpiedd",
+        "initial": {
+          "fileSchemeAccess": true,
+          "rendered": true,
+          "fetch": {
+            "ok": true,
+            "status": 200,
+            "matches": true,
+            "text": "RECnRun E1 probe: read through file:// by the extension\n"
+          }
+        },
+        "after": {
+          "fileSchemeAccess": true,
+          "rendered": true,
+          "fetch": {
+            "ok": true,
+            "status": 200,
+            "matches": true,
+            "text": "RECnRun E1 probe: read through file:// by the extension\n"
+          }
+        },
+        "methods": ["xdotool", "xdotool", "xdotool"],
+        "pref": {
+          "newAllowFileAccess": true,
+          "file": "Preferences",
+          "creationFlags": 38,
+          "keys": [
+            "account_extension_type",
+            "active_permissions",
+            "commands",
+            "content_settings",
+            "creation_flags",
+            "filtered_service_worker_events",
+            "first_install_time",
+            "from_webstore",
+            "granted_permissions",
+            "has_started_service_worker",
+            "incognito_content_settings",
+            "incognito_preferences",
+            "install_time_for_action_metric",
+            "last_update_time",
+            "location",
+            "newAllowFileAccess",
+            "path",
+            "preferences",
+            "regular_only_preferences",
+            "service_worker_registration_info",
+            "serviceworkerevents",
+            "was_installed_by_default",
+            "was_installed_by_oem",
+            "was_pinned_by_default",
+            "withholding_permissions"
+          ]
+        },
+        "gestures": 3,
+        "steps": [
+          "xdotool: Developer mode on at chrome://extensions",
+          "xdotool: \"Allow access to file URLs\" off at chrome://extensions",
+          "xdotool: \"Allow access to file URLs\" on at chrome://extensions"
+        ]
+      },
+      {
+        "extensionId": "omllgeochjfpkjbkpcgjmnnbncdpiedd",
+        "initial": {
+          "fileSchemeAccess": true,
+          "rendered": true,
+          "fetch": {
+            "ok": true,
+            "status": 200,
+            "matches": true,
+            "text": "RECnRun E1 probe: read through file:// by the extension\n"
+          }
+        },
+        "after": {
+          "fileSchemeAccess": true,
+          "rendered": true,
+          "fetch": {
+            "ok": true,
+            "status": 200,
+            "matches": true,
+            "text": "RECnRun E1 probe: read through file:// by the extension\n"
+          }
+        },
+        "methods": ["xdotool", "xdotool", "xdotool"],
+        "pref": {
+          "newAllowFileAccess": true,
+          "file": "Preferences",
+          "creationFlags": 38,
+          "keys": [
+            "account_extension_type",
+            "active_permissions",
+            "commands",
+            "content_settings",
+            "creation_flags",
+            "filtered_service_worker_events",
+            "first_install_time",
+            "from_webstore",
+            "granted_permissions",
+            "has_started_service_worker",
+            "incognito_content_settings",
+            "incognito_preferences",
+            "install_time_for_action_metric",
+            "last_update_time",
+            "location",
+            "newAllowFileAccess",
+            "path",
+            "preferences",
+            "regular_only_preferences",
+            "service_worker_registration_info",
+            "serviceworkerevents",
+            "was_installed_by_default",
+            "was_installed_by_oem",
+            "was_pinned_by_default",
+            "withholding_permissions"
+          ]
+        },
+        "gestures": 3,
+        "steps": [
+          "xdotool: Developer mode on at chrome://extensions",
+          "xdotool: \"Allow access to file URLs\" off at chrome://extensions",
+          "xdotool: \"Allow access to file URLs\" on at chrome://extensions"
+        ]
+      },
+      {
+        "extensionId": "omllgeochjfpkjbkpcgjmnnbncdpiedd",
+        "initial": {
+          "fileSchemeAccess": true,
+          "rendered": true,
+          "fetch": {
+            "ok": true,
+            "status": 200,
+            "matches": true,
+            "text": "RECnRun E1 probe: read through file:// by the extension\n"
+          }
+        },
+        "after": {
+          "fileSchemeAccess": true,
+          "rendered": true,
+          "fetch": {
+            "ok": true,
+            "status": 200,
+            "matches": true,
+            "text": "RECnRun E1 probe: read through file:// by the extension\n"
+          }
+        },
+        "methods": ["xdotool", "xdotool", "xdotool"],
+        "pref": {
+          "newAllowFileAccess": true,
+          "file": "Preferences",
+          "creationFlags": 38,
+          "keys": [
+            "account_extension_type",
+            "active_permissions",
+            "commands",
+            "content_settings",
+            "creation_flags",
+            "filtered_service_worker_events",
+            "first_install_time",
+            "from_webstore",
+            "granted_permissions",
+            "has_started_service_worker",
+            "incognito_content_settings",
+            "incognito_preferences",
+            "install_time_for_action_metric",
+            "last_update_time",
+            "location",
+            "newAllowFileAccess",
+            "path",
+            "preferences",
+            "regular_only_preferences",
+            "service_worker_registration_info",
+            "serviceworkerevents",
+            "was_installed_by_default",
+            "was_installed_by_oem",
+            "was_pinned_by_default",
+            "withholding_permissions"
+          ]
+        },
+        "gestures": 3,
+        "steps": [
+          "xdotool: Developer mode on at chrome://extensions",
+          "xdotool: \"Allow access to file URLs\" off at chrome://extensions",
+          "xdotool: \"Allow access to file URLs\" on at chrome://extensions"
+        ]
+      }
+    ],
+    "gestures": 3,
+    "steps": [
+      "xdotool: Developer mode on at chrome://extensions",
+      "xdotool: \"Allow access to file URLs\" off at chrome://extensions",
+      "xdotool: \"Allow access to file URLs\" on at chrome://extensions"
+    ],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "E1",
+    "hypothesis": "E1.unpacked.reinstall",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "single-root",
+    "debugger": "none",
+    "observations": [
+      {
+        "extensionId": "omllgeochjfpkjbkpcgjmnnbncdpiedd",
+        "reinstalledId": "omllgeochjfpkjbkpcgjmnnbncdpiedd",
+        "initial": {
+          "fileSchemeAccess": true,
+          "rendered": true,
+          "fetch": {
+            "ok": true,
+            "status": 200,
+            "matches": true,
+            "text": "RECnRun E1 probe: read through file:// by the extension\n"
+          }
+        },
+        "revoked": {
+          "fileSchemeAccess": false,
+          "rendered": false,
+          "fetch": {
+            "ok": false,
+            "name": "TypeError",
+            "message": "Failed to fetch"
+          }
+        },
+        "reinstalled": {
+          "fileSchemeAccess": false,
+          "rendered": false,
+          "fetch": {
+            "ok": false,
+            "name": "TypeError",
+            "message": "Failed to fetch"
+          }
+        },
+        "prefAfterQuit": {
+          "newAllowFileAccess": false,
+          "file": "Preferences",
+          "creationFlags": 38,
+          "keys": [
+            "account_extension_type",
+            "active_permissions",
+            "commands",
+            "content_settings",
+            "creation_flags",
+            "filtered_service_worker_events",
+            "first_install_time",
+            "from_webstore",
+            "granted_permissions",
+            "has_started_service_worker",
+            "incognito_content_settings",
+            "incognito_preferences",
+            "install_time_for_action_metric",
+            "last_update_time",
+            "location",
+            "newAllowFileAccess",
+            "path",
+            "preferences",
+            "regular_only_preferences",
+            "service_worker_registration_info",
+            "serviceworkerevents",
+            "was_installed_by_default",
+            "was_installed_by_oem",
+            "was_pinned_by_default",
+            "withholding_permissions"
+          ]
+        },
+        "runsAfterRelaunch": true,
+        "prefAfterRelaunch": {
+          "newAllowFileAccess": false,
+          "file": "Preferences",
+          "creationFlags": 38,
+          "keys": [
+            "account_extension_type",
+            "active_permissions",
+            "commands",
+            "content_settings",
+            "creation_flags",
+            "filtered_service_worker_events",
+            "first_install_time",
+            "from_webstore",
+            "granted_permissions",
+            "has_started_service_worker",
+            "incognito_content_settings",
+            "incognito_preferences",
+            "install_time_for_action_metric",
+            "last_update_time",
+            "location",
+            "newAllowFileAccess",
+            "path",
+            "preferences",
+            "regular_only_preferences",
+            "service_worker_registration_info",
+            "serviceworkerevents",
+            "was_installed_by_default",
+            "was_installed_by_oem",
+            "was_pinned_by_default",
+            "withholding_permissions"
+          ]
+        },
+        "prefAfterReinstall": {
+          "newAllowFileAccess": false,
+          "file": "Preferences",
+          "creationFlags": 32806,
+          "keys": [
+            "account_extension_type",
+            "active_permissions",
+            "commands",
+            "content_settings",
+            "creation_flags",
+            "disable_reasons",
+            "filtered_service_worker_events",
+            "first_install_time",
+            "from_webstore",
+            "granted_permissions",
+            "has_started_service_worker",
+            "incognito_content_settings",
+            "incognito_preferences",
+            "install_time_for_action_metric",
+            "last_update_time",
+            "location",
+            "newAllowFileAccess",
+            "path",
+            "preferences",
+            "regular_only_preferences",
+            "service_worker_registration_info",
+            "serviceworkerevents",
+            "was_installed_by_default",
+            "was_installed_by_oem",
+            "was_pinned_by_default",
+            "withholding_permissions"
+          ]
+        },
+        "methods": ["xdotool", "xdotool"],
+        "gestures": 2,
+        "steps": [
+          "xdotool: Developer mode on at chrome://extensions",
+          "xdotool: \"Allow access to file URLs\" off at chrome://extensions"
+        ]
+      },
+      {
+        "extensionId": "omllgeochjfpkjbkpcgjmnnbncdpiedd",
+        "reinstalledId": "omllgeochjfpkjbkpcgjmnnbncdpiedd",
+        "initial": {
+          "fileSchemeAccess": true,
+          "rendered": true,
+          "fetch": {
+            "ok": true,
+            "status": 200,
+            "matches": true,
+            "text": "RECnRun E1 probe: read through file:// by the extension\n"
+          }
+        },
+        "revoked": {
+          "fileSchemeAccess": false,
+          "rendered": false,
+          "fetch": {
+            "ok": false,
+            "name": "TypeError",
+            "message": "Failed to fetch"
+          }
+        },
+        "reinstalled": {
+          "fileSchemeAccess": false,
+          "rendered": false,
+          "fetch": {
+            "ok": false,
+            "name": "TypeError",
+            "message": "Failed to fetch"
+          }
+        },
+        "prefAfterQuit": {
+          "newAllowFileAccess": false,
+          "file": "Preferences",
+          "creationFlags": 38,
+          "keys": [
+            "account_extension_type",
+            "active_permissions",
+            "commands",
+            "content_settings",
+            "creation_flags",
+            "filtered_service_worker_events",
+            "first_install_time",
+            "from_webstore",
+            "granted_permissions",
+            "has_started_service_worker",
+            "incognito_content_settings",
+            "incognito_preferences",
+            "install_time_for_action_metric",
+            "last_update_time",
+            "location",
+            "newAllowFileAccess",
+            "path",
+            "preferences",
+            "regular_only_preferences",
+            "service_worker_registration_info",
+            "serviceworkerevents",
+            "was_installed_by_default",
+            "was_installed_by_oem",
+            "was_pinned_by_default",
+            "withholding_permissions"
+          ]
+        },
+        "runsAfterRelaunch": true,
+        "prefAfterRelaunch": {
+          "newAllowFileAccess": false,
+          "file": "Preferences",
+          "creationFlags": 38,
+          "keys": [
+            "account_extension_type",
+            "active_permissions",
+            "commands",
+            "content_settings",
+            "creation_flags",
+            "filtered_service_worker_events",
+            "first_install_time",
+            "from_webstore",
+            "granted_permissions",
+            "has_started_service_worker",
+            "incognito_content_settings",
+            "incognito_preferences",
+            "install_time_for_action_metric",
+            "last_update_time",
+            "location",
+            "newAllowFileAccess",
+            "path",
+            "preferences",
+            "regular_only_preferences",
+            "service_worker_registration_info",
+            "serviceworkerevents",
+            "was_installed_by_default",
+            "was_installed_by_oem",
+            "was_pinned_by_default",
+            "withholding_permissions"
+          ]
+        },
+        "prefAfterReinstall": {
+          "newAllowFileAccess": false,
+          "file": "Preferences",
+          "creationFlags": 32806,
+          "keys": [
+            "account_extension_type",
+            "active_permissions",
+            "commands",
+            "content_settings",
+            "creation_flags",
+            "disable_reasons",
+            "filtered_service_worker_events",
+            "first_install_time",
+            "from_webstore",
+            "granted_permissions",
+            "has_started_service_worker",
+            "incognito_content_settings",
+            "incognito_preferences",
+            "install_time_for_action_metric",
+            "last_update_time",
+            "location",
+            "newAllowFileAccess",
+            "path",
+            "preferences",
+            "regular_only_preferences",
+            "service_worker_registration_info",
+            "serviceworkerevents",
+            "was_installed_by_default",
+            "was_installed_by_oem",
+            "was_pinned_by_default",
+            "withholding_permissions"
+          ]
+        },
+        "methods": ["xdotool", "xdotool"],
+        "gestures": 2,
+        "steps": [
+          "xdotool: Developer mode on at chrome://extensions",
+          "xdotool: \"Allow access to file URLs\" off at chrome://extensions"
+        ]
+      },
+      {
+        "extensionId": "omllgeochjfpkjbkpcgjmnnbncdpiedd",
+        "reinstalledId": "omllgeochjfpkjbkpcgjmnnbncdpiedd",
+        "initial": {
+          "fileSchemeAccess": true,
+          "rendered": true,
+          "fetch": {
+            "ok": true,
+            "status": 200,
+            "matches": true,
+            "text": "RECnRun E1 probe: read through file:// by the extension\n"
+          }
+        },
+        "revoked": {
+          "fileSchemeAccess": false,
+          "rendered": false,
+          "fetch": {
+            "ok": false,
+            "name": "TypeError",
+            "message": "Failed to fetch"
+          }
+        },
+        "reinstalled": {
+          "fileSchemeAccess": false,
+          "rendered": false,
+          "fetch": {
+            "ok": false,
+            "name": "TypeError",
+            "message": "Failed to fetch"
+          }
+        },
+        "prefAfterQuit": {
+          "newAllowFileAccess": false,
+          "file": "Preferences",
+          "creationFlags": 38,
+          "keys": [
+            "account_extension_type",
+            "active_permissions",
+            "commands",
+            "content_settings",
+            "creation_flags",
+            "filtered_service_worker_events",
+            "first_install_time",
+            "from_webstore",
+            "granted_permissions",
+            "has_started_service_worker",
+            "incognito_content_settings",
+            "incognito_preferences",
+            "install_time_for_action_metric",
+            "last_update_time",
+            "location",
+            "newAllowFileAccess",
+            "path",
+            "preferences",
+            "regular_only_preferences",
+            "service_worker_registration_info",
+            "serviceworkerevents",
+            "was_installed_by_default",
+            "was_installed_by_oem",
+            "was_pinned_by_default",
+            "withholding_permissions"
+          ]
+        },
+        "runsAfterRelaunch": true,
+        "prefAfterRelaunch": {
+          "newAllowFileAccess": false,
+          "file": "Preferences",
+          "creationFlags": 38,
+          "keys": [
+            "account_extension_type",
+            "active_permissions",
+            "commands",
+            "content_settings",
+            "creation_flags",
+            "filtered_service_worker_events",
+            "first_install_time",
+            "from_webstore",
+            "granted_permissions",
+            "has_started_service_worker",
+            "incognito_content_settings",
+            "incognito_preferences",
+            "install_time_for_action_metric",
+            "last_update_time",
+            "location",
+            "newAllowFileAccess",
+            "path",
+            "preferences",
+            "regular_only_preferences",
+            "service_worker_registration_info",
+            "serviceworkerevents",
+            "was_installed_by_default",
+            "was_installed_by_oem",
+            "was_pinned_by_default",
+            "withholding_permissions"
+          ]
+        },
+        "prefAfterReinstall": {
+          "newAllowFileAccess": false,
+          "file": "Preferences",
+          "creationFlags": 32806,
+          "keys": [
+            "account_extension_type",
+            "active_permissions",
+            "commands",
+            "content_settings",
+            "creation_flags",
+            "disable_reasons",
+            "filtered_service_worker_events",
+            "first_install_time",
+            "from_webstore",
+            "granted_permissions",
+            "has_started_service_worker",
+            "incognito_content_settings",
+            "incognito_preferences",
+            "install_time_for_action_metric",
+            "last_update_time",
+            "location",
+            "newAllowFileAccess",
+            "path",
+            "preferences",
+            "regular_only_preferences",
+            "service_worker_registration_info",
+            "serviceworkerevents",
+            "was_installed_by_default",
+            "was_installed_by_oem",
+            "was_pinned_by_default",
+            "withholding_permissions"
+          ]
+        },
+        "methods": ["xdotool", "xdotool"],
+        "gestures": 2,
+        "steps": [
+          "xdotool: Developer mode on at chrome://extensions",
+          "xdotool: \"Allow access to file URLs\" off at chrome://extensions"
+        ]
+      }
+    ],
+    "gestures": 2,
+    "steps": [
+      "xdotool: Developer mode on at chrome://extensions",
+      "xdotool: \"Allow access to file URLs\" off at chrome://extensions"
+    ],
+    "verdict": "fail",
+    "error": "the revoke survived the reinstall: fileSchemeAccess false, fetch failed (TypeError: Failed to fetch) | the revoke survived the reinstall: fileSchemeAccess false, fetch failed (TypeError: Failed to fetch) | the revoke survived the reinstall: fileSchemeAccess false, fetch failed (TypeError: Failed to fetch)",
+    "samples": 3
+  },
+  {
+    "experiment": "E1",
+    "hypothesis": "E1.unpacked.noHostPermission",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "single-root",
+    "debugger": "none",
+    "observations": [
+      {
+        "extensionId": "omllgeochjfpkjbkpcgjmnnbncdpiedd",
+        "removed": {
+          "host_permissions": "removed from the manifest"
+        },
+        "fileSchemeAccess": true,
+        "rendered": true,
+        "fetch": {
+          "ok": false,
+          "name": "TypeError",
+          "message": "Failed to fetch"
+        },
+        "gestures": 0
+      },
+      {
+        "extensionId": "omllgeochjfpkjbkpcgjmnnbncdpiedd",
+        "removed": {
+          "host_permissions": "removed from the manifest"
+        },
+        "fileSchemeAccess": true,
+        "rendered": true,
+        "fetch": {
+          "ok": false,
+          "name": "TypeError",
+          "message": "Failed to fetch"
+        },
+        "gestures": 0
+      },
+      {
+        "extensionId": "omllgeochjfpkjbkpcgjmnnbncdpiedd",
+        "removed": {
+          "host_permissions": "removed from the manifest"
+        },
+        "fileSchemeAccess": true,
+        "rendered": true,
+        "fetch": {
+          "ok": false,
+          "name": "TypeError",
+          "message": "Failed to fetch"
+        },
+        "gestures": 0
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "E1",
+    "hypothesis": "E1.unpacked.noDeveloperMode",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "single-root",
+    "debugger": "none",
+    "observations": [
+      {
+        "extensionId": "omllgeochjfpkjbkpcgjmnnbncdpiedd",
+        "before": {
+          "state": "ENABLED",
+          "location": "UNPACKED",
+          "fileAccess": {
+            "isActive": true,
+            "isEnabled": true
+          },
+          "disableReasons": []
+        },
+        "after": {
+          "state": "DISABLED",
+          "location": "UNPACKED",
+          "fileAccess": {
+            "isActive": false,
+            "isEnabled": true
+          },
+          "disableReasons": ["unsupportedDeveloperExtension"]
+        },
+        "methods": ["xdotool"],
+        "gestures": 1,
+        "steps": ["xdotool: \"Allow access to file URLs\" off at chrome://extensions"]
+      },
+      {
+        "extensionId": "omllgeochjfpkjbkpcgjmnnbncdpiedd",
+        "before": {
+          "state": "ENABLED",
+          "location": "UNPACKED",
+          "fileAccess": {
+            "isActive": true,
+            "isEnabled": true
+          },
+          "disableReasons": []
+        },
+        "after": {
+          "state": "DISABLED",
+          "location": "UNPACKED",
+          "fileAccess": {
+            "isActive": false,
+            "isEnabled": true
+          },
+          "disableReasons": ["unsupportedDeveloperExtension"]
+        },
+        "methods": ["xdotool"],
+        "gestures": 1,
+        "steps": ["xdotool: \"Allow access to file URLs\" off at chrome://extensions"]
+      },
+      {
+        "extensionId": "omllgeochjfpkjbkpcgjmnnbncdpiedd",
+        "before": {
+          "state": "ENABLED",
+          "location": "UNPACKED",
+          "fileAccess": {
+            "isActive": true,
+            "isEnabled": true
+          },
+          "disableReasons": []
+        },
+        "after": {
+          "state": "DISABLED",
+          "location": "UNPACKED",
+          "fileAccess": {
+            "isActive": false,
+            "isEnabled": true
+          },
+          "disableReasons": ["unsupportedDeveloperExtension"]
+        },
+        "methods": ["xdotool"],
+        "gestures": 1,
+        "steps": ["xdotool: \"Allow access to file URLs\" off at chrome://extensions"]
+      }
+    ],
+    "gestures": 1,
+    "steps": ["xdotool: \"Allow access to file URLs\" off at chrome://extensions"],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "E1",
+    "hypothesis": "E1.policy.default",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "environment": "lab",
+    "install": "managed-policy",
+    "label": "strict",
+    "externalClient": false,
+    "variant": "poc-d0",
+    "topology": "single-root",
+    "debugger": "none",
+    "observations": [
+      {
+        "extensionId": "bjhchfmjeejfbiembnedaoohalinbngi",
+        "installed": true,
+        "ran": true,
+        "state": {
+          "onDisk": true,
+          "location": 7,
+          "disableReasons": []
+        },
+        "pref": {
+          "newAllowFileAccess": null,
+          "file": null
+        },
+        "fetch": {
+          "unavailable": "no observation channel without CDP until E2 writes results to disk"
+        },
+        "gestures": 0
+      },
+      {
+        "extensionId": "efkagigbbdbdgglnmipaaiiibaiaihln",
+        "installed": true,
+        "ran": true,
+        "state": {
+          "onDisk": true,
+          "location": 7,
+          "disableReasons": []
+        },
+        "pref": {
+          "newAllowFileAccess": null,
+          "file": null
+        },
+        "fetch": {
+          "unavailable": "no observation channel without CDP until E2 writes results to disk"
+        },
+        "gestures": 0
+      },
+      {
+        "extensionId": "lkgmioinhbagnffcainbmbmimkaffgif",
+        "installed": true,
+        "ran": true,
+        "state": {
+          "onDisk": true,
+          "location": 7,
+          "disableReasons": []
+        },
+        "pref": {
+          "newAllowFileAccess": null,
+          "file": null
+        },
+        "fetch": {
+          "unavailable": "no observation channel without CDP until E2 writes results to disk"
+        },
+        "gestures": 0
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "E1",
+    "hypothesis": "E1.packed",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "environment": "lab",
+    "install": "none",
+    "label": "strict",
+    "externalClient": false,
+    "variant": "poc-d0",
+    "topology": "single-root",
+    "debugger": "none",
+    "verdict": "unavailable",
+    "error": "packed distribution not executed in this round (decision 4, M-P9.c)",
+    "samples": 0,
+    "gestures": 0,
+    "steps": [],
+    "observations": []
+  }
+]

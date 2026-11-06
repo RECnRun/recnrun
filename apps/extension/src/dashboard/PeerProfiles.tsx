@@ -2,6 +2,7 @@ import * as v from "valibot";
 import { FolderBanner, PairingSection } from "@/dashboard/FolderPairing";
 import type { RemoteTake } from "@/dashboard/control";
 import { peerBlocks } from "@/dashboard/peer-blocks";
+import { OpenTab } from "@/dashboard/OpenTab";
 import { TabList } from "@/dashboard/TabList";
 import type { TakeControl } from "@/dashboard/TabList";
 import { useMemo } from "preact/hooks";
@@ -11,7 +12,9 @@ import { peerViews } from "@/views/peer-view";
 import type { PeerView } from "@/views/peer-view";
 import { useRecording } from "@/views/recording";
 import type { PeerServices } from "@/views/remote-peer";
-import { usePeerStatus } from "@/views/use-peer";
+import { useMayControl, usePeerStatus } from "@/views/use-peer";
+
+const NOT_MASTER = "Only the master controls other profiles";
 
 interface PeerProfilesProps {
   services: Pick<ExtensionServices, "tabs" | "recordings">;
@@ -37,20 +40,28 @@ function RemoteProfile({
   // A new source each render would read the tabs again on every render.
   const tabs = useMemo(() => peers.tabsOf(peer), [peers, peer]);
   const recordings = useMemo(() => peers.recordingsOf(peer), [peers, peer]);
+  const may = useMayControl(peers, peer);
   const activate = (tabId: number) =>
     peers.client.ask({ type: "activate", peer, tabId }, v.unknown()).then(() => {});
+  const openTab = (url: string) =>
+    peers.client.ask({ type: "open-tab", peer, url }, v.unknown()).then(() => {});
+  // Until the role answers, an empty reason offers nothing and says nothing.
+  const denied = may === undefined ? "" : NOT_MASTER;
   return (
-    <TabList
-      tabs={tabs}
-      store={recordings}
-      take={take(peer)}
-      activate={status.link.verified ? activate : undefined}
-      blocked={blocked}
-      heading={{
-        id: `remote-tabs-${peer}`,
-        text: `Chrome — ${status.peer.displayName} (${linkLabel(status.link, status.peer.displayName)})`,
-      }}
-    />
+    <>
+      <TabList
+        tabs={tabs}
+        store={recordings}
+        take={take(peer)}
+        activate={status.link.verified && may ? activate : undefined}
+        blocked={blocked ?? (may ? undefined : denied)}
+        heading={{
+          id: `remote-tabs-${peer}`,
+          text: `Chrome — ${status.peer.displayName} (${linkLabel(status.link, status.peer.displayName)})`,
+        }}
+      />
+      {status.link.verified && may && <OpenTab open={openTab} peerName={status.peer.displayName} />}
+    </>
   );
 }
 

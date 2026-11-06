@@ -1,0 +1,233 @@
+[
+  {
+    "experiment": "E9",
+    "hypothesis": "E9.duplicate",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "three requests on one closed profile: two together, one during the open",
+    "debugger": "none",
+    "observations": [
+      {
+        "codes": [0, 75, 75]
+      },
+      {
+        "codes": [0, 75, 75]
+      },
+      {
+        "codes": [0, 75, 75]
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "E9",
+    "hypothesis": "E9.idempotent",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "a request on a running profile with a fresh presence",
+    "debugger": "none",
+    "observations": [
+      {
+        "boots": ["7418d92f-cdb9-4816-a2d2-7bb785c949e0", "7418d92f-cdb9-4816-a2d2-7bb785c949e0"]
+      },
+      {
+        "boots": ["bb89da11-d73d-4fc8-b4af-bbf3f7a423b0", "bb89da11-d73d-4fc8-b4af-bbf3f7a423b0"]
+      },
+      {
+        "boots": ["8f246940-88a7-45ee-8379-9ef34d42e886", "8f246940-88a7-45ee-8379-9ef34d42e886"]
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "E9",
+    "hypothesis": "E9.backoff",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "a registered root whose Chrome never acks: failed, then refused until nextAt",
+    "debugger": "none",
+    "observations": [
+      {
+        "state": {
+          "token": "",
+          "pid": "4065",
+          "startedAt": "1793864123",
+          "attempts": "1",
+          "nextAt": "1793864246",
+          "status": "failed",
+          "boot": "",
+          "root": "",
+          "userDataDir": "/tmp/recnrun-e9-w4nfEz/Chrome",
+          "shared": "0"
+        }
+      },
+      {
+        "state": {
+          "token": "",
+          "pid": "4478",
+          "startedAt": "1793864127",
+          "attempts": "1",
+          "nextAt": "1793864250",
+          "status": "failed",
+          "boot": "",
+          "root": "",
+          "userDataDir": "/tmp/recnrun-e9-an6ztj/Chrome",
+          "shared": "0"
+        }
+      },
+      {
+        "state": {
+          "token": "",
+          "pid": "4886",
+          "startedAt": "1793864131",
+          "attempts": "1",
+          "nextAt": "1793864254",
+          "status": "failed",
+          "boot": "",
+          "root": "",
+          "userDataDir": "/tmp/recnrun-e9-QUoMiS/Chrome",
+          "shared": "0"
+        }
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "E9",
+    "hypothesis": "E9.restart",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "the launched Chrome killed, its presence expired, a request relaunches",
+    "debugger": "none",
+    "observations": [
+      {
+        "boots": ["93babd07-c9be-47cd-8f8a-e74e638f975d", "70b4e0ef-f4e4-484a-a314-548a06986335"]
+      },
+      {
+        "boots": ["db2de9e1-602f-4aea-83d6-1118e5ea0a30", "5e1a7dae-c935-4d9e-a975-ed56786458bb"]
+      },
+      {
+        "boots": ["c0275564-5c30-4b0f-a4b3-72f8a9429f32", "ef1ee45c-b464-49a5-80e1-199fcd04fa3e"]
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "E9",
+    "hypothesis": "E9.stop",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "stop signals the launched Chrome only, beside a bystander Chrome",
+    "debugger": "none",
+    "observations": [
+      {
+        "ms": 1035,
+        "heldCode": 73
+      },
+      {
+        "ms": 1045,
+        "heldCode": 73
+      },
+      {
+        "ms": 1060,
+        "heldCode": 73
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "E9",
+    "hypothesis": "E9.pause",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "a paused profile is not launched; resumed, it is",
+    "debugger": "none",
+    "observations": [
+      {
+        "refused": 73
+      },
+      {
+        "refused": 73
+      },
+      {
+        "refused": 73
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "E9",
+    "hypothesis": "E9.sharedRoot",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "two profiles of one root, Default open: the second is forwarded",
+    "debugger": "none",
+    "verdict": "pass",
+    "samples": 3,
+    "gestures": 0,
+    "steps": [],
+    "observations": [
+      {
+        "mains": [13821],
+        "pid": "13821",
+        "stop": 70
+      },
+      {
+        "mains": [14946],
+        "pid": "14946",
+        "stop": 70
+      },
+      {
+        "mains": [16079],
+        "pid": "16079",
+        "stop": 70
+      }
+    ]
+  }
+]

@@ -3,10 +3,19 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vite-plus/tes
 import { fakeBrowser } from "wxt/testing/fake-browser";
 import { peerNotice } from "@/messaging/peer-messages";
 import { allowFolder, chooseFolder } from "@/p2p/folder-store";
+import { createPins } from "@/p2p/pins";
 import { peerServices } from "@/peers/page-services";
-import { remoteRecordingsRepository } from "@/storage/peer-repository";
+import { roleStores } from "@/storage/hierarchy-repository";
+import {
+  identityRepository,
+  peerPinsRepository,
+  remoteRecordingsRepository,
+} from "@/storage/peer-repository";
 import { createPeerClient } from "@/views/peer-client";
-import { PEER, STRANGER, answering } from "./fake-peer";
+import { FINGERPRINT, ME, PEER, PEER_IDENTITY, STRANGER, answering } from "./fake-peer";
+import { identityOf } from "./test-identity";
+
+const binding = { role: "worker", boundAt: 1, source: "pairing" } as const;
 
 const NamedSchema = v.strictObject({ name: v.string() });
 const session = { tabId: 4, status: "paused" as const, banked: 10, since: 1 };
@@ -119,6 +128,29 @@ describe("peerServices", () => {
     expect(await services.recordingsOf(STRANGER).read()).toEqual(session);
     expect(await services.recordingsOf(PEER).read()).toBeNull();
     expect(await services.recordings.read()).toEqual(session);
+  });
+
+  test("controls another profile only as the master of its bound worker, hearing each change", async () => {
+    const services = peerServices();
+    let changes = 0;
+    const stop = services.watchControl(() => changes++);
+    // Before it has an identity, a profile knows of no one it controls, itself included.
+    expect(await services.mayControl(ME)).toBe(false);
+    await identityRepository.write({ profileId: ME, displayName: "Alice" });
+    const proven = { identity: PEER_IDENTITY, fingerprint: FINGERPRINT };
+    await createPins(peerPinsRepository()).pin(PEER, proven, "pairing-code");
+    const { role, workers } = roleStores();
+    await role.write({ ...binding, masterProfileId: PEER, masterIdentity: PEER_IDENTITY });
+    expect(await services.mayControl(ME)).toBe(true);
+    expect(await services.mayControl(PEER)).toBe(false);
+    await role.write({ role: "master", profileId: ME, identity: await identityOf(ME) });
+    await workers.set(PEER, { identity: PEER_IDENTITY, boundAt: 1, source: "pairing" });
+    expect(await services.mayControl(PEER)).toBe(true);
+    expect(await services.mayControl(STRANGER)).toBe(false);
+    await expect.poll(() => changes).toBe(5);
+    stop();
+    await role.write(null);
+    expect(changes).toBe(5);
   });
 
   test("asks for the folder in the dashboard itself, through the folder store", () => {

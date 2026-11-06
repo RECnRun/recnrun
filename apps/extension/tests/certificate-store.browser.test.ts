@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, test } from "vite-plus/test";
-import { certificateFingerprint, persistentCertificate } from "@/p2p/certificate-store";
+import {
+  certificateFingerprint,
+  discardCertificate,
+  persistentCertificate,
+  storeCertificate,
+  storedFingerprint,
+} from "@/p2p/certificate-store";
 
 const DB_NAME = "recnrun-p2p";
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -87,5 +93,40 @@ describe("certificateFingerprint", () => {
       getFingerprints: () => [{ algorithm: "sha-1", value: "ab:cd" }],
     } as unknown as RTCCertificate;
     expect(certificateFingerprint(sha1Only)).toBeUndefined();
+  });
+});
+
+describe("storedFingerprint", () => {
+  test("is null before the profile has a certificate, and never makes one", async () => {
+    expect(await storedFingerprint()).toBeNull();
+    expect(await storedFingerprint()).toBeNull();
+  });
+
+  test("is the fingerprint of the certificate the profile keeps", async () => {
+    const certificate = await persistentCertificate();
+    expect(await storedFingerprint()).toBe(fingerprint(certificate));
+  });
+
+  test("is null for a stored value that is not a certificate", async () => {
+    await seed(1, { expires: Number.MAX_SAFE_INTEGER });
+    expect(await storedFingerprint()).toBeNull();
+  });
+});
+
+describe("storeCertificate and discardCertificate", () => {
+  test("stores the certificate the next document uses, replacing the profile's own", async () => {
+    const own = await persistentCertificate();
+    const keys: EcKeyGenParams = { name: "ECDSA", namedCurve: "P-256" };
+    const given = await RTCPeerConnection.generateCertificate(keys);
+    await storeCertificate(given);
+    expect(fingerprint(await persistentCertificate())).toBe(fingerprint(given));
+    expect(fingerprint(given)).not.toBe(fingerprint(own));
+  });
+
+  test("forgets the certificate, so the next document makes its own", async () => {
+    const first = await persistentCertificate();
+    await discardCertificate();
+    expect(await storedFingerprint()).toBeNull();
+    expect(fingerprint(await persistentCertificate())).not.toBe(fingerprint(first));
   });
 });

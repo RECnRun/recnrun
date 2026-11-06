@@ -1,0 +1,39 @@
+[
+  {
+    "experiment": "P4.6",
+    "hypothesis": "P4.6.firstRun.host",
+    "chrome": "Google Chrome 156.0.8078.80",
+    "environment": "host",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "one prepared profile at the default root of a throwaway HOME, Chrome closed",
+    "debugger": "none",
+    "verdict": "pass",
+    "samples": 1,
+    "gestures": 7,
+    "steps": [
+      "estimated: Open chrome://extensions",
+      "estimated: Turn on Developer mode",
+      "estimated: Click Load unpacked",
+      "estimated: Choose the extension folder",
+      "observed: sh recnrun-launcher first-run",
+      "observed: sh recnrun-launcher status",
+      "not run on the host: sh recnrun-launcher autostart on"
+    ],
+    "observations": [
+      {
+        "command": "sh recnrun-launcher first-run",
+        "first": {
+          "code": 0,
+          "stdout": "f946e296-5116-49d0-aa5a-b9206f80c9df open\nnext: sh recnrun-launcher autostart on <home>/.recnrun/launcher <home>/.recnrun/launcher.record lab\n",
+          "stderr": "first-run.sh: f946e296-5116-49d0-aa5a-b9206f80c9df: registered (Default of <home>/Library/Application Support/Google/Chrome)\nlifecycle.sh: pid=75128\nboot=c7f639d5-a96d-4900-a027-8e7001d541a7\nrecnrun-launcher.sh: catalog.sh for <downloads>: exit 0\n"
+        },
+        "status": "launcher stopped\nf946e296-5116-49d0-aa5a-b9206f80c9df open 75128 0 0\n",
+        "acked": ["c7f639d5-a96d-4900-a027-8e7001d541a7.json"]
+      }
+    ],
+    "mode": "smoke"
+  }
+]

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vite-plus/test";
 import { PAIRING_TTL_MS, decodePairing, encodePairing, fingerprintOf } from "@/p2p/pairing-code";
+import { signAs } from "./test-identity";
 
 const NOW = 1_700_000_000_000;
 const FINGERPRINT = "AB:CD:EF:01";
@@ -12,6 +13,10 @@ const pairing = {
   displayName: "Work laptop é ✓",
   expiresAt: NOW + PAIRING_TTL_MS,
   sdp: `v=0\r\na=fingerprint:sha-256 ${FINGERPRINT}\r\n`,
+  identity: await signAs({
+    profileId: "11111111-1111-4111-8111-111111111111",
+    fingerprint: FINGERPRINT,
+  }),
 };
 
 const codeOf = (json: string) => `RECNRUN-PAIR-1.${Buffer.from(json).toString("base64url")}`;
@@ -35,6 +40,11 @@ describe("pairing codes", () => {
     ["JSON that is not a pairing", codeOf(JSON.stringify({ ...pairing, kind: "other" }))],
     ["an extra field", codeOf(JSON.stringify({ ...pairing, extra: 1 }))],
     ["an empty name", codeOf(JSON.stringify({ ...pairing, displayName: " " }))],
+    ["no identity statement", codeOf(JSON.stringify({ ...pairing, identity: undefined }))],
+    [
+      "a malformed statement",
+      codeOf(JSON.stringify({ ...pairing, identity: { ...pairing.identity, signature: "AA" } })),
+    ],
   ])("reports a code with %s as damaged", (_, code) => {
     expect(() => decodePairing(code, NOW)).toThrow(DAMAGED);
   });

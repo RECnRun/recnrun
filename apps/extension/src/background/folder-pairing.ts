@@ -3,7 +3,10 @@ import type { PairingFlow } from "@/background/pairing";
 import type { LinkCommand } from "@/messaging/peer-messages";
 import { signalFileOf } from "@/p2p/folder-rendezvous";
 import type { Presence, Seen, SignalFile } from "@/p2p/folder-rendezvous";
-import { decodePairing, fingerprintOf } from "@/p2p/pairing-code";
+import { signerOf } from "@/p2p/identity-key";
+import { PAIRING_TTL_MS, decodePairing, fingerprintOf } from "@/p2p/pairing-code";
+import type { Pins } from "@/p2p/pins";
+import type { AnsweredOffers } from "@/storage/answered-repository";
 import type {
   FolderActed,
   FolderPairing,
@@ -30,6 +33,8 @@ interface Situation {
   /** This profile's offers waiting for an answer, by the profile each is for. */
   pending: Record<string, PendingOffer>;
   acted: Record<string, FolderActed>;
+  /** The offers answered in this boot or an earlier one, which a relaunch finds on disk again. */
+  answered: Record<string, AnsweredOffers>;
   now: number;
 }
 
@@ -58,7 +63,10 @@ function offererStep(partner: Presence, signals: SignalFile[], situation: Situat
   const answer = signals.find(
     (each) => each.kind === "answer" && each.pairingId === pending.pairingId,
   );
-  return answer && ({ type: "connect", answer } as const);
+  if (answer) return { type: "connect", answer } as const;
+  // Unanswered for a retry period: the answerer may have restarted, and it answers an offer once.
+  const madeAt = pending.expiresAt - PAIRING_TTL_MS;
+  return now - madeAt >= RETRY_MS ? ({ type: "offer", to: partner } as const) : undefined;
 }
 
 /** The next step with one partner, if there is one now. */
@@ -66,10 +74,14 @@ function stepWith(partner: Presence, situation: Situation): FolderStep | undefin
   const { me, seen, now } = situation;
   const signals = seen.signals.filter((each) => vouched(each, partner, now));
   if (me < partner.profileId) return offererStep(partner, signals, situation);
-  const acted = situation.acted[partner.profileId];
-  const offer = signals.find(
-    (each) => each.kind === "offer" && each.pairingId !== acted?.pairingId,
-  );
+  const records = [
+    situation.acted[partner.profileId],
+    ...(situation.answered[partner.profileId] ?? []),
+  ];
+  // An answer of its own on disk counts too: a quit may land after it, before the record.
+  const own = seen.signals.filter((each) => each.profileId === me && each.to === partner.profileId);
+  const done = new Set([...records, ...own].flatMap((each) => each?.pairingId ?? []));
+  const offer = signals.find((each) => each.kind === "offer" && !done.has(each.pairingId));
   return offer && { type: "answer", offer };
 }
 
@@ -91,9 +103,40 @@ export interface FolderPairingDependencies {
   pending: Pick<PeerRecords<PendingOffer>, "all">;
   link: Pick<PeerRecords<PeerLink>, "all">;
   acted: Pick<PeerRecords<FolderActed>, "all" | "get" | "set">;
+  answered: Pick<PeerRecords<AnsweredOffers>, "all" | "set">;
   state: Pick<Repository<FolderPairing>, "read" | "write">;
+  /** A presence's certificate must be signed by the identity key pinned for its profile, if any. */
+  pins: Pick<Pins, "verify">;
   log: (entry: string) => void;
   now?: () => number;
+}
+
+/**
+ * Why this profile makes no offer to `presence`, if it does not: no valid statement names its
+ * certificate, or one does but by a key other than the one pinned for its profile.
+ */
+async function refusal({ pins }: FolderPairingDependencies, presence: Presence) {
+  const { profileId, fingerprint } = presence;
+  const signer = await signerOf(presence.identity, { profileId, fingerprint });
+  if (!signer) return "no valid signature names its certificate";
+  if ((await pins.verify(profileId, signer)) === "pinned-mismatch")
+    return "its certificate is signed by another identity than the one pinned";
+  return undefined;
+}
+
+/** Remembers every offer answered from its sender, and forgets each one that expired. */
+async function rememberAnswered(
+  records: FolderPairingDependencies["answered"],
+  { profileId, pairingId, expiresAt }: SignalFile,
+  now: number,
+) {
+  const all = await records.all();
+  const kept = (peer: string) => (all[peer] ?? []).filter((each) => each.expiresAt > now);
+  for (const peer of Object.keys(all))
+    if (peer !== profileId && kept(peer).length < (all[peer]?.length ?? 0))
+      await records.set(peer, kept(peer).length > 0 ? kept(peer) : null);
+  const same = kept(profileId).filter((each) => each.pairingId !== pairingId);
+  await records.set(profileId, [...same, { pairingId, expiresAt }]);
 }
 
 /** Carries out one step: offers and answers go into the folder, and connecting needs nothing there. */
@@ -103,12 +146,18 @@ async function act(deps: FolderPairingDependencies, step: FolderStep, now: () =>
   const acted = ({ profileId, pairingId }: SignalFile) =>
     deps.acted.set(profileId, { pairingId, at: now() });
   if (step.type === "offer") {
-    const { code } = await deps.pairing.createOffer(step.to.profileId);
-    await publish(code, step.to.profileId);
+    const { profileId } = step.to;
+    // Checked before the offer, so a forged presence never gets a connection of this profile's.
+    const refused = await refusal(deps, step.to);
+    if (refused) return deps.log(`folder pairing: no offer to ${profileId}: ${refused}`);
+    const { code } = await deps.pairing.createOffer(profileId);
+    await publish(code, profileId);
   } else if (step.type === "answer") {
     const { code } = await deps.pairing.accept(step.offer.code);
     await acted(step.offer);
     if (code) await publish(code, step.offer.profileId);
+    // Once the answer is out, so a quit before it leaves the offer to answer after a relaunch.
+    await rememberAnswered(deps.answered, step.offer, now());
   } else {
     await deps.pairing.accept(step.answer.code);
     await acted(step.answer);
@@ -155,16 +204,18 @@ export function createFolderPairing(deps: FolderPairingDependencies) {
   const handle = async (seen: Seen) => {
     const state = await deps.state.read();
     if (!state) return;
-    const [me, links, pending, acted] = await Promise.all([
+    const [me, links, pending, acted, answered] = await Promise.all([
       deps.identity(),
       deps.link.all(),
       deps.pending.all(),
       deps.acted.all(),
+      deps.answered.all(),
     ]);
     // A verified link needs nothing; the presence stays, so the peer finds this one again.
     const linked = Object.keys(links).filter((peer) => links[peer]?.verified);
     const skip = [...linked, ...(state.paused ?? [])];
-    const steps = decideFolderSteps({ me: me.profileId, seen, skip, pending, acted, now: now() });
+    const situation = { me: me.profileId, seen, skip, pending, acted, answered, now: now() };
+    const steps = decideFolderSteps(situation);
     // One step at a time, so two never offer at once; one that fails leaves the others theirs.
     await steps.reduce(
       (done, step) => done.then(() => act(deps, step, now).catch(failed)),

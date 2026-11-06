@@ -1,9 +1,11 @@
-import { afterEach, describe, expect, test, vi } from "vite-plus/test";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vite-plus/test";
+import { fakeBrowser } from "wxt/testing/fake-browser";
 import { NOT_CONNECTED, createPeerChannel } from "@/background/peer-channel";
 import type { LinkCommand } from "@/messaging/peer-messages";
 import { peerMessage } from "@/p2p/protocol";
 import type { PeerMessage } from "@/p2p/protocol";
 import type { AuthorizedPeer, PeerLink } from "@/storage/peer-repository";
+import { PEER_IDENTITY, PEER_STATEMENT } from "./fake-peer";
 
 const ME = "11111111-1111-4111-8111-111111111111";
 const PEER = "22222222-2222-4222-8222-222222222222";
@@ -47,11 +49,16 @@ function channel(setup: Setup = {}) {
 }
 
 function authorizedPeer(profileId: string): AuthorizedPeer {
-  return { profileId, displayName: "Peer", fingerprint: "AB:CD" };
+  return { profileId, displayName: "Peer", fingerprint: "AB:CD", identity: PEER_IDENTITY };
 }
 
 const reply = (requestId: string, from = PEER) =>
   JSON.stringify(peerMessage("TABS_SNAPSHOT", { from, to: ME }, { requestId, tabs: [] }));
+
+// The channel's default hierarchy reads this profile's storage, which `isolate: false` shares across files.
+beforeEach(() => {
+  fakeBrowser.reset();
+});
 
 afterEach(() => {
   vi.useRealTimers();
@@ -60,7 +67,8 @@ afterEach(() => {
 describe("send", () => {
   test("addresses the authorized peer and logs only the type", async () => {
     const { send, sent, log } = channel();
-    const message = await send(PEER, "HELLO", { displayName: "Me", extensionVersion: "0.1.0" });
+    const hello = { displayName: "Me", extensionVersion: "0.1.0", identity: PEER_STATEMENT };
+    const message = await send(PEER, "HELLO", hello);
     expect(message).toMatchObject({ from: ME, to: PEER, type: "HELLO", displayName: "Me" });
     expect(sent).toEqual([message]);
     expect(log).toHaveBeenCalledWith("sent HELLO");

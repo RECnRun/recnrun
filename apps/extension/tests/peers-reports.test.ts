@@ -6,8 +6,8 @@ import {
   remoteRecordingsRepository,
 } from "@/storage/peer-repository";
 import { recordingSessionRepository } from "@/storage/recording-session-repository";
-import { ME, PEER, STRANGER, fromPeer } from "./fake-peer";
-import { peerBackground } from "./peer-background";
+import { ME, PEER, PEER_HELLO, STRANGER, fromPeer } from "./fake-peer";
+import { bindToPeer, peerBackground } from "./peer-background";
 
 const session = { tabId: 4, status: "recording" as const, banked: 0, since: 1 };
 const TAB = { id: 3, windowId: 1, incognito: false as const, title: "Shop", url: "https://s/" };
@@ -123,6 +123,7 @@ describe("this profile's session", () => {
   test("runs as the peer commands, and its end clears the controller marker", async () => {
     const peers = await peerBackground();
     await peers.connect();
+    await bindToPeer();
     const shop = await fakeBrowser.tabs.create({ url: "https://shop.example/" });
     const start = fromPeer("SESSION_START", { tabId: shop.id ?? -1 });
     await peers.receive(start);
@@ -139,6 +140,19 @@ describe("this profile's session", () => {
     await vi.waitFor(() =>
       expect(peers.link.frames().at(-1)).toMatchObject({ type: "SESSION_STATUS", session: null }),
     );
+  });
+
+  test("drops a command from a peer that is not its bound master, with one log line", async () => {
+    const peers = await peerBackground();
+    await peers.connect();
+    const shop = await fakeBrowser.tabs.create({ url: "https://shop.example/" });
+    peers.log.mockClear();
+    await peers.receive(fromPeer("SESSION_START", { tabId: shop.id ?? -1 }));
+    expect(peers.link.sentTypes()).not.toContain("COMMAND_RESULT");
+    expect(await recordingSessionRepository.read()).toBeNull();
+    expect(peers.log.mock.calls).toEqual([
+      ["[RECnRun peer]", `REFUSED SESSION_START from ${PEER}: not the bound master`],
+    ]);
   });
 
   test("ending a session clears the marker even without a link", async () => {
@@ -161,10 +175,13 @@ describe("the peer's reports", () => {
     });
     await peers.receive(fromPeer("TABS_CHANGED", { tabs: [] }));
     expect(await peers.routes.request({ type: "tabs", peer: PEER })).toStrictEqual({ tabs: [] });
-    await peers.receive(fromPeer("HELLO", { displayName: "Desk", extensionVersion: "0.1.0" }));
+    await peers.receive(fromPeer("HELLO", PEER_HELLO));
     const listed = peers.routes.request({ type: "tabs", peer: PEER });
-    await vi.waitFor(() => expect(peers.link.sentTypes().at(-1)).toBe("GET_TABS"));
-    const ask = peers.link.frames().at(-1) as unknown as { id: string };
+    // Found by type: a TABS_CHANGED report from the HELLO may follow the request (CI run 41730590018).
+    await vi.waitFor(() => expect(peers.link.sentTypes()).toContain("GET_TABS"));
+    const ask = peers.link.frames().find(({ type }) => type === "GET_TABS") as unknown as {
+      id: string;
+    };
     await peers.receive(fromPeer("TABS_SNAPSHOT", { requestId: ask.id, tabs: [TAB] }));
     expect(await listed).toStrictEqual({ tabs: [TAB] });
     expect(peers.link.notices.length).toBeGreaterThan(3);
@@ -173,7 +190,8 @@ describe("the peer's reports", () => {
   test("a HELLO renames the authorized peer, and is answered with the session", async () => {
     const peers = await peerBackground();
     await peers.connect();
-    await peers.receive(fromPeer("HELLO", { displayName: "Studio", extensionVersion: "0.2.0" }));
+    const renamed = { ...PEER_HELLO, displayName: "Studio", extensionVersion: "0.2.0" };
+    await peers.receive(fromPeer("HELLO", renamed));
     expect(await authorizedPeersRepository.get(PEER)).toMatchObject({ displayName: "Studio" });
     expect(peers.link.frames().at(-1)).toMatchObject({ type: "SESSION_STATUS", session: null });
   });

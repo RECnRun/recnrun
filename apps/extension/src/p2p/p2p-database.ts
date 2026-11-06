@@ -44,3 +44,16 @@ export const readStored = (store: Store, key: string): Promise<unknown> =>
 
 export const writeStored = async (store: Store, key: string, value: unknown): Promise<void> =>
   void (await inStore(store, "readwrite", (objects) => objects.put(value, key)));
+
+/** Stores `value` unless `key` holds one already, and says whether it did: a first write wins. */
+export const addStored = (store: Store, key: string, value: unknown): Promise<boolean> =>
+  inStore(store, "readwrite", (objects) => objects.add(value, key)).then(
+    () => true,
+    (error: unknown) => {
+      if (error instanceof DOMException && error.name === "ConstraintError") return false;
+      throw error;
+    },
+  );
+
+export const deleteStored = async (store: Store, key: string): Promise<void> =>
+  await inStore(store, "readwrite", (objects) => objects.delete(key));

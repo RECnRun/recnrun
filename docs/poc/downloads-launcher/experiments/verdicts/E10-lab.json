@@ -1,0 +1,191 @@
+[
+  {
+    "experiment": "E10",
+    "hypothesis": "E10.pipe.load",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "a clean base started by install.sh on the DevTools pipe",
+    "debugger": "none",
+    "observations": [
+      {
+        "install": {
+          "code": 0,
+          "out": {
+            "extensionId": "omllgeochjfpkjbkpcgjmnnbncdpiedd",
+            "installS": "7"
+          },
+          "err": "install.sh: pid=367",
+          "ms": 7136
+        },
+        "entry": {
+          "file": "Preferences",
+          "location": 4,
+          "path": "/workspace/apps/extension/.output/chrome-mv3-poc-d0",
+          "flags": 38,
+          "developerMode": true
+        },
+        "left": [],
+        "checks": {
+          "noExtensionBefore": true,
+          "exitZero": true,
+          "pinnedId": true,
+          "unpackedFromBuild": true,
+          "cdpFlagDropped": true,
+          "chromeClosed": true
+        }
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "mode": "smoke",
+    "verdict": "pass",
+    "samples": 1
+  },
+  {
+    "experiment": "E10",
+    "hypothesis": "E10.pipe.persistFirstRelaunch",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": false,
+    "variant": "poc-d0",
+    "topology": "a clean base started by base.sh template with no debugging flag after install.sh closed it",
+    "debugger": "none",
+    "observations": [
+      {
+        "template": {
+          "code": 0,
+          "out": {
+            "profileId": "14047e05-6e5c-43c7-bb66-516efb5fb25f",
+            "token": "709ad4b1-40a0-4553-a0ea-03a222d9f9dd",
+            "root": "/tmp/recnrun-e10-J9l5O0/bases/base-v1/downloads"
+          },
+          "err": "base.sh: pid=898",
+          "ms": 1047
+        },
+        "quit": {
+          "code": 0,
+          "err": "base.sh: stopped pid 898"
+        },
+        "after": {
+          "file": "Preferences",
+          "location": 4,
+          "path": "/workspace/apps/extension/.output/chrome-mv3-poc-d0",
+          "flags": 38,
+          "developerMode": true
+        },
+        "downloads": [
+          "RECnRun",
+          "RECnRun/poc",
+          "RECnRun/poc/lab",
+          "RECnRun/poc/lab/acks",
+          "RECnRun/poc/lab/peers",
+          "RECnRun/poc/lab/peers/14047e05-6e5c-43c7-bb66-516efb5fb25f",
+          "RECnRun/poc/lab/peers/14047e05-6e5c-43c7-bb66-516efb5fb25f/presence.json",
+          "RECnRun/poc/lab/acks/14047e05-6e5c-43c7-bb66-516efb5fb25f",
+          "RECnRun/poc/lab/acks/14047e05-6e5c-43c7-bb66-516efb5fb25f/709ad4b1-40a0-4553-a0ea-03a222d9f9dd.json"
+        ],
+        "checks": {
+          "acked": true,
+          "downloadsInsideBase": true,
+          "noDebuggingFlag": true,
+          "quit": true
+        }
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "mode": "smoke",
+    "verdict": "pass",
+    "samples": 1
+  },
+  {
+    "experiment": "E10",
+    "hypothesis": "E10.pipe.persistSecondRelaunch",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": false,
+    "variant": "poc-d0",
+    "topology": "a clean base started by base.sh template with no debugging flag after install.sh closed it",
+    "debugger": "none",
+    "observations": [
+      {
+        "template": {
+          "code": 0,
+          "out": {
+            "profileId": "14047e05-6e5c-43c7-bb66-516efb5fb25f",
+            "token": "09ed1225-47da-44c7-959d-55ac953395d6",
+            "root": "/tmp/recnrun-e10-J9l5O0/bases/base-v1/downloads"
+          },
+          "err": "base.sh: pid=1168",
+          "ms": 1042
+        },
+        "quit": {
+          "code": 0,
+          "err": "base.sh: stopped pid 1168"
+        },
+        "after": {
+          "file": "Preferences",
+          "location": 4,
+          "path": "/workspace/apps/extension/.output/chrome-mv3-poc-d0",
+          "flags": 38,
+          "developerMode": true
+        },
+        "downloads": [
+          "RECnRun",
+          "RECnRun/poc",
+          "RECnRun/poc/lab",
+          "RECnRun/poc/lab/acks",
+          "RECnRun/poc/lab/peers",
+          "RECnRun/poc/lab/peers/14047e05-6e5c-43c7-bb66-516efb5fb25f",
+          "RECnRun/poc/lab/peers/14047e05-6e5c-43c7-bb66-516efb5fb25f/presence.json",
+          "RECnRun/poc/lab/acks/14047e05-6e5c-43c7-bb66-516efb5fb25f",
+          "RECnRun/poc/lab/acks/14047e05-6e5c-43c7-bb66-516efb5fb25f/09ed1225-47da-44c7-959d-55ac953395d6.json",
+          "RECnRun/poc/lab/acks/14047e05-6e5c-43c7-bb66-516efb5fb25f/709ad4b1-40a0-4553-a0ea-03a222d9f9dd.json"
+        ],
+        "checks": {
+          "acked": true,
+          "downloadsInsideBase": true,
+          "noDebuggingFlag": true,
+          "quit": true
+        },
+        "freeze": {
+          "code": 0,
+          "err": "",
+          "marker": "setting=base-v1\nextensionId=omllgeochjfpkjbkpcgjmnnbncdpiedd\nprofileId=14047e05-6e5c-43c7-bb66-516efb5fb25f\nnamespace=lab\nfrozenAt=1793890829\ninstall=unpacked\nunpackedPath=/workspace/apps/extension/.output/chrome-mv3-poc-d0\n"
+        }
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "mode": "smoke",
+    "verdict": "pass",
+    "samples": 1
+  },
+  {
+    "experiment": "E10",
+    "hypothesis": "E10.policy.forcelist",
+    "chrome": "Google Chrome 157.0.8103.38",
+    "environment": "lab",
+    "install": "managed-policy",
+    "label": "strict",
+    "externalClient": false,
+    "variant": "poc-d0",
+    "topology": "a clean base with poc-d0 named in ExtensionInstallForcelist",
+    "debugger": "none",
+    "verdict": "unavailable",
+    "error": "ExtensionInstallForcelist needs a packed CRX behind an update manifest and a mandatory policy: on Linux /etc/opt/chrome/policies/managed belongs to root, and on macOS a user-level plist value is only recommended while ExtensionManagement reads the force list only when it is managed (extension_management.cc l=724 and l=994); the poc-d0 build is unpacked, and the POC builds no CRX server (decision 4).",
+    "samples": 0,
+    "gestures": 0,
+    "steps": [],
+    "observations": [],
+    "mode": "smoke"
+  }
+]

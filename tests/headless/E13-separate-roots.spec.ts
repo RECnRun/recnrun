@@ -1,0 +1,79 @@
+import { test } from "../browser/fixtures/chrome.ts";
+import { expectEveryHypothesis, recordHypothesis } from "../experiments/outcome.ts";
+import { sized } from "../experiments/samples.ts";
+import { cloneLab, exclusiveSample, replayed, roundSample } from "./fixtures/e13-clones.ts";
+import type { RoundOps } from "./fixtures/e13-clones.ts";
+import { EXPERIMENT, HYPOTHESES, cellOf, record, recorderOf } from "./fixtures/e13-cells.ts";
+import { bootstrapTabSample } from "./fixtures/e13-diagnostic.ts";
+import { alternateCell, workerCells } from "./fixtures/e13-flow.ts";
+import { v1Lab } from "./fixtures/e13-lab.ts";
+
+/*
+ * E13 (POC PLAN.md P7.4, T6 to T9): the master on a root of its own, workers each on a root of their
+ * own, opened headless by the launcher's scripts with no CDP client on any worker. The master is a
+ * headed Playwright Chrome on Xvfb that stands in for the personal Default. A failed hypothesis is a
+ * verdict; the last test fails only when one left none.
+ */
+
+const WORKERS = sized(4, 2);
+const CLONES = sized(3, 2);
+
+test.describe.configure({ mode: "serial" });
+
+test("headless workers on separate roots: link, commands, tabs, navigation, marker, background", async () => {
+  const lab = await v1Lab(WORKERS);
+  try {
+    await workerCells(lab, recorderOf());
+  } finally {
+    await lab.dispose();
+  }
+});
+
+test("one worker root opened headed, headless, headed keeps its identity, cookie, and link", async () => {
+  const lab = await v1Lab(1);
+  try {
+    await alternateCell(lab, recorderOf());
+  } finally {
+    await lab.dispose();
+  }
+});
+
+test("clones of the frozen base open headless, link to the master, answer, and stay exclusive", async ({
+  browserName,
+}, testInfo) => {
+  test.skip(browserName === "firefox", "Chrome only");
+  // Three rounds of clones and three exclusivity samples take longer than the config's ten minutes.
+  test.setTimeout(sized(1_500_000, 600_000));
+  const lab = await cloneLab(testInfo);
+  const topology = `${CLONES} clones of one frozen base opened by clone-open.sh headless`;
+  try {
+    // Each round's clones are asked in that round; the ops cells replay the rounds' samples.
+    const ops: RoundOps = { tabs: [], marker: [], commands: [] };
+    const names = ["A", "B", "C"].slice(0, CLONES);
+    await record("t9.clones", topology, () => roundSample(lab, names, ops));
+    const opened = `${topology}; the master opens the test page in each clone, in every round`;
+    await record("ops.tabs", opened, replayed(ops.tabs));
+    await record("ops.marker", opened, replayed(ops.marker));
+    await record("t9.commands", opened, replayed(ops.commands));
+    await record("t9.exclusive", `${topology}; a running clone is asked for the other mode`, () =>
+      exclusiveSample(lab),
+    );
+  } finally {
+    await lab.dispose();
+  }
+});
+
+test("diagnostic: a headless worker's only target is its bootstrap tab, which it does not share", async () => {
+  const topology =
+    "1 hand-installed worker opened by open.sh headless with a debugging port added; Playwright is attached to it, and the master reads the tabs it shares";
+  const cell = {
+    ...(await cellOf("diag.bootstrapTab", "")),
+    topology,
+    debugger: "attached" as const,
+  };
+  await recordHypothesis(cell, bootstrapTabSample, { full: 1 });
+});
+
+test("every E13 hypothesis left a verdict", async () => {
+  await expectEveryHypothesis(EXPERIMENT, HYPOTHESES);
+});

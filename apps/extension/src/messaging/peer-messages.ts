@@ -1,7 +1,7 @@
 import * as v from "valibot";
 import { PresenceSchema, SignalFileSchema } from "@/p2p/folder-rendezvous";
 import { DisplayNameSchema } from "@/p2p/pairing-code";
-import { MAX_FRAME_LENGTH, ProfileIdSchema } from "@/p2p/protocol";
+import { MAX_FRAME_LENGTH, ProfileIdSchema, WebUrlSchema } from "@/p2p/protocol";
 
 const TabIdSchema = v.pipe(v.number(), v.integer(), v.minValue(0));
 const SdpSchema = v.pipe(v.string(), v.nonEmpty(), v.maxLength(64 * 1024));
@@ -35,6 +35,7 @@ export const PeerRequestSchema = v.variant("type", [
   kind("folder-release", {}),
   kind("tabs", peer),
   kind("activate", { ...peer, tabId: TabIdSchema }),
+  kind("open-tab", { ...peer, url: WebUrlSchema }),
   kind("session-start", { ...peer, tabId: TabIdSchema }),
   kind("session-set", { ...peer, status: v.picklist(["recording", "paused"]) }),
   kind("session-stop", peer),

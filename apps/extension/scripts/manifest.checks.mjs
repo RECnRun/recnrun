@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
@@ -59,4 +59,60 @@ await test("the production build leaves out the cross-profile POC", () => {
   assert.equal(existsSync(new URL("../.output/chrome-mv3/offscreen.html", import.meta.url)), false);
   const background = readFileSync(new URL("../.output/chrome-mv3/background.js", import.meta.url));
   assert.doesNotMatch(String(background), /createDocument|RTCPeerConnection/);
+});
+
+await test("the production build leaves out every POC-only permission and page", () => {
+  const manifest = productionManifest();
+  assert.equal(manifest.key, undefined);
+  for (const permission of ["downloads", "debugger", "offscreen", "alarms"]) {
+    assert.ok(!manifest.permissions.includes(permission), permission);
+  }
+  for (const page of ["diagnostics.html", "bootstrap.html"]) {
+    assert.equal(
+      existsSync(new URL(`../.output/chrome-mv3/${page}`, import.meta.url)),
+      false,
+      page,
+    );
+  }
+  const background = readFileSync(new URL("../.output/chrome-mv3/background.js", import.meta.url));
+  assert.doesNotMatch(String(background), /downloads\.download/);
+});
+
+await test("the production build leaves out the POC's Downloads presence", () => {
+  const output = new URL("../.output/chrome-mv3/", import.meta.url);
+  for (const file of readdirSync(output, { recursive: true, encoding: "utf8" })) {
+    if (!file.endsWith(".js") && !file.endsWith(".html")) continue;
+    const code = readFileSync(new URL(file, output), "utf8");
+    assert.doesNotMatch(
+      code,
+      /presence\.json|downloads-presence|poc-presence|POC_FINGERPRINT|POC_PUBLISH_PRESENCE|POC_LAUNCHER_ACK|registry\.json/,
+      file,
+    );
+  }
+});
+
+await test("the production build leaves out the POC's file:// read", () => {
+  const output = new URL("../.output/chrome-mv3/", import.meta.url);
+  for (const file of readdirSync(output, { recursive: true, encoding: "utf8" })) {
+    if (!file.endsWith(".js") && !file.endsWith(".html")) continue;
+    assert.doesNotMatch(readFileSync(new URL(file, output), "utf8"), /POC_READ_FILE/, file);
+  }
+});
+
+await test("the production build leaves out the POC's roles, pins, answered offers, and their storage", () => {
+  const output = new URL("../.output/chrome-mv3/", import.meta.url);
+  for (const file of readdirSync(output, { recursive: true, encoding: "utf8" })) {
+    if (!file.endsWith(".js") && !file.endsWith(".html")) continue;
+    const code = readFileSync(new URL(file, output), "utf8");
+    assert.doesNotMatch(
+      code,
+      /local:role|local:boundWorkers|local:answeredOffers|local:peerPins|pinnedAt|REFUSED |not the bound master/,
+      file,
+    );
+  }
+});
+
+await test("no content script of the production build matches file:// (POC §4)", () => {
+  const matches = productionManifest().content_scripts.flatMap((script) => script.matches);
+  assert.ok(!matches.some((pattern) => /^(file|\*):/.test(pattern)), matches.join(", "));
 });

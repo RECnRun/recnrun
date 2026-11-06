@@ -8,6 +8,7 @@ const connected: PeerView = {
     profileId: "22222222-2222-4222-8222-222222222222",
     displayName: "Desk",
     fingerprint: "AB:CD:EF",
+    identity: "A".repeat(87),
   },
   link: { state: "connected", verified: true },
   peerSession: null,
@@ -15,6 +16,7 @@ const connected: PeerView = {
   paused: false,
   folder: "granted",
   folderPairing: false,
+  rendezvous: { kind: "folder", available: true },
 };
 const DESK = connected.peer.profileId;
 const STUDIO = "33333333-3333-4333-8333-333333333333";

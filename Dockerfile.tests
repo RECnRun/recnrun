@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM mcr.microsoft.com/playwright:v1.64.1-noble@sha256:7852dc5a7d72f5fe458a597d690f6c42fbc8e9e26ddfa95f8e6ef552558d9bbf
+FROM mcr.microsoft.com/playwright:v1.64.1-noble@sha256:7852dc5a7d72f5fe458a597d690f6c42fbc8e9e26ddfa95f8e6ef552558d9bbf AS runtime
 
 ENV VP_HOME=/opt/vite-plus \
     VP_NODE_VERSION=24.21.0 \
@@ -11,11 +11,21 @@ RUN curl -fsSL https://vite.plus -o /tmp/install-vp.sh \
     && rm /tmp/install-vp.sh \
     && vp env install node@24.21.0 pnpm@12.14.0
 
-# The end-to-end tests drive Chrome's own folder picker and prompts on the Xvfb display.
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends xdotool scrot \
-    && rm -rf /var/lib/apt/lists/*
+# Google Chrome Stable from Google's apt repository for tests/browser and tests/experiments; tests/e2e keeps the image's Chromium.
+# xdotool and scrot drive Chrome's own folder picker and prompts on the Xvfb display.
+# iproute2 gives scripts/test-container-entry.sh the on-link default route of the internal network and the tc drop on eth0,
+# and iptables (nf_tables backend) its lo-only OUTPUT filter.
+# shellcheck lints the launcher scripts under scripts/poc-cross-profile (vp run test:scripts).
+RUN curl -fsSL https://dl.google.com/linux/linux_signing_key.pub -o /etc/apt/keyrings/google-chrome.asc \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/google-chrome.asc] https://dl.google.com/linux/chrome/deb/ stable main" \
+        > /etc/apt/sources.list.d/google-chrome.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends google-chrome-stable xdotool scrot iproute2 iptables shellcheck \
+    && rm -rf /var/lib/apt/lists/* \
+    && google-chrome --version
 
+# tests/container/runner.checks.mjs builds this stage alone to check the browser.
+FROM runtime
 WORKDIR /workspace
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/website/package.json ./apps/website/package.json
@@ -31,7 +41,21 @@ COPY . .
 # pnpm skips "prepare" when node_modules is already current, so generate WXT's types explicitly.
 RUN vp install --frozen-lockfile --offline \
     && vp run extension#wxt:prepare \
-    && mkdir -p coverage test-results playwright-report
+    && mkdir -p coverage test-results playwright-report .artifacts/evidence /opt/recnrun
 
-ENTRYPOINT ["xvfb-run", "-a", "--server-args=-screen 0 1920x1440x24 -nolisten tcp", "vp", "run", "--no-cache"]
+# scripts/test-container.mjs copies this file into the run's versions.json.
+RUN node -e ' \
+        const { execFileSync } = require("node:child_process"); \
+        const run = (file, ...args) => execFileSync(file, args, { encoding: "utf8" }).trim(); \
+        const versions = { \
+          chrome: run("google-chrome", "--version"), \
+          node: process.version, \
+          pnpm: run("pnpm", "--version"), \
+          playwright: run("node_modules/.bin/playwright", "--version").replace(/^Version /, ""), \
+        }; \
+        require("node:fs").writeFileSync("/opt/recnrun/versions.json", JSON.stringify(versions, null, 2) + "\n");' \
+    && cat /opt/recnrun/versions.json
+
+
+ENTRYPOINT ["sh", "/workspace/scripts/test-container-entry.sh"]
 CMD ["verify:local"]

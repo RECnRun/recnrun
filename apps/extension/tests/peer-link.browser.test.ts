@@ -127,6 +127,19 @@ describe("liveness", () => {
     expect([...alice.frames, ...bob.frames]).toEqual([]);
   });
 
+  test("counts the beats it sends and keeps when the peer was last heard", async () => {
+    const [alice, bob] = [await side(true, quick), await side(true, quick)];
+    expect(alice.link.liveness()).toEqual({ beats: 0 });
+    const started = Date.now();
+    await pair(alice, bob);
+    await new Promise((resolve) => setTimeout(resolve, 1_000));
+    const { heardAt, beats } = alice.link.liveness();
+    expect(beats).toBeGreaterThanOrEqual(5);
+    expect(heardAt).toBeGreaterThanOrEqual(started);
+    alice.link.close();
+    expect(alice.link.liveness().heardAt).toBe(heardAt);
+  });
+
   test("drops a link whose peer went silent, as when its browser quits", async () => {
     const [alice, bob] = [await side(true, quick), await side(true, { heartbeatMs: 60_000 })];
     await pair(alice, bob);

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, test, vi } from "vite-plus/test";
 import { fakeBrowser } from "wxt/testing/fake-browser";
-import { askLink, closeOffscreen } from "@/background/link";
+import { askLink, closeOffscreen, ensureOffscreen } from "@/background/link";
 import { OFFSCREEN_PAGE } from "@/background/listener";
 import { linkCommandMessage } from "@/messaging/peer-messages";
 import { PEER, answering } from "./fake-peer";
@@ -67,4 +67,64 @@ test("closes the offscreen document only when one is open", async () => {
   offscreen(true);
   await closeOffscreen();
   expect(close).toHaveBeenCalledOnce();
+});
+
+/** Chrome reports the offscreen frame as soon as creation starts, before its page has loaded. */
+function slowCreation() {
+  let created = false;
+  let finish = () => {};
+  vi.spyOn(fakeBrowser.runtime, "getContexts").mockImplementation(
+    answering(() => (created ? [{}] : [])),
+  );
+  const create = vi.spyOn(fakeBrowser.offscreen, "createDocument").mockImplementation(
+    answering(
+      () =>
+        new Promise<void>((resolve) => {
+          created = true;
+          finish = resolve;
+        }),
+    ),
+  );
+  return {
+    create,
+    finish: () => finish(),
+    reset: () => {
+      created = false;
+    },
+  };
+}
+
+const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+test("a second caller waits for a creation that is still loading", async () => {
+  const { finish } = slowCreation();
+  const state = { secondDone: false };
+  const first = ensureOffscreen();
+  await flush();
+  const second = ensureOffscreen().then(() => (state.secondDone = true));
+  await flush();
+  expect(state.secondDone).toBe(false);
+  finish();
+  await Promise.all([first, second]);
+  expect(state.secondDone).toBe(true);
+});
+
+test("closing waits for a pending creation, and the next caller creates again", async () => {
+  const { create, finish, reset } = slowCreation();
+  const close = vi
+    .spyOn(fakeBrowser.offscreen, "closeDocument")
+    .mockImplementation(answering(reset));
+  const first = ensureOffscreen();
+  await flush();
+  const closing = closeOffscreen();
+  await flush();
+  expect(close).not.toHaveBeenCalled();
+  finish();
+  await Promise.all([first, closing]);
+  expect(close).toHaveBeenCalledOnce();
+  const again = ensureOffscreen();
+  await flush();
+  expect(create).toHaveBeenCalledTimes(2);
+  finish();
+  await again;
 });

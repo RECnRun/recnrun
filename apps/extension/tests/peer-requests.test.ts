@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vite-plus/test";
+import { describe, expect, test, vi } from "vite-plus/test";
 import { handlePeerRequest } from "@/background/peer-requests";
 import { ME, PEER, STRANGER } from "./fake-peer";
 import { TAB, VERIFIED, identity, other, peer, requests, withOther } from "./peer-requests-fixture";
@@ -14,6 +14,7 @@ describe("the status", () => {
       paused: [],
       folder: "granted",
       folderPairing: false,
+      rendezvous: { kind: "folder", available: true },
     });
     await deps.link.set(PEER, VERIFIED);
     expect(await handlePeerRequest(deps, { type: "status" })).toMatchObject({
@@ -76,6 +77,27 @@ describe("the status", () => {
     expect(await handlePeerRequest(deps, { type: "status" })).toMatchObject({ folder: "none" });
     await handlePeerRequest(deps, { type: "folder-pair" });
     expect(deps.folder.start).toHaveBeenCalledOnce();
+  });
+
+  test("reports the transport: the folder available once granted, Downloads once its root is known", async () => {
+    const { deps } = requests();
+    deps.folder.access.mockResolvedValue("prompt");
+    expect(await handlePeerRequest(deps, { type: "status" })).toMatchObject({
+      rendezvous: { kind: "folder", available: false },
+    });
+    let known = false;
+    const downloads = {
+      ...deps,
+      folder: { ...deps.folder, downloadsAvailable: async () => known },
+    };
+    expect(await handlePeerRequest(downloads, { type: "status" })).toMatchObject({
+      folder: "prompt",
+      rendezvous: { kind: "downloads", available: false },
+    });
+    known = true;
+    expect(await handlePeerRequest(downloads, { type: "status" })).toMatchObject({
+      rendezvous: { kind: "downloads", available: true },
+    });
   });
 });
 
@@ -146,5 +168,37 @@ describe("one peer at a time", () => {
     await deps.link.set(STRANGER, { state: "failed", verified: false });
     await handlePeerRequest(deps, { type: "folder-release" });
     expect(deps.folder.release).toHaveBeenCalledOnce();
+  });
+
+  describe("the launcher's pause policy", () => {
+    const marked = async () => {
+      const paired = await withOther();
+      const mark = vi.fn(async () => {});
+      return { ...paired, mark, deps: { ...paired.deps, launcher: { mark } } };
+    };
+
+    test("disconnect states the pause, never forget's reason", async () => {
+      const { deps, mark } = await marked();
+      await handlePeerRequest(deps, { type: "disconnect", peer: PEER });
+      expect(mark.mock.calls).toEqual([["disconnect"]]);
+    });
+
+    test("forget states the pause once, with its own reason", async () => {
+      const { deps, mark } = await marked();
+      await handlePeerRequest(deps, { type: "forget", peer: PEER });
+      expect(mark.mock.calls).toEqual([["forget"]]);
+    });
+
+    test.each(["reconnect", "pair-again"] as const)("%s states the return", async (type) => {
+      const { deps, mark } = await marked();
+      await handlePeerRequest(deps, { type, peer: PEER });
+      expect(mark.mock.calls).toEqual([["resumed"]]);
+    });
+
+    test("a build without the launcher disconnects as before", async () => {
+      const { deps } = await withOther();
+      await handlePeerRequest(deps, { type: "disconnect", peer: PEER });
+      expect(await deps.link.get(PEER)).toMatchObject({ reason: "closed-here" });
+    });
   });
 });

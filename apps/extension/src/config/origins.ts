@@ -1,15 +1,28 @@
 const PRODUCTION_MATCHES = ["https://recnrun.com/*"];
 const LOCAL_MATCHES = ["http://localhost/*", "http://127.0.0.1/*"];
 const LOCAL_MODES = new Set(["development", "test"]);
+const POC_MODES = new Set(["poc-d0", "poc-d1", "poc-d2"]);
 
 /** Local origins are trusted only in development and test builds, never in a published one. */
 export function contentScriptMatches(mode: string): string[] {
-  return LOCAL_MODES.has(mode) ? [...PRODUCTION_MATCHES, ...LOCAL_MATCHES] : PRODUCTION_MATCHES;
+  return LOCAL_MODES.has(mode) || POC_MODES.has(mode)
+    ? [...PRODUCTION_MATCHES, ...LOCAL_MATCHES]
+    : PRODUCTION_MATCHES;
 }
 
-/** The cross-profile POC exists only in development and test builds, never in a published one. */
+/** The downloads-launcher POC variants; they never ship. */
+export function pocEnabled(mode: string): boolean {
+  return POC_MODES.has(mode);
+}
+
+/** The cross-profile POC exists only in development, test, and POC builds, never in a published one. */
 export function peersEnabled(mode: string): boolean {
-  return LOCAL_MODES.has(mode);
+  return LOCAL_MODES.has(mode) || POC_MODES.has(mode);
+}
+
+/** Only the POC variants declare the debugger permission (d0 never does). */
+export function debuggerDeclared(mode: string): boolean {
+  return mode === "poc-d1" || mode === "poc-d2";
 }
 
 /** The privacy policy needs no bridge, so RECnRun runs nothing on it. */

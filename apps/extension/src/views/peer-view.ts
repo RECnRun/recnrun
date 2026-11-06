@@ -21,5 +21,4 @@ export function peerViews(status: PeerStatus): PeerView[] {
 }
 
 /** Whether any peer's link is verified now. */
-export const anyLinked = (status: PeerStatus | undefined) =>
-  status?.peers.some(({ link }) => link.verified) ?? false;
+export const anyLinked = (status: PeerStatus) => status.peers.some(({ link }) => link.verified);

@@ -1,9 +1,12 @@
+import { folderRendezvous } from "@/p2p/folder-rendezvous";
 import { readStored, writeStored } from "@/p2p/p2p-database";
+import { createSightingFilter, createSignalStamp } from "@/p2p/rendezvous-transport";
+import type { RendezvousTransport } from "@/p2p/rendezvous-transport";
 
 const STORE = "folders";
 const KEY = "recnrun";
 /** Where each profile pairs; recordings/ beside it is reserved for M1. */
-export const PAIRING_FOLDER = "pairing";
+const PAIRING_FOLDER = "pairing";
 const RECORDINGS_FOLDER = "recordings";
 
 /** Whether this profile may use the folder: none chosen, Chrome asks again, or granted. */
@@ -66,4 +69,39 @@ export async function allowFolder(load: typeof loadFolder = loadFolder): Promise
     mode: "readwrite",
   });
   if (state !== "granted") throw new Error("Chrome did not allow RECnRun to use the folder.");
+}
+
+interface FolderTransportOptions {
+  me: string;
+  /** The boot this document stamps its files with. */
+  boot: string;
+  load?: typeof loadFolder;
+  now?: () => number;
+}
+
+/** The rendezvous through the folder the user chose: its pairing area, read and written in place. */
+export function folderTransport({
+  me,
+  boot,
+  load = loadFolder,
+  now = Date.now,
+}: FolderTransportOptions): RendezvousTransport {
+  const stamp = createSignalStamp(now);
+  const sift = createSightingFilter();
+  const files = async () => {
+    const chosen = await load();
+    if (!chosen) throw new Error("Choose the RECnRun folder first.");
+    const pairing = await chosen.getDirectoryHandle(PAIRING_FOLDER, { create: true });
+    return folderRendezvous(pairing, me, now);
+  };
+  return {
+    kind: "folder",
+    available: async () => (await folderAccess(await load())) === "granted",
+    announce: async (presence) => (await files()).announce({ ...presence, boot }),
+    publish: async (signal) => (await files()).publish(stamp(signal, boot)),
+    look: async () => sift(await (await files()).look()),
+    discover: async () => [],
+    /** Removes this profile's presence and signals, whichever document wrote them. */
+    clean: async () => (await files()).clean(),
+  };
 }

@@ -1,0 +1,192 @@
+[
+  {
+    "experiment": "E0",
+    "hypothesis": "E0.loadUnpacked",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "test",
+    "topology": "single-root",
+    "debugger": "none",
+    "observations": [
+      {
+        "extensionId": "aohedjlnhghpahbgpcccgplhbidpfdeh",
+        "stateAfterQuit": {
+          "onDisk": false,
+          "location": 4,
+          "disableReasons": []
+        }
+      },
+      {
+        "extensionId": "aohedjlnhghpahbgpcccgplhbidpfdeh",
+        "stateAfterQuit": {
+          "onDisk": false,
+          "location": 4,
+          "disableReasons": []
+        }
+      },
+      {
+        "extensionId": "aohedjlnhghpahbgpcccgplhbidpfdeh",
+        "stateAfterQuit": {
+          "onDisk": false,
+          "location": 4,
+          "disableReasons": []
+        }
+      }
+    ],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "E0",
+    "hypothesis": "E0.loadUnpacked.persists",
+    "chrome": "Google Chrome 156.0.8078.79",
+    "environment": "lab",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "test",
+    "topology": "single-root",
+    "debugger": "none",
+    "observations": [
+      {
+        "extensionId": "aohedjlnhghpahbgpcccgplhbidpfdeh",
+        "stateAfterQuit": {
+          "onDisk": false,
+          "location": 4,
+          "disableReasons": []
+        },
+        "dashboardAfterRelaunch": false,
+        "runningAfterRelaunch": false,
+        "stateAfterRelaunch": {
+          "onDisk": false
+        },
+        "idAfterReinstall": "aohedjlnhghpahbgpcccgplhbidpfdeh"
+      },
+      {
+        "extensionId": "aohedjlnhghpahbgpcccgplhbidpfdeh",
+        "stateAfterQuit": {
+          "onDisk": false,
+          "location": 4,
+          "disableReasons": []
+        },
+        "dashboardAfterRelaunch": false,
+        "runningAfterRelaunch": false,
+        "stateAfterRelaunch": {
+          "onDisk": false
+        },
+        "idAfterReinstall": "aohedjlnhghpahbgpcccgplhbidpfdeh"
+      },
+      {
+        "extensionId": "aohedjlnhghpahbgpcccgplhbidpfdeh",
+        "stateAfterQuit": {
+          "onDisk": false,
+          "location": 4,
+          "disableReasons": []
+        },
+        "dashboardAfterRelaunch": false,
+        "runningAfterRelaunch": false,
+        "stateAfterRelaunch": {
+          "onDisk": false
+        },
+        "idAfterReinstall": "aohedjlnhghpahbgpcccgplhbidpfdeh"
+      }
+    ],
+    "verdict": "fail",
+    "error": "the worker did not answer after the relaunch; no RECnRun dashboard window after the relaunch; no prefs entry after the relaunch | the worker did not answer after the relaunch; no RECnRun dashboard window after the relaunch; no prefs entry after the relaunch | the worker did not answer after the relaunch; no RECnRun dashboard window after the relaunch; no prefs entry after the relaunch",
+    "samples": 3
+  },
+  {
+    "experiment": "E0",
+    "hypothesis": "E0.managedPolicy",
+    "verdict": "pass",
+    "samples": 3,
+    "chrome": "Google Chrome 156.0.8078.79",
+    "environment": "lab",
+    "install": "managed-policy",
+    "label": "strict",
+    "externalClient": false,
+    "variant": "test",
+    "topology": "single-root",
+    "debugger": "none",
+    "observations": [
+      {
+        "extensionId": "jmecoedcpkhbdpdgmmligabopcmaiheh",
+        "first": {
+          "ran": true,
+          "debuggingFlags": [],
+          "state": {
+            "onDisk": true,
+            "location": 7,
+            "disableReasons": []
+          }
+        },
+        "relaunch": {
+          "ran": true,
+          "debuggingFlags": [],
+          "state": {
+            "onDisk": true,
+            "location": 7,
+            "disableReasons": []
+          }
+        },
+        "requests": [
+          "GET /updates.xml?os=linux&arch=arm64&prod=chromecrx&prodchannel=&prodversion=156.0.8078.79&lang=en-US&acceptformat=crx3,puff&x=id%3Djmecoedcpkhbdpdgmmligabopcmaiheh%26v%3D0.0.0.0%26installsource%3Dnotfromwebstore%26installedby%3Dpolicy%26uc",
+          "GET /extension.crx"
+        ]
+      },
+      {
+        "extensionId": "fpmjlkikbbeemkjgccgpcblciepigdam",
+        "first": {
+          "ran": true,
+          "debuggingFlags": [],
+          "state": {
+            "onDisk": true,
+            "location": 7,
+            "disableReasons": []
+          }
+        },
+        "relaunch": {
+          "ran": true,
+          "debuggingFlags": [],
+          "state": {
+            "onDisk": true,
+            "location": 7,
+            "disableReasons": []
+          }
+        },
+        "requests": [
+          "GET /updates.xml?os=linux&arch=arm64&prod=chromecrx&prodchannel=&prodversion=156.0.8078.79&lang=en-US&acceptformat=crx3,puff&x=id%3Dfpmjlkikbbeemkjgccgpcblciepigdam%26v%3D0.0.0.0%26installsource%3Dnotfromwebstore%26installedby%3Dpolicy%26uc",
+          "GET /extension.crx"
+        ]
+      },
+      {
+        "extensionId": "llnjdehiklkklglogjnhpgeocbnplppa",
+        "first": {
+          "ran": true,
+          "debuggingFlags": [],
+          "state": {
+            "onDisk": true,
+            "location": 7,
+            "disableReasons": []
+          }
+        },
+        "relaunch": {
+          "ran": true,
+          "debuggingFlags": [],
+          "state": {
+            "onDisk": true,
+            "location": 7,
+            "disableReasons": []
+          }
+        },
+        "requests": [
+          "GET /updates.xml?os=linux&arch=arm64&prod=chromecrx&prodchannel=&prodversion=156.0.8078.79&lang=en-US&acceptformat=crx3,puff&x=id%3Dllnjdehiklkklglogjnhpgeocbnplppa%26v%3D0.0.0.0%26installsource%3Dnotfromwebstore%26installedby%3Dpolicy%26uc",
+          "GET /extension.crx"
+        ]
+      }
+    ]
+  }
+]

@@ -5,12 +5,16 @@ import type { Browser } from "wxt/browser";
 import type { BackgroundReply } from "@/messaging/background-reply";
 import { LinkCommandMessageSchema, linkEventMessage } from "@/messaging/peer-messages";
 import type { LinkCommand, LinkEvent } from "@/messaging/peer-messages";
-import { createFolderWatch } from "@/offscreen/folder-watch";
-import type { FolderWatch } from "@/offscreen/folder-watch";
+import type { LinkLiveness } from "@/messaging/poc-liveness";
+import { createRendezvousWatch } from "@/offscreen/folder-watch";
+import type { RendezvousWatch } from "@/offscreen/folder-watch";
 import { certificateFingerprint, persistentCertificate } from "@/p2p/certificate-store";
-import { folderAccess, loadFolder } from "@/p2p/folder-store";
+import { folderAccess, folderTransport, loadFolder } from "@/p2p/folder-store";
+import { signedIdentity } from "@/p2p/identity-key";
+import type { IdentityClaim, IdentityStatement } from "@/p2p/identity-key";
 import { createPeerLink } from "@/p2p/peer-link";
 import type { PeerLink } from "@/p2p/peer-link";
+import type { RendezvousTransport } from "@/p2p/rendezvous-transport";
 
 type Send = (message: unknown) => Promise<unknown>;
 type Folder = () => Promise<FileSystemDirectoryHandle | undefined>;
@@ -19,8 +23,8 @@ type FolderCommand = Extract<LinkCommand, { type: `folder-${string}` }>;
 const isFolderCommand = (command: LinkCommand): command is FolderCommand =>
   command.type.startsWith("folder-");
 
-/** The folder's file work, which the background cannot do, since only a window holds the folder. */
-async function runFolderCommand(watch: FolderWatch, command: FolderCommand, folder: Folder) {
+/** The rendezvous's file work, which the background cannot do: only a window holds the folder or reads file://. */
+async function runFolderCommand(watch: RendezvousWatch, command: FolderCommand, folder: Folder) {
   switch (command.type) {
     case "folder-status":
       return { access: await folderAccess(await folder()) };
@@ -35,13 +39,16 @@ async function runFolderCommand(watch: FolderWatch, command: FolderCommand, fold
 
 interface Held {
   linkOf: (peer: string) => PeerLink;
-  watch: FolderWatch;
+  liveness: () => Record<string, LinkLiveness>;
+  watch: RendezvousWatch;
 }
 
 /** One link per peer, made on first use, each reporting its events under the peer's id. */
 function createLinks(certificate: RTCCertificate, report: (event: LinkEvent) => void) {
   const links = new Map<string, PeerLink>();
-  return (peer: string): PeerLink => {
+  const liveness = () =>
+    Object.fromEntries([...links].map(([peer, link]) => [peer, link.liveness()]));
+  const linkOf = (peer: string): PeerLink => {
     const known = links.get(peer);
     if (known) return known;
     const link: PeerLink = createPeerLink(
@@ -58,6 +65,7 @@ function createLinks(certificate: RTCCertificate, report: (event: LinkEvent) => 
     links.set(peer, link);
     return link;
   };
+  return { linkOf, liveness };
 }
 
 /** Runs one command; the offscreen document holds the connections and no logic beyond them. */
@@ -86,20 +94,38 @@ interface OffscreenOptions {
   send?: Send;
   certificate?: () => Promise<RTCCertificate>;
   folder?: Folder;
+  /** How a profile meets the others; the folder it chose unless a POC build passes Downloads. */
+  rendezvous?: (profileId: string) => RendezvousTransport;
+  /** Signs the presence's statement; the identity key in IndexedDB unless a test passes its own. */
+  sign?: (claim: IdentityClaim) => Promise<IdentityStatement>;
 }
+
+/** The folder, in a boot of this document's own, so a document made again stamps its files apart. */
+const folderRendezvousOf = (folder: Folder) => {
+  const boot = crypto.randomUUID();
+  return (me: string) => folderTransport({ me, boot, load: folder });
+};
 
 /** Forwards every frame and state change to the background, which decides what they mean. */
 export function startOffscreen({
   send = (message) => browser.runtime.sendMessage(message),
   certificate = persistentCertificate,
   folder = loadFolder,
-}: OffscreenOptions = {}): void {
+  rendezvous = folderRendezvousOf(folder),
+  sign = signedIdentity,
+}: OffscreenOptions = {}) {
   // A sleeping service worker wakes for the message; a closed one makes nothing to report to.
   const report = (event: LinkEvent) => void send(linkEventMessage(event)).catch(() => {});
   const ready = certificate().then((cert) => {
     const fingerprint = certificateFingerprint(cert) ?? "";
-    const watch = createFolderWatch({ report, fingerprint, folder });
-    return { linkOf: createLinks(cert, report), watch };
+    const signFor = (profileId: string) => sign({ profileId, fingerprint });
+    const watch = createRendezvousWatch({
+      report,
+      fingerprint,
+      sign: signFor,
+      transport: rendezvous,
+    });
+    return { ...createLinks(cert, report), watch };
   });
   const backgroundUrl = browser.runtime.getURL("/background.js");
   browser.runtime.onMessage.addListener(
@@ -122,4 +148,6 @@ export function startOffscreen({
       return true;
     },
   );
+  // POC builds answer for it (P3.6), so their heartbeat policy reads it without a link command.
+  return { liveness: async () => (await ready).liveness() };
 }

@@ -7,10 +7,14 @@ import {
   peerTabsRepository,
   remoteRecordingsRepository,
 } from "@/storage/peer-repository";
-import { FINGERPRINT, ME, PEER, STRANGER, fromPeer } from "./fake-peer";
+import { FINGERPRINT, ME, PEER, PEER_IDENTITY, STRANGER, fromPeer } from "./fake-peer";
 import { peerBackground } from "./peer-background";
+import { identityOf, signAs } from "./test-identity";
 
 const session = { tabId: 4, status: "recording" as const, banked: 0, since: 1 };
+const OTHER_FINGERPRINT = "12:34";
+const LAB_IDENTITY = await identityOf(STRANGER);
+const LAB_STATEMENT = await signAs({ profileId: STRANGER, fingerprint: OTHER_FINGERPRINT });
 
 beforeEach(() => {
   fakeBrowser.reset();
@@ -22,15 +26,22 @@ afterEach(() => {
 
 describe("two peers", () => {
   const tab = { id: 3, windowId: 1, incognito: false as const, title: "Shop", url: "https://s/" };
-  const OTHER_FINGERPRINT = "12:34";
+  const lab = {
+    profileId: STRANGER,
+    displayName: "Lab",
+    fingerprint: OTHER_FINGERPRINT,
+    identity: LAB_IDENTITY,
+  };
+  const desk = {
+    profileId: PEER,
+    displayName: "Desk",
+    fingerprint: FINGERPRINT,
+    identity: PEER_IDENTITY,
+  };
 
   test("a link that drops leaves the other peer's link, waiters, and tabs alone", async () => {
     const { routes, connect, receive, link } = await peerBackground();
-    await authorizedPeersRepository.set(STRANGER, {
-      profileId: STRANGER,
-      displayName: "Lab",
-      fingerprint: OTHER_FINGERPRINT,
-    });
+    await authorizedPeersRepository.set(STRANGER, lab);
     await connect();
     await connect(OTHER_FINGERPRINT, STRANGER);
     const mine = { session, controlledBy: ME };
@@ -54,13 +65,11 @@ describe("two peers", () => {
     expect(await pending).toEqual({ tabs: [] });
     // A new link to one peer starts from its next report; the other's stays.
     await connect(OTHER_FINGERPRINT, STRANGER);
-    const hello = { displayName: "Lab", extensionVersion: "0.1.0" };
+    const hello = { displayName: "Lab", extensionVersion: "0.1.0", identity: LAB_STATEMENT };
     await receive(fromPeer("HELLO", hello, STRANGER), STRANGER);
     expect(await peerTabsRepository.all()).toEqual({ [PEER]: { tabs: [] } });
   });
 
-  const lab = { profileId: STRANGER, displayName: "Lab", fingerprint: OTHER_FINGERPRINT };
-  const desk = { profileId: PEER, displayName: "Desk", fingerprint: FINGERPRINT };
   const membersSent = (frames: { type: string; to?: string; members?: unknown }[]) =>
     frames.filter((frame) => frame.type === "MEMBERS").map(({ to, members }) => ({ to, members }));
 
@@ -93,11 +102,7 @@ describe("two peers", () => {
 
   test("a frame claiming one peer's id over the other's link is dropped", async () => {
     const { connect, receive, link } = await peerBackground();
-    await authorizedPeersRepository.set(STRANGER, {
-      profileId: STRANGER,
-      displayName: "Lab",
-      fingerprint: OTHER_FINGERPRINT,
-    });
+    await authorizedPeersRepository.set(STRANGER, lab);
     await connect();
     await connect(OTHER_FINGERPRINT, STRANGER);
     await receive(fromPeer("GET_TABS", {}), STRANGER);

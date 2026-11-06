@@ -1,5 +1,6 @@
 import type { Page } from "@playwright/test";
 import { expect } from "./extension.ts";
+import { bindHierarchy } from "./hierarchy.ts";
 import type { Native } from "./native-dialogs.ts";
 import { linkStatus, pairingSection, peerStatus } from "./profiles.ts";
 import type { Profile } from "./profiles.ts";
@@ -39,8 +40,7 @@ export async function allowFolder(profile: Profile, native: Native) {
   return dialogs.allowInEitherPrompt();
 }
 
-/** Pairs two profiles, each choosing the folder in its own dashboard. */
-export async function pair(a: Profile, b: Profile, native: Native): Promise<void> {
+async function link(a: Profile, b: Profile, native: Native): Promise<void> {
   await chooseFolder(a, native);
   await expect(pairingSection(a.dashboard)).toContainText(WAITING);
   await chooseFolder(b, native);
@@ -48,14 +48,21 @@ export async function pair(a: Profile, b: Profile, native: Native): Promise<void
   await expect(linkStatus(b)).toHaveText(`Connected — ${a.name}`);
 }
 
+/** Pairs two profiles, each choosing the folder in its own dashboard, and binds `b` to master `a`. */
+export async function pair(a: Profile, b: Profile, native: Native): Promise<void> {
+  await link(a, b, native);
+  await bindHierarchy(a, [b]);
+}
+
 /**
  * Pairs every profile with every other, one newcomer at a time, as a user adds profiles: the
- * linked profiles' dashboards keep the folder grant (H2), so they find each newcomer there.
+ * linked profiles' dashboards keep the folder grant (H2), so they find each newcomer there. Every
+ * profile is bound to the first, its master, once all are linked.
  */
 export async function pairAll(profiles: Profile[], native: Native): Promise<void> {
   const [first, second, ...rest] = profiles;
   if (!first || !second) throw new Error("Pairing takes two profiles.");
-  await pair(first, second, native);
+  await link(first, second, native);
   const joined = [first, second];
   for (const next of rest) {
     await chooseFolder(next, native);
@@ -67,4 +74,5 @@ export async function pairAll(profiles: Profile[], native: Native): Promise<void
     }
     joined.push(next);
   }
+  await bindHierarchy(first, joined.slice(1));
 }

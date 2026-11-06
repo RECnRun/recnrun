@@ -18,10 +18,23 @@ if (command === "build") {
     writeFileSync(join(dirname(args[args.indexOf("--iidfile") + 1]), "coverage"), "Blocked");
   }
 }
+if (command === "network") {
+  const created = join(directory, "network-created");
+  if (args[1] === "create") writeFileSync(created, args.join(" "));
+  if (args[1] === "inspect") {
+    if (scenario === "external-network") console.log("false");
+    else if (existsSync(created)) console.log("true");
+    else {
+      console.error(`Error: No such network: ${args.at(-1)}`);
+      process.exit(1);
+    }
+  }
+}
 if (command === "create") console.log("fixture-container");
 if (command === "start") {
   console.log("Container test output");
   console.error("Container diagnostic output");
+  if (scenario === "dirty-during") writeFileSync(process.env.DOCKER_FIXTURE_TOUCH, "Changed");
   if (scenario === "interrupt") {
     const timer = setInterval(() => {
       if (existsSync(join(directory, "stopped"))) {
@@ -38,6 +51,14 @@ if (command === "wait") {
 if (command === "cp") {
   if (scenario === "copy-failure") process.exit(1);
   const destination = args.at(-1);
-  mkdirSync(destination, { recursive: true });
-  writeFileSync(join(destination, "evidence.txt"), "Test evidence");
+  if (args[1].endsWith("/versions.json")) {
+    const versions = { chrome: "Google Chrome 156.0.8078.80", node: "v24.21.0" };
+    writeFileSync(
+      destination,
+      JSON.stringify({ ...versions, pnpm: "12.14.0", playwright: "1.64.1" }),
+    );
+  } else {
+    mkdirSync(destination, { recursive: true });
+    writeFileSync(join(destination, "evidence.txt"), "Test evidence");
+  }
 }

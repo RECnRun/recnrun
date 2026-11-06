@@ -1,5 +1,6 @@
 import { RecordingSessionSchema } from "@recnrun/domain";
 import * as v from "valibot";
+import { IdentityKeySchema, IdentityStatementSchema, SIGNED } from "@/p2p/identity-key";
 
 const PEER_CHANNEL = "recnrun-peer";
 const PEER_PROTOCOL = 1;
@@ -12,6 +13,18 @@ const text = (max: number) => v.pipe(v.string(), v.maxLength(max));
 export const ProfileIdSchema = v.pipe(v.string(), v.uuid());
 const MessageIdSchema = v.pipe(v.string(), v.uuid());
 const TabIdSchema = v.pipe(v.number(), v.integer(), v.minValue(0));
+const MAX_URL_LENGTH = 2048;
+
+/** Whether `url` is an http or https address; a peer opens nothing else (no chrome://, extension, file, or script URL). */
+function isWebUrl(url: string): boolean {
+  try {
+    return ["http:", "https:"].includes(new URL(url).protocol);
+  } catch {
+    return false;
+  }
+}
+
+export const WebUrlSchema = v.pipe(v.string(), v.maxLength(MAX_URL_LENGTH), v.check(isWebUrl));
 export const FingerprintSchema = v.pipe(v.string(), v.regex(/^[0-9A-F:]+$/), v.maxLength(200));
 
 const envelope = {
@@ -52,11 +65,13 @@ const sessionStatus = {
 
 const reply = { requestId: MessageIdSchema };
 
-/** A profile the sender's verified links reach, as the sender pinned it. */
+/** A profile the sender's verified links reach, as the sender accepted it: its identity key too. */
 export const MemberSchema = v.strictObject({
   profileId: ProfileIdSchema,
   displayName: text(64),
   fingerprint: FingerprintSchema,
+  // Production has no peers; the cast types the entry its bundle folds away.
+  ...(SIGNED ? { identity: IdentityKeySchema } : ({} as { identity: typeof IdentityKeySchema })),
 });
 
 export type Member = v.InferOutput<typeof MemberSchema>;
@@ -66,11 +81,19 @@ const relay = { origin: ProfileIdSchema, target: ProfileIdSchema };
 
 /** The closed set of things a peer may say; anything else is dropped. */
 const PeerMessageSchema = v.variant("type", [
-  message("HELLO", { displayName: text(64), extensionVersion: text(32) }),
+  message("HELLO", {
+    displayName: text(64),
+    extensionVersion: text(32),
+    // The sender's statement for the certificate this link proved; production folds it away.
+    ...(SIGNED
+      ? { identity: IdentityStatementSchema }
+      : ({} as { identity: typeof IdentityStatementSchema })),
+  }),
   message("GET_TABS", {}),
   message("TABS_SNAPSHOT", { ...reply, ...SharedTabsSchema.entries }),
   message("TABS_CHANGED", SharedTabsSchema.entries),
   message("ACTIVATE_TAB", { tabId: TabIdSchema }),
+  message("OPEN_TAB", { url: WebUrlSchema }),
   message("SESSION_START", { tabId: TabIdSchema }),
   message("SESSION_SET_STATUS", { status: v.picklist(["recording", "paused"]) }),
   message("SESSION_STOP", {}),
@@ -88,6 +111,10 @@ const PeerMessageSchema = v.variant("type", [
 
 export type PeerMessage = v.InferOutput<typeof PeerMessageSchema>;
 export type PeerType = PeerMessage["type"];
+
+/** Every message type the protocol defines, as the schema lists them. */
+export const peerTypes = (): PeerType[] =>
+  PeerMessageSchema.options.map((option) => option.entries.type.literal);
 export type MessageOf<T extends PeerType> = Extract<PeerMessage, { type: T }>;
 export type PeerPayload<T extends PeerType> = Omit<MessageOf<T>, keyof typeof envelope | "type">;
 

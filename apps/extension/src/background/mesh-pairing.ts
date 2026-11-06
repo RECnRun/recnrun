@@ -71,9 +71,10 @@ function wanted({ me, state, links }: Known, partner: string) {
 function partnerVia(known: Known, relay: string, partner: string): Member | undefined {
   if (!wanted(known, partner) || known.links[relay]?.verified !== true) return undefined;
   const member = known.members[relay]?.find((each) => each.profileId === partner);
-  // A relay cannot swap the certificate of a profile this one pinned already.
-  const pinned = known.authorized[partner]?.fingerprint ?? member?.fingerprint;
-  return member?.fingerprint === pinned ? member : undefined;
+  // A relay cannot swap the identity of a profile this one accepted already; a renewed
+  // certificate keeps it, and the codes that follow must be signed by it.
+  const accepted = known.authorized[partner]?.identity ?? member?.identity;
+  return member?.identity === accepted ? member : undefined;
 }
 
 /** A profile this one met already: paired once, and linked or tried in this session. */

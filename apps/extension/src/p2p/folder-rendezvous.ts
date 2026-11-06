@@ -1,4 +1,5 @@
 import * as v from "valibot";
+import { IdentityStatementSchema, SIGNED } from "@/p2p/identity-key";
 import { DisplayNameSchema, decodePairing } from "@/p2p/pairing-code";
 import { FingerprintSchema, MAX_CODE_LENGTH, ProfileIdSchema } from "@/p2p/protocol";
 
@@ -7,11 +8,18 @@ const SIGNAL_NAME = /^(offer|answer)-[0-9a-f-]{36}\.json$/;
 /** A presence lasts this long unless refreshed, so a profile that stopped waiting drops out. */
 export const PRESENCE_TTL_MS = 60 * 1000;
 
-/** A profile waiting in the folder to pair: who it is, its certificate, and since when. */
+/**
+ * A profile waiting in the folder to pair: who it is, its certificate, its identity key's statement
+ * that the certificate is its own, and since when.
+ */
 export const PresenceSchema = v.strictObject({
   profileId: ProfileIdSchema,
   displayName: DisplayNameSchema,
   fingerprint: FingerprintSchema,
+  // Production has no rendezvous; the cast types the entry its bundle folds away.
+  ...(SIGNED
+    ? { identity: IdentityStatementSchema }
+    : ({} as { identity: typeof IdentityStatementSchema })),
   createdAt: v.number(),
   expiresAt: v.number(),
 });
@@ -30,9 +38,50 @@ export const SignalFileSchema = v.strictObject({
 
 /**
  * One half of a pairing, as a file: the same code the user would paste, which holds no secret,
- * since the link still proves the certificate fingerprint the code announces.
+ * since the link still proves the certificate the code announces and its maker's key signed.
  */
 export type SignalFile = v.InferOutput<typeof SignalFileSchema>;
+
+/** The run of a profile's process that wrote a file, so a reader tells an earlier run's apart. */
+export const BootSchema = v.pipe(v.string(), v.uuid());
+
+/** A presence as the folder stores it: with the boot of the document that wrote it. */
+const FolderPresenceSchema = v.strictObject({
+  // PresenceSchema's entries spelled out: a spread of them would stay in the production background.
+  profileId: ProfileIdSchema,
+  displayName: DisplayNameSchema,
+  fingerprint: FingerprintSchema,
+  identity: IdentityStatementSchema,
+  createdAt: v.number(),
+  expiresAt: v.number(),
+  boot: BootSchema,
+});
+
+export type FolderPresence = v.InferOutput<typeof FolderPresenceSchema>;
+
+/**
+ * A signal as a transport stores it: stamped with its sender's boot and a sequence that grows with
+ * each signal of that boot, so a reader drops an earlier run's file or a late, older write.
+ */
+export const StampedSignalSchema = v.strictObject({
+  // SignalFileSchema's entries spelled out: a spread of them would stay in the production background.
+  kind: v.picklist(["offer", "answer"]),
+  pairingId: v.pipe(v.string(), v.uuid()),
+  profileId: ProfileIdSchema,
+  to: ProfileIdSchema,
+  expiresAt: v.number(),
+  code: v.pipe(v.string(), v.maxLength(MAX_CODE_LENGTH)),
+  boot: BootSchema,
+  sequence: v.pipe(v.number(), v.safeInteger(), v.minValue(1)),
+});
+
+export type StampedSignal = v.InferOutput<typeof StampedSignalSchema>;
+
+/** What a transport read for this profile: each file still carries its boot, and a signal its sequence. */
+export interface Sighting {
+  presences: (Presence & { boot: string })[];
+  signals: StampedSignal[];
+}
 
 /** What the other profiles left for this one. */
 export interface Seen {
@@ -76,13 +125,28 @@ async function readOwner(folder: Directory, owner: string, me: string, now: numb
   // A file counts only in its owner's folder, and only until it expires.
   const current = (item: { profileId: string; expiresAt: number } | undefined) =>
     item?.profileId === owner && item.expiresAt > now ? item : undefined;
-  const presence = await readFile(folder, PRESENCE_FILE, PresenceSchema).catch(() => undefined);
-  const signals: SignalFile[] = [];
+  const presence = await readFile(folder, PRESENCE_FILE, FolderPresenceSchema).catch(
+    () => undefined,
+  );
+  const signals: StampedSignal[] = [];
   for (const name of (await namesIn(folder)).filter((each) => SIGNAL_NAME.test(each))) {
-    const signal = await readFile(folder, name, SignalFileSchema).catch(() => undefined);
+    const signal = await readFile(folder, name, StampedSignalSchema).catch(() => undefined);
     if (current(signal) && signal?.to === me) signals.push(signal);
   }
   return { presence: current(presence) && presence, signals };
+}
+
+/** This profile's own current answers, so a relaunch knows the offers it answered. */
+async function ownAnswers(folder: Directory, me: string, now: number) {
+  const answers: StampedSignal[] = [];
+  for (const name of (await namesIn(folder)).filter(
+    (each) => SIGNAL_NAME.test(each) && each.startsWith("answer-"),
+  )) {
+    const signal = await readFile(folder, name, StampedSignalSchema).catch(() => undefined);
+    const mine = signal?.kind === "answer" && signal.profileId === me;
+    if (mine && signal.expiresAt > now) answers.push(signal);
+  }
+  return answers;
 }
 
 /**
@@ -95,15 +159,16 @@ export function folderRendezvous(pairing: Directory, me: string, now: () => numb
     const folder = await own();
     for (const name of (await namesIn(folder)).filter(matches)) await folder.removeEntry(name);
   };
-  const announce = async (presence: Presence) => writeFile(await own(), PRESENCE_FILE, presence);
+  const announce = async (presence: FolderPresence) =>
+    writeFile(await own(), PRESENCE_FILE, presence);
   /**
    * Replaces this profile's earlier signal of the same kind for the same profile, so only the
    * current one counts, and answers to two offerers both stay until each reads its own.
    */
-  const publish = async (signal: SignalFile) =>
+  const publish = async (signal: StampedSignal) =>
     writeFile(await own(), `${signal.kind}-${signal.to}.json`, signal);
-  const look = async (): Promise<Seen> => {
-    const seen: Seen = { presences: [], signals: [] };
+  const look = async (): Promise<Sighting> => {
+    const seen: Sighting = { presences: [], signals: await ownAnswers(await own(), me, now()) };
     for (const owner of await namesIn(pairing)) {
       if (owner === me || !v.is(ProfileIdSchema, owner)) continue;
       const folder = await pairing.getDirectoryHandle(owner).catch(() => undefined);

@@ -1,5 +1,7 @@
+import type { PauseReason } from "@/background/launcher-pause";
 import type { PeerChannel } from "@/background/peer-channel";
 import type { LinkCommand, PeerRequest } from "@/messaging/peer-messages";
+import type { RendezvousStatus } from "@/messaging/peer-results";
 import type { FolderAccess } from "@/p2p/folder-store";
 import type { PeerMessage, PeerPayload, PeerType, SharedTabs } from "@/p2p/protocol";
 import type { RecordingStore } from "@/ports/recording-store";
@@ -39,7 +41,11 @@ export interface PeerRequestDependencies {
     unpauseAll: () => Promise<void>;
     /** Drops every handle to the folder, so Chrome may offer to keep it on every visit. */
     release: () => Promise<void>;
+    /** Whether the POC builds' Downloads root is known; absent where the folder carries pairing. */
+    downloadsAvailable?: () => Promise<boolean>;
   };
+  /** POC builds only: tells the launcher this profile left its peers on purpose, or is back. */
+  launcher?: { mark: (reason: PauseReason) => Promise<void> };
 }
 
 type Deps = PeerRequestDependencies;
@@ -102,6 +108,13 @@ async function entry(deps: Deps, peer: AuthorizedPeer) {
   return { peer, link, peerSession: peerSession(mirror, link) };
 }
 
+/** The transport pairing goes through, and whether it can work now. */
+async function rendezvousOf(deps: Deps, folder: FolderAccess): Promise<RendezvousStatus> {
+  const { downloadsAvailable } = deps.folder;
+  if (!downloadsAvailable) return { kind: "folder", available: folder === "granted" };
+  return { kind: "downloads", available: await downloadsAvailable() };
+}
+
 async function status(deps: Deps) {
   const [identity, authorized, controller, local, paused] = await Promise.all([
     deps.identity(),
@@ -119,7 +132,8 @@ async function status(deps: Deps) {
   // A folder the offscreen document cannot read is one the user has to choose again.
   const folder = await deps.folder.access().catch((): FolderAccess => "none");
   const folderPairing = await deps.folder.waiting();
-  return { identity, peers, controlledBy, paused, folder, folderPairing };
+  const rendezvous = await rendezvousOf(deps, folder);
+  return { identity, peers, controlledBy, paused, folder, folderPairing, rendezvous };
 }
 
 /** Tells a verified peer the close is intended, so it does not report a failure, then closes. */
@@ -131,17 +145,24 @@ async function close(deps: Deps, peer: string) {
 }
 
 /** The user ends one link, so the folder leaves that peer alone until Reconnect. */
-async function disconnect(deps: Deps, peer: string) {
+async function disconnect(deps: Deps, peer: string, reason: PauseReason = "disconnect") {
+  await deps.launcher?.mark(reason);
   await deps.folder.pause(peer);
   await close(deps, peer);
 }
 
 /** Forgetting keeps the pause, so a profile still in the folder does not pair again at once. */
 async function forget(deps: Deps, peer: string) {
-  await disconnect(deps, peer);
+  await disconnect(deps, peer, "forget");
   await deps.authorized.set(peer, null);
   await deps.mirror.set(peer, null);
   await deps.tabs.set(peer, null);
+}
+
+/** The profile is back among its peers, so the launcher may relaunch it after a crash again. */
+async function resume(deps: Deps, unpause: () => Promise<void>) {
+  await unpause();
+  await deps.launcher?.mark("resumed");
 }
 
 /** The peers whose link is verified now. */
@@ -172,13 +193,14 @@ const HANDLERS: Handlers = {
   status: (deps) => status(deps),
   rename: (deps, { displayName }) => rename(deps, displayName),
   disconnect: (deps, { peer }) => disconnect(deps, peer),
-  reconnect: (deps, { peer }) => deps.folder.unpause(peer),
+  reconnect: (deps, { peer }) => resume(deps, () => deps.folder.unpause(peer)),
   forget: (deps, { peer }) => forget(deps, peer),
-  "pair-again": (deps) => deps.folder.unpauseAll(),
+  "pair-again": (deps) => resume(deps, () => deps.folder.unpauseAll()),
   "folder-pair": (deps) => deps.folder.start(),
   "folder-release": (deps) => releaseFolder(deps),
   tabs: (deps, { peer }) => peerTabs(deps, peer),
   activate: (deps, { peer, tabId }) => ask(deps, peer, "ACTIVATE_TAB", { tabId }),
+  "open-tab": (deps, { peer, url }) => ask(deps, peer, "OPEN_TAB", { url }),
   "session-start": (deps, { peer, tabId }) => startRemote(deps, peer, tabId),
   "session-set": (deps, { peer, status: next }) =>
     ask(deps, peer, "SESSION_SET_STATUS", { status: next }),

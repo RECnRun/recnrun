@@ -11,7 +11,7 @@ import {
   peerRequestMessage,
 } from "@/messaging/peer-messages";
 import { MAX_FRAME_LENGTH } from "@/p2p/protocol";
-import { PEER } from "./fake-peer";
+import { PEER, PEER_STATEMENT } from "./fake-peer";
 
 const accepts = (schema: v.GenericSchema, value: unknown) => v.safeParse(schema, value).success;
 
@@ -23,6 +23,12 @@ test("accepts the page requests and rejects malformed ones", () => {
   expect(accepts(PeerRequestSchema, { type: "rename", displayName: "  " })).toBe(false);
   expect(accepts(PeerRequestSchema, { type: "create-offer" })).toBe(false);
   expect(accepts(PeerRequestSchema, { type: "activate", peer: PEER, tabId: -1 })).toBe(false);
+  const url = "https://shop.test/";
+  expect(accepts(PeerRequestSchema, { type: "open-tab", peer: PEER, url })).toBe(true);
+  // Only web pages; the executor would refuse the rest, and the page never asks.
+  for (const bad of ["chrome://settings/", "javascript:alert(1)", "chrome-extension://x/a.html"]) {
+    expect(accepts(PeerRequestSchema, { type: "open-tab", peer: PEER, url: bad })).toBe(false);
+  }
   // Each request about one peer names it.
   expect(accepts(PeerRequestSchema, { type: "activate", tabId: 2 })).toBe(false);
   expect(accepts(PeerRequestSchema, { type: "disconnect" })).toBe(false);
@@ -84,12 +90,15 @@ test("carries what the folder holds, and folder commands, only in their own shap
     profileId,
     displayName: "Desk",
     fingerprint: "AB:CD",
+    identity: PEER_STATEMENT,
     createdAt: 1,
     expiresAt: 2,
   };
   const sighting = (presences: unknown[]) => ({ type: "folder", presences, signals: [] });
   expect(accepts(LinkEventSchema, sighting([presence]))).toBe(true);
   expect(accepts(LinkEventSchema, sighting([{ ...presence, fingerprint: "ab:cd" }]))).toBe(false);
+  const { identity: _identity, ...unsigned } = presence;
+  expect(accepts(LinkEventSchema, sighting([unsigned]))).toBe(false);
   const watch = { type: "folder-watch" as const, profileId, displayName: "Desk" };
   expect(accepts(LinkCommandMessageSchema, linkCommandMessage(watch))).toBe(true);
   const stranger = linkCommandMessage({ ...watch, profileId: "not-a-profile" });

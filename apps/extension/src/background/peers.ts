@@ -3,12 +3,13 @@ import * as v from "valibot";
 import { browser } from "wxt/browser";
 import { execute, sessionStatus, sharedTabs } from "@/background/executor";
 import type { ExecutorDependencies } from "@/background/executor";
-import { createFolderPairing } from "@/background/folder-pairing";
-import type { FolderPairingFlow } from "@/background/folder-pairing";
+import type { PauseReason } from "@/background/launcher-pause";
+import { launcherMark, outwardGate } from "@/background/outward-gate";
+import type { Outward } from "@/background/outward-gate";
 import { askLink, closeOffscreen } from "@/background/link";
-import { createMeshPairing } from "@/background/mesh-pairing";
 import type { MeshPairingFlow } from "@/background/mesh-pairing";
-import { createPairing } from "@/background/pairing";
+import { createPairingFlows, trusted } from "@/background/pairing-flows";
+import type { PairingFlows, Transport } from "@/background/pairing-flows";
 import { createPeerChannel } from "@/background/peer-channel";
 import type { PeerChannel } from "@/background/peer-channel";
 import { handlePeerRequest } from "@/background/peer-requests";
@@ -20,19 +21,22 @@ import { FolderAccessSchema } from "@/messaging/peer-results";
 import type { PeerMessage, PeerPayload, PeerType, SharedTabs } from "@/p2p/protocol";
 import {
   authorizedPeersRepository,
-  folderActedRepository,
   folderPairingRepository,
   identityRepository,
-  meshMembersRepository,
   peerLinksRepository,
   peerTabsRepository,
-  pendingOffersRepository,
   readIdentity,
   remoteControllerRepository,
   remoteRecordingsRepository,
 } from "@/storage/peer-repository";
 import { recordingSessionRepository } from "@/storage/recording-session-repository";
 import { browserTabs } from "@/tabs/open-tabs";
+// Imported last, so the production bundle (which drops them) keeps its module order and bytes.
+import { startPocPresence } from "@/background/downloads-presence";
+import { startedOutward } from "@/background/poc-bootstrap";
+import { hello, provenHello, refuseLink } from "@/background/greeting";
+import type { Sign } from "@/background/greeting";
+import { signedIdentity } from "@/p2p/identity-key";
 
 const log = (entry: string) => console.debug("[RECnRun peer]", entry);
 const notifyPages = () => void browser.runtime.sendMessage(peerNotice()).catch(() => {});
@@ -87,20 +91,6 @@ async function observe(message: PeerMessage, tabs: TabsCache): Promise<void> {
   if (message.type === "ERROR") log(`peer reported ${message.reason}`);
 }
 
-async function hello(channel: PeerChannel, peer: string): Promise<void> {
-  const { displayName } = await readIdentity();
-  await channel.send(peer, "HELLO", {
-    displayName,
-    extensionVersion: browser.runtime.getManifest().version,
-  });
-}
-
-/** Pairing through the RECnRun folder, and through the peers linked already. */
-interface PairingFlows {
-  folder: FolderPairingFlow;
-  mesh: MeshPairingFlow;
-}
-
 /** The link to `peer` went down; every other peer's link, waiters, and reports stay. */
 async function linkDown(
   peer: string,
@@ -120,26 +110,31 @@ async function linkDown(
 }
 
 type StateEvent = Extract<LinkEvent, { type: "state" }>;
+type Mark = (reason: PauseReason) => Promise<void>;
 
-async function linkUp(event: StateEvent, channel: PeerChannel, flows: PairingFlows) {
-  const authorized = await authorizedPeersRepository.get(event.peer);
-  // DTLS proved the other side holds this certificate; only the one the user accepted may talk.
-  if (!authorized || event.remoteFingerprint !== authorized.fingerprint) {
+async function linkUp(event: StateEvent, context: LinkContext) {
+  const { channel, flows, sign, mark } = context;
+  // DTLS proved the other side holds this certificate; only the one accepted and pinned may talk.
+  if (!(await trusted(event, flows.trust))) {
     log("closed a link whose certificate is not the accepted one");
-    const refused = { state: "failed", verified: false, reason: "certificate" } as const;
-    await peerLinksRepository.set(event.peer, refused);
-    await askLink({ type: "close", peer: event.peer });
-    return;
+    return refuseLink(event.peer);
   }
   await peerLinksRepository.set(event.peer, { state: "connected", verified: true });
   await flows.folder.linked(event.peer);
-  await hello(channel, event.peer);
+  await mark?.("resumed");
+  await hello(channel, event.peer, sign);
   await flows.mesh.announce();
   notifyPages();
 }
 
 /** The peer said it closes the link on purpose, so this side closes too, without waiting for ICE. */
-async function closedByPeer(channel: PeerChannel, peer: string, mesh: MeshPairingFlow) {
+async function closedByPeer(
+  channel: PeerChannel,
+  peer: string,
+  mesh: MeshPairingFlow,
+  mark?: Mark,
+) {
+  await mark?.("disconnect");
   await peerLinksRepository.set(peer, {
     state: "disconnected",
     verified: false,
@@ -149,15 +144,23 @@ async function closedByPeer(channel: PeerChannel, peer: string, mesh: MeshPairin
   await askLink({ type: "close", peer });
 }
 
-function createLinkHandler(
-  channel: PeerChannel,
-  executor: ExecutorDependencies,
-  tabs: TabsCache,
-  flows: PairingFlows,
-) {
+interface LinkContext {
+  channel: PeerChannel;
+  executor: ExecutorDependencies;
+  tabs: TabsCache;
+  flows: PairingFlows;
+  sign: Sign;
+  noticed?: (seen: { profileId: string }[]) => Promise<void>;
+  /** POC builds only: states to the launcher that this profile left its peers, or is back. */
+  mark?: Mark;
+}
+
+function createLinkHandler(context: LinkContext) {
+  const { channel, executor, tabs, flows, noticed, mark } = context;
   const onFrame = async (frame: string, peer: string) => {
     tap?.push(frame);
     const received = await channel.receive(frame, peer);
+    if (received.kind === "refused") return;
     if (received.kind !== "accepted") {
       log(`dropped an ${received.kind} frame`);
       // Only a verified peer learns why; anything else gets no answer.
@@ -166,15 +169,23 @@ function createLinkHandler(
       return;
     }
     const { message } = received;
-    if (message.type === "BYE") return closedByPeer(channel, message.from, flows.mesh);
+    if (message.type === "BYE") return closedByPeer(channel, message.from, flows.mesh, mark);
+    if (message.type === "HELLO" && !(await provenHello(message))) {
+      log(`closed the link to ${peer}, whose HELLO no valid signature by its identity vouches for`);
+      return refuseLink(peer);
+    }
     await execute(message, executor);
     await observe(message, tabs);
     await flows.mesh.receive(message);
   };
   const handle = async (event: LinkEvent) => {
     if (event.type === "frame") return onFrame(event.frame, event.peer);
-    if (event.type === "folder") return flows.folder.seen(event);
-    if (event.state === "connected") return linkUp(event, channel, flows);
+    if (event.type === "folder") {
+      // A POC presence policy renews once for a profile the catalog shows that no record knows.
+      await noticed?.(event.presences).catch((error: unknown) => log(errorMessage(error)));
+      return flows.folder.seen(event);
+    }
+    if (event.state === "connected") return linkUp(event, context);
     if (event.state !== "connecting") return linkDown(event.peer, event.state, channel, flows.mesh);
     await peerLinksRepository.set(event.peer, { state: "connecting", verified: false });
     notifyPages();
@@ -237,15 +248,16 @@ function watchExecutor(channel: PeerChannel, executor: ExecutorDependencies) {
 const FolderStatusSchema = v.object({ access: FolderAccessSchema });
 
 function requestDependencies(
-  channel: PeerChannel,
-  tabs: TabsCache,
-  { folder, mesh }: PairingFlows,
+  { channel, tabs, flows, sign }: Omit<LinkContext, "executor">,
+  outward: Outward,
+  { available: downloadsAvailable, mark }: { available?: () => Promise<boolean>; mark?: Mark },
 ): PeerRequestDependencies {
+  const { folder, mesh } = flows;
   // Reconnect also asks the peers linked already, which need no folder.
   const viaMesh = () => mesh.look("all");
   return {
     channel,
-    hello: (peer) => hello(channel, peer),
+    hello: (peer) => hello(channel, peer, sign),
     askLink,
     identity: readIdentity,
     rename: (identity) => identityRepository.write(identity),
@@ -260,54 +272,31 @@ function requestDependencies(
         v.parse(FolderStatusSchema, await askLink({ type: "folder-status" })).access,
       waiting: async () => (await folderPairingRepository.read()) !== null,
       paused: folder.paused,
-      start: () => folder.start().then(notifyPages),
+      start: () => outward(() => folder.start().then(notifyPages)),
       pause: folder.pause,
-      unpause: (peer) => folder.unpause(peer).then(viaMesh).then(notifyPages),
-      unpauseAll: () => folder.unpauseAll().then(viaMesh).then(notifyPages),
+      unpause: (peer) => outward(() => folder.unpause(peer).then(viaMesh).then(notifyPages)),
+      unpauseAll: () => outward(() => folder.unpauseAll().then(viaMesh).then(notifyPages)),
       release: closeOffscreen,
+      ...(downloadsAvailable && { downloadsAvailable }),
     },
+    ...(mark && { launcher: { mark } }),
   };
 }
 
-/** Pairing through the folder and through the mesh, which exchange the same offer and answer codes. */
-function createPairingFlows(channel: PeerChannel): PairingFlows {
-  const pairing = createPairing({
-    askLink,
-    identity: readIdentity,
-    authorized: authorizedPeersRepository,
-    pending: pendingOffersRepository,
-  });
-  const folder = createFolderPairing({
-    askLink,
-    identity: readIdentity,
-    pairing,
-    pending: pendingOffersRepository,
-    link: peerLinksRepository,
-    acted: folderActedRepository,
-    state: folderPairingRepository,
-    log,
-  });
-  const mesh = createMeshPairing({
-    channel,
-    identity: readIdentity,
-    pairing,
-    authorized: authorizedPeersRepository,
-    link: peerLinksRepository,
-    pending: pendingOffersRepository,
-    acted: folderActedRepository,
-    members: meshMembersRepository,
-    state: folderPairingRepository,
-    exclusive: folder.exclusive,
-    log,
-  });
-  return { folder, mesh };
+export interface PeersOptions {
+  /** How this profile finds the others: the chosen folder, or the POC builds' Downloads. */
+  transport: Transport;
+  /** Signs this profile's statements; the identity key in IndexedDB unless a test passes its own. */
+  sign?: Sign;
 }
 
 /**
  * The background's half of the cross-profile POC: pairing, the authorized channel, the executor
  * of the peer's commands, and the controller's copy of what the peer reports.
  */
-export function startPeers(): PeerRoutes {
+export function startPeers(
+  { transport, sign = signedIdentity }: PeersOptions = { transport: "folder" },
+): PeerRoutes {
   const channel = createPeerChannel({
     askLink: tappedAskLink,
     identity: readIdentity,
@@ -323,16 +312,31 @@ export function startPeers(): PeerRoutes {
   };
   const tabs = createTabsCache();
   watchExecutor(channel, executor);
-  const flows = createPairingFlows(channel);
+  const flows = createPairingFlows(channel, transport, log, sign);
   const { folder } = flows;
+  const { outward, startOutward } = outwardGate(log);
   // Chrome starts the worker with the browser only for a startup listener; starting resumes.
   browser.runtime.onStartup.addListener(() => {});
-  void folder.resume().catch((error: unknown) => log(errorMessage(error)));
+  // Downloads needs no prior choice: the profile announces itself as its worker starts, then pairs.
+  const downloads = startedOutward(
+    startOutward(async () => {
+      void folder.resume().catch((error: unknown) => log(errorMessage(error)));
+      if (transport !== "downloads") return undefined;
+      return startPocPresence({ log, sign, startPairing: () => folder.start().then(notifyPages) });
+    }),
+    transport === "downloads" && { log, sign },
+  );
   // Chrome ends the folder's grant with the last extension page, so the pages read it again.
   browser.tabs.onRemoved.addListener(notifyPages);
-  const deps = requestDependencies(channel, tabs, flows);
+  const available =
+    transport === "downloads"
+      ? async () => (await (await downloads())?.available()) ?? false
+      : undefined;
+  const mark = launcherMark(transport === "downloads" ? downloads : undefined, log);
+  const deps = requestDependencies({ channel, tabs, flows, sign }, outward, { available, mark });
+  const noticed = async (seen: { profileId: string }[]) => (await downloads())?.noticed(seen);
   return {
     request: (request) => handlePeerRequest(deps, request),
-    link: createLinkHandler(channel, executor, tabs, flows),
+    link: createLinkHandler({ channel, executor, tabs, flows, sign, noticed, mark }),
   };
 }

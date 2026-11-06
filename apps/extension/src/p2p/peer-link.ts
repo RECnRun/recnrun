@@ -18,6 +18,8 @@ export interface PeerLink {
   close: () => void;
   state: () => LinkState;
   remoteFingerprint: () => string | undefined;
+  /** When any channel to the peer last delivered anything, beats included, and the beats sent. */
+  liveness: () => Heard;
 }
 
 interface LinkOptions {
@@ -70,20 +72,30 @@ function watchConnection(pc: RTCPeerConnection, tracker: Tracker, isCurrent: () 
   });
 }
 
+/** What a link heard of its peer and the beats it sent, kept across its connections. */
+interface Heard {
+  heardAt?: number;
+  beats: number;
+}
+
 /** Beats while the channel is open, and calls `silent` once nothing came from the peer for too long. */
 function keepAlive(
   channel: RTCDataChannel,
   { heartbeatMs, silenceMs }: Liveness,
   silent: () => void,
+  heard: Heard,
 ) {
-  let heard = Date.now();
-  channel.addEventListener("message", () => (heard = Date.now()));
+  let last = Date.now();
+  channel.addEventListener("message", () => (last = heard.heardAt = Date.now()));
   const timer = setInterval(() => {
     if (channel.readyState !== "open") clearInterval(timer);
-    else if (Date.now() - heard >= silenceMs) {
+    else if (Date.now() - last >= silenceMs) {
       clearInterval(timer);
       silent();
-    } else channel.send(HEARTBEAT);
+    } else {
+      channel.send(HEARTBEAT);
+      heard.beats += 1;
+    }
   }, heartbeatMs);
 }
 
@@ -99,11 +111,13 @@ async function exportLocal(pc: RTCPeerConnection, timeoutMs: number): Promise<st
 function createSlot(
   tracker: Tracker,
   events: PeerLinkEvents,
-  liveness: Liveness,
+  timing: Liveness,
   certificate?: RTCCertificate,
 ) {
   let pc: RTCPeerConnection | undefined;
   let channel: RTCDataChannel | undefined;
+  // Kept across connections, so a replaced or dropped channel still tells when the peer was heard.
+  const heard: Heard = { beats: 0 };
   const close = () => {
     channel?.close();
     channel = undefined;
@@ -113,11 +127,12 @@ function createSlot(
     channel = opened;
     opened.addEventListener("open", () => {
       tracker.set("connected");
-      keepAlive(opened, liveness, () => {
+      const silent = () => {
         if (channel !== opened) return;
         close();
         tracker.set("disconnected");
-      });
+      };
+      keepAlive(opened, timing, silent, heard);
     });
     opened.addEventListener("close", () => {
       if (channel === opened) tracker.set("disconnected");
@@ -140,7 +155,8 @@ function createSlot(
     tracker.set("connecting");
     return next;
   };
-  return { adopt, fresh, close, pc: () => pc, channel: () => channel };
+  const liveness = () => ({ ...heard });
+  return { adopt, fresh, close, pc: () => pc, channel: () => channel, liveness };
 }
 
 export function createPeerLink(events: PeerLinkEvents, options: LinkOptions = {}): PeerLink {
@@ -183,5 +199,6 @@ export function createPeerLink(events: PeerLinkEvents, options: LinkOptions = {}
     },
     state: tracker.state,
     remoteFingerprint: () => fingerprintOf(slot.pc()?.remoteDescription?.sdp ?? ""),
+    liveness: slot.liveness,
   };
 }

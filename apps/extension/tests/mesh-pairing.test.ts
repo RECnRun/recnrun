@@ -12,13 +12,31 @@ import type {
   PendingOffer,
 } from "@/storage/peer-repository";
 import { ME, PEER, STRANGER, memoryRecords, memoryRepository, recordingChannel } from "./fake-peer";
+import { identityOf, signAs } from "./test-identity";
 
 const NOW = 1_700_000_000_000;
 const PAIRING_ID = "44444444-4444-4444-8444-444444444444";
+const fingerprintOf = (profileId: string) => `${profileId.slice(0, 1)}${profileId.slice(0, 1)}:AA`;
+const IDS = [ME, PEER, STRANGER];
+const KEYS = new Map(await Promise.all(IDS.map(async (id) => [id, await identityOf(id)] as const)));
+const STATEMENTS = new Map(
+  await Promise.all(
+    IDS.map(
+      async (id) => [id, await signAs({ profileId: id, fingerprint: fingerprintOf(id) })] as const,
+    ),
+  ),
+);
+const OTHER_KEY = await identityOf("other");
+const statementOf = (profileId: string) => {
+  const statement = STATEMENTS.get(profileId);
+  if (!statement) throw new Error(`No test statement for ${profileId}.`);
+  return statement;
+};
 const member = (profileId: string): Member => ({
   profileId,
   displayName: `Profile ${profileId.slice(0, 1)}`,
-  fingerprint: `${profileId.slice(0, 1)}${profileId.slice(0, 1)}:AA`,
+  fingerprint: fingerprintOf(profileId),
+  identity: KEYS.get(profileId) ?? "",
 });
 const VERIFIED: PeerLink = { state: "connected", verified: true };
 const FAILED: PeerLink = { state: "failed", verified: false };
@@ -32,6 +50,8 @@ const codeOf = (kind: Pairing["kind"], from: string, fingerprint = member(from).
     displayName: "Profile",
     expiresAt: NOW + PAIRING_TTL_MS,
     sdp: `v=0\r\na=fingerprint:sha-256 ${fingerprint}\r\n`,
+    // The mesh relays codes; the pairing flow verifies their statements.
+    identity: statementOf(from),
   });
 
 interface Setup {
@@ -138,6 +158,16 @@ describe("pairing with a profile a peer reaches", () => {
     expect(sent.map(({ type }) => type)).toEqual(["SIGNAL"]);
   });
 
+  test("a relay may announce a renewed certificate of the identity accepted already", async () => {
+    const renewed = { ...member(STRANGER), fingerprint: "99:99" };
+    const { flow, sent } = meshOf({
+      links: { [PEER]: VERIFIED, [STRANGER]: FAILED },
+      authorized: { [PEER]: member(PEER), [STRANGER]: renewed },
+    });
+    await flow.look("all");
+    expect(sent.map(({ type }) => type)).toEqual(["SIGNAL"]);
+  });
+
   test("leaves alone paused and linked profiles, and pairs with none without the folder", async () => {
     const cases: Setup[] = [
       { state: { paused: [STRANGER] } },
@@ -145,8 +175,8 @@ describe("pairing with a profile a peer reaches", () => {
       { links: { [PEER]: VERIFIED, [STRANGER]: VERIFIED } },
       // Only a verified link vouches.
       { links: { [PEER]: FAILED } },
-      // A relay cannot swap the certificate of a profile pinned already.
-      { authorized: { [STRANGER]: { ...member(STRANGER), fingerprint: "99:99" } } },
+      // A relay cannot swap the identity of a profile accepted already.
+      { authorized: { [STRANGER]: { ...member(STRANGER), identity: OTHER_KEY } } },
     ];
     for (const setup of cases) {
       const { flow, sent } = meshOf(setup);

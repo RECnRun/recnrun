@@ -10,7 +10,10 @@
     "build:test": "wxt build --mode test",
     "zip": "wxt zip",
     "wxt:prepare": "wxt prepare",
-    "test:manifest": "node --test scripts/manifest.checks.mjs"
+    "build:poc-d0": "wxt build --mode poc-d0",
+    "build:poc-d1": "wxt build --mode poc-d1",
+    "build:poc-d2": "wxt build --mode poc-d2",
+    "test:manifest": "node --test scripts/manifest.checks.mjs scripts/manifest-poc.checks.mjs"
   },
   "dependencies": {
     "@recnrun/brand": "workspace:*",

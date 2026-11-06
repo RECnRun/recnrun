@@ -1,5 +1,10 @@
 import { allowFolder, chooseFolder } from "@/p2p/folder-store";
-import { remoteRecordingsRepository } from "@/storage/peer-repository";
+import { roleStores, storedRoles } from "@/storage/hierarchy-repository";
+import {
+  identityRepository,
+  peerPinsRepository,
+  remoteRecordingsRepository,
+} from "@/storage/peer-repository";
 import { createPeerClient } from "@/views/peer-client";
 import { remoteRecordings, remoteSessionTabs, remoteTabs } from "@/views/remote-peer";
 import type { PeerServices } from "@/views/remote-peer";
@@ -7,6 +12,7 @@ import type { PeerServices } from "@/views/remote-peer";
 /** The paired profiles, through this extension's background and its session storage. */
 export function peerServices(): PeerServices {
   const client = createPeerClient();
+  const roles = storedRoles();
   const mirror = {
     // One session runs at a time, so at most one peer's is this profile's.
     read: async () =>
@@ -25,5 +31,15 @@ export function peerServices(): PeerServices {
     sessionTabs: remoteSessionTabs(client, mirror),
     chooseFolder,
     allowFolder,
+    mayControl: async (profileId) =>
+      roles.controls(profileId, (await identityRepository.read())?.profileId ?? ""),
+    watchControl: (onChange) => {
+      const { role, workers } = roleStores();
+      const stores = [identityRepository, role, workers, peerPinsRepository()];
+      const stops = stores.map((store) => store.watch(onChange));
+      return () => {
+        for (const stop of stops) stop();
+      };
+    },
   };
 }

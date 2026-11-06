@@ -1,0 +1,22 @@
+[
+  { "name": "Desk", "accepted": true },
+  { "name": "José's Mac", "accepted": true },
+  { "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "accepted": true },
+  { "name": "éééééééééééééééééééééééééééééééé", "accepted": true },
+  { "name": "🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂", "accepted": true },
+  {
+    "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "accepted": false
+  },
+  { "name": "éééééééééééééééééééééééééééééééééééééééé", "accepted": false },
+  { "name": "🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂", "accepted": false },
+  { "name": "My \"Mac\"", "accepted": false },
+  { "name": "a\\b", "accepted": false },
+  { "name": "a\u0001b", "accepted": false },
+  { "name": "tab\there", "accepted": false },
+  { "name": "a\u007fb", "accepted": false },
+  { "name": " Desk", "accepted": false },
+  { "name": "Desk ", "accepted": false },
+  { "name": "", "accepted": false },
+  { "name": "lone \ud800", "accepted": false }
+]

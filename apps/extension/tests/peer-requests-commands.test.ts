@@ -52,11 +52,13 @@ describe("commands to another profile", () => {
     await handlePeerRequest(deps, { type: "session-start", peer: PEER, tabId: 3 });
     await handlePeerRequest(deps, { type: "session-set", peer: PEER, status: "paused" });
     await handlePeerRequest(deps, { type: "session-stop", peer: PEER });
+    await handlePeerRequest(deps, { type: "open-tab", peer: PEER, url: "https://a.test/" });
     expect(asked()).toEqual([
       [STRANGER, "ACTIVATE_TAB", { tabId: 3 }],
       [PEER, "SESSION_START", { tabId: 3 }],
       [PEER, "SESSION_SET_STATUS", { status: "paused" }],
       [PEER, "SESSION_STOP", {}],
+      [PEER, "OPEN_TAB", { url: "https://a.test/" }],
     ]);
   });
 

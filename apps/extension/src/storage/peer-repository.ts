@@ -7,6 +7,7 @@ import {
   PeerLinkSchema,
   ProfileIdentitySchema,
 } from "@/messaging/peer-results";
+import { PinSchema } from "@/p2p/pins";
 import { MAX_CODE_LENGTH, MemberSchema, ProfileIdSchema, SharedTabsSchema } from "@/p2p/protocol";
 
 export type ProfileIdentity = v.InferOutput<typeof ProfileIdentitySchema>;
@@ -58,7 +59,10 @@ export type RemoteRecording = v.InferOutput<typeof RemoteRecordingSchema>;
 const RemoteControllerSchema = v.strictObject({ profileId: ProfileIdSchema });
 export type RemoteController = v.InferOutput<typeof RemoteControllerSchema>;
 
-function repository<T>(key: `local:${string}` | `session:${string}`, schema: v.GenericSchema<T>) {
+export function repository<T>(
+  key: `local:${string}` | `session:${string}`,
+  schema: v.GenericSchema<T>,
+) {
   const item = storage.defineItem<unknown>(key);
   return {
     /** Null when absent; a stored value that does not match is an error, never overwritten. */
@@ -77,7 +81,10 @@ function repository<T>(key: `local:${string}` | `session:${string}`, schema: v.G
 export type Repository<T> = ReturnType<typeof repository<T>>;
 
 /** One value per peer, keyed by its profile id; writes to one peer never lose another's. */
-function peerRecords<T>(key: `local:${string}` | `session:${string}`, schema: v.GenericSchema<T>) {
+export function peerRecords<T>(
+  key: `local:${string}` | `session:${string}`,
+  schema: v.GenericSchema<T>,
+) {
   const whole = repository(key, v.record(ProfileIdSchema, schema));
   const all = async (): Promise<Record<string, T>> => (await whole.read()) ?? {};
   let queue = Promise.resolve();
@@ -104,6 +111,9 @@ export type PeerRecords<T> = ReturnType<typeof peerRecords<T>>;
 
 export const identityRepository = repository("local:profileIdentity", ProfileIdentitySchema);
 export const authorizedPeersRepository = peerRecords("local:authorizedPeers", AuthorizedPeerSchema);
+let pins: PeerRecords<v.InferOutput<typeof PinSchema>> | undefined;
+// Local and apart from the authorized peers, so a pin outlives a restart and a Forget alike; made on first call so production drops it.
+export const peerPinsRepository = () => (pins ??= peerRecords("local:peerPins", PinSchema));
 // Local, so waiting in the folder survives a restart of the browser.
 export const folderPairingRepository = repository("local:folderPairing", FolderPairingSchema);
 // Session storage ends with the browser, as the link and anything it carried do.

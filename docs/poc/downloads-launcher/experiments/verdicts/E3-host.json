@@ -1,0 +1,464 @@
+[
+  {
+    "experiment": "E3",
+    "hypothesis": "E3.page.fetch",
+    "chrome": "Google Chrome 156.0.8078.80",
+    "environment": "host",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "single-root",
+    "debugger": "none",
+    "observations": [
+      {
+        "extensionId": "omllgeochjfpkjbkpcgjmnnbncdpiedd",
+        "via": "page",
+        "read": {
+          "ok": true,
+          "status": 200,
+          "text": "RECnRun E3 probe, version A\n"
+        },
+        "matches": true
+      },
+      {
+        "extensionId": "omllgeochjfpkjbkpcgjmnnbncdpiedd",
+        "via": "page",
+        "read": {
+          "ok": true,
+          "status": 200,
+          "text": "RECnRun E3 probe, version A\n"
+        },
+        "matches": true
+      },
+      {
+        "extensionId": "omllgeochjfpkjbkpcgjmnnbncdpiedd",
+        "via": "page",
+        "read": {
+          "ok": true,
+          "status": 200,
+          "text": "RECnRun E3 probe, version A\n"
+        },
+        "matches": true
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "E3",
+    "hypothesis": "E3.offscreen.fetch",
+    "chrome": "Google Chrome 156.0.8078.80",
+    "environment": "host",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "single-root",
+    "debugger": "none",
+    "observations": [
+      {
+        "extensionId": "omllgeochjfpkjbkpcgjmnnbncdpiedd",
+        "via": "offscreen",
+        "read": {
+          "ok": true,
+          "status": 200,
+          "text": "RECnRun E3 probe, version A\n"
+        },
+        "matches": true
+      },
+      {
+        "extensionId": "omllgeochjfpkjbkpcgjmnnbncdpiedd",
+        "via": "offscreen",
+        "read": {
+          "ok": true,
+          "status": 200,
+          "text": "RECnRun E3 probe, version A\n"
+        },
+        "matches": true
+      },
+      {
+        "extensionId": "omllgeochjfpkjbkpcgjmnnbncdpiedd",
+        "via": "offscreen",
+        "read": {
+          "ok": true,
+          "status": 200,
+          "text": "RECnRun E3 probe, version A\n"
+        },
+        "matches": true
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "E3",
+    "hypothesis": "E3.page.cache",
+    "chrome": "Google Chrome 156.0.8078.80",
+    "environment": "host",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "single-root",
+    "debugger": "none",
+    "observations": [
+      {
+        "extensionId": "omllgeochjfpkjbkpcgjmnnbncdpiedd",
+        "via": "page",
+        "pollMs": 1000,
+        "before": {
+          "ok": true,
+          "status": 200,
+          "text": "RECnRun E3 probe, version A\n"
+        },
+        "changes": [
+          {
+            "version": "B",
+            "first": {
+              "ok": true,
+              "status": 200,
+              "text": "RECnRun E3 probe, version B\n"
+            },
+            "afterPoll": {
+              "ok": true,
+              "status": 200,
+              "text": "RECnRun E3 probe, version B\n"
+            }
+          },
+          {
+            "version": "C",
+            "first": {
+              "ok": true,
+              "status": 200,
+              "text": "RECnRun E3 probe, version C\n"
+            },
+            "afterPoll": {
+              "ok": true,
+              "status": 200,
+              "text": "RECnRun E3 probe, version C\n"
+            }
+          },
+          {
+            "version": "D",
+            "first": {
+              "ok": true,
+              "status": 200,
+              "text": "RECnRun E3 probe, version D\n"
+            },
+            "afterPoll": {
+              "ok": true,
+              "status": 200,
+              "text": "RECnRun E3 probe, version D\n"
+            }
+          }
+        ],
+        "noStoreNeeded": false
+      },
+      {
+        "extensionId": "omllgeochjfpkjbkpcgjmnnbncdpiedd",
+        "via": "page",
+        "pollMs": 1000,
+        "before": {
+          "ok": true,
+          "status": 200,
+          "text": "RECnRun E3 probe, version A\n"
+        },
+        "changes": [
+          {
+            "version": "B",
+            "first": {
+              "ok": true,
+              "status": 200,
+              "text": "RECnRun E3 probe, version B\n"
+            },
+            "afterPoll": {
+              "ok": true,
+              "status": 200,
+              "text": "RECnRun E3 probe, version B\n"
+            }
+          },
+          {
+            "version": "C",
+            "first": {
+              "ok": true,
+              "status": 200,
+              "text": "RECnRun E3 probe, version C\n"
+            },
+            "afterPoll": {
+              "ok": true,
+              "status": 200,
+              "text": "RECnRun E3 probe, version C\n"
+            }
+          },
+          {
+            "version": "D",
+            "first": {
+              "ok": true,
+              "status": 200,
+              "text": "RECnRun E3 probe, version D\n"
+            },
+            "afterPoll": {
+              "ok": true,
+              "status": 200,
+              "text": "RECnRun E3 probe, version D\n"
+            }
+          }
+        ],
+        "noStoreNeeded": false
+      },
+      {
+        "extensionId": "omllgeochjfpkjbkpcgjmnnbncdpiedd",
+        "via": "page",
+        "pollMs": 1000,
+        "before": {
+          "ok": true,
+          "status": 200,
+          "text": "RECnRun E3 probe, version A\n"
+        },
+        "changes": [
+          {
+            "version": "B",
+            "first": {
+              "ok": true,
+              "status": 200,
+              "text": "RECnRun E3 probe, version B\n"
+            },
+            "afterPoll": {
+              "ok": true,
+              "status": 200,
+              "text": "RECnRun E3 probe, version B\n"
+            }
+          },
+          {
+            "version": "C",
+            "first": {
+              "ok": true,
+              "status": 200,
+              "text": "RECnRun E3 probe, version C\n"
+            },
+            "afterPoll": {
+              "ok": true,
+              "status": 200,
+              "text": "RECnRun E3 probe, version C\n"
+            }
+          },
+          {
+            "version": "D",
+            "first": {
+              "ok": true,
+              "status": 200,
+              "text": "RECnRun E3 probe, version D\n"
+            },
+            "afterPoll": {
+              "ok": true,
+              "status": 200,
+              "text": "RECnRun E3 probe, version D\n"
+            }
+          }
+        ],
+        "noStoreNeeded": false
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "E3",
+    "hypothesis": "E3.offscreen.cache",
+    "chrome": "Google Chrome 156.0.8078.80",
+    "environment": "host",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "single-root",
+    "debugger": "none",
+    "observations": [
+      {
+        "extensionId": "omllgeochjfpkjbkpcgjmnnbncdpiedd",
+        "via": "offscreen",
+        "pollMs": 1000,
+        "before": {
+          "ok": true,
+          "status": 200,
+          "text": "RECnRun E3 probe, version A\n"
+        },
+        "changes": [
+          {
+            "version": "B",
+            "first": {
+              "ok": true,
+              "status": 200,
+              "text": "RECnRun E3 probe, version B\n"
+            },
+            "afterPoll": {
+              "ok": true,
+              "status": 200,
+              "text": "RECnRun E3 probe, version B\n"
+            }
+          },
+          {
+            "version": "C",
+            "first": {
+              "ok": true,
+              "status": 200,
+              "text": "RECnRun E3 probe, version C\n"
+            },
+            "afterPoll": {
+              "ok": true,
+              "status": 200,
+              "text": "RECnRun E3 probe, version C\n"
+            }
+          },
+          {
+            "version": "D",
+            "first": {
+              "ok": true,
+              "status": 200,
+              "text": "RECnRun E3 probe, version D\n"
+            },
+            "afterPoll": {
+              "ok": true,
+              "status": 200,
+              "text": "RECnRun E3 probe, version D\n"
+            }
+          }
+        ],
+        "noStoreNeeded": false
+      },
+      {
+        "extensionId": "omllgeochjfpkjbkpcgjmnnbncdpiedd",
+        "via": "offscreen",
+        "pollMs": 1000,
+        "before": {
+          "ok": true,
+          "status": 200,
+          "text": "RECnRun E3 probe, version A\n"
+        },
+        "changes": [
+          {
+            "version": "B",
+            "first": {
+              "ok": true,
+              "status": 200,
+              "text": "RECnRun E3 probe, version B\n"
+            },
+            "afterPoll": {
+              "ok": true,
+              "status": 200,
+              "text": "RECnRun E3 probe, version B\n"
+            }
+          },
+          {
+            "version": "C",
+            "first": {
+              "ok": true,
+              "status": 200,
+              "text": "RECnRun E3 probe, version C\n"
+            },
+            "afterPoll": {
+              "ok": true,
+              "status": 200,
+              "text": "RECnRun E3 probe, version C\n"
+            }
+          },
+          {
+            "version": "D",
+            "first": {
+              "ok": true,
+              "status": 200,
+              "text": "RECnRun E3 probe, version D\n"
+            },
+            "afterPoll": {
+              "ok": true,
+              "status": 200,
+              "text": "RECnRun E3 probe, version D\n"
+            }
+          }
+        ],
+        "noStoreNeeded": false
+      },
+      {
+        "extensionId": "omllgeochjfpkjbkpcgjmnnbncdpiedd",
+        "via": "offscreen",
+        "pollMs": 1000,
+        "before": {
+          "ok": true,
+          "status": 200,
+          "text": "RECnRun E3 probe, version A\n"
+        },
+        "changes": [
+          {
+            "version": "B",
+            "first": {
+              "ok": true,
+              "status": 200,
+              "text": "RECnRun E3 probe, version B\n"
+            },
+            "afterPoll": {
+              "ok": true,
+              "status": 200,
+              "text": "RECnRun E3 probe, version B\n"
+            }
+          },
+          {
+            "version": "C",
+            "first": {
+              "ok": true,
+              "status": 200,
+              "text": "RECnRun E3 probe, version C\n"
+            },
+            "afterPoll": {
+              "ok": true,
+              "status": 200,
+              "text": "RECnRun E3 probe, version C\n"
+            }
+          },
+          {
+            "version": "D",
+            "first": {
+              "ok": true,
+              "status": 200,
+              "text": "RECnRun E3 probe, version D\n"
+            },
+            "afterPoll": {
+              "ok": true,
+              "status": 200,
+              "text": "RECnRun E3 probe, version D\n"
+            }
+          }
+        ],
+        "noStoreNeeded": false
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "E3",
+    "hypothesis": "E3.directoryListing",
+    "chrome": "Google Chrome 156.0.8078.80",
+    "environment": "host",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "single-root",
+    "debugger": "none",
+    "verdict": "unavailable",
+    "error": "no dedicated experiment and validated parser (§6.3)",
+    "samples": 0,
+    "gestures": 0,
+    "steps": [],
+    "observations": []
+  }
+]
