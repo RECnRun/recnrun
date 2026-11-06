@@ -97,13 +97,29 @@ export async function measured(profile: DownloadsProfile) {
   };
 }
 
+const historyTotal = (profile: DownloadsProfile) =>
+  profile.serviceWorker.evaluate(async () => {
+    const items = await (globalThis as unknown as DownloadsGlobal).chrome.downloads.search({});
+    return items.length;
+  });
+
 /** Reads Chrome's visible history list before cleanup; these small samples fit its first page. */
-export async function visibleDownloads(profile: DownloadsProfile, count: number) {
+export async function visibleDownloads(profile: DownloadsProfile) {
   const page = await profile.context.newPage();
   try {
     await page.goto("chrome://downloads/");
-    await expect(page.locator("downloads-item")).toHaveCount(count);
-    return await page.locator("downloads-item").count();
+    // The list is live and the profile keeps writing and erasing, so the API's count is read at the same moment.
+    let visible = 0;
+    await expect
+      .poll(
+        async () => {
+          visible = await page.locator("downloads-item").count();
+          return (await historyTotal(profile)) - visible;
+        },
+        { message: "chrome://downloads lists every retained history item" },
+      )
+      .toBe(0);
+    return visible;
   } finally {
     await page.close();
   }
@@ -124,7 +140,7 @@ export async function complete(profile: DownloadsProfile) {
     return held.chrome.downloads.search({});
   });
   const history = historyCounts(items);
-  return { history, chromeDownloads: await visibleDownloads(profile, history.total) };
+  return { history, chromeDownloads: await visibleDownloads(profile) };
 }
 
 /** The DataChannel heartbeats this profile's links sent so far, read from its offscreen document. */

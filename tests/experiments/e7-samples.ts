@@ -109,7 +109,7 @@ async function countAll(
     counts.push({
       ...count,
       historyBefore: before[index],
-      chromeDownloads: await visibleDownloads(profile, count.history.total),
+      chromeDownloads: await visibleDownloads(profile),
       heartbeatFrames: beats,
       heartbeatFramesPerHour: (beats * HOUR_MS) / count.windowMs,
     });
