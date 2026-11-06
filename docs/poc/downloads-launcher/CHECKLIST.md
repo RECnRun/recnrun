@@ -522,6 +522,14 @@ Plan: [PLAN.md](PLAN.md#dashboard-control-of-clones-p75p78). The master's dashbo
   - applied: finding 10 (the spec runs the real launcher pass; the test writes neither clones.json nor status.json), the UI part of finding 9 (one request at a time, every button disabled while one is pending, stale answers ignored)
   - commit: the commit with subject "Add a Clones section to the master's dashboard"
 
+- [i] P7.7 Open a tab in a linked clone from the dashboard
+  - red: `RECNRUN_TEST_QUIET=1 vp run test:components -- open-tab` with the form not rendered (negative control in the checkout, restored): 3 failed (`expected null not to be null`); `RECNRUN_TEST_QUIET=1 RECNRUN_EXPERIMENT_SAMPLES=smoke vp run test:headless -- tests/headless/dashboard-open-tab.spec.ts` with the Open tab click removed: `Expected pattern: /^Opened in /`, `element(s) not found`
+  - green: component `open-tab` 4 passed and `peer-profiles` 13 passed; the headless spec 1 passed (27 s: the dashboard's address field and Open tab button open the E13 site's start page in a linked headless worker; the server logged `/start/<id>` and `/marker/<id>`, and the worker's tab list holds the marker title)
+  - M-P7.a in MANUAL_VALIDATION.md rewritten to use the dashboard alone, Reopen included
+  - commit: the commit with subject "Open a tab in a linked profile from the dashboard"
+
+- [ ] P7.8 Manual check M-P7.a from the dashboard alone, Reopen included (owner)
+
 ## P8: With and without `chrome.debugger`
 
 - [ ] P8.1 D2 operation
