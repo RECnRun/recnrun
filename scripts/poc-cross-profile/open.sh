@@ -1,6 +1,6 @@
 #!/bin/sh
 # open.sh open <record> <namespace> <profileId> [headed|headless]
-# open.sh bind <userDataDir> <profileDirectory> <namespace> [headed|headless]
+# open.sh bind <userDataDir> <profileDirectory> <namespace> [headed|headless [master]]
 #
 # One open attempt of the launcher (POC PLAN.md P4.3): starts Chrome on a registered profile with
 # a fresh token in the bootstrap URL, then waits for the ack that carries the token. The request
@@ -12,7 +12,9 @@
 # `bind` is the same request for a profile the record does not hold yet (the first run of a root
 # shared by several profiles): it takes the paths from its arguments, checked with the record
 # grammar, and the profile id from the ack that carries its token, in any profile folder of the
-# namespace under a candidate Downloads root. It prints profileId= first.
+# namespace under a candidate Downloads root. It prints profileId= first. With `master` the bootstrap
+# URL carries `&role=master`: the extension records the profile as the master before it acks, so an
+# ack means the role is held (a worker or a template refuses and answers with a failure ack, exit 71).
 #
 # Output: pid=<n> on stderr at once; on stdout root=<downloadsRoot>, boot=<uuid>, token=<uuid>.
 # The extension id is the first line of the file `extension-id` next to this script (the id the
@@ -251,13 +253,14 @@ start_chrome() {
   refuse_other_mode
   finder=chrome_binary # by name: ShellCheck would read a bare call as a forgotten "$@"
   chrome=$("$finder") || { log 'no Google Chrome found'; exit 66; }
-  url=chrome-extension://$p_ext/bootstrap.html#token=$1
+  url=chrome-extension://$p_ext/bootstrap.html#token=$1$want_role
   set -- "--user-data-dir=$p_user" "--profile-directory=$p_dir" --no-first-run --no-default-browser-check "$url"
   [ "$mode" != headless ] || set -- --headless=new "$@"
   "$chrome" "$@" >/dev/null 2>&1 &
   log "pid=$!"
   launched "$!"
 }
+want_role=''
 # Called with the pid right after the launch; a script that sources this one redefines it.
 launched() { :; }
 open_profile() {
@@ -284,10 +287,14 @@ open_profile() {
 
 # The same request for a profile the record does not hold yet: the ack names the profile id.
 bind_profile() {
-  [ "$#" -ge 3 ] || { log 'usage: open.sh bind <userDataDir> <profileDirectory> <namespace> [headed|headless]'; exit 64; }
-  [ "$#" -le 4 ] || refuse 'a free argument: the request is the user data directory, profile directory, namespace, and mode'
-  mode=headed
+  [ "$#" -ge 3 ] || { log 'usage: open.sh bind <userDataDir> <profileDirectory> <namespace> [headed|headless [master]]'; exit 64; }
+  [ "$#" -le 5 ] || refuse 'a free argument: the request is the user data directory, profile directory, namespace, mode, and master'
+  mode=headed want_role=''
   [ "$#" -lt 4 ] || mode=$4
+  if [ "$#" -eq 5 ]; then
+    [ "$5" = master ] || refuse 'the fifth argument is master or nothing'
+    want_role='&role=master'
+  fi
   case $mode in headed | headless) ;; *) refuse 'the mode is neither headed nor headless' ;; esac
   check_timing
   is_record_directory "$1" || refuse 'the user data directory is not a plain absolute directory'

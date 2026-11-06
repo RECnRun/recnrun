@@ -15,6 +15,7 @@ import { IdentityStatementSchema } from "@/p2p/identity-key";
 import type { IdentityStatement } from "@/p2p/identity-key";
 import { SettingSchema } from "@/p2p/poc-setting";
 import { ProfileIdSchema } from "@/p2p/protocol";
+import type { Identity } from "@/p2p/roles";
 
 /*
  * P4.3 (POC PLAN.md decision 11): the launcher's proof that an open attempt reached a profile. A
@@ -123,9 +124,23 @@ interface Sender {
   url?: string;
 }
 
+/** Records this profile as the master with the key of its presence; any other outcome throws. */
+export async function claimMaster(
+  roles: { becomeMaster: (self: Identity) => Promise<{ ok: boolean; reason?: string }> },
+  deps: Pick<AckDependencies, "profileId" | "identity">,
+): Promise<void> {
+  const statement = await deps.identity();
+  if (!statement) throw new Error("No presence has been published yet.");
+  const outcome = await roles.becomeMaster({
+    profileId: await deps.profileId(),
+    identity: statement.key,
+  });
+  if (!outcome.ok) throw new Error(`This profile cannot become the master: ${outcome.reason}`);
+}
+
 /** The bootstrap page asks, once the presence is out, for the ack of the token it was opened with. */
 export function createAckListener(
-  ack: (token: string, template?: AckTemplate) => Promise<void>,
+  ack: (token: string, template?: AckTemplate, master?: true) => Promise<void>,
   own: { extensionId: string; extensionUrl: string },
 ) {
   return (message: unknown, sender: Sender, reply: (answer: BackgroundReply) => void) => {
@@ -133,10 +148,10 @@ export function createAckListener(
     const parsed = v.safeParse(PocLauncherAckSchema, message);
     if (!parsed.success || !ownPage) return false;
     const { token, ...rest } = parsed.output;
-    const sent =
-      "template" in rest
-        ? ack(token, { template: rest.template, setting: rest.setting })
-        : ack(token);
+    let sent: Promise<void>;
+    if ("template" in rest) sent = ack(token, { template: rest.template, setting: rest.setting });
+    else if ("master" in rest) sent = ack(token, undefined, true);
+    else sent = ack(token);
     sent.then(
       () => reply({ ok: true }),
       (error: unknown) => reply({ ok: false, error: errorMessage(error) }),

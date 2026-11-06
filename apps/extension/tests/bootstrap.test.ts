@@ -55,6 +55,16 @@ describe("bootstrap", () => {
     expect(deps.send).toHaveBeenCalledTimes(2);
   });
 
+  test("a #role=master token asks the ack to make this profile the master", async () => {
+    const deps = dependencies(`#token=${TOKEN}&role=master`);
+    expect(await bootstrap(deps)).toEqual({ ok: true, token: TOKEN, acked: true });
+    expect(deps.send).toHaveBeenNthCalledWith(2, {
+      type: "POC_LAUNCHER_ACK",
+      token: TOKEN,
+      master: true,
+    });
+  });
+
   test("keeps the presence when the ack fails, and says it was not written", async () => {
     const replies = [{ ok: true }, { ok: false, error: "No presence has been published yet." }];
     const deps = { ...dependencies(`#token=${TOKEN}`), send: vi.fn(async () => replies.shift()) };
@@ -81,6 +91,8 @@ describe("bootstrap", () => {
     "#",
     `#token=${TOKEN.toUpperCase()}`,
     `#token=${TOKEN}&next=1`,
+    `#token=${TOKEN}&role=worker`,
+    `#token=${TOKEN}&role=master&x=1`,
     `#token=${TOKEN} `,
     "#token=0f8b6a3e-2c1d-1e5f-9a7b-1c2d3e4f5a6b",
     "#token=0f8b6a3e-2c1d-4e5f-7a7b-1c2d3e4f5a6b",

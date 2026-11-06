@@ -6,6 +6,7 @@ import type { startPocPresence } from "@/background/downloads-presence";
 import type { Sign } from "@/background/greeting";
 import {
   createAckListener,
+  claimMaster,
   createFailureListener,
   writeAck,
   writeFailureAck,
@@ -62,13 +63,17 @@ function startPocBootstrap({ log, sign, presence, start }: PocBootstrapOptions):
   const own = { extensionId: browser.runtime.id, extensionUrl: browser.runtime.getURL("/") };
   const ackDeps = (identity: AckDependencies["identity"]) => ackDependencies(store, log, identity);
   const latest = async () => (await presence())?.identity();
-  const ack = (token: string, template?: AckTemplate) => writeAck(ackDeps(latest), token, template);
+  const roles = storedRoles();
+  const ack = async (token: string, template?: AckTemplate, master?: true) => {
+    if (master) await claimMaster(roles, ackDeps(latest));
+    await writeAck(ackDeps(latest), token, template);
+  };
   browser.runtime.onMessage.addListener(createAckListener(ack, own));
   browser.runtime.onMessage.addListener(
     createFailureListener(boundedFailureAck(ackDeps(latest)), own),
   );
   const deps: ProvisionDependencies = {
-    roles: storedRoles(),
+    roles,
     identity: identityRepository,
     namespace: { read: store.namespace, write: store.setNamespace },
     // The offscreen document keeps the certificate it loaded, so it closes before both go.
@@ -89,7 +94,6 @@ function startPocBootstrap({ log, sign, presence, start }: PocBootstrapOptions):
   };
   const provision = createProvisionListener((request) => provisionClone(deps, request), own);
   browser.runtime.onMessage.addListener(provision);
-  const roles = storedRoles();
   const prepare = createPrepareListener(
     {
       downloads: browser.downloads,

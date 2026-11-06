@@ -26,7 +26,10 @@ const STUB = `#!/bin/sh
 [ -n "\${STUB_SIGNALS:-}" ] || exec /usr/bin/perl -e '$SIG{INT} = "DEFAULT"; $ENV{STUB_SIGNALS} = 1; exec @ARGV or die' /bin/sh "$0" "$@"
 for a in "$@"; do last=$a; case $a in --profile-directory=*) directory=\${a#*=} ;; esac; done
 printf 'launch\\n' >>"$STUB_LOG"
+printf '%s\\n' "$last" >>"$STUB_LOG.urls"
 token=\${last#*token=}
+token=\${token%%&*}
+case $last in *"&role=master") [ -z "\${STUB_MASTER_FAIL:-}" ] || STUB_ACK= ;; esac
 # STUB_IDS_FILE maps "<profile directory>=<profileId>" lines: a directory it does not list never acks.
 if [ -n "\${STUB_IDS_FILE:-}" ]; then
   STUB_PROFILE=

@@ -33,6 +33,7 @@ for (const shell of shells) {
         `profileId=${ALICE}`,
         "namespace=lab",
         `downloadsRoot=${scene.home}/Downloads`,
+        "role=master", // the Default of the default root is the master
         "root=r1\n", // the catalog pass of start --once numbered the root
       ].join("\n"),
     ]);
@@ -119,6 +120,7 @@ const recordBlock = (scene, id, directory) =>
     `profileId=${id}`,
     "namespace=lab",
     `downloadsRoot=${scene.home}/Downloads`,
+    ...(directory === "Default" ? ["role=master"] : []),
     "root=r1", // the catalog pass of first-run numbered the shared root
   ].join("\n");
 const trimmed = (record) => blocks(record).map((block) => block.trimEnd());

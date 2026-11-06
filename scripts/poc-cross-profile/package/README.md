@@ -40,7 +40,7 @@ It registers each profile that has the extension, opens it, waits for the extens
 acknowledgement, and prints `<profile id> open` per profile, then the autostart command to run
 next. Profiles that download to the same folder (the usual layout) are bound by that
 acknowledgement: Chrome starts on each with a one-time token and the profile id comes from the
-extension's answer, so nothing is written for a profile that does not answer. Run it again after you prepare another profile; a profile that is already registered is not
+extension's answer, so nothing is written for a profile that does not answer. The Default profile of Chrome's own folder becomes the master in the same run, with no extra step: its extension is asked once through the same one-time token, and the launcher record gets `role=master` only after the extension answers. Run it again after you prepare another profile; a profile that is already registered is not
 opened twice. Each pass of the launcher, `first-run` included, also writes the catalog `registry.json` into the `RECnRun/poc/lab` folder of each profile's Downloads folder: the extension cannot list folders, so it finds the other profiles only through that file. The launcher keeps its state in `$HOME/.recnrun/launcher` and its record in
 `$HOME/.recnrun/launcher.record`, both under the namespace `lab`. Exit 0: every profile is open;
 66: no profile has the extension; 70: a profile did not open or did not acknowledge.

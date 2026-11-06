@@ -264,6 +264,7 @@ await test("LIBRARIES holds every script the shipped scripts source or run", () 
     "catalog.sh",
     "presence.sh",
     "record.sh",
+    "master-role.sh",
     "roots.sh",
     "provision.sh",
     "base.sh",

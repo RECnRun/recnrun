@@ -43,6 +43,12 @@ export type AckTemplate = v.InferOutput<typeof AckTemplateSchema>;
 /** The bootstrap page asks the background to answer the launcher's open attempt (POC PLAN.md P4.3). */
 export const PocLauncherAckSchema = v.union([
   v.strictObject({ type: v.literal("POC_LAUNCHER_ACK"), token: TokenSchema }),
+  // The launcher's first run opened the Default with #role=master: record it as the master first.
+  v.strictObject({
+    type: v.literal("POC_LAUNCHER_ACK"),
+    token: TokenSchema,
+    master: v.literal(true),
+  }),
   v.strictObject({
     type: v.literal("POC_LAUNCHER_ACK"),
     token: TokenSchema,
@@ -54,10 +60,12 @@ export const PocLauncherAckSchema = v.union([
 export const pocLauncherAck = (
   token: string,
   template?: AckTemplate,
+  master?: true,
 ): v.InferOutput<typeof PocLauncherAckSchema> => ({
   type: "POC_LAUNCHER_ACK",
   token,
   ...template,
+  ...(master && { master }),
 });
 
 /** What a clone ack adds after the identity (POC PLAN.md P5.3); the three come together. */

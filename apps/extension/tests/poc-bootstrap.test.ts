@@ -118,4 +118,57 @@ describe("startedOutward", () => {
     });
     expect(written).toEqual([]);
   });
+
+  describe("the ack of a master request", () => {
+    const TOKEN = "0f8b6a3e-2c1d-4e5f-9a7b-1c2d3e4f5a6b";
+    const page = () => ({
+      id: browser.runtime.id,
+      url: browser.runtime.getURL("/bootstrap.html"),
+    });
+    async function askAck(listener: Listener | undefined, message: object) {
+      const reply = vi.fn();
+      expect(
+        listener?.({ type: "POC_LAUNCHER_ACK", token: TOKEN, ...message }, page(), reply),
+      ).toBe(true);
+      await vi.waitFor(() => expect(reply).toHaveBeenCalled());
+      return reply.mock.calls[0]?.[0];
+    }
+
+    test("records the master with the key of the presence, then writes the ack", async () => {
+      const { listeners } = bootstrapped(fakePresence(STATEMENT));
+      expect(await askAck(listeners[0], { master: true })).toEqual({ ok: true });
+      expect(await roleRepository.read()).toMatchObject({
+        role: "master",
+        identity: STATEMENT.key,
+      });
+      expect(written).toHaveLength(1);
+    });
+
+    test("is idempotent for the master it already is", async () => {
+      const { listeners } = bootstrapped(fakePresence(STATEMENT));
+      expect(await askAck(listeners[0], { master: true })).toEqual({ ok: true });
+      expect(await askAck(listeners[0], { master: true })).toEqual({ ok: true });
+    });
+
+    test("a plain ack records no role", async () => {
+      const { listeners } = bootstrapped(fakePresence(STATEMENT));
+      expect(await askAck(listeners[0], {})).toEqual({ ok: true });
+      expect(await roleRepository.read()).toBeNull();
+    });
+
+    test("a worker stays a worker: the request fails and no ack is written", async () => {
+      const binding = {
+        role: "worker",
+        masterProfileId: MASTER,
+        masterIdentity: MASTER_KEY,
+        boundAt: 1,
+        source: "pairing",
+      } as const;
+      await roleRepository.write(binding);
+      const { listeners } = bootstrapped(fakePresence(STATEMENT));
+      expect(await askAck(listeners[0], { master: true })).toMatchObject({ ok: false });
+      expect(await roleRepository.read()).toEqual(binding);
+      expect(written).toEqual([]);
+    });
+  });
 });

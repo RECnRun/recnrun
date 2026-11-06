@@ -21,6 +21,8 @@ import { pocTemplateStore } from "@/storage/poc-template-repository";
  * ack of the attempt, the launcher's proof that this open reached the profile.
  * P5.1: a base is opened with #template=<uuid>&setting=base-v<n> instead; the page records template
  * mode and the setting, adopts no boot, asks for no presence, and acks with both fields.
+ * The first run opens the Default with #token=<uuid>&role=master: the ack request then asks the
+ * background to record this profile as the master first.
  * P5.3: a copy of a base is opened with #clone=<token>&instance=<uuid>&operation=<uuid>&
  * namespace=<namespace>&master=<profile id>.<identity key>, in exactly that order; the page stores
  * nothing and hands exactly those fields to its worker, which provisions, acks, and announces.
@@ -29,9 +31,12 @@ import { pocTemplateStore } from "@/storage/poc-template-repository";
 // Lowercase v4, as catalog.sh requires of a boot; nothing else may follow it.
 const FragmentSchema = v.pipe(
   v.string(),
-  v.regex(/^#token=[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/),
+  v.regex(
+    /^#token=[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}(&role=master)?$/,
+  ),
 );
 const PREFIX = "#token=";
+const MASTER_SUFFIX = "&role=master";
 const TemplateFragmentSchema = v.pipe(
   v.string(),
   v.regex(
@@ -151,7 +156,18 @@ async function publishPresence(
 
 /** The token open: adopt, publish, ack, each bounded; a failure leaves a failure ack for the token. */
 async function bootstrapToken(
+  fragment: string,
+  deps: BootstrapDependencies,
+): Promise<BootstrapResult> {
+  const master = fragment.endsWith(MASTER_SUFFIX);
+  const token = fragment.slice(PREFIX.length, master ? -MASTER_SUFFIX.length : undefined);
+  return bootstrapAttempt(token, master, deps);
+}
+
+async function bootstrapAttempt(
   token: string,
+  master: boolean,
+
   { adopt, send, limits = LIMITS }: BootstrapDependencies,
 ): Promise<BootstrapResult> {
   const fail = async (step: BootstrapStep, error: string) =>
@@ -168,7 +184,11 @@ async function bootstrapToken(
     await fail("publish", published.error);
     return published;
   }
-  const error = await ackError(send, token, limits.ackMs);
+  const error = await ackError(
+    send,
+    pocLauncherAck(token, undefined, master || undefined),
+    limits.ackMs,
+  );
   if (error === undefined) return { ok: true, token, acked: true };
   await fail("ack", error);
   return { ok: true, token, acked: false, error };
@@ -177,11 +197,11 @@ async function bootstrapToken(
 /** The reason the ack was not written, or undefined once it was. */
 async function ackError(
   send: BootstrapDependencies["send"],
-  token: string,
+  request: ReturnType<typeof pocLauncherAck>,
   ms: number,
 ): Promise<string | undefined> {
   try {
-    const ack = await bounded(ask(send, pocLauncherAck(token)), ms, "The ack");
+    const ack = await bounded(ask(send, request), ms, "The ack");
     return ack.ok ? undefined : ack.error;
   } catch (error) {
     return errorMessage(error);
@@ -202,7 +222,7 @@ export async function bootstrap(deps: BootstrapDependencies): Promise<BootstrapR
   const parsed = v.safeParse(FragmentSchema, hash);
   if (!parsed.success)
     return { ok: false, error: "The address carries no #token=<lowercase v4 uuid>." };
-  return bootstrapToken(parsed.output.slice(PREFIX.length), deps);
+  return bootstrapToken(parsed.output, deps);
 }
 
 /** Runs the bootstrap of this page and shows its result in `<pre id="bootstrap">`. */

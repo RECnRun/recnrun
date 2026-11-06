@@ -31,6 +31,7 @@ export const LIBRARIES = [
   "lifecycle-launch.sh",
   "open.sh",
   "record.sh",
+  "master-role.sh",
   "presence.sh",
   "roots.sh",
   "catalog.sh",

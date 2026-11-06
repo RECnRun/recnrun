@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from "vite-plus/test";
-import { createAckListener, writeAck } from "@/background/launcher-requests";
+import { claimMaster, createAckListener, writeAck } from "@/background/launcher-requests";
 import type { AckDependencies } from "@/background/launcher-requests";
 import type { DownloadsPort } from "@/background/downloads-publisher";
 import { FINGERPRINT, ME } from "./fake-peer";
@@ -133,7 +133,31 @@ describe("createAckListener", () => {
     expect(ack).toHaveBeenCalledWith(TOKEN, template);
   });
 
+  test("hands a master request to the ack as its third argument", async () => {
+    const ack = vi.fn(async (_token: string, _template?: unknown, _master?: boolean) => {});
+    const reply = vi.fn();
+    expect(createAckListener(ack, own)({ ...request, master: true }, page, reply)).toBe(true);
+    await vi.waitFor(() => expect(reply).toHaveBeenCalledWith({ ok: true }));
+    expect(ack).toHaveBeenCalledWith(TOKEN, undefined, true);
+  });
+
   test.each([
+    [
+      "a master request from another extension",
+      { ...request, master: true },
+      { ...page, id: "stranger" },
+    ],
+    [
+      "a master request from a web page",
+      { ...request, master: true },
+      { id: "own", url: "https://recnrun.com/" },
+    ],
+    [
+      "a master flag with a template",
+      { ...request, master: true, template: true, setting: "base-v1" },
+      page,
+    ],
+    ["a false master flag", { ...request, master: false }, page],
     ["another message", { type: "POC_PUBLISH_PRESENCE" }, page],
     ["an extra key", { ...request, boot: TOKEN }, page],
     ["a malformed token", { ...request, token: "nope" }, page],
@@ -157,4 +181,30 @@ describe("createAckListener", () => {
       expect(reply).toHaveBeenCalledWith({ ok: false, error: "Invalid filename" }),
     );
   });
+});
+
+describe("claimMaster", () => {
+  const profile = { profileId: async () => ME, identity: async () => STATEMENT };
+
+  test("records this profile as the master with the key of its presence, once", async () => {
+    const becomeMaster = vi.fn(async (_self: unknown) => ({ ok: true as const }));
+    await claimMaster({ becomeMaster }, profile);
+    expect(becomeMaster).toHaveBeenCalledWith({ profileId: ME, identity: STATEMENT.key });
+  });
+
+  test("refuses before a presence carries an identity", async () => {
+    const becomeMaster = vi.fn(async (_self: unknown) => ({ ok: true as const }));
+    await expect(
+      claimMaster({ becomeMaster }, { ...profile, identity: async () => undefined }),
+    ).rejects.toThrow("No presence has been published yet.");
+    expect(becomeMaster).not.toHaveBeenCalled();
+  });
+
+  test.each(["template", "bound", "master-differs", "malformed", "store-failed"])(
+    "refuses when the role outcome is %s",
+    async (reason) => {
+      const becomeMaster = vi.fn(async (_self: unknown) => ({ ok: false as const, reason }));
+      await expect(claimMaster({ becomeMaster }, profile)).rejects.toThrow(reason);
+    },
+  );
 });
