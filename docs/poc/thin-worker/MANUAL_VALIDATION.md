@@ -4,12 +4,27 @@ Checks that need the owner's Mac, the real Chrome Web Store, or a person's judgm
 
 Record each result under its check as `Result: <date> · <machine, OS> · Chrome <version> · build <commit> · run <id> · pass | fail · <notes>`. Store screenshots and logs under `.artifacts/evidence/host/<run id>/`; link the folder name, not the files. A failure becomes a task in [CHECKLIST.md](CHECKLIST.md).
 
+## After Gate W
+
+- **M-TW.12 Real origin.** Needs the owner's explicit authorization, because it publishes the lab page on recnrun.com through a push to `master`. Repeat `W.rtc` (variant `public`), `W.fsa` (tab), and `W.friction` against `https://recnrun.com` on the owner's Mac.
+  Expected: as the lab cells; any Local Network Access or macOS Local Network prompt is listed with its gesture count.
+  Result:
+- **M-TW.13 `W.rtc` on macOS.** On a throwaway root, open the lab page from the stand-in run on the Mac, and link two clones (one headless) with no flag.
+  Expected: both links up with `.local` page candidates kept; the selected candidate pair recorded; every prompt (Chrome's or macOS Local Network) listed.
+  Result:
+- **M-TW.14 `W.fsa` on macOS, tab and app.** On a throwaway root, onboard in a tab, then install the app with Chrome's own install button and onboard again in a second throwaway root. Close and reopen, then quit and relaunch Chrome twice.
+  Expected: zero gestures after onboarding in both; same key thumbprint; the folder readable and writable. Repeat on the personal Default (orchestrator only).
+  Result:
+- **M-TW.15 Sleep during a job.** Start a job whose `wait` is held, close the lid for 5 minutes, then wake the Mac and reopen the page.
+  Expected: the job ends on the worker or answers `TIMEOUT`/`EXPIRED`; the page reconciles with no resubmission; the fixture POST count is at most 1.
+  Result:
+
 ## After P1
 
 - **M-TW.1 `P1.master-fsa` on macOS.**
   1. On a throwaway root, load `poc-master` with file access off and turn on "Ask where to save" in `chrome://settings/downloads`.
   2. Run onboarding: choose `~/RECnRun/rendezvous`, then obtain "Allow on every visit".
-  3. Provision a base (pick the rendezvous folder in its settings chooser), freeze it, and make two clones; quit Chrome.
+  3. Provision a base, freeze it, and make two clones; quit Chrome. The launcher moves the workers' files into the rendezvous folder.
   4. Relaunch Chrome twice without opening any extension tab. Each time, check `chrome://inspect/#extensions` for the recreated offscreen document, ask for one provisioning and one clone-control operation from a terminal request file, and wait for both acks in the rendezvous folder and for the clones' new presence files.
   5. After the second run, quit Chrome and count the rows of the `downloads` table in the profile's `History` database (`sqlite3`).
   6. Repeat on the personal Default (orchestrator only).

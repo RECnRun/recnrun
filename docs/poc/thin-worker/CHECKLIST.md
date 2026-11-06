@@ -1,8 +1,8 @@
 # Thin worker POC: checklist
 
 **Branch:** `poc-thin-worker` (pull request targets `poc-downloads-launcher`)
-**Last commit:** `18c4ec12` (plan not yet committed)
-**Current phase:** P0
+**Last commit:** `3b37afdf`
+**Current phase:** PW
 **Paused:** no
 
 ## Resume protocol
@@ -19,6 +19,29 @@
 
 Markers: `[ ]` not started · `[i]` implemented, awaiting the phase gate · `[x]` verified by `vp run verify` · `[!]` blocked (reason indented) · `[~]` partial (what is missing indented)
 
+## PW: website-master spike
+
+Phase 0 and later wait for Gate W. W.4 or W.9 failing stops the spike and goes straight to Gate W.
+
+- [ ] W.1 Add `packages/link` (moved link modules), `packages/worker-protocol`, `apps/worker`, `apps/web-master-lab`; update ARCHITECTURE, dependency-cruiser, Vitest, coverage, jscpd, and Knip
+- [ ] W.2 Launcher move step from `<root>/downloads/RECnRun/` to the rendezvous folder
+- [ ] W.3 HTTPS stand-in `https://recnrun.test`; page onboarding and pairing; `persist()` answer recorded
+- [ ] W.4 Deciding cell `W.rtc` (stop the spike if it fails)
+- [ ] W.5 Cell `W.fsa` (tab and app)
+- [ ] W.6 Job schema, limits, errors, signature
+- [ ] W.7 Worker job runner, ledger, executor
+- [ ] W.8 Page job submit, journal, reconcile, cancel
+- [ ] W.9 Deciding cell `W.lifecycle` (stop the spike if it fails)
+- [ ] W.10 Cell `W.trust`
+- [ ] W.11 Cell `W.friction`
+
+Gate W: lab run · verify · review · RESULTS W1–W5 · owner decision
+
+- lab run (`vp run lab:web-master`, run id, result per cell):
+- verify:
+- review (`reviews/PW.md`):
+- owner decision (adopt the website master or keep the extension master):
+
 ## P0: freeze and prune verify
 
 Baseline: run `2026-11-06T18-35-02Z` on `18c4ec12`, 70.8 min.
@@ -29,6 +52,7 @@ Baseline: run `2026-11-06T18-35-02Z` on `18c4ec12`, 70.8 min.
 - [ ] P0.4 Delete the shared-root worker cases; keep `launcher-first-run-shared` and the refusal checks
 - [ ] P0.5 Retire the `poc-d1` and `poc-d2` builds and their manifest checks
 - [ ] P0.6 Fix `P6.1.error.retry` with an asserting test
+- [ ] P0.7 Delete or keep the spike code according to Gate W
 
 Gate P0: verify · time per task · review
 
@@ -37,6 +61,8 @@ Gate P0: verify · time per task · review
 - review:
 
 ## P1: cold-start vertical slice
+
+Phase W started P1.1, P1.3, P1.5, P1.6, P1.7, P1.10, and P1.12; those tasks finish what it left.
 
 - [ ] P1.1 Add `packages/worker-protocol`, `packages/link`, `apps/worker`; update ARCHITECTURE, dependency-cruiser, the extension rule, and `CHROMIUM.md`; wire Vitest, coverage, jscpd, and Knip
 - [ ] P1.2 Build master and worker with distinct pinned ids; pack the versioned package (worker, `bin/`, `SHA256SUMS`)
@@ -47,13 +73,13 @@ Gate P0: verify · time per task · review
 - [ ] P1.7 Move the link to `packages/link` with FSA and Downloads adapters (jscpd at most 1%)
 - [ ] P1.8 Rendezvous onboarding: picker, marker, persistent consent, recovery action
 - [ ] P1.9 Trusted master pin in the launcher record; `clone-open.sh` never reads presence for the key
-- [ ] P1.10 Base download directory set through Chrome's settings chooser; no rewrite in `clone.sh` and `base-update.sh`; cell `P1.base-download-dir`
+- [ ] P1.10 Launcher move step into the rendezvous folder (started in W.2); cell `P1.rendezvous-move`
 - [ ] P1.11 Exclude frozen bases and unpublished copies through the registry and the role check
 - [ ] P1.12 Strict-CSP fixture server with POST counter
 - [ ] P1.13 Cold-start slice spec (H-CSP recorded)
 - [ ] P1.14 Rejection spec
 - [ ] P1.15 Restart and replay spec
-- [ ] P1.16 Deciding cell `P1.master-fsa`
+- [ ] P1.16 Deciding cell `P1.master-fsa` (replaced by `W.fsa` if the website master is adopted)
 
 Gate P1: verify · slice specs time · RESULTS H1–H8 · review
 
@@ -153,6 +179,7 @@ Gate P7: soak run · owner checks · review
 
 - `P6.1.error.retry` → P0.6
 - "Ask where to save" warning → P1.16, P6.3
+- Base download folder: option B (move step) is the default; the owner may still choose the `chrome://settings/downloads` route → P1.10
 - README `4 N + 3` gesture count and the runbook's Documents and Full Disk Access steps → P6.5
 - `launcher` presence policy default → P2.7
 - E9 backoff, stop, and pause → lab only, until the launcher review
