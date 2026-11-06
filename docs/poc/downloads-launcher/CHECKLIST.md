@@ -17,9 +17,9 @@ Tracks [PLAN.md](PLAN.md). One line per task; the orchestrator owns `[x]`, imple
 Markers: `[ ]` not started · `[i]` implemented, awaiting the phase gate · `[x]` verified by `vp run verify` · `[!]` blocked (reason indented) · `[~]` partial (what is missing indented).
 
 **Branch:** `poc-downloads-launcher` (from `60989d6`, head of PR #19 `poc/multi-profile-mesh`)
-**Last commit:** on `p7-headless`, "Record the three-sample E13 host run and the owner's T9 check" plus this record, over `7f2c9ad8` (pushed HEAD of PR #30, the Gate P6 record)
-**Current phase:** P7.1 and P7.4 on branch `p7-headless` (rebased onto `7f2c9ad8`, the pushed Gate P6 head) on 2026-11-05: the headless lab runner, the `OPEN_TAB` peer command, and E13 in the lab (three samples) and on the host (throwaway roots, three samples). Next: the Codex review of P7 ([reviews/P7.md](reviews/P7.md)) and `vp run verify`; P7.2, P7.3, and the push wait for the owner (Gate P7 is fused into Gate P8).
-**Paused:** not paused. Gate P6 was pushed on 2026-11-05 (`7f2c9ad8`, PR #30). M-P1.a, M-P2.a, M-P3.a, M-P4.a, M-P4.b, M-P5.a, M-P6.a, and M-P7.a wait for the owner.
+**Last commit:** on `p7-headless`, "Record the Gate P7 E13 runs and the P7 review disposition", over `7f2c9ad8` (pushed HEAD of PR #30, the Gate P6 record)
+**Current phase:** Gate P7 on branch `p7-headless` (worktree `.claude/worktrees/p7-headless`), 2026-11-06: P7.1 and P7.4 (E13 lab and host, the eleven P7 review fixes, and T1–T3: SIGINT quit, bounded bootstrap with failure ack and exit 71, wider E13 failure evidence). P7.2 (E11) and P7.3 (E12) are `[ ]`. Next, when the owner resumes: the owner's M-P7.a, then P7.2 and P7.3, or the owner's choice of what follows; P8 does not start without the owner.
+**Paused:** since 2026-11-06, by the owner, after Gate P7 (no P8 or further gate). No agent worktree, background run, or unpushed commit is in flight once the gate push lands; the agent worktrees `agent-ab31d64fbe5903eb3`, `agent-a2e79d8744dd597cf`, and `agent-ae180240ba390f815` (branch `t1-chrome-quit`) hold only commits already cherry-picked here. Gate P6 was pushed on 2026-11-05 (`7f2c9ad8`, PR #30). M-P1.a, M-P2.a, M-P3.a, M-P4.a, M-P4.b, M-P5.a, M-P6.a, and M-P7.a wait for the owner.
 
 ## P0: Base, lab, baseline, and Chromium inventory
 
@@ -475,8 +475,17 @@ Gate P6: verify · CL16, CL17 · review of P5+P6 · push
   - red: `RECNRUN_EXPERIMENT_SAMPLES=smoke vp run test:headless -- tests/headless/chrome.spec.ts -g "full shutdown"` with the SIGTERM quit failed: after the quit the root held `["SingletonCookie","SingletonLock","SingletonSocket"]`, expected `[]`; `vp run test:scripts` with the new checks against the old scripts failed 8 of 625 (base quit, install linger, lifecycle stop and `--force`, in sh and dash); `RECNRUN_EXPERIMENT_SAMPLES=smoke vp run test:browser -- tests/browser/E10-base-install.spec.ts` with the old base.sh and install.sh: E10.pipe.persistFirstRelaunch and persistSecondRelaunch fail, `noSingletonAfterQuit` false
   - green: the same headless spec 5 passed (3.1m); `vp run test:scripts` 625 pass, 0 fail; E10 smoke all three pass ("base.sh: stopped pid 902 by SIGINT", singletons `[]`, "install.sh: Chrome pid 367 ended by Browser.close"); `vp run test:browser -- tests/browser/launcher-open.spec.ts tests/browser/launcher-commands.spec.ts tests/browser/launcher-first-run-shared.spec.ts tests/browser/clones.spec.ts` 9 passed (7.5m), no "survived SIGINT" warning
   - commit: the commit with subject "Quit Chrome with SIGINT so its normal shutdown removes the singletons"
+- [i] P7.4/T2 The token bootstrap is bounded at each step and writes a failure ack when it cannot ack; `open.sh` exits 71 on it
+  - red: `vp run test:unit -- bootstrap-failure` 5 of 6 failed (stalled publish, ack, and adopt timed out in 5000 ms; the refused publish was not retried); `vp run test:scripts` with the new failure-ack check: exit 69, expected 71, in sh and dash
+  - green: `vp run test:unit` 126 files, 1313 tests passed; `vp run test:scripts` 647 tests, 0 failed
+  - commit: the commits with subjects "Bound the token bootstrap and write a failure ack when it cannot ack" and "Exit open.sh with 71 when the profile answers with a failure ack"
+- [i] P7.4/T3 A failed headed reopen in E13's exclusive cell keeps the display, Downloads tree, exit state, singletons, processes, and timestamps
+  - red: `RECNRUN_EXPERIMENT_SAMPLES=smoke vp run test:headless -- tests/headless/E13-separate-roots.spec.ts -g clones` with the reopen forced to a missing clone name: the observation held only stderr, chromeLog, singletonLock, and commandLines (it showed `exit_type` SessionEnded and a lock naming a gone pid once widened)
+  - green: the same command without the control: `E13.t9.exclusive` pass, and the forced failure carried the widened evidence
+  - commit: the commits with subjects "Keep the evidence of a failed headed reopen in E13's exclusive cell" and "Widen the evidence E13 keeps when a headed reopen fails"
+- [i] P7.4 rerun after the review fixes and T1–T3: `RECNRUN_EXPERIMENT_SAMPLES=full vp run test:headless` 10 passed (16.7m), the eleven cells pass at three samples (bootstrap diagnostic one), focus and pip unavailable, `E13.t9.exclusive` reopened headed in all three samples, run `2026-11-05T23-43-44.405Z-29471de0-f643-4845-b7ad-f12dd8ecc5f9`; host: `RECNRUN_HOST_ROOTS=~/Documents/RECnRun/poc-downloads-launcher/roots vp run test:host -- tests/host/E13-separate-roots.spec.ts` 4 passed (8.8m), the five worker cells pass at three samples, run `host-2026-11-06T00-00-43.212Z`; [E13.md](experiments/E13.md) and the four verdict files regenerated
 
-Gate P7: verify · E11–E13 (review and push fused into Gate P8)
+Gate P7: verify · E13 · review [reviews/P7.md](reviews/P7.md) (Codex `gpt-6.1-sol` high, 2026-11-05: 11 findings, 11 applied, 0 rejected) · P7.2 (E11) and P7.3 (E12) not started; the owner paused the POC after this gate (2026-11-06)
 
 ## P8: With and without `chrome.debugger`
 
