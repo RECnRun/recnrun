@@ -47,6 +47,10 @@ RECNRUN_DISCOVERY_LIB=1 . "$(dirname -- "$0")/clone-open.sh"
 # shellcheck source=lifecycle-state.sh
 . "$(dirname -- "$0")/lifecycle-state.sh"
 RECNRUN_DISCOVERY_LIB=$cc_as_library # a dot keeps its own assignment: give back what this script saw
+# shellcheck source=clone-control-request.sh
+. "$(dirname -- "$0")/clone-control-request.sh"
+# shellcheck source=clone-control-ops.sh
+. "$(dirname -- "$0")/clone-control-ops.sh"
 cc_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)
 
 log() { printf 'clone-control.sh: %s\n' "$*" >&2; }
@@ -98,78 +102,6 @@ find_roster() {
   [ -d "$cc_control" ] || mkdir -- "$cc_control" 2>/dev/null || { log "cannot make $cc_control"; return 1; }
 }
 
-# --- The request -------------------------------------------------------------------------------
-
-# Sets rq_* from the request file $1 of request $2, else rq_why and failure.
-parse_request() {
-  rq_why='the request is not in the closed grammar'
-  ack_rest=$(cat -- "$1")
-  ack_take '{"requestId":"' '"' && [ "$ack_value" = "$2" ] || return 1
-  ack_take '","kind":"clone-control","action":"' '"' || return 1
-  case $ack_value in
-    close | open-headless | open-visible | reopen-headless | reopen-visible) rq_action=$ack_value ;;
-    *) rq_why='the action is not one of close, open-headless, open-visible, reopen-headless, reopen-visible'; return 1 ;;
-  esac
-  ack_take '","instanceId":"' '"' && is_v4 "$ack_value" || return 1
-  rq_instance=$ack_value
-  ack_take '","namespace":"' '"' && [ "$ack_value" = "$ns" ] || return 1
-  ack_take '","masterProfileId":"' '"' && [ "$ack_value" = "$cc_master_id" ] || return 1
-  ack_take '","masterIdentity":{"key":"' '"' && is_base64url "$ack_value" 87 || return 1
-  ack_take '","signedAt":' ',' && is_time "$ack_value" || return 1
-  ack_take ',"signature":"' '"' && is_base64url "$ack_value" 86 || return 1
-  ack_take '"},"createdAt":' '}' && is_time "$ack_value" || return 1
-  rq_created=$ack_value
-  [ "$ack_rest" = '}' ]
-}
-# Fails when createdAt is older than ten minutes or more than 5 s ahead of this clock.
-check_fresh() {
-  cf_now="$(date +%s)000"
-  [ "$rq_created" -ge $((cf_now - cc_fresh_ms)) ] && [ "$rq_created" -le $((cf_now + cc_ahead_ms)) ] && return 0
-  rq_why='the request is older than 10 minutes or from the future'
-  return 1
-}
-# Succeeds when the request of $1 is a plain small file in a plain folder without a NUL byte.
-request_file_ok() {
-  no_link_below "$cc_master_root" "RECnRun/poc/$ns/control/$1/request.json" || return 1
-  rf_file=$cc_control/$1/request.json
-  [ -f "$rf_file" ] && [ ! -L "$rf_file" ] || return 1
-  rf_size=$(wc -c <"$rf_file" | tr -d ' ')
-  [ "$rf_size" -le 4096 ] || return 1
-  rf_text=$(cat -- "$rf_file")
-  [ "${#rf_text}" -eq "$rf_size" ]
-}
-
-# --- The clone ---------------------------------------------------------------------------------
-
-# Sets cc_root and cc_name to the clone of instance $1 the record registers, when its root is a plain
-# clone under a folder named clones whose marker belongs to that instance and this namespace.
-eligible_clone() {
-  cc_root='' ec_count=0
-  while IFS= read -r ec_line; do
-    [ "$ec_line" != "$1" ] || ec_count=$((ec_count + 1))
-  done <<IDS
-$cc_ids
-IDS
-  [ "$ec_count" -le 1 ] || { rq_why='the record names that profile in more than one block'; return 1; }
-  while IFS= read -r ec_line; do
-    [ "${ec_line%%=*}" = "$1" ] || continue
-    cc_root=${ec_line#*=}
-  done <<WORKERS
-$cc_workers
-WORKERS
-  [ -n "$cc_root" ] || { rq_why='that profile is not the Default profile of a worker clone of the record'; return 1; }
-  cc_name=${cc_root##*/}
-  ec_parent=${cc_root%/*}
-  case $cc_name in '' | .* | *[!A-Za-z0-9_-]*) rq_why="$cc_root is not a published clone root"; return 1 ;; esac
-  [ "${ec_parent##*/}" = clones ] || { rq_why="$cc_root is not under a folder named clones"; return 1; }
-  { [ -d "$cc_root" ] && [ ! -L "$cc_root" ]; } || { rq_why="$cc_root is not a plain folder"; return 1; }
-  # Every component below the first is checked: macOS itself links /var, /tmp, and /etc.
-  ec_top=${cc_root#/}
-  ec_top=${ec_top%%/*}
-  no_link_below "/$ec_top" "${cc_root#/"$ec_top"/}" || { rq_why="$cc_root has a link in its path"; return 1; }
-  { is_plain_file "$cc_root/.recnrun-clone" && read_clone_marker "$cc_root/.recnrun-clone" "$cc_name"; } || { rq_why="$cc_root has no valid clone marker"; return 1; }
-  { [ "$lc_id" = "$1" ] && [ "$(sed -n 4p "$cc_root/.recnrun-clone")" = "namespace=$ns" ]; } || { rq_why="the marker of $cc_name belongs to another instance or namespace"; return 1; }
-}
 # The main Chrome pid of the clone root, or nothing.
 running_pid() { (st_pid=''; main_pid_of "$cc_root") || :; }
 life_status() {
@@ -177,117 +109,6 @@ life_status() {
     read_state "$cc_state/profiles/$1" 2>/dev/null
     printf '%s' "$st_status"
   )
-}
-
-# --- The request's state -----------------------------------------------------------------------
-
-# A message the status carries: printable ASCII without quote or backslash, at most 256 bytes.
-clean_message() { printf '%s' "$1" | LC_ALL=C tr -cd ' -~' | LC_ALL=C tr -d '\042\134' | cut -c1-256; }
-# Sets op_* from the state of request $1; fails when it is unreadable (the request is then left alone).
-read_op() {
-  op_action='' op_instance='' op_state='' op_message=''
-  ro_file=$cc_state/control/$1
-  [ -e "$ro_file" ] || return 0
-  [ -f "$ro_file" ] && [ ! -L "$ro_file" ] && [ "$(wc -c <"$ro_file" | tr -d ' ')" -le 2048 ] || return 1
-  while IFS= read -r ro_line || [ -n "$ro_line" ]; do
-    ro_value=${ro_line#*=}
-    case $ro_line in
-      action=*) op_action=$ro_value ;;
-      instanceId=*) op_instance=$ro_value ;;
-      state=*) op_state=$ro_value ;;
-      message=*) op_message=$ro_value ;;
-      *) return 1 ;;
-    esac
-  done <"$ro_file"
-  case $op_state in running | done | refused | error) ;; *) return 1 ;; esac
-}
-# Replaces the state of request $rq_id and its status.json with state $1 and message $2.
-put_op() {
-  op_state=$1 op_message=$(clean_message "$2")
-  po_tmp=$cc_state/control/.$rq_id.$(lc_random).tmp
-  (
-    set -C
-    printf 'action=%s\ninstanceId=%s\nstate=%s\nmessage=%s\n' "$op_action" "$op_instance" "$op_state" "$op_message" >"$po_tmp"
-  ) || die 73 "cannot write $po_tmp"
-  mv -f -- "$po_tmp" "$cc_state/control/$rq_id" || die 73 'cannot replace the state'
-  po_tmp=$cc_control/$rq_id/.status.json.$(lc_random).tmp
-  (
-    set -C
-    printf '{"requestId":"%s","action":"%s","instanceId":"%s","state":"%s","message":"%s","updatedAt":%s000}' \
-      "$rq_id" "$op_action" "$op_instance" "$op_state" "$op_message" "$(date +%s)" >"$po_tmp"
-  ) || die 73 "cannot write $po_tmp"
-  mv -f -- "$po_tmp" "$cc_control/$rq_id/status.json" || die 73 'cannot replace status.json'
-}
-
-# --- Running lifecycle.sh ----------------------------------------------------------------------
-
-cc_child='' cc_run=''
-drop_run() {
-  [ -z "$cc_run" ] || rm -rf -- "$cc_run"
-  cc_run=''
-}
-# Runs `sh lifecycle.sh $@` in the background, so a SIGTERM ends the wait; rl_code is its exit code and
-# its stderr is kept in a private folder made for this call.
-run_life() {
-  drop_run
-  cc_run=$cc_state/control/.run.$(lc_random)
-  mkdir -m 700 -- "$cc_run" || die 73 "cannot make a private folder in $cc_state/control"
-  RECNRUN_DISCOVERY_LIB='' RECNRUN_CONTROL_ROOT=$cc_root /bin/sh "$cc_dir/lifecycle.sh" "$@" >"$cc_run/out" 2>"$cc_run/err" &
-  cc_child=$!
-  wait "$cc_child"
-  rl_code=$?
-  cc_child=''
-}
-last_error_line() { clean_message "$(grep -v '^[[:space:]]*$' "$cc_run/err" 2>/dev/null | tail -n 1)"; }
-
-# --- The actions -------------------------------------------------------------------------------
-
-# Closes the clone through lifecycle.sh close (SIGINT only, checked against the record, held closed);
-# sets cc_was to 1 when a Chrome ended. On failure it has answered and fails.
-close_clone() {
-  run_life close "$cc_state" "$record" "$ns" "$rq_instance"
-  case $rl_code in
-    0)
-      cc_was=0
-      if grep -q '^was=1$' "$cc_run/out"; then cc_was=1; fi
-      return 0
-      ;;
-    65 | 70 | 75) put_op refused "$(last_error_line)" ;;
-    74) put_op error "$(last_error_line)" ;;
-    *) put_op error "close exit $rl_code: $(last_error_line)" ;;
-  esac
-  return 1
-}
-act_close() {
-  close_clone || return 0
-  if [ "$cc_was" = 1 ]; then put_op 'done' "closed $cc_name"; else put_op 'done' 'already closed'; fi
-}
-# Opens the clone in mode $1 (headed or headless) through lifecycle.sh open-clone and answers.
-launch_clone() {
-  run_life open-clone "$cc_state" "$record" "$ns" "$rq_instance" "$1"
-  case $rl_code in
-    0)
-      printf '%s\n' "$rq_instance" >>"$cc_state/control/opened"
-      put_op 'done' "opened $cc_name $1"
-      ;;
-    65 | 66 | 73 | 75) put_op refused "$(last_error_line)" ;;
-    69) put_op error "no ack within ${RECNRUN_OPEN_TIMEOUT_S:-60} s" ;;
-    *) put_op error "open exit $rl_code: $(last_error_line)" ;;
-  esac
-}
-act_open() { launch_clone "$1"; }
-act_reopen() {
-  close_clone || return 0
-  launch_clone "$1"
-}
-perform() {
-  case $rq_action in
-    close) act_close ;;
-    open-headless) act_open headless ;;
-    open-visible) act_open headed ;;
-    reopen-headless) act_reopen headless ;;
-    reopen-visible) act_reopen headed ;;
-  esac
 }
 
 # --- One request -------------------------------------------------------------------------------

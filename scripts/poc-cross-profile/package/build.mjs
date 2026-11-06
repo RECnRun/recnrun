@@ -47,6 +47,8 @@ export const LIBRARIES = [
   "clone.sh",
   "clone-open.sh",
   "clone-control.sh",
+  "clone-control-request.sh",
+  "clone-control-ops.sh",
   "extension-id",
 ];
 const OSES = {
