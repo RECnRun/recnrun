@@ -22,6 +22,25 @@ for (const shell of shells) {
     assert.equal(s.field("status", CLONE), "stopped");
   });
 
+  await test(`${shell}: an older request delivered after a newer one was handled is refused`, (context) => {
+    const s = controlScene(context);
+    s.write({ action: "close", createdAt: Date.now() - 1000 }, SECOND);
+    assert.equal(s.run(shell).code, 0);
+    assert.equal(s.status(SECOND).state, "done", s.status(SECOND).raw);
+    s.write({ action: "open-visible", createdAt: Date.now() - 2000 });
+    assert.equal(s.run(shell).code, 0);
+    assert.equal(s.status().state, "refused", s.status().raw);
+    assert.match(s.status().message, /older than a request already handled/);
+    assert.equal(s.launches(), 0);
+    assert.equal(s.field("status", CLONE), "stopped");
+    s.write(
+      { action: "open-visible", createdAt: Date.now() },
+      "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+    );
+    assert.equal(s.run(shell).code, 0);
+    assert.equal(s.status("cccccccc-cccc-4ccc-8ccc-cccccccccccc").state, "done");
+  });
+
   await test(`${shell}: of several pending requests only the newest for the clone runs, in one pass`, (context) => {
     const s = controlScene(context);
     const THIRD = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";

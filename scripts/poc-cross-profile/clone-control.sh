@@ -27,7 +27,8 @@
 #                 close, then open in that mode; a closed clone is only opened; a close that times out
 #                 is an error and nothing opens
 # Several pending requests are handled in one call, per clone ordered by createdAt: the newest runs and
-# the older ones are refused as superseded. A successful open is listed in <state-dir>/control/opened so
+# the older ones are refused as superseded; the newest createdAt handled per clone is kept in
+# <state-dir>/control/newest-<instanceId>, so an older request that arrives in a later call is refused too. A successful open is listed in <state-dir>/control/opened so
 # the launcher forgets that it skipped the clone. A clone must be the one Default profile block of its
 # instanceId, under clones/ with no linked folder, and its marker must name the request's instanceId.
 # Each request keeps <state-dir>/control/<requestId> (key=value lines action, instanceId, state,
@@ -121,7 +122,7 @@ handle_request() {
     return 0
   fi
   op_action=$rq_action op_instance=$rq_instance
-  if ! check_fresh || ! eligible_clone "$rq_instance"; then
+  if ! check_fresh || ! eligible_clone "$rq_instance" || ! accept_request; then
     put_op refused "$rq_why"
     return 0
   fi

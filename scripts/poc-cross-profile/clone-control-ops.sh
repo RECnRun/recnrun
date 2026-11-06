@@ -5,7 +5,7 @@
 
 # shellcheck disable=SC2034 # the settings and results are read by clone-control.sh
 # Set by clone-control.sh before these run; named here so ShellCheck sees them.
-cc_state='' cc_control='' cc_dir='' cc_root='' cc_name='' record='' ns='' rq_id='' rq_action='' rq_instance=''
+cc_state='' cc_control='' cc_dir='' cc_root='' cc_name='' record='' ns='' rq_id='' rq_action='' rq_instance='' rq_created='' rq_why=''
 
 # --- The request's state -----------------------------------------------------------------------
 
@@ -45,6 +45,25 @@ put_op() {
       "$rq_id" "$op_action" "$op_instance" "$op_state" "$op_message" "$(date +%s)" >"$po_tmp"
   ) || die 73 "cannot write $po_tmp"
   mv -f -- "$po_tmp" "$cc_control/$rq_id/status.json" || die 73 'cannot replace status.json'
+}
+
+# Fails when a request newer than the one in hand was already handled for the clone, else records this
+# one as the newest: a late old click, delivered in a later pass, can never undo a newer one.
+accept_request() {
+  ar_file=$cc_state/control/newest-$rq_instance
+  ar_newest=0
+  if [ -f "$ar_file" ] && [ ! -L "$ar_file" ]; then read -r ar_newest <"$ar_file" || :; fi
+  case $ar_newest in '' | *[!0-9]*) ar_newest=0 ;; esac
+  if [ "$rq_created" -lt "$ar_newest" ]; then
+    rq_why='the request is older than a request already handled for the clone'
+    return 1
+  fi
+  ar_tmp=$cc_state/control/.newest.$(lc_random).tmp
+  (
+    set -C
+    printf '%s\n' "$rq_created" >"$ar_tmp"
+  ) || die 73 "cannot write $ar_tmp"
+  mv -f -- "$ar_tmp" "$ar_file" || die 73 'cannot record the newest request'
 }
 
 # --- Running lifecycle.sh ----------------------------------------------------------------------
