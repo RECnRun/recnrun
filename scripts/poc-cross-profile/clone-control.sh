@@ -157,13 +157,13 @@ WORKERS
   ec_parent=${cc_root%/*}
   case $cc_name in '' | .* | *[!A-Za-z0-9_-]*) rq_why="$cc_root is not a published clone root"; return 1 ;; esac
   [ "${ec_parent##*/}" = clones ] || { rq_why="$cc_root is not under a folder named clones"; return 1; }
-  [ -d "$cc_root" ] && [ ! -L "$cc_root" ] || { rq_why="$cc_root is not a plain folder"; return 1; }
+  { [ -d "$cc_root" ] && [ ! -L "$cc_root" ]; } || { rq_why="$cc_root is not a plain folder"; return 1; }
   # Every component below the first is checked: macOS itself links /var, /tmp, and /etc.
   ec_top=${cc_root#/}
   ec_top=${ec_top%%/*}
   no_link_below "/$ec_top" "${cc_root#/"$ec_top"/}" || { rq_why="$cc_root has a link in its path"; return 1; }
-  is_plain_file "$cc_root/.recnrun-clone" && read_clone_marker "$cc_root/.recnrun-clone" "$cc_name" || { rq_why="$cc_root has no valid clone marker"; return 1; }
-  [ "$lc_id" = "$1" ] && [ "$(sed -n 4p "$cc_root/.recnrun-clone")" = "namespace=$ns" ] || { rq_why="the marker of $cc_name belongs to another instance or namespace"; return 1; }
+  { is_plain_file "$cc_root/.recnrun-clone" && read_clone_marker "$cc_root/.recnrun-clone" "$cc_name"; } || { rq_why="$cc_root has no valid clone marker"; return 1; }
+  { [ "$lc_id" = "$1" ] && [ "$(sed -n 4p "$cc_root/.recnrun-clone")" = "namespace=$ns" ]; } || { rq_why="the marker of $cc_name belongs to another instance or namespace"; return 1; }
 }
 # The main Chrome pid of the clone root, or nothing.
 running_pid() { (st_pid=''; main_pid_of "$cc_root") || :; }
@@ -255,7 +255,7 @@ close_clone() {
 }
 act_close() {
   close_clone || return 0
-  if [ "$cc_was" = 1 ]; then put_op done "closed $cc_name"; else put_op done 'already closed'; fi
+  if [ "$cc_was" = 1 ]; then put_op 'done' "closed $cc_name"; else put_op 'done' 'already closed'; fi
 }
 # Opens the clone in mode $1 (headed or headless) through lifecycle.sh open-clone and answers.
 launch_clone() {
@@ -263,7 +263,7 @@ launch_clone() {
   case $rl_code in
     0)
       printf '%s\n' "$rq_instance" >>"$cc_state/control/opened"
-      put_op done "opened $cc_name $1"
+      put_op 'done' "opened $cc_name $1"
       ;;
     65 | 66 | 73 | 75) put_op refused "$(last_error_line)" ;;
     69) put_op error "no ack within ${RECNRUN_OPEN_TIMEOUT_S:-60} s" ;;
@@ -312,7 +312,7 @@ note_pending() {
 # is superseded, so a late click can never be undone by an earlier one.
 run_pending() {
   rp_seen=' ' rp_keep=''
-  while read -r rp_created rp_id rp_inst rp_action; do
+  while read -r _ rp_id rp_inst rp_action; do
     case $rp_seen in
       *" $rp_inst "*)
         rq_id=$rp_id op_action=$rp_action op_instance=$rp_inst
@@ -413,7 +413,7 @@ cmd_run() {
   cc_state=$1 record=$2 ns=$3
   is_namespace "$ns" || die 65 'the namespace is not a namespace'
   if ! is_directory "$record" || [ ! -f "$record" ]; then die 65 'the record is not an absolute file'; fi
-  cc_stop_s=$(setting "${RECNRUN_LIFECYCLE_STOP_S:-}" 20 RECNRUN_LIFECYCLE_STOP_S) || exit $?
+  setting "${RECNRUN_LIFECYCLE_STOP_S:-}" 20 RECNRUN_LIFECYCLE_STOP_S >/dev/null || exit $?
   find_roster || return 0
   take_lock "$cc_state/control.lock" "$$"
   trap cleanup EXIT

@@ -14,8 +14,10 @@
 #       adopted (no launch), one of the other mode is refused (65, close it first), none is launched with
 #       a fresh attempt, whatever a stale presence or a stale open state says. Prints boot= like request.
 
+# shellcheck disable=SC2034 # the settings and the state are read by the libraries lifecycle.sh sources
 # Set by the commands below; named here so ShellCheck sees them.
-open_s='' backoff_s='' max_attempts='' stop_s='' cl_target='' lc_attempt=''
+open_s='' backoff_s='' max_attempts='' stop_s='' cl_target='' lc_attempt='' p_user='' pause_file='' pause_reason=''
+st_user='' st_status='' st_started='' st_pid='' st_boot='' st_root='' st_shared='' l_before=''
 
 # Reads the state of the profile under its lock and checks it against the record.
 control_prepare() {
