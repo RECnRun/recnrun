@@ -24,7 +24,7 @@ const APP = "Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 // process singleton hands its command line to the browser already running on the root.
 const STUB = `#!/bin/sh
 [ -n "\${STUB_SIGNALS:-}" ] || exec /usr/bin/perl -e '$SIG{INT} = "DEFAULT"; $ENV{STUB_SIGNALS} = 1; exec @ARGV or die' /bin/sh "$0" "$@"
-for a in "$@"; do last=$a; case $a in --profile-directory=*) directory=\${a#*=} ;; esac; done
+for a in "$@"; do last=$a; case $a in --profile-directory=*) directory=\${a#*=} ;; --user-data-dir=*) printf '%s\\n' "\${a#*=}" >>"$STUB_LOG.roots" ;; esac; done
 printf 'launch\\n' >>"$STUB_LOG"
 printf '%s\\n' "$last" >>"$STUB_LOG.urls"
 token=\${last#*token=}
@@ -73,11 +73,24 @@ fi
 ${ps} "$@" | sed -E -e 's,(^|[[:space:]])(/bin/|/usr/bin/)?(da)?sh /,\\1/,' -e 's,Google Chrome\\.real,Google Chrome,'
 `;
 
+// od, the first command of the open attempt after the profile was pinned: while $HOME/hold2 exists and the
+// state file named by STUB_OPENING_FILE says the attempt is opening, it stops there (touching $HOME/held2).
+const OD = (od) => `#!/bin/sh
+if [ -e "$HOME/hold2" ] && grep -qx 'status=opening' "\${STUB_OPENING_FILE:-/nonexistent}" 2>/dev/null; then
+  : >"$HOME/held2"
+  while [ -e "$HOME/hold2" ]; do sleep 0.1; done
+fi
+exec ${od} "$@"
+`;
+
 export function installPs(home) {
   const real = spawnSync("sh", ["-c", "command -v ps"], { encoding: "utf8" }).stdout.trim();
   mkdirSync(join(home, "ps-stub"));
   writeFileSync(join(home, "ps-stub/ps"), PS(real));
   chmodSync(join(home, "ps-stub/ps"), 0o755);
+  const od = spawnSync("sh", ["-c", "command -v od"], { encoding: "utf8" }).stdout.trim();
+  writeFileSync(join(home, "ps-stub/od"), OD(od));
+  chmodSync(join(home, "ps-stub/od"), 0o755);
 }
 
 export const env = (extra) => ({ PATH: process.env.PATH, ...extra });

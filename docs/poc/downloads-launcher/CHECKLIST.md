@@ -534,6 +534,11 @@ Plan: [PLAN.md](PLAN.md#dashboard-control-of-clones-p75p78). The master's dashbo
   - applied: 1-4 (unique ids, worker role, protected roots, `RECNRUN_CONTROL_ROOT`, main pid only, opener gate under the lock), 5 (`newest-<instanceId>`), 6 and 8 (pending reserved before the send, structured outcome with `role="alert"`, linked from the registry boot), 7 (the spec waits for a new UUID folder with a matching `request.json`), 9 (dead `textOf` removed, `clone-control.sh` split into request and ops libraries), 10 (PLAN order and rules, `ps` optional in M-P7.a)
   - commit: `40c8a787`, `42c75e74`, `7224da3b`, `d77ce250`, and the commit with subject "Wait for the real request in the clone-control spec and fix the docs"
 
+- [i] P7.5-P7.8 Codex second fix review: the arguments and the exit code
+  - red: `node --test scripts/poc-cross-profile/lifecycle-control.checks.mjs --test-name-pattern="goes A, B, A"` failed on `sh` and `dash` (Chrome started on the second root: `Chrome was started on a root other than the one checked`, `.../Chrome-b`) because `start_chrome` built the arguments before `before_spawn` read the record again
+  - green: the same command passes; `open.sh` builds the arguments after `before_spawn`; the "record changed after" check now asserts exit 65 and no leftover lock; `lifecycle-control.checks.mjs` 38 passed
+  - commit: this commit
+
 - [ ] P7.8 Manual check M-P7.a from the dashboard alone, Reopen included (owner)
 
 ## P8: With and without `chrome.debugger`

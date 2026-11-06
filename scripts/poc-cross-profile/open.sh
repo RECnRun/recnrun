@@ -262,10 +262,10 @@ start_chrome() {
   refuse_other_mode
   finder=chrome_binary # by name: ShellCheck would read a bare call as a forgotten "$@"
   chrome=$("$finder") || { log 'no Google Chrome found'; exit 66; }
+  before_spawn # it may read the record again: the arguments below come from what it validated
   url=chrome-extension://$p_ext/bootstrap.html#token=$1$want_role
   set -- "--user-data-dir=$p_user" "--profile-directory=$p_dir" --no-first-run --no-default-browser-check "$url"
   [ "$mode" != headless ] || set -- --headless=new "$@"
-  before_spawn
   "$chrome" "$@" >/dev/null 2>&1 &
   log "pid=$!"
   launched "$!"
