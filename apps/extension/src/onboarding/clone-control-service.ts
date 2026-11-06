@@ -1,14 +1,21 @@
 import { errorMessage } from "@recnrun/domain";
 import { readCloneStatus, readClones } from "@/p2p/clone-control";
+import { readRegistry } from "@/p2p/registry";
 import type { CloneAction, CloneRow } from "@/p2p/clone-control";
 
 export const POLL_MS = 2000;
 /** Longer than a launcher pass and a stop: past it the request is given up as unanswered. */
 export const NO_ANSWER_MS = 120_000;
 
+interface Texts {
+  clones?: string;
+  status?: string;
+  registry?: string;
+}
+
 export interface CloneControlPorts {
   /** The text of control/clones.json and of the request's status.json; undefined when unreadable. */
-  readTexts: (requestId: string | undefined) => Promise<{ clones?: string; status?: string }>;
+  readTexts: (requestId: string | undefined) => Promise<Texts>;
   /** Asks the background to write the request; rejects with the reason. */
   send: (message: unknown) => Promise<void>;
   /** Whether this profile is the master, the only role that controls clones. */
@@ -24,9 +31,19 @@ export interface Pending {
   instanceId: string;
 }
 
+/** A clone the launcher lists; linked when the registry shows the boot it reported. */
+export type CloneEntry = CloneRow & { linked: boolean };
+
+export interface Outcome {
+  state: "done" | "refused" | "error" | "unanswered";
+  message: string;
+}
+
 export interface CloneControlSnapshot {
-  clones: CloneRow[];
+  clones: CloneEntry[];
   pending?: Pending;
+  /** The last terminal answer, kept structured so the panel can alert on a failure. */
+  outcome?: Outcome;
   /** The launcher's last answer, as "<state>: <message>". */
   message: string;
   /** Why the last request could not be written, if it could not. */
@@ -65,18 +82,26 @@ function settle(core: Core, ports: CloneControlPorts, status: string | undefined
   const answer = readCloneStatus(status);
   if (answer && answer.requestId === pending.requestId && answer.state !== "running") {
     core.state.message = `${answer.state}: ${answer.message}`;
+    core.state.outcome = { state: answer.state, message: answer.message };
     core.state.pending = undefined;
   } else if ((ports.now ?? Date.now)() - core.state.askedAt > NO_ANSWER_MS) {
     core.state.message = "No answer from the launcher.";
+    core.state.outcome = { state: "unanswered", message: core.state.message };
     core.state.pending = undefined;
   }
 }
 
 async function refresh(core: Core, ports: CloneControlPorts): Promise<void> {
-  const texts = await ports
-    .readTexts(core.state.pending?.requestId)
-    .catch((): { clones?: string; status?: string } => ({}));
-  core.state.clones = readClones(texts.clones)?.clones ?? core.state.clones;
+  const texts = await ports.readTexts(core.state.pending?.requestId).catch((): Texts => ({}));
+  const rows = readClones(texts.clones)?.clones;
+  if (rows) {
+    const peers = readRegistry(texts.registry, undefined, (ports.now ?? Date.now)()).publication
+      ?.peers;
+    core.state.clones = rows.map((row) => ({
+      ...row,
+      linked: row.boot !== "" && peers?.[row.instanceId]?.boot === row.boot,
+    }));
+  }
   settle(core, ports, texts.status);
   core.emit();
 }
@@ -106,18 +131,19 @@ export function createCloneControl(ports: CloneControlPorts): CloneControl {
     ask: async (instanceId, action) => {
       if (core.state.pending) return;
       const requestId = ports.newId();
-      try {
-        await ports.send({ type: "POC_CLONE_CONTROL", choice: { requestId, action, instanceId } });
-      } catch (error) {
-        core.state.failure = errorMessage(error);
-        core.emit();
-        return;
-      }
       core.state.failure = "";
       core.state.message = "";
+      core.state.outcome = undefined;
       core.state.pending = { requestId, action, instanceId };
       core.state.askedAt = (ports.now ?? Date.now)();
       core.emit();
+      try {
+        await ports.send({ type: "POC_CLONE_CONTROL", choice: { requestId, action, instanceId } });
+      } catch (error) {
+        core.state.pending = undefined;
+        core.state.failure = errorMessage(error);
+        core.emit();
+      }
     },
   };
 }

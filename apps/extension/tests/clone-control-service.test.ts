@@ -13,6 +13,25 @@ const clonesText = (state = "open", mode = "headless") =>
     clones: [{ name: "w1", instanceId: W1, state, mode, boot: state === "closed" ? "" : BOOT }],
     updatedAt: NOW,
   });
+const registryText = (boot: string) =>
+  JSON.stringify({
+    version: 1,
+    namespace: "lab-1",
+    writtenAt: NOW,
+    launcher: { boot: "99999999-9999-4999-8999-999999999999" },
+    roots: { r1: "/Downloads" },
+    peers: {
+      [W1]: {
+        profileId: W1,
+        displayName: "w1",
+        fingerprint: "AB:CD",
+        root: "r1",
+        lastSeenAt: NOW,
+        expiresAt: NOW + 60_000,
+        boot,
+      },
+    },
+  });
 const statusText = (state: string, over: object = {}) =>
   JSON.stringify({
     requestId: REQ,
@@ -25,7 +44,7 @@ const statusText = (state: string, over: object = {}) =>
   });
 
 function scene(master = true) {
-  const texts: { clones?: string; status?: string } = { clones: clonesText() };
+  const texts: { clones?: string; status?: string; registry?: string } = { clones: clonesText() };
   const sent: unknown[] = [];
   const ids = [REQ, REQ2];
   const clock = { now: NOW };
@@ -166,5 +185,65 @@ describe("createCloneControl", () => {
   test("isMaster answers the profile's role", async () => {
     expect(await scene(false).control.isMaster()).toBe(false);
     expect(await scene(true).control.isMaster()).toBe(true);
+  });
+});
+
+describe("createCloneControl reservations and outcomes", () => {
+  test("two quick asks send one message and reserve pending before the send settles", async () => {
+    const s = scene();
+    await vi.waitFor(() => expect(s.last()?.clones).toHaveLength(1));
+    let release: () => void = () => {};
+    s.ports.send = (message) => {
+      s.sent.push(message);
+      return new Promise<void>((resolve) => (release = resolve));
+    };
+    const first = s.control.ask(W1, "close");
+    const second = s.control.ask(W1, "open-visible");
+    expect(s.last()?.pending?.requestId).toBe(REQ);
+    release();
+    await Promise.all([first, second]);
+    expect(s.sent).toHaveLength(1);
+  });
+
+  test("a rejected send releases the reservation", async () => {
+    const s = scene();
+    await vi.waitFor(() => expect(s.last()?.clones).toHaveLength(1));
+    s.ports.send = async () => {
+      throw new Error("no");
+    };
+    await s.control.ask(W1, "close");
+    expect(s.last()?.pending).toBeUndefined();
+    expect(s.last()?.failure).toBe("no");
+  });
+
+  test.each(["done", "refused", "error"])("a %s answer is kept as an outcome", async (state) => {
+    const s = scene();
+    await vi.waitFor(() => expect(s.last()?.clones).toHaveLength(1));
+    await s.control.ask(W1, "close");
+    s.texts.status = statusText(state);
+    await s.poll();
+    expect(s.last()?.outcome).toEqual({ state, message: "closed w1" });
+  });
+
+  test("no answer is an unanswered outcome", async () => {
+    const s = scene();
+    await vi.waitFor(() => expect(s.last()?.clones).toHaveLength(1));
+    await s.control.ask(W1, "close");
+    s.clock.now += NO_ANSWER_MS + 1;
+    await s.poll();
+    expect(s.last()?.outcome?.state).toBe("unanswered");
+  });
+
+  test("a clone is linked when the registry boot equals its boot", async () => {
+    const s = scene();
+    s.texts.registry = registryText(BOOT);
+    await s.poll();
+    expect(s.last()?.clones[0]?.linked).toBe(true);
+    s.texts.registry = registryText("c3c3c3c3-c3c3-4c3c-8c3c-c3c3c3c3c3c3");
+    await s.poll();
+    expect(s.last()?.clones[0]?.linked).toBe(false);
+    s.texts.registry = undefined;
+    await s.poll();
+    expect(s.last()?.clones[0]?.linked).toBe(false);
   });
 });

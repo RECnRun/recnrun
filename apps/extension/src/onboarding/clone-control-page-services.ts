@@ -9,6 +9,7 @@ import {
   NamespaceSchema,
   clonesStatePath,
   controlPath,
+  registryPath,
 } from "@/p2p/downloads-rendezvous";
 import { storedRoles } from "@/storage/hierarchy-repository";
 import { pocPresenceStore } from "@/storage/poc-presence-repository";
@@ -23,13 +24,14 @@ export function cloneControlServices(): CloneControl {
       if (root === null) return {};
       const stored = await presence.namespace();
       const namespace = v.is(NamespaceSchema, stored) ? stored : DEFAULT_NAMESPACE;
-      const [clones, status] = await Promise.all([
+      const [clones, status, registry] = await Promise.all([
         readText(`${root}/${clonesStatePath(namespace)}`),
         requestId === undefined
           ? undefined
           : readText(`${root}/${controlPath(namespace, requestId, "status.json")}`),
+        readText(`${root}/${registryPath(namespace)}`),
       ]);
-      return { clones, status };
+      return { clones, status, registry };
     },
     send: async (message) => {
       const reply = v.parse(BackgroundReplySchema, await browser.runtime.sendMessage(message));

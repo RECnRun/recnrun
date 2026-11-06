@@ -1,6 +1,10 @@
 import { useEffect, useState } from "preact/hooks";
-import type { CloneControl, CloneControlSnapshot } from "@/onboarding/clone-control-service";
-import type { CloneAction, CloneRow } from "@/p2p/clone-control";
+import type {
+  CloneControl,
+  CloneControlSnapshot,
+  CloneEntry,
+} from "@/onboarding/clone-control-service";
+import type { CloneAction } from "@/p2p/clone-control";
 
 function useSnapshot(control: CloneControl): CloneControlSnapshot | undefined {
   const [snapshot, setSnapshot] = useState<CloneControlSnapshot>();
@@ -9,7 +13,7 @@ function useSnapshot(control: CloneControl): CloneControlSnapshot | undefined {
 }
 
 /** The buttons a clone offers in its state; an opening clone offers none. */
-export function actionsOf(row: CloneRow): [string, CloneAction][] {
+export function actionsOf(row: CloneEntry): [string, CloneAction][] {
   if (row.state === "closed") {
     return [
       ["Open visible", "open-visible"],
@@ -27,7 +31,7 @@ export function actionsOf(row: CloneRow): [string, CloneAction][] {
   return [["Close", "close"], ...(row.mode === "" ? reopen : other)];
 }
 
-function Row(props: { row: CloneRow; busy: boolean; control: CloneControl }) {
+function Row(props: { row: CloneEntry; busy: boolean; control: CloneControl }) {
   const { row, busy, control } = props;
   return (
     <li data-field="clone">
@@ -36,6 +40,7 @@ function Row(props: { row: CloneRow; busy: boolean; control: CloneControl }) {
         {row.state}
         {row.mode && ` (${row.mode})`}
       </span>
+      <span data-field="linked">{row.linked ? "linked" : "not linked"}</span>
       {actionsOf(row).map(([label, action]) => (
         <button
           type="button"
@@ -69,7 +74,12 @@ export function CloneControlPanel({ control }: { control: CloneControl }) {
           Waiting for the launcher: {snapshot.pending.action}
         </p>
       )}
-      <p data-field="message">{snapshot.message}</p>
+      <p
+        data-field="message"
+        role={snapshot.outcome && snapshot.outcome.state !== "done" ? "alert" : "status"}
+      >
+        {snapshot.message}
+      </p>
       {snapshot.failure && (
         <p role="alert" data-field="failure">
           {snapshot.failure}

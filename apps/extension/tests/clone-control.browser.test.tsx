@@ -12,6 +12,7 @@ const row = (state: "closed" | "opening" | "open", mode: "" | "headless" | "head
   state,
   mode,
   boot: state === "closed" ? "" : BOOT,
+  linked: state !== "closed",
 });
 const snapshot = (over: Partial<CloneControlSnapshot> = {}): CloneControlSnapshot => ({
   clones: [],
@@ -89,4 +90,29 @@ test("shows the launcher's answer and a failed write", async () => {
 test("says so when the launcher lists no clone", async () => {
   const { root } = await shown(snapshot());
   expect(root.textContent).toMatch(/No clones yet/);
+});
+
+test.each(["refused", "error", "unanswered"] as const)(
+  "a %s outcome is announced as an alert",
+  async (state) => {
+    const { root } = await shown(
+      snapshot({ message: `${state}: why`, outcome: { state, message: "why" } }),
+    );
+    expect(root.querySelector('[data-field="message"][role="alert"]')?.textContent).toBe(
+      `${state}: why`,
+    );
+  },
+);
+
+test("a done outcome is a plain status, not an alert", async () => {
+  const { root } = await shown(
+    snapshot({ message: "done: closed w1", outcome: { state: "done", message: "closed w1" } }),
+  );
+  expect(root.querySelector('[data-field="message"]')?.getAttribute("role")).toBe("status");
+});
+
+test("shows whether each clone is linked", async () => {
+  const unlinked = { ...row("open", "headless"), linked: false };
+  const { root } = await shown(snapshot({ clones: [unlinked] }));
+  expect(root.querySelector('[data-field="linked"]')?.textContent).toBe("not linked");
 });
