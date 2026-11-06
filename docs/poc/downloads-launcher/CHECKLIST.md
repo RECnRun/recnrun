@@ -534,6 +534,12 @@ Plan: [PLAN.md](PLAN.md#dashboard-control-of-clones-p75p78). The master's dashbo
   - applied: 1-4 (unique ids, worker role, protected roots, `RECNRUN_CONTROL_ROOT`, main pid only, opener gate under the lock), 5 (`newest-<instanceId>`), 6 and 8 (pending reserved before the send, structured outcome with `role="alert"`, linked from the registry boot), 7 (the spec waits for a new UUID folder with a matching `request.json`), 9 (dead `textOf` removed, `clone-control.sh` split into request and ops libraries), 10 (PLAN order and rules, `ps` optional in M-P7.a)
   - commit: `40c8a787`, `42c75e74`, `7224da3b`, `d77ce250`, and the commit with subject "Wait for the real request in the clone-control spec and fix the docs"
 
+- [i] P7.5-P7.8 Codex fix review: four follow-ups applied
+  - red: `lifecycle-control.checks.mjs --test-name-pattern="record changed after"` on `sh` and `dash` (`Expected "actual" to be strictly unequal to: 0`: the opener spawned after the record turned the worker into a master); `clone-control-rules.checks.mjs --test-name-pattern="same time and a lower"` `expected: 'refused' actual: 'done'`; `vp run test:unit -- apps/extension/tests/clone-control-service.test.ts` 1 of 22 failed (`expected undefined to be 'bbbbbbbb-...'`: a late rejection of an older send cleared the newer reservation)
+  - green: `RECNRUN_TEST_QUIET=1 vp run test:scripts` 797 passed; extension unit 22 of 22 and the whole `test:unit` passed
+  - applied: the record pinned at the check and read again under the spawn lock, `(createdAt, requestId)` kept in `newest-<instanceId>`, a rejection clears only its own reservation, one clock value in the ordering test
+  - commit: `cfdc53ef`, `5a593d4c`
+
 - [ ] P7.8 Manual check M-P7.a from the dashboard alone, Reopen included (owner)
 
 ## P8: With and without `chrome.debugger`
