@@ -1,4 +1,3 @@
-import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { Page } from "@playwright/test";
 import { POC_EXTENSION_ID, createDownloadsGroup, tempPlatform } from "./downloads-profiles.ts";
@@ -24,7 +23,7 @@ interface Run {
   err: string;
 }
 
-export interface CloneControlRig {
+interface CloneControlRig {
   clone: string;
   requestFolder(id: string): string;
   pass(extra?: Record<string, string>): Run;
@@ -95,6 +94,3 @@ export async function cloneControlScene(): Promise<CloneControlScene> {
     throw error;
   }
 }
-
-/** The text of a file, or undefined while it is not there. */
-export const textOf = async (path: string) => await readFile(path, "utf8").catch(() => undefined);

@@ -528,6 +528,12 @@ Plan: [PLAN.md](PLAN.md#dashboard-control-of-clones-p75p78). The master's dashbo
   - M-P7.a in MANUAL_VALIDATION.md rewritten to use the dashboard alone, Reopen included
   - commit: the commit with subject "Open a tab in a linked profile from the dashboard"
 
+- [i] P7.5-P7.8 Codex implementation review: ten findings applied
+  - red: `node --test scripts/poc-cross-profile/lifecycle-control.checks.mjs` 12 of 34 failed on `sh` and `dash` (base close `expected: 65 actual: 0`, non-worker block, duplicate id, other checked root, renderer pid `expected: false actual: true`, resumed opener `expected: 0 actual: 1` launches); `clone-control-rules.checks.mjs --test-name-pattern="older request delivered"` `expected: 'refused' actual: 'done'`; `vp run test:unit -- apps/extension/tests/clone-control-service.test.ts` 6 of 21 failed (`expected undefined to be 'aaaaaaaa-...'` for pending, `expected undefined to deeply equal { state: 'done', ... }`, linked `expected undefined to be true`); the browser spec with a button that sends nothing (scratch worktree, removed) timed out in `requested()` after the Open headless click, not on the initial state
+  - green: `node --test scripts/poc-cross-profile/*.checks.mjs` 803 passed, `RECNRUN_TEST_QUIET=1 vp run test:scripts` passed; extension unit 1388 and components passed; `vp run test:browser -- tests/browser/clone-control.spec.ts` 1 passed
+  - applied: 1-4 (unique ids, worker role, protected roots, `RECNRUN_CONTROL_ROOT`, main pid only, opener gate under the lock), 5 (`newest-<instanceId>`), 6 and 8 (pending reserved before the send, structured outcome with `role="alert"`, linked from the registry boot), 7 (the spec waits for a new UUID folder with a matching `request.json`), 9 (dead `textOf` removed, `clone-control.sh` split into request and ops libraries), 10 (PLAN order and rules, `ps` optional in M-P7.a)
+  - commit: `40c8a787`, `42c75e74`, `7224da3b`, `d77ce250`, and the commit with subject "Wait for the real request in the clone-control spec and fix the docs"
+
 - [ ] P7.8 Manual check M-P7.a from the dashboard alone, Reopen included (owner)
 
 ## P8: With and without `chrome.debugger`

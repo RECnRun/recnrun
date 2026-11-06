@@ -6,4 +6,3 @@ export const PocCloneControlSchema = v.strictObject({
   type: v.literal("POC_CLONE_CONTROL"),
   choice: CloneControlChoiceSchema,
 });
-export type PocCloneControl = v.InferOutput<typeof PocCloneControlSchema>;

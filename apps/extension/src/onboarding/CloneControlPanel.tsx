@@ -13,7 +13,7 @@ function useSnapshot(control: CloneControl): CloneControlSnapshot | undefined {
 }
 
 /** The buttons a clone offers in its state; an opening clone offers none. */
-export function actionsOf(row: CloneEntry): [string, CloneAction][] {
+function actionsOf(row: CloneEntry): [string, CloneAction][] {
   if (row.state === "closed") {
     return [
       ["Open visible", "open-visible"],

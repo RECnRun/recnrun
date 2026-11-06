@@ -10,7 +10,7 @@ import { MAX_CODE_LENGTH, ProfileIdSchema } from "@/p2p/protocol";
  * are the schema's key order, which clone-control.sh reads.
  */
 
-export const CLONE_ACTIONS = [
+const CLONE_ACTIONS = [
   "close",
   "open-headless",
   "open-visible",
@@ -44,7 +44,7 @@ export const CloneControlRequestSchema = v.strictObject({
 const MessageSchema = v.pipe(v.string(), v.maxLength(256), v.regex(/^[ !#-[\]-~]*$/));
 
 /** The launcher's status.json of one request; action and instance are empty when it could not read them. */
-export const CloneStatusSchema = v.strictObject({
+const CloneStatusSchema = v.strictObject({
   requestId: TokenSchema,
   action: v.union([v.literal(""), v.picklist(CLONE_ACTIONS)]),
   instanceId: v.union([v.literal(""), TokenSchema]),
@@ -66,7 +66,7 @@ const CloneRowSchema = v.strictObject({
 export type CloneRow = v.InferOutput<typeof CloneRowSchema>;
 
 /** The launcher's control/clones.json, in the key order clone-control.sh writes. */
-export const ClonesSchema = v.strictObject({
+const ClonesSchema = v.strictObject({
   clones: v.pipe(
     v.array(CloneRowSchema),
     v.maxLength(MAX_CLONES),

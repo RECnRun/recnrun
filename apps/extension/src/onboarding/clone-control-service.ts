@@ -25,7 +25,7 @@ export interface CloneControlPorts {
   now?: () => number;
 }
 
-export interface Pending {
+interface Pending {
   requestId: string;
   action: CloneAction;
   instanceId: string;
@@ -34,7 +34,7 @@ export interface Pending {
 /** A clone the launcher lists; linked when the registry shows the boot it reported. */
 export type CloneEntry = CloneRow & { linked: boolean };
 
-export interface Outcome {
+interface Outcome {
   state: "done" | "refused" | "error" | "unanswered";
   message: string;
 }

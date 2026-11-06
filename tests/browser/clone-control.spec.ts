@@ -1,4 +1,5 @@
-import { readdir } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
+import { join } from "node:path";
 import { expect, test } from "@playwright/test";
 import { cloneControlScene } from "./fixtures/clone-control-rig.ts";
 import type { CloneControlScene } from "./fixtures/clone-control-rig.ts";
@@ -25,14 +26,32 @@ const stateOf = (current: CloneControlScene) => row(current).locator('[data-fiel
 const press = (current: CloneControlScene, name: string) =>
   current.dashboard.getByRole("button", { name, exact: true }).click({ timeout: PAGE_MS });
 
-/** Waits for the request folder the page wrote and returns its id. */
-async function requested(current: CloneControlScene, known: string[]) {
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+/** The id of a request folder the page wrote: a new UUID folder whose request.json is complete and matches. */
+async function requested(current: CloneControlScene, known: string[], action: string) {
+  const instanceId = (JSON.parse(current.rig.clonesJson()) as { clones: { instanceId: string }[] })
+    .clones[0]?.instanceId;
   let id: string | undefined;
   await expect
     .poll(
       async () => {
         const all = await readdir(current.control).catch(() => [] as string[]);
-        id = all.find((each) => !known.includes(each) && !each.startsWith("."));
+        for (const each of all.filter((name) => UUID.test(name) && !known.includes(name))) {
+          const text = await readFile(join(current.control, each, "request.json"), "utf8").catch(
+            () => "",
+          );
+          const body = (() => {
+            try {
+              return JSON.parse(text) as Record<string, unknown>;
+            } catch {
+              return {};
+            }
+          })();
+          if (body.requestId === each && body.kind === "clone-control") {
+            if (body.action === action && body.instanceId === instanceId) id = each;
+          }
+        }
         return id;
       },
       { timeout: PAGE_MS },
@@ -41,9 +60,15 @@ async function requested(current: CloneControlScene, known: string[]) {
   return id as string;
 }
 
+const ACTIONS: Record<string, string> = {
+  "Open headless": "open-headless",
+  "Reopen visible": "reopen-visible",
+  Close: "close",
+};
+
 async function ask(current: CloneControlScene, button: string, known: string[]) {
   await press(current, button);
-  const id = await requested(current, known);
+  const id = await requested(current, known, ACTIONS[button] as string);
   expect(current.rig.pass().code).toBe(0);
   return id;
 }

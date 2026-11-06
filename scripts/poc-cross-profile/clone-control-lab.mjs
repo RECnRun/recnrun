@@ -7,7 +7,7 @@ import { EXTENSION } from "./base-lab.mjs";
 import { MASTER, masterBlock } from "./clone-open-lab.mjs";
 import { scene } from "./lifecycle-lab.mjs";
 
-export const script = fileURLToPath(new URL("./clone-control.sh", import.meta.url));
+const script = fileURLToPath(new URL("./clone-control.sh", import.meta.url));
 export const CLONE = CAROL;
 export const OTHER = "66666666-6666-4666-8666-666666666666";
 export const REQUEST = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
