@@ -15,7 +15,7 @@
 #    "masterIdentity":{"key","signedAt","signature"},"createdAt"}
 # Any other file is logged and left alone, with no status. A well-formed request that must not run
 # (another namespace or master, createdAt older than 10 minutes or more than 5 s ahead, an instanceId
-# that is not a worker clone of the record under a folder named clones with a matching marker, an
+# that is not the one block of the record, a worker clone under a folder named clones with a matching marker, an
 # open of the clone under way) gets state=refused and nothing is launched or signalled.
 #   action        what it does (the transitions are lifecycle.sh close and open-clone, under the profile lock)
 #   close         SIGINT only, never SIGTERM or SIGKILL; holds the clone closed until an open. Refused before
@@ -66,6 +66,7 @@ record_hook_line() {
 }
 record_hook_block() {
   cc_block_role=$cc_role cc_role=
+  cc_ids="$cc_ids$b_id$cc_nl"
   [ "$b_ns" = "$ns" ] || return 0
   case $cc_block_role in
     master)
@@ -81,7 +82,7 @@ record_hook_block() {
 }
 # Sets cc_master_id, cc_master_root, cc_control, and cc_workers (id=userDataDir lines), or fails.
 find_roster() {
-  cc_role='' cc_masters=0 cc_master_id='' cc_master_root='' cc_workers=''
+  cc_role='' cc_masters=0 cc_master_id='' cc_master_root='' cc_workers='' cc_ids=''
   if [ ! -f "$record" ] || [ ! -r "$record" ]; then refuse 'the record is not a readable file'; fi
   record_load "$record"
   record_parse 1
@@ -145,13 +146,17 @@ request_file_ok() {
 eligible_clone() {
   cc_root='' ec_count=0
   while IFS= read -r ec_line; do
+    [ "$ec_line" != "$1" ] || ec_count=$((ec_count + 1))
+  done <<IDS
+$cc_ids
+IDS
+  [ "$ec_count" -le 1 ] || { rq_why='the record names that profile in more than one block'; return 1; }
+  while IFS= read -r ec_line; do
     [ "${ec_line%%=*}" = "$1" ] || continue
     cc_root=${ec_line#*=}
-    ec_count=$((ec_count + 1))
   done <<WORKERS
 $cc_workers
 WORKERS
-  [ "$ec_count" -le 1 ] || { rq_why='the record names that profile in more than one worker block'; return 1; }
   [ -n "$cc_root" ] || { rq_why='that profile is not the Default profile of a worker clone of the record'; return 1; }
   cc_name=${cc_root##*/}
   ec_parent=${cc_root%/*}
@@ -227,7 +232,7 @@ run_life() {
   drop_run
   cc_run=$cc_state/control/.run.$(lc_random)
   mkdir -m 700 -- "$cc_run" || die 73 "cannot make a private folder in $cc_state/control"
-  RECNRUN_DISCOVERY_LIB='' /bin/sh "$cc_dir/lifecycle.sh" "$@" >"$cc_run/out" 2>"$cc_run/err" &
+  RECNRUN_DISCOVERY_LIB='' RECNRUN_CONTROL_ROOT=$cc_root /bin/sh "$cc_dir/lifecycle.sh" "$@" >"$cc_run/out" 2>"$cc_run/err" &
   cc_child=$!
   wait "$cc_child"
   rl_code=$?

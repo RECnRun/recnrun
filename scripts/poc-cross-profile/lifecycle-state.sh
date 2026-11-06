@@ -41,8 +41,9 @@ names_root() {
   return 1
 }
 # True when the command line $1 is the Chrome open.sh launches (chrome_binary, the same lookup) on the
-# user data dir $2. A Chrome started by hand from another path is refused rather than signalled.
+# user data dir $2, as its main process (a renderer or helper with --type= is not). A Chrome started by hand from another path is refused rather than signalled.
 is_chrome_of() {
+  case $1 in *" --type="*) return 1 ;; esac
   ic_bin=$(chrome_binary) || return 1
   case $1 in "$ic_bin "*) ;; *) return 1 ;; esac
   names_root "$1" "$2"

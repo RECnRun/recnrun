@@ -46,18 +46,22 @@ lock_wait() {
     sleep 1
   done
 }
-# open.sh calls this inside the command substitution, so the pid reaches the state before the ack wait.
-# It is recorded while the attempt is current and also after the owner paused or stopped it, so a later
-# stop can still end that Chrome; the state of a newer attempt is left alone.
-launched() {
-  is_pid "$1" || return 0
-  lock_wait || return 0
+# open.sh calls this inside the command substitution right before it starts Chrome: the profile lock is
+# taken and kept until launched records the pid, so a close cannot fall between the check of the attempt
+# and the spawn, and an opener that was held up never starts Chrome for a clone that was stopped meanwhile.
+before_spawn() {
+  lock_wait || die 75 "cannot take the lock of $lc_id to start Chrome"
   read_state "$st_file"
-  case $st_status in
-    opening) [ "$st_started" != "$lc_attempt" ] || state_set pid "$1" ;;
-    paused | stopped | idle) state_set pid "$1" ;;
-  esac
-  write_state
+  { [ "$st_status" = opening ] && [ "$st_started" = "$lc_attempt" ]; } && return 0
+  release_lock "$lc_lock" "$$"
+  die 73 "$lc_id is $st_status, not opening: Chrome is not started"
+}
+# The pid reaches the state before the ack wait, under the lock before_spawn took.
+launched() {
+  if is_pid "$1"; then
+    state_set pid "$1"
+    write_state
+  fi
   release_lock "$lc_lock" "$$"
 }
 # The result of the open arrives after a pause, a stop, or a newer attempt: that decision stays.

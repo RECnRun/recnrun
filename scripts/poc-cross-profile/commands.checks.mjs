@@ -196,10 +196,7 @@ for (const shell of shells) {
     registerDownloads(scene, { [ALICE]: downloads });
     writeFileSync(
       scene.record,
-      readFileSync(scene.record, "utf8").replace(
-        "profileId=" + ALICE,
-        `profileId=${ALICE}\nrole=master`,
-      ),
+      readFileSync(scene.record, "utf8").replace("role=worker", "role=master"),
     );
     const folder = join(downloads, "RECnRun/poc", NAMESPACE, "ops", OPERATION);
     mkdirSync(folder, { recursive: true });

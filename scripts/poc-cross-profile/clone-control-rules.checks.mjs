@@ -55,6 +55,17 @@ for (const shell of shells) {
     assert.equal(s.launches(), 0);
   });
 
+  await test(`${shell}: an earlier block of another role with the same id is refused and nothing runs`, (context) => {
+    const s = controlScene(context);
+    const block = `userDataDir=${s.stray}\nprofileDirectory=Default\nprofileId=${CLONE}\nnamespace=${NAMESPACE}\nrole=template\n\n`;
+    writeFileSync(s.record, block + readFileSync(s.record, "utf8"));
+    s.write({ action: "open-visible" });
+    assert.equal(s.run(shell).code, 0);
+    assert.equal(s.status().state, "refused", s.status().raw);
+    assert.match(s.status().message, /more than one block/);
+    assert.equal(s.launches(), 0);
+  });
+
   await test(`${shell}: a worker block with a profile other than Default is refused`, (context) => {
     const s = controlScene(context);
     edit(

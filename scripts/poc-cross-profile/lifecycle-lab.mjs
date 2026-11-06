@@ -66,6 +66,10 @@ if [ "$1" = -o ] && [ "$2" = command= ] && [ "$3" = -p ] && { [ -z "\${STUB_PS_P
   [ "$n" -eq 0 ] || [ -z "\${STUB_PS_CMD_AFTER:-}" ] || { printf '%s\\n' "$STUB_PS_CMD_AFTER"; exit 0; }
   [ -z "\${STUB_PS_CMD:-}" ] || { printf '%s\\n' "$STUB_PS_CMD"; exit 0; }
 fi
+if [ "$1" = -axo ] && [ -e "$HOME/hold" ] && [ -n "\${STUB_HOLD_LOCK:-}" ] && [ ! -e "$STUB_HOLD_LOCK" ]; then
+  : >"$HOME/held"
+  while [ -e "$HOME/hold" ]; do sleep 0.1; done
+fi
 ${ps} "$@" | sed -E -e 's,(^|[[:space:]])(/bin/|/usr/bin/)?(da)?sh /,\\1/,' -e 's,Google Chrome\\.real,Google Chrome,'
 `;
 
@@ -118,7 +122,7 @@ function install(home, shared) {
   mkdirSync(join(root, "Default"), { recursive: true });
   writeFileSync(join(root, "Default/Preferences"), "{}");
   const block = (id, directory) =>
-    `userDataDir=${root}\nprofileDirectory=${directory}\nprofileId=${id}\nnamespace=${NAMESPACE}\n`;
+    `userDataDir=${root}\nprofileDirectory=${directory}\nprofileId=${id}\nnamespace=${NAMESPACE}\nrole=worker\n`;
   const second = shared ? `\n${block(BOB, "Profile 1")}` : "";
   if (shared) {
     mkdirSync(join(root, "Profile 1"), { recursive: true });

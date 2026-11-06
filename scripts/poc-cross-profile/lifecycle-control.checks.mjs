@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
-import { readFileSync, writeFileSync } from "node:fs";
+import { spawn, spawnSync } from "node:child_process";
+import { appendFileSync, existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { test } from "node:test";
+import { setTimeout as sleep } from "node:timers/promises";
 import { ALICE, NAMESPACE, shells } from "./lab.mjs";
-import { alive, life, scene } from "./lifecycle-lab.mjs";
+import { alive, life, scene, script } from "./lifecycle-lab.mjs";
 
 /** The explicit close and open-clone of lifecycle.sh (POC PLAN.md P7.5), under the profile lock. */
 const close = (shell, s, extra) =>
@@ -13,6 +16,9 @@ const edit = (s, pattern, text) => {
   const file = s.stateFile();
   writeFileSync(file, readFileSync(file, "utf8").replace(pattern, text));
 };
+
+const chromePath = (s) =>
+  join(s.home, "Applications/Google Chrome.app/Contents/MacOS/Google Chrome");
 
 for (const shell of shells) {
   await test(`${shell}: close stops the Chrome with SIGINT and holds the clone closed`, (context) => {
@@ -129,5 +135,92 @@ for (const shell of shells) {
     edit(s, /^userDataDir=.*$/m, `userDataDir=${s.home}`);
     const refused = openClone(shell, s, "headed");
     assert.equal(refused.code, 65, refused.err);
+  });
+
+  await test(`${shell}: close refuses a frozen base even when it carries a clone marker`, (context) => {
+    const s = scene(context);
+    assert.equal(s.request(shell).code, 0);
+    const pid = Number(s.field("pid"));
+    writeFileSync(join(s.root, ".recnrun-base"), "base\n");
+    const refused = close(shell, s);
+    assert.equal(refused.code, 65, refused.err);
+    assert.match(refused.err, /frozen base/);
+    assert.deepEqual(s.signals(), []);
+    assert.equal(alive(pid), true);
+  });
+
+  await test(`${shell}: close and open-clone refuse a block that is not a worker`, (context) => {
+    const s = scene(context);
+    edit({ stateFile: () => s.record }, /role=worker/, "role=template");
+    assert.equal(close(shell, s).code, 65);
+    const refused = openClone(shell, s, "headed");
+    assert.equal(refused.code, 65, refused.err);
+    assert.match(refused.err, /not a worker/);
+    assert.equal(s.launches(), 0);
+  });
+
+  await test(`${shell}: close and open-clone refuse an id that more than one block names`, (context) => {
+    const s = scene(context);
+    appendFileSync(
+      s.record,
+      `\nuserDataDir=${s.home}\nprofileDirectory=Default\nprofileId=${ALICE}\nnamespace=${NAMESPACE}\nrole=template\n`,
+    );
+    const refused = close(shell, s);
+    assert.equal(refused.code, 65, refused.err);
+    assert.match(refused.err, /more than one block|in 2 blocks/);
+    assert.equal(openClone(shell, s, "headed").code, 65);
+    assert.equal(s.launches(), 0);
+  });
+
+  await test(`${shell}: close and open-clone refuse a root other than the one the caller checked`, (context) => {
+    const s = scene(context);
+    const refused = close(shell, s, { RECNRUN_CONTROL_ROOT: `${s.home}/elsewhere` });
+    assert.equal(refused.code, 65, refused.err);
+    assert.match(refused.err, /not the root/);
+    assert.equal(close(shell, s, { RECNRUN_CONTROL_ROOT: s.root }).code, 0);
+  });
+
+  await test(`${shell}: close signals the main process even when the state names a renderer`, (context) => {
+    const s = scene(context);
+    assert.equal(s.request(shell).code, 0);
+    const main = Number(s.field("pid"));
+    const renderer = spawn(chromePath(s), [`--user-data-dir=${s.root}`, "--type=renderer"], {
+      stdio: "ignore",
+      env: s.vars({ STUB_ACK: "", STUB_ALIVE: "30" }),
+    });
+    s.spawned.push(renderer.pid);
+    spawnSync("sleep", ["0.3"]);
+    edit(s, /^pid=.*$/m, `pid=${renderer.pid}`);
+    const closed = close(shell, s);
+    assert.equal(closed.code, 0, closed.err);
+    assert.equal(alive(main), false);
+    assert.equal(alive(renderer.pid), true);
+  });
+
+  await test(`${shell}: an opener resumed after a close does not start Chrome`, async (context) => {
+    const s = scene(context);
+    assert.equal(close(shell, s).code, 0);
+    const lock = join(s.state, "profiles", `${ALICE}.lock`);
+    writeFileSync(join(s.home, "hold"), "");
+    const opener = spawn(
+      shell,
+      [script, "open-clone", s.state, s.record, NAMESPACE, ALICE, "headed"],
+      {
+        stdio: "ignore",
+        env: s.vars({ STUB_HOLD_LOCK: lock }),
+      },
+    );
+    const ended = new Promise((resolve) => opener.on("close", resolve));
+    for (let waited = 0; !existsSync(join(s.home, "held")) && waited < 100; waited++)
+      await sleep(100);
+    assert.equal(existsSync(join(s.home, "held")), true, "the opener never reached its launch");
+    await sleep(2200);
+    const closed = close(shell, s, { RECNRUN_OPEN_TIMEOUT_S: "1" });
+    assert.equal(closed.code, 0, closed.err);
+    rmSync(join(s.home, "hold"));
+    assert.notEqual(await ended, 0);
+    assert.equal(s.launches(), 0);
+    assert.equal(s.field("status"), "stopped");
+    assert.equal(s.field("pid"), "");
   });
 }
