@@ -17,10 +17,13 @@ export const script = fileURLToPath(new URL("./lifecycle.sh", import.meta.url));
 const APP = "Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 
 // Logs one line per launch; writes the ack of its token when STUB_ACK is set; stays alive for
-// STUB_ALIVE seconds (deaf to SIGTERM with STUB_DEAF) so the pid rules have a process to look at.
+// STUB_ALIVE seconds, logging SIGINT or SIGTERM to $HOME/signals.txt (deaf to both with STUB_DEAF), so the
+// pid rules have a process to look at. A background sh inherits SIGINT ignored and cannot trap it, while
+// Chrome installs its own handler: the stub restarts itself once through perl with SIGINT at its default.
 // With RECNRUN_STUB_FORWARD it is a forwarder: it acks and exits at once, as a Chrome does when the
 // process singleton hands its command line to the browser already running on the root.
 const STUB = `#!/bin/sh
+[ -n "\${STUB_SIGNALS:-}" ] || exec /usr/bin/perl -e '$SIG{INT} = "DEFAULT"; $ENV{STUB_SIGNALS} = 1; exec @ARGV or die' /bin/sh "$0" "$@"
 for a in "$@"; do last=$a; case $a in --profile-directory=*) directory=\${a#*=} ;; esac; done
 printf 'launch\\n' >>"$STUB_LOG"
 token=\${last#*token=}
@@ -38,7 +41,12 @@ if [ -n "\${STUB_ACK:-}" ]; then
 fi
 [ -n "\${RECNRUN_STUB_FORWARD:-}" ] && exit 0
 [ -n "\${STUB_ALIVE:-}" ] || exit 0
-if [ -n "\${STUB_DEAF:-}" ]; then trap '' TERM; else trap 'kill $s 2>/dev/null; exit 0' TERM; fi
+if [ -n "\${STUB_DEAF:-}" ]; then
+  trap '' INT TERM
+else
+  trap 'printf "int\\n" >>"$HOME/signals.txt"; kill $s 2>/dev/null; exit 0' INT
+  trap 'printf "term\\n" >>"$HOME/signals.txt"; kill $s 2>/dev/null; exit 0' TERM
+fi
 sleep "$STUB_ALIVE" &
 s=$!
 wait $s
@@ -187,6 +195,11 @@ export function scene(context, defaults = {}, { shared = false } = {}) {
     request: (shell, extra, id = ALICE, ...rest) =>
       life(shell, ["request", state, record, NAMESPACE, id, ...rest], vars(extra)),
     launches: () => (existsSync(log) ? lines(readFileSync(log, "utf8")).length : 0),
+    /** The signals the stub Chrome caught, int or term, one line each. */
+    signals: () => {
+      const file = join(home, "signals.txt");
+      return existsSync(file) ? lines(readFileSync(file, "utf8")) : [];
+    },
     field: (key, id = ALICE) =>
       lines(readFileSync(stateFile(id), "utf8"))
         .find((line) => line.startsWith(`${key}=`))

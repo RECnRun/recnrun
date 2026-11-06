@@ -132,7 +132,7 @@ for (const shell of shells) {
     assert.equal(s.launchCount(), launched);
   });
 
-  await test(`${shell}: quit signals only the Chrome whose command line names the root`, (context) => {
+  await test(`${shell}: quit sends SIGINT only to the Chrome whose command line names the root`, (context) => {
     const s = baseScene(context);
     const first = s.create(shell, "base-v1", { STUB_ALIVE: "30" });
     const other = s.create(shell, "base-v2", { STUB_ALIVE: "30" });
@@ -140,6 +140,8 @@ for (const shell of shells) {
     s.spawned.push(bystander.pid);
     const quit = s.run(shell, ["quit", s.bases, "base-v1"], "base-v1");
     assert.equal(quit.code, 0, quit.err);
+    assert.match(quit.err, new RegExp(`stopped pid ${pidOf(first)} by SIGINT`));
+    assert.deepEqual(s.signals(), ["int"], "Chrome's normal shutdown, not SIGTERM's SessionEnding");
     assert.equal(alive(pidOf(first)), false);
     assert.equal(alive(pidOf(other)), true, "another root's Chrome keeps running");
     assert.equal(alive(bystander.pid), true);

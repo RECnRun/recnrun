@@ -165,6 +165,7 @@ export default defineConfig({
           "vp run --no-cache test:browser:local",
           // scripts/test-container.mjs runs verify with RECNRUN_EXPERIMENT_SAMPLES=smoke.
           "vp run --no-cache test:experiments:local",
+          "vp run --no-cache test:headless:local",
           "vp run --no-cache test:container",
 
           "vp run --no-cache test:hooks",

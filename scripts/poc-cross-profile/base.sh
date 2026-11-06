@@ -20,8 +20,10 @@
 #                 Chrome that holds the root and waits for the ack of the token that carries
 #                 "template":true and "setting":"<name>"; stdout profileId=, token=, root=
 #                 (the Downloads root). A frozen base is refused.
-#   quit          SIGTERM to the main Chrome of the root (only the Chrome of open.sh whose command line
-#                 names it), then waits until no process names it.
+#   quit          SIGINT to the main Chrome of the root (only the Chrome of open.sh whose command line
+#                 names it), Chrome's normal shutdown, which removes the Singleton files freeze would
+#                 otherwise copy (SIGTERM exits without it, TROUBLESHOOTING.md); then waits until no process
+#                 names it, and exits 70 when one still does.
 #   freeze        refuses while any process names the root; with the extension in Default, a
 #                 template ack of <name>, and the Preferences, writes <root>/.recnrun-base:
 #                 setting, extensionId, profileId, namespace, frozenAt (epoch seconds), install
@@ -173,16 +175,16 @@ quit_base() {
     return 0
   fi
   is_chrome_of "$(ps -o command= -p "$main" 2>/dev/null)" "$root" || refuse "pid $main is not the Chrome of this machine on $root: not signalled"
-  kill -TERM "$main"
+  kill -INT "$main"
   waited=0
   while :; do
     holders_of "$root"
     [ -n "$holders" ] || break
-    [ "$waited" -lt "$stop_s" ] || die 70 "pids $holders still name $root after $stop_s s"
+    [ "$waited" -lt "$stop_s" ] || die 70 "pids $holders still name $root $stop_s s after SIGINT"
     sleep 1
     waited=$((waited + 1))
   done
-  log "stopped pid $main"
+  log "stopped pid $main by SIGINT"
 }
 
 if [ -z "$base_as_library" ]; then

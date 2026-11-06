@@ -3,7 +3,12 @@ import * as v from "valibot";
 import { downloadsWriter } from "@/background/downloads-publisher";
 import type { WriterPort } from "@/background/downloads-publisher";
 import type { BackgroundReply } from "@/messaging/background-reply";
-import { PocLauncherAckSchema } from "@/messaging/poc-presence";
+import {
+  BOOTSTRAP_STEPS,
+  PocLauncherAckSchema,
+  PocLauncherFailureSchema,
+} from "@/messaging/poc-presence";
+import type { BootstrapStep } from "@/messaging/poc-presence";
 import type { AckClone, AckTemplate } from "@/messaging/poc-presence";
 import { TokenSchema, ackPath } from "@/p2p/downloads-rendezvous";
 import { IdentityStatementSchema } from "@/p2p/identity-key";
@@ -33,6 +38,51 @@ const AckSchema = v.strictObject({
   operationId: v.optional(TokenSchema),
   provisioned: v.optional(v.literal(true)),
 });
+
+// open.sh logs the error, so it reads only this alphabet, 1 to 200 characters.
+const SAFE_ERROR = /^[A-Za-z0-9 .,:;()_/=-]{1,200}$/;
+
+/** The failure ack of a bootstrap that cannot write its ack: no identity, so no presence is needed. */
+const FailureAckSchema = v.strictObject({
+  token: TokenSchema,
+  profileId: ProfileIdSchema,
+  failedStep: v.picklist(BOOTSTRAP_STEPS),
+  error: v.pipe(v.string(), v.regex(SAFE_ERROR)),
+  createdAt: v.pipe(v.number(), v.safeInteger(), v.minValue(0)),
+});
+
+/** Any text in the alphabet of the failure ack: other characters become spaces. */
+export function boundedError(text: string): string {
+  const safe = text
+    .replaceAll(/[^A-Za-z0-9 .,:;()_/=-]/g, " ")
+    .replaceAll(/ {2,}/g, " ")
+    .trim();
+  return safe.slice(0, 200).trim() || "unknown error";
+}
+
+export type FailureDependencies = Pick<
+  AckDependencies,
+  "downloads" | "profileId" | "namespace" | "now"
+>;
+
+/** Writes where the ack would go, saying the bootstrap failed at `step`; it needs no presence. */
+export async function writeFailureAck(
+  deps: FailureDependencies,
+  token: string,
+  step: BootstrapStep,
+  error: string,
+): Promise<void> {
+  const profileId = await deps.profileId();
+  const path = ackPath(await deps.namespace(), profileId, token);
+  const ack = v.parse(FailureAckSchema, {
+    token,
+    profileId,
+    failedStep: step,
+    error: boundedError(error),
+    createdAt: (deps.now ?? Date.now)(),
+  });
+  await downloadsWriter(deps.downloads).write(path, JSON.stringify(ack));
+}
 
 export interface AckDependencies {
   downloads: WriterPort;
@@ -90,6 +140,24 @@ export function createAckListener(
     sent.then(
       () => reply({ ok: true }),
       (error: unknown) => reply({ ok: false, error: errorMessage(error) }),
+    );
+    return true;
+  };
+}
+
+/** The bootstrap page reports a failure it could not recover from; the failure ack answers the token. */
+export function createFailureListener(
+  fail: (token: string, step: BootstrapStep, error: string) => Promise<void>,
+  own: { extensionId: string; extensionUrl: string },
+) {
+  return (message: unknown, sender: Sender, reply: (answer: BackgroundReply) => void) => {
+    const ownPage = sender.id === own.extensionId && sender.url?.startsWith(own.extensionUrl);
+    const parsed = v.safeParse(PocLauncherFailureSchema, message);
+    if (!parsed.success || !ownPage) return false;
+    const { token, step, error } = parsed.output;
+    fail(token, step, error).then(
+      () => reply({ ok: true }),
+      (cause: unknown) => reply({ ok: false, error: errorMessage(cause) }),
     );
     return true;
   };

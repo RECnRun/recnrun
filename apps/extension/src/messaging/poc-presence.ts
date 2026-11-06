@@ -10,6 +10,29 @@ export const pocPublishPresence = (): v.InferOutput<typeof PocPublishPresenceSch
   type: "POC_PUBLISH_PRESENCE",
 });
 
+/** Where a bootstrap can fail; the launcher's failure ack names one of these. */
+export const BOOTSTRAP_STEPS = ["adopt", "publish", "ack"] as const;
+export type BootstrapStep = (typeof BOOTSTRAP_STEPS)[number];
+
+/** The bootstrap page reports that it cannot produce the ack of the token it was opened with. */
+export const PocLauncherFailureSchema = v.strictObject({
+  type: v.literal("POC_LAUNCHER_FAILURE"),
+  token: TokenSchema,
+  step: v.picklist(BOOTSTRAP_STEPS),
+  error: v.pipe(v.string(), v.maxLength(2000)),
+});
+
+export const pocLauncherFailure = (
+  token: string,
+  step: BootstrapStep,
+  error: string,
+): v.InferOutput<typeof PocLauncherFailureSchema> => ({
+  type: "POC_LAUNCHER_FAILURE",
+  token,
+  step,
+  error,
+});
+
 /** A template base's open attempt names the base; both fields or neither (POC PLAN.md P5.1). */
 const AckTemplateSchema = v.strictObject({
   template: v.literal(true),

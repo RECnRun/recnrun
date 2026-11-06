@@ -1,8 +1,8 @@
 import { execFile } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
+import { interruptChrome } from "../../browser/fixtures/chrome-quit.ts";
 import { recordHypothesis } from "../outcome.ts";
 import type { Cell } from "../outcome.ts";
 import type { Sample, VerdictTarget } from "./downloads-verdicts.ts";
@@ -19,7 +19,6 @@ const FIRST_RUN = fileURLToPath(new URL("first-run.sh", SCRIPTS));
 const LAUNCHER = fileURLToPath(new URL("recnrun-launcher.sh", SCRIPTS));
 const NAMESPACE = "lab";
 const QUIT_MS = 20_000;
-const POLL_MS = 100;
 
 /** A root of two profiles that share one Downloads folder; the first is the rig's scene. */
 export interface FirstRunPair extends Rig {
@@ -91,17 +90,9 @@ async function measure(rig: FirstRunPair): Promise<Sample> {
   return { ok: problems.length === 0, ...error, observation: { code: first.code, status } };
 }
 
-/** SIGTERM to every Chrome process of the root, then waits until none is left. */
+/** SIGINT to every Chrome process of the root, as Ctrl+C sends it, then until none is left. */
 async function quitAll(rig: Rig): Promise<void> {
-  for (const pid of await rig.survivors()) {
-    try {
-      process.kill(pid, "SIGTERM");
-    } catch {
-      // Already gone.
-    }
-  }
-  for (const deadline = Date.now() + QUIT_MS; Date.now() < deadline; await delay(POLL_MS))
-    if ((await rig.survivors()).length === 0) return;
+  await interruptChrome(await rig.survivors(), () => rig.survivors(), QUIT_MS);
 }
 
 /** One sample: prepare a rig, run first-run and status, and leave nothing of the root behind. */

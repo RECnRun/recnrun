@@ -3,7 +3,14 @@ import * as v from "valibot";
 import { browser } from "wxt/browser";
 import { ask } from "@/diagnostics/poc-messages";
 import { CLONE_PREFIX, cloneRequestOf } from "@/messaging/clone-fragment";
-import { pocLauncherAck, pocProvisionClone, pocPublishPresence } from "@/messaging/poc-presence";
+import {
+  pocLauncherAck,
+  pocLauncherFailure,
+  pocProvisionClone,
+  pocPublishPresence,
+} from "@/messaging/poc-presence";
+import type { BootstrapStep } from "@/messaging/poc-presence";
+import { bounded } from "@/p2p/bounded";
 import { pocPresenceStore } from "@/storage/poc-presence-repository";
 import { pocTemplateStore } from "@/storage/poc-template-repository";
 
@@ -36,6 +43,21 @@ const SETTING_KEY = "&setting=";
 const CLONE_REFUSED =
   "The address carries no #clone=<token>&instance=<uuid>&operation=<uuid>&namespace=<namespace>&master=<profile id>.<identity key>.";
 
+/** How long each step of a token bootstrap may take; open.sh waits 60 s by default for the ack. */
+interface BootstrapLimits {
+  adoptMs: number;
+  /** For each of the two tries of the presence. */
+  publishMs: number;
+  ackMs: number;
+  failureMs: number;
+}
+const LIMITS: BootstrapLimits = {
+  adoptMs: 5_000,
+  publishMs: 10_000,
+  ackMs: 8_000,
+  failureMs: 8_000,
+};
+
 export interface BootstrapDependencies {
   /** `location.hash` of the page, as the launcher opened it. */
   hash: string;
@@ -44,6 +66,8 @@ export interface BootstrapDependencies {
   /** Stores template mode and the base's setting. */
   enterTemplate: (setting: string) => Promise<void>;
   send: (message: unknown) => Promise<unknown>;
+  /** Replaces the default bounds of the token steps. */
+  limits?: BootstrapLimits;
 }
 
 /** `acked` tells whether the ack of the attempt was written; a failed one keeps the presence's `ok`. */
@@ -96,8 +120,76 @@ async function bootstrapClone(
   }
 }
 
+/** Tells the launcher, through a failure ack, where the bootstrap stopped; a dead background changes nothing. */
+async function reportFailure(
+  send: BootstrapDependencies["send"],
+  failure: { token: string; step: BootstrapStep; error: string; ms: number },
+): Promise<void> {
+  const { token, step, error, ms } = failure;
+  await bounded(ask(send, pocLauncherFailure(token, step, error)), ms, "The failure report").catch(
+    () => undefined,
+  );
+}
+
+/** Asks for a presence; one stall or refusal is retried once, since the background then recreates its offscreen document. */
+async function publishPresence(
+  send: BootstrapDependencies["send"],
+  ms: number,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  let failure = "";
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const reply = await bounded(ask(send, pocPublishPresence()), ms, "The presence");
+      if (reply.ok) return { ok: true };
+      failure = reply.error;
+    } catch (error) {
+      failure = errorMessage(error);
+    }
+  }
+  return { ok: false, error: failure };
+}
+
+/** The token open: adopt, publish, ack, each bounded; a failure leaves a failure ack for the token. */
+async function bootstrapToken(
+  token: string,
+  { adopt, send, limits = LIMITS }: BootstrapDependencies,
+): Promise<BootstrapResult> {
+  const fail = async (step: BootstrapStep, error: string) =>
+    reportFailure(send, { token, step, error, ms: limits.failureMs });
+  try {
+    await bounded(adopt(token), limits.adoptMs, "The adoption");
+  } catch (error) {
+    const message = errorMessage(error);
+    await fail("adopt", message);
+    return { ok: false, error: message };
+  }
+  const published = await publishPresence(send, limits.publishMs);
+  if (!published.ok) {
+    await fail("publish", published.error);
+    return published;
+  }
+  const error = await ackError(send, token, limits.ackMs);
+  if (error === undefined) return { ok: true, token, acked: true };
+  await fail("ack", error);
+  return { ok: true, token, acked: false, error };
+}
+
+/** The reason the ack was not written, or undefined once it was. */
+async function ackError(
+  send: BootstrapDependencies["send"],
+  token: string,
+  ms: number,
+): Promise<string | undefined> {
+  try {
+    const ack = await bounded(ask(send, pocLauncherAck(token)), ms, "The ack");
+    return ack.ok ? undefined : ack.error;
+  } catch (error) {
+    return errorMessage(error);
+  }
+}
+
 export async function bootstrap(deps: BootstrapDependencies): Promise<BootstrapResult> {
-  const { hash, adopt, send } = deps;
+  const { hash, send } = deps;
   if (hash.startsWith(CLONE_PREFIX)) return bootstrapClone(hash, send);
   if (hash.startsWith(TEMPLATE_PREFIX)) {
     return v.is(TemplateFragmentSchema, hash)
@@ -110,18 +202,7 @@ export async function bootstrap(deps: BootstrapDependencies): Promise<BootstrapR
   const parsed = v.safeParse(FragmentSchema, hash);
   if (!parsed.success)
     return { ok: false, error: "The address carries no #token=<lowercase v4 uuid>." };
-  const token = parsed.output.slice(PREFIX.length);
-  try {
-    await adopt(token);
-    const reply = await ask(send, pocPublishPresence());
-    if (!reply.ok) return { ok: false, error: reply.error };
-    const ack = await ask(send, pocLauncherAck(token));
-    return ack.ok
-      ? { ok: true, token, acked: true }
-      : { ok: true, token, acked: false, error: ack.error };
-  } catch (error) {
-    return { ok: false, error: errorMessage(error) };
-  }
+  return bootstrapToken(parsed.output.slice(PREFIX.length), deps);
 }
 
 /** Runs the bootstrap of this page and shows its result in `<pre id="bootstrap">`. */

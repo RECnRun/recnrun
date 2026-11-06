@@ -154,20 +154,23 @@ keep_build() {
   until_true "chrome.developerPrivate.reload('$want',{failQuietly:true}).then(()=>true)" 'the reload'
   until_true "chrome.developerPrivate.getExtensionInfo('$want').then((i)=>i.state==='ENABLED')" 'the reloaded build'
 }
-# Browser.close over the pipe, then the pid Chrome started under is waited for, and signalled only
-# after a full wait; returns 1 when it still runs.
+# Browser.close over the pipe, then the pid Chrome started under is waited for, and only after a full
+# wait gets SIGINT, Chrome's normal shutdown (SIGTERM would skip it); returns 1 when it still runs.
 close_chrome() {
   send Browser.close '{}'
   cc_waited=0
+  cc_ended=Browser.close
   while pid_alive "$chrome_pid"; do
     if [ "$cc_waited" -eq "$limit" ]; then
-      log "Chrome pid $chrome_pid still runs $limit s after Browser.close: SIGTERM"
-      kill -TERM "$chrome_pid" 2>/dev/null
+      log "Chrome pid $chrome_pid still runs $limit s after Browser.close: SIGINT"
+      kill -INT "$chrome_pid" 2>/dev/null
+      cc_ended=SIGINT
     fi
     [ "$cc_waited" -lt $((limit * 2)) ] || return 1
     sleep "$step"
     cc_waited=$((cc_waited + step))
   done
+  log "Chrome pid $chrome_pid ended by $cc_ended"
   # Helper processes of the root can outlive the main one by a moment.
   while holders_of "$root" && [ -n "$holders" ]; do
     [ "$cc_waited" -lt $((limit * 2)) ] || return 1
@@ -190,7 +193,7 @@ install_base() {
   start_pipe_chrome
   load_build
   keep_build
-  close_chrome || die 70 "Chrome still names $root after Browser.close and SIGTERM: pids ${holders:-$chrome_pid}"
+  close_chrome || die 70 "Chrome still names $root after Browser.close and SIGINT: pids ${holders:-$chrome_pid}"
   extension_in_profile "$root" Default "$want" >/dev/null || die 70 "Chrome kept no settings entry of $want in $root/Default"
   printf 'extensionId=%s\ninstallS=%s\n' "$want" $(($(date +%s) - started))
 }

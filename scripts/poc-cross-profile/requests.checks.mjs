@@ -9,6 +9,7 @@ import {
   EX_REFUSED,
   EXTENSION,
   OTHER_TOKEN,
+  holdChrome,
   UUID,
   lines,
   open,
@@ -53,6 +54,49 @@ for (const shell of shells) {
     writeFileSync(record, `${broken}\n\n\n${block(ALICE)}\n`);
     assert.equal(open(shell, request(record), env()).code, EX_REFUSED);
     assert.equal(existsSync(argv), false);
+  });
+
+  for (const { running, asked, flags } of [
+    { running: "headless", asked: "headed", flags: ["--headless=new"] },
+    { running: "headed", asked: "headless", flags: [] },
+  ]) {
+    await test(`${shell}: a root that runs ${running} refuses ${asked} at once and starts no Chrome`, (context) => {
+      const s = scene(context);
+      const { root, record, argv, env } = s;
+      holdChrome(context, s, ...flags);
+      const started = Date.now();
+      const result = open(
+        shell,
+        request(record, ALICE, asked),
+        env({ RECNRUN_OPEN_TIMEOUT_S: "20" }),
+      );
+      assert.equal(result.code, EX_REFUSED, result.err);
+      assert.ok(Date.now() - started < 10_000, "refused without waiting for an ack");
+      assert.ok(
+        result.err.includes(
+          `refused: ${root} already runs ${running}; quit it before opening it ${asked}`,
+        ),
+        result.err,
+      );
+      assert.equal(existsSync(argv), false);
+      assert.equal(result.out, "");
+    });
+
+    await test(`${shell}: a root that runs ${running} is opened ${running} as before`, (context) => {
+      const s = scene(context);
+      const { record, argv, env } = s;
+      holdChrome(context, s, ...flags);
+      const result = open(shell, request(record, ALICE, running), env());
+      assert.equal(result.code, 0, result.err);
+      assert.equal(existsSync(argv), true);
+    });
+  }
+
+  await test(`${shell}: a helper process of the other mode does not count as the running Chrome`, (context) => {
+    const s = scene(context);
+    const { record, env } = s;
+    holdChrome(context, s, "--type=renderer", "--headless=new");
+    assert.equal(open(shell, request(record, ALICE, "headed"), env()).code, 0);
   });
 
   const badRecords = [

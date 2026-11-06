@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -8,6 +8,7 @@ import { ALICE, NAMESPACE } from "./lab.mjs";
 const script = fileURLToPath(new URL("./open.sh", import.meta.url));
 export const EX_REFUSED = 65;
 export const EX_NO_ACK = 69;
+export const EX_BOOTSTRAP_FAILED = 71;
 export const BOB = "22222222-2222-4222-8222-222222222222";
 export const OTHER_TOKEN = "99999999-9999-4999-8999-999999999999";
 export const EXTENSION = readFileSync(new URL("./extension-id", import.meta.url), "utf8").trim();
@@ -19,6 +20,7 @@ const STUB = `#!/bin/sh
 KEY=${"B".repeat(87)}
 SIG=${"S".repeat(86)}
 for a in "$@"; do last=$a; done
+[ -z "\${STUB_HOLD:-}" ] || { sleep "$STUB_HOLD"; exit 0; }
 printf '%s\\n' "$@" >"$STUB_ARGV"
 [ -n "\${STUB_ROOT:-}" ] || exit 0
 sleep "\${STUB_DELAY:-1}"
@@ -33,6 +35,7 @@ case \${STUB_SHAPE:-good} in
   nested) body=$head'{"key":"'$KEY'","signedAt":1,"signature":"'$SIG'","boot":"'$boot'"},"createdAt":1}' ;;
   noident) body='{"token":"'$token'","profileId":"'$STUB_PROFILE'","boot":"'$boot'","createdAt":1}' ;;
   freeident) body=$head'{"key":"K","signedAt":1,"signature":"S"},"boot":"'$boot'","createdAt":1}' ;;
+  failure) body='{"token":"'$token'","profileId":"'$STUB_PROFILE'","failedStep":"'\${STUB_STEP:-publish}'","error":"'\${STUB_ERROR-The offscreen document did not answer.}'","createdAt":1}' ;;
 esac
 dir=$STUB_ROOT/RECnRun/poc/$STUB_NS/acks/$STUB_PROFILE
 mkdir -p "$dir"
@@ -87,6 +90,15 @@ export function scene(context, { blocks } = {}) {
     STUB_DELAY: "0",
     ...extra,
   });
-  return { home, root, record, argv, env, block };
+  return { home, root, record, argv, env, block, chrome };
+}
+
+/** A main Chrome process on the scene's root (the stub, held for a while) with the given flags. */
+export function holdChrome(context, { home, root, chrome }, ...flags) {
+  const child = spawn(chrome, [`--user-data-dir=${root}`, ...flags], {
+    env: { PATH: process.env.PATH, STUB_HOLD: "30", STUB_ARGV: join(home, "held.txt") },
+    stdio: "ignore",
+  });
+  context.after(() => child.kill());
 }
 export const request = (record, id = ALICE, ...rest) => ["open", record, NAMESPACE, id, ...rest];

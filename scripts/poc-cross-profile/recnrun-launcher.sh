@@ -8,7 +8,7 @@
 #       takes the launcher lock, then every RECNRUN_LAUNCHER_INTERVAL_S (10) requests, headed, each
 #       profile the record registers in the namespace (lifecycle.sh request). It opens no other
 #       profile and leaves a paused or stopped one alone until lifecycle.sh resume (the owner's stop
-#       is never undone by the next pass). Exits 73, 75, 69, and 70 of a request are logged, not
+#       is never undone by the next pass). Exits 73, 75, 69, 71, and 70 of a request are logged, not
 #       errors; 65 and 66 are logged once and the profile skipped until the launcher restarts.
 #       After the requests of each pass it runs provision.sh once (the master's "Prepare workers" operations,
 #       one step per operation, P6.1; exits are logged), then catalog.sh once per distinct downloadsRoot the
@@ -128,7 +128,7 @@ request_profile() {
       la_skipped="$la_skipped$4 "
       log "$4: exit $rq_code, skipped until the launcher restarts"
       ;;
-    69 | 70 | 73 | 75) log "$4: exit $rq_code, not an error" ;;
+    69 | 70 | 71 | 73 | 75) log "$4: exit $rq_code, not an error" ;;
     *) log "$4: exit $rq_code" ;;
   esac
 }

@@ -6,6 +6,7 @@ type MessageClass = "command" | "result" | "status" | "heartbeat" | "signaling";
 /** What each protocol type may do; a new type fails the type check until it is classified here. */
 export const MESSAGE_CLASSES = {
   ACTIVATE_TAB: "command",
+  OPEN_TAB: "command",
   SESSION_START: "command",
   SESSION_SET_STATUS: "command",
   SESSION_STOP: "command",
@@ -30,6 +31,7 @@ export type Command = MessageOf<CommandType>;
 /** The types only the bound master may send; the executor runs exactly these. */
 export const COMMAND_TYPES: ReadonlySet<PeerType> = new Set<CommandType>([
   "ACTIVATE_TAB",
+  "OPEN_TAB",
   "SESSION_START",
   "SESSION_SET_STATUS",
   "SESSION_STOP",

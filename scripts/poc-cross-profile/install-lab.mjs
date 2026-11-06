@@ -24,8 +24,11 @@ export const OTHER = "a".repeat(32);
 // A Chrome on the DevTools pipe: records its argv, copies every NUL-terminated command of fd 3 to
 // STUB_MESSAGES, and answers each on fd 4 as STUB_REPLY says (good; other: another id is loaded;
 // silent: no answer at all; noentry: no settings entry is written; linger: Browser.close is answered
-// but only SIGTERM ends it). On Browser.close it writes the settings entry Chrome keeps and exits.
+// but only a signal ends it, logged as int or term). On Browser.close it writes the settings entry Chrome
+// keeps and exits. A background sh inherits SIGINT ignored and cannot trap it, while Chrome installs its own
+// handler: the stub restarts itself once through perl with SIGINT at its default action.
 const STUB = `#!/bin/sh
+[ -n "\${STUB_SIGNALS:-}" ] || exec /usr/bin/perl -e '$SIG{INT} = "DEFAULT"; $ENV{STUB_SIGNALS} = 1; exec @ARGV or die' /bin/sh "$0" "$@"
 printf '%s\\n' "$@" >"$STUB_ARGV"
 printf 'launch\\n' >>"$STUB_LOG"
 for a in "$@"; do case $a in --user-data-dir=*) root=\${a#*=} ;; esac; done
@@ -33,6 +36,7 @@ mode=\${STUB_REPLY:-good}
 : >"$STUB_MESSAGES"
 cat <&3 >>"$STUB_MESSAGES" &
 reader=$!
+trap 'printf "int\\n" >>"$STUB_LOG"; kill $reader 2>/dev/null; exit 0' INT
 trap 'printf "term\\n" >>"$STUB_LOG"; kill $reader 2>/dev/null; exit 0' TERM
 reply() { printf '%s\\0' "$1" >&4; }
 seen=0

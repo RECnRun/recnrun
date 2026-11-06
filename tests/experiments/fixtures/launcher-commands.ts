@@ -3,6 +3,7 @@ import { mkdir, readFile, readdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
+import { interruptChrome } from "../../browser/fixtures/chrome-quit.ts";
 import { recordHypothesis } from "../outcome.ts";
 import type { Cell } from "../outcome.ts";
 import type { Sample, VerdictTarget } from "./downloads-verdicts.ts";
@@ -140,15 +141,6 @@ async function measureCatalog(rig: SharedPair, pids: number[]): Promise<Sample> 
   return { ok: held !== undefined, ...error, observation: { passes, peers: wanted.length } };
 }
 
-/** SIGTERM to a pid that may already be gone: stop --all ended it. */
-function terminate(pid: number): void {
-  try {
-    process.kill(pid, "SIGTERM");
-  } catch {
-    // Already gone.
-  }
-}
-
 /** One sample: prepare a rig, run the three commands, and leave nothing of the root behind. */
 async function sampleOf<R extends Rig>(
   setup: () => Promise<R>,
@@ -165,8 +157,8 @@ async function sampleOf<R extends Rig>(
     return sample;
   } finally {
     try {
-      pids.forEach(terminate);
-      await gone(rig, QUIT_MS);
+      // A pid may already be gone: stop --all ended it.
+      await interruptChrome(pids, () => rig.survivors(), QUIT_MS);
     } finally {
       await rig.dispose();
     }

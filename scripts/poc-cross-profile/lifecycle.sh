@@ -9,9 +9,10 @@
 #                                           the caller's pid ($PPID); a dead pid's lock is taken over
 #   request <state-dir> <record> <namespace> <profileId> [headed|headless]
 #   pause | resume | reset <state-dir> <profileId>
-#   stop <state-dir> <profileId> [--force]  SIGTERM to the pid the state names, only while its command
-#                                           line is the Chrome of open.sh on exactly the user data dir (checked again
-#                                           before SIGKILL); --force adds SIGKILL
+#   stop <state-dir> <profileId> [--force]  SIGINT (Chrome's normal shutdown; SIGTERM would skip it) to the
+#                                           pid the state names, only while its command line is the Chrome of
+#                                           open.sh on exactly the user data dir (checked again before SIGKILL);
+#                                           --force adds SIGKILL after the wait; stderr names the ending signal
 #   status <state-dir>                      profileId status pid attempts nextAt, one line each
 #
 # State, <state-dir>/profiles/<profileId>: key=value lines with token, pid, startedAt, attempts,
@@ -106,7 +107,9 @@ stop_profile() {
   [ "$st_shared" = 0 ] || die 70 "$(shared_message)"
   if pid_alive "$st_pid"; then
     names_user_dir || die 65 "pid $st_pid does not name $st_user: not signalled"
-    kill -TERM "$st_pid"
+    # Chrome reads one shutdown signal, so a SIGTERM after this one would change nothing.
+    kill -INT "$st_pid"
+    sp_ended=SIGINT
     sp_waited=0
     while pid_alive "$st_pid" && [ "$sp_waited" -lt "$stop_s" ]; do
       sleep 1
@@ -116,7 +119,9 @@ stop_profile() {
       [ "$stop_force" = 1 ] || die 70 "pid $st_pid still runs after $stop_s s: stop --force kills it"
       names_user_dir || die 65 "pid $st_pid no longer names $st_user: not killed"
       kill -KILL "$st_pid"
+      sp_ended=SIGKILL
     fi
+    log "pid $st_pid ended by $sp_ended"
   fi
   st_status=stopped st_pid=''
 }

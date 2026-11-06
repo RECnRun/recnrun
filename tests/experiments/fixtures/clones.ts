@@ -58,7 +58,7 @@ export interface CloneHost {
   commandLines(root: string): Promise<string[]>;
   /** Attaches Playwright to the Chrome running on a clone root. */
   attach(root: string, name: string, instanceId: string): Promise<DownloadsProfile>;
-  /** Detaches, ends the Chrome of `root` with SIGTERM, and waits until nothing names it. */
+  /** Detaches, ends the Chrome of `root` with SIGINT, and waits until nothing names it. */
   stop(profile: DownloadsProfile): Promise<void>;
   /** Tells the launcher's catalog loop about a Downloads root the record now names. */
   track(downloads: string): void;
@@ -133,8 +133,17 @@ export async function createClone(host: CloneHost, clones: string, name: string)
 }
 
 /** `clone-open.sh open-clone`, which also reopens a clone the record already registers. */
-export const openClone = (host: CloneHost, clones: string, name: string) =>
-  runScript("clone-open.sh", ["open-clone", clones, name, host.record, NAMESPACE], host.env);
+export const openClone = (
+  host: CloneHost,
+  clones: string,
+  name: string,
+  { mode, env = {} }: { mode?: "headed" | "headless"; env?: NodeJS.ProcessEnv } = {},
+) =>
+  runScript(
+    "clone-open.sh",
+    ["open-clone", clones, name, host.record, NAMESPACE, ...(mode ? [mode] : [])],
+    { ...host.env, ...env },
+  );
 
 /** The file at `path` as JSON. */
 export const readJson = async (path: string) =>

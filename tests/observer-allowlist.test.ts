@@ -5,7 +5,7 @@ import type { Site } from "./harness-scan.ts";
 
 /**
  * POC PLAN.md decisions 5 and 7: the harness observes and never provides capability. Every CDP
- * command a file under tests/browser, tests/experiments, or tests/host sends is listed here with its reason.
+ * command a file under tests/browser, tests/experiments, tests/headless, or tests/host sends is listed here with its reason.
  */
 const ALLOWED_COMMANDS: Record<string, string> = {
   "Browser.getVersion": "reads the product string",
@@ -51,6 +51,7 @@ const ALLOWED_FLAGS: Record<string, string> = {
   "--silent-debugger-extension-api": "hides the debugging infobar",
   "--enable-unsafe-extension-debugging": "Extensions.loadUnpacked",
   "--profile-directory": "E8 opens a secondary profile of a root, as a person's Chrome does",
+  "--headless": "Chrome's native headless mode, which the launcher and the headless lab start",
   "--version": "a version query, not a browser launch",
   "--no-default-browser-check": "no default-browser prompt on the host",
   "--use-mock-keychain": "the host never reads the owner's Chrome Safe Storage key",

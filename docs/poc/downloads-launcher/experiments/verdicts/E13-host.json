@@ -1,0 +1,725 @@
+[
+  {
+    "experiment": "E13",
+    "hypothesis": "E13.t6.workers",
+    "chrome": "Google Chrome 156.0.8078.80",
+    "environment": "host",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "4 hand-installed workers, one root each, opened by open.sh headless; the master is a throwaway headed root of this run and stands in for the personal Default, no CDP client is on any worker",
+    "debugger": "none",
+    "observations": [
+      {
+        "workers": 4,
+        "opens": [
+          {
+            "mode": "headless",
+            "exit": 0,
+            "totalS": 2.5,
+            "presenceS": 1.8,
+            "ackS": 2
+          },
+          {
+            "mode": "headless",
+            "exit": 0,
+            "totalS": 2.5,
+            "presenceS": 1.8,
+            "ackS": 1.7
+          },
+          {
+            "mode": "headless",
+            "exit": 0,
+            "totalS": 2.5,
+            "presenceS": 1.8,
+            "ackS": 1.9
+          },
+          {
+            "mode": "headless",
+            "exit": 0,
+            "totalS": 2.5,
+            "presenceS": 1.8,
+            "ackS": 1.7
+          }
+        ],
+        "linked": 4
+      },
+      {
+        "workers": 4,
+        "opens": [
+          {
+            "mode": "headless",
+            "exit": 0,
+            "totalS": 2.3,
+            "presenceS": 1.5,
+            "ackS": 1.6
+          },
+          {
+            "mode": "headless",
+            "exit": 0,
+            "totalS": 2.3,
+            "presenceS": 1.5,
+            "ackS": 1.6
+          },
+          {
+            "mode": "headless",
+            "exit": 0,
+            "totalS": 2.3,
+            "presenceS": 1.5,
+            "ackS": 1.6
+          },
+          {
+            "mode": "headless",
+            "exit": 0,
+            "totalS": 2.3,
+            "presenceS": 1.5,
+            "ackS": 1.6
+          }
+        ],
+        "linked": 4
+      },
+      {
+        "workers": 4,
+        "opens": [
+          {
+            "mode": "headless",
+            "exit": 0,
+            "totalS": 2.2,
+            "presenceS": 1.3,
+            "ackS": 1.5
+          },
+          {
+            "mode": "headless",
+            "exit": 0,
+            "totalS": 2.2,
+            "presenceS": 1.3,
+            "ackS": 1.5
+          },
+          {
+            "mode": "headless",
+            "exit": 0,
+            "totalS": 2.2,
+            "presenceS": 1.3,
+            "ackS": 1.5
+          },
+          {
+            "mode": "headless",
+            "exit": 0,
+            "totalS": 2.2,
+            "presenceS": 1.3,
+            "ackS": 1.5
+          }
+        ],
+        "linked": 4
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "E13",
+    "hypothesis": "E13.t6.commands",
+    "chrome": "Google Chrome 156.0.8078.80",
+    "environment": "host",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "4 hand-installed workers, one root each, opened by open.sh headless; each worker is bound to the master, which opens the test page in it and activates the tab it reports; the master is a throwaway headed root of this run and stands in for the personal Default, no CDP client is on any worker",
+    "debugger": "none",
+    "observations": [
+      {
+        "boundWorkers": 4,
+        "replies": [
+          {
+            "name": "Worker 1",
+            "tab": "marker:02c2771fc9794d0383f5835c424707d9n1mw47no23",
+            "requests": [
+              "/start/02c2771fc9794d0383f5835c424707d9n1mw47no23",
+              "/marker/02c2771fc9794d0383f5835c424707d9n1mw47no23"
+            ],
+            "activate": "ok"
+          },
+          {
+            "name": "Worker 2",
+            "tab": "marker:622b1af7fd894721ac29b9523e045530n2mw47nqnf",
+            "requests": [
+              "/start/622b1af7fd894721ac29b9523e045530n2mw47nqnf",
+              "/marker/622b1af7fd894721ac29b9523e045530n2mw47nqnf"
+            ],
+            "activate": "ok"
+          },
+          {
+            "name": "Worker 3",
+            "tab": "marker:2a9fb41d599447fe8727b7132213a71dn3mw47nt1h",
+            "requests": [
+              "/start/2a9fb41d599447fe8727b7132213a71dn3mw47nt1h",
+              "/marker/2a9fb41d599447fe8727b7132213a71dn3mw47nt1h"
+            ],
+            "activate": "ok"
+          },
+          {
+            "name": "Worker 4",
+            "tab": "marker:b03d21b003844cf095cccf2123362049n4mw47nvfu",
+            "requests": [
+              "/start/b03d21b003844cf095cccf2123362049n4mw47nvfu",
+              "/marker/b03d21b003844cf095cccf2123362049n4mw47nvfu"
+            ],
+            "activate": "ok"
+          }
+        ]
+      },
+      {
+        "boundWorkers": 4,
+        "replies": [
+          {
+            "name": "Worker 1",
+            "tab": "marker:02c2771fc9794d0383f5835c424707d9n5mw47nxpr",
+            "requests": [
+              "/start/02c2771fc9794d0383f5835c424707d9n5mw47nxpr",
+              "/marker/02c2771fc9794d0383f5835c424707d9n5mw47nxpr"
+            ],
+            "activate": "ok"
+          },
+          {
+            "name": "Worker 2",
+            "tab": "marker:622b1af7fd894721ac29b9523e045530n6mw47nzwv",
+            "requests": [
+              "/start/622b1af7fd894721ac29b9523e045530n6mw47nzwv",
+              "/marker/622b1af7fd894721ac29b9523e045530n6mw47nzwv"
+            ],
+            "activate": "ok"
+          },
+          {
+            "name": "Worker 3",
+            "tab": "marker:2a9fb41d599447fe8727b7132213a71dn7mw47o2as",
+            "requests": [
+              "/start/2a9fb41d599447fe8727b7132213a71dn7mw47o2as",
+              "/marker/2a9fb41d599447fe8727b7132213a71dn7mw47o2as"
+            ],
+            "activate": "ok"
+          },
+          {
+            "name": "Worker 4",
+            "tab": "marker:b03d21b003844cf095cccf2123362049n8mw47o4in",
+            "requests": [
+              "/start/b03d21b003844cf095cccf2123362049n8mw47o4in",
+              "/marker/b03d21b003844cf095cccf2123362049n8mw47o4in"
+            ],
+            "activate": "ok"
+          }
+        ]
+      },
+      {
+        "boundWorkers": 4,
+        "replies": [
+          {
+            "name": "Worker 1",
+            "tab": "marker:02c2771fc9794d0383f5835c424707d9n9mw47o6zc",
+            "requests": [
+              "/start/02c2771fc9794d0383f5835c424707d9n9mw47o6zc",
+              "/marker/02c2771fc9794d0383f5835c424707d9n9mw47o6zc"
+            ],
+            "activate": "ok"
+          },
+          {
+            "name": "Worker 2",
+            "tab": "marker:622b1af7fd894721ac29b9523e045530namw47o96i",
+            "requests": [
+              "/start/622b1af7fd894721ac29b9523e045530namw47o96i",
+              "/marker/622b1af7fd894721ac29b9523e045530namw47o96i"
+            ],
+            "activate": "ok"
+          },
+          {
+            "name": "Worker 3",
+            "tab": "marker:2a9fb41d599447fe8727b7132213a71dnbmw47obks",
+            "requests": [
+              "/start/2a9fb41d599447fe8727b7132213a71dnbmw47obks",
+              "/marker/2a9fb41d599447fe8727b7132213a71dnbmw47obks"
+            ],
+            "activate": "ok"
+          },
+          {
+            "name": "Worker 4",
+            "tab": "marker:b03d21b003844cf095cccf2123362049ncmw47ods7",
+            "requests": [
+              "/start/b03d21b003844cf095cccf2123362049ncmw47ods7",
+              "/marker/b03d21b003844cf095cccf2123362049ncmw47ods7"
+            ],
+            "activate": "ok"
+          }
+        ]
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "E13",
+    "hypothesis": "E13.ops.navigation",
+    "chrome": "Google Chrome 156.0.8078.80",
+    "environment": "host",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "4 hand-installed workers, one root each, opened by open.sh headless; the master opens the start page, which navigates itself to the marker page; the master is a throwaway headed root of this run and stands in for the personal Default, no CDP client is on any worker",
+    "debugger": "none",
+    "observations": [
+      {
+        "navigated": [
+          {
+            "name": "Worker 1",
+            "marker": "02c2771fc9794d0383f5835c424707d9ndmw47og9l",
+            "requests": [
+              "/start/02c2771fc9794d0383f5835c424707d9ndmw47og9l",
+              "/marker/02c2771fc9794d0383f5835c424707d9ndmw47og9l"
+            ],
+            "url": "http://127.0.0.1:60476/marker/02c2771fc9794d0383f5835c424707d9ndmw47og9l"
+          },
+          {
+            "name": "Worker 2",
+            "marker": "622b1af7fd894721ac29b9523e045530nemw47oigs",
+            "requests": [
+              "/start/622b1af7fd894721ac29b9523e045530nemw47oigs",
+              "/marker/622b1af7fd894721ac29b9523e045530nemw47oigs"
+            ],
+            "url": "http://127.0.0.1:60476/marker/622b1af7fd894721ac29b9523e045530nemw47oigs"
+          },
+          {
+            "name": "Worker 3",
+            "marker": "2a9fb41d599447fe8727b7132213a71dnfmw47okuz",
+            "requests": [
+              "/start/2a9fb41d599447fe8727b7132213a71dnfmw47okuz",
+              "/marker/2a9fb41d599447fe8727b7132213a71dnfmw47okuz"
+            ],
+            "url": "http://127.0.0.1:60476/marker/2a9fb41d599447fe8727b7132213a71dnfmw47okuz"
+          },
+          {
+            "name": "Worker 4",
+            "marker": "b03d21b003844cf095cccf2123362049ngmw47on1y",
+            "requests": [
+              "/start/b03d21b003844cf095cccf2123362049ngmw47on1y",
+              "/marker/b03d21b003844cf095cccf2123362049ngmw47on1y"
+            ],
+            "url": "http://127.0.0.1:60476/marker/b03d21b003844cf095cccf2123362049ngmw47on1y"
+          }
+        ]
+      },
+      {
+        "navigated": [
+          {
+            "name": "Worker 1",
+            "marker": "02c2771fc9794d0383f5835c424707d9nhmw47opg6",
+            "requests": [
+              "/start/02c2771fc9794d0383f5835c424707d9nhmw47opg6",
+              "/marker/02c2771fc9794d0383f5835c424707d9nhmw47opg6"
+            ],
+            "url": "http://127.0.0.1:60476/marker/02c2771fc9794d0383f5835c424707d9nhmw47opg6"
+          },
+          {
+            "name": "Worker 2",
+            "marker": "622b1af7fd894721ac29b9523e045530nimw47orvg",
+            "requests": [
+              "/start/622b1af7fd894721ac29b9523e045530nimw47orvg",
+              "/marker/622b1af7fd894721ac29b9523e045530nimw47orvg"
+            ],
+            "url": "http://127.0.0.1:60476/marker/622b1af7fd894721ac29b9523e045530nimw47orvg"
+          },
+          {
+            "name": "Worker 3",
+            "marker": "2a9fb41d599447fe8727b7132213a71dnjmw47ou2t",
+            "requests": [
+              "/start/2a9fb41d599447fe8727b7132213a71dnjmw47ou2t",
+              "/marker/2a9fb41d599447fe8727b7132213a71dnjmw47ou2t"
+            ],
+            "url": "http://127.0.0.1:60476/marker/2a9fb41d599447fe8727b7132213a71dnjmw47ou2t"
+          },
+          {
+            "name": "Worker 4",
+            "marker": "b03d21b003844cf095cccf2123362049nkmw47owin",
+            "requests": [
+              "/start/b03d21b003844cf095cccf2123362049nkmw47owin",
+              "/marker/b03d21b003844cf095cccf2123362049nkmw47owin"
+            ],
+            "url": "http://127.0.0.1:60476/marker/b03d21b003844cf095cccf2123362049nkmw47owin"
+          }
+        ]
+      },
+      {
+        "navigated": [
+          {
+            "name": "Worker 1",
+            "marker": "02c2771fc9794d0383f5835c424707d9nlmw47oyph",
+            "requests": [
+              "/start/02c2771fc9794d0383f5835c424707d9nlmw47oyph",
+              "/marker/02c2771fc9794d0383f5835c424707d9nlmw47oyph"
+            ],
+            "url": "http://127.0.0.1:60476/marker/02c2771fc9794d0383f5835c424707d9nlmw47oyph"
+          },
+          {
+            "name": "Worker 2",
+            "marker": "622b1af7fd894721ac29b9523e045530nmmw47p13v",
+            "requests": [
+              "/start/622b1af7fd894721ac29b9523e045530nmmw47p13v",
+              "/marker/622b1af7fd894721ac29b9523e045530nmmw47p13v"
+            ],
+            "url": "http://127.0.0.1:60476/marker/622b1af7fd894721ac29b9523e045530nmmw47p13v"
+          },
+          {
+            "name": "Worker 3",
+            "marker": "2a9fb41d599447fe8727b7132213a71dnnmw47p3b8",
+            "requests": [
+              "/start/2a9fb41d599447fe8727b7132213a71dnnmw47p3b8",
+              "/marker/2a9fb41d599447fe8727b7132213a71dnnmw47p3b8"
+            ],
+            "url": "http://127.0.0.1:60476/marker/2a9fb41d599447fe8727b7132213a71dnnmw47p3b8"
+          },
+          {
+            "name": "Worker 4",
+            "marker": "b03d21b003844cf095cccf2123362049nomw47p5i7",
+            "requests": [
+              "/start/b03d21b003844cf095cccf2123362049nomw47p5i7",
+              "/marker/b03d21b003844cf095cccf2123362049nomw47p5i7"
+            ],
+            "url": "http://127.0.0.1:60476/marker/b03d21b003844cf095cccf2123362049nomw47p5i7"
+          }
+        ]
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "E13",
+    "hypothesis": "E13.t7.background",
+    "chrome": "Google Chrome 156.0.8078.80",
+    "environment": "host",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "4 hand-installed workers, one root each, opened by open.sh headless; the master has no page open; the master is a throwaway headed root of this run and stands in for the personal Default, no CDP client is on any worker",
+    "debugger": "none",
+    "observations": [
+      {
+        "masterPages": 1,
+        "linkedWithNoPage": 4,
+        "heldS": 10,
+        "dropS": 2.1,
+        "relinkAfterAckS": 0.6,
+        "relaunch": {
+          "mode": "headless",
+          "exit": 0,
+          "totalS": 1.2,
+          "presenceS": 0.8,
+          "ackS": 0.7
+        }
+      },
+      {
+        "masterPages": 1,
+        "linkedWithNoPage": 4,
+        "heldS": 10,
+        "dropS": 2.6,
+        "relinkAfterAckS": 1.6,
+        "relaunch": {
+          "mode": "headless",
+          "exit": 0,
+          "totalS": 1.2,
+          "presenceS": 0.8,
+          "ackS": 0.6
+        }
+      },
+      {
+        "masterPages": 1,
+        "linkedWithNoPage": 4,
+        "heldS": 10,
+        "dropS": 2.6,
+        "relinkAfterAckS": 0.8,
+        "relaunch": {
+          "mode": "headless",
+          "exit": 0,
+          "totalS": 1.2,
+          "presenceS": 0.8,
+          "ackS": 0.8
+        }
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "E13",
+    "hypothesis": "E13.focus",
+    "chrome": "Google Chrome 156.0.8078.80",
+    "environment": "host",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "4 hand-installed workers, one root each, opened by open.sh headless; the master is a throwaway headed root of this run and stands in for the personal Default, no CDP client is on any worker",
+    "debugger": "none",
+    "observations": [],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "unavailable",
+    "error": "not applicable: headless has no window to focus and no picture-in-picture surface",
+    "samples": 0
+  },
+  {
+    "experiment": "E13",
+    "hypothesis": "E13.pip",
+    "chrome": "Google Chrome 156.0.8078.80",
+    "environment": "host",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "4 hand-installed workers, one root each, opened by open.sh headless; the master is a throwaway headed root of this run and stands in for the personal Default, no CDP client is on any worker",
+    "debugger": "none",
+    "observations": [],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "unavailable",
+    "error": "not applicable: headless has no window to focus and no picture-in-picture surface",
+    "samples": 0
+  },
+  {
+    "experiment": "E13",
+    "hypothesis": "E13.t8.alternate",
+    "chrome": "Google Chrome 156.0.8078.80",
+    "environment": "host",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "one hand-installed worker root opened headed, headless, headed; the master is a throwaway headed root of this run and stands in for the personal Default, no CDP client is on any worker",
+    "debugger": "none",
+    "observations": [
+      {
+        "passes": [
+          {
+            "linked": true,
+            "cookieOnStart": "",
+            "fingerprint": "88:DE:8E:F2",
+            "mode": "headed",
+            "exit": 0,
+            "totalS": 1.2,
+            "presenceS": 0.8,
+            "ackS": 0.7
+          },
+          {
+            "linked": true,
+            "cookieOnStart": null,
+            "fingerprint": "88:DE:8E:F2",
+            "mode": "headless",
+            "exit": 0,
+            "totalS": 1.2,
+            "presenceS": 0.8,
+            "ackS": 0.8
+          },
+          {
+            "linked": true,
+            "cookieOnStart": "e13=dae9daaeccf0495981e2f8fc6414921c",
+            "fingerprint": "88:DE:8E:F2",
+            "mode": "headed",
+            "exit": 0,
+            "totalS": 1.2,
+            "presenceS": 0.8,
+            "ackS": 0.6
+          }
+        ]
+      },
+      {
+        "passes": [
+          {
+            "linked": true,
+            "cookieOnStart": "e13=dae9daaeccf0495981e2f8fc6414921c",
+            "fingerprint": "88:DE:8E:F2",
+            "mode": "headed",
+            "exit": 0,
+            "totalS": 1.2,
+            "presenceS": 0.8,
+            "ackS": 0.6
+          },
+          {
+            "linked": true,
+            "cookieOnStart": null,
+            "fingerprint": "88:DE:8E:F2",
+            "mode": "headless",
+            "exit": 0,
+            "totalS": 1.2,
+            "presenceS": 0.8,
+            "ackS": 0.6
+          },
+          {
+            "linked": true,
+            "cookieOnStart": "e13=dae9daaeccf0495981e2f8fc6414921c",
+            "fingerprint": "88:DE:8E:F2",
+            "mode": "headed",
+            "exit": 0,
+            "totalS": 1.2,
+            "presenceS": 0.8,
+            "ackS": 0.6
+          }
+        ]
+      },
+      {
+        "passes": [
+          {
+            "linked": true,
+            "cookieOnStart": "e13=dae9daaeccf0495981e2f8fc6414921c",
+            "fingerprint": "88:DE:8E:F2",
+            "mode": "headed",
+            "exit": 0,
+            "totalS": 1.2,
+            "presenceS": 0.8,
+            "ackS": 0.6
+          },
+          {
+            "linked": true,
+            "cookieOnStart": null,
+            "fingerprint": "88:DE:8E:F2",
+            "mode": "headless",
+            "exit": 0,
+            "totalS": 1.2,
+            "presenceS": 0.8,
+            "ackS": 0.6
+          },
+          {
+            "linked": true,
+            "cookieOnStart": "e13=dae9daaeccf0495981e2f8fc6414921c",
+            "fingerprint": "88:DE:8E:F2",
+            "mode": "headed",
+            "exit": 0,
+            "totalS": 1.2,
+            "presenceS": 0.8,
+            "ackS": 0.6
+          }
+        ]
+      }
+    ],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "pass",
+    "samples": 3
+  },
+  {
+    "experiment": "E13",
+    "hypothesis": "E13.t9.clones",
+    "chrome": "Google Chrome 156.0.8078.80",
+    "environment": "host",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "clones of the frozen base opened by clone-open.sh headless; the master is a throwaway headed root of this run and stands in for the personal Default, no CDP client is on any worker",
+    "debugger": "none",
+    "observations": [],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "unavailable",
+    "error": "not run on the host: the clone cells need a master this run can attach to, and the owner's personal Default is never launched or read; the lab verdicts and the P5.5 host twin cover clones",
+    "samples": 0
+  },
+  {
+    "experiment": "E13",
+    "hypothesis": "E13.ops.tabs",
+    "chrome": "Google Chrome 156.0.8078.80",
+    "environment": "host",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "clones of the frozen base opened by clone-open.sh headless; the master is a throwaway headed root of this run and stands in for the personal Default, no CDP client is on any worker",
+    "debugger": "none",
+    "observations": [],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "unavailable",
+    "error": "not run on the host: the clone cells need a master this run can attach to, and the owner's personal Default is never launched or read; the lab verdicts and the P5.5 host twin cover clones",
+    "samples": 0
+  },
+  {
+    "experiment": "E13",
+    "hypothesis": "E13.ops.marker",
+    "chrome": "Google Chrome 156.0.8078.80",
+    "environment": "host",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "clones of the frozen base opened by clone-open.sh headless; the master is a throwaway headed root of this run and stands in for the personal Default, no CDP client is on any worker",
+    "debugger": "none",
+    "observations": [],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "unavailable",
+    "error": "not run on the host: the clone cells need a master this run can attach to, and the owner's personal Default is never launched or read; the lab verdicts and the P5.5 host twin cover clones",
+    "samples": 0
+  },
+  {
+    "experiment": "E13",
+    "hypothesis": "E13.t9.commands",
+    "chrome": "Google Chrome 156.0.8078.80",
+    "environment": "host",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "clones of the frozen base opened by clone-open.sh headless; the master is a throwaway headed root of this run and stands in for the personal Default, no CDP client is on any worker",
+    "debugger": "none",
+    "observations": [],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "unavailable",
+    "error": "not run on the host: the clone cells need a master this run can attach to, and the owner's personal Default is never launched or read; the lab verdicts and the P5.5 host twin cover clones",
+    "samples": 0
+  },
+  {
+    "experiment": "E13",
+    "hypothesis": "E13.t9.exclusive",
+    "chrome": "Google Chrome 156.0.8078.80",
+    "environment": "host",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "clones of the frozen base opened by clone-open.sh headless; the master is a throwaway headed root of this run and stands in for the personal Default, no CDP client is on any worker",
+    "debugger": "none",
+    "observations": [],
+    "gestures": 0,
+    "steps": [],
+    "verdict": "unavailable",
+    "error": "not run on the host: the clone cells need a master this run can attach to, and the owner's personal Default is never launched or read; the lab verdicts and the P5.5 host twin cover clones",
+    "samples": 0
+  },
+  {
+    "experiment": "E13",
+    "hypothesis": "E13.diag.bootstrapTab",
+    "chrome": "Google Chrome 156.0.8078.80",
+    "environment": "host",
+    "install": "loadUnpacked",
+    "label": "diagnostic",
+    "externalClient": true,
+    "variant": "poc-d0",
+    "topology": "a hand-installed worker with a debugging port; the master is a throwaway headed root of this run and stands in for the personal Default, no CDP client is on any worker",
+    "debugger": "none",
+    "verdict": "unavailable",
+    "error": "not run on the host: the diagnostic attaches Playwright to a headless worker through a debugging port, which the owner's host runs never open on a worker",
+    "samples": 0,
+    "gestures": 0,
+    "steps": [],
+    "observations": []
+  }
+]

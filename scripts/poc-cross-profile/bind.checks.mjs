@@ -3,7 +3,17 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node
 import { join } from "node:path";
 import { test } from "node:test";
 import { NAMESPACE, shells } from "./lab.mjs";
-import { BOB, EX_NO_ACK, EX_REFUSED, OTHER_TOKEN, UUID, lines, open, scene } from "./open-lab.mjs";
+import {
+  BOB,
+  EX_BOOTSTRAP_FAILED,
+  EX_NO_ACK,
+  EX_REFUSED,
+  OTHER_TOKEN,
+  UUID,
+  lines,
+  open,
+  scene,
+} from "./open-lab.mjs";
 
 /** `open.sh bind <root> Default <namespace> [mode]` for the scene's root. */
 const bindArgs = (root, ...rest) => ["bind", root, "Default", NAMESPACE, ...rest];
@@ -21,6 +31,14 @@ for (const shell of shells) {
     assert.equal(boot, `boot=${(token ?? "").slice(6)}`);
     assert.match(result.err, /pid=\d+/);
     assert.ok(existsSync(argv));
+  });
+
+  await test(`${shell}: bind exits 71 and logs the step when the ack names a failure`, (context) => {
+    const { root, env } = scene(context);
+    const result = open(shell, bindArgs(root), env({ STUB_SHAPE: "failure", STUB_STEP: "ack" }));
+    assert.equal(result.code, EX_BOOTSTRAP_FAILED, result.err);
+    assert.equal(result.out, "");
+    assert.match(result.err, /bootstrap failed at ack: /);
   });
 
   await test(`${shell}: bind refuses a free argument and never runs Chrome`, (context) => {

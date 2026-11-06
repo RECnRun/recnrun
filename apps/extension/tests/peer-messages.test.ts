@@ -23,6 +23,12 @@ test("accepts the page requests and rejects malformed ones", () => {
   expect(accepts(PeerRequestSchema, { type: "rename", displayName: "  " })).toBe(false);
   expect(accepts(PeerRequestSchema, { type: "create-offer" })).toBe(false);
   expect(accepts(PeerRequestSchema, { type: "activate", peer: PEER, tabId: -1 })).toBe(false);
+  const url = "https://shop.test/";
+  expect(accepts(PeerRequestSchema, { type: "open-tab", peer: PEER, url })).toBe(true);
+  // Only web pages; the executor would refuse the rest, and the page never asks.
+  for (const bad of ["chrome://settings/", "javascript:alert(1)", "chrome-extension://x/a.html"]) {
+    expect(accepts(PeerRequestSchema, { type: "open-tab", peer: PEER, url: bad })).toBe(false);
+  }
   // Each request about one peer names it.
   expect(accepts(PeerRequestSchema, { type: "activate", tabId: 2 })).toBe(false);
   expect(accepts(PeerRequestSchema, { type: "disconnect" })).toBe(false);

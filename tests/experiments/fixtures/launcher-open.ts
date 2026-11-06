@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 import { connectWebSocket, openPage } from "../../browser/fixtures/cdp-client.ts";
+import { interruptChrome } from "../../browser/fixtures/chrome-quit.ts";
 import { attachExtension } from "../../browser/fixtures/extension-loaders.ts";
 import type { LoadedExtension } from "../../browser/fixtures/extension-loaders.ts";
 import { recordHypothesis } from "../outcome.ts";
@@ -116,13 +117,21 @@ async function turnOnDeveloperMode({ chrome }: LoadedExtension): Promise<void> {
 /** Waits for the first presence, reloads the build so Chrome keeps it, writes the record; returns the scene. */
 export async function registerIn(
   extension: LoadedExtension,
-  { root, downloads, record, profileDirectory }: Omit<Scene, "profileId">,
+  {
+    root,
+    downloads,
+    record,
+    profileDirectory,
+    prepare,
+  }: Omit<Scene, "profileId"> & { prepare?: (extension: LoadedExtension) => Promise<void> },
 ): Promise<Scene> {
   // connectOverCDP routes every download to Playwright's own folder; Chrome's must take the writes.
   await extension.chrome.cdp.send("Browser.setDownloadBehavior", { behavior: "default" });
   const profileId = await profileIdOf(extension);
   await until(() => readFile(presenceFile(downloads, profileId)), "the first presence", 30_000);
   await turnOnDeveloperMode(extension);
+  // The reload below closes the session, and the storage written here survives it.
+  await prepare?.(extension);
   // The reload drops the CDP install flag that makes Chrome delete the extension at its next start.
   await extension.evaluateInBackground("chrome.runtime.reload()").catch(() => undefined);
   await until(
@@ -166,9 +175,12 @@ export function parseOpened(stdout: string, stderr: string) {
 }
 
 /** One `open.sh open`, run without a shell string; a non-zero exit is a result, not a throw. */
-export function runOpen({ scene, env }: Pick<Rig, "scene" | "env">): Promise<Opened> {
+export function runOpen(
+  { scene, env }: Pick<Rig, "scene" | "env">,
+  mode?: "headed" | "headless",
+): Promise<Opened> {
   const started = Date.now();
-  const args = [OPEN, "open", scene.record, NAMESPACE, scene.profileId];
+  const args = [OPEN, "open", scene.record, NAMESPACE, scene.profileId, ...(mode ? [mode] : [])];
   const options = { env: { ...env, RECNRUN_OPEN_TIMEOUT_S: String(OPEN_TIMEOUT_S) } };
   return new Promise((resolve) => {
     execFile("sh", args, { ...options, encoding: "utf8" }, (error, stdout, stderr) => {
@@ -256,19 +268,9 @@ async function measure(rig: Rig, again: boolean, pids: number[]): Promise<Sample
   return { ok: problems.length === 0, ...error, observation };
 }
 
-/** SIGTERM to the pids open.sh printed, then waits until nothing of the root runs. */
+/** SIGINT to the pids open.sh printed (0 when it printed none), then until nothing of the root runs. */
 export async function quit(rig: Pick<Rig, "survivors">, pids: number[]): Promise<void> {
-  for (const pid of pids) {
-    // pid 0 means open.sh printed none, and kill(0) would signal the whole process group.
-    if (pid <= 0) continue;
-    try {
-      process.kill(pid, "SIGTERM");
-    } catch {
-      // Already gone: the second open's process hands over to the first and exits.
-    }
-  }
-  const gone = async () => ((await rig.survivors()).length === 0 ? true : undefined);
-  await until(gone, "Chrome of the root left", QUIT_MS);
+  await interruptChrome(pids, () => rig.survivors(), QUIT_MS);
 }
 
 /** One sample: prepare a rig, measure, stop only the Chrome open.sh spawned, and leave nothing behind. */
