@@ -17,7 +17,7 @@ import { promisify } from "node:util";
 export const HOST = "recnrun.test";
 const POLICY_DIRECTORY = "/etc/opt/chrome/policies/managed";
 const POLICY_FILE = join(POLICY_DIRECTORY, "recnrun-lab-ca.json");
-const SITE = fileURLToPath(new URL("site/", import.meta.url));
+export const SITE = fileURLToPath(new URL("site/", import.meta.url));
 const TYPES: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
@@ -29,6 +29,8 @@ const run = promisify(execFile);
 export interface StandIn {
   origin: string;
   port: number;
+  /** Serves another site folder from now on, as a deploy of the same origin would. */
+  serve(directory: string): void;
   close(): Promise<void>;
 }
 
@@ -114,6 +116,7 @@ export async function startStandIn(): Promise<StandIn> {
   await writeFile(POLICY_FILE, JSON.stringify({ CACertificates: [caDer.toString("base64")] }), {
     flag: "wx",
   });
+  let site = SITE;
   const server = createServer({ key, cert }, (request, response) => {
     const name = request.url === "/" ? "index.html" : (request.url ?? "").slice(1);
     const type = TYPES[extname(name)];
@@ -121,7 +124,7 @@ export async function startStandIn(): Promise<StandIn> {
       response.writeHead(404).end();
       return;
     }
-    void readFile(join(SITE, name)).then(
+    void readFile(join(site, name)).then(
       (body) => response.writeHead(200, { "content-type": type }).end(body),
       () => response.writeHead(404).end(),
     );
@@ -133,5 +136,8 @@ export async function startStandIn(): Promise<StandIn> {
     await rm(POLICY_FILE, { force: true });
     await rm(directory, { recursive: true, force: true });
   };
-  return { origin: `https://${HOST}:${port}`, port, close };
+  const serve = (directory: string) => {
+    site = directory;
+  };
+  return { origin: `https://${HOST}:${port}`, port, serve, close };
 }

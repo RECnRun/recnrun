@@ -34,7 +34,7 @@ interface Fsa {
 
 /** The page's lab API; cast inside `evaluate`, since W.rtc types `window.lab` its own way. */
 export interface FsaWindow {
-  lab: { fsa: Fsa; masterKey(): Promise<JsonWebKey> };
+  lab: { fsa: Fsa; masterKey(): Promise<JsonWebKey | null>; pair(): Promise<JsonWebKey> };
 }
 
 export interface Step {
@@ -109,11 +109,15 @@ export async function openPage(master: LaunchedChrome, origin: string): Promise<
   return page;
 }
 
+/** The owner's explicit pairing: the only path that makes the page's master key. */
+export const pair = (page: Page): Promise<JsonWebKey> =>
+  page.evaluate(() => (window as unknown as FsaWindow).lab.pair());
+
 /** The RFC 7638 thumbprint of the page's identity key (the master key of jobs.js). */
 export async function thumbprint(page: Page): Promise<string> {
-  const { crv, kty, x, y } = await page.evaluate(() =>
-    (window as unknown as FsaWindow).lab.masterKey(),
-  );
+  const key = await page.evaluate(() => (window as unknown as FsaWindow).lab.masterKey());
+  if (!key) throw new Error("The page holds no master key.");
+  const { crv, kty, x, y } = key;
   const canonical = JSON.stringify({ crv, kty, x, y });
   return createHash("sha256").update(canonical).digest("base64url");
 }

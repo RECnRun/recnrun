@@ -2,11 +2,11 @@
 import { createFsa } from "./fsa.js";
 import { createJobs } from "./jobs.js";
 
-const links = new Map();
+export const links = new Map();
 const fingerprintOf = (sdp) => /^a=fingerprint:sha-256 (\S+)/im.exec(sdp)?.[1]?.toUpperCase() ?? "";
 const fromBase64 = (text) => Uint8Array.from(atob(text), (c) => c.charCodeAt(0));
 
-const nextMessage = (channel, type) =>
+export const nextMessage = (channel, type) =>
   new Promise((resolve) => {
     const listener = ({ data }) => {
       const message = JSON.parse(data);

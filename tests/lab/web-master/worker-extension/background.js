@@ -45,6 +45,7 @@ globalThis.lab = {
   identity: () => ask({ type: "identity" }),
   answer: (offer) => ask({ type: "answer", offer }),
   ready: () => recovered,
+  provisioned: provision,
   provision: (value) => chrome.storage.local.set({ provision: value }).then(() => true),
   setKnob: (knob) => setKnob(knob).then(() => true),
   state: () => ({ reached: labState.reached, linkClosedAt: labState.linkClosedAt }),

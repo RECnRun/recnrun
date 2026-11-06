@@ -123,7 +123,7 @@ test.beforeAll(async () => {
   const { root, id } = await provisionWorker();
   const worker = await startWorker(root, id);
   shared = { site, target, master, root, id, worker, jobIds: [], evidence: {} };
-  const masterKey = await call<JsonWebKey>(await openMaster(shared), "masterKey");
+  const masterKey = await call<JsonWebKey>(await openMaster(shared), "pair");
   const provision = { masterKey, allowlist: [target.origin] };
   await background(worker, `lab.provision(${JSON.stringify(provision)})`);
   shared.evidence.chrome = master.version;

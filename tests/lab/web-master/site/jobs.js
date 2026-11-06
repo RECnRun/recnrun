@@ -3,7 +3,7 @@ const JOURNAL = "recnrun-lab-journal";
 const TERMINAL = new Set(["DONE", "FAILED", "INTERRUPTED"]);
 const toBase64 = (buffer) => btoa(String.fromCharCode(...new Uint8Array(buffer)));
 
-const canonical = (value) => {
+export const canonical = (value) => {
   if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
   if (value && typeof value === "object") {
     const keys = Object.keys(value).sort();
@@ -24,21 +24,35 @@ const keyStore = async (mode) => {
   return (await request(open)).transaction("keys", mode).objectStore("keys");
 };
 
-const masterPair = async () => {
-  const stored = await request((await keyStore("readonly")).get("master"));
-  if (stored) return stored;
-  const algorithm = { name: "ECDSA", namedCurve: "P-256" };
-  const pair = await crypto.subtle.generateKey(algorithm, false, ["sign", "verify"]);
-  await request((await keyStore("readwrite")).put(pair, "master"));
-  return pair;
+const storedPair = async () => request((await keyStore("readonly")).get("master"));
+
+const showIdentity = (paired) => {
+  document.getElementById("identity").textContent = paired ? "paired" : "Pair again";
+  document.getElementById("pair").hidden = paired;
 };
 
-const masterKey = async () => crypto.subtle.exportKey("jwk", (await masterPair()).publicKey);
+// Only the owner's explicit pairing makes a key; a page that lost it never makes one by itself.
+const pair = async () => {
+  const stored = await storedPair();
+  const algorithm = { name: "ECDSA", namedCurve: "P-256" };
+  const made = stored ?? (await crypto.subtle.generateKey(algorithm, false, ["sign", "verify"]));
+  if (!stored) await request((await keyStore("readwrite")).put(made, "master"));
+  showIdentity(true);
+  return crypto.subtle.exportKey("jwk", made.publicKey);
+};
+
+const masterKey = async () => {
+  const stored = await storedPair();
+  showIdentity(Boolean(stored));
+  return stored ? crypto.subtle.exportKey("jwk", stored.publicKey) : null;
+};
 
 const sign = async (fields) => {
   const data = new TextEncoder().encode(canonical(fields));
   const ecdsa = { name: "ECDSA", hash: "SHA-256" };
-  const signature = await crypto.subtle.sign(ecdsa, (await masterPair()).privateKey, data);
+  const stored = await storedPair();
+  if (!stored) throw new Error("PAIR_AGAIN");
+  const signature = await crypto.subtle.sign(ecdsa, stored.privateKey, data);
   return { ...fields, signature: toBase64(signature) };
 };
 
@@ -89,5 +103,7 @@ export const createJobs = ({ links, nextMessage }) => {
     return jobs;
   };
   render(readJournal());
-  return { masterKey, submit, reconcile, journal: readJournal, sent: () => sent };
+  void masterKey();
+  document.getElementById("pair").addEventListener("click", () => void pair());
+  return { pair, masterKey, submit, reconcile, journal: readJournal, sent: () => sent };
 };

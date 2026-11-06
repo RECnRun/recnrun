@@ -15,6 +15,7 @@ import {
   launchMaster,
   onboard,
   openPage,
+  pair,
   waitReady,
   restoredAt,
   thumbprint,
@@ -102,6 +103,7 @@ test("W.fsa tab: the folder grant survives a page close and two Chrome restarts"
   const cell = await prepare("tab", native, testInfo);
   try {
     let page = await openPage(await restart(cell), cell.site.origin);
+    await pair(page);
     const identity = await thumbprint(page);
     await onboard(page, native, cell.folder, cell.log);
     const results = [await step(cell, page, "onboarding", false)];
@@ -149,6 +151,7 @@ test("W.fsa app: the installed app keeps the folder grant across two Chrome rest
   try {
     const master = await restart(cell);
     const tab = await openPage(master, cell.site.origin);
+    await pair(tab);
     const identity = await thumbprint(tab);
     await install(master, cell.site.origin);
     cell.log.gesture("install", "omnibox install icon, then Install (CDP PWA.install here)");

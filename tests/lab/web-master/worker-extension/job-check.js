@@ -11,6 +11,11 @@ const MAX_OPS = 32;
 const MAX_OP_MS = 30_000;
 const MAX_JOB_MS = 600_000;
 const MAX_JOB_BYTES = 65_536;
+const MAX_SELECTOR = 512;
+const MAX_TEXT = 4096;
+const MAX_READ_BYTES = 16_384;
+const STATES = ["attached", "visible", "text"];
+const WHAT = ["text", "value"];
 
 export const canonical = (value) => {
   if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
@@ -39,10 +44,25 @@ const urlError = (url, origins) => {
   return origins.includes(originOf(url)) ? null : "FORBIDDEN_ORIGIN";
 };
 
+const boundedString = (value, max) => typeof value === "string" && value.length <= max;
+const inRange = (value, max) => Number.isInteger(value) && value > 0 && value <= max;
+
+// Every argument has a cap of plan §6; one missing here lets a master exceed it.
+const ARG_VALID = {
+  selector: (value) => boundedString(value, MAX_SELECTOR) && value.length > 0,
+  text: (value) => boundedString(value, MAX_TEXT),
+  maxBytes: (value) => inRange(value, MAX_READ_BYTES),
+  state: (value) => STATES.includes(value),
+  what: (value) => WHAT.includes(value),
+  url: () => true,
+};
+
+const argsValid = (args) => Object.entries(args).every(([key, value]) => ARG_VALID[key](value));
+
 const opError = (entry, origins) => {
   if (!hasKeys(entry, ["args", "op", "timeoutMs"])) return "INVALID_COMMAND";
   const keys = Object.hasOwn(ARGS, entry.op) ? ARGS[entry.op] : null;
-  if (!keys || !hasKeys(entry.args, keys)) return "INVALID_COMMAND";
+  if (!keys || !hasKeys(entry.args, keys) || !argsValid(entry.args)) return "INVALID_COMMAND";
   const timeout = entry.timeoutMs;
   if (!Number.isInteger(timeout) || timeout <= 0 || timeout > MAX_OP_MS) return "INVALID_COMMAND";
   return entry.op === "navigate" ? urlError(entry.args.url, origins) : null;
@@ -84,7 +104,8 @@ export const checkJob = async (job, { masterKey, allowlist }) => {
     null;
   if (error) return error;
   if (Date.now() > job.deadlineAt + 5_000) return "EXPIRED";
-  return (await signatureValid(job, masterKey)) ? null : "BAD_SIGNATURE";
+  // The pinned key is the only one the worker knows: any other signer is an unpinned master.
+  return (await signatureValid(job, masterKey)) ? null : "UNPINNED_MASTER";
 };
 
 export const digestOf = async (job) => {
