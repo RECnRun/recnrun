@@ -76,6 +76,15 @@ $(ps -axo pid=,command= 2>/dev/null)
 MAIN_PIDS
   [ -n "$mp_self" ] && printf '%s\n' "$mp_self"
 }
+# headless when the process $1 runs with --headless (open.sh's own test), headed when it runs without, empty when unknown.
+mode_of_pid() {
+  mo_cmd=$(ps -o command= -p "$1" 2>/dev/null) || return 0
+  case $mo_cmd in
+    '') ;;
+    *" --headless"*) printf 'headless\n' ;;
+    *) printf 'headed\n' ;;
+  esac
+}
 lc_random() { od -An -N8 -tx1 /dev/urandom | tr -d ' \n'; }
 setting() {
   s_value=${1:-$2}
@@ -157,7 +166,7 @@ state_dir() {
 }
 
 state_defaults() {
-  st_token='' st_pid='' st_started=0 st_attempts=0 st_next=0 st_status=none st_boot='' st_root='' st_user='' st_shared=0
+  st_token='' st_pid='' st_started=0 st_attempts=0 st_next=0 st_status=none st_boot='' st_root='' st_user='' st_shared=0 st_mode=''
 }
 state_bad() { die 65 "state file $st_file: invalid $1"; }
 # Each key has its own grammar; a free value is refused before the shell uses it.
@@ -173,6 +182,7 @@ state_set() {
     root) [ -z "$2" ] || is_directory "$2" || state_bad "$1"; st_root=$2 ;;
     userDataDir) [ -z "$2" ] || is_directory "$2" || state_bad "$1"; st_user=$2 ;;
     shared) case $2 in 0 | 1) st_shared=$2 ;; *) state_bad "$1" ;; esac ;;
+    mode) case $2 in '' | headed | headless) st_mode=$2 ;; *) state_bad "$1" ;; esac ;;
     *) state_bad key ;;
   esac
 }
@@ -194,8 +204,8 @@ write_state() {
   ws_tmp=$st_file.$(lc_random).tmp
   (
     set -C
-    printf 'token=%s\npid=%s\nstartedAt=%s\nattempts=%s\nnextAt=%s\nstatus=%s\nboot=%s\nroot=%s\nuserDataDir=%s\nshared=%s\n' \
-      "$st_token" "$st_pid" "$st_started" "$st_attempts" "$st_next" "$st_status" "$st_boot" "$st_root" "$st_user" "$st_shared" >"$ws_tmp"
+    printf 'token=%s\npid=%s\nstartedAt=%s\nattempts=%s\nnextAt=%s\nstatus=%s\nboot=%s\nroot=%s\nuserDataDir=%s\nshared=%s\nmode=%s\n' \
+      "$st_token" "$st_pid" "$st_started" "$st_attempts" "$st_next" "$st_status" "$st_boot" "$st_root" "$st_user" "$st_shared" "$st_mode" >"$ws_tmp"
   ) || die 73 'cannot write the state'
   mv -f -- "$ws_tmp" "$st_file" || die 73 'cannot replace the state'
 }

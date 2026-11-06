@@ -105,6 +105,7 @@ launch() {
   state_set startedAt "$lc_now"
   state_set pid ''
   state_set userDataDir "$p_user"
+  state_set mode "$lc_mode"
   lc_attempt=$lc_now
   write_state
   release_lock "$lc_lock" "$$"

@@ -19,7 +19,8 @@
 #   status <state-dir>                      profileId status pid attempts nextAt, one line each
 #
 # State, <state-dir>/profiles/<profileId>: key=value lines with token, pid, startedAt, attempts,
-# nextAt (epoch seconds), status (idle, opening, open, failed, paused, stopped), boot, root (the
+# nextAt (epoch seconds), status (idle, opening, open, failed, paused, stopped), mode (headed or headless: the
+# mode of the last open, which a crash relaunch repeats; empty before any), boot, root (the
 # Downloads root), userDataDir, shared (1 when another record block names the same userDataDir or the folder holds another profile: Default or Profile <n> with a Preferences file); any other key or value outside its grammar exits 65. Numbers are canonical decimal (no leading zero, a pid above zero, attempts at most the maximum). userDataDir and
 # pid are written when the attempt starts and the Chrome launches, so a timed-out open (69) keeps both
 # and stop can still end that Chrome.
@@ -92,6 +93,7 @@ adopt_profile() {
   case $st_status in paused | stopped) die 73 "$lc_id is $st_status: resume it first" ;; esac
   st_pid=''
   state_set pid "$(main_pid_of "$p_user" || :)"
+  state_set mode "$(mode_of_pid "$st_pid")"
   state_set status open
   state_set startedAt "$(date +%s)"
   state_set attempts 0

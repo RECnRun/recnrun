@@ -5,7 +5,7 @@
 # nothing read from a file is ever run or expanded; positional arguments and enumerated flags only.
 #
 #   start <state-dir> <record> <namespace> [--once]
-#       takes the launcher lock, then every RECNRUN_LAUNCHER_INTERVAL_S (10) requests, headed, each
+#       takes the launcher lock, then every RECNRUN_LAUNCHER_INTERVAL_S (10) requests, in the mode of its last open (headed when none), each
 #       profile the record registers in the namespace (lifecycle.sh request). It opens no other
 #       profile and leaves a paused or stopped one alone until lifecycle.sh resume (the owner's stop
 #       is never undone by the next pass). Exits 73, 75, 69, 71, and 70 of a request are logged, not
@@ -115,9 +115,18 @@ cleanup() {
   if [ "$cu_named" = "$$" ]; then rm -f -- "$la_state/launcher.pid"; fi
 }
 run_lifecycle() { /bin/sh "$la_dir/lifecycle.sh" "$@"; }
+# The mode the profile $2 of state dir $1 was last opened in; headed when none is recorded or the state is unreadable
+# (lifecycle.sh request then refuses a bad state itself).
+recorded_mode() {
+  rm_mode=$(
+    read_state "$1/profiles/$2" 2>/dev/null
+    printf '%s' "$st_mode"
+  )
+  printf '%s\n' "${rm_mode:-headed}"
+}
 # One lifecycle.sh request, in the background so a SIGTERM ends the wait at once.
 request_profile() {
-  run_lifecycle request "$1" "$2" "$3" "$4" headed &
+  run_lifecycle request "$1" "$2" "$3" "$4" "$(recorded_mode "$1" "$4")" &
   la_child=$!
   wait "$la_child"
   rq_code=$?

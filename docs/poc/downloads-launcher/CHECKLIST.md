@@ -493,6 +493,15 @@ Gate P7: verify · E13 · review [reviews/P7.md](reviews/P7.md) (Codex `gpt-6.1-
 - fix: nothing made the Default the master. `first-run.sh` now binds the Default of the OS default user data root with `open.sh bind … headed master` (`#token=<uuid>&role=master`), the bootstrap page sends `master: true` in its ack message, the worker calls `roles.becomeMaster` (`claimMaster`) before it writes the ack, and `master-role.sh` writes `role=master` into the record atomically only after that ack (a registered block with no role included; never a second master; a failed claim exits 70 and is asked again). Red: `node --test scripts/poc-cross-profile/first-run-master.checks.mjs` 6 failed of 10 (`sh`, `dash`: no role written, no master open); `cd apps/extension && npx vitest run tests/launcher-requests.test.ts` 9 failed (`claimMaster` missing). Green: the same commands 10 passed and 73 passed; `npx vitest run tests/bootstrap.test.ts tests/poc-bootstrap.test.ts` passed (a negative control that skips `claimMaster` failed 2 tests, then was reverted); `node --test scripts/poc-cross-profile/*.checks.mjs` 671 passed. Not exercised: real Chrome and the Docker browser cells.
 - fix: no single install command. `sh recnrun-launcher install` is `first-run.sh --autostart`: the smaller change, since first-run already holds the state dir, record, namespace, and the open/master verdicts, so autostart runs only after every profile is open and the Default is master (exit 70 otherwise, or when `autostart on` fails; 0 on success). Every check uses the fixture HOME with a recording `launchctl` first on PATH; `autostart on` never ran against the real HOME. Red: `node --test scripts/poc-cross-profile/first-run-install.checks.mjs` 12 failed of 14 (`first-run.sh: usage: first-run.sh [<state-dir> <record> <namespace>]`). Green: same command 14 passed; `node --test scripts/poc-cross-profile/*.checks.mjs` 685 passed.
 
+## Dashboard control of clones
+
+Plan: [PLAN.md](PLAN.md). The master's dashboard opens, closes, and reopens the worker clones, and opens a tab in a linked one.
+
+- [i] P7.5.0 A clone reopens in the mode of its last open: a crashed headless clone relaunches headless
+  - red: `node --test scripts/poc-cross-profile/lifecycle-mode.checks.mjs` 0 passed, 6 failed on `sh` and `dash` (`expected: 'headless'` for the recorded mode, `expected: 'headed'`, and a state with `mode=sideways` exited 0 instead of 65 because the key did not exist)
+  - green: the same file 8 passed (the adopt case added); `node --test scripts/poc-cross-profile/{lifecycle,lifecycle-signal,commands,shellcheck,package}.checks.mjs scripts/check-docs.checks.mjs` pass; `vp check` clean
+  - commit: the commit with subject "Reopen a crashed clone in the mode of its last open"
+
 ## P8: With and without `chrome.debugger`
 
 - [ ] P8.1 D2 operation
