@@ -544,6 +544,14 @@ Plan: [PLAN.md](PLAN.md#dashboard-control-of-clones-p75p78). The master's dashbo
   - red: `node --test scripts/poc-cross-profile/lifecycle-control.checks.mjs --test-name-pattern="goes A, B, A"` failed on `sh` and `dash` (Chrome started on the second root: `Chrome was started on a root other than the one checked`, `.../Chrome-b`) because `start_chrome` built the arguments before `before_spawn` read the record again
   - green: the same command passes; `open.sh` builds the arguments after `before_spawn`; the "record changed after" check now asserts exit 65 and no leftover lock; `lifecycle-control.checks.mjs` 38 passed
   - commit: `943eabca`
+- [i] P7 bases folder: a blank "Bases folder" means `$HOME/RECnRun/bases`, created by the launcher below the home
+  - red: `node --test scripts/poc-cross-profile/provision-request.checks.mjs` failed on the blank and missing-folder cases (the old code refused a blank `basesDir` and never created the folder); `apps/extension/tests/prepare-schema.test.ts` failed on `basesDir: ""`
+  - green: the same commands pass; test:scripts and test:unit green
+  - commit: `ed4a0cdb`
+- [i] P7 no TCC reads: the launcher never reads Chrome's own user-data root; the Default is known by convention and proven by the token ack (`--downloads` for a Downloads root other than `~/Downloads`)
+  - red: `node --test scripts/poc-cross-profile/first-run-default.checks.mjs` against the old scripts exited 66 on a fixture HOME with an unreadable default root
+  - green: `RECNRUN_TEST_QUIET=1 vp run test:scripts` 809 passed; `RECNRUN_EXPERIMENT_SAMPLES=smoke RECNRUN_TEST_QUIET=1 vp run test:browser -- tests/browser/launcher-first-run-shared.spec.ts tests/browser/onboarding.spec.ts` 3 passed; the host twin `tests/host/launcher-first-run.spec.ts` was not run (host Chrome)
+  - commit: `b2a38e51`
 
 - [ ] P7.8 Manual check M-P7.a from the dashboard alone, Reopen included (owner)
 
