@@ -13,6 +13,7 @@ import {
 } from "@/background/launcher-requests";
 import type { AckDependencies, FailureDependencies } from "@/background/launcher-requests";
 import { closeOffscreen, offscreenFingerprint } from "@/background/link";
+import { createCloneControlListener } from "@/background/poc-clone-control";
 import { createPrepareListener } from "@/background/poc-prepare";
 import type { AckTemplate, BootstrapStep } from "@/messaging/poc-presence";
 import { bounded } from "@/p2p/bounded";
@@ -94,20 +95,19 @@ function startPocBootstrap({ log, sign, presence, start }: PocBootstrapOptions):
   };
   const provision = createProvisionListener((request) => provisionClone(deps, request), own);
   browser.runtime.onMessage.addListener(provision);
-  const prepare = createPrepareListener(
-    {
-      downloads: browser.downloads,
-      masterProfileId: async () => {
-        const record = await roles.record();
-        return record?.role === "master" ? record.profileId : undefined;
-      },
-      identity: latest,
-      namespace: () => pocNamespaceOf(store, log),
-      written: pocOnboardingStore().written,
+  const prepareDeps = {
+    downloads: browser.downloads,
+    masterProfileId: async () => {
+      const record = await roles.record();
+      return record?.role === "master" ? record.profileId : undefined;
     },
-    own,
-  );
+    identity: latest,
+    namespace: () => pocNamespaceOf(store, log),
+    written: pocOnboardingStore().written,
+  };
+  const prepare = createPrepareListener(prepareDeps, own);
   browser.runtime.onMessage.addListener(prepare);
+  browser.runtime.onMessage.addListener(createCloneControlListener(prepareDeps, own));
 }
 
 type PocPresence = ReturnType<typeof startPocPresence>;

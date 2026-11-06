@@ -5,13 +5,14 @@
 # nothing read from a file is ever run or expanded; positional arguments and enumerated flags only.
 #
 #   start <state-dir> <record> <namespace> [--once]
-#       takes the launcher lock, then every RECNRUN_LAUNCHER_INTERVAL_S (10) requests, headed, each
+#       takes the launcher lock, then every RECNRUN_LAUNCHER_INTERVAL_S (10) requests, in the mode of its last open (headed when none), each
 #       profile the record registers in the namespace (lifecycle.sh request). It opens no other
 #       profile and leaves a paused or stopped one alone until lifecycle.sh resume (the owner's stop
 #       is never undone by the next pass). Exits 73, 75, 69, 71, and 70 of a request are logged, not
 #       errors; 65 and 66 are logged once and the profile skipped until the launcher restarts.
 #       After the requests of each pass it runs provision.sh once (the master's "Prepare workers" operations,
-#       one step per operation, P6.1; exits are logged), then catalog.sh once per distinct downloadsRoot the
+#       one step per operation, P6.1; exits are logged), then clone-control.sh once (the master's dashboard
+#       opens, closes, and reopens clones, P7.5; exits are logged), then catalog.sh once per distinct downloadsRoot the
 #       record registers in the namespace (the extension finds its peers only through the
 #       registry.json it writes); its exits are logged, not errors.
 #       --once runs one pass; otherwise it runs in the foreground, writes <state-dir>/launcher.pid,
@@ -115,9 +116,18 @@ cleanup() {
   if [ "$cu_named" = "$$" ]; then rm -f -- "$la_state/launcher.pid"; fi
 }
 run_lifecycle() { /bin/sh "$la_dir/lifecycle.sh" "$@"; }
+# The mode the profile $2 of state dir $1 was last opened in; headed when none is recorded or the state is unreadable
+# (lifecycle.sh request then refuses a bad state itself).
+recorded_mode() {
+  rm_mode=$(
+    read_state "$1/profiles/$2" 2>/dev/null
+    printf '%s' "$st_mode"
+  )
+  printf '%s\n' "${rm_mode:-headed}"
+}
 # One lifecycle.sh request, in the background so a SIGTERM ends the wait at once.
 request_profile() {
-  run_lifecycle request "$1" "$2" "$3" "$4" headed &
+  run_lifecycle request "$1" "$2" "$3" "$4" "$(recorded_mode "$1" "$4")" &
   la_child=$!
   wait "$la_child"
   rq_code=$?
@@ -154,6 +164,23 @@ run_provision() {
   la_child=''
   case $pv_code in 0) ;; 75) log "provision.sh: exit $pv_code, not an error" ;; *) log "provision.sh: exit $pv_code" ;; esac
 }
+run_clone_control() {
+  /bin/sh "$la_dir/clone-control.sh" run "$1" "$2" "$3" &
+  la_child=$!
+  wait "$la_child"
+  cc_code=$?
+  la_child=''
+  case $cc_code in 0) ;; 75) log "clone-control.sh: exit $cc_code, not an error" ;; *) log "clone-control.sh: exit $cc_code" ;; esac
+  forget_opened
+}
+# An explicit Open of a clone is a fresh start: the clone leaves the skipped list and the note is consumed.
+forget_opened() {
+  [ -f "$la_state/control/opened" ] || return 0
+  while IFS= read -r fo_id; do
+    [ -z "$fo_id" ] || la_skipped=$(printf '%s' "$la_skipped" | sed "s/ $fo_id / /")
+  done <"$la_state/control/opened"
+  rm -f -- "$la_state/control/opened"
+}
 run_catalog() {
   pass_roots=$(record_downloads_roots "$1" "$2") || return 0
   while IFS= read -r pass_root; do
@@ -168,6 +195,7 @@ run_pass() {
     log "cannot read the record $2"
     return 0
   fi
+  run_clone_control "$1" "$2" "$3"
   while IFS= read -r pass_id; do
     [ -n "$pass_id" ] || continue
     case $la_skipped in *" $pass_id "*) continue ;; esac

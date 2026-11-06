@@ -1,4 +1,5 @@
-#prepare-workers {
+#prepare-workers,
+#clone-control {
   max-width: 48rem;
   margin: calc(var(--space) * 2) auto;
   padding: 0 var(--space);

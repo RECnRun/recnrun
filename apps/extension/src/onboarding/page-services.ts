@@ -16,7 +16,7 @@ import { pocPresenceStore } from "@/storage/poc-presence-repository";
 import * as v from "valibot";
 
 /** Reads a file:// URL through the background and the offscreen document, which hold the access. */
-async function readText(path: string): Promise<string | undefined> {
+export async function readText(path: string): Promise<string | undefined> {
   const answer = await browser.runtime.sendMessage({
     type: POC_READ_FILE,
     url: fileUrlFor(path),

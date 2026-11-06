@@ -29,6 +29,7 @@ export const LIBRARIES = [
   "lifecycle.sh",
   "lifecycle-state.sh",
   "lifecycle-launch.sh",
+  "lifecycle-control.sh",
   "open.sh",
   "record.sh",
   "master-role.sh",
@@ -45,6 +46,9 @@ export const LIBRARIES = [
   "provision.sh",
   "clone.sh",
   "clone-open.sh",
+  "clone-control.sh",
+  "clone-control-request.sh",
+  "clone-control-ops.sh",
   "extension-id",
 ];
 const OSES = {

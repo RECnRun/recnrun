@@ -6,7 +6,7 @@
 
 # Set by cmd_request and find_profile before a launch runs; named here so ShellCheck sees them.
 backoff_s='' lc_lock='' lc_id='' lc_now='' lc_record='' lc_ns='' lc_mode='' l_before='' p_user='' st_file=''
-st_user='' st_attempts='' st_status='' st_started='' st_boot=''
+p_dir='' p_role='' p_count='' lc_pin='' lc_control='' st_user='' st_attempts='' st_status='' st_started='' st_boot=''
 
 # After every ack the pid of record is the root's main process, never a forwarder's: a root already
 # running Chrome hands the open to it and the new process exits, shared or not.
@@ -46,19 +46,31 @@ lock_wait() {
     sleep 1
   done
 }
-# open.sh calls this inside the command substitution, so the pid reaches the state before the ack wait.
-# It is recorded while the attempt is current and also after the owner paused or stopped it, so a later
-# stop can still end that Chrome; the state of a newer attempt is left alone.
-launched() {
-  is_pid "$1" || return 0
-  lock_wait || return 0
+# open.sh calls this inside the command substitution right before it starts Chrome: the profile lock is
+# taken and kept until launched records the pid, so a close cannot fall between the check of the attempt
+# and the spawn, and an opener that was held up never starts Chrome for a clone that was stopped meanwhile.
+before_spawn() {
+  lock_wait || die 75 "cannot take the lock of $lc_id to start Chrome"
+  trap 'release_lock "$lc_lock" "$$"' EXIT
+  # The record is read again under the lock: it must still name the profile that was checked.
+  find_profile "$lc_record" "$lc_ns" "$lc_id"
+  if [ "$p_user|$p_dir|$p_role|$p_count" != "$lc_pin" ] || { [ -n "$lc_control" ] && ! (control_guard); }; then
+    release_lock "$lc_lock" "$$"
+    die 65 "the record changed while $lc_id was opening: Chrome is not started"
+  fi
   read_state "$st_file"
-  case $st_status in
-    opening) [ "$st_started" != "$lc_attempt" ] || state_set pid "$1" ;;
-    paused | stopped | idle) state_set pid "$1" ;;
-  esac
-  write_state
+  { [ "$st_status" = opening ] && [ "$st_started" = "$lc_attempt" ]; } && return 0
   release_lock "$lc_lock" "$$"
+  die 73 "$lc_id is $st_status, not opening: Chrome is not started"
+}
+# The pid reaches the state before the ack wait, under the lock before_spawn took.
+launched() {
+  if is_pid "$1"; then
+    state_set pid "$1"
+    write_state
+  fi
+  release_lock "$lc_lock" "$$"
+  trap - EXIT
 }
 # The result of the open arrives after a pause, a stop, or a newer attempt: that decision stays.
 abandon() {
@@ -105,7 +117,9 @@ launch() {
   state_set startedAt "$lc_now"
   state_set pid ''
   state_set userDataDir "$p_user"
+  state_set mode "$lc_mode"
   lc_attempt=$lc_now
+  lc_pin="$p_user|$p_dir|$p_role|$p_count"
   write_state
   release_lock "$lc_lock" "$$"
   l_err=$st_file.$(lc_random).err

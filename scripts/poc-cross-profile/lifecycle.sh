@@ -19,7 +19,8 @@
 #   status <state-dir>                      profileId status pid attempts nextAt, one line each
 #
 # State, <state-dir>/profiles/<profileId>: key=value lines with token, pid, startedAt, attempts,
-# nextAt (epoch seconds), status (idle, opening, open, failed, paused, stopped), boot, root (the
+# nextAt (epoch seconds), status (idle, opening, open, failed, paused, stopped), mode (headed or headless: the
+# mode of the last open, which a crash relaunch repeats; empty before any), boot, root (the
 # Downloads root), userDataDir, shared (1 when another record block names the same userDataDir or the folder holds another profile: Default or Profile <n> with a Preferences file); any other key or value outside its grammar exits 65. Numbers are canonical decimal (no leading zero, a pid above zero, attempts at most the maximum). userDataDir and
 # pid are written when the attempt starts and the Chrome launches, so a timed-out open (69) keeps both
 # and stop can still end that Chrome.
@@ -31,6 +32,11 @@
 # linked profile goes silent on purpose), and a dead pid is a crash and relaunches.
 # Stop policy: stop is the owner's decision, so a stopped profile is held like a paused one (request
 # exits 73) until resume; resume turns a paused or stopped profile into idle, which request launches.
+#
+#   close <state-dir> <record> <namespace> <profileId> | open-clone ... <headed|headless>
+#                                           the owner's explicit close and open of one clone, checked against the
+#                                           record before any signal or launch (lifecycle-control.sh); close 74
+#                                           when the Chrome outlives the wait
 #
 # Shared roots: profiles of one user data dir live in one Chrome (the process singleton forwards a
 # second open to it and the new process exits), so the pid of any profile is that main process after
@@ -58,6 +64,8 @@ umask 077
 . "$(dirname -- "$0")/lifecycle-state.sh"
 # shellcheck source=lifecycle-launch.sh
 . "$(dirname -- "$0")/lifecycle-launch.sh"
+# shellcheck source=lifecycle-control.sh
+. "$(dirname -- "$0")/lifecycle-control.sh"
 
 log() { printf 'lifecycle.sh: %s\n' "$*" >&2; }
 die() {
@@ -76,6 +84,8 @@ mutate() {
   trap 'release_lock "$lc_lock" "$$"' EXIT
   read_state "$1/profiles/$2"
   "$3"
+  # A profile with no state stays without one: status none is not a status the reader accepts.
+  [ "$st_status" != none ] || return 0
   write_state
 }
 do_pause() { st_status=paused; }
@@ -92,6 +102,7 @@ adopt_profile() {
   case $st_status in paused | stopped) die 73 "$lc_id is $st_status: resume it first" ;; esac
   st_pid=''
   state_set pid "$(main_pid_of "$p_user" || :)"
+  state_set mode "$(mode_of_pid "$st_pid")"
   state_set status open
   state_set startedAt "$(date +%s)"
   state_set attempts 0
@@ -267,6 +278,8 @@ if [ -z "$lifecycle_as_library" ]; then
     adopt) cmd_adopt "$@" ;;
     reset) mutate "$1" "${2:-}" do_reset ;;
     stop) cmd_stop "$@" ;;
+    close) cmd_close "$@" ;;
+    open-clone) cmd_open_clone "$@" ;;
     status) cmd_status "$1" ;;
     *) die 64 "unknown command $lc_command" ;;
   esac

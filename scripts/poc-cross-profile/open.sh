@@ -57,20 +57,29 @@ new_token() {
 }
 # --- The registered profile ------------------------------------------------------------------
 
-# The first block that names the profile counts, but the whole record is valid before any is used.
-record_hook_block() {
-  [ "$b_id" = "$want_id" ] && [ -z "$sel_found" ] || return 0
-  sel_found=1 sel_ns=$b_ns sel_user=$b_user sel_dir=$b_profile
+# The first block that names the profile counts, but the whole record is valid before any is used; the
+# blocks naming it and the role of the first are kept for the commands that must not guess.
+record_hook_line() {
+  case $line in role=*) sel_line_role=${line#role=} ;; esac
 }
-# Sets p_user and p_dir from the record, or refuses.
+record_hook_block() {
+  sel_block_role=$sel_line_role sel_line_role=
+  [ "$b_id" = "$want_id" ] || return 0
+  sel_count=$((sel_count + 1))
+  [ -z "$sel_found" ] || return 0
+  sel_found=1 sel_ns=$b_ns sel_user=$b_user sel_dir=$b_profile sel_role=$sel_block_role
+}
+# Sets p_user, p_dir, p_role, and p_count (the blocks that name the profile) from the record, or refuses.
 find_profile() {
   if [ ! -f "$1" ] || [ ! -r "$1" ]; then refuse 'the record is not a readable file'; fi
-  want_id=$3 sel_found='' sel_ns='' sel_user='' sel_dir=''
+  want_id=$3 sel_found='' sel_ns='' sel_user='' sel_dir='' sel_role='' sel_count=0 sel_line_role=''
   record_load "$1"
   record_parse 1
   [ -n "$sel_found" ] || refuse 'the profile is not registered in the record'
   [ "$sel_ns" = "$2" ] || refuse 'the profile is registered in another namespace'
   p_user=$sel_user p_dir=$sel_dir
+  # shellcheck disable=SC2034 # read by lifecycle-control.sh
+  p_role=$sel_role p_count=$sel_count
 }
 # The registered values reach a command line only after these checks.
 validate_profile() {
@@ -256,12 +265,14 @@ start_chrome() {
   url=chrome-extension://$p_ext/bootstrap.html#token=$1$want_role
   set -- "--user-data-dir=$p_user" "--profile-directory=$p_dir" --no-first-run --no-default-browser-check "$url"
   [ "$mode" != headless ] || set -- --headless=new "$@"
+  before_spawn
   "$chrome" "$@" >/dev/null 2>&1 &
   log "pid=$!"
   launched "$!"
 }
 want_role=''
-# Called with the pid right after the launch; a script that sources this one redefines it.
+# Called right before Chrome starts, and with its pid right after; a script that sources this one redefines them.
+before_spawn() { :; }
 launched() { :; }
 open_profile() {
   [ "$#" -ge 3 ] || { log 'usage: open.sh open <record> <namespace> <profileId> [headed|headless]'; exit 64; }
