@@ -54,6 +54,23 @@ plain_path() {
   done
 }
 
+# The Chrome roots: the OS default one, whose files the launcher never reads.
+system_name() { printf '%s' "${RECNRUN_DISCOVERY_UNAME:-$(uname -s)}"; }
+default_root() {
+  [ -n "${HOME:-}" ] || return 0
+  if [ "$(system_name)" = Darwin ]; then
+    printf '%s\n' "$HOME/Library/Application Support/Google/Chrome"
+  else
+    printf '%s\n' "${XDG_CONFIG_HOME:-$HOME/.config}/google-chrome"
+  fi
+}
+# True for the Default of the OS default user data root: the person's own Chrome, whose files the launcher
+# never reads (macOS may ask for Full Disk Access). It is known by convention and proven by the token ack.
+is_personal_default() {
+  pd_root=$(default_root)
+  [ -n "$pd_root" ] && [ "$1" = "$pd_root" ] && [ "$2" = Default ]
+}
+
 # --- Step 1: Preferences ---------------------------------------------------------------------
 
 # Prints the UTF-8 bytes of code point $1, a BMP value outside controls and surrogates.
@@ -105,6 +122,11 @@ read_with_sed() {
 pref_download_dir() {
   [ "$#" -eq 2 ] || return 64
   if ! is_directory "$1" || ! is_profile_directory "$2"; then return 0; fi
+  # The personal Default's Preferences are never read: its Downloads root is the option or ~/Downloads.
+  if is_personal_default "$1" "$2"; then
+    [ -z "${RECNRUN_DEFAULT_DOWNLOADS:-}" ] || ! is_directory "$RECNRUN_DEFAULT_DOWNLOADS" || printf '%s\n' "$RECNRUN_DEFAULT_DOWNLOADS"
+    return 0
+  fi
   file=$1/$2/Preferences
   if [ ! -f "$file" ] || [ -L "$file" ]; then return 0; fi
   if [ -z "${RECNRUN_DISCOVERY_NO_PLUTIL:-}" ] && command -v plutil >/dev/null 2>&1; then

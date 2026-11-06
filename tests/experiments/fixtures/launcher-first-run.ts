@@ -10,8 +10,9 @@ import type { Rig, Scene } from "./launcher-open.ts";
 
 /*
  * The shared-root sample of P4.6 (POC PLAN.md): first-run.sh on the usual layout, one user data
- * root whose profiles all download to ~/Downloads and an empty record. Each profile is bound by its
- * token ack, registered with the id the extension acked, and opened; status then lists both.
+ * root whose profiles all download to ~/Downloads and an empty record. The launcher never reads
+ * Chrome's own root, so only the Default is known (by convention); it is bound by its token ack,
+ * registered with the id the extension acked, and opened. Profile 1 is ignored and not in status.
  */
 
 const SCRIPTS = new URL("../../../scripts/poc-cross-profile/", import.meta.url);
@@ -58,13 +59,13 @@ async function blocksOf(record: string): Promise<Record<string, string>[]> {
     );
 }
 
-/** What first-run.sh and status must show for both profiles; every failed expectation is a problem. */
+/** What first-run.sh and status must show for the Default; every failed expectation is a problem. */
 async function measure(rig: FirstRunPair): Promise<Sample> {
   const { record, downloads } = rig.scene;
   const state = join(dirname(record), "state");
   const problems: string[] = [];
   const want = (ok: boolean, text: string) => ok || problems.push(text);
-  const ids = [rig.scene, rig.second];
+  const ids = [rig.scene];
   const first = await run(rig, FIRST_RUN, [state, record, NAMESPACE]);
   want(first.code === 0, `first-run exited ${first.code}: ${first.stderr.slice(-400)}`);
   const lines = first.stdout.split("\n");
@@ -72,7 +73,7 @@ async function measure(rig: FirstRunPair): Promise<Sample> {
     want(lines[at] === `${scene.profileId} open`, `line ${at}: ${lines[at]}`),
   );
   const blocks = await blocksOf(record);
-  want(blocks.length === 2, `the record held ${blocks.length} blocks`);
+  want(blocks.length === 1, `the record held ${blocks.length} blocks`);
   ids.forEach((scene, at) => {
     const block = blocks[at] ?? {};
     const got = [block.profileDirectory, block.profileId, block.downloadsRoot, block.namespace];
@@ -85,6 +86,10 @@ async function measure(rig: FirstRunPair): Promise<Sample> {
       status.some((line) => line.startsWith(`${scene.profileId} open `)),
       `status lacks ${scene.profileId} open: ${status.join(" / ")}`,
     ),
+  );
+  want(
+    !status.some((line) => line.startsWith(rig.second.profileId)),
+    `status lists the ignored Profile 1: ${status.join(" / ")}`,
   );
   const error = problems.length > 0 ? { error: problems.join("; ") } : {};
   return { ok: problems.length === 0, ...error, observation: { code: first.code, status } };
@@ -117,7 +122,7 @@ export async function firstRunSample(setup: () => Promise<FirstRunPair>): Promis
 /** The cell of P4.6 on a shared root, with its topology. */
 export const FIRST_RUN_CELLS = {
   "P4.6.firstRun.sharedRoot":
-    "two profiles of one root downloading to one folder, empty record: first-run binds, registers, and opens both",
+    "two profiles of one root downloading to one folder, empty record: first-run binds, registers, and opens the Default only",
 } as const;
 export type FirstRunHypothesis = keyof typeof FIRST_RUN_CELLS;
 

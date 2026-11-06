@@ -1,6 +1,14 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import {
@@ -264,8 +272,15 @@ for (const shell of shells) {
   });
 
   await test(`${shell}: first-run skips a frozen root and says so`, (context) => {
+    // The OS default root is never inspected, so the frozen root is one the record names.
     const s = firstRunScene(context);
-    writeFileSync(join(s.root, MARKER), "setting=base-v1\n");
+    rmSync(s.root, { recursive: true });
+    const frozen = join(s.home, "bases/base-v1");
+    mkdirSync(join(frozen, "Default"), { recursive: true });
+    writeFileSync(join(frozen, "Default/Preferences"), "{}");
+    writeFileSync(join(frozen, MARKER), "setting=base-v1\n");
+    const block = `userDataDir=${frozen}\nprofileDirectory=Default\nprofileId=${ALICE}\nnamespace=lab\ndownloadsRoot=${s.home}/Downloads\n`;
+    writeFileSync(s.record, block);
     const result = firstRun(
       shell,
       [s.state, s.record, "lab"],
@@ -273,7 +288,7 @@ for (const shell of shells) {
     );
     assert.equal(result.code, 66, result.err);
     assert.match(result.err, /frozen base/);
-    assert.equal(existsSync(s.record), false);
+    assert.equal(readFileSync(s.record, "utf8"), block);
     assert.equal(s.launches(), 0);
   });
 

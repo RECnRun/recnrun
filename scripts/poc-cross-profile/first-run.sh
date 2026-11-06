@@ -1,5 +1,5 @@
 #!/bin/sh
-# first-run.sh [--autostart] [<state-dir> <record> <namespace>]
+# first-run.sh [--autostart] [--downloads <dir>] [<state-dir> <record> <namespace>]
 #
 # The launcher's first run (POC PLAN.md P4.6): registers each profile that has the extension and a
 # presence of its own, then opens every registered profile of the namespace once and checks that
@@ -19,6 +19,11 @@
 # left running, or is the Chrome already running on the root, and the ack counts as the open: the state is
 # written open (lifecycle.sh adopt) so the launcher's pass does not open the profile again. A profile that does not ack is left out and the run exits 70 naming it; the record
 # never gets a profile the extension did not ack.
+#
+# The launcher never reads Chrome's own user data root (macOS may ask for Full Disk Access for it): the
+# Default of the OS default root is known by convention and is always bound by a token ack, which is also
+# the only proof that it has the extension; other profiles of that root are out of scope. Its Downloads
+# root is ~/Downloads, or --downloads <dir> when Chrome downloads elsewhere.
 #
 # The Default of the OS default user data root becomes the master (PLAN.md P3.4) when the namespace has
 # none: its token bind carries `master` (open.sh), and master-role.sh writes `role=master` into the
@@ -61,6 +66,15 @@ is_unit_path() {
 # --- Arguments -------------------------------------------------------------------------------
 
 fr_arguments() {
+  fr_downloads=''
+  if [ "${1:-}" = --downloads ]; then
+    [ "$#" -ge 2 ] || die 64 '--downloads needs a folder'
+    fr_downloads=$2
+    shift 2
+    is_unit_path "$fr_downloads" || die 65 'the --downloads folder is not an absolute directory of plain characters'
+    RECNRUN_DEFAULT_DOWNLOADS=$fr_downloads
+    export RECNRUN_DEFAULT_DOWNLOADS
+  fi
   case $# in
     0)
       is_unit_path "${HOME:-}" || die 65 'HOME must be an absolute path of letters, digits, dot, underscore, hyphen, and slash'
@@ -71,7 +85,7 @@ fr_arguments() {
     3)
       fr_state=$1 fr_record=$2 fr_ns=$3
       ;;
-    *) die 64 'usage: first-run.sh [--autostart] [<state-dir> <record> <namespace>]' ;;
+    *) die 64 'usage: first-run.sh [--autostart] [--downloads <dir>] [<state-dir> <record> <namespace>]' ;;
   esac
   is_unit_path "$fr_state" || die 65 'the state directory is not an absolute path of plain characters'
   is_unit_path "$fr_record" || die 65 'the record is not an absolute path of plain characters'
@@ -151,6 +165,9 @@ $br_out
 EOF
   if [ -z "$br_id" ] || [ -z "$br_downloads" ]; then
     log "$br_name of $br_root: did not ack the bootstrap token, left out"
+    if is_personal_default "$br_root" "$br_name"; then
+      log 'load the extension in the Default profile of Chrome and run install again; if Chrome downloads outside ~/Downloads, add --downloads <folder>'
+    fi
     fr_left=$fr_left$br_name$nl
     return 0
   fi
@@ -257,7 +274,7 @@ register_all
 claim_default_master
 if [ -z "$fr_ids" ]; then
   [ -z "$fr_left" ] || die 70 "no profile acked: $(printf '%s' "$fr_left" | tr "$nl" ' ')"
-  die 66 'no profile with the extension: load the extension in a profile and try again'
+  die 66 'no profile with the extension: load the extension in the Default profile and try again'
 fi
 open_registered
 report

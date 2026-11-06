@@ -190,7 +190,8 @@ for (const shell of shells) {
     const result = profiles(shell, ["bind_profiles", record, NAMESPACE, EXTENSION], env());
     assert.equal(result.code, 0, result.err);
     const rows = [
-      [BOB, rootB, "Default", dl("DlB"), "distinct"],
+      // The OS default root is not read: its Default is unbound whatever the files say.
+      ["-", rootB, "Default", "-", "unbound"],
       [ALICE, rootA, "Default", dl("DlA"), "distinct"],
       ["-", rootA, "Profile 2", dl("DlS"), "shared"],
       ["-", rootA, "Profile 3", dl("DlS"), "shared"],

@@ -23,6 +23,8 @@ pid_alive() {
 # folder holds more than one Chrome profile (Default, Profile <n> with a Preferences file; System
 # Profile and Guest Profile are not profiles a person opens), because a signal closes them all.
 root_is_shared() {
+  # The person's own root holds profiles the launcher does not list and never reads: it is shared.
+  [ "$1" != "$(default_root)" ] || return 0
   rs_count=0
   while IFS= read -r rs_line || [ -n "$rs_line" ]; do
     [ "$rs_line" != "userDataDir=$1" ] || rs_count=$((rs_count + 1))

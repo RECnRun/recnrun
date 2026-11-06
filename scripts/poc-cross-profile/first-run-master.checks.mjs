@@ -65,21 +65,23 @@ for (const shell of shells) {
     assert.equal(masterOpens(scene), 0);
   });
 
-  await test(`${shell}: first-run never makes a profile other than the Default the master`, (context) => {
+  await test(`${shell}: first-run never lists another profile of the default root, so none becomes the master`, (context) => {
     const scene = firstRunScene(context, "lab", { shared: true });
     scene.ack({ "Profile 1": BOB });
     const result = run(shell, scene);
     assert.equal(result.code, 70, result.err);
-    assert.deepEqual(roles(scene), []);
+    assert.equal(existsSync(scene.record), false, "no profile, so no role");
     assert.equal(masterOpens(scene), 1, "only the Default was asked");
+    assert.doesNotMatch(result.err, /Profile 1/);
   });
 
   await test(`${shell}: first-run writes no role when the Default does not confirm and exits 70`, (context) => {
     const scene = firstRunScene(context);
+    // The Default is bound with its master claim, so a claim that is not acked leaves it unregistered.
     const result = run(shell, scene, { STUB_MASTER_FAIL: "1" });
     assert.equal(result.code, 70);
-    assert.match(result.err, /did not become the master/);
-    assert.deepEqual(roles(scene), []);
+    assert.match(result.err, /did not ack/);
+    assert.equal(existsSync(scene.record), false);
     const retry = run(shell, scene);
     assert.equal(retry.code, 0, retry.err);
     assert.deepEqual(roles(scene), ["role=master"]);

@@ -84,12 +84,13 @@ find_profile() {
 # The registered values reach a command line only after these checks.
 validate_profile() {
   [ -d "$p_user" ] || refuse 'userDataDir is not an existing directory'
-  ! is_base_root "$p_user" || refuse 'a frozen base is not an executor'
-  ! is_partial_root "$p_user" || refuse 'an unpublished clone copy is not an executor'
-  is_plain_file "$p_user/$p_dir/Preferences" || refuse 'the profile has no Preferences: open never creates one'
   p_ext=
   if [ -f "$here/extension-id" ]; then p_ext=$(head -n 1 "$here/extension-id"); fi
   is_extension_id "$p_ext" || { log 'no valid extension id'; exit 66; }
+  is_personal_default "$p_user" "$p_dir" && return 0 # nothing of the person's Chrome root is read; the ack is the proof
+  ! is_base_root "$p_user" || refuse 'a frozen base is not an executor'
+  ! is_partial_root "$p_user" || refuse 'an unpublished clone copy is not an executor'
+  is_plain_file "$p_user/$p_dir/Preferences" || refuse 'the profile has no Preferences: open never creates one'
   unpacked_code_present "$p_user" "$p_dir" "$p_ext" || exit $? # CL13: Chrome disables an unpacked build whose folder is gone
 }
 

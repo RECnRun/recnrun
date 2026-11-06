@@ -80,9 +80,8 @@ for (const shell of shells) {
   });
 
   await test(`${shell}: first-run --autostart does not turn it on when a profile does not ack`, (context) => {
-    const scene = installScene(context, "lab", { shared: true });
-    scene.ack({ Default: ALICE });
-    const result = firstRun(shell, args(scene, "--autostart"), scene.vars());
+    const scene = installScene(context);
+    const result = firstRun(shell, args(scene, "--autostart"), scene.vars({ STUB_ACK: "" }));
     assert.equal(result.code, EX_FAILED);
     assert.equal(existsSync(scene.plist), false);
     assert.deepEqual(scene.calls(), []);
@@ -96,7 +95,7 @@ for (const shell of shells) {
       scene.vars({ STUB_MASTER_FAIL: "1" }),
     );
     assert.equal(result.code, EX_FAILED);
-    assert.match(result.err, /did not become the master/);
+    assert.match(result.err, /did not ack/);
     assert.equal(existsSync(scene.plist), false);
     assert.deepEqual(scene.calls(), []);
   });

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { ALICE, BOB, shells } from "./lab.mjs";
@@ -73,9 +73,18 @@ for (const shell of shells) {
     assert.equal(existsSync(scene.record), false);
   });
 
-  await test(`${shell}: first-run exits 66 when no profile has the extension`, (context) => {
+  await test(`${shell}: first-run exits 70 and says where to load the extension when the Default does not ack`, (context) => {
     const scene = firstRunScene(context);
     writeFileSync(join(scene.root, "Default/Preferences"), "{}");
+    const result = firstRun(shell, explicit(scene), vars(scene, { STUB_ACK: "" }));
+    assert.equal(result.code, EX_FAILED);
+    assert.match(result.err, /load the extension in the Default/);
+    assert.equal(existsSync(scene.record), false);
+  });
+
+  await test(`${shell}: first-run exits 66 when there is no Chrome root and nothing registered`, (context) => {
+    const scene = firstRunScene(context);
+    rmSync(scene.root, { recursive: true });
     const result = firstRun(shell, explicit(scene), vars(scene));
     assert.equal(result.code, EX_NONE);
     assert.match(result.err, /no profile with the extension/);
@@ -96,7 +105,7 @@ for (const shell of shells) {
     const result = firstRun(shell, explicit(scene), vars(scene, { STUB_ACK: "" }));
     assert.equal(result.code, EX_FAILED);
     assert.notEqual(lines(result.out)[0], `${ALICE} open`);
-    assert.match(result.err, /a profile did not open/);
+    assert.match(result.err, /no profile acked: Default/);
   });
 
   await test(`${shell}: first-run refuses a wrong call, a relative path, and a space in HOME`, (context) => {
@@ -113,64 +122,49 @@ for (const shell of shells) {
   });
 }
 
-const recordBlock = (scene, id, directory) =>
+const defaultBlock = (scene) =>
   [
     `userDataDir=${scene.root}`,
-    `profileDirectory=${directory}`,
-    `profileId=${id}`,
+    "profileDirectory=Default",
+    `profileId=${ALICE}`,
     "namespace=lab",
     `downloadsRoot=${scene.home}/Downloads`,
-    ...(directory === "Default" ? ["role=master"] : []),
-    "root=r1", // the catalog pass of first-run numbered the shared root
+    "role=master",
+    "root=r1", // the catalog pass of first-run numbered the root
   ].join("\n");
 const trimmed = (record) => blocks(record).map((block) => block.trimEnd());
 
+// Chrome's own root is never listed: the Default is bound by its ack and its other profiles are out of scope.
 for (const shell of shells) {
-  await test(`${shell}: first-run binds both profiles of a shared Downloads root with their acked ids`, (context) => {
+  await test(`${shell}: first-run binds only the Default of the default root, whatever else it holds`, (context) => {
     const scene = firstRunScene(context, "lab", { shared: true });
     const result = firstRun(shell, explicit(scene), vars(scene));
     assert.equal(result.code, 0, result.err);
-    assert.deepEqual(trimmed(scene.record), [
-      recordBlock(scene, ALICE, "Default"),
-      recordBlock(scene, BOB, "Profile 1"),
-    ]);
-    assert.deepEqual(lines(result.out).slice(0, 2), [`${ALICE} open`, `${BOB} open`]);
-    assert.doesNotMatch(result.err, /skipped/);
+    assert.deepEqual(trimmed(scene.record), [defaultBlock(scene)]);
+    assert.deepEqual(lines(result.out).slice(0, 1), [`${ALICE} open`]);
+    assert.equal(scene.launches(), 1, "Profile 1 was never opened");
   });
 
-  await test(`${shell}: first-run binds a profile whose extension has not written a presence yet`, (context) => {
+  await test(`${shell}: first-run binds the Default with no presence written yet`, (context) => {
     const scene = firstRunScene(context, "lab", { shared: true });
     scene.unpublish(BOB);
     scene.unpublish(ALICE);
     const result = firstRun(shell, explicit(scene), vars(scene));
     assert.equal(result.code, 0, result.err);
-    assert.deepEqual(trimmed(scene.record), [
-      recordBlock(scene, ALICE, "Default"),
-      recordBlock(scene, BOB, "Profile 1"),
-    ]);
+    assert.deepEqual(trimmed(scene.record), [defaultBlock(scene)]);
   });
 
-  await test(`${shell}: first-run leaves out a profile that never acks and exits 70 naming it`, (context) => {
+  await test(`${shell}: first-run does not ask Profile 1 when only it would ack, and exits 70`, (context) => {
     const scene = firstRunScene(context, "lab", { shared: true });
-    scene.ack({ Default: ALICE });
-    const result = firstRun(shell, explicit(scene), vars(scene));
-    assert.equal(result.code, EX_FAILED);
-    assert.match(result.err, /Profile 1 of .*: did not ack/);
-    assert.deepEqual(trimmed(scene.record), [recordBlock(scene, ALICE, "Default")]);
-    assert.equal(lines(result.out)[0], `${ALICE} open`);
-  });
-
-  await test(`${shell}: first-run exits 70 when no profile of a shared root acks`, (context) => {
-    const scene = firstRunScene(context, "lab", { shared: true });
-    scene.ack({});
+    scene.ack({ "Profile 1": BOB });
     const result = firstRun(shell, explicit(scene), vars(scene));
     assert.equal(result.code, EX_FAILED);
     assert.match(result.err, /Default of .*: did not ack/);
-    assert.match(result.err, /Profile 1 of .*: did not ack/);
+    assert.doesNotMatch(result.err, /Profile 1/);
     assert.equal(existsSync(scene.record), false);
   });
 
-  await test(`${shell}: first-run leaves a registered profile of a shared root alone`, (context) => {
+  await test(`${shell}: first-run leaves a registered Default alone, whatever else the root holds`, (context) => {
     const scene = firstRunScene(context, "lab", { shared: true });
     assert.equal(firstRun(shell, explicit(scene), vars(scene)).code, 0);
     const before = readFileSync(scene.record, "utf8");

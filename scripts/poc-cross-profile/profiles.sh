@@ -7,7 +7,7 @@
 #
 # Commands (also functions):
 #   chrome_binary                                       the first Google Chrome that is executable
-#   chrome_roots <record>                               the OS default user data root, then the record's
+#   chrome_roots <record>                               the OS default user data root (never opened), then the record's
 #   profiles_in_root <root>                             profile directory names, Default first, then sorted
 #   extension_in_profile <root> <profileDirectory> <id> prints packed or unpacked, else exits 1
 #   unpacked_path_of <root> <profileDirectory> <id>     the `path` of an unpacked install's settings entry
@@ -60,7 +60,6 @@ is_listable() {
   case $1 in *"$tab"*) return 1 ;; esac
   [ -d "$1" ]
 }
-system_name() { printf '%s' "${RECNRUN_DISCOVERY_UNAME:-$(uname -s)}"; }
 is_runnable() { [ -f "$1" ] && [ -x "$1" ]; }
 
 # --- Links -----------------------------------------------------------------------------------
@@ -108,14 +107,6 @@ chrome_binary() {
 
 # --- Roots -----------------------------------------------------------------------------------
 
-default_root() {
-  [ -n "${HOME:-}" ] || return 0
-  if [ "$(system_name)" = Darwin ]; then
-    printf '%s\n' "$HOME/Library/Application Support/Google/Chrome"
-  else
-    printf '%s\n' "${XDG_CONFIG_HOME:-$HOME/.config}/google-chrome"
-  fi
-}
 record_user_data_dirs() {
   if [ ! -f "$1" ] || [ ! -r "$1" ]; then return 0; fi
   while IFS= read -r line || [ -n "$line" ]; do
@@ -133,6 +124,7 @@ chrome_roots() {
     is_listable "$root" || continue
     case "$nl$seen" in *"$nl$root$nl"*) continue ;; esac
     seen=$seen$root$nl
+    [ "$root" != "$(default_root)" ] || { printf '%s\n' "$root"; continue; } # no file of it is read
     if is_base_root "$root"; then log "skipped $root: a frozen base is not an executor"; continue; fi
     if is_partial_root "$root"; then log "skipped $root: an unpublished clone copy is not an executor"; continue; fi
     printf '%s\n' "$root"
@@ -255,9 +247,13 @@ ROOTS
 # Rows "<root> TAB <profile> TAB <count> TAB <id> TAB <downloadsRoot>", "-" where nothing was found.
 collect_rows() {
   rows=
+  # The Default of the OS default root is always a row, unbound: only its token ack tells whether it has the extension.
+  pd_root=$(default_root)
+  if [ -n "$pd_root" ] && is_listable "$pd_root"; then rows=$pd_root${tab}Default${tab}0${tab}-${tab}-$nl; fi
   roots=$(chrome_roots "$1")
   while IFS= read -r root; do
     [ -n "$root" ] || continue
+    [ "$root" != "$pd_root" ] || continue
     names=$(profiles_in_root "$root")
     while IFS= read -r name; do
       [ -n "$name" ] || continue
