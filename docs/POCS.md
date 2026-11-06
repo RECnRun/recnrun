@@ -175,8 +175,18 @@ A throwaway Playwright spec on a test build that logged the service worker's eve
 
 **Problem.** The mesh above pairs profiles through a folder each profile grants with the File System Access picker, and the grant ends with the extension's last top-level page. The question is whether `chrome.downloads` (write) and `file://` reads (read) replace that rendezvous with no picker, whether a native launcher in POSIX `sh` can open and close worker profiles on request from a master Default profile, whether workers run with no window or in Chrome's own headless mode, and how clones of a prepared base profile behave, with and without `chrome.debugger`.
 
-**Status.** In progress on `poc-downloads-launcher` (branched from PR #19's head `60989d6`), under [poc/downloads-launcher/PLAN.md](poc/downloads-launcher/PLAN.md); [CHECKLIST.md](poc/downloads-launcher/CHECKLIST.md) tracks the phases and [RESULTS.md](poc/downloads-launcher/RESULTS.md) will hold the computed answers.
+**Status.** Stopped 2026-11-06, superseded by the thin worker POC below; tag `archive/downloads-launcher-2026-11-06`. It ran on `poc-downloads-launcher` (branched from PR #19's head `60989d6`) under [poc/downloads-launcher/PLAN.md](poc/downloads-launcher/PLAN.md); [CHECKLIST.md](poc/downloads-launcher/CHECKLIST.md) tracks the phases and [RESULTS.md](poc/downloads-launcher/RESULTS.md) holds the handoff.
 
-| POC | Branch                   | Idea                                                                                        | Result      |
-| --- | ------------------------ | ------------------------------------------------------------------------------------------- | ----------- |
-| 8   | `poc-downloads-launcher` | Downloads write and `file://` read as the mesh rendezvous; `sh` launcher; headless; cloning | In progress |
+| POC | Branch                   | Idea                                                                                        | Result                                        |
+| --- | ------------------------ | ------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| 8   | `poc-downloads-launcher` | Downloads write and `file://` read as the mesh rendezvous; `sh` launcher; headless; cloning | Stopped 2026-11-06, superseded by thin-worker |
+
+## Thin worker extension driven by a Store master (November 2026)
+
+**Problem.** One extension in every role needs `debugger` in the owner's personal profile and a mesh of equal peers. The question is whether a Chrome Web Store master with no `debugger`, holding one File System Access folder as its rendezvous, can command a separate thin worker extension loaded into cloned headless profiles through a closed operation vocabulary, with no Node service, no repeated mutation after a restart, a one-line installer an AI assistant judges safe, and the fewest owner gestures. If it passes, it supersedes the main line's local-service direction (`docs/adr/0001` and `0002`) when merged.
+
+**Status.** Planned on `poc-thin-worker` (from `18c4ec12`), under [poc/thin-worker/PLAN.md](poc/thin-worker/PLAN.md); [CHECKLIST.md](poc/thin-worker/CHECKLIST.md) tracks the phases and [RESULTS.md](poc/thin-worker/RESULTS.md) will hold the answers.
+
+| POC | Branch            | Idea                                                                                                       | Result  |
+| --- | ----------------- | ---------------------------------------------------------------------------------------------------------- | ------- |
+| 9   | `poc-thin-worker` | Store master over an FSA folder; thin `debugger` worker in clones; closed CDP vocabulary; one-line install | Planned |

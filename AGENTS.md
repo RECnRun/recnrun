@@ -18,6 +18,7 @@ Durable decisions live in `docs/`:
 - [POCS.md](docs/POCS.md): proofs of concept behind architecture decisions, and what they found.
 - [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md): problems that took investigation, their causes, and their solutions.
 - [poc/downloads-launcher/PLAN.md](docs/poc/downloads-launcher/PLAN.md): the plan of the Downloads rendezvous, native launcher, headless, and cloning POC, with its [CHECKLIST.md](docs/poc/downloads-launcher/CHECKLIST.md) (progress and resume protocol) and [MANUAL_VALIDATION.md](docs/poc/downloads-launcher/MANUAL_VALIDATION.md) (checks that need a person).
+- [poc/thin-worker/PLAN.md](docs/poc/thin-worker/PLAN.md): the plan of the thin worker extension driven by a Store master, with its [CHECKLIST.md](docs/poc/thin-worker/CHECKLIST.md) (progress and resume protocol) and [MANUAL_VALIDATION.md](docs/poc/thin-worker/MANUAL_VALIDATION.md) (checks that need a person).
 
 Update the relevant doc when a change alters what it describes.
 

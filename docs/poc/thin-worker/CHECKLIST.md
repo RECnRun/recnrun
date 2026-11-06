@@ -1,0 +1,159 @@
+# Thin worker POC: checklist
+
+**Branch:** `poc-thin-worker` (pull request targets `poc-downloads-launcher`)
+**Last commit:** `18c4ec12` (plan not yet committed)
+**Current phase:** P0
+**Paused:** no
+
+## Resume protocol
+
+1. Read [PLAN.md](PLAN.md), this file, and [AGENTS.md](../../../AGENTS.md). The plan's decisions are binding; change one only with the owner.
+2. Work in the worktree of `poc-thin-worker`. Check `git status` is clean and `git log -n 1` matches **Last commit**.
+3. Take the first `[ ]` task of the current phase. A `[!]` task waits for its reason; a `[~]` task resumes at what is missing.
+4. Delegate a task to a Sonnet `plan-implementer` agent by default; use Opus only for Chrome or WebRTC internals. Every brief says agents never open host Chrome: browser layers run only through Docker `vp run test:*`. Only the orchestrator touches host Chrome and the personal Default profile.
+5. Every behavior change is red/green, with one commit per task. Under the task, add `red:`, `green:`, and `commit:` lines, and mark it `[i]`.
+6. At a phase gate, run Codex review (`gpt-6.1-sol`, high, read-only, stdin closed with `</dev/null`) on the phase's commits. Save it as `reviews/P<n>.md` and fix its findings as tasks.
+7. Then run `vp run verify` until it exits 0, record its run id and wall time on the gate's lines, mark the phase's `[i]` tasks `[x]`, and push. Run verify and push only at gates, except that Phase 0 runs a timed verify after every task (pushes stay at the gate). Watch CI in the background.
+8. Owner checks go only in [MANUAL_VALIDATION.md](MANUAL_VALIDATION.md); answers go in [RESULTS.md](RESULTS.md).
+9. To pause, set **Paused** to the date and the next step, update **Last commit**, and commit this file.
+
+Markers: `[ ]` not started · `[i]` implemented, awaiting the phase gate · `[x]` verified by `vp run verify` · `[!]` blocked (reason indented) · `[~]` partial (what is missing indented)
+
+## P0: freeze and prune verify
+
+Baseline: run `2026-11-06T18-35-02Z` on `18c4ec12`, 70.8 min.
+
+- [ ] P0.1 Old POC handoff: write `downloads-launcher/RESULTS.md` (findings, abandoned branches, unresolved defects, pending manual checks)
+- [ ] P0.2 Move experiments to `lab:downloads-launcher`; promote `E9.restart` and `E9.idempotent` to `tests/browser`
+- [ ] P0.3 Delete the eight `E8.discovery.*` cells
+- [ ] P0.4 Delete the shared-root worker cases; keep `launcher-first-run-shared` and the refusal checks
+- [ ] P0.5 Retire the `poc-d1` and `poc-d2` builds and their manifest checks
+- [ ] P0.6 Fix `P6.1.error.retry` with an asserting test
+
+Gate P0: verify · time per task · review
+
+- time per task (verify wall time after each task):
+- verify:
+- review:
+
+## P1: cold-start vertical slice
+
+- [ ] P1.1 Add `packages/worker-protocol`, `packages/link`, `apps/worker`; update ARCHITECTURE, dependency-cruiser, the extension rule, and `CHROMIUM.md`; wire Vitest, coverage, jscpd, and Knip
+- [ ] P1.2 Build master and worker with distinct pinned ids; pack the versioned package (worker, `bin/`, `SHA256SUMS`)
+- [ ] P1.3 `worker-protocol` schemas, negotiation, limits, errors
+- [ ] P1.4 CDP method table and `scripts/worker-cdp.checks.mjs`, wired into `test:scripts:local`
+- [ ] P1.5 Worker ledger and retention (`EPOCH_FULL`, no eviction inside an epoch)
+- [ ] P1.6 Executor with origin, destination, and document checks and the `Fetch` guard
+- [ ] P1.7 Move the link to `packages/link` with FSA and Downloads adapters (jscpd at most 1%)
+- [ ] P1.8 Rendezvous onboarding: picker, marker, persistent consent, recovery action
+- [ ] P1.9 Trusted master pin in the launcher record; `clone-open.sh` never reads presence for the key
+- [ ] P1.10 Base download directory set through Chrome's settings chooser; no rewrite in `clone.sh` and `base-update.sh`; cell `P1.base-download-dir`
+- [ ] P1.11 Exclude frozen bases and unpublished copies through the registry and the role check
+- [ ] P1.12 Strict-CSP fixture server with POST counter
+- [ ] P1.13 Cold-start slice spec (H-CSP recorded)
+- [ ] P1.14 Rejection spec
+- [ ] P1.15 Restart and replay spec
+- [ ] P1.16 Deciding cell `P1.master-fsa`
+
+Gate P1: verify · slice specs time · RESULTS H1–H8 · review
+
+- verify:
+- slice specs time:
+- review:
+
+## P2: replace and retire
+
+- [ ] P2.1 Replace `forged-sender`
+- [ ] P2.2 Replace `hierarchy` and `dashboard-open-tab`
+- [ ] P2.3 Classify every E13 and E10 case: replace, keep as assertion, or move to the lab
+- [ ] P2.4 Retire the worker-to-worker mesh
+- [ ] P2.5 Retire the one-extension-many-roles code
+- [ ] P2.6 Adapt FSA folder pairing to the master flow only
+- [!] P2.7 One presence policy as default, others removed
+  - owner decides the policy (proposed: `launcher`)
+
+Gate P2: verify · time against Gate P0 · coverage per file · review
+
+- verify:
+- review:
+
+## P3: update existing clones
+
+- [ ] P3.1 Immutable versioned bundles under `~/RECnRun/app/<version>/`
+- [ ] P3.2 Stopped-clone update keeps identity, pin, and ledger
+- [ ] P3.3 Garbage-collect unreferenced bundles
+
+Gate P3: verify · review
+
+- verify:
+- review:
+
+## P4: version skew
+
+- [ ] P4.1 N−1, N, N+1 negotiation matrix
+- [ ] P4.2 Mixed-version cell
+
+Gate P4: verify · review
+
+- verify:
+- review:
+
+## P5: headed clones
+
+- [ ] P5.1 `--silent-debugger-extension-api`, no infobar
+  - `[unsure]` xdotool and scrot on Xvfb; port `tests/desktop` if not
+- [ ] P5.2 DevTools contention
+- [ ] P5.3 Detach behavior
+- [ ] P5.4 Headed to headless to headed
+
+Gate P5: verify · review
+
+- verify:
+- review:
+
+## P6: Store-like master, one-line install, and friction
+
+- [ ] P6.1 Packed CRX id check
+- [ ] P6.2 Gesture count from the install command (owner sets the target)
+- [ ] P6.3 "Ask where to save" handling
+- [ ] P6.4 Reboot recovery with no terminal (Linux claimed only after M-TW.11)
+- [ ] P6.5 README gesture count and owner runbook
+- [ ] P6.6 `install.sh` served from `apps/website` with its SHA-256; piped, re-run, upgrade, repair, `--uninstall`, `--dry-run`
+- [ ] P6.7 Installer lint over `install.sh` and every package script, wired into `test:scripts:local`
+- [ ] P6.8 Checksum mismatch, partial download, truncated script install nothing
+- [ ] P6.9 End-to-end from the install command to a script on a new clone
+- [ ] P6.10 Installer trust review (Codex and Claude, orchestrator only, not in verify); plus a package-script audit; rerun whenever `install.sh` or a package script changes
+
+Gate P6: verify · gesture count · installer trust review · review
+
+- verify:
+- gesture count:
+- installer trust review (`reviews/installer-trust-<date>.md`, script SHA-256):
+- review:
+
+## P7: manual acceptance and soak
+
+- [ ] P7.1 `lab:thin-worker-soak`
+- [ ] P7.2 Owner checks M-TW.1–M-TW.11 and RESULTS
+
+Gate P7: soak run · owner checks · review
+
+- soak:
+- review:
+
+## P8: Windows (not executed)
+
+- [!] P8.1 Windows evidence environment
+  - no environment yet; `install.ps1` is not served before P8.3 passes
+- [!] P8.2 Port launcher, provisioning, and cloning
+- [!] P8.3 `install.ps1` with lint and loopback tests
+- [!] P8.4 Owner checks on Windows
+
+## Open items carried from downloads-launcher
+
+- `P6.1.error.retry` → P0.6
+- "Ask where to save" warning → P1.16, P6.3
+- README `4 N + 3` gesture count and the runbook's Documents and Full Disk Access steps → P6.5
+- `launcher` presence policy default → P2.7
+- E9 backoff, stop, and pause → lab only, until the launcher review
+- Pending owner checks M-P1.a … M-P7.a → listed in the old RESULTS handoff (P0.1)
