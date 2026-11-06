@@ -540,6 +540,11 @@ Plan: [PLAN.md](PLAN.md#dashboard-control-of-clones-p75p78). The master's dashbo
   - applied: the record pinned at the check and read again under the spawn lock, `(createdAt, requestId)` kept in `newest-<instanceId>`, a rejection clears only its own reservation, one clock value in the ordering test
   - commit: `cfdc53ef`, `5a593d4c`
 
+- [i] P7.5-P7.8 Codex second fix review: the arguments and the exit code
+  - red: `node --test scripts/poc-cross-profile/lifecycle-control.checks.mjs --test-name-pattern="goes A, B, A"` failed on `sh` and `dash` (Chrome started on the second root: `Chrome was started on a root other than the one checked`, `.../Chrome-b`) because `start_chrome` built the arguments before `before_spawn` read the record again
+  - green: the same command passes; `open.sh` builds the arguments after `before_spawn`; the "record changed after" check now asserts exit 65 and no leftover lock; `lifecycle-control.checks.mjs` 38 passed
+  - commit: `943eabca`
+
 - [ ] P7.8 Manual check M-P7.a from the dashboard alone, Reopen included (owner)
 
 ## P8: With and without `chrome.debugger`

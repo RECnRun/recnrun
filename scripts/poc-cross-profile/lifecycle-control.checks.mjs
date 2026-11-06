@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
-import { appendFileSync, existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, cpSync, existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { setTimeout as sleep } from "node:timers/promises";
@@ -240,7 +240,48 @@ for (const shell of shells) {
     assert.equal(existsSync(join(s.home, "held")), true, "the opener never reached its launch");
     writeFileSync(s.record, readFileSync(s.record, "utf8").replace("role=worker", "role=master"));
     rmSync(join(s.home, "hold"));
-    assert.notEqual(await ended, 0);
+    assert.equal(await ended, 65);
     assert.equal(s.launches(), 0);
+    assert.equal(existsSync(lock), false, "the lock was left behind");
+  });
+
+  await test(`${shell}: Chrome starts on the root the guard checked when the record goes A, B, A`, async (context) => {
+    const s = scene(context);
+    assert.equal(close(shell, s).code, 0);
+    const lock = join(s.state, "profiles", `${ALICE}.lock`);
+    const rootB = `${s.root}-b`;
+    cpSync(s.root, rootB, { recursive: true });
+    const recordA = readFileSync(s.record, "utf8");
+    writeFileSync(join(s.home, "hold2"), "");
+    const opener = spawn(
+      shell,
+      [script, "open-clone", s.state, s.record, NAMESPACE, ALICE, "headed"],
+      {
+        stdio: "ignore",
+        env: s.vars({ STUB_HOLD_LOCK: lock, STUB_OPENING_FILE: s.stateFile() }),
+      },
+    );
+    const ended = new Promise((resolve) => opener.on("close", resolve));
+    const reached = async (name) => {
+      for (let waited = 0; !existsSync(join(s.home, name)) && waited < 100; waited++)
+        await sleep(100);
+      assert.equal(existsSync(join(s.home, name)), true, `the opener never reached ${name}`);
+    };
+    await reached("held2"); // pinned on A, before open_profile reads the record
+    writeFileSync(s.record, recordA.replaceAll(s.root, rootB));
+    writeFileSync(join(s.home, "hold"), "");
+    rmSync(join(s.home, "hold2"));
+    await reached("held"); // open_profile read B and is about to build its arguments
+    writeFileSync(s.record, recordA);
+    rmSync(join(s.home, "hold"));
+    await ended;
+    const roots = existsSync(`${s.vars().STUB_LOG}.roots`)
+      ? readFileSync(`${s.vars().STUB_LOG}.roots`, "utf8").split("\n").filter(Boolean)
+      : [];
+    assert.deepEqual(
+      roots.filter((root) => root !== s.root),
+      [],
+      "Chrome was started on a root other than the one checked",
+    );
   });
 }
