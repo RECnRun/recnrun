@@ -13,6 +13,9 @@
 #                                           pid the state names, only while its command line is the Chrome of
 #                                           open.sh on exactly the user data dir (checked again before SIGKILL);
 #                                           --force adds SIGKILL after the wait; stderr names the ending signal
+#   adopt <state-dir> <record> <namespace> <profileId> <downloadsRoot> <boot>
+#                                           records the profile open: an acked open.sh bind is the proof, even
+#                                           when the Chrome that answered was already running (no launch pass)
 #   status <state-dir>                      profileId status pid attempts nextAt, one line each
 #
 # State, <state-dir>/profiles/<profileId>: key=value lines with token, pid, startedAt, attempts,
@@ -84,6 +87,31 @@ do_resume() {
   st_status=idle
 }
 do_reset() { st_attempts=0 st_next=0; }
+# Records an acked profile as open, with the root's main Chrome as its pid when one is found.
+adopt_profile() {
+  case $st_status in paused | stopped) die 73 "$lc_id is $st_status: resume it first" ;; esac
+  st_pid=''
+  state_set pid "$(main_pid_of "$p_user" || :)"
+  state_set status open
+  state_set startedAt "$(date +%s)"
+  state_set attempts 0
+  state_set nextAt 0
+  state_set boot "$ad_boot"
+  state_set root "$ad_root"
+  state_set userDataDir "$p_user"
+  st_shared=0
+  if root_is_shared "$p_user" "$ad_record"; then st_shared=1; fi
+}
+cmd_adopt() {
+  [ "$#" -eq 6 ] || die 64 'usage: adopt <state-dir> <record> <namespace> <profileId> <downloadsRoot> <boot>'
+  is_namespace "$3" || die 65 'the namespace is not a namespace'
+  is_v4 "$4" || die 65 'the profile id is not a lowercase v4 uuid'
+  is_uuid "$6" || die 65 'the boot is not a uuid'
+  is_directory "$5" || die 65 'the Downloads root is not an absolute directory'
+  find_profile "$2" "$3" "$4"
+  ad_record=$2 ad_root=$5 ad_boot=$6
+  mutate "$1" "$4" adopt_profile
+}
 cmd_status() {
   state_dir "$1"
   for ss_file in "$1"/profiles/*; do
@@ -222,7 +250,7 @@ cmd_unlock() {
 }
 
 if [ -z "$lifecycle_as_library" ]; then
-  [ "$#" -ge 2 ] || die 64 'usage: lifecycle.sh lock|unlock|request|pause|resume|reset|stop|status <state-dir> ...'
+  [ "$#" -ge 2 ] || die 64 'usage: lifecycle.sh lock|unlock|request|adopt|pause|resume|reset|stop|status <state-dir> ...'
   lc_command=$1
   shift
   trap 'exit 143' TERM
@@ -236,6 +264,7 @@ if [ -z "$lifecycle_as_library" ]; then
     request) cmd_request "$@" ;;
     pause) mutate "$1" "${2:-}" do_pause ;;
     resume) mutate "$1" "${2:-}" do_resume ;;
+    adopt) cmd_adopt "$@" ;;
     reset) mutate "$1" "${2:-}" do_reset ;;
     stop) cmd_stop "$@" ;;
     status) cmd_status "$1" ;;

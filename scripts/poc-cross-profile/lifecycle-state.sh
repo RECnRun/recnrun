@@ -47,13 +47,25 @@ is_chrome_of() {
   case $1 in "$ic_bin "*) ;; *) return 1 ;; esac
   names_root "$1" "$2"
 }
+# True when the command line $1 is the Chrome of open.sh started with no --user-data-dir at all: the
+# person's own Chrome (Dock, Start menu), which runs on the OS default root.
+is_flagless_chrome() {
+  case $1 in *" --user-data-dir="*) return 1 ;; esac
+  ifc_bin=$(chrome_binary) || return 1
+  case $1 in "$ifc_bin" | "$ifc_bin "*) return 0 ;; esac
+  return 1
+}
 # The main Chrome process of the user data dir $1 (no --type= word): one that is not the pid open.sh
-# started, else that pid itself, which is the main when no Chrome ran on the root before.
+# started, else that pid itself, which is the main when no Chrome ran on the root before. On the OS
+# default root a Chrome with no --user-data-dir flag counts too.
 main_pid_of() {
   mp_self=''
+  mp_default=$(default_root)
   while read -r mp_pid mp_cmd; do
     case $mp_cmd in *" --type="*) continue ;; esac
-    names_root "$mp_cmd" "$1" || continue
+    if ! names_root "$mp_cmd" "$1"; then
+      { [ "$1" = "$mp_default" ] && is_flagless_chrome "$mp_cmd"; } || continue
+    fi
     if [ "$mp_pid" != "$st_pid" ]; then
       printf '%s\n' "$mp_pid"
       return 0

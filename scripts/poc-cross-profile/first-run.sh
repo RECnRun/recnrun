@@ -16,7 +16,8 @@
 # A shared profile (several profiles download to one folder, the usual layout) and an unbound one
 # (no presence yet) are bound by a token ack instead: `open.sh bind` starts Chrome on the profile and
 # takes the profileId and the Downloads root from the ack that carries its token. That Chrome is
-# left running. A profile that does not ack is left out and the run exits 70 naming it; the record
+# left running, or is the Chrome already running on the root, and the ack counts as the open: the state is
+# written open (lifecycle.sh adopt) so the launcher's pass does not open the profile again. A profile that does not ack is left out and the run exits 70 naming it; the record
 # never gets a profile the extension did not ack.
 #
 # Output: one line per profile, `<profileId> <status>`, then the autostart command to run next.
@@ -120,11 +121,12 @@ bind_row() {
     return 0
   fi
   br_out=$(RECNRUN_DISCOVERY_LIB='' /bin/sh "$fr_dir/open.sh" bind "$br_root" "$br_name" "$fr_ns") || br_out=''
-  br_id='' br_downloads=''
+  br_id='' br_downloads='' br_boot=''
   while IFS= read -r br_line; do
     case $br_line in
       profileId=*) br_id=${br_line#profileId=} ;;
       root=*) br_downloads=${br_line#root=} ;;
+      boot=*) br_boot=${br_line#boot=} ;;
     esac
   done <<EOF
 $br_out
@@ -136,6 +138,13 @@ EOF
   fi
   register_profile "$br_id" "$br_root" "$br_name" "$br_downloads"
   fr_ids=$fr_ids$br_id$nl
+  adopt_open "$br_id" "$br_downloads" "$br_boot"
+}
+# The ack is the proof that Chrome opened the profile, also when it was the Chrome already running:
+# the state says so, and the launcher's pass does not open it again.
+adopt_open() {
+  RECNRUN_DISCOVERY_LIB='' /bin/sh "$fr_dir/lifecycle.sh" adopt "$fr_state" "$fr_record" "$fr_ns" "$1" "$2" "$3" >&2 ||
+    log "$1: could not record the open; the launcher's pass opens it"
 }
 # Registers each distinct profile and binds the others; sets fr_ids to the ids of those, one per line.
 register_all() {
