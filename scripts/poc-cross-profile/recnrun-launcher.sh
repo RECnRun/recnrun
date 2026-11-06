@@ -171,6 +171,15 @@ run_clone_control() {
   cc_code=$?
   la_child=''
   case $cc_code in 0) ;; 75) log "clone-control.sh: exit $cc_code, not an error" ;; *) log "clone-control.sh: exit $cc_code" ;; esac
+  forget_opened
+}
+# An explicit Open of a clone is a fresh start: the clone leaves the skipped list and the note is consumed.
+forget_opened() {
+  [ -f "$la_state/control/opened" ] || return 0
+  while IFS= read -r fo_id; do
+    [ -z "$fo_id" ] || la_skipped=$(printf '%s' "$la_skipped" | sed "s/ $fo_id / /")
+  done <"$la_state/control/opened"
+  rm -f -- "$la_state/control/opened"
 }
 run_catalog() {
   pass_roots=$(record_downloads_roots "$1" "$2") || return 0
@@ -186,6 +195,7 @@ run_pass() {
     log "cannot read the record $2"
     return 0
   fi
+  run_clone_control "$1" "$2" "$3"
   while IFS= read -r pass_id; do
     [ -n "$pass_id" ] || continue
     case $la_skipped in *" $pass_id "*) continue ;; esac
@@ -194,7 +204,6 @@ run_pass() {
 $pass_ids
 EOF
   run_provision "$1" "$2" "$3"
-  run_clone_control "$1" "$2" "$3"
   run_catalog "$2" "$3"
 }
 cmd_start() {

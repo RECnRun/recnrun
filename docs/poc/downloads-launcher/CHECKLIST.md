@@ -509,6 +509,13 @@ Plan: [PLAN.md](PLAN.md#dashboard-control-of-clones-p75p78). The master's dashbo
   - contradiction resolved: the plan says to exit 0 when the master has no `control` folder, but the dashboard needs `clones.json` before any request exists, so the launcher makes `control/` when `RECnRun/poc/<ns>` is a plain path
   - commit: the commit with subject "Let the launcher open and close clones for the master"
 
+- [i] P7.5b Codex plan review amendments: transitions in `lifecycle.sh`, safety and ordering rules
+  - red: `node --test scripts/poc-cross-profile/lifecycle-control.checks.mjs` against `close`/`open-clone` stubs, and `clone-control-rules.checks.mjs` and `launcher-control.checks.mjs` against the P7.5 code: supersession, linked folder, duplicate and non-Default blocks, an open under way, a timed-out reopen opening again, and `expected: 'done'` / `actual: 'refused'` ("already runs in headed; close it first") for an `open-headless` that the automatic request opened headed first
+  - green: `lifecycle-control.checks.mjs` 22, `clone-control-rules.checks.mjs` 16, `clone-control.checks.mjs` and `launcher-control.checks.mjs` pass on `sh` and `dash`
+  - applied: findings 1-3 (root equality, link-free path and marker id, one Default block, `root_is_shared` before any stop), 4 (control step before the automatic requests, skipped list cleared by an explicit open), 5 (already the mode key of P7.5.0), 6 (stop timeout keeps the intent and reports error; reopen does not open after it), 7 (an explicit Open adopts a running clone), 8 (one call handles every pending request), 9 (per-clone order, newer supersedes older), 12 (transitions in `lifecycle.sh`); 10 and the UI part of 9 follow in P7.6
+  - rejected: the "serialize Close with the spawn" half of finding 6; a close during an open attempt is a refusal (75) instead, and an abandoned attempt older than `RECNRUN_OPEN_TIMEOUT_S` can be closed. Finding 11 does not apply (the coordinator runs `verify`)
+  - commit: the commit with subject "Move clone transitions into lifecycle.sh and tighten their rules"
+
 ## P8: With and without `chrome.debugger`
 
 - [ ] P8.1 D2 operation

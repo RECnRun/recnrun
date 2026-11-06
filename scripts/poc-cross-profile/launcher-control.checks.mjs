@@ -26,4 +26,13 @@ for (const shell of shells) {
     assert.equal(result.code, 0, result.err);
     assert.equal(s.clones().clones[0].instanceId, CLONE);
   });
+
+  await test(`${shell}: start --once handles the owner's request before the automatic open`, (context) => {
+    const s = controlScene(context);
+    s.write({ action: "open-headless" });
+    const result = once(shell, s);
+    assert.equal(result.code, 0, result.err);
+    assert.equal(s.status().state, "done", s.status().raw);
+    assert.equal(s.field("mode", CLONE), "headless");
+  });
 }

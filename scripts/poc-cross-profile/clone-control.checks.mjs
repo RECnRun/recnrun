@@ -88,7 +88,7 @@ for (const shell of shells) {
     const ran = s.run(shell);
     assert.equal(ran.code, 0, ran.err);
     untouched(s, before);
-    assert.match(s.status().message, /already runs headless; close it before opening it visible/);
+    assert.match(s.status().message, /already runs in headless; close it first/);
   });
 
   await test(`${shell}: open in the mode that already runs is done without a launch`, (context) => {
@@ -98,7 +98,7 @@ for (const shell of shells) {
     s.write({ action: "open-headless" });
     assert.equal(s.run(shell).code, 0);
     assert.equal(s.status().state, "done");
-    assert.match(s.status().message, /already open headless/);
+    assert.match(s.status().message, /opened w1 headless/);
     assert.equal(s.launches(), before);
   });
 

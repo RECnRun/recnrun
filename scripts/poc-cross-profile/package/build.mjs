@@ -29,6 +29,7 @@ export const LIBRARIES = [
   "lifecycle.sh",
   "lifecycle-state.sh",
   "lifecycle-launch.sh",
+  "lifecycle-control.sh",
   "open.sh",
   "record.sh",
   "master-role.sh",

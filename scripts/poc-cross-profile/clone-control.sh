@@ -17,17 +17,22 @@
 # (another namespace or master, createdAt older than 10 minutes or more than 5 s ahead, an instanceId
 # that is not a worker clone of the record under a folder named clones with a matching marker, an
 # open of the clone under way) gets state=refused and nothing is launched or signalled.
-#   action        what it does
-#   close         lifecycle.sh stop (SIGINT only, never SIGTERM or SIGKILL), which holds the clone closed
-#                 until an open; a Chrome the lifecycle state does not record gets the same SIGINT
+#   action        what it does (the transitions are lifecycle.sh close and open-clone, under the profile lock)
+#   close         SIGINT only, never SIGTERM or SIGKILL; holds the clone closed until an open. Refused before
+#                 any signal when the state names another root, the root is shared, or an open is under way
 #   open-headless | open-visible
-#                 lifecycle.sh resume, reset, request in that mode; a clone already open in that mode is
-#                 done, one open in the other mode is refused (reopen instead)
+#                 resumes the clone and opens it in that mode; a running Chrome of that mode is adopted, one
+#                 of the other mode is refused (reopen instead)
 #   reopen-headless | reopen-visible
-#                 close, then open in that mode; a closed clone is only opened
+#                 close, then open in that mode; a closed clone is only opened; a close that times out
+#                 is an error and nothing opens
+# Several pending requests are handled in one call, per clone ordered by createdAt: the newest runs and
+# the older ones are refused as superseded. A successful open is listed in <state-dir>/control/opened so
+# the launcher forgets that it skipped the clone. A clone must be the one Default profile block of its
+# instanceId, under clones/ with no linked folder, and its marker must name the request's instanceId.
 # Each request keeps <state-dir>/control/<requestId> (key=value lines action, instanceId, state,
 # message); a state of done, refused, or error is final and never runs again, a request found
-# running was interrupted and becomes error. One new request is handled per call.
+# running was interrupted and becomes error.
 # <control>/<requestId>/status.json is the launcher's, replaced by rename:
 #   {"requestId","action","instanceId","state":"running|done|refused|error","message","updatedAt"}
 # <control>/clones.json lists the worker clones, rewritten on every call:
@@ -67,7 +72,11 @@ record_hook_block() {
       cc_masters=$((cc_masters + 1))
       cc_master_id=$b_id cc_master_root=$b_downloads
       ;;
-    worker) [ -z "$b_user" ] || cc_workers="$cc_workers$b_id=$b_user$cc_nl" ;;
+    worker)
+      # A block that is not the Default profile of its root is listed without a root, so it never qualifies.
+      [ -z "$b_user" ] || [ "$b_profile" = Default ] || b_user=''
+      cc_workers="$cc_workers$b_id=$b_user$cc_nl"
+      ;;
   esac
 }
 # Sets cc_master_id, cc_master_root, cc_control, and cc_workers (id=userDataDir lines), or fails.
@@ -134,18 +143,25 @@ request_file_ok() {
 # Sets cc_root and cc_name to the clone of instance $1 the record registers, when its root is a plain
 # clone under a folder named clones whose marker belongs to that instance and this namespace.
 eligible_clone() {
-  cc_root=''
+  cc_root='' ec_count=0
   while IFS= read -r ec_line; do
-    [ "${ec_line%%=*}" = "$1" ] && cc_root=${ec_line#*=}
+    [ "${ec_line%%=*}" = "$1" ] || continue
+    cc_root=${ec_line#*=}
+    ec_count=$((ec_count + 1))
   done <<WORKERS
 $cc_workers
 WORKERS
-  [ -n "$cc_root" ] || { rq_why='that profile is not a worker clone of the record'; return 1; }
+  [ "$ec_count" -le 1 ] || { rq_why='the record names that profile in more than one worker block'; return 1; }
+  [ -n "$cc_root" ] || { rq_why='that profile is not the Default profile of a worker clone of the record'; return 1; }
   cc_name=${cc_root##*/}
   ec_parent=${cc_root%/*}
   case $cc_name in '' | .* | *[!A-Za-z0-9_-]*) rq_why="$cc_root is not a published clone root"; return 1 ;; esac
   [ "${ec_parent##*/}" = clones ] || { rq_why="$cc_root is not under a folder named clones"; return 1; }
   [ -d "$cc_root" ] && [ ! -L "$cc_root" ] || { rq_why="$cc_root is not a plain folder"; return 1; }
+  # Every component below the first is checked: macOS itself links /var, /tmp, and /etc.
+  ec_top=${cc_root#/}
+  ec_top=${ec_top%%/*}
+  no_link_below "/$ec_top" "${cc_root#/"$ec_top"/}" || { rq_why="$cc_root has a link in its path"; return 1; }
   is_plain_file "$cc_root/.recnrun-clone" && read_clone_marker "$cc_root/.recnrun-clone" "$cc_name" || { rq_why="$cc_root has no valid clone marker"; return 1; }
   [ "$lc_id" = "$1" ] && [ "$(sed -n 4p "$cc_root/.recnrun-clone")" = "namespace=$ns" ] || { rq_why="the marker of $cc_name belongs to another instance or namespace"; return 1; }
 }
@@ -221,72 +237,40 @@ last_error_line() { clean_message "$(grep -v '^[[:space:]]*$' "$cc_run/err" 2>/d
 
 # --- The actions -------------------------------------------------------------------------------
 
-# SIGINT to the Chrome of the root that the lifecycle state did not record; fails after answering.
-signal_stray() {
-  ss_pid=$(running_pid)
-  [ -n "$ss_pid" ] || return 0
-  ss_cmd=$(ps -o command= -p "$ss_pid" 2>/dev/null)
-  if ! is_chrome_of "$ss_cmd" "$cc_root"; then
-    put_op refused "pid $ss_pid is not the Chrome of $cc_name: not signalled"
-    return 1
-  fi
-  kill -INT "$ss_pid" 2>/dev/null
-  ss_waited=0
-  while pid_alive "$ss_pid" && [ "$ss_waited" -lt "$cc_stop_s" ]; do
-    sleep 1
-    ss_waited=$((ss_waited + 1))
-  done
-  pid_alive "$ss_pid" || return 0
-  put_op error "pid $ss_pid still runs after $cc_stop_s s"
-  return 1
-}
-# Stops the clone and holds it closed; on failure it has answered and fails.
+# Closes the clone through lifecycle.sh close (SIGINT only, checked against the record, held closed);
+# sets cc_was to 1 when a Chrome ended. On failure it has answered and fails.
 close_clone() {
-  cc_was=$(running_pid)
-  run_life stop "$cc_state" "$rq_instance"
+  run_life close "$cc_state" "$record" "$ns" "$rq_instance"
   case $rl_code in
-    0) ;;
-    70)
-      cl_pid=$(running_pid)
-      if [ -n "$cl_pid" ]; then put_op error "pid $cl_pid still runs after $cc_stop_s s"; else put_op refused "$(last_error_line)"; fi
-      return 1
+    0)
+      cc_was=0
+      if grep -q '^was=1$' "$cc_run/out"; then cc_was=1; fi
+      return 0
       ;;
-    65) put_op refused "$(last_error_line)"; return 1 ;;
-    *) put_op error "stop exit $rl_code: $(last_error_line)"; return 1 ;;
+    65 | 70 | 75) put_op refused "$(last_error_line)" ;;
+    74) put_op error "$(last_error_line)" ;;
+    *) put_op error "close exit $rl_code: $(last_error_line)" ;;
   esac
-  signal_stray
+  return 1
 }
 act_close() {
   close_clone || return 0
-  if [ -n "$cc_was" ]; then put_op done "closed $cc_name"; else put_op done 'already closed'; fi
+  if [ "$cc_was" = 1 ]; then put_op done "closed $cc_name"; else put_op done 'already closed'; fi
 }
-# Opens the held-closed clone in mode $1 (headed or headless) and answers.
+# Opens the clone in mode $1 (headed or headless) through lifecycle.sh open-clone and answers.
 launch_clone() {
-  for lc_step in resume reset; do
-    run_life "$lc_step" "$cc_state" "$rq_instance"
-    [ "$rl_code" -eq 0 ] || { put_op error "$lc_step exit $rl_code: $(last_error_line)"; return 0; }
-  done
-  run_life request "$cc_state" "$record" "$ns" "$rq_instance" "$1"
+  run_life open-clone "$cc_state" "$record" "$ns" "$rq_instance" "$1"
   case $rl_code in
-    0) ;;
-    65 | 66) put_op refused "$(last_error_line)"; return 0 ;;
-    69) put_op error "no ack within ${RECNRUN_OPEN_TIMEOUT_S:-60} s"; return 0 ;;
-    *) put_op error "request exit $rl_code: $(last_error_line)"; return 0 ;;
+    0)
+      printf '%s\n' "$rq_instance" >>"$cc_state/control/opened"
+      put_op done "opened $cc_name $1"
+      ;;
+    65 | 66 | 73 | 75) put_op refused "$(last_error_line)" ;;
+    69) put_op error "no ack within ${RECNRUN_OPEN_TIMEOUT_S:-60} s" ;;
+    *) put_op error "open exit $rl_code: $(last_error_line)" ;;
   esac
-  if [ -n "$(running_pid)" ]; then put_op done "opened $cc_name $1"; else put_op error "no Chrome runs on $cc_name after the open"; fi
 }
-act_open() {
-  ao_pid=$(running_pid)
-  [ -n "$ao_pid" ] || { launch_clone "$1"; return 0; }
-  ao_have=$(mode_of_pid "$ao_pid")
-  ao_word=$1
-  [ "$ao_word" != headed ] || ao_word=visible
-  if [ "$ao_have" = "$1" ]; then
-    put_op done "already open $1"
-  else
-    put_op refused "$cc_name already runs ${ao_have:-in an unknown mode}; close it before opening it $ao_word"
-  fi
-}
+act_open() { launch_clone "$1"; }
 act_reopen() {
   close_clone || return 0
   launch_clone "$1"
@@ -315,28 +299,52 @@ handle_request() {
     put_op refused "$rq_why"
     return 0
   fi
-  if [ "$(life_status "$rq_instance")" = opening ]; then
-    put_op refused "an open of $cc_name is under way"
-    return 0
-  fi
   perform
 }
-advance_request() {
+# Adds "createdAt id instance action" of the still unanswered request $1 to cc_pending; one that is not
+# in the closed grammar counts as time 0 with no instance, so handle_request answers it.
+note_pending() {
   rq_id=$1
-  read_op "$rq_id" || { log "ignored the state of $rq_id: not in the closed grammar"; return 0; }
+  parse_request "$cc_control/$1/request.json" "$1" || { rq_created=0 rq_instance='' rq_action=''; }
+  cc_pending="$cc_pending${cc_pending:+$cc_nl}$rq_created $1 ${rq_instance:--} ${rq_action:--}"
+}
+# Handles the pending requests oldest first; a request that a newer one for the same clone follows
+# is superseded, so a late click can never be undone by an earlier one.
+run_pending() {
+  rp_seen=' ' rp_keep=''
+  while read -r rp_created rp_id rp_inst rp_action; do
+    case $rp_seen in
+      *" $rp_inst "*)
+        rq_id=$rp_id op_action=$rp_action op_instance=$rp_inst
+        put_op refused 'superseded by a newer request for the same clone'
+        continue
+        ;;
+    esac
+    [ "$rp_inst" = - ] || rp_seen="$rp_seen$rp_inst "
+    rp_keep="$rp_id${rp_keep:+$cc_nl$rp_keep}"
+  done <<PENDING
+$(printf '%s\n' "$cc_pending" | LC_ALL=C sort -k1,1nr -k2,2r)
+PENDING
+  while IFS= read -r rq_id; do
+    [ -z "$rq_id" ] || handle_request
+  done <<KEPT
+$rp_keep
+KEPT
+}
+advance_request() {
+  read_op "$1" || { log "ignored the state of $1: not in the closed grammar"; return 0; }
   case $op_state in
     done | refused | error) return 0 ;;
     running)
+      rq_id=$1
       put_op error 'interrupted; ask again'
       return 0
       ;;
   esac
-  [ "$cc_handled" -eq 0 ] || return 0
-  cc_handled=1
-  handle_request
+  note_pending "$1"
 }
 scan_requests() {
-  cc_handled=0
+  cc_pending=''
   for sr_folder in "$cc_control"/*/; do
     sr_id=${sr_folder%/}
     sr_id=${sr_id##*/}
@@ -350,6 +358,7 @@ scan_requests() {
     fi
     advance_request "$sr_id"
   done
+  [ -z "$cc_pending" ] || run_pending
 }
 
 # --- clones.json -------------------------------------------------------------------------------

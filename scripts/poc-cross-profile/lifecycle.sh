@@ -33,6 +33,11 @@
 # Stop policy: stop is the owner's decision, so a stopped profile is held like a paused one (request
 # exits 73) until resume; resume turns a paused or stopped profile into idle, which request launches.
 #
+#   close <state-dir> <record> <namespace> <profileId> | open-clone ... <headed|headless>
+#                                           the owner's explicit close and open of one clone, checked against the
+#                                           record before any signal or launch (lifecycle-control.sh); close 74
+#                                           when the Chrome outlives the wait
+#
 # Shared roots: profiles of one user data dir live in one Chrome (the process singleton forwards a
 # second open to it and the new process exits), so the pid of any profile is that main process after
 # its ack (shared or not: the person may have the root open already), found by its command line; stop is refused (70) because a signal would close every
@@ -59,6 +64,8 @@ umask 077
 . "$(dirname -- "$0")/lifecycle-state.sh"
 # shellcheck source=lifecycle-launch.sh
 . "$(dirname -- "$0")/lifecycle-launch.sh"
+# shellcheck source=lifecycle-control.sh
+. "$(dirname -- "$0")/lifecycle-control.sh"
 
 log() { printf 'lifecycle.sh: %s\n' "$*" >&2; }
 die() {
@@ -271,6 +278,8 @@ if [ -z "$lifecycle_as_library" ]; then
     adopt) cmd_adopt "$@" ;;
     reset) mutate "$1" "${2:-}" do_reset ;;
     stop) cmd_stop "$@" ;;
+    close) cmd_close "$@" ;;
+    open-clone) cmd_open_clone "$@" ;;
     status) cmd_status "$1" ;;
     *) die 64 "unknown command $lc_command" ;;
   esac
