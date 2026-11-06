@@ -24,7 +24,12 @@ const POC =
   import.meta.env.MODE === "poc-d0" ||
   import.meta.env.MODE === "poc-d1" ||
   import.meta.env.MODE === "poc-d2";
-if (POC) void import("@/onboarding/mount").then(({ mountPrepareWorkers }) => mountPrepareWorkers());
+if (POC) {
+  void import("@/onboarding/mount").then(({ mountPrepareWorkers }) => mountPrepareWorkers());
+  void import("@/onboarding/clone-control-mount").then(({ mountCloneControl }) =>
+    mountCloneControl(),
+  );
+}
 
 const root = document.getElementById("app");
 if (root) {

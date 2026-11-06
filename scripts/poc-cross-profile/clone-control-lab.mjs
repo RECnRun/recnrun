@@ -61,19 +61,30 @@ const workerBlock = (root, id, downloads) =>
     `downloadsRoot=${downloads}`,
   ].join("\n");
 
+/** The block of a master that is a real extension profile: its id and the Downloads root it writes to. */
+const realMasterBlock = (home, real) =>
+  [
+    `userDataDir=${home}/Master`,
+    "profileDirectory=Default",
+    `profileId=${real.id}`,
+    `namespace=${NAMESPACE}`,
+    "role=master",
+    `downloadsRoot=${real.downloads}`,
+  ].join("\n");
+
 /** Lays out the master's folders, a clone `w1` under clones/, a stray one outside it, and the record. */
-function layout(s) {
+function layout(s, real) {
   const downloads = join(s.home, "Downloads");
-  const master = join(s.home, "master-downloads");
+  const master = real?.downloads ?? join(s.home, "master-downloads");
   const control = join(master, "RECnRun/poc", NAMESPACE, "control");
   const root = makeClone(join(s.home, "bases/clones"), "w1", CLONE);
   const stray = makeClone(join(s.home, "bases/other"), "w2", OTHER);
   mkdirSync(join(s.home, "Master"), { recursive: true });
   mkdirSync(join(downloads, "RECnRun/poc", NAMESPACE), { recursive: true });
-  announce(master, presence(MASTER));
+  if (!real) announce(master, presence(MASTER));
   mkdirSync(control, { recursive: true });
   const blocks = [
-    masterBlock(s.home),
+    real ? realMasterBlock(s.home, real) : masterBlock(s.home),
     workerBlock(root, CLONE, downloads),
     workerBlock(stray, OTHER, downloads),
   ];
@@ -101,10 +112,10 @@ function accessors(control) {
   };
 }
 
-/** The lifecycle scene with a master, a worker clone `w1` under clones/, and a second one outside it. */
-export function controlScene(context, defaults = {}) {
+/** The lifecycle scene with a master, a worker clone `w1` under clones/, and a second one outside it; `real` is a master that is a real profile: `{ id, downloads }`. */
+export function controlScene(context, defaults = {}, real) {
   const s = scene(context, { STUB_PROFILE: CLONE, ...defaults });
-  const placed = layout(s);
+  const placed = layout(s, real);
   /** A stub Chrome on the clone root that no lifecycle state records. */
   const holdClone = (mode = "headed") => {
     const args = mode === "headless" ? ["--headless=new"] : [];

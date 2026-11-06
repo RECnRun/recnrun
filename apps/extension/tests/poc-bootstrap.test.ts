@@ -73,8 +73,27 @@ describe("startedOutward", () => {
     expect(add).not.toHaveBeenCalled();
   });
 
-  test("with poc, answers the ack, the provisioning and the prepare request", () => {
-    expect(bootstrapped(fakePresence(STATEMENT)).listeners).toHaveLength(4);
+  test("with poc, answers the ack, the provisioning, the prepare and the clone-control request", () => {
+    expect(bootstrapped(fakePresence(STATEMENT)).listeners).toHaveLength(5);
+  });
+
+  test("refuses the clone-control request of a profile that is not the master", async () => {
+    const { listeners } = bootstrapped(fakePresence(STATEMENT));
+    const reply = vi.fn();
+    const sender = { id: browser.runtime.id, url: browser.runtime.getURL("/dashboard.html") };
+    const message = {
+      type: "POC_CLONE_CONTROL",
+      choice: {
+        requestId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        action: "close",
+        instanceId: "11111111-1111-4111-8111-111111111111",
+      },
+    };
+    expect(listeners[4]?.(message, sender, reply)).toBe(true);
+    await vi.waitFor(() =>
+      expect(reply).toHaveBeenCalledWith({ ok: false, error: "Only the master controls clones." }),
+    );
+    expect(written).toEqual([]);
   });
 
   test("refuses the prepare request of a profile that is not the master", async () => {

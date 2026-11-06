@@ -50,6 +50,23 @@ export function operationPath(
   return `${namespaceFolder(namespace)}/ops/${operationId}/${file}`;
 }
 
+/** One file of a clone-control request, in the folder the launcher scans (POC PLAN.md P7.5). */
+export function controlPath(
+  namespace: string,
+  requestId: string,
+  file: "request.json" | "status.json",
+): string {
+  if (!v.is(TokenSchema, requestId)) {
+    throw new Error(`Invalid request id ${JSON.stringify(requestId)}: use a lowercase v4 uuid.`);
+  }
+  return `${namespaceFolder(namespace)}/control/${requestId}/${file}`;
+}
+
+/** The list of worker clones the launcher keeps for the master's dashboard. */
+export function clonesStatePath(namespace: string): string {
+  return `${namespaceFolder(namespace)}/control/clones.json`;
+}
+
 /** A profile id as a path segment, which only a uuid may be. */
 function profileSegment(profileId: string): string {
   if (!v.is(ProfileIdSchema, profileId)) {

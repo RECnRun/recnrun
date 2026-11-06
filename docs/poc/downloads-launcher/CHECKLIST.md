@@ -516,6 +516,12 @@ Plan: [PLAN.md](PLAN.md#dashboard-control-of-clones-p75p78). The master's dashbo
   - rejected: the "serialize Close with the spawn" half of finding 6; a close during an open attempt is a refusal (75) instead, and an abandoned attempt older than `RECNRUN_OPEN_TIMEOUT_S` can be closed. Finding 11 does not apply (the coordinator runs `verify`)
   - commit: the commit with subject "Move clone transitions into lifecycle.sh and tighten their rules"
 
+- [i] P7.6 The dashboard section "Clones": the master asks, the launcher answers
+  - red: unit and component layers: `npx vitest run tests/clone-control-schema.test.ts tests/poc-clone-control.test.ts tests/clone-control-service.test.ts tests/poc-bootstrap.test.ts` (module-not-found stubs replaced by behavior stubs: wrong action list, unsigned request accepted, pending state never cleared); Docker browser spec `RECNRUN_TEST_QUIET=1 RECNRUN_EXPERIMENT_SAMPLES=smoke vp run test:browser -- tests/browser/clone-control.spec.ts` with the owner's close removed (negative control): `expect(rig.field("status")).toBe("stopped")` failed on the real launcher pass
+  - green: extension unit 1177 passed; `RECNRUN_TEST_QUIET=1 vp run test:components` 9 passed for the section and its mount; the browser spec 1 passed (button click -> request.json by chrome.downloads -> real launcher pass -> clones.json: open headless, Reopen visible, Close, three later passes held closed with no launch); `RECNRUN_TEST_QUIET=1 vp run test:scripts` 777 passed with ShellCheck
+  - applied: finding 10 (the spec runs the real launcher pass; the test writes neither clones.json nor status.json), the UI part of finding 9 (one request at a time, every button disabled while one is pending, stale answers ignored)
+  - commit: the commit with subject "Add a Clones section to the master's dashboard"
+
 ## P8: With and without `chrome.debugger`
 
 - [ ] P8.1 D2 operation
