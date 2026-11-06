@@ -495,12 +495,19 @@ Gate P7: verify · E13 · review [reviews/P7.md](reviews/P7.md) (Codex `gpt-6.1-
 
 ## Dashboard control of clones
 
-Plan: [PLAN.md](PLAN.md). The master's dashboard opens, closes, and reopens the worker clones, and opens a tab in a linked one.
+Plan: [PLAN.md](PLAN.md#dashboard-control-of-clones-p75p78). The master's dashboard opens, closes, and reopens the worker clones, and opens a tab in a linked one.
 
 - [i] P7.5.0 A clone reopens in the mode of its last open: a crashed headless clone relaunches headless
   - red: `node --test scripts/poc-cross-profile/lifecycle-mode.checks.mjs` 0 passed, 6 failed on `sh` and `dash` (`expected: 'headless'` for the recorded mode, `expected: 'headed'`, and a state with `mode=sideways` exited 0 instead of 65 because the key did not exist)
   - green: the same file 8 passed (the adopt case added); `node --test scripts/poc-cross-profile/{lifecycle,lifecycle-signal,commands,shellcheck,package}.checks.mjs scripts/check-docs.checks.mjs` pass; `vp check` clean
   - commit: the commit with subject "Reopen a crashed clone in the mode of its last open"
+
+- [i] P7.5 `clone-control.sh`: the launcher opens, closes, and reopens clones for the master's dashboard
+  - red: `node --test scripts/poc-cross-profile/clone-control.checks.mjs` against a stub that exits 0: 10 passed, 42 failed (`ENOENT ... control/<id>/status.json`; the 10 passing are the "ignored with no status" cases, validated by a scratch copy with the request file and folder checks removed: all 10 failed); `launcher-control.checks.mjs` with the `run_clone_control` call removed in a scratch copy: 4 failed (`ENOENT ... status.json` and `clones.json`); `package.checks.mjs`: `recnrun-launcher.sh uses clone-control.sh, which is not in LIBRARIES`; the resume/reset case: `resume poisoned the state`
+  - green: `clone-control.checks.mjs` 54 passed on `sh` and `dash`; `launcher-control.checks.mjs` 4 passed; `package.checks.mjs` 14 passed
+  - defect found and fixed: `lifecycle.sh resume` or `reset` on a profile with no state wrote `status=none`, which every later read refused as `invalid status`; `mutate` now writes nothing while the status is still `none`
+  - contradiction resolved: the plan says to exit 0 when the master has no `control` folder, but the dashboard needs `clones.json` before any request exists, so the launcher makes `control/` when `RECnRun/poc/<ns>` is a plain path
+  - commit: the commit with subject "Let the launcher open and close clones for the master"
 
 ## P8: With and without `chrome.debugger`
 

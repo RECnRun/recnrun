@@ -45,6 +45,7 @@ export const LIBRARIES = [
   "provision.sh",
   "clone.sh",
   "clone-open.sh",
+  "clone-control.sh",
   "extension-id",
 ];
 const OSES = {

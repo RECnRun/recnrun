@@ -11,7 +11,8 @@
 #       is never undone by the next pass). Exits 73, 75, 69, 71, and 70 of a request are logged, not
 #       errors; 65 and 66 are logged once and the profile skipped until the launcher restarts.
 #       After the requests of each pass it runs provision.sh once (the master's "Prepare workers" operations,
-#       one step per operation, P6.1; exits are logged), then catalog.sh once per distinct downloadsRoot the
+#       one step per operation, P6.1; exits are logged), then clone-control.sh once (the master's dashboard
+#       opens, closes, and reopens clones, P7.5; exits are logged), then catalog.sh once per distinct downloadsRoot the
 #       record registers in the namespace (the extension finds its peers only through the
 #       registry.json it writes); its exits are logged, not errors.
 #       --once runs one pass; otherwise it runs in the foreground, writes <state-dir>/launcher.pid,
@@ -163,6 +164,14 @@ run_provision() {
   la_child=''
   case $pv_code in 0) ;; 75) log "provision.sh: exit $pv_code, not an error" ;; *) log "provision.sh: exit $pv_code" ;; esac
 }
+run_clone_control() {
+  /bin/sh "$la_dir/clone-control.sh" run "$1" "$2" "$3" &
+  la_child=$!
+  wait "$la_child"
+  cc_code=$?
+  la_child=''
+  case $cc_code in 0) ;; 75) log "clone-control.sh: exit $cc_code, not an error" ;; *) log "clone-control.sh: exit $cc_code" ;; esac
+}
 run_catalog() {
   pass_roots=$(record_downloads_roots "$1" "$2") || return 0
   while IFS= read -r pass_root; do
@@ -185,6 +194,7 @@ run_pass() {
 $pass_ids
 EOF
   run_provision "$1" "$2" "$3"
+  run_clone_control "$1" "$2" "$3"
   run_catalog "$2" "$3"
 }
 cmd_start() {

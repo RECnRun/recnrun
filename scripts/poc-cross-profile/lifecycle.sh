@@ -77,6 +77,8 @@ mutate() {
   trap 'release_lock "$lc_lock" "$$"' EXIT
   read_state "$1/profiles/$2"
   "$3"
+  # A profile with no state stays without one: status none is not a status the reader accepts.
+  [ "$st_status" != none ] || return 0
   write_state
 }
 do_pause() { st_status=paused; }

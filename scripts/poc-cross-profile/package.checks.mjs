@@ -270,6 +270,7 @@ await test("LIBRARIES holds every script the shipped scripts source or run", () 
     "base.sh",
     "clone.sh",
     "clone-open.sh",
+    "clone-control.sh",
   ]) {
     assert.ok(LIBRARIES.includes(library), `${library} ships`);
   }

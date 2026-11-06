@@ -255,6 +255,20 @@ Goal: measure, per topology, whether workers start the extension and keep the of
 
 Gate P7: `vp run verify` exits 0; E11–E13 reports; §14 questions 5 and 6 computable. No separate review or push: fused with Gate P8 (owner decision 2026-11-04).
 
+### Dashboard control of clones (P7.5–P7.8)
+
+Goal (owner, 2026-11-06): the master's dashboard opens a clone headless or visible, closes it, reopens it in the other mode, and opens a tab in a linked one, so no terminal command is needed after the one-time install. Files carry no authority: the launcher re-checks every request, as it does for `ops/` (P6.1).
+
+- **P7.5 `clone-control.sh` (launcher).** The launcher runs it once per pass after `provision.sh`. It scans `<master downloadsRoot>/RECnRun/poc/<ns>/control/<requestId>/request.json` in the closed layout `{"requestId","kind":"clone-control","action","instanceId","namespace","masterProfileId","masterIdentity","createdAt"}`; `action` is `close`, `open-headless`, `open-visible`, `reopen-headless`, or `reopen-visible`. It writes `status.json` beside the request (`state` is `running`, `done`, `refused`, or `error`) and `control/clones.json` (each worker clone with `state` closed, opening, or open, the `mode`, and the `boot`). A request is ignored with no status when it is a link, over 4096 bytes, holds a NUL byte, or sits in a folder not named by a v4 uuid; it is refused with a status when it has another namespace or master, is older than 10 minutes or more than 5 s ahead, names a profile that is not a worker clone under a folder named `clones` with a matching `.recnrun-clone`, or the clone is opening.
+  Close is `lifecycle.sh stop` (SIGINT only, never SIGTERM or SIGKILL): the clone stays closed until an open from the dashboard. Open resumes, resets, and requests in the mode asked; open in the mode that already runs is done, and open in the other mode is refused, because a clone is never open headed and headless at once. Reopen closes, then opens in the mode asked, in one request; a closed clone is only opened. Each request keeps its state in `<state-dir>/control/<requestId>`; a final state never runs again, and a request found running was interrupted and becomes `error`. One new request is handled per pass.
+  The launcher makes `control/` itself (when `RECnRun/poc/<ns>` is a plain path) so `clones.json` exists before the first request: the extension needs the list to show a button.
+  Accept: `scripts/poc-cross-profile/clone-control.checks.mjs` and `launcher-control.checks.mjs` on `sh` and `dash`.
+- **P7.6 Dashboard control (extension).** The master's dashboard lists the clones from `clones.json` with Open visible, Open headless, Close, and, on an open clone, Reopen in the other mode; it writes the request and shows the status. Only the master mounts it.
+  Accept: unit and component tests; `tests/browser/clone-control.spec.ts`.
+- **P7.7 Open a tab in a linked clone.** The dashboard's remote-profile list gets an address field and an Open tab button that sends the existing open-tab command; no terminal.
+  Accept: component test; `tests/headless/dashboard-open-tab.spec.ts` (E13's setup, driven from the dashboard).
+- **P7.8 Manual check.** M-P7.a is done from the dashboard alone, Reopen included (owner).
+
 ### P8: With and without `chrome.debugger` (§10, §13 step 9)
 
 Goal: the viable modes and topologies run in D0, D1, and D2, built from the same code, on clean installs and on updates, with detach, failure, and ten-minute post-detach survival measured, and no external client in the D0/D1 approval runs.
