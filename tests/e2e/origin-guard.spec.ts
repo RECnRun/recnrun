@@ -30,7 +30,7 @@ test("answers its own page but ignores requests from another origin", async ({
   const forged = await context.newPage();
   await forged.goto(`${FORGED_ORIGIN}/`);
   const [site] = await Promise.all([
-    context.waitForEvent("page"),
+    forged.waitForEvent("popup"),
     forged.evaluate((url) => {
       (window as unknown as Observed).opened = window.open(url);
     }, `${baseURL}/`),
