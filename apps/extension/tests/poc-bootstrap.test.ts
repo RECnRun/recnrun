@@ -123,7 +123,7 @@ describe("startedOutward", () => {
     const TOKEN = "0f8b6a3e-2c1d-4e5f-9a7b-1c2d3e4f5a6b";
     const page = () => ({
       id: browser.runtime.id,
-      url: browser.runtime.getURL("/bootstrap.html"),
+      url: fakeBrowser.runtime.getURL("/bootstrap.html"),
     });
     async function askAck(listener: Listener | undefined, message: object) {
       const reply = vi.fn();
