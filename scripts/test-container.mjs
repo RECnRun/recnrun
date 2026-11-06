@@ -20,6 +20,7 @@ const tasks = new Set([
   "test:headless:local",
   "test:coverage:local",
   "test:scripts:local",
+  "lab:web-master:local",
 ]);
 // An internal bridge keeps eth0 for WebRTC host candidates and routes nothing out (POC P1.0).
 const network = "recnrun-tests";
@@ -157,6 +158,8 @@ async function startTests() {
       // The image's entry adds the on-link default route WebRTC needs (test-container-entry.sh).
       "--cap-add",
       "NET_ADMIN",
+      // The website-master lab's HTTPS stand-in for recnrun.com (docs/poc/thin-worker/PLAN.md §4).
+      ...(task === "lab:web-master:local" ? ["--add-host", "recnrun.test:127.0.0.1"] : []),
       ...environment,
       image,
       task,

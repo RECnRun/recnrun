@@ -1,0 +1,8 @@
+{
+  "manifest_version": 3,
+  "name": "RECnRun lab worker",
+  "version": "0.0.1",
+  "description": "Throwaway worker of the website-master spike: an offscreen document answers WebRTC offers.",
+  "permissions": ["offscreen"],
+  "background": { "service_worker": "background.js" }
+}

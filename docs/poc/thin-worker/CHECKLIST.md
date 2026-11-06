@@ -26,7 +26,10 @@ Phase 0 and later wait for Gate W. W.4 or W.9 failing stops the spike and goes s
 - [ ] W.1 Add `packages/link` (moved link modules), `packages/worker-protocol`, `apps/worker`, `apps/web-master-lab`; update ARCHITECTURE, dependency-cruiser, Vitest, coverage, jscpd, and Knip
 - [ ] W.2 Launcher move step from `<root>/downloads/RECnRun/` to the rendezvous folder
 - [ ] W.3 HTTPS stand-in `https://recnrun.test`; page onboarding and pairing; `persist()` answer recorded
-- [ ] W.4 Deciding cell `W.rtc` (stop the spike if it fails)
+- [i] W.4 Deciding cell `W.rtc` (stop the spike if it fails)
+  - red: scratch copy with the answer's DTLS fingerprint changed by one byte, `node scripts/test-container.mjs lab:web-master:local -- -g default`: failed, `Error: channel headed did not open`
+  - green: `vp run lab:web-master`: 2 passed (default, public), run `2026-11-06T22-18-09.019Z-886ddf42-a879-4c38-b371-798de8a1d80f`
+  - commit: see `git log -- tests/lab/web-master`
 - [ ] W.5 Cell `W.fsa` (tab and app)
 - [ ] W.6 Job schema, limits, errors, signature
 - [ ] W.7 Worker job runner, ledger, executor

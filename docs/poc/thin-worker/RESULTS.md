@@ -2,23 +2,37 @@
 
 The answers to [PLAN.md](PLAN.md), filled at each gate from asserting tests and the owner checks of [MANUAL_VALIDATION.md](MANUAL_VALIDATION.md). Until then this file only reserves the table.
 
-| ID  | Hypothesis                                                                                                          | Decided by                | Verdict | Evidence |
-| --- | ------------------------------------------------------------------------------------------------------------------- | ------------------------- | ------- | -------- |
-| W1  | H-W-RTC: a recnrun.com page links to separate-root workers with `iceServers: []`, no flag, mDNS kept                | `W.rtc`, M-TW.12, M-TW.13 |         |          |
-| W2  | H-W-FSA: the page, tab or installed app, keeps the folder and identity across restarts with no prompt               | `W.fsa`, M-TW.14          |         |          |
-| W3  | H-W-LIFECYCLE: a job finishes after the page closes, and reopening reconciles with no repeated mutation             | `W.lifecycle`, M-TW.15    |         |          |
-| W4  | H-W-TRUST: updates and cache clears keep identity, a site-data clear fails closed, worker limits bound changed code | `W.trust`                 |         |          |
-| W5  | H-W-FRICTION: the website path needs fewer gestures than the Store path                                             | `W.friction`, M-TW.12     |         |          |
-| H1  | H-FSA: a file-access-off master holds the rendezvous folder through restarts with zero prompts                      | `P1.master-fsa`, M-TW.1   |         |          |
-| H2  | H-CONSENT: "Allow on every visit" is obtained in the onboarding session                                             | `P1.master-fsa`, M-TW.1   |         |          |
-| H3  | H-DBG-HEADLESS: `chrome.debugger` drives headless clones with no debugging flag                                     | P1.13                     |         |          |
-| H4  | H-CSP: the five operations work under `script-src 'none'` with Trusted Types                                        | P1.13                     |         |          |
-| H5  | H-MOVE: the launcher moves only finished worker files into the rendezvous folder                                    | W.2, `P1.rendezvous-move` |         |          |
-| H6  | H-PIN: only the master key pinned at onboarding can command a worker                                                | P1.9, P1.14               |         |          |
-| H7  | H-REJECT: forbidden origins, stale documents, and code-carrying commands are refused before any effect              | P1.14                     |         |          |
-| H8  | H-DEDUPE: an acknowledged mutation is never repeated across restarts                                                | P1.15                     |         |          |
-| H9  | H-UPDATE: a stopped clone takes a new worker with identity, pin, and ledger intact                                  | P3.2, M-TW.8              |         |          |
-| H10 | H-SKEW: N−1 and N+1 negotiate or fail with a typed reason before any effect                                         | P4.1, P4.2                |         |          |
-| H11 | H-HEADED: headed clones show no infobar and report DevTools contention                                              | P5.1, P5.2, M-TW.3        |         |          |
-| H12 | H-GESTURES: install to first result within the owner's gesture target                                               | P6.2, M-TW.4              |         |          |
-| H13 | H-INSTALL: the one-line installer is idempotent, refuses bad downloads, and an AI review judges it safe             | P6.6–P6.8, P6.10, M-TW.9  |         |          |
+| ID  | Hypothesis                                                                                                          | Decided by                | Verdict                                 | Evidence                       |
+| --- | ------------------------------------------------------------------------------------------------------------------- | ------------------------- | --------------------------------------- | ------------------------------ |
+| W1  | H-W-RTC: a recnrun.com page links to separate-root workers with `iceServers: []`, no flag, mDNS kept                | `W.rtc`, M-TW.12, M-TW.13 | Lab PASS (Linux); M-TW.12, M-TW.13 open | [W1 lab run](#w1-lab-run-wrtc) |
+| W2  | H-W-FSA: the page, tab or installed app, keeps the folder and identity across restarts with no prompt               | `W.fsa`, M-TW.14          |                                         |                                |
+| W3  | H-W-LIFECYCLE: a job finishes after the page closes, and reopening reconciles with no repeated mutation             | `W.lifecycle`, M-TW.15    |                                         |                                |
+| W4  | H-W-TRUST: updates and cache clears keep identity, a site-data clear fails closed, worker limits bound changed code | `W.trust`                 |                                         |                                |
+| W5  | H-W-FRICTION: the website path needs fewer gestures than the Store path                                             | `W.friction`, M-TW.12     |                                         |                                |
+| H1  | H-FSA: a file-access-off master holds the rendezvous folder through restarts with zero prompts                      | `P1.master-fsa`, M-TW.1   |                                         |                                |
+| H2  | H-CONSENT: "Allow on every visit" is obtained in the onboarding session                                             | `P1.master-fsa`, M-TW.1   |                                         |                                |
+| H3  | H-DBG-HEADLESS: `chrome.debugger` drives headless clones with no debugging flag                                     | P1.13                     |                                         |                                |
+| H4  | H-CSP: the five operations work under `script-src 'none'` with Trusted Types                                        | P1.13                     |                                         |                                |
+| H5  | H-MOVE: the launcher moves only finished worker files into the rendezvous folder                                    | W.2, `P1.rendezvous-move` |                                         |                                |
+| H6  | H-PIN: only the master key pinned at onboarding can command a worker                                                | P1.9, P1.14               |                                         |                                |
+| H7  | H-REJECT: forbidden origins, stale documents, and code-carrying commands are refused before any effect              | P1.14                     |                                         |                                |
+| H8  | H-DEDUPE: an acknowledged mutation is never repeated across restarts                                                | P1.15                     |                                         |                                |
+| H9  | H-UPDATE: a stopped clone takes a new worker with identity, pin, and ledger intact                                  | P3.2, M-TW.8              |                                         |                                |
+| H10 | H-SKEW: N−1 and N+1 negotiate or fail with a typed reason before any effect                                         | P4.1, P4.2                |                                         |                                |
+| H11 | H-HEADED: headed clones show no infobar and report DevTools contention                                              | P5.1, P5.2, M-TW.3        |                                         |                                |
+| H12 | H-GESTURES: install to first result within the owner's gesture target                                               | P6.2, M-TW.4              |                                         |                                |
+| H13 | H-INSTALL: the one-line installer is idempotent, refuses bad downloads, and an AI review judges it safe             | P6.6–P6.8, P6.10, M-TW.9  |                                         |                                |
+
+## W1 lab run (`W.rtc`)
+
+Google Chrome 157.0.8103.38 on Linux (Docker image `sha256:ab532ec9e844`), run `2026-11-06T22-18-09.019Z-886ddf42-a879-4c38-b371-798de8a1d80f`, `vp run lab:web-master` (`tests/lab/web-master/w-rtc.spec.ts`), both variants passed. Fast track: the harness relays the SDP, so the folder signalling and its latency belong to W.fsa.
+
+- **Setup.** The master is a normal root with no extension, opened at `https://recnrun.test:<port>` (secure context, valid chain, no certificate flag; master flags: `--user-data-dir`, `--remote-debugging-port=0` to drive it, `--no-first-run`, `--no-sandbox` for root in the container). Two workers on roots of their own, one headed and one `--headless`, each an unpacked MV3 extension whose offscreen document (`WEB_RTC`) answers with `iceServers: []`.
+- **Deviation.** The test CA is trusted through the managed `CACertificates` policy, not Chrome's NSS store: the image has no `certutil`, and the policy is the documented trust path that needs no flag. `recnrun.test` maps to `127.0.0.1` through the runner's `--add-host`.
+- **Pass.** For each worker: the offer's only host candidate is an mDNS `.local` name, kept in the SDP; the data channel opened; the page verified the worker's ECDSA P-256 signature, under the key pinned before the offer, over a nonce and both DTLS fingerprints; 100 ping round trips.
+- **Selected pairs** (`getStats`): every link is `host` (the page's `.local`, address hidden in stats) to `host` `172.21.0.2` (the worker's plain IP), UDP. The worker offscreen documents offer plain IPs, as the plan expected.
+- **Timings** (default / public): answer applied to channel open 3.2 / 2.8 ms (headed) and 7.9 / 6.3 ms (headless); 100 pings 27.9 / 29.2 ms and 36.5 / 35.1 ms; two links from the first offer 586 / 548 ms.
+- **Variant `public`.** `--ip-address-space-overrides=127.0.0.1:<stand-in port>=public` scoped to the stand-in's endpoint: CDP reports the document and subresource as `Public` and the page's `initiatorIPAddressSpace` as `Public` (`Loopback` in the default variant), with `localNetworkAccessRequestPolicy: PermissionBlock` in both. The link to the worker's private address still came up with no prompt; `navigator.permissions.query({ name: "local-network-access" })` read `prompt` before and after, so WebRTC did not consult it on this revision `[unsure]` whether a later revision gates WebRTC. The restart repeat is moot with no prompt.
+- **Prompts.** None on the display in either variant (`display-default.png`, `display-public.png`).
+- **Negative control.** The same spec with the answer's DTLS fingerprint changed by one byte before the page applied it failed: `Error: channel headed did not open` after 20 s (scratch worktree, not committed).
+- **Not covered.** macOS (M-TW.13), the real origin (M-TW.12), and the folder signalling (W.fsa).

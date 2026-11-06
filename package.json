@@ -23,6 +23,8 @@
     "test:headless:local": "vp run --no-cache extension#build:poc-d0 && playwright test --config playwright.headless.config.ts",
     "test:experiments:local": "vp run --no-cache extension#build:test && vp run --no-cache extension#build:poc-d0 && playwright test --config playwright.experiments.config.ts",
     "test:host": "node scripts/test-host.mjs",
+    "lab:web-master": "node scripts/test-container.mjs lab:web-master:local",
+    "lab:web-master:local": "playwright test --config tests/lab/web-master/playwright.config.ts",
     "test:coverage": "node scripts/test-container.mjs test:coverage:local",
     "test:coverage:local": "vp test --coverage && node --test scripts/coverage.checks.mjs",
     "test:container": "node --test tests/container/runner.checks.mjs tests/container/verified.checks.mjs tests/container/image.checks.mjs",
