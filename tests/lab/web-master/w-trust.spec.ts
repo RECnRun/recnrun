@@ -29,7 +29,7 @@ import {
   updatedSite,
 } from "./trust-harness.ts";
 import type { Provision } from "./trust-harness.ts";
-import { refusals } from "./trust-refusals.ts";
+import { deadline, refusals } from "./trust-refusals.ts";
 
 /*
  * Cell W.trust of docs/poc/thin-worker/PLAN.md §4 (fast track): a site update and a cache-only
@@ -135,6 +135,13 @@ test("W.trust 3: changed same-origin code with the real key stays inside the wor
   expect(c.outside.posts).toHaveLength(0);
   expect(await provisioned(c.worker)).toEqual(c.pinned);
   c.evidence.hostile = outcomes;
+});
+
+test("W.trust 3b: the worker stops a job at its deadline", async () => {
+  const c = cell();
+  c.site.serve(await hostileSite());
+  const page = await reopen(c, "ready hostile");
+  c.evidence.deadline = await deadline(page, c);
 });
 
 const persist = (p: Page) => p.evaluate(() => (window as unknown as FsaWindow).lab.fsa.persist());

@@ -1,6 +1,6 @@
 // Throwaway master jobs: a non-extractable key, signed jobs, a journal, and reconcile (plan §6).
 const JOURNAL = "recnrun-lab-journal";
-const TERMINAL = new Set(["DONE", "FAILED", "INTERRUPTED"]);
+const TERMINAL = new Set(["DONE", "FAILED", "EXPIRED", "INTERRUPTED"]);
 const toBase64 = (buffer) => btoa(String.fromCharCode(...new Uint8Array(buffer)));
 
 export const canonical = (value) => {

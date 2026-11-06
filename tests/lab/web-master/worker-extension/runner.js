@@ -23,7 +23,9 @@ const step = async (context, index) => {
   await barrier(index, "between");
   await setOp(context, index, { state: MUTATING.has(entry.op) ? "APPLYING" : "RUNNING" });
   await barrier(index, "applying");
-  const outcome = await execute(context.target, entry, context.job.origins);
+  // The job's deadline bounds every op: at deadlineAt the running op ends with TIMEOUT.
+  const timeoutMs = Math.min(entry.timeoutMs, context.job.deadlineAt - Date.now());
+  const outcome = await execute(context.target, { ...entry, timeoutMs }, context.job.origins);
   await barrier(index, "afterEffect");
   await setOp(context, index, outcome);
   return outcome.state === "DONE";
@@ -35,7 +37,7 @@ const runOps = async (context) => {
     for (let rest = index + 1; rest < context.job.ops.length; rest += 1) {
       context.record.ops[rest] = { op: context.job.ops[rest].op, state: "SKIPPED" };
     }
-    return "FAILED";
+    return Date.now() >= context.job.deadlineAt ? "EXPIRED" : "FAILED";
   }
   return "DONE";
 };

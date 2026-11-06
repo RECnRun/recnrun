@@ -11,6 +11,7 @@ const MAX_OPS = 32;
 const MAX_OP_MS = 30_000;
 const MAX_JOB_MS = 600_000;
 const MAX_JOB_BYTES = 65_536;
+const CLOCK_SKEW_MS = 30_000;
 const MAX_SELECTOR = 512;
 const MAX_TEXT = 4096;
 const MAX_READ_BYTES = 16_384;
@@ -78,6 +79,12 @@ const shapeError = (job) => {
   return Number.isInteger(span) && span > 0 && span <= MAX_JOB_MS ? null : "INVALID_COMMAND";
 };
 
+// A future issuedAt would stretch the 10-minute cap; the cap holds against the worker's clock.
+const clockError = (job, now) => {
+  if (job.issuedAt > now + CLOCK_SKEW_MS) return "INVALID_COMMAND";
+  return job.deadlineAt - now > MAX_JOB_MS ? "INVALID_COMMAND" : null;
+};
+
 const originsError = (job, allowlist) => {
   const valid = Array.isArray(job.origins) && job.origins.length >= 1 && job.origins.length <= 8;
   if (!valid) return "INVALID_COMMAND";
@@ -99,6 +106,7 @@ const signatureValid = async (job, masterJwk) => {
 export const checkJob = async (job, { masterKey, allowlist }) => {
   const error =
     shapeError(job) ??
+    clockError(job, Date.now()) ??
     originsError(job, allowlist) ??
     job.ops.map((entry) => opError(entry, job.origins)).find(Boolean) ??
     null;

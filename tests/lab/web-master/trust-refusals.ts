@@ -1,8 +1,8 @@
 import type { Page } from "@playwright/test";
 import { expect } from "@playwright/test";
 import type { LoadedExtension } from "../../browser/fixtures/extension-loaders.ts";
-import { background, jobOps } from "./lifecycle-harness.ts";
-import type { JobOp } from "./lifecycle-harness.ts";
+import { background, jobOps, until } from "./lifecycle-harness.ts";
+import type { JobOp, JobStatus } from "./lifecycle-harness.ts";
 import type { Target } from "./target-server.ts";
 import { done, fields, hostileJob, hostileSend } from "./trust-harness.ts";
 import type { Provision } from "./trust-harness.ts";
@@ -76,6 +76,16 @@ function attempts(origin: string, outside: string): Attempt[] {
       status: "INVALID_COMMAND",
     },
     {
+      label: "issuedAt 60 s in the future",
+      job: job({ issuedAt: Date.now() + 60_000, deadlineAt: Date.now() + 660_000 }),
+      status: "INVALID_COMMAND",
+    },
+    {
+      label: "deadline over 10 min from now",
+      job: job({ issuedAt: Date.now() + 20_000, deadlineAt: Date.now() + 620_000 }),
+      status: "INVALID_COMMAND",
+    },
+    {
       label: "op timeout over 30 s",
       job: withOp(origin, op("click", { selector: "#send" }, 30_001)),
       status: "INVALID_COMMAND",
@@ -132,4 +142,34 @@ export async function refusals(page: Page, b: Bound) {
     expect.soft(b.target.count(jobId), attempt.label).toBe(0);
   }
   return { allowed: allowed.jobId, outcomes };
+}
+
+const DEADLINE_MS = 3_000;
+
+/** A job whose wait outlives its deadline: the wait ends TIMEOUT at deadlineAt, the job EXPIRED. */
+export async function deadline(page: Page, b: Bound) {
+  const issuedAt = Date.now();
+  const [navigate, , click, , read] = jobOps(b.target.origin, "deadline");
+  const never = op("wait", { selector: "#never", state: "attached" }, 30_000);
+  const job = fields(b.target.origin, {
+    issuedAt,
+    deadlineAt: issuedAt + DEADLINE_MS,
+    ops: [navigate, never, click, read],
+  });
+  const jobId = String(job.jobId);
+  expect((await hostileJob(page, job)).status).toBe("ACCEPTED");
+  const status = () =>
+    background<JobStatus & { endedAt?: number }>(b.worker, `lab.job("${jobId}")`);
+  const ended = await until(status, (value) => Boolean(value.endedAt), 40_000);
+  const late = Number(ended.endedAt) - (issuedAt + DEADLINE_MS);
+  expect(ended.state).toBe("EXPIRED");
+  expect(ended.ops.map((outcome) => outcome.code ?? outcome.state)).toEqual([
+    "DONE",
+    "TIMEOUT",
+    "SKIPPED",
+    "SKIPPED",
+  ]);
+  expect(late).toBeLessThan(2_000);
+  expect(b.target.count(jobId)).toBe(0);
+  return { jobId, state: ended.state, ops: ended.ops, lateMs: late };
 }

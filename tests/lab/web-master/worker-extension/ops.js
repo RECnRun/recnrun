@@ -103,6 +103,7 @@ const timeout = (ms) =>
 /** Runs one op and answers its outcome; never throws. */
 export const execute = async (target, entry, origins) => {
   try {
+    if (entry.timeoutMs <= 0) throw new OpError("TIMEOUT");
     await checkOrigin(target, entry, origins);
     const result = await Promise.race([
       TABLE[entry.op](target, entry.args, entry.timeoutMs),
