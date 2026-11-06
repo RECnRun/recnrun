@@ -1,4 +1,6 @@
-// Throwaway master of the website-master spike: offers, pins worker identities, pings.
+// Throwaway master of the website-master spike: offers, pins worker identities, pings, jobs.
+import { createJobs } from "./jobs.js";
+
 const links = new Map();
 const fingerprintOf = (sdp) => /^a=fingerprint:sha-256 (\S+)/im.exec(sdp)?.[1]?.toUpperCase() ?? "";
 const fromBase64 = (text) => Uint8Array.from(atob(text), (c) => c.charCodeAt(0));
@@ -86,5 +88,12 @@ const selectedPair = async (name) => {
   };
 };
 
-window.lab = { offer, accept, authenticate, ping, selectedPair };
+window.lab = {
+  offer,
+  accept,
+  authenticate,
+  ping,
+  selectedPair,
+  ...createJobs({ links, nextMessage }),
+};
 document.getElementById("status").textContent = "ready";

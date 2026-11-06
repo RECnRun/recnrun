@@ -34,7 +34,10 @@ Phase 0 and later wait for Gate W. W.4 or W.9 failing stops the spike and goes s
 - [ ] W.6 Job schema, limits, errors, signature
 - [ ] W.7 Worker job runner, ledger, executor
 - [ ] W.8 Page job submit, journal, reconcile, cancel
-- [ ] W.9 Deciding cell `W.lifecycle` (stop the spike if it fails)
+- [i] W.9 Deciding cell `W.lifecycle` (stop the spike if it fails)
+  - red: scratch worktree whose runner stops once the master link closes, `node scripts/test-container.mjs lab:web-master:local tests/lab/web-master/w-lifecycle.spec.ts`: test 1 failed, `Error: sabotage: master gone` (job FAILED, no POST)
+  - green: `vp run lab:web-master -- tests/lab/web-master/w-lifecycle.spec.ts`: 3 passed, run `2026-11-06T22-35-09.757Z-08c38dd4-83af-44a9-85af-adfdb29769f7`
+  - commit: see `git log -- tests/lab/web-master/w-lifecycle.spec.ts`
 - [ ] W.10 Cell `W.trust`
 - [ ] W.11 Cell `W.friction`
 
