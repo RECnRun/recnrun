@@ -1,8 +1,11 @@
 #!/bin/sh
-# master-role.sh: the record's master block (POC PLAN.md P3.4, decision 11), sourced by first-run.sh,
-# which defines nl. The namespace has at most one block with role=master; the writer adds the line to
+# master-role.sh: the record's master block (POC PLAN.md P3.4, decision 11), sourced by first-run.sh.
+# The namespace has at most one block with role=master; the writer adds the line to
 # one block through a temp file in the record's folder and a rename, so a reader never sees half a
 # record. Nothing read from the record is run or expanded.
+
+nl='
+'
 
 # Succeeds when a block of namespace $2 in record $1 has role=master.
 namespace_has_master() {
