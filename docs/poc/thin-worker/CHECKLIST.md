@@ -30,7 +30,10 @@ Phase 0 and later wait for Gate W. W.4 or W.9 failing stops the spike and goes s
   - red: scratch copy with the answer's DTLS fingerprint changed by one byte, `node scripts/test-container.mjs lab:web-master:local -- -g default`: failed, `Error: channel headed did not open`
   - green: `vp run lab:web-master`: 2 passed (default, public), run `2026-11-06T22-18-09.019Z-886ddf42-a879-4c38-b371-798de8a1d80f`
   - commit: see `git log -- tests/lab/web-master`
-- [ ] W.5 Cell `W.fsa` (tab and app)
+- [i] W.5 Cell `W.fsa` (tab and app)
+  - red: scratch worktree answering the restore prompt with "Allow this time", `vp run lab:web-master -- tests/lab/web-master/w-fsa.spec.ts -g tab`: failed, `Expected: "granted"`, `Received: "prompt"` (reopen and both restarts read `prompt`)
+  - green: `vp run lab:web-master -- tests/lab/web-master/w-fsa.spec.ts`: 2 passed (tab, app), run `2026-11-06T22-53-07.297Z-205f196a-f0cb-405e-8495-e345250763df`
+  - commit: see `git log -- tests/lab/web-master/w-fsa.spec.ts`
 - [ ] W.6 Job schema, limits, errors, signature
 - [ ] W.7 Worker job runner, ledger, executor
 - [ ] W.8 Page job submit, journal, reconcile, cancel

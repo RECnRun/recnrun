@@ -4,14 +4,19 @@
     <meta charset="utf-8" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'none'; script-src 'self'; connect-src 'self'"
+      content="default-src 'none'; script-src 'self'; connect-src 'self'; manifest-src 'self'; img-src 'self'"
     />
     <title>RECnRun lab master</title>
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/icon.svg" />
     <script type="module" src="/master.js"></script>
   </head>
   <body>
     <h1>RECnRun lab master</h1>
     <p id="status">loading</p>
+    <button id="choose" type="button">Choose the rendezvous folder</button>
+    <button id="restore" type="button">Restore folder access</button>
+    <p id="folder">no folder</p>
     <pre id="journal"></pre>
   </body>
 </html>

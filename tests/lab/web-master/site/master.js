@@ -1,4 +1,5 @@
 // Throwaway master of the website-master spike: offers, pins worker identities, pings, jobs.
+import { createFsa } from "./fsa.js";
 import { createJobs } from "./jobs.js";
 
 const links = new Map();
@@ -95,5 +96,6 @@ window.lab = {
   ping,
   selectedPair,
   ...createJobs({ links, nextMessage }),
+  ...createFsa(),
 };
 document.getElementById("status").textContent = "ready";

@@ -1,0 +1,12 @@
+{
+  "id": "/",
+  "name": "RECnRun lab master",
+  "short_name": "RECnRun lab",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "launch_handler": { "client_mode": "focus-existing" },
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}

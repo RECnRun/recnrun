@@ -21,6 +21,8 @@ const SITE = fileURLToPath(new URL("site/", import.meta.url));
 const TYPES: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
+  ".webmanifest": "application/manifest+json",
+  ".svg": "image/svg+xml",
 };
 const run = promisify(execFile);
 

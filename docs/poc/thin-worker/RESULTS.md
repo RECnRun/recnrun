@@ -5,7 +5,7 @@ The answers to [PLAN.md](PLAN.md), filled at each gate from asserting tests and 
 | ID  | Hypothesis                                                                                                          | Decided by                | Verdict                                 | Evidence                             |
 | --- | ------------------------------------------------------------------------------------------------------------------- | ------------------------- | --------------------------------------- | ------------------------------------ |
 | W1  | H-W-RTC: a recnrun.com page links to separate-root workers with `iceServers: []`, no flag, mDNS kept                | `W.rtc`, M-TW.12, M-TW.13 | Lab PASS (Linux); M-TW.12, M-TW.13 open | [W1 lab run](#w1-lab-run-wrtc)       |
-| W2  | H-W-FSA: the page, tab or installed app, keeps the folder and identity across restarts with no prompt               | `W.fsa`, M-TW.14          |                                         |                                      |
+| W2  | H-W-FSA: the page, tab or installed app, keeps the folder and identity across restarts with no prompt               | `W.fsa`, M-TW.14          | Lab PASS (Linux); M-TW.14 open          | [W2 lab run](#w2-lab-run-wfsa)       |
 | W3  | H-W-LIFECYCLE: a job finishes after the page closes, and reopening reconciles with no repeated mutation             | `W.lifecycle`, M-TW.15    | Lab PASS (Linux); M-TW.15 open          | [W3 lab run](#w3-lab-run-wlifecycle) |
 | W4  | H-W-TRUST: updates and cache clears keep identity, a site-data clear fails closed, worker limits bound changed code | `W.trust`                 |                                         |                                      |
 | W5  | H-W-FRICTION: the website path needs fewer gestures than the Store path                                             | `W.friction`, M-TW.12     |                                         |                                      |
@@ -36,6 +36,39 @@ Google Chrome 157.0.8103.38 on Linux (Docker image `sha256:ab532ec9e844`), run `
 - **Prompts.** None on the display in either variant (`display-default.png`, `display-public.png`).
 - **Negative control.** The same spec with the answer's DTLS fingerprint changed by one byte before the page applied it failed: `Error: channel headed did not open` after 20 s (scratch worktree, not committed).
 - **Not covered.** macOS (M-TW.13), the real origin (M-TW.12), and the folder signalling (W.fsa).
+
+## W2 lab run (`W.fsa`)
+
+Google Chrome 157.0.8103.38 on Linux (Docker image `sha256:6bdb27d0f509`), run `2026-11-06T22-53-07.297Z-205f196a-f0cb-405e-8495-e345250763df`, `vp run lab:web-master -- tests/lab/web-master/w-fsa.spec.ts`, 2 passed. Evidence: `.artifacts/docker/<run>/evidence/<run>/w-fsa/` (`w-fsa-tab.json`, `w-fsa-app.json`, one display screenshot per step and per prompt).
+
+- **Setup.** The W1 master page at `https://recnrun.test:<port>` picks `~/RECnRun/rendezvous` with `showDirectoryPicker({ id, mode: "readwrite" })` and keeps the handle in IndexedDB. Chrome's picker and prompts are driven with xdotool and scrot (`tests/e2e/fixtures/native-dialogs.ts`). Each restart is an orderly quit (SIGTERM) and a new launch on the same root; the pids in the evidence differ at each restart. Master flags: `--user-data-dir`, `--remote-debugging-port=0` (tab) or `--remote-debugging-pipe` (app), `--no-first-run`, `--no-sandbox`.
+- **Pass, both variants.** At every visit the same stored handle reports `queryPermission({ mode: "readwrite" })` `granted`, reads the marker file, and writes a new file the harness reads back. The identity thumbprint (RFC 7638 over the page's master key) is unchanged.
+- **Tab (decides): PASS, 5 gestures, all in the onboarding session.** Gestures:
+  - click "Choose the rendezvous folder";
+  - the picker: type the path, then Open;
+  - write prompt: Allow (`tab-onboarding-write-prompt.png`);
+  - after the page closes and reopens in the same session, `queryPermission` reads `prompt`: click "Restore folder access";
+  - restore prompt "View and edit files from the last time you visited this site": "Allow on every visit" (`tab-onboarding-reopen-prompt.png`).
+
+  The grant then held with no gesture across a page reload, a further page close and reopen, and two restarts (`tab-reopen-open.png`, `tab-restart-1-open.png`, `tab-restart-2-open.png`).
+
+- **Reading applied: the strict one.** Chrome offered "Allow on every visit" before any restart, at the first reopen of the onboarding session. Answering it there counts as onboarding. The later reading (an offer that first appears after a restart) did not arise: no prompt or gesture followed the onboarding reopen.
+- **App (recorded): 4 gestures, no restore prompt.** Gestures:
+  - install (the omnibox install button for a person; `PWA.install` here);
+  - the 3 onboarding gestures of the tab variant, in a tab of the installed origin (`app-onboarding-write-prompt.png`).
+
+  The tab closed, and the app then launched with `PWA.launch` as a standalone window (`display-mode: standalone` true, `app-restart-2-open.png`). That launch and two restarts each read `granted` with no prompt.
+
+- **App records.**
+  - Install state: `chrome://web-app-internals` lists `install_state` 1, which is `INSTALLED_WITH_OS_INTEGRATION`. The same state appears after both restarts.
+  - `navigator.storage.persist()`: `true`, `persisted()` `true`, both in the tab and in the app.
+  - `chrome://discards`, after its internal pages are enabled at `chrome://chrome-urls`: the app tab is not discardable. Its reasons are "Tab is recently visible, Tab is a web application, Tab is currently active, Tab is currently using DevTools".
+  - After `PWA.uninstall`, the stored handle opened in a tab reads `prompt`. The extended grant went with the install.
+- **Deviation.** CDP registers the `PWA` domain only for a client that allows unsafe operations, which the pipe does and the port does not (`chrome_devtools_session.cc`). So the app variant runs over `--remote-debugging-pipe`. A DevTools install opens in a tab, so `PWA.changeAppUserSettings` sets the display mode to standalone, as the omnibox install would.
+- **Negative control.** A scratch worktree answered the restore prompt with "Allow this time" instead of "Allow on every visit". The spec failed with `Expected: "granted"`, `Received: "prompt"`: the page close after onboarding, and both restarts, read `prompt` (not committed).
+- **[unsure] Pinned tab.** The tab is a plain tab, not a pinned one. Whether pinning changes the grant was not exercised.
+- **[unsure] Gesture count.** The count assumes a person who reopens the page once during onboarding. A person who closes the page and comes back only after a restart meets the same restore prompt then, and answers it once. This run did not exercise that order.
+- **Not covered.** macOS and the real origin (M-TW.14), the default profile, a session-restore launch, and the master's folder signalling to workers (later cells).
 
 ## W3 lab run (`W.lifecycle`)
 
