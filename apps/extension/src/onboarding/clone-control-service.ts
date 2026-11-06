@@ -106,6 +106,10 @@ async function refresh(core: Core, ports: CloneControlPorts): Promise<void> {
   core.emit();
 }
 
+/** Whether the reservation of `requestId` is still the pending one: a late failure must not clear a newer one. */
+const stillReserved = (core: Core, requestId: string) =>
+  core.state.pending?.requestId === requestId;
+
 export function createCloneControl(ports: CloneControlPorts): CloneControl {
   const core = createCore();
   let stopPolling: (() => void) | undefined;
@@ -140,6 +144,7 @@ export function createCloneControl(ports: CloneControlPorts): CloneControl {
       try {
         await ports.send({ type: "POC_CLONE_CONTROL", choice: { requestId, action, instanceId } });
       } catch (error) {
+        if (!stillReserved(core, requestId)) return;
         core.state.pending = undefined;
         core.state.failure = errorMessage(error);
         core.emit();

@@ -205,6 +205,24 @@ describe("createCloneControl reservations and outcomes", () => {
     expect(s.sent).toHaveLength(1);
   });
 
+  test("a stale rejection leaves a newer reservation alone", async () => {
+    const s = scene();
+    await vi.waitFor(() => expect(s.last()?.clones).toHaveLength(1));
+    let rejectFirst: (error: Error) => void = () => {};
+    s.ports.send = () => new Promise<void>((_, reject) => (rejectFirst = reject));
+    const first = s.control.ask(W1, "close");
+    s.clock.now += NO_ANSWER_MS + 1;
+    await s.poll();
+    expect(s.last()?.pending).toBeUndefined();
+    s.ports.send = async (message) => void s.sent.push(message);
+    await s.control.ask(W1, "open-visible");
+    expect(s.last()?.pending?.requestId).toBe(REQ2);
+    rejectFirst(new Error("late"));
+    await first;
+    expect(s.last()?.pending?.requestId).toBe(REQ2);
+    expect(s.last()?.failure).toBe("");
+  });
+
   test("a rejected send releases the reservation", async () => {
     const s = scene();
     await vi.waitFor(() => expect(s.last()?.clones).toHaveLength(1));
