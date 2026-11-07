@@ -2,25 +2,24 @@ import { rm } from "node:fs/promises";
 import { setTimeout as delay } from "node:timers/promises";
 import { expect, test } from "../../browser/fixtures/chrome.ts";
 import type { LoadedExtension } from "../../browser/fixtures/extension-loaders.ts";
-import { ended, settle, signer, submitDirect } from "./admission-harness.ts";
+import { ended, settle, signer } from "./admission-harness.ts";
 import type { Signer } from "./admission-harness.ts";
 import { background, provisionWorker, startWorker, until } from "./lifecycle-harness.ts";
 import { startTarget } from "./target-server.ts";
 import type { Target } from "./target-server.ts";
-import { fields, provision } from "./trust-harness.ts";
+import { provision } from "./trust-harness.ts";
 import {
   BLUE,
   GRAY,
   GREEN,
   ORANGE,
+  advance as moveTo,
   frames,
-  holdAt,
   panelShows,
   rate,
-  reached,
   saveFrame,
+  startVisualJob,
   visual,
-  visualOps,
   visualStats,
   writeEvidence,
 } from "./visual-harness.ts";
@@ -71,20 +70,10 @@ test.afterAll(async () => {
 test.describe.configure({ mode: "serial" });
 
 async function startJob(c: Cell, holdIndex: number) {
-  await holdAt(c.worker, holdIndex);
-  const job = await c.key.sign(fields(c.target.origin, { ops: visualOps(c.target.origin) }));
-  const reply = await submitDirect(c.worker, job);
-  expect(reply.status).toBe("ACCEPTED");
-  c.jobId = String(job.jobId);
-  await reached(c.worker, holdIndex);
+  c.jobId = await startVisualJob(c.worker, c.key, c.target.origin, holdIndex);
 }
 
-/** Moves the runner's hold from where it is to `next`, then waits until it gets there. */
-async function advance(c: Cell, next: number, phase = "between") {
-  await holdAt(c.worker, next, phase);
-  expect(await background<boolean>(c.worker, "lab.release()")).toBe(true);
-  await reached(c.worker, next, phase);
-}
+const advance = (c: Cell, next: number, phase = "between") => moveTo(c.worker, next, phase);
 
 test("W6.A 1: frames from the worker's own debuggee change after the job's click", async () => {
   const c = cell();

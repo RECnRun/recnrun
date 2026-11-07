@@ -1,11 +1,15 @@
 // Throwaway worker link: one ECDSA identity, answers offers with iceServers [], signs challenges.
+import { createSender } from "./visual-sender.js";
+
 const identity = crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, false, [
   "sign",
   "verify",
 ]);
 const links = [];
 const channels = new Set();
-const RELAYED = new Set(["job", "job-status"]);
+// lab: visual-start and visual-stop are replaced by OBSERVE_START and OBSERVE_STOP in slice C.
+const RELAYED = new Set(["job", "job-status", "visual-start", "visual-stop"]);
+const visual = createSender();
 
 const fingerprintOf = (sdp) => /^a=fingerprint:sha-256 (\S+)/im.exec(sdp)?.[1]?.toUpperCase() ?? "";
 const toBase64 = (buffer) => btoa(String.fromCharCode(...new Uint8Array(buffer)));
@@ -51,8 +55,13 @@ const answer = async (offer) => {
   const pc = new RTCPeerConnection({ iceServers: [] });
   links.push(pc);
   pc.oniceconnectionstatechange = () => LOST.has(pc.iceConnectionState) && linkClosed();
-  pc.ondatachannel = ({ channel }) =>
-    serve(channel, fingerprintOf(offer), fingerprintOf(pc.localDescription.sdp));
+  // Frames and control never share a channel: visual.v1 gets no handler of recnrun-lab.
+  pc.ondatachannel = ({ channel }) => {
+    if (channel.label === "visual.v1") visual.attach(channel, pc);
+    else if (channel.label === "recnrun-lab") {
+      serve(channel, fingerprintOf(offer), fingerprintOf(pc.localDescription.sdp));
+    } else channel.close();
+  };
   const complete = new Promise((resolve) => {
     pc.onicegatheringstatechange = () => pc.iceGatheringState === "complete" && resolve();
   });
@@ -66,6 +75,18 @@ const publicKey = async () => crypto.subtle.exportKey("jwk", (await identity).pu
 
 chrome.runtime.onMessage.addListener((message, _sender, respond) => {
   if (message.target !== "offscreen") return false;
+  if (message.type === "visual-frame") {
+    visual.relayed(message.frame);
+    return false;
+  }
+  if (message.type === "visual-burst") {
+    respond(visual.burst(message.count, message.padBytes));
+    return false;
+  }
+  if (message.type === "visual-stats") {
+    respond(visual.stats());
+    return false;
+  }
   if (message.type === "push") {
     const open = [...channels].filter((channel) => channel.readyState === "open");
     for (const channel of open) channel.send(JSON.stringify(message.message));

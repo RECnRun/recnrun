@@ -69,7 +69,7 @@ const run = async (job, record) => {
   await chrome.debugger.sendCommand(target, "Emulation.setFocusEmulationEnabled", {
     enabled: true,
   });
-  bind(target);
+  bind(target, job.jobId);
   try {
     record.state = await runOps({ job, record, target, readBytes: 0 });
   } finally {

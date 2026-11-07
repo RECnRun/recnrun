@@ -10,6 +10,8 @@ const HEARTBEAT_MS = 1_000;
 const FIRST_FRAME_MS = 1_000;
 const SCREENSHOT_MS = 3_000;
 const LOG_MAX = 400;
+// Frames of one service-worker life share a boot; the master starts over on a new one.
+const BOOT_ID = crypto.randomUUID();
 
 const fresh = () => ({
   state: "IDLE",
@@ -34,7 +36,7 @@ const stats = fresh();
 /**
  * @type {{ wanted: any, target: { tabId: number } | null, epochStartedAt: number,
  *   lastFrameAt: number, last: any, slot: any, sink: ((frame: any) => Promise<unknown>) | null,
- *   inflight: boolean, seq: number, timers: number[] }}
+ *   inflight: boolean, seq: number, timers: number[], jobId: string | null }}
  */
 const session = {
   wanted: null,
@@ -47,6 +49,7 @@ const session = {
   inflight: false,
   seq: 0,
   timers: [],
+  jobId: null,
 };
 
 const command = (method, params = {}) =>
@@ -77,7 +80,7 @@ const keep = (data, source, capturedAtMs) => {
   session.seq += 1;
   const frame = { data, bytes, width, height, source, capturedAtMs, frameSeq: session.seq };
   frame.epoch = stats.epoch;
-  frame.targetId = `tab-${session.target.tabId}`;
+  Object.assign(frame, { bootId: BOOT_ID, jobId: session.jobId, tabId: session.target.tabId });
   stats.bytes += bytes.length;
   stats.decodeMs += decodeMs;
   session.last = frame;
@@ -214,8 +217,9 @@ const run = (work) =>
   });
 
 /** The runner hands its debuggee over once the job tab is set up. */
-export const bind = (target) => {
+export const bind = (target, jobId) => {
   session.target = target;
+  session.jobId = jobId;
   session.epochStartedAt = 0;
   stats.detached = null;
   if (session.wanted) void run(begin());
@@ -243,6 +247,12 @@ export const stop = async () => {
   session.wanted = null;
   await halt();
   return { ok: true };
+};
+
+/** Slice B's transport: an async consumer of one frame at a time, or null. */
+export const setSink = (sink) => {
+  session.sink = sink;
+  session.slot = null;
 };
 
 export const captureStats = () => stats;

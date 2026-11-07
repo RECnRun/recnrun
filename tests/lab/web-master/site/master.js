@@ -1,6 +1,7 @@
 // Throwaway master of the website-master spike: offers, pins worker identities, pings, jobs.
 import { createFsa } from "./fsa.js";
 import { createJobs } from "./jobs.js";
+import { createVisual } from "./visual-view.js";
 
 export const links = new Map();
 const fingerprintOf = (sdp) => /^a=fingerprint:sha-256 (\S+)/im.exec(sdp)?.[1]?.toUpperCase() ?? "";
@@ -17,13 +18,18 @@ export const nextMessage = (channel, type) =>
     channel.addEventListener("message", listener);
   });
 
+const visual = createVisual({ links, nextMessage });
+
 const offer = async (name) => {
   const pc = new RTCPeerConnection({ iceServers: [] });
   const channel = pc.createDataChannel("recnrun-lab");
+  // Frames go unordered and unretransmitted: a lost frame is replaced, never resent.
+  const frames = pc.createDataChannel("visual.v1", { ordered: false, maxRetransmits: 0 });
+  visual.attach(frames);
   const opened = new Promise((resolve) =>
     channel.addEventListener("open", () => resolve(performance.now())),
   );
-  links.set(name, { pc, channel, opened });
+  links.set(name, { pc, channel, opened, visual: frames });
   const complete = new Promise((resolve) => {
     pc.onicegatheringstatechange = () => pc.iceGatheringState === "complete" && resolve();
   });
@@ -116,5 +122,6 @@ window.lab = {
   selectedPair,
   ...createJobs({ links, nextMessage }),
   ...createFsa(),
+  ...visual,
 };
 document.getElementById("status").textContent = "ready";

@@ -5,6 +5,8 @@ process.env.RECNRUN_RUN_ID ??= new Date().toISOString().replaceAll(":", "-");
 
 export default defineConfig({
   testDir: ".",
+  // The envelope's Node tests (*.test.ts) belong to Vitest's harness project.
+  testMatch: /.*\.spec\.ts$/,
   outputDir: "../../../test-results/lab",
   fullyParallel: false,
   workers: 1,

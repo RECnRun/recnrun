@@ -1,9 +1,14 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
+import type { Page } from "@playwright/test";
+import { expect } from "../../browser/fixtures/chrome.ts";
 import type { LoadedExtension } from "../../browser/fixtures/extension-loaders.ts";
-import { background, until } from "./lifecycle-harness.ts";
+import { submitDirect } from "./admission-harness.ts";
+import type { Signer } from "./admission-harness.ts";
+import { background, call, until } from "./lifecycle-harness.ts";
 import type { JobOp } from "./lifecycle-harness.ts";
+import { fields } from "./trust-harness.ts";
 
 /* Helpers of the W6 visual cells: lab.visual readouts on the worker's service worker only. */
 
@@ -99,7 +104,7 @@ const op = (name: string, args: Record<string, unknown>, timeoutMs = 10_000): Jo
 });
 
 /** Ops 0–7: the fixture, its click, the second document, the static page. */
-export const visualOps = (origin: string): JobOp[] => [
+const visualOps = (origin: string): JobOp[] => [
   op("navigate", { url: `${origin}/visual` }),
   op("wait", { selector: "#go", state: "attached" }),
   op("click", { selector: "#go" }),
@@ -111,17 +116,47 @@ export const visualOps = (origin: string): JobOp[] => [
 ];
 
 /** Holds the runner at `index`/`phase`, then waits until it is there. */
-export async function holdAt(worker: LoadedExtension, index: number, phase = "between") {
+async function holdAt(worker: LoadedExtension, index: number, phase = "between") {
   await background(worker, `lab.setKnob(${JSON.stringify({ index, phase })})`);
 }
 
-export async function reached(worker: LoadedExtension, index: number, phase = "between") {
+async function reached(worker: LoadedExtension, index: number, phase = "between") {
   const read = () =>
     background<{ reached: { index: number; phase: string } | null }>(worker, "lab.state()");
   await until(
     read,
     (state) => state.reached?.index === index && state.reached.phase === phase,
     30_000,
+  );
+}
+
+/** Submits the visual job held at `holdIndex` and waits until the runner is there; answers its id. */
+export async function startVisualJob(
+  worker: LoadedExtension,
+  key: Signer,
+  origin: string,
+  holdIndex: number,
+) {
+  await holdAt(worker, holdIndex);
+  const job = await key.sign(fields(origin, { ops: visualOps(origin) }));
+  expect((await submitDirect(worker, job)).status).toBe("ACCEPTED");
+  await reached(worker, holdIndex);
+  return String(job.jobId);
+}
+
+/** Moves the runner's hold from where it is to `next`, then waits until it gets there. */
+export async function advance(worker: LoadedExtension, next: number, phase = "between") {
+  await holdAt(worker, next, phase);
+  expect(await background<boolean>(worker, "lab.release()")).toBe(true);
+  await reached(worker, next, phase);
+}
+
+/** Waits until the master page's own image of the worker shows `want` at the panel point. */
+export async function masterShows(page: Page, want: Rgb, ms = 15_000) {
+  return until(
+    () => call<Rgb | null>(page, "visualPixel", ...PANEL),
+    (rgb) => near(rgb, want),
+    ms,
   );
 }
 
