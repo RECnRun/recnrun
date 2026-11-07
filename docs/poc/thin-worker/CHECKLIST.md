@@ -74,8 +74,14 @@ Branch `poc-w6-visual-observability`, from d51a4b81.
   - red: stub `encodeFrame` (no message) and `createReceiver` (drops all), `cd tests && vp test run lab/web-master/visual-envelope.test.ts`: 20 failed, 2 passed; `RECNRUN_TEST_QUIET=1 vp run lab:web-master -- tests/lab/web-master/w-visual-link.spec.ts`: test 1 failed, `Error: Timed out after 15000 ms: null` in `masterShows`, run `2026-11-07T10-50-51.819Z-b90c0fb4-a330-4288-b340-50504eba6518`
   - green: `cd tests && vp test run lab/web-master/visual-envelope.test.ts`: 22 passed; `vp run lab:web-master -- tests/lab/web-master/w-visual-link.spec.ts`: 3 passed, run `2026-11-07T10-52-41.679Z-f2bc14e2-0edb-4b3d-95b3-3aa5c15d00e8`; `vp run lab:web-master`: 41 passed, run `2026-11-07T10-53-27.066Z-c6ebb760-63ab-41e1-aadc-72a14f6213e2`
   - commit: e10c607c
-- [ ] W6.C observe control, trust, and policy (G3)
-- [ ] W6.D dashboard, tab and PWA (G4)
+- [i] W6.C observe control, trust, and policy (G3)
+  - red: scratch-worktree negative controls with `RECNRUN_TEST_QUIET=1 vp run lab:web-master -- <spec>`: live at 60 fps (`w-observe.spec.ts` caps, 161 > 16), no lease tick (`w-observe-life.spec.ts` W6.09 timed out), admit without proof (W6.15, 24 frames shown, want 20), no navigated hook (off-policy timed out); `observe.test.ts` against stubs: 26 failed, 2 passed
+  - green: `observe.test.ts` 50 passed (lab unit files); `vp run lab:web-master -- tests/lab/web-master/w-observe.spec.ts tests/lab/web-master/w-observe-life.spec.ts`: 12 passed, run `2026-11-07T11-21-19.857Z-a7128a63`; `w-observe.spec.ts` + `w-visual-link.spec.ts`: 10 passed, run `2026-11-07T11-27-31.551Z-ff8574be`
+  - commit: 4e35dcfe
+- [i] W6.D dashboard as a tab (G4); the PWA (W6.17) is not tested, by owner decision
+  - red: scratch-worktree negative controls with `node scripts/test-container.mjs lab:web-master:local tests/lab/web-master/w-dashboard.spec.ts --project headed-worker`: observe on add (cards `THUMBNAIL`, want `OFF`), close leaves the worker live (`Timed out after 5000 ms: "live"`), no `STREAM_UNAVAILABLE` (status `RUNNING`), no `STALE` (stale false); 1 failed each
+  - green: `vp run lab:web-master -- tests/lab/web-master/w-dashboard.spec.ts`: 14 passed (7 headed, 7 headless), run `2026-11-07T11-39-32.980Z-d7f34c3e-181d-4027-9645-7246d56b1c4a`; `w-observe`, `w-observe-life`, `w-visual-link`: 15 passed after the master keyed frames by link
+  - commit: af036bc0
 - [ ] W6.E benchmarks, network faults, no-flags worker run (G5 in the lab)
 
 Gate W6: lab run · verify · review · RESULTS W6.01–W6.20 · verdict (GO, GO-LAB-ONLY, NO-GO)
