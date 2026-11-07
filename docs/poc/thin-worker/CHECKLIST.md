@@ -29,32 +29,37 @@ Phase 0 and later wait for Gate W. W.4 or W.9 failing stops the spike and goes s
 - [i] W.4 Deciding cell `W.rtc` (stop the spike if it fails)
   - red: scratch copy with the answer's DTLS fingerprint changed by one byte, `node scripts/test-container.mjs lab:web-master:local -- -g default`: failed, `Error: channel headed did not open`
   - green: `vp run lab:web-master`: 2 passed (default, public), run `2026-11-06T22-18-09.019Z-886ddf42-a879-4c38-b371-798de8a1d80f`
-  - commit: see `git log -- tests/lab/web-master`
+  - review follow-up (finding 8): `vp run lab:web-master -- tests/lab/web-master/w-rtc.spec.ts`: 3 passed
+  - commit: 8d9c2c54, c1dd54db
 - [i] W.5 Cell `W.fsa` (tab and app)
   - red: scratch worktree answering the restore prompt with "Allow this time", `vp run lab:web-master -- tests/lab/web-master/w-fsa.spec.ts -g tab`: failed, `Expected: "granted"`, `Received: "prompt"` (reopen and both restarts read `prompt`)
   - green: `vp run lab:web-master -- tests/lab/web-master/w-fsa.spec.ts`: 2 passed (tab, app), run `2026-11-06T22-53-07.297Z-205f196a-f0cb-405e-8495-e345250763df`
-  - commit: see `git log -- tests/lab/web-master/w-fsa.spec.ts`
+  - review follow-up (finding 6): red with restores forced at reopen and restart-1, `Expected "granted", Received "prompt"`; green 2 passed
+  - commit: c19013ed, c1dd54db
 - [ ] W.6 Job schema, limits, errors, signature
 - [ ] W.7 Worker job runner, ledger, executor
 - [ ] W.8 Page job submit, journal, reconcile, cancel
 - [i] W.9 Deciding cell `W.lifecycle` (stop the spike if it fails)
   - red: scratch worktree whose runner stops once the master link closes, `node scripts/test-container.mjs lab:web-master:local tests/lab/web-master/w-lifecycle.spec.ts`: test 1 failed, `Error: sabotage: master gone` (job FAILED, no POST)
   - green: `vp run lab:web-master -- tests/lab/web-master/w-lifecycle.spec.ts`: 3 passed, run `2026-11-06T22-35-09.757Z-08c38dd4-83af-44a9-85af-adfdb29769f7`
-  - commit: see `git log -- tests/lab/web-master/w-lifecycle.spec.ts`
+  - unattached worker: red 3 of 3 `click` TIMEOUT headed and headless; green `--repeat-each 10` 60 passed, run `2026-11-07T07-03-22.360Z-7c9b98be-cdb4-4580-9294-21c4ad4bcd98`
+  - commit: 01eae1cf, b4094c6d, dad3e5b5
 - [i] W.10 Cell `W.trust`
   - red: `vp run lab:web-master -- tests/lab/web-master/w-trust.spec.ts`: test 3 failed, `text over 4096` and `read over 16 KiB` ACCEPTED (run `2026-11-06T23-00-34.692Z-26231483-e8f4-48ca-a9f6-ff28e2661210`); then test 4 failed, `Expected: "UNPINNED_MASTER" Received: "BAD_SIGNATURE"`; negative control (scratch worktree, signature check accepts any key): test 4 failed, `Received: "ACCEPTED"`
   - green: `vp run lab:web-master`: 11 passed (all cells), run `2026-11-06T23-05-22.232Z-3c627f27-b75e-4a94-97e2-5e683becead4`
-  - commit: see `git log -- tests/lab/web-master/w-trust.spec.ts`
+  - review follow-up (findings 1–4, 12): `vp run lab:web-master -- tests/lab/web-master/w-admission.spec.ts`: red 8 of 8 against the old worker; green 9 passed
+  - commit: 34110098, 09702d43, 59cbf740, c192f6e4
 - [i] W.11 Cell `W.friction`
   - red: negative control (scratch worktree, Store list without the restore pair, 6), `node scripts/test-container.mjs lab:web-master:local tests/lab/web-master/w-friction.spec.ts`: test 3 failed, `Expected: < 6`, `Received: 7`
   - green: `vp run lab:web-master -- tests/lab/web-master/w-friction.spec.ts`: 3 passed (tab 7, app 7, Store 8), run `2026-11-06T23-13-04.506Z-2b85052b-c8c2-4005-a15d-64bb0b189ba8`
-  - commit: see `git log -- tests/lab/web-master/w-friction.spec.ts`
+  - commit: c574fe00
 
 Gate W: lab run · verify · review · RESULTS W1–W5 · owner decision
 
-- lab run (`vp run lab:web-master`, run id, result per cell):
+- lab run (`vp run lab:web-master`, run id, result per cell): `2026-11-07T07-57-50.325Z-13178a3d-d7c7-437c-bc36-85772e0652d9`, 28 passed (W.rtc 3, W.fsa 2, W.lifecycle 3 headed + 3 headless, W.trust 5, W.admission 9, W.friction 3)
 - verify:
-- review (`reviews/PW.md`):
+- review (`reviews/PW.md`): Codex, not supported; blocker 1 and majors 2–4, 6, 12 fixed, wording of 5, 7, 11 corrected, the rest carried below
+- carried into Phase 1 after a GO ([PW review](reviews/PW.md) findings 5, 9–11, 13): persistent worker identity, onboarding-bound pins, mutual HELLO, authenticated status and results; epoch floor, ledger retention, signed cancellation, resubmission and replay tests; destination, redirect, stale-document, and network-guard checks; a durable publication queue with crash tests; real folder signalling and launcher move with R4 reconciliation; focus emulation in the fixed CDP table and a worker run without lab flags; strict-CSP execution, app closure, suspend and resume; macOS and the real origin (M-TW.12–M-TW.15)
 - owner decision (adopt the website master or keep the extension master):
 
 ## P0: freeze and prune verify
