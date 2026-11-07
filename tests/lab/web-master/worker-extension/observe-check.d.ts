@@ -11,6 +11,7 @@ export interface CheckContext {
 
 export interface ObserveCheck {
   check(message: unknown, context: CheckContext): Promise<string | null>;
+  sizes(): { recent: number; seen: number };
 }
 
 export declare function createObserveCheck(options?: {

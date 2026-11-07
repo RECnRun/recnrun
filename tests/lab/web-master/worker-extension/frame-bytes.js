@@ -25,3 +25,30 @@ export const decodeFrame = (data) => {
   const decodeMs = performance.now() - started;
   return { bytes, decodeMs, ...jpegSize(bytes) };
 };
+
+const toBase64 = (bytes) => {
+  let text = "";
+  for (let at = 0; at < bytes.length; at += 32_768) {
+    text += String.fromCharCode(...bytes.subarray(at, at + 32_768));
+  }
+  return btoa(text);
+};
+
+/**
+ * A JPEG over the mode's size is scaled down here, in the worker: a screenshot with a clip or scale
+ * would make Chrome emulate the page's view size (page_handler.cc, CaptureScreenshot).
+ */
+export const fit = async (data, { maxWidth, maxHeight }, quality) => {
+  const { bytes, width, height } = decodeFrame(data);
+  const scale = Math.min(1, maxWidth / width, maxHeight / height);
+  if (!(scale < 1)) return data;
+  const blob = new Blob([bytes], { type: "image/jpeg" });
+  const resizeWidth = Math.floor(width * scale);
+  const resizeHeight = Math.floor(height * scale);
+  const bitmap = await createImageBitmap(blob, { resizeWidth, resizeHeight });
+  const canvas = new OffscreenCanvas(resizeWidth, resizeHeight);
+  canvas.getContext("2d")?.drawImage(bitmap, 0, 0);
+  bitmap.close();
+  const out = await canvas.convertToBlob({ type: "image/jpeg", quality: quality / 100 });
+  return toBase64(new Uint8Array(await out.arrayBuffer()));
+};

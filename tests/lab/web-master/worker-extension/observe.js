@@ -1,5 +1,5 @@
 // W6 slice C: one observe session per worker, bound to the running job's tab and a lease.
-import { bootId, captureStats, setHooks, setSink, start, stop } from "./capture.js";
+import { bootId, captureStats, isCurrent, setHooks, setSink, start, stop } from "./capture.js";
 import { load } from "./ledger.js";
 import { createObserveCheck } from "./observe-check.js";
 import { createGate } from "./observe-gate.js";
@@ -20,28 +20,50 @@ const toOffscreen = (message) =>
   chrome.runtime.sendMessage({ target: "offscreen", ...message }).catch(() => false);
 const push = (message) => toOffscreen({ type: "push", linkId: session?.linkId, message });
 
-// Frames leave over chrome.runtime as base64; the offscreen document owns visual.v1.
-const gate = createGate({
-  send: (frame) => {
-    const { bootId: boot, jobId, tabId, epoch, frameSeq, width, height, capturedAtMs } = frame;
-    const meta = { bootId: boot, jobId, targetId: tabId, epoch, frameSeq, width, height };
-    stats.sent += 1;
-    if (session && !session.firstFrameAt) session.firstFrameAt = Date.now();
-    void toOffscreen({
-      type: "visual-frame",
-      frame: { ...meta, capturedAtMs, data: frame.data, queuedAt: Date.now() },
-    });
-  },
-});
-
 /** Only http(s) documents of the job's own origins are ever shown. */
 const allowed = (url, origins) => {
   if (!/^https?:\/\//.test(url)) return false;
   return origins.includes(new URL(url).origin);
 };
 
+const expiry = () => {
+  const now = Date.now();
+  if (now > session.leaseUntil) return "LEASE_EXPIRED";
+  return now > session.authorizedUntil ? "AUTHORIZATION_EXPIRED" : null;
+};
+
+/** Checked at every handoff: an unexpired session, its running job, its tab, its live document. */
+const live = (frame) => {
+  if (!session) return false;
+  const expired = expiry();
+  if (expired) {
+    end(expired);
+    return false;
+  }
+  const job = current();
+  if (!job || job.jobId !== session.jobId || frame.jobId !== session.jobId) return false;
+  if (frame.tabId !== session.targetId || !isCurrent(frame)) return false;
+  return allowed(frame.url, session.origins);
+};
+
+// Frames leave over chrome.runtime as base64; the offscreen document owns visual.v1.
+const gate = createGate({
+  valid: live,
+  send: (frame) => {
+    const { bootId: boot, jobId, tabId, epoch, frameSeq, width, height, capturedAtMs } = frame;
+    const meta = { bootId: boot, jobId, targetId: tabId, epoch, frameSeq, width, height };
+    stats.sent += 1;
+    if (!session.firstFrameAt) session.firstFrameAt = Date.now();
+    const validUntil = Math.min(session.leaseUntil, session.authorizedUntil);
+    void toOffscreen({
+      type: "visual-frame",
+      frame: { ...meta, capturedAtMs, data: frame.data, queuedAt: Date.now(), validUntil },
+    });
+  },
+});
+
 const sink = async (frame) => {
-  if (!session || !allowed(frame.url, session.origins)) {
+  if (!live(frame)) {
     stats.policyDrops += 1;
     return;
   }
@@ -89,6 +111,8 @@ const fail = (code) => {
 setHooks({
   // A document off policy ends the session before any of its frames reaches the gate.
   navigated: (url) => {
+    // The held frame shows the previous document.
+    gate.clear();
     if (session && url !== "about:blank" && !allowed(url, session.origins)) {
       fail("TARGET_OFF_POLICY");
     }
@@ -98,20 +122,19 @@ setHooks({
 });
 
 setInterval(() => {
-  if (!session) return;
-  const now = Date.now();
-  if (now > session.leaseUntil) end("LEASE_EXPIRED");
-  else if (now > session.authorizedUntil) end("AUTHORIZATION_EXPIRED");
+  const expired = session && expiry();
+  if (expired) end(expired);
 }, TICK_MS);
 setInterval(() => session && void push(heartbeat()), HEARTBEAT_MS);
 
 const begin = async (request, job, linkId) => {
   const now = Date.now();
   end("REPLACED");
-  highestEpoch = request.sessionEpoch;
+  highestEpoch = Math.max(highestEpoch, request.sessionEpoch);
   session = {
     sessionEpoch: request.sessionEpoch,
     jobId: job.jobId,
+    targetId: job.tabId,
     origins: job.origins,
     mode: request.mode,
     linkId,
@@ -152,10 +175,22 @@ const contextOf = async () => {
   };
 };
 
-/** A relayed request from link `linkId`: refused and counted, or acted on with a renewed lease. */
-export const observe = async (request, linkId) => {
+// What the checks saw before their awaits may have changed: rechecked just before acting.
+const liveError = (request) => {
+  const job = current();
+  if (Date.now() > request.expiresAt) return "EXPIRED";
+  if (!job || job.jobId !== request.jobId) return "JOB_FINISHED";
+  if (job.tabId !== request.targetId) return "WRONG_TARGET";
+  if (request.type === "OBSERVE_START") {
+    return request.sessionEpoch > highestEpoch ? null : "OLD_EPOCH";
+  }
+  return session?.sessionEpoch === request.sessionEpoch ? null : "NO_SESSION";
+};
+
+const handle = async (request, linkId) => {
   const context = await contextOf();
-  const refused = context.masterKey ? await checker.check(request, context) : "UNPROVISIONED";
+  const checked = context.masterKey ? await checker.check(request, context) : "UNPROVISIONED";
+  const refused = checked ?? liveError(request);
   const requestId = request?.requestId ?? null;
   if (refused) {
     stats.refused[refused] = (stats.refused[refused] ?? 0) + 1;
@@ -165,6 +200,14 @@ export const observe = async (request, linkId) => {
   await ACTIONS[request.type](request, current(), linkId);
   if (session) session.leaseUntil = Date.now() + limits.leaseMs;
   return { ok: true, requestId, status: heartbeat() };
+};
+
+let queue = Promise.resolve();
+/** A relayed request from link `linkId`: one at a time, refused and counted or acted on. */
+export const observe = (request, linkId) => {
+  const reply = queue.then(() => handle(request, linkId));
+  queue = reply.catch(() => undefined);
+  return reply;
 };
 
 export const observeLab = {

@@ -28,8 +28,10 @@ export const createObserveCheck = ({ now = Date.now, rate = RATE } = {}) => {
   const limited = () => {
     const at = now();
     while (recent.length > 0 && recent[0] <= at - rate.windowMs) recent.shift();
+    // Refused arrivals are not recorded, so a flood cannot grow the history past the cap.
+    if (recent.length >= rate.max) return true;
     recent.push(at);
-    return recent.length > rate.max;
+    return false;
   };
 
   const replayed = (message) => {
@@ -65,5 +67,5 @@ export const createObserveCheck = ({ now = Date.now, rate = RATE } = {}) => {
     );
   };
 
-  return { check };
+  return { check, sizes: () => ({ recent: recent.length, seen: seen.size }) };
 };

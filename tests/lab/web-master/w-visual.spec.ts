@@ -129,7 +129,11 @@ test("W6.A 3: a static page gives a first screenshot, then NO_CHANGE heartbeats"
   const stats = await visualStats(c.worker);
   const fresh = stats.log.filter((entry) => entry.at > (before.log.at(-1)?.at ?? 0));
   const images = fresh.filter((entry) => entry.type === "frame");
-  expect(images.some((entry) => entry.source === "screenshot")).toBe(true);
+  // The worker scales a full-viewport shot down to the mode's size itself, with no clip.
+  const shot = images.find((entry) => entry.source === "screenshot");
+  expect(shot?.width).toBeGreaterThan(0);
+  expect(shot?.width).toBeLessThanOrEqual(480);
+  expect(shot?.height).toBeLessThanOrEqual(270);
   const beats = fresh.filter((entry) => entry.type === "NO_CHANGE");
   expect(beats.length).toBeGreaterThanOrEqual(2);
   const screencast = stats.produced - before.produced;
@@ -146,6 +150,7 @@ test("W6.A 3: a static page gives a first screenshot, then NO_CHANGE heartbeats"
     heartbeats: beats.length,
     sources,
     firstImageMs,
+    screenshotSize: [shot?.width, shot?.height],
   };
 });
 

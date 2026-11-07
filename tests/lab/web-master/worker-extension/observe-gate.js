@@ -8,7 +8,7 @@ export const CAPS = {
 };
 const WINDOW_MS = 1_000;
 
-export const createGate = ({ send, now = Date.now, caps = CAPS }) => {
+export const createGate = ({ send, now = Date.now, caps = CAPS, valid = () => true }) => {
   /** @type {{ mode: string | null, pending: any, timer: any, lastSentAt: number, sentLog: any[] }} */
   const state = { mode: null, pending: null, timer: null, lastSentAt: -Infinity, sentLog: [] };
   const stats = { sent: 0, bytes: 0, drops: { replaced: 0, dimensions: 0, "frame-cap": 0 } };
@@ -35,6 +35,11 @@ export const createGate = ({ send, now = Date.now, caps = CAPS }) => {
     state.timer = null;
     const frame = state.pending;
     if (!frame || !state.mode) return;
+    // The session, target, and document are rechecked at send, not only when the frame arrived.
+    if (!valid(frame)) {
+      state.pending = null;
+      return drop("invalid");
+    }
     const wait = waitFor(frame);
     if (wait > 0) {
       state.timer = setTimeout(flush, wait);
@@ -48,24 +53,36 @@ export const createGate = ({ send, now = Date.now, caps = CAPS }) => {
     send(frame);
   }
 
-  const offer = (frame) => {
-    if (!state.mode) return;
+  const capError = (frame) => {
     const cap = caps[state.mode];
-    if (frame.width > cap.maxWidth || frame.height > cap.maxHeight) return drop("dimensions");
-    if (frame.bytes.length > caps.frameBytes) return drop("frame-cap");
-    if (state.pending) drop("replaced");
-    state.pending = frame;
-    if (!state.timer) flush();
+    if (frame.width > cap.maxWidth || frame.height > cap.maxHeight) return "dimensions";
+    return frame.bytes.length > caps.frameBytes ? "frame-cap" : null;
   };
 
-  /** A new mode applies at once; no mode frees the held frame and its timer. */
-  const setMode = (mode) => {
-    state.mode = mode;
-    if (mode) return;
+  const clear = () => {
     clearTimeout(state.timer);
     state.timer = null;
     state.pending = null;
   };
 
-  return { offer, setMode, stats: () => ({ ...stats, pending: state.pending !== null }) };
+  const offer = (frame) => {
+    if (!state.mode) return;
+    const error = capError(frame);
+    if (error) return drop(error);
+    if (state.pending) drop("replaced");
+    state.pending = frame;
+    if (!state.timer) flush();
+  };
+
+  /** A new mode applies at once, to the held frame too; no mode frees the frame and its timer. */
+  const setMode = (mode) => {
+    state.mode = mode;
+    if (!mode) return clear();
+    const error = state.pending && capError(state.pending);
+    if (!error) return;
+    clear();
+    drop(error);
+  };
+
+  return { offer, setMode, clear, stats: () => ({ ...stats, pending: state.pending !== null }) };
 };

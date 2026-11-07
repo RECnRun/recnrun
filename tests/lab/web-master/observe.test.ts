@@ -135,6 +135,12 @@ describe("the signed observe check", () => {
     }
     expect(codes).toEqual([null, null, null, "RATE_LIMITED", "RATE_LIMITED"]);
   });
+
+  test("refused arrivals do not grow the rate history", async () => {
+    const check = createObserveCheck({ rate: { max: 3, windowMs: 10_000 } });
+    for (let index = 0; index < 100; index += 1) await check.check({}, context);
+    expect(check.sizes().recent).toBeLessThanOrEqual(3);
+  });
 });
 
 describe("the worker's frame caps", () => {
@@ -200,6 +206,31 @@ describe("the worker's frame caps", () => {
     const { sent, gate } = stream("live", 3_000, tight, 40_000);
     expect(sent.length).toBeLessThanOrEqual(8);
     expect(gate.stats().bytes).toBeLessThanOrEqual(3 * 100_000 + 40_000);
+  });
+
+  test("a mode change drops a held frame over the new mode's size", () => {
+    const sent: number[] = [];
+    const gate = createGate({ send: (value) => sent.push(value.frameSeq) });
+    gate.setMode("live");
+    gate.offer(frame(1, 1_000, 960, 540));
+    gate.offer(frame(2, 1_000, 960, 540));
+    gate.setMode("thumbnail");
+    vi.advanceTimersByTime(2_000);
+    expect(sent).toEqual([1]);
+    expect(gate.stats().drops.dimensions).toBe(1);
+  });
+
+  test("a held frame the session no longer allows is dropped at send", () => {
+    const sent: number[] = [];
+    let allowed = true;
+    const gate = createGate({ send: (value) => sent.push(value.frameSeq), valid: () => allowed });
+    gate.setMode("thumbnail");
+    gate.offer(frame(1));
+    gate.offer(frame(2));
+    allowed = false;
+    vi.advanceTimersByTime(2_000);
+    expect(sent).toEqual([1]);
+    expect(gate.stats().drops.invalid).toBe(1);
   });
 
   test("no mode sends nothing and frees the frame it held", () => {

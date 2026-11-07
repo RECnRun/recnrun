@@ -1,5 +1,5 @@
 // W6 slice A: the worker captures its job tab over the runner's own debuggee, never another client.
-import { decodeFrame } from "./frame-bytes.js";
+import { decodeFrame, fit } from "./frame-bytes.js";
 
 export const MODES = {
   thumbnail: { maxWidth: 480, maxHeight: 270 },
@@ -24,7 +24,7 @@ const fresh = () => ({
   bytes: 0,
   decodeMs: 0,
   starts: 0,
-  drops: { epoch: 0, replaced: 0, stopped: 0 },
+  drops: { epoch: 0, replaced: 0, stopped: 0, generation: 0 },
   visibility: [],
   detached: null,
   errors: [],
@@ -36,7 +36,7 @@ const stats = fresh();
 /**
  * @type {{ wanted: any, target: { tabId: number } | null, epochStartedAt: number,
  *   lastFrameAt: number, last: any, slot: any, sink: ((frame: any) => Promise<unknown>) | null,
- *   inflight: boolean, seq: number, timers: number[], jobId: string | null }}
+ *   inflight: boolean, seq: number, timers: number[], jobId: string | null, generation: number }}
  */
 const session = {
   wanted: null,
@@ -51,6 +51,8 @@ const session = {
   timers: [],
   jobId: null,
   url: "",
+  // Bumped whenever the document, the target, or the capture changes; older work is dropped.
+  generation: 0,
 };
 // Slice C's observe session listens here; the capture itself decides nothing about policy.
 /** @type {{ navigated?: (url: string) => void, detached?: () => void, unbound?: () => void }} */
@@ -79,11 +81,16 @@ const pump = async () => {
   void pump();
 };
 
+const renew = () => {
+  session.generation += 1;
+};
+
 const keep = (data, source, capturedAtMs) => {
   const { bytes, width, height, decodeMs } = decodeFrame(data);
   session.seq += 1;
   const frame = { data, bytes, width, height, source, capturedAtMs, frameSeq: session.seq };
   frame.epoch = stats.epoch;
+  frame.generation = session.generation;
   frame.url = session.url;
   Object.assign(frame, { bootId: BOOT_ID, jobId: session.jobId, tabId: session.target.tabId });
   stats.bytes += bytes.length;
@@ -128,18 +135,23 @@ const onFrame = ({ data, metadata, sessionId }) => {
   keep(data, "screencast", capturedAtMs);
 };
 
+// No clip and no scale: either would resize the page's view while Chrome takes the shot.
 const screenshot = async () => {
-  const { cssVisualViewport: view } = await command("Page.getLayoutMetrics");
-  const { maxWidth, maxHeight } = MODES[stats.mode];
-  const scale = Math.min(1, maxWidth / view.clientWidth, maxHeight / view.clientHeight);
-  const clip = { x: 0, y: 0, width: view.clientWidth, height: view.clientHeight, scale };
-  const shot = command("Page.captureScreenshot", { format: "jpeg", quality: QUALITY, clip });
+  const { generation, target } = session;
+  const shot = command("Page.captureScreenshot", { format: "jpeg", quality: QUALITY });
   const timeout = new Promise((_, reject) =>
     setTimeout(() => reject(new Error("SCREENSHOT_TIMEOUT")), SCREENSHOT_MS),
   );
   const { data } = await Promise.race([shot, timeout]);
+  const capturedAtMs = Date.now();
+  const fitted = await fit(data, MODES[stats.mode], QUALITY);
+  // A reply that crossed a navigation, a rebind, or a restart shows a document it cannot name.
+  if (generation !== session.generation || target !== session.target) {
+    stats.drops.generation += 1;
+    return;
+  }
   stats.screenshots += 1;
-  keep(data, "screenshot", Date.now());
+  keep(fitted, "screenshot", capturedAtMs);
 };
 
 // A page that draws nothing new gets one screenshot, so the viewer is never left blank.
@@ -153,6 +165,7 @@ const fallback = (epoch) => {
 
 const onNavigated = (frame) => {
   if (frame.parentId) return;
+  renew();
   stats.epoch += 1;
   session.epochStartedAt = Date.now();
   session.url = frame.url;
@@ -190,6 +203,7 @@ chrome.debugger.onEvent.addListener((source, method, params) => {
 chrome.debugger.onDetach.addListener((source, reason) => {
   if (!session.target || source.tabId !== session.target.tabId) return;
   clearTimers();
+  renew();
   stats.state = "DETACHED";
   stats.detached = { reason, at: Date.now() };
   session.target = null;
@@ -213,6 +227,7 @@ const begin = async () => {
 
 const halt = async () => {
   clearTimers();
+  renew();
   if (stats.state !== "ACTIVE" && stats.state !== "STARTING") return;
   stats.state = "IDLE";
   await command("Page.stopScreencast").catch(fail);
@@ -226,6 +241,7 @@ const run = (work) =>
 
 /** The runner hands its debuggee over once the job tab is set up. */
 export const bind = (target, jobId) => {
+  renew();
   session.target = target;
   session.jobId = jobId;
   session.epochStartedAt = 0;
@@ -238,6 +254,7 @@ export const bind = (target, jobId) => {
 export const unbind = (target) => {
   if (session.target?.tabId !== target.tabId) return;
   clearTimers();
+  renew();
   void command("Page.stopScreencast").catch(() => false);
   stats.state = "ENDED";
   session.target = null;
@@ -275,3 +292,6 @@ export const bootId = () => BOOT_ID;
 export const lastFrame = () => session.last;
 /** @returns {{ tabId: number } | null} */
 export const boundTarget = () => session.target;
+/** A frame of the document, target, and capture that are live now. */
+export const isCurrent = (frame) =>
+  frame.generation === session.generation && frame.tabId === session.target?.tabId;

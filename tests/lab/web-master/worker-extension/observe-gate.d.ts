@@ -16,6 +16,7 @@ export interface Caps {
 export interface Gate {
   offer(frame: GateFrame): void;
   setMode(mode: "thumbnail" | "live" | null): void;
+  clear(): void;
   stats(): { sent: number; bytes: number; drops: Record<string, number>; pending: boolean };
 }
 
@@ -24,4 +25,5 @@ export declare function createGate(options: {
   send: (frame: GateFrame) => unknown;
   now?: () => number;
   caps?: Caps;
+  valid?: (frame: GateFrame) => boolean;
 }): Gate;

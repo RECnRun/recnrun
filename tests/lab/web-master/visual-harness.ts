@@ -20,6 +20,8 @@ interface FrameEntry {
   epoch: number;
   source?: "screencast" | "screenshot";
   bytes?: number;
+  width?: number;
+  height?: number;
   capturedAtMs?: number;
   at: number;
 }

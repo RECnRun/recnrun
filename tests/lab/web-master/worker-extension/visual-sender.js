@@ -23,7 +23,7 @@ export const createSender = () => {
     messages: 0,
     maxBuffered: 0,
     rejected: 0,
-    drops: { replaced: 0, oversize: 0, closed: 0, invalid: 0 },
+    drops: { replaced: 0, oversize: 0, closed: 0, invalid: 0, expired: 0 },
     relayMs: [],
     handoffs: [],
     base64Ms: [],
@@ -59,6 +59,11 @@ export const createSender = () => {
     const frame = state.slot;
     state.slot = null;
     const { channel } = state;
+    // The worker's grant for this frame may run out while it waits behind a full buffer.
+    if (frame.validUntil !== undefined && Date.now() > frame.validUntil) {
+      stats.drops.expired += 1;
+      return;
+    }
     if (channel?.readyState !== "open") {
       stats.drops.closed += 1;
       return;
