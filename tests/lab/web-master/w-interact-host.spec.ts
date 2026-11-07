@@ -179,8 +179,11 @@ async function runCell(headless: boolean) {
     await lease(c, "/interact/drag");
     if (!headless) {
       const file = test.info().outputPath("display.png");
-      await captureDisplay(file);
-      console.log(`W7.host screenshot ${file}`);
+      // Informational only: macOS refuses it until the terminal has Screen Recording permission.
+      await captureDisplay(file).then(
+        () => console.log(`W7.host screenshot ${file}`),
+        (error: Error) => console.log(`W7.host screenshot unavailable: ${error.message}`),
+      );
     }
     await end(c);
     await closeMidDrag(c);

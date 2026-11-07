@@ -25,6 +25,7 @@ const fresh = () => ({
   bytes: 0,
   decodeMs: 0,
   starts: 0,
+  startRetries: 0,
   drops: { epoch: 0, replaced: 0, stopped: 0, generation: 0 },
   visibility: [],
   detached: null,
@@ -214,6 +215,24 @@ chrome.debugger.onDetach.addListener((source, reason) => {
   hooks.detached?.();
 });
 
+// Page.navigate answers before DevTools moves to the committed frame; on macOS the old,
+// inactive frame can still answer startScreencast, so that one error is retried briefly.
+const INACTIVE = "Not attached to an active page";
+const START_TRIES = 20;
+const START_RETRY_MS = 100;
+
+const startScreencast = async (params) => {
+  for (let tries = 1; ; tries += 1) {
+    try {
+      return await command("Page.startScreencast", params);
+    } catch (error) {
+      if (!String(error?.message).includes(INACTIVE) || tries >= START_TRIES) throw error;
+      stats.startRetries += 1;
+      await new Promise((resolve) => setTimeout(resolve, START_RETRY_MS));
+    }
+  }
+};
+
 const begin = async () => {
   const { mode, everyNthFrame = 1, quality = QUALITY } = session.wanted;
   stats.state = "STARTING";
@@ -221,7 +240,7 @@ const begin = async () => {
   stats.starts += 1;
   session.lastFrameAt = Date.now();
   const params = { format: "jpeg", quality, everyNthFrame, ...MODES[mode] };
-  await command("Page.startScreencast", params);
+  await startScreencast(params);
   stats.state = "ACTIVE";
   session.timers.push(setInterval(heartbeat, HEARTBEAT_MS));
   // After the screencast starts: a hidden tab with no capturer draws nothing to screenshot.

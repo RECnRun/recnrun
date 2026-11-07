@@ -23,23 +23,37 @@ const MAX_DELTA = 10_000;
 const LINE_PX = 40;
 const clampDelta = (delta) => Math.max(-MAX_DELTA, Math.min(MAX_DELTA, delta));
 
-/** One in flight, and only the newest waiting item (merged with the one it replaces) after it. */
-const coalescer = (send, merge, stats) => {
-  let inFlight = null;
-  let waiting = null;
+/**
+ * One in flight; the newest waiting item merges with the one it replaces. `ordered` puts a task
+ * (a press or a release) in the same line, so no move overtakes it and none it follows lags.
+ */
+export const coalescer = (send, merge, stats) => {
+  const queue = [];
+  let busy = false;
+  const next = () => {
+    const entry = queue.shift();
+    busy = Boolean(entry);
+    if (!entry) return;
+    const work = entry.task ? entry.task() : send(entry.item);
+    void Promise.resolve(work)
+      .catch(() => null)
+      .then(next);
+  };
+  const enqueue = (entry) => {
+    queue.push(entry);
+    if (!busy) next();
+  };
   const push = (item) => {
-    if (inFlight) {
-      if (waiting) stats.coalesced += 1;
-      waiting = waiting ? merge(waiting, item) : item;
+    const last = queue.at(-1);
+    if (busy && last && !last.task) {
+      stats.coalesced += 1;
+      last.item = merge(last.item, item);
       return;
     }
-    inFlight = send(item).finally(() => {
-      inFlight = null;
-      const next = waiting;
-      waiting = null;
-      if (next) push(next);
-    });
+    enqueue({ item });
   };
+  push.ordered = (task) =>
+    new Promise((resolve) => enqueue({ task: () => task().finally(resolve) }));
   return push;
 };
 
@@ -162,7 +176,8 @@ export const createInteractView = ({ input, visual, observe }) => {
     // The click on the frame is where the owner's keys go next.
     if (kind === "pointerDown") capture.focus({ preventScroll: true });
     const clickCount = Math.min(Math.max(event.detail, 1), 3);
-    void aim(attached, kind, point, { ...fields, clickCount });
+    const name = attached;
+    void move.ordered(() => aim(name, kind, point, { ...fields, clickCount }));
   };
 
   const onPointer = (event) => {
