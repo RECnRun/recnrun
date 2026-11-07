@@ -82,7 +82,10 @@ Branch `poc-w6-visual-observability`, from d51a4b81.
   - red: scratch-worktree negative controls with `node scripts/test-container.mjs lab:web-master:local tests/lab/web-master/w-dashboard.spec.ts --project headed-worker`: observe on add (cards `THUMBNAIL`, want `OFF`), close leaves the worker live (`Timed out after 5000 ms: "live"`), no `STREAM_UNAVAILABLE` (status `RUNNING`), no `STALE` (stale false); 1 failed each
   - green: `vp run lab:web-master -- tests/lab/web-master/w-dashboard.spec.ts`: 14 passed (7 headed, 7 headless), run `2026-11-07T11-39-32.980Z-d7f34c3e-181d-4027-9645-7246d56b1c4a`; `w-observe`, `w-observe-life`, `w-visual-link`: 15 passed after the master keyed frames by link
   - commit: af036bc0
-- [ ] W6.E benchmarks, network faults, no-flags worker run (G5 in the lab)
+- [i] W6.E benchmarks, network faults, no-flags worker run (G5 in the lab); results in [W6-PLAN.md](W6-PLAN.md#slice-e-in-the-lab)
+  - red: `w-no-flags.spec.ts` before the worker polled the relay: 1 failed, `Timed out after 20000 ms: null`; scratch-copy negative controls with `node scripts/test-container.mjs lab:web-master:local`: `w-netem.spec.ts -g "path|outage"` with the buffer bound at 10000, 1 failed (`Received: 25814`); `w-observe-friction.spec.ts` with Observe calling `confirm()`, 1 failed (`"dialogs": 1`); `RECNRUN_W6_BENCH=1 vp run lab:web-master -- tests/lab/web-master/w-scale.spec.ts -g "1 worker.*visible"`: 1 failed (`Received: NaN`, no capture time on arrivals)
+  - green: `vp run lab:web-master -- tests/lab/web-master/w-no-flags.spec.ts`: 1 passed, run `2026-11-07T11-49-46.409Z-2bf2abfa`; `RECNRUN_W6_BENCH=1 vp run lab:web-master -- tests/lab/web-master/w-netem.spec.ts`: 6 passed, run `2026-11-07T11-57-47.257Z-aba016e9`; `RECNRUN_W6_BENCH=1 … w-scale.spec.ts`: 4 passed, run `2026-11-07T12-12-15.039Z-1e895a86`; `… w-observe-friction.spec.ts`: 1 passed, run `2026-11-07T12-15-36.409Z-4cf477b4`
+  - commit: 0014bdb6, 923a7b54, 180a0c98, 5f031a75
 
 Gate W6: lab run · verify · review · RESULTS W6.01–W6.20 · verdict (GO, GO-LAB-ONLY, NO-GO)
 

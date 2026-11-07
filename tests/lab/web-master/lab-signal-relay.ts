@@ -11,7 +11,7 @@ import { call, until } from "./lifecycle-harness.ts";
  * touches the worker's execution or capture.
  */
 
-export interface RelayAnswer {
+interface RelayAnswer {
   answer: string;
   identity: JsonWebKey;
 }
