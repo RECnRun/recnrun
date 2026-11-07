@@ -1,11 +1,13 @@
 // W7 slice A: the closed input.v1 messages. Exact keys and enums: no code, selector, or method fits.
 import { canonical, utf8Length } from "./encoding.js";
+import { POINTER_KINDS } from "./interact-frames.js";
 
 export const INPUT_TYPES = [
   "INTERACT_CHALLENGE",
   "INTERACT_START",
   "INTERACT_RENEW",
   "INTERACT_STOP",
+  "INTERACT_REFRESH",
   "INPUT_EVENT",
 ];
 // The kinds the worker knows; slices B and C give each its fields and its dispatch.
@@ -27,8 +29,27 @@ const KEYS = {
   ],
   INTERACT_RENEW: ["leaseId", "seq", "type"],
   INTERACT_STOP: ["leaseId", "seq", "type"],
+  INTERACT_REFRESH: ["leaseId", "seq", "type"],
+  // Slice C gives wheel, key, and text their own fields.
   INPUT_EVENT: ["kind", "leaseId", "seq", "type"],
 };
+// W7 slice B: a pointer names the frame it was aimed at and a point over that frame's image.
+const POINTER_KEYS = [
+  "bootId",
+  "button",
+  "clickCount",
+  "frameSeq",
+  "kind",
+  "leaseId",
+  "loaderId",
+  "modifiers",
+  "seq",
+  "sessionEpoch",
+  "type",
+  "x",
+  "y",
+];
+const BUTTONS = ["none", "left", "middle", "right"];
 const MAX_TTL_MS = 30_000;
 const MAX_BYTES = 8_192;
 const MAX_URL = 2_048;
@@ -54,15 +75,28 @@ const FIELD_VALID = {
   exp: timestamp,
   seq: (value) => Number.isSafeInteger(value) && value >= 1,
   kind: (value) => EVENT_KINDS.includes(value),
+  x: (value) => Number.isFinite(value) && value >= 0 && value <= 1,
+  y: (value) => Number.isFinite(value) && value >= 0 && value <= 1,
+  button: (value) => BUTTONS.includes(value),
+  clickCount: (value) => Number.isSafeInteger(value) && value >= 0 && value <= 3,
+  modifiers: (value) => Number.isSafeInteger(value) && value >= 0 && value <= 15,
+  frameSeq: (value) => Number.isSafeInteger(value) && value >= 1,
+  sessionEpoch: timestamp,
+  loaderId: (value) => typeof value === "string" && /^[0-9A-Za-z]{1,64}$/.test(value),
   signature: (value) => typeof value === "string" && value.length > 0 && value.length <= 256,
 };
 
 const isObject = (value) => Boolean(value) && typeof value === "object" && !Array.isArray(value);
 
+const keysOf = (message) =>
+  message.type === "INPUT_EVENT" && POINTER_KINDS.includes(message.kind)
+    ? POINTER_KEYS
+    : KEYS[message.type];
+
 /** Null for a well-formed input.v1 message, otherwise INVALID_REQUEST. */
 export const inputError = (message) => {
   if (!isObject(message) || !Object.hasOwn(KEYS, message.type)) return INVALID;
-  const keys = KEYS[message.type];
+  const keys = keysOf(message);
   if (Object.keys(message).sort().join() !== keys.join()) return INVALID;
   if (!keys.every((key) => FIELD_VALID[key](message[key]))) return INVALID;
   if (utf8Length(canonical(message)) > MAX_BYTES) return INVALID;

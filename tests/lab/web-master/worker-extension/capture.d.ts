@@ -13,9 +13,13 @@ export interface CaptureFrame {
   bootId: string;
   jobId: string | null;
   tabId: number;
+  metadata: Record<string, number> | null;
 }
 
-export declare const MODES: Record<"thumbnail" | "live", { maxWidth: number; maxHeight: number }>;
+export declare const MODES: Record<
+  "thumbnail" | "live" | "interact",
+  { maxWidth: number; maxHeight: number }
+>;
 export declare function bind(target: { tabId: number }, jobId: string): void;
 export declare function unbind(target: { tabId: number }): void;
 export declare function start(options: { mode: string }): Promise<{ ok: boolean; error?: string }>;

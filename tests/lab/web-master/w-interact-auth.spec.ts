@@ -73,7 +73,8 @@ test.afterAll(async () => {
 
 test.describe.configure({ mode: "serial" });
 
-const url = (c: Cell) => `${c.target.origin}/`;
+// A page that loads: an empty 404 commits Chrome's error page, which is off the allowlist.
+const url = (c: Cell) => `${c.target.origin}/form`;
 const enable = (c: Cell) =>
   provision(c.worker, {
     masterKey: c.key.publicKey,

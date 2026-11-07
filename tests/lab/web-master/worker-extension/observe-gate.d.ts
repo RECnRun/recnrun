@@ -9,13 +9,14 @@ export interface GateFrame {
 export interface Caps {
   thumbnail: { fps: number; maxWidth: number; maxHeight: number };
   live: { fps: number; maxWidth: number; maxHeight: number };
+  interact: { fps: number; maxWidth: number; maxHeight: number };
   bytesPerSecond: number;
   frameBytes: number;
 }
 
 export interface Gate {
   offer(frame: GateFrame): void;
-  setMode(mode: "thumbnail" | "live" | null): void;
+  setMode(mode: "thumbnail" | "live" | "interact" | null): void;
   clear(): void;
   stats(): { sent: number; bytes: number; drops: Record<string, number>; pending: boolean };
 }

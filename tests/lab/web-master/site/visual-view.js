@@ -153,6 +153,8 @@ export const createVisual = ({ links, nextMessage }) => {
     visualStats,
     visualSendRaw,
     jobStatus,
+    // The frame the image shows now, so a pointer names the frame it was aimed at.
+    shownFrame: (name) => shown.get(name)?.frameSeq ?? null,
     onVisualFrame: (listener) => void listeners.add(listener),
   };
 };

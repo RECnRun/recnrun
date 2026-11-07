@@ -1,15 +1,22 @@
-// W7 slice A: link-bound interactive sessions; they share the runner's admission and claim.
-import { bootId } from "./capture.js";
+// W7 slices A and B: link-bound interactive sessions on the worker's own tab, sharing the claim.
+import { bootId, captureStats } from "./capture.js";
 import { createStartCheck } from "./input-check.js";
 import { INPUT_TYPES, inputError } from "./input-schema.js";
+import { POINTER_KINDS, createFrames, geometryOf, mouseParams } from "./interact-frames.js";
 import { createLeases } from "./interact-lease.js";
+import { closeTab, isOpen, liveDocument, mouse, openTab, refresh } from "./interact-tab.js";
+import { resize, tabState } from "./interact-tab.js";
+import { setSentHook } from "./observe.js";
 import { claimInteraction, claimed, releaseInteraction } from "./runner.js";
 
 const TICK_MS = 250;
 const limits = { leaseMs: 3_000, renewMs: 1_000 };
 const starts = createStartCheck();
 const leases = createLeases({ leaseMs: limits.leaseMs });
-const stats = { started: 0, refused: {}, revoked: {}, errors: [] };
+const frames = createFrames();
+const stats = { started: 0, dispatched: 0, refused: {}, revoked: {}, errors: [], framesSent: 0 };
+// A static page draws nothing: its screencast restarts so the newest frame stays fresh.
+const QUIET_MS = 750;
 
 const provision = async () => (await chrome.storage.local.get("provision")).provision;
 const latched = async () => (await chrome.storage.local.get("interactStop")).interactStop === true;
@@ -29,16 +36,35 @@ const refuse = (code, extra = {}) => {
   return { ok: false, code, ...extra };
 };
 
-const end = (ended) => {
+const push = (linkId, message) =>
+  void chrome.runtime
+    .sendMessage({ target: "offscreen", type: "input-push", linkId, message })
+    .catch(() => false);
+
+// The tab is closed before the claim is freed, so a job never shares the worker with it.
+const end = async (ended) => {
   if (!ended) return;
   count(stats.revoked, ended.reason);
-  // B: close the interactive tab and release pressed state before the claim is freed.
+  frames.clear();
+  await closeTab().catch((error) => stats.errors.push(String(error)));
   releaseInteraction(ended.interactId);
   const { leaseId, interactId, reason } = ended;
-  const message = { type: "INTERACT_REVOKED", leaseId, interactId, reason };
-  const push = { target: "offscreen", type: "input-push", linkId: ended.linkId, message };
-  void chrome.runtime.sendMessage(push).catch(() => false);
+  push(ended.linkId, { type: "INTERACT_REVOKED", leaseId, interactId, reason });
 };
+
+// Every frame the master gets is announced on input.v1 with what an event must name to aim at it.
+setSentHook((frame, sessionEpoch) => {
+  const lease = leases.current();
+  if (!lease || frame.jobId !== lease.interactId) return;
+  const { loaderId } = tabState().tab ?? {};
+  const geometry = frame.source === "screencast" ? geometryOf(frame.metadata) : null;
+  const { frameSeq, bootId: boot } = frame;
+  const entry = { frameSeq, bootId: boot, sessionEpoch, loaderId, geometry };
+  // A screenshot carries no geometry, so it is never an input target.
+  if (geometry && loaderId) frames.add(entry);
+  stats.framesSent += 1;
+  push(lease.linkId, { type: "INTERACT_FRAME", leaseId: lease.leaseId, ...entry });
+});
 
 const challenge = async (link) => {
   const refused = await gateError(await provision());
@@ -66,20 +92,62 @@ const start = async (message, link) => {
     interactId: claim.interactId,
     url: message.url,
   });
+  const { allowlist } = await provision();
+  const on = { offPolicy: () => revokeLater("TARGET_OFF_POLICY"), gone: revokeLater };
+  const opened = await openTab(
+    { interactId: claim.interactId, url: message.url, origins: allowlist },
+    on,
+  ).then(
+    (tabId) => ({ tabId }),
+    (error) => ({ error: String(error) }),
+  );
+  if (opened.error) {
+    stats.errors.push(opened.error);
+    await end(leases.revoke("TAB_FAILED"));
+    return refuse("TAB_FAILED");
+  }
   stats.started += 1;
   return { ok: true, leaseId: lease.leaseId, interactId: lease.interactId, ...limits };
 };
 
-const onLease = (message, link) => {
+/** A pointer event: aimed at a frame of the document now, mapped, and dispatched in order. */
+const pointer = async (message) => {
+  const { leaseId, seq } = message;
+  // A down acts on whatever document the tab holds: its loader is read again first.
+  const live = await liveDocument(message.kind === "pointerDown");
+  if (!live.allowed) {
+    await end(leases.revoke("TARGET_OFF_POLICY"));
+    return refuse("TARGET_OFF_POLICY", { leaseId, seq });
+  }
+  const refused = frames.check(message, live);
+  if (refused) return refuse(refused, { leaseId, seq });
+  await mouse(mouseParams(message, frames.get(message.frameSeq), live.zoom));
+  stats.dispatched += 1;
+  return { ok: true, leaseId, seq };
+};
+
+const failedEvent = async (error, message) => {
+  if (String(error?.message) !== "INPUT_UNKNOWN") throw error;
+  await end(leases.revoke("INPUT_UNKNOWN"));
+  return refuse("INPUT_UNKNOWN", { leaseId: message.leaseId, seq: message.seq });
+};
+
+const onLease = async (message, link) => {
   const refusal = leases.admit(message, link.linkId);
   if (refusal) {
-    end(refusal.ended);
+    await end(refusal.ended);
     return refuse(refusal.code, refusal.reason ? { reason: refusal.reason } : {});
   }
   const { leaseId, seq } = message;
   if (message.type === "INTERACT_RENEW") leases.renew();
-  else if (message.type === "INTERACT_STOP") end(leases.revoke("STOPPED"));
-  // Slices B and C dispatch events; until then each is refused but keeps its seq.
+  else if (message.type === "INTERACT_STOP") await end(leases.revoke("STOPPED"));
+  else if (message.type === "INTERACT_REFRESH") {
+    if (!observed()) return refuse("NOT_OBSERVED", { leaseId, seq });
+    await refresh();
+  } else if (POINTER_KINDS.includes(message.kind)) {
+    return pointer(message).catch((error) => failedEvent(error, message));
+  }
+  // Slice C dispatches wheel, key, and text; until then each is refused but keeps its seq.
   else return refuse("INPUT_UNSUPPORTED", { leaseId, seq });
   return { ok: true, leaseId, seq };
 };
@@ -115,13 +183,33 @@ export const input = (message, link) =>
 
 /** A closed input channel or link ends its lease and voids its outstanding challenges. */
 export const interactLinkClosed = (linkId) =>
-  serial(() => {
+  serial(async () => {
     starts.forget(linkId);
-    if (leases.current()?.linkId === linkId) end(leases.revoke("LINK_CLOSED"));
+    if (leases.current()?.linkId === linkId) await end(leases.revoke("LINK_CLOSED"));
   });
+
+/** Revokes from outside a message: an off-policy commit, a closed tab, a detach. */
+function revokeLater(reason) {
+  void serial(() => end(leases.revoke(reason)));
+}
+
+let refreshedAt = 0;
+function observed() {
+  const capture = captureStats();
+  return capture.state === "ACTIVE" && capture.mode === "interact";
+}
+const quiet = () => {
+  if (!observed()) return false;
+  const since = Date.now() - Math.max(frames.latest()?.sentAt ?? 0, refreshedAt);
+  return since > QUIET_MS;
+};
 
 setInterval(() => {
   if (leases.expired()) void serial(() => end(leases.revoke("LEASE_EXPIRED")));
+  else if (leases.current() && quiet()) {
+    refreshedAt = Date.now();
+    void serial(() => refresh().catch(() => false));
+  }
 }, TICK_MS);
 
 export const interactLab = {
@@ -129,15 +217,15 @@ export const interactLab = {
   stop: () =>
     serial(async () => {
       await chrome.storage.local.set({ interactStop: true });
-      end(leases.revoke("WORKER_STOP"));
+      await end(leases.revoke("WORKER_STOP"));
       return true;
     }),
   clear: () => chrome.storage.local.remove("interactStop").then(() => true),
-  state: () => ({
-    lease: leases.current(),
-    claim: claimed(),
-    stats,
-    limits,
-    starts: starts.sizes(),
-  }),
+  state: () => {
+    const { tab, stats: tabStats } = tabState();
+    const state = { lease: leases.current(), claim: claimed(), stats, limits };
+    return { ...state, starts: starts.sizes(), frames: frames.size(), tab, tabStats };
+  },
+  resize: (width, height) => resize(width, height).then(() => true),
+  isOpen,
 };

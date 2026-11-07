@@ -9,7 +9,7 @@ import { MUTATING, execute } from "./ops.js";
 let running = null;
 // W7: the interaction that holds the claim; a job and an interaction exclude each other.
 let interacting = null;
-/** @type {{ jobId: string, tabId: number, origins: string[] } | null} */
+/** @type {{ jobId: string, tabId: number, origins: string[], interactive?: boolean } | null} */
 let active = null;
 
 const push = (message) =>
@@ -143,7 +143,15 @@ export const claimInteraction = (interactId, check) =>
     return { status: "CLAIMED", interactId };
   });
 
-// B: the interactive tab is closed and pressed state released before this is called.
+/** W7: the claimed interaction's own tab is what observe binds to, under its interactId. */
+export const holdTab = (interactId, tabId, origins) => {
+  if (interacting === interactId) active = { jobId: interactId, tabId, origins, interactive: true };
+};
+export const dropTab = (tabId) => {
+  if (active?.interactive && active.tabId === tabId) active = null;
+};
+
+// The interactive tab is closed before this is called.
 export const releaseInteraction = (interactId) => {
   if (interacting === interactId) interacting = null;
 };
@@ -157,6 +165,9 @@ export const current = () => active;
 export const statuses = async (jobIds) => {
   const records = await Promise.all(jobIds.map((jobId) => load(jobId)));
   return records.map((record, index) => {
+    const interaction = active?.interactive && active.jobId === jobIds[index];
+    if (interaction)
+      return { jobId: active.jobId, state: "INTERACTING", ops: [], targetId: active.tabId };
     if (!record) return { jobId: jobIds[index], state: "NOT_FOUND", ops: [] };
     // The tab of the running job is what an observe request targets.
     const tab = active?.jobId === record.jobId ? { targetId: active.tabId } : {};

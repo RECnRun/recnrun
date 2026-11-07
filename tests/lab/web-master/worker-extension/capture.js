@@ -4,6 +4,7 @@ import { decodeFrame, fit } from "./frame-bytes.js";
 export const MODES = {
   thumbnail: { maxWidth: 480, maxHeight: 270 },
   live: { maxWidth: 960, maxHeight: 540 },
+  interact: { maxWidth: 960, maxHeight: 540 },
 };
 const QUALITY = 50;
 const HEARTBEAT_MS = 1_000;
@@ -85,13 +86,15 @@ const renew = () => {
   session.generation += 1;
 };
 
-const keep = (data, source, capturedAtMs) => {
+// W7: a screencast frame keeps its metadata, the geometry an input event maps through.
+const keep = (data, source, capturedAtMs, metadata = null) => {
   const { bytes, width, height, decodeMs } = decodeFrame(data);
   session.seq += 1;
   const frame = { data, bytes, width, height, source, capturedAtMs, frameSeq: session.seq };
   frame.epoch = stats.epoch;
   frame.generation = session.generation;
   frame.url = session.url;
+  frame.metadata = metadata;
   Object.assign(frame, { bootId: BOOT_ID, jobId: session.jobId, tabId: session.target.tabId });
   stats.bytes += bytes.length;
   stats.decodeMs += decodeMs;
@@ -132,7 +135,7 @@ const onFrame = ({ data, metadata, sessionId }) => {
     stats.drops.epoch += 1;
     return;
   }
-  keep(data, "screencast", capturedAtMs);
+  keep(data, "screencast", capturedAtMs, metadata);
 };
 
 // No clip and no scale: either would resize the page's view while Chrome takes the shot.

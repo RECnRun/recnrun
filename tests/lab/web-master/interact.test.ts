@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, test } from "vite-plus/test";
 import { createStartCheck } from "./worker-extension/input-check.js";
 import type { LinkView, StartContext } from "./worker-extension/input-check.js";
 import { inputError } from "./worker-extension/input-schema.js";
+import { createFrames, mouseParams, toCss } from "./worker-extension/interact-frames.js";
 import { createLeases } from "./worker-extension/interact-lease.js";
 
 /* W7 slice A: the closed input.v1 messages, the link-bound signed start, and the lease. */
@@ -22,6 +23,19 @@ const LINK_B: LinkView = {
   linkId: "link-b",
   masterFingerprint: fingerprint("BB"),
   workerFingerprint: fingerprint("B1"),
+};
+
+// A pointer event's frame identity and point, as the master's viewer sends it.
+const POINTER = {
+  x: 0.25,
+  y: 0.5,
+  button: "left",
+  clickCount: 1,
+  modifiers: 0,
+  bootId: BOOT,
+  sessionEpoch: 1_700_000_000_000,
+  frameSeq: 7,
+  loaderId: "A1B2C3D4E5F60718293A4B5C6D7E8F90",
 };
 
 const canonical = (value: unknown): string => {
@@ -62,7 +76,13 @@ describe("the closed input.v1 schema", () => {
     start: { ...startFields(nonce, LINK_A), signature: "c2ln" },
     renew: { type: "INTERACT_RENEW", leaseId: LEASE, seq: 1 },
     stop: { type: "INTERACT_STOP", leaseId: LEASE, seq: 2 },
-    event: { type: "INPUT_EVENT", leaseId: LEASE, seq: 3, kind: "pointerDown" },
+    event: {
+      type: "INPUT_EVENT",
+      leaseId: LEASE,
+      seq: 3,
+      kind: "pointerDown",
+      ...POINTER,
+    },
   };
 
   test.each(Object.keys(valid))("a well-formed %s passes", (name) => {
@@ -74,6 +94,10 @@ describe("the closed input.v1 schema", () => {
     ["an unknown field", { ...valid.renew, selector: "#go" }],
     ["a missing field", { type: "INTERACT_RENEW", leaseId: LEASE }],
     ["an unknown event kind", { ...valid.event, kind: "dispatchKeyEvent" }],
+    ["a pointer with no frame", { type: "INPUT_EVENT", leaseId: LEASE, seq: 3, kind: "pointerUp" }],
+    ["a point off the image", { ...valid.event, x: 1.5 }],
+    ["an unknown button", { ...valid.event, button: "back" }],
+    ["a CDP mouse type", { ...valid.event, type: "mousePressed" }],
     ["a seq of zero", { ...valid.renew, seq: 0 }],
     ["a fractional seq", { ...valid.renew, seq: 1.5 }],
     ["a lease id that is not a UUID", { ...valid.renew, leaseId: "../lease" }],
@@ -225,6 +249,77 @@ describe("the interaction lease", () => {
     expect(leases.admit(message(1), "link-a")).toEqual({
       code: "SESSION_REVOKED",
       reason: "WORKER_STOP",
+    });
+  });
+});
+
+describe("the frames an event may aim at", () => {
+  const GEOMETRY = { deviceWidth: 1280, deviceHeight: 720, pageScaleFactor: 1, offsetTop: 0 };
+  const LIVE = { loaderId: POINTER.loaderId, zoom: 1 };
+  let clock: number;
+  let frames: ReturnType<typeof createFrames>;
+  const sent = (frameSeq: number, geometry = GEOMETRY, loaderId = POINTER.loaderId) =>
+    frames.add({ frameSeq, bootId: BOOT, sessionEpoch: POINTER.sessionEpoch, loaderId, geometry });
+
+  beforeEach(() => {
+    clock = 5_000;
+    frames = createFrames({ now: () => clock, limits: { maxAgeMs: 1_500, size: 4 } });
+    sent(7);
+  });
+
+  test("an event aimed at a fresh frame of the live document passes", () => {
+    clock += 1_500;
+    expect(frames.check(POINTER, LIVE)).toBeNull();
+  });
+
+  test.each([
+    ["a frame never sent", { frameSeq: 8 }, LIVE, "UNKNOWN_FRAME"],
+    ["another boot", { bootId: crypto.randomUUID() }, LIVE, "UNKNOWN_FRAME"],
+    ["another session", { sessionEpoch: 1 }, LIVE, "UNKNOWN_FRAME"],
+    ["another document named", { loaderId: "B".repeat(32) }, LIVE, "TARGET_CHANGED"],
+    ["a navigated tab", {}, { ...LIVE, loaderId: "C".repeat(32) }, "TARGET_CHANGED"],
+    ["a zoomed tab", {}, { ...LIVE, zoom: 1.25 }, "VIEWPORT_CHANGED"],
+  ])("%s is refused", (_name, change, live, code) => {
+    expect(frames.check({ ...POINTER, ...change }, live)).toBe(code);
+  });
+
+  test("a frame older than 1.5 s is stale", () => {
+    clock += 1_501;
+    expect(frames.check(POINTER, LIVE)).toBe("STALE_FRAME");
+  });
+
+  test("a frame sent before the viewport changed is refused", () => {
+    sent(8, { ...GEOMETRY, deviceWidth: 1000 });
+    expect(frames.check(POINTER, LIVE)).toBe("VIEWPORT_CHANGED");
+  });
+
+  test("the record keeps only the newest frames", () => {
+    for (const frameSeq of [8, 9, 10, 11]) sent(frameSeq);
+    expect(frames.size()).toBe(4);
+    expect(frames.check(POINTER, LIVE)).toBe("UNKNOWN_FRAME");
+  });
+});
+
+describe("the mapping from a frame to CSS pixels", () => {
+  const at = (geometry: Parameters<typeof toCss>[0], zoom = 1) => toCss(geometry, 0.25, 0.5, zoom);
+  const plain = { deviceWidth: 1280, deviceHeight: 720, pageScaleFactor: 1, offsetTop: 0 };
+
+  test("divides DIP by zoom and page scale and subtracts the top offset", () => {
+    expect(at(plain)).toEqual({ x: 320, y: 360 });
+    expect(at({ ...plain, pageScaleFactor: 2 })).toEqual({ x: 160, y: 180 });
+    expect(at(plain, 1.25)).toEqual({ x: 256, y: 288 });
+    expect(at({ ...plain, offsetTop: 40 })).toEqual({ x: 320, y: 320 });
+  });
+
+  test("a pointer event becomes one CDP mouse event", () => {
+    const entry = { geometry: plain };
+    expect(mouseParams({ ...POINTER, kind: "pointerDown" }, entry, 1)).toEqual({
+      type: "mousePressed",
+      x: 320,
+      y: 360,
+      button: "left",
+      clickCount: 1,
+      modifiers: 0,
     });
   });
 });

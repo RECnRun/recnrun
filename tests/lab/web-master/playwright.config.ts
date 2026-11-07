@@ -20,6 +20,9 @@ export default defineConfig({
   // W.lifecycle and W6.A run again with a headless worker root; the master stays headed.
   projects: [
     { name: "headed-worker" },
-    { name: "headless-worker", testMatch: /w-(lifecycle|visual|dashboard)\.spec\.ts$/ },
+    {
+      name: "headless-worker",
+      testMatch: /w-(lifecycle|visual|dashboard|interact-click)\.spec\.ts$/,
+    },
   ],
 });

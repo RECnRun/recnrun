@@ -1,12 +1,26 @@
-// W7 slice A: the master's input.v1 client: challenge, signed start, renewals each second, stop.
+// W7 slices A and B: the master's input.v1 client: signed start, renewals, frames, events, stop.
 import { sign } from "./jobs.js";
 
 const fingerprintOf = (sdp) => /^a=fingerprint:sha-256 (\S+)/im.exec(sdp)?.[1]?.toUpperCase() ?? "";
 const REPLY_MS = 5_000;
 const RENEW_MS = 1_000;
 const START_TTL_MS = 10_000;
+const FRAMES_KEPT = 128;
+const POINTER = ["pointerMove", "pointerDown", "pointerUp"];
+// A well-formed pointer that names no frame the worker sent, for refusal checks.
+const UNAIMED = {
+  x: 0.5,
+  y: 0.5,
+  button: "left",
+  clickCount: 1,
+  modifiers: 0,
+  bootId: "00000000-0000-4000-8000-000000000000",
+  sessionEpoch: 1,
+  frameSeq: 1,
+  loaderId: "0",
+};
 
-export const createInput = ({ links }) => {
+export const createInput = ({ links, onRevoked = () => undefined }) => {
   /** @type {Map<string, any>} link name → its input session */
   const sessions = new Map();
 
@@ -15,12 +29,24 @@ export const createInput = ({ links }) => {
     session.timer = null;
   };
 
-  const onMessage = (session, { data }) => {
+  // The frames the worker announced, by frameSeq; only these can be aimed at.
+  const keepFrame = (session, message) => {
+    const { type: _type, leaseId: _lease, ...frame } = message;
+    session.frames.set(frame.frameSeq, frame);
+    session.latest = frame;
+    if (session.frames.size > FRAMES_KEPT)
+      session.frames.delete(session.frames.keys().next().value);
+  };
+
+  const onMessage = (name, session, { data }) => {
     const message = JSON.parse(data);
     // Every message the page sends gets exactly one reply, in order; anything else is a push.
     if (message.type.endsWith("-reply")) return session.pending.shift()?.(message);
+    if (message.type === "INTERACT_FRAME") return keepFrame(session, message);
     session.pushes.push(message);
-    if (message.type === "INTERACT_REVOKED") pause(session);
+    if (message.type !== "INTERACT_REVOKED") return;
+    pause(session);
+    onRevoked(name, message);
   };
 
   const open = (name) => {
@@ -28,11 +54,12 @@ export const createInput = ({ links }) => {
     if (known && known.channel.readyState !== "closed") return known.ready;
     const channel = links.get(name).pc.createDataChannel("input.v1", { ordered: true });
     const session = { channel, pending: [], pushes: [], lease: null, seq: 0, timer: null };
+    Object.assign(session, { frames: new Map(), latest: null });
     session.ready = new Promise((resolve) =>
       channel.addEventListener("open", () => resolve(session)),
     );
     channel.addEventListener("close", () => pause(session));
-    channel.addEventListener("message", (event) => onMessage(session, event));
+    channel.addEventListener("message", (event) => onMessage(name, session, event));
     sessions.set(name, session);
     return session.ready;
   };
@@ -95,7 +122,8 @@ export const createInput = ({ links }) => {
     const session = await open(name);
     const reply = await sendOn(session, start);
     if (!reply.ok) return reply;
-    Object.assign(session, { lease: reply, seq: 0 });
+    Object.assign(session, { lease: reply, seq: 0, latest: null });
+    session.frames.clear();
     const renew = () =>
       void leaseMessage(session, "INTERACT_RENEW").then((renewed) => renewed.ok || pause(session));
     session.timer = setInterval(renew, RENEW_MS);
@@ -133,7 +161,13 @@ export const createInput = ({ links }) => {
     interactRaw: raw,
     interactStop: stop,
     interactPause: (name) => pause(sessions.get(name)),
-    interactEvent: (name, kind) => leaseMessage(sessions.get(name), "INPUT_EVENT", { kind }),
+    interactEvent: (name, kind, fields = {}) => {
+      const pointer = POINTER.includes(kind) ? UNAIMED : {};
+      return leaseMessage(sessions.get(name), "INPUT_EVENT", { kind, ...pointer, ...fields });
+    },
+    interactRefresh: (name) => leaseMessage(sessions.get(name), "INTERACT_REFRESH"),
+    interactFrame: (name, frameSeq) => sessions.get(name)?.frames.get(frameSeq) ?? null,
+    interactLatest: (name) => sessions.get(name)?.latest ?? null,
     interactFingerprints: fingerprints,
     interactSession: session,
     interactDuplicate: duplicate,

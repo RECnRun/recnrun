@@ -3,6 +3,6 @@
   "name": "RECnRun lab worker",
   "version": "0.0.1",
   "description": "Throwaway worker of the website-master spike: answers WebRTC offers and runs signed jobs.",
-  "permissions": ["offscreen", "storage", "debugger", "downloads"],
+  "permissions": ["offscreen", "storage", "debugger", "downloads", "webNavigation"],
   "background": { "service_worker": "background.js", "type": "module" }
 }
