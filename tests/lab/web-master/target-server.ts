@@ -7,7 +7,7 @@ import type { AddressInfo } from "node:net";
  * mutation. The harness counts each POST, with the time it arrived, to prove when it happened.
  */
 
-export interface Post {
+interface Post {
   text: string;
   at: number;
 }

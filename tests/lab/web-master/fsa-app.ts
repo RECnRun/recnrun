@@ -17,7 +17,7 @@ async function pwa(master: LaunchedChrome, method: string, params: Record<string
   return master.pipe.send<Record<string, unknown>>(method, params);
 }
 
-export const manifestIdOf = (origin: string) => `${origin}/`;
+const manifestIdOf = (origin: string) => `${origin}/`;
 
 export async function install(master: LaunchedChrome, origin: string) {
   // From the browser target, Chrome installs from a URL it loads itself.

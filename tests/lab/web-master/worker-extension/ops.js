@@ -5,7 +5,7 @@ import { originOfUrl } from "./job-check.js";
 const READ_TEXT = "function () { return this.textContent; }";
 const POLL_MS = 100;
 
-export class OpError extends Error {
+class OpError extends Error {
   constructor(code) {
     super(code);
     this.code = code;

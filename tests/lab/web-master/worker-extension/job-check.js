@@ -5,8 +5,6 @@ import { envelopeError, opError, originOf } from "./job-schema.js";
 const CLOCK_SKEW_MS = 30_000;
 const MAX_JOB_MS = 600_000;
 
-export { canonical };
-
 // A future issuedAt would stretch the 10-minute cap; the cap holds against the worker's clock.
 const clockError = (job, now) => {
   if (job.issuedAt > now + CLOCK_SKEW_MS) return "INVALID_COMMAND";

@@ -15,7 +15,7 @@ const WORKER = fileURLToPath(new URL("worker-extension/", import.meta.url));
 const LINK_TIMEOUT_MS = 20_000;
 const POLL_MS = 100;
 
-export interface OpOutcome {
+interface OpOutcome {
   op: string;
   state: string;
   result?: unknown;

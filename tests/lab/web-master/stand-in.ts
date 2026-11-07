@@ -14,7 +14,7 @@ import { promisify } from "node:util";
  * the image has no NSS `certutil`. The runner maps recnrun.test to 127.0.0.1 (`--add-host`).
  */
 
-export const HOST = "recnrun.test";
+const HOST = "recnrun.test";
 const POLICY_DIRECTORY = "/etc/opt/chrome/policies/managed";
 const POLICY_FILE = join(POLICY_DIRECTORY, "recnrun-lab-ca.json");
 export const SITE = fileURLToPath(new URL("site/", import.meta.url));

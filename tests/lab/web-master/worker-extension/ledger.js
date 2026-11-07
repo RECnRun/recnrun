@@ -1,5 +1,5 @@
 // Per-job ledger in storage.local, the result file, and the restart rule of plan §6.
-export const TERMINAL = new Set(["DONE", "FAILED", "EXPIRED", "INTERRUPTED"]);
+const TERMINAL = new Set(["DONE", "FAILED", "EXPIRED", "INTERRUPTED"]);
 const PREFIX = "job:";
 
 export const load = async (jobId) =>
