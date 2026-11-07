@@ -43,13 +43,17 @@ const cell = (): Cell => {
   if (!shared) throw new Error("The W7.B setup did not run.");
   return shared;
 };
+const headless = () => test.info().project.name === "headless-worker";
 
 test.beforeAll(async () => {
   const site = await startStandIn();
   const target = await startTarget();
   const master = await launchChrome({ silentDebugger: false });
   const { root, id } = await provisionWorker();
-  const worker = await startWorker(root, id);
+  const worker = await startWorker(root, id, headless());
+  // The headless project must drive a headless worker, as the launcher's headless worker runs.
+  const agent = await background<string>(worker, "navigator.userAgent");
+  expect(agent.includes("HeadlessChrome")).toBe(headless());
   const page = await openLinked(master, site.origin, worker);
   expect(await link(page, worker, OTHER)).toBe(true);
   const key = await pageSigner(page);
@@ -179,8 +183,10 @@ test("N7: an event aimed before a navigation or a resize has no effect", async (
   const navigated = await pointer(c.page, "pointerDown", { ...aimedAt(first), ...DOWN });
   expect(navigated).toMatchObject({ ok: false, code: "TARGET_CHANGED" });
   const second = await aimable(c.page);
-  expect(await background(c.worker, "lab.interact.resize(800, 450)")).toBe(true);
-  const width = second.geometry?.deviceWidth;
+  const width = second.geometry?.deviceWidth ?? 0;
+  // A headless worker's view is already 800 wide: the resize always shrinks the current one.
+  const resize = `lab.interact.resize(${width - 160}, ${Math.round(((width - 160) * 9) / 16)})`;
+  expect(await background(c.worker, resize)).toBe(true);
   await aimable(c.page, (frame) => frame.geometry?.deviceWidth !== width);
   const resized = await pointer(c.page, "pointerDown", { ...aimedAt(second), ...DOWN });
   expect(resized).toMatchObject({ ok: false, code: "VIEWPORT_CHANGED" });
