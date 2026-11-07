@@ -23,34 +23,50 @@ export const holdsJpeg = async (value) => {
   return false;
 };
 
+const decoded = (bytes) => new TextDecoder().decode(bytes);
+
+/** A matcher like holdsJpeg for one string, raw or as UTF-8 bytes (W7.C's typed marker). */
+export const holdsText = (marker) => {
+  const holds = async (value) => {
+    if (value instanceof Blob) return (await value.text()).includes(marker);
+    if (value instanceof ArrayBuffer) return decoded(new Uint8Array(value)).includes(marker);
+    if (ArrayBuffer.isView(value)) return decoded(value).includes(marker);
+    if (typeof value === "string") return value.includes(marker);
+    if (!value || typeof value !== "object") return false;
+    for (const item of Object.values(value)) if (await holds(item)) return true;
+    return false;
+  };
+  return holds;
+};
+
 const settled = (request) =>
   new Promise((resolve, reject) => {
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
   });
 
-/** Every IndexedDB store whose values hold a JPEG, as "database/store". */
-export const databaseHits = async () => {
+/** Every IndexedDB store whose values `matches` (a JPEG by default), as "database/store". */
+export const databaseHits = async (matches = holdsJpeg) => {
   const hits = [];
   for (const { name } of await indexedDB.databases()) {
     const database = await settled(indexedDB.open(name));
     for (const store of database.objectStoreNames) {
       const values = await settled(database.transaction(store).objectStore(store).getAll());
-      if (await holdsJpeg(values)) hits.push(`${name}/${store}`);
+      if (await matches(values)) hits.push(`${name}/${store}`);
     }
     database.close();
   }
   return hits;
 };
 
-/** Every Cache Storage entry whose body holds a JPEG, as "cache url". */
-export const cacheHits = async () => {
+/** Every Cache Storage entry whose body `matches` (a JPEG by default), as "cache url". */
+export const cacheHits = async (matches = holdsJpeg) => {
   const hits = [];
   for (const name of await caches.keys()) {
     const cache = await caches.open(name);
     for (const request of await cache.keys()) {
       const response = await cache.match(request);
-      if (response && (await holdsJpeg(await response.arrayBuffer()))) {
+      if (response && (await matches(await response.arrayBuffer()))) {
         hits.push(`${name} ${request.url}`);
       }
     }

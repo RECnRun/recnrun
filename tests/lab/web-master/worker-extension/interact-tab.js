@@ -1,5 +1,6 @@
 // W7 slice B: the worker's own interactive tab: opened, attached, watched, and closed by it alone.
 import { MODES, bind, unbind } from "./capture.js";
+import { createHeld } from "./interact-held.js";
 import { originOf } from "./job-schema.js";
 import { dropTab, holdTab } from "./runner.js";
 
@@ -11,6 +12,9 @@ let tab = null;
 /** @type {{ offPolicy?: (url: string) => void, gone?: (reason: string) => void }} */
 let watcher = {};
 const stats = { opened: 0, closed: 0, openersClosed: 0, leftoversClosed: 0, refreshes: 0 };
+// Slice C: releases sent, by why (DEADMAN, CLEANUP), and those that failed.
+Object.assign(stats, { released: {}, releaseEvents: 0, releaseFailed: 0 });
+const held = createHeld();
 
 const command = (method, params = {}) => chrome.debugger.sendCommand(tab.target, method, params);
 const allowed = (url) => tab.origins.includes(originOf(url));
@@ -78,6 +82,7 @@ export const openTab = async ({ interactId, url, origins }, on) => {
   const created = await chrome.tabs.create({ url: "about:blank", active: false });
   const target = { tabId: created.id };
   tab = { interactId, target, origins, loaderId: null, url: "about:blank" };
+  held.clear();
   watcher = on;
   stats.opened += 1;
   await prepare(created.id, target);
@@ -90,11 +95,12 @@ export const openTab = async ({ interactId, url, origins }, on) => {
 /** Detaches and closes the tab; the claim is released only after this. */
 export const closeTab = async () => {
   if (!tab) return;
+  // Held buttons and keys are let go while the debugger still holds the tab.
+  await releaseHeld("CLEANUP");
   const { target } = tab;
   tab = null;
   watcher = {};
   stats.closed += 1;
-  // Slice C releases held buttons and keys here, before the detach.
   dropTab(target.tabId);
   unbind(target);
   await chrome.debugger.detach(target).catch(() => false);
@@ -113,8 +119,33 @@ export const liveDocument = async (fresh) => {
   return { loaderId: tab.loaderId, url: tab.url, zoom, allowed: allowed(tab.url) };
 };
 
-/** One mouse event with a deadline; a timeout leaves its effect unknown. */
-export const mouse = (params) => deadline(command("Input.dispatchMouseEvent", params));
+/** One input command with a deadline, tracked first: one that times out may still have pressed. */
+const tracked = (method, params) => {
+  held.track(method, params);
+  return deadline(command(method, params));
+};
+
+export const mouse = (params) => tracked("Input.dispatchMouseEvent", params);
+export const key = (params) => tracked("Input.dispatchKeyEvent", params);
+export const insertText = (text) => deadline(command("Input.insertText", { text }));
+export const holding = () => held.any();
+
+/** Best effort: every held key and button goes up, then any drag is cancelled. */
+export const releaseHeld = async (reason) => {
+  if (!tab) return;
+  const pending = held.releases();
+  held.clear();
+  if (pending.length > 0) stats.released[reason] = (stats.released[reason] ?? 0) + 1;
+  const cancel = { method: "Input.cancelDragging", params: {} };
+  for (const { method, params } of [...pending, cancel]) {
+    const sent = await deadline(command(method, params)).then(
+      () => true,
+      () => false,
+    );
+    if (sent) stats.releaseEvents += method === cancel.method ? 0 : 1;
+    else stats.releaseFailed += 1;
+  }
+};
 
 // A restarted screencast draws a fresh frame of an unchanged page; no screenshot is taken.
 export const refresh = async () => {
@@ -125,6 +156,7 @@ export const refresh = async () => {
 
 export const tabState = () => ({
   tab: tab && { tabId: tab.target.tabId, loaderId: tab.loaderId, url: tab.url },
+  held: held.size(),
   stats,
 });
 

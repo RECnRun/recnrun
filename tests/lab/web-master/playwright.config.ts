@@ -22,7 +22,7 @@ export default defineConfig({
     { name: "headed-worker" },
     {
       name: "headless-worker",
-      testMatch: /w-(lifecycle|visual|dashboard|interact-click)\.spec\.ts$/,
+      testMatch: /w-(lifecycle|visual|dashboard|interact-(click|input))\.spec\.ts$/,
     },
   ],
 });

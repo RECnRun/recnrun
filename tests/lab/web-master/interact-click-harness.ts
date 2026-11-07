@@ -75,14 +75,20 @@ const imageBox = (page: Page) =>
     return { left, top, width, height, naturalWidth: natural.width, naturalHeight: natural.height };
   }) as Promise<ImageBox>;
 
-/** Clicks the master's image where the frame's normalized `point` is drawn, as a person would. */
-export async function clickAt(page: Page, point: Point): Promise<void> {
+/** The master page's pixel where the frame's normalized `point` is drawn. */
+export async function screenAt(page: Page, point: Point): Promise<Point> {
   const box = await imageBox(page);
   const scale = Math.min(box.width / box.naturalWidth, box.height / box.naturalHeight);
   const width = box.naturalWidth * scale;
   const height = box.naturalHeight * scale;
   const x = box.left + (box.width - width) / 2 + point.x * width;
   const y = box.top + (box.height - height) / 2 + point.y * height;
+  return { x, y };
+}
+
+/** Clicks the master's image where the frame's normalized `point` is drawn, as a person would. */
+export async function clickAt(page: Page, point: Point): Promise<void> {
+  const { x, y } = await screenAt(page, point);
   await page.mouse.click(x, y);
 }
 

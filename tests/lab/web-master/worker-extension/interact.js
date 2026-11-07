@@ -2,9 +2,10 @@
 import { bootId, captureStats } from "./capture.js";
 import { createStartCheck } from "./input-check.js";
 import { INPUT_TYPES, inputError } from "./input-schema.js";
-import { POINTER_KINDS, createFrames, geometryOf, mouseParams } from "./interact-frames.js";
+import { createEvents } from "./interact-events.js";
+import { createFrames, geometryOf } from "./interact-frames.js";
 import { createLeases } from "./interact-lease.js";
-import { closeTab, isOpen, liveDocument, mouse, openTab, refresh } from "./interact-tab.js";
+import { closeTab, isOpen, openTab, refresh } from "./interact-tab.js";
 import { resize, tabState } from "./interact-tab.js";
 import { setSentHook } from "./observe.js";
 import { claimInteraction, claimed, releaseInteraction } from "./runner.js";
@@ -66,6 +67,15 @@ setSentHook((frame, sessionEpoch) => {
   push(lease.linkId, { type: "INTERACT_FRAME", leaseId: lease.leaseId, ...entry });
 });
 
+let queue = Promise.resolve();
+const serial = (work) => {
+  const result = queue.then(work);
+  queue = result.catch(() => undefined);
+  return result;
+};
+const revoke = (reason) => end(leases.revoke(reason));
+const event = createEvents({ frames, refuse, revoke, serial, stats });
+
 const challenge = async (link) => {
   const refused = await gateError(await provision());
   if (refused) return refuse(refused);
@@ -110,22 +120,6 @@ const start = async (message, link) => {
   return { ok: true, leaseId: lease.leaseId, interactId: lease.interactId, ...limits };
 };
 
-/** A pointer event: aimed at a frame of the document now, mapped, and dispatched in order. */
-const pointer = async (message) => {
-  const { leaseId, seq } = message;
-  // A down acts on whatever document the tab holds: its loader is read again first.
-  const live = await liveDocument(message.kind === "pointerDown");
-  if (!live.allowed) {
-    await end(leases.revoke("TARGET_OFF_POLICY"));
-    return refuse("TARGET_OFF_POLICY", { leaseId, seq });
-  }
-  const refused = frames.check(message, live);
-  if (refused) return refuse(refused, { leaseId, seq });
-  await mouse(mouseParams(message, frames.get(message.frameSeq), live.zoom));
-  stats.dispatched += 1;
-  return { ok: true, leaseId, seq };
-};
-
 const failedEvent = async (error, message) => {
   if (String(error?.message) !== "INPUT_UNKNOWN") throw error;
   await end(leases.revoke("INPUT_UNKNOWN"));
@@ -144,11 +138,7 @@ const onLease = async (message, link) => {
   else if (message.type === "INTERACT_REFRESH") {
     if (!observed()) return refuse("NOT_OBSERVED", { leaseId, seq });
     await refresh();
-  } else if (POINTER_KINDS.includes(message.kind)) {
-    return pointer(message).catch((error) => failedEvent(error, message));
-  }
-  // Slice C dispatches wheel, key, and text; until then each is refused but keeps its seq.
-  else return refuse("INPUT_UNSUPPORTED", { leaseId, seq });
+  } else return event(message).catch((error) => failedEvent(error, message));
   return { ok: true, leaseId, seq };
 };
 
@@ -162,13 +152,6 @@ const dispatch = async (message, link) => {
 
 const replyType = (message) =>
   INPUT_TYPES.includes(message?.type) ? `${message.type}-reply` : "INPUT-reply";
-
-let queue = Promise.resolve();
-const serial = (work) => {
-  const result = queue.then(work);
-  queue = result.catch(() => undefined);
-  return result;
-};
 
 /** One input.v1 message from `link`; messages are handled one at a time, in arrival order. */
 export const input = (message, link) =>
@@ -222,9 +205,9 @@ export const interactLab = {
     }),
   clear: () => chrome.storage.local.remove("interactStop").then(() => true),
   state: () => {
-    const { tab, stats: tabStats } = tabState();
+    const { tab, held, stats: tabStats } = tabState();
     const state = { lease: leases.current(), claim: claimed(), stats, limits };
-    return { ...state, starts: starts.sizes(), frames: frames.size(), tab, tabStats };
+    return { ...state, starts: starts.sizes(), frames: frames.size(), tab, held, tabStats };
   },
   resize: (width, height) => resize(width, height).then(() => true),
   isOpen,

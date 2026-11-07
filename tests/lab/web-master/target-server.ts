@@ -1,6 +1,8 @@
 import { createServer } from "node:http";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
+import { INPUT_PAGES, servedReport } from "./input-fixtures.ts";
+import type { InputReport } from "./input-fixtures.ts";
 
 /*
  * The second loopback origin of W.lifecycle: a script-free form whose submit is the job's
@@ -26,6 +28,7 @@ export interface Target {
   origin: string;
   posts: Post[];
   hits: Hit[];
+  reports: InputReport[];
   count(text: string): number;
   close(): Promise<void>;
 }
@@ -108,6 +111,8 @@ const INTERACT: Record<string, string> = {
 ${CORNERS}${INTERACT_SCRIPT}`,
 };
 
+const STATIC: Record<string, string> = { ...VISUAL, ...INTERACT, ...INPUT_PAGES };
+
 const HTML = { "content-type": "text/html; charset=utf-8" };
 
 // W6.07's job takes long enough for its observation to change mode while it runs.
@@ -130,7 +135,7 @@ function servedGet(request: IncomingMessage, response: ServerResponse): boolean 
     "/text": () => textPage(url.searchParams),
     "/form": () => FORM,
   };
-  const body = pages[url.pathname]?.() ?? VISUAL[url.pathname] ?? INTERACT[url.pathname];
+  const body = pages[url.pathname]?.() ?? STATIC[url.pathname];
   if (body === undefined) return false;
   response.writeHead(200, HTML).end(body);
   return true;
@@ -148,9 +153,10 @@ function servedHit(request: IncomingMessage, response: ServerResponse, hits: Hit
   return true;
 }
 
-function handler(posts: Post[], hits: Hit[]) {
+function handler(posts: Post[], hits: Hit[], reports: InputReport[]) {
   return (request: IncomingMessage, response: ServerResponse) => {
     if (servedGet(request, response) || servedHit(request, response, hits)) return;
+    if (servedReport(request, response, reports)) return;
     if (request.method !== "POST" || request.url !== "/submit") {
       response.writeHead(404).end();
       return;
@@ -166,13 +172,15 @@ function handler(posts: Post[], hits: Hit[]) {
 export async function startTarget(): Promise<Target> {
   const posts: Post[] = [];
   const hits: Hit[] = [];
-  const server = createServer(handler(posts, hits));
+  const reports: InputReport[] = [];
+  const server = createServer(handler(posts, hits, reports));
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const { port } = server.address() as AddressInfo;
   return {
     origin: `http://127.0.0.1:${port}`,
     posts,
     hits,
+    reports,
     count: (text) => posts.filter((post) => post.text === text).length,
     close: () => new Promise<void>((resolve) => server.close(() => resolve())),
   };

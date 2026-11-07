@@ -1,4 +1,4 @@
-// W7 slice B: pointer events on the live frame become input.v1 events aimed at that frame.
+// W7 slices B and C: pointer, wheel, and keyboard input on the live frame become input.v1 events.
 const BUTTONS = ["left", "middle", "right"];
 const KEPT = 200;
 // Downs and ups come from mouse events: their `detail` is the browser's own click count.
@@ -14,19 +14,100 @@ export const imagePoint = (box, natural, client) => {
   return x >= 0 && x <= 1 && y >= 0 && y <= 1 ? { x, y } : null;
 };
 
-const modifiersOf = (event) =>
-  (event.altKey ? 1 : 0) |
-  (event.ctrlKey ? 2 : 0) |
-  (event.metaKey ? 4 : 0) |
-  (event.shiftKey ? 8 : 0);
+// The worker's closed key table; any other printable key reaches it as text, from beforeinput.
+const TABLE_KEYS = ["Enter", "Backspace", "Tab", "Escape", "ArrowLeft", "ArrowUp"];
+TABLE_KEYS.push("ArrowRight", "ArrowDown");
+const MAX_DELTA = 10_000;
+const LINE_PX = 40;
+const clampDelta = (delta) => Math.max(-MAX_DELTA, Math.min(MAX_DELTA, delta));
+
+/** One in flight, and only the newest waiting item (merged with the one it replaces) after it. */
+const coalescer = (send, merge, stats) => {
+  let inFlight = null;
+  let waiting = null;
+  const push = (item) => {
+    if (inFlight) {
+      if (waiting) stats.coalesced += 1;
+      waiting = waiting ? merge(waiting, item) : item;
+      return;
+    }
+    inFlight = send(item).finally(() => {
+      inFlight = null;
+      const next = waiting;
+      waiting = null;
+      if (next) push(next);
+    });
+  };
+  return push;
+};
+
+const sumWheel = (older, newer) => ({
+  ...newer,
+  fields: {
+    ...newer.fields,
+    deltaX: clampDelta(older.fields.deltaX + newer.fields.deltaX),
+    deltaY: clampDelta(older.fields.deltaY + newer.fields.deltaY),
+  },
+});
+
+// A field off to the side takes the owner's keys; nothing typed stays in it.
+const keyCapture = () => {
+  const capture = document.createElement("textarea");
+  capture.id = "interact-keys";
+  capture.setAttribute("aria-label", "Keyboard input for the worker's tab");
+  capture.autocomplete = "off";
+  const style = { position: "fixed", left: "0", bottom: "0", width: "1px", height: "1px" };
+  Object.assign(capture.style, style, { opacity: "0" });
+  document.body.append(capture);
+  return capture;
+};
+
+/** The point and deltas of a wheel over the image, or null in the letterbox. */
+const wheelOf = (event, image, natural) => {
+  const client = { x: event.clientX, y: event.clientY };
+  const point = imagePoint(image.getBoundingClientRect(), natural, client);
+  if (!point) return null;
+  const scale = event.deltaMode === 1 ? LINE_PX : 1;
+  const deltaX = clampDelta(event.deltaX * scale);
+  const deltaY = clampDelta(event.deltaY * scale);
+  return { point, fields: { deltaX, deltaY, modifiers: modifiersOf(event) } };
+};
+
+/** Table keys become key events and inserted characters text events; `send(kind, fields)`. */
+const listenKeys = (capture, send) => {
+  const onKey = (event) => {
+    if (!TABLE_KEYS.includes(event.key)) return;
+    event.preventDefault();
+    const phase = event.type === "keydown" ? "down" : "up";
+    void send("key", { code: event.key, phase, modifiers: modifiersOf(event) });
+  };
+  capture.addEventListener("keydown", onKey);
+  capture.addEventListener("keyup", onKey);
+  capture.addEventListener("beforeinput", (event) => {
+    event.preventDefault();
+    if (event.inputType === "insertText" && event.data) void send("text", { text: event.data });
+  });
+  // An input that could not be cancelled (a composition) is dropped, not kept.
+  capture.addEventListener("input", () => {
+    capture.value = "";
+  });
+};
+
+function modifiersOf(event) {
+  return (
+    (event.altKey ? 1 : 0) |
+    (event.ctrlKey ? 2 : 0) |
+    (event.metaKey ? 4 : 0) |
+    (event.shiftKey ? 8 : 0)
+  );
+}
 
 export const createInteractView = ({ input, visual, observe }) => {
   const image = /** @type {HTMLImageElement} */ (document.getElementById("visual"));
   const replies = [];
   const stats = { sent: 0, noFrame: 0, letterbox: 0, coalesced: 0 };
   let attached = null;
-  let moving = null;
-  let pendingMove = null;
+  const capture = keyCapture();
   /** @type {{ width: number, height: number } | null} */
   let natural = null;
 
@@ -50,20 +131,9 @@ export const createInteractView = ({ input, visual, observe }) => {
     return input.interactEvent(name, kind, { ...target, ...fields }).then(record);
   };
 
-  // Moves are coalesced: one in flight, and only the newest waiting one is sent after it.
-  const move = (name, point, fields) => {
-    if (moving) {
-      if (pendingMove) stats.coalesced += 1;
-      pendingMove = { point, fields };
-      return;
-    }
-    moving = aim(name, "pointerMove", point, fields).finally(() => {
-      moving = null;
-      const next = pendingMove;
-      pendingMove = null;
-      if (next) move(name, next.point, next.fields);
-    });
-  };
+  const send = (kind) => (item) => aim(item.name, kind, item.point, item.fields);
+  const move = coalescer(send("pointerMove"), (_older, newer) => newer, stats);
+  const wheel = coalescer(send("wheel"), sumWheel, stats);
 
   const onPointer = (event) => {
     if (!attached || !natural) return;
@@ -77,14 +147,28 @@ export const createInteractView = ({ input, visual, observe }) => {
     const pressed =
       kind === "pointerMove" && event.buttons === 0 ? "none" : (BUTTONS[event.button] ?? "left");
     const fields = { button: pressed, clickCount: 0, modifiers: modifiersOf(event) };
-    if (kind === "pointerMove") return move(attached, point, fields);
+    if (kind === "pointerMove") return move({ name: attached, point, fields });
     event.preventDefault();
+    // The click on the frame is where the owner's keys go next.
+    if (kind === "pointerDown") capture.focus({ preventScroll: true });
     void aim(attached, kind, point, {
       ...fields,
       clickCount: Math.min(Math.max(event.detail, 1), 3),
     });
   };
   for (const type of Object.keys(KINDS)) image.addEventListener(type, onPointer);
+
+  image.addEventListener(
+    "wheel",
+    (event) => {
+      const aimed = attached && natural ? wheelOf(event, image, natural) : null;
+      if (!aimed) return;
+      event.preventDefault();
+      wheel({ name: attached, ...aimed });
+    },
+    { passive: false },
+  );
+  listenKeys(capture, (kind, fields) => attached && aim(attached, kind, {}, fields));
   // The size of the last decoded frame: it reads zero while the next frame loads.
   image.addEventListener("load", () => {
     natural = { width: image.naturalWidth, height: image.naturalHeight };

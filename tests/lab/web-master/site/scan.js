@@ -1,5 +1,12 @@
 // W6.14 readout: what the master keeps, searched by content after streaming.
-import { cacheHits, databaseHits, holdsJpeg, plantStores, unplantStores } from "./deep-scan.js";
+import {
+  cacheHits,
+  databaseHits,
+  holdsJpeg,
+  holdsText,
+  plantStores,
+  unplantStores,
+} from "./deep-scan.js";
 
 const PLANT = "recnrun-plant";
 
@@ -41,6 +48,15 @@ export const scan = async () => {
     opfs: files,
     opfsHits: await opfsHits(root),
   };
+};
+
+/** W7.C: every place the master keeps that holds `marker`: localStorage, stores, and caches. */
+export const scanText = async (marker) => {
+  const matches = holdsText(marker);
+  const keys = Object.keys(localStorage).filter((key) =>
+    localStorage.getItem(key)?.includes(marker),
+  );
+  return { keys, databaseHits: await databaseHits(matches), cacheHits: await cacheHits(matches) };
 };
 
 /** The positive control: a JPEG in localStorage, IndexedDB, Cache Storage, and OPFS. */

@@ -30,7 +30,6 @@ const KEYS = {
   INTERACT_RENEW: ["leaseId", "seq", "type"],
   INTERACT_STOP: ["leaseId", "seq", "type"],
   INTERACT_REFRESH: ["leaseId", "seq", "type"],
-  // Slice C gives wheel, key, and text their own fields.
   INPUT_EVENT: ["kind", "leaseId", "seq", "type"],
 };
 // W7 slice B: a pointer names the frame it was aimed at and a point over that frame's image.
@@ -49,6 +48,14 @@ const POINTER_KEYS = [
   "x",
   "y",
 ];
+// W7 slice C: a key, a text, and a wheel name the frame too; only a wheel names a point.
+const AIMED = ["bootId", "frameSeq", "kind", "leaseId", "loaderId", "seq", "sessionEpoch", "type"];
+const KIND_KEYS = {
+  key: [...AIMED, "code", "modifiers", "phase"].sort(),
+  text: [...AIMED, "text"].sort(),
+  wheel: [...AIMED, "deltaX", "deltaY", "modifiers", "x", "y"].sort(),
+};
+const MAX_DELTA = 10_000;
 const BUTTONS = ["none", "left", "middle", "right"];
 const MAX_TTL_MS = 30_000;
 const MAX_BYTES = 8_192;
@@ -83,15 +90,24 @@ const FIELD_VALID = {
   frameSeq: (value) => Number.isSafeInteger(value) && value >= 1,
   sessionEpoch: timestamp,
   loaderId: (value) => typeof value === "string" && /^[0-9A-Za-z]{1,64}$/.test(value),
+  // Any short name: a well-formed code outside the table is refused as unsupported, not invalid.
+  code: (value) => typeof value === "string" && /^[A-Za-z0-9]{1,32}$/.test(value),
+  phase: (value) => value === "down" || value === "up",
+  // Control characters are keys, never text; the 4 KiB cap is the dispatch's own refusal.
+  text: (value) => typeof value === "string" && value.length > 0 && !hasControl(value),
+  deltaX: (value) => Number.isFinite(value) && Math.abs(value) <= MAX_DELTA,
+  deltaY: (value) => Number.isFinite(value) && Math.abs(value) <= MAX_DELTA,
   signature: (value) => typeof value === "string" && value.length > 0 && value.length <= 256,
 };
 
+const hasControl = (text) => [...text].some((char) => char < " " || char === "\u007f");
 const isObject = (value) => Boolean(value) && typeof value === "object" && !Array.isArray(value);
 
-const keysOf = (message) =>
-  message.type === "INPUT_EVENT" && POINTER_KINDS.includes(message.kind)
-    ? POINTER_KEYS
-    : KEYS[message.type];
+const keysOf = (message) => {
+  if (message.type !== "INPUT_EVENT") return KEYS[message.type];
+  if (POINTER_KINDS.includes(message.kind)) return POINTER_KEYS;
+  return Object.hasOwn(KIND_KEYS, message.kind) ? KIND_KEYS[message.kind] : KEYS.INPUT_EVENT;
+};
 
 /** Null for a well-formed input.v1 message, otherwise INVALID_REQUEST. */
 export const inputError = (message) => {

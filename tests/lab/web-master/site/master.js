@@ -5,7 +5,7 @@ import { createInput } from "./input-client.js";
 import { createInteractView } from "./interact-view.js";
 import { createJobs } from "./jobs.js";
 import { createObserve } from "./observe-client.js";
-import { plant, scan, unplant } from "./scan.js";
+import { plant, scan, scanText, unplant } from "./scan.js";
 import { createVisual } from "./visual-view.js";
 
 export const links = new Map();
@@ -140,6 +140,7 @@ window.lab = {
   ...createInteractView({ input, visual, observe }),
   ...createDashboard({ links, visual, observe }),
   scan,
+  scanText,
   plant,
   unplant,
 };

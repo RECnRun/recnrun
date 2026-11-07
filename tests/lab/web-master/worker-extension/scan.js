@@ -1,5 +1,12 @@
 // W6.14 readout: what the worker keeps, searched by content; the harness reads the result files.
-import { cacheHits, databaseHits, holdsJpeg, plantStores, unplantStores } from "./deep-scan.js";
+import {
+  cacheHits,
+  databaseHits,
+  holdsJpeg,
+  holdsText,
+  plantStores,
+  unplantStores,
+} from "./deep-scan.js";
 
 const PLANT_KEY = "recnrun-plant";
 
@@ -22,6 +29,18 @@ export const scan = async () => {
     cacheHits: await cacheHits(),
     downloads: downloads.map((item) => item.filename),
   };
+};
+
+/** W7.C: every place the worker keeps that holds `marker`: storage keys, stores, and caches. */
+export const scanText = async (marker) => {
+  const matches = holdsText(marker);
+  const stored = {
+    ...(await chrome.storage.local.get(null)),
+    ...(await chrome.storage.session.get(null)),
+  };
+  const keys = [];
+  for (const [key, value] of Object.entries(stored)) if (await matches(value)) keys.push(key);
+  return { keys, databaseHits: await databaseHits(matches), cacheHits: await cacheHits(matches) };
 };
 
 /** The positive control: a JPEG in chrome.storage, IndexedDB, and Cache Storage. */

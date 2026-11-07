@@ -172,5 +172,10 @@ export const createInput = ({ links, onRevoked = () => undefined }) => {
     interactSession: session,
     interactDuplicate: duplicate,
     interactClose: (name) => sessions.get(name)?.channel.close(),
+    // N10: the link itself lost, from the master's side.
+    interactDropLink: (name) => {
+      links.get(name).pc.close();
+      return true;
+    },
   };
 };
