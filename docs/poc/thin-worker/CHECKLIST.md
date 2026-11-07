@@ -97,9 +97,9 @@ Branch `poc-w6-visual-observability`, from d51a4b81.
 - [i] W6 review fixes, measurement and content scans (findings 7, 8, 11b, 11d)
   - red: scratch worktree at 0ad03b8c, `RECNRUN_W6_BENCH=1 node scripts/test-container.mjs lab:web-master:local w-observe-life.spec.ts w-scale.spec.ts`: 2 failed (W6.14 scan `Received: undefined`, no content scan; W6.E 1 worker visible `captureToDisplayMs.n` 0, no paint time)
   - green: `RECNRUN_W6_BENCH=1 … w-scale.spec.ts w-netem.spec.ts`: 10 passed, run `2026-11-07T12-54-04.522Z-754c7c1e`; `… w-observe-life.spec.ts`: 6 passed, run `2026-11-07T12-57-57.886Z-c3642c3d`
-  - commit: this commit
+  - commit: e2f67f14
 
-Gate W6: lab run · verify · review · RESULTS W6.01–W6.20 · verdict (GO, GO-LAB-ONLY, NO-GO)
+Gate W6: full lab 70 passed, 10 bench cells skipped (run `2026-11-07T12-59-40.380Z-9bf89e87`) · verify gates the push · review [PW-W6.md](reviews/PW-W6.md), findings fixed in 579b50cb, 0ad03b8c, e2f67f14 · RESULTS W6.01–W6.20 filled · verdict **GO-LAB-ONLY** (2026-11-07)
 
 ## P0: freeze and prune verify
 
