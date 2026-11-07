@@ -44,7 +44,14 @@ export function cloneControlRig({ downloads, masterId }) {
       launcher("sh", ["start", s.state, s.record, NAMESPACE, "--once"], s.vars(extra)),
     /** Holds the clone closed, as the owner's close does, before any pass opens it. */
     hold: () => life("sh", ["close", s.state, s.record, NAMESPACE, CLONE], s.vars()),
-    launches: s.launches,
+    // The stub's shared log also counts the retries of the record's other worker; only the clone's root is its own.
+    launches: () => {
+      const roots = join(s.home, "launches.txt.roots");
+      if (!existsSync(roots)) return 0;
+      return readFileSync(roots, "utf8")
+        .split("\n")
+        .filter((line) => line === s.root).length;
+    },
     signals: s.signals,
     field: (key) => s.field(key, CLONE),
     clonesJson: () => readFileSync(join(s.control, "clones.json"), "utf8"),
