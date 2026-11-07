@@ -1,5 +1,6 @@
 // Throwaway worker link: one ECDSA identity, answers offers with iceServers [], signs challenges.
 import { OBSERVE_TYPES } from "./observe-schema.js";
+import { createInputs } from "./input-channel.js";
 import { startLabSignal } from "./lab-signal.js";
 import { createSender } from "./visual-sender.js";
 
@@ -16,6 +17,7 @@ const RELAYED = new Set(["job", "job-status"]);
 const peers = new Map();
 const OBSERVE = new Set(OBSERVE_TYPES);
 const visual = createSender();
+const inputs = createInputs();
 
 const fingerprintOf = (sdp) => /^a=fingerprint:sha-256 (\S+)/im.exec(sdp)?.[1]?.toUpperCase() ?? "";
 const toBase64 = (buffer) => btoa(String.fromCharCode(...new Uint8Array(buffer)));
@@ -28,7 +30,8 @@ const sign = async (text) => {
 
 // A closed page may send no SCTP abort; ICE consent loss is then the first sign.
 const LOST = new Set(["disconnected", "failed", "closed"]);
-const linkClosed = () => void chrome.runtime.sendMessage({ target: "runner", type: "link-closed" });
+const linkClosed = (linkId) =>
+  void chrome.runtime.sendMessage({ target: "runner", type: "link-closed", linkId });
 
 const relay = async (channel, message) => {
   const reply = await chrome.runtime.sendMessage({ target: "runner", ...message });
@@ -47,15 +50,14 @@ const relayObserve = async (channel, request) => {
   channel.send(JSON.stringify({ type: `${request.type}-reply`, ...reply }));
 };
 
-const serve = (channel, fingerprints, pc) => {
+const serve = (channel, fingerprints, pc, linkId) => {
   const [offerFingerprint, answerFingerprint] = fingerprints;
-  const linkId = crypto.randomUUID();
   channels.set(channel, linkId);
   peers.set(linkId, pc);
   channel.onclose = () => {
     channels.delete(channel);
     peers.delete(linkId);
-    linkClosed();
+    linkClosed(linkId);
   };
   channel.onmessage = async ({ data }) => {
     const message = JSON.parse(data);
@@ -81,18 +83,22 @@ const serve = (channel, fingerprints, pc) => {
 
 const answer = async (offer) => {
   const pc = new RTCPeerConnection({ iceServers: [] });
+  const linkId = crypto.randomUUID();
   links.add(pc);
   pc.oniceconnectionstatechange = () => {
     if (!LOST.has(pc.iceConnectionState)) return;
     // A disconnected link may recover; a failed or closed one is retired.
     if (pc.iceConnectionState !== "disconnected") links.delete(pc);
-    linkClosed();
+    linkClosed(linkId);
   };
   // Frames and control never share a channel: visual.v1 gets no handler of recnrun-lab.
   pc.ondatachannel = ({ channel }) => {
+    const fingerprints = [fingerprintOf(offer), fingerprintOf(pc.localDescription.sdp)];
     if (channel.label === "visual.v1") visual.attach(channel, pc);
-    else if (channel.label === "recnrun-lab") {
-      serve(channel, [fingerprintOf(offer), fingerprintOf(pc.localDescription.sdp)], pc);
+    else if (channel.label === "recnrun-lab") serve(channel, fingerprints, pc, linkId);
+    else if (channel.label === "input.v1") {
+      const [masterFingerprint, workerFingerprint] = fingerprints;
+      inputs.attach(channel, { linkId, masterFingerprint, workerFingerprint });
     } else channel.close();
   };
   const complete = new Promise((resolve) => {
@@ -114,6 +120,7 @@ const IMMEDIATE = {
     visual.select(peers.get(message.linkId));
     return true;
   },
+  "input-push": (message) => inputs.push(message.linkId, message.message),
   "lab-signal": (message) => {
     startLabSignal(message.url, { answer, identity: publicKey, metrics: () => visual.stats() });
     return true;

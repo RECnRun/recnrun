@@ -7,6 +7,8 @@ import { load, publish, save } from "./ledger.js";
 import { MUTATING, execute } from "./ops.js";
 
 let running = null;
+// W7: the interaction that holds the claim; a job and an interaction exclude each other.
+let interacting = null;
 /** @type {{ jobId: string, tabId: number, origins: string[] } | null} */
 let active = null;
 
@@ -98,6 +100,7 @@ const admit = async (job, provision) => {
   const stored = await load(job.jobId);
   if (stored) return replay(job, stored);
   if (running) return { status: "BUSY", jobId: running };
+  if (interacting) return { status: "BUSY", jobId: job.jobId, holder: "interaction" };
   running = job.jobId;
   try {
     const ops = job.ops.map(({ op }) => ({ op, state: "PENDING" }));
@@ -121,12 +124,32 @@ const admit = async (job, provision) => {
 // Admission is one critical section: check, ledger lookup, claim, and ledger write never interleave.
 let admission = Promise.resolve();
 
-/** ACCEPTED only after the ledger holds the job; then the first op runs. */
-export const submit = (job, provision) => {
-  const result = admission.then(() => admit(job, provision));
+const enqueue = (work) => {
+  const result = admission.then(work);
   admission = result.catch(() => undefined);
   return result;
 };
+
+/** ACCEPTED only after the ledger holds the job; then the first op runs. */
+export const submit = (job, provision) => enqueue(() => admit(job, provision));
+
+/** Runs `check` inside admission, then claims the worker for `interactId`; writes no ledger entry. */
+export const claimInteraction = (interactId, check) =>
+  enqueue(async () => {
+    const refused = await check();
+    if (refused) return { status: refused };
+    if (running || interacting) return { status: "BUSY" };
+    interacting = interactId;
+    return { status: "CLAIMED", interactId };
+  });
+
+// B: the interactive tab is closed and pressed state released before this is called.
+export const releaseInteraction = (interactId) => {
+  if (interacting === interactId) interacting = null;
+};
+
+/** The holder of the claim now: a job id, an interaction id, or null. */
+export const claimed = () => running ?? interacting;
 
 /** The job whose tab is open now, which an observe request must name. */
 export const current = () => active;

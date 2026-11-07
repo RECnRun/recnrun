@@ -2,6 +2,7 @@
 import { bootId } from "./capture.js";
 import { visualLab } from "./capture-lab.js";
 import { labState, release, setKnob } from "./knobs.js";
+import { input, interactLab, interactLinkClosed } from "./interact.js";
 import { all, load, recover, resultFile } from "./ledger.js";
 import { observe, observeLab } from "./observe.js";
 import { statuses, submit } from "./runner.js";
@@ -45,13 +46,19 @@ const handle = async (message) => {
   if (message.type === "job-status")
     return { jobs: await statuses(message.jobIds), bootId: bootId() };
   if (message.type === "observe") return observe(message.request, message.linkId);
-  if (message.type === "link-closed") labState.linkClosedAt = Date.now();
+  if (message.type === "input-closed") void interactLinkClosed(message.linkId);
+  if (message.type === "link-closed") {
+    labState.linkClosedAt = Date.now();
+    void interactLinkClosed(message.linkId);
+  }
   return { ok: true };
 };
 
 chrome.runtime.onMessage.addListener((message, _sender, respond) => {
   if (message.target !== "runner") return false;
-  handle(message).then(respond, (error) => respond({ error: String(error) }));
+  // Input is queued on receipt, before any await, so its order is the channel's.
+  const work = message.type === "input" ? input(message.message, message.link) : handle(message);
+  work.then(respond, (error) => respond({ error: String(error) }));
   return true;
 });
 
@@ -78,6 +85,7 @@ globalThis.lab = {
     transport: () => ask({ type: "visual-stats" }),
   },
   observe: observeLab,
+  interact: interactLab,
   scan,
   plant,
   unplant,
