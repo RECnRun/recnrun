@@ -174,7 +174,7 @@ export async function link(page: Page, worker: LoadedExtension, name: string): P
       throw new Error(`channel ${name} did not open`);
     }),
   ]);
-  return call<boolean>(page, "authenticate", name, pinned);
+  return (await call<{ ok: boolean }>(page, "authenticate", name, pinned)).ok;
 }
 
 /** Pages of the master Chrome on the stand-in origin, read from the browser target list. */

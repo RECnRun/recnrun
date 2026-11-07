@@ -32,9 +32,21 @@ async function bodyOf(request: IncomingMessage): Promise<string> {
   return body;
 }
 
+/** `/text?c=€&n=10000`: a page whose #t holds the character `c` repeated `n` times. */
+function textPage(search: URLSearchParams): string {
+  const count = Math.min(Number(search.get("n") ?? 0), 200_000);
+  const body = (search.get("c") ?? "a").repeat(count);
+  return `<!doctype html><meta charset="utf-8"><title>Text</title><p id="t">${body}</p>`;
+}
+
 function handler(posts: Post[]) {
   return (request: IncomingMessage, response: ServerResponse) => {
     const html = { "content-type": "text/html; charset=utf-8" };
+    const url = new URL(request.url ?? "/", "http://lab.invalid");
+    if (request.method === "GET" && url.pathname === "/text") {
+      response.writeHead(200, html).end(textPage(url.searchParams));
+      return;
+    }
     if (request.method === "GET" && request.url === "/form") {
       response.writeHead(200, html).end(FORM);
       return;

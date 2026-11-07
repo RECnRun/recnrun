@@ -1,83 +1,11 @@
-// Strict job check of plan §6 (lab subset): exact keys, the five ops, limits, origins, signature.
-const TOP = ["deadlineAt", "epoch", "issuedAt", "jobId", "ops", "origins", "signature", "tabRef"];
-const ARGS = {
-  navigate: ["url"],
-  wait: ["selector", "state"],
-  type: ["selector", "text"],
-  click: ["selector"],
-  read: ["maxBytes", "selector", "what"],
-};
-const MAX_OPS = 32;
-const MAX_OP_MS = 30_000;
-const MAX_JOB_MS = 600_000;
-const MAX_JOB_BYTES = 65_536;
+// Strict job check of plan §6 (lab subset): schema, clock, origins, signature.
+import { canonical } from "./encoding.js";
+import { envelopeError, opError, originOf } from "./job-schema.js";
+
 const CLOCK_SKEW_MS = 30_000;
-const MAX_SELECTOR = 512;
-const MAX_TEXT = 4096;
-const MAX_READ_BYTES = 16_384;
-const STATES = ["attached", "visible", "text"];
-const WHAT = ["text", "value"];
+const MAX_JOB_MS = 600_000;
 
-export const canonical = (value) => {
-  if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
-  if (value && typeof value === "object") {
-    const keys = Object.keys(value).sort();
-    return `{${keys.map((key) => `${JSON.stringify(key)}:${canonical(value[key])}`).join(",")}}`;
-  }
-  return JSON.stringify(value);
-};
-
-const isObject = (value) => Boolean(value) && typeof value === "object" && !Array.isArray(value);
-const hasKeys = (value, keys) =>
-  isObject(value) && Object.keys(value).sort().join() === keys.join();
-const originOf = (url) => {
-  try {
-    return new URL(url).origin;
-  } catch {
-    return "";
-  }
-};
-
-const urlError = (url, origins) => {
-  if (typeof url !== "string" || url.length > 2048 || !/^https?:\/\//.test(url)) {
-    return "INVALID_COMMAND";
-  }
-  return origins.includes(originOf(url)) ? null : "FORBIDDEN_ORIGIN";
-};
-
-const boundedString = (value, max) => typeof value === "string" && value.length <= max;
-const inRange = (value, max) => Number.isInteger(value) && value > 0 && value <= max;
-
-// Every argument has a cap of plan §6; one missing here lets a master exceed it.
-const ARG_VALID = {
-  selector: (value) => boundedString(value, MAX_SELECTOR) && value.length > 0,
-  text: (value) => boundedString(value, MAX_TEXT),
-  maxBytes: (value) => inRange(value, MAX_READ_BYTES),
-  state: (value) => STATES.includes(value),
-  what: (value) => WHAT.includes(value),
-  url: () => true,
-};
-
-const argsValid = (args) => Object.entries(args).every(([key, value]) => ARG_VALID[key](value));
-
-const opError = (entry, origins) => {
-  if (!hasKeys(entry, ["args", "op", "timeoutMs"])) return "INVALID_COMMAND";
-  const keys = Object.hasOwn(ARGS, entry.op) ? ARGS[entry.op] : null;
-  if (!keys || !hasKeys(entry.args, keys) || !argsValid(entry.args)) return "INVALID_COMMAND";
-  const timeout = entry.timeoutMs;
-  if (!Number.isInteger(timeout) || timeout <= 0 || timeout > MAX_OP_MS) return "INVALID_COMMAND";
-  return entry.op === "navigate" ? urlError(entry.args.url, origins) : null;
-};
-
-const shapeError = (job) => {
-  if (!hasKeys(job, TOP) || typeof job.jobId !== "string") return "INVALID_COMMAND";
-  if (canonical(job).length > MAX_JOB_BYTES) return "INVALID_COMMAND";
-  if (!Array.isArray(job.ops) || job.ops.length < 1 || job.ops.length > MAX_OPS) {
-    return "INVALID_COMMAND";
-  }
-  const span = job.deadlineAt - job.issuedAt;
-  return Number.isInteger(span) && span > 0 && span <= MAX_JOB_MS ? null : "INVALID_COMMAND";
-};
+export { canonical };
 
 // A future issuedAt would stretch the 10-minute cap; the cap holds against the worker's clock.
 const clockError = (job, now) => {
@@ -99,13 +27,16 @@ const signatureValid = async (job, masterJwk) => {
   const key = await crypto.subtle.importKey("jwk", masterJwk, algorithm, false, ["verify"]);
   const data = new TextEncoder().encode(canonical(fields));
   const ecdsa = { name: "ECDSA", hash: "SHA-256" };
-  return crypto.subtle.verify(ecdsa, key, fromBase64(String(signature)), data).catch(() => false);
+  // A signature that is not base64 is a bad signature, not a crash of the admission path.
+  return Promise.resolve()
+    .then(() => crypto.subtle.verify(ecdsa, key, fromBase64(signature), data))
+    .catch(() => false);
 };
 
 /** Null when the job may be accepted, otherwise the refusal code. */
 export const checkJob = async (job, { masterKey, allowlist }) => {
   const error =
-    shapeError(job) ??
+    envelopeError(job) ??
     clockError(job, Date.now()) ??
     originsError(job, allowlist) ??
     job.ops.map((entry) => opError(entry, job.origins)).find(Boolean) ??

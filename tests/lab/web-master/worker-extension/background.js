@@ -50,6 +50,8 @@ globalThis.lab = {
   setKnob: (knob) => setKnob(knob).then(() => true),
   state: () => ({ reached: labState.reached, linkClosedAt: labState.linkClosedAt }),
   release,
+  // The same admission path a relayed job takes, for tests that need no link.
+  submit: async (job) => submit(job, await provision()),
   job: load,
   jobs: all,
   resultFile,

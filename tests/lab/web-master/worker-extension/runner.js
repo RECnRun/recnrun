@@ -1,5 +1,6 @@
 // Whole-job runner of plan §6 (lab subset): accept once, run in order, keep running with no master.
 import { checkJob, digestOf } from "./job-check.js";
+import { utf8Length } from "./encoding.js";
 import { barrier } from "./knobs.js";
 import { load, publish, save } from "./ledger.js";
 import { MUTATING, execute } from "./ops.js";
@@ -17,15 +18,31 @@ const setOp = async (context, index, outcome) => {
   void push({ type: "op-result", jobId: context.job.jobId, index, outcome });
 };
 
+const READ_BUDGET = 65_536;
+
+const runFor = (context, index) => {
+  const entry = context.job.ops[index];
+  // The op's deadline is absolute: its own timeout, capped by the job's.
+  const deadlineAt = Math.min(Date.now() + entry.timeoutMs, context.job.deadlineAt);
+  const gate = () => barrier(index, "preflight");
+  return {
+    origins: context.job.origins,
+    deadlineAt,
+    readBudget: READ_BUDGET - context.readBytes,
+    gate,
+  };
+};
+
 /** Runs one op between its barriers; answers whether the job goes on. */
 const step = async (context, index) => {
   const entry = context.job.ops[index];
   await barrier(index, "between");
   await setOp(context, index, { state: MUTATING.has(entry.op) ? "APPLYING" : "RUNNING" });
   await barrier(index, "applying");
-  // The job's deadline bounds every op: at deadlineAt the running op ends with TIMEOUT.
-  const timeoutMs = Math.min(entry.timeoutMs, context.job.deadlineAt - Date.now());
-  const outcome = await execute(context.target, { ...entry, timeoutMs }, context.job.origins);
+  const outcome = await execute(context.target, entry, runFor(context, index));
+  if (outcome.state === "DONE" && entry.op === "read") {
+    context.readBytes += utf8Length(outcome.result.text);
+  }
   await barrier(index, "afterEffect");
   await setOp(context, index, outcome);
   return outcome.state === "DONE";
@@ -52,7 +69,7 @@ const run = async (job, record) => {
     enabled: true,
   });
   try {
-    record.state = await runOps({ job, record, target });
+    record.state = await runOps({ job, record, target, readBytes: 0 });
   } finally {
     await chrome.debugger.detach(target).catch(() => false);
     await chrome.tabs.remove(tab.id).catch(() => false);
@@ -68,26 +85,40 @@ const replay = async (job, stored) =>
     ? { status: "REPLAYED", ...statusOf(stored) }
     : { status: "PAYLOAD_MISMATCH", jobId: job.jobId };
 
-/** ACCEPTED only after the ledger holds the job; then the first op runs. */
-export const submit = async (job, provision) => {
+const admit = async (job, provision) => {
   const refused = await checkJob(job, provision);
   if (refused) return { status: refused, jobId: job?.jobId };
   const stored = await load(job.jobId);
   if (stored) return replay(job, stored);
   if (running) return { status: "BUSY", jobId: running };
-  const ops = job.ops.map(({ op }) => ({ op, state: "PENDING" }));
-  const record = { jobId: job.jobId, digest: await digestOf(job), state: "RUNNING", ops };
-  record.acceptedAt = Date.now();
-  await save(record);
   running = job.jobId;
-  void run(job, record)
-    .catch(async (error) => {
-      await save({ ...record, state: "FAILED", error: String(error) });
-    })
-    .finally(() => {
-      running = null;
-    });
+  try {
+    const ops = job.ops.map(({ op }) => ({ op, state: "PENDING" }));
+    const record = { jobId: job.jobId, digest: await digestOf(job), state: "RUNNING", ops };
+    record.acceptedAt = Date.now();
+    await save(record);
+    void run(job, record)
+      .catch(async (error) => {
+        await save({ ...record, state: "FAILED", error: String(error) });
+      })
+      .finally(() => {
+        running = null;
+      });
+  } catch (error) {
+    running = null;
+    throw error;
+  }
   return { status: "ACCEPTED", jobId: job.jobId };
+};
+
+// Admission is one critical section: check, ledger lookup, claim, and ledger write never interleave.
+let admission = Promise.resolve();
+
+/** ACCEPTED only after the ledger holds the job; then the first op runs. */
+export const submit = (job, provision) => {
+  const result = admission.then(() => admit(job, provision));
+  admission = result.catch(() => undefined);
+  return result;
 };
 
 export const statuses = async (jobIds) => {
