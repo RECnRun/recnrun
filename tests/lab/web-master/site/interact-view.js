@@ -208,6 +208,7 @@ export const createInteractView = ({ input, visual, observe }) => {
     const { lease } = input.interactSession(name);
     if (!lease?.ok) return Promise.resolve({ ok: false, code: "NO_LEASE" });
     attached = name;
+    visual.visualFocus(name);
     return observe.observeStart(name, lease.interactId, "live");
   };
 
@@ -216,6 +217,7 @@ export const createInteractView = ({ input, visual, observe }) => {
     interactAim: aim,
     interactDetach: () => {
       attached = null;
+      visual.visualFocus(null);
     },
     interactKeepalive: hold.enable,
     interactView: () => {

@@ -22,6 +22,10 @@ export const createVisual = ({ links, nextMessage }) => {
   const shown = new Map();
   const arrivals = [];
   let revoked = 0;
+  // Frames each link put into the large image.
+  const shownBy = {};
+  // The link the owner interacts with; while set, the large image shows that link alone.
+  let focus = null;
   /** @type {Blob | null} */
   let lastBlob = null;
   // Keyed by link: every root of the same build carries the same extension id.
@@ -52,10 +56,14 @@ export const createVisual = ({ links, nextMessage }) => {
 
   // One object URL per link: the previous frame's URL is revoked before the next is shown.
   const display = (name, frame) => {
-    lastBlob = new Blob([frame.bytes], { type: "image/jpeg" });
-    const entry = { blob: lastBlob, capturedAtMs: frame.capturedAtMs, at: Date.now() };
+    const blob = new Blob([frame.bytes], { type: "image/jpeg" });
+    const entry = { blob, capturedAtMs: frame.capturedAtMs, at: Date.now() };
     latest.set(name, entry);
     for (const listener of listeners) listener(name, entry);
+    // Other links' frames stay in their cards, never in the view the owner aims at.
+    if (focus !== null && name !== focus) return;
+    lastBlob = blob;
+    shownBy[name] = (shownBy[name] ?? 0) + 1;
     const url = URL.createObjectURL(lastBlob);
     const previous = shown.get(name);
     // Events aim at the frame on screen: the new one counts once it is presented, not on arrival.
@@ -143,6 +151,7 @@ export const createVisual = ({ links, nextMessage }) => {
     sessions: [...sessions.values()],
     admission: admission.stats(),
     revoked,
+    shownBy: { ...shownBy },
     superseded: supersededCount,
     arrivals: [...arrivals],
     size: [image.naturalWidth, image.naturalHeight],
@@ -165,5 +174,8 @@ export const createVisual = ({ links, nextMessage }) => {
     shownFrame: (name) => shown.get(name)?.frameSeq ?? null,
     onVisualFrame: (listener) => void listeners.add(listener),
     onPresented: (listener) => void presentedListeners.add(listener),
+    visualFocus: (name) => {
+      focus = name;
+    },
   };
 };

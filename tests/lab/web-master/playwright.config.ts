@@ -22,7 +22,8 @@ export default defineConfig({
     { name: "headed-worker" },
     {
       name: "headless-worker",
-      testMatch: /w-(lifecycle|visual|dashboard|interact-(click|input|drag|latency))\.spec\.ts$/,
+      testMatch:
+        /w-(lifecycle|visual|dashboard|interact-(click|input|drag|latency|load))\.spec\.ts$/,
     },
   ],
 });
