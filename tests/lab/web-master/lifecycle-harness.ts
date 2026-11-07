@@ -3,8 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
-import { chromium } from "@playwright/test";
-import type { Browser, Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
 import { launchChrome } from "../../browser/fixtures/chrome.ts";
 import type { LaunchedChrome } from "../../browser/fixtures/chrome.ts";
 import { attachExtension, loadUnpacked } from "../../browser/fixtures/extension-loaders.ts";
@@ -125,34 +124,30 @@ async function recoveryPublished(worker: LoadedExtension): Promise<void> {
 }
 
 /**
- * Starts the provisioned root and waits until its restart recovery has run. Playwright connects
- * only after the recovery's result files are written: its connect renames downloads to GUIDs.
+ * Starts the provisioned root and waits until its restart recovery has run. No Playwright or
+ * page-level CDP client attaches: a real worker has none, and one changes background-tab input.
  */
-export async function startWorker(root: string, id: string): Promise<LoadedExtension> {
+export async function startWorker(
+  root: string,
+  id: string,
+  headless = false,
+): Promise<LoadedExtension> {
   const flags = ["--enable-unsafe-extension-debugging", "--remote-debugging-port=0"];
+  // A headless worker root runs as the launcher's headless worker does.
+  if (headless) flags.push("--headless");
   const launched = await launchChrome({ cdp: false, userDataDir: root, args: flags });
   const wsEndpoint = await workerEndpoint(root).catch(async (error: unknown) => {
     await launched.close();
     throw error;
   });
-  // browser and cdp are set after the recovery; attachExtension reads only wsEndpoint and close.
-  let browser: Browser | undefined;
-  const close = async () => {
-    await browser?.close().catch(() => undefined);
-    await launched.close();
-  };
-  const chrome = { ...launched, strict: false, wsEndpoint, close } as unknown as LaunchedChrome;
+  // attachExtension reads only wsEndpoint and close; it attaches to the service worker alone.
+  const chrome = { ...launched, strict: false, wsEndpoint } as unknown as LaunchedChrome;
   try {
     const worker = await attachExtension(chrome, id);
     await recoveryPublished(worker);
-    browser = await chromium.connectOverCDP(wsEndpoint);
-    chrome.browser = browser;
-    chrome.cdp = await browser.newBrowserCDPSession();
-    // Later result files keep their names in the worker's own Downloads folder.
-    await chrome.cdp.send("Browser.setDownloadBehavior", { behavior: "default" });
     return worker;
   } catch (error) {
-    await close();
+    await launched.close();
     throw error;
   }
 }

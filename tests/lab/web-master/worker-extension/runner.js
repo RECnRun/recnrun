@@ -47,6 +47,10 @@ const run = async (job, record) => {
   const target = { tabId: tab.id };
   await chrome.debugger.attach(target, "1.3");
   await chrome.debugger.sendCommand(target, "Page.enable");
+  // A background tab is hidden and draws no frames, so a mouseMoved is never acked without it.
+  await chrome.debugger.sendCommand(target, "Emulation.setFocusEmulationEnabled", {
+    enabled: true,
+  });
   try {
     record.state = await runOps({ job, record, target });
   } finally {

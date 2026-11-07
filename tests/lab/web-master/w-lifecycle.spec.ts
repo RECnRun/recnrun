@@ -33,6 +33,8 @@ import type { Target } from "./target-server.ts";
 const NAME = "worker";
 const DONE_MS = 30_000;
 const RECONNECT_BUDGET_MS = 60_000;
+// The headless-worker project runs this cell with the worker root under --headless.
+const headless = () => test.info().project.name === "headless-worker";
 
 interface Cell {
   site: StandIn;
@@ -121,13 +123,14 @@ test.beforeAll(async () => {
   const target = await startTarget();
   const master = await launchChrome({ silentDebugger: false });
   const { root, id } = await provisionWorker();
-  const worker = await startWorker(root, id);
+  const worker = await startWorker(root, id, headless());
   shared = { site, target, master, root, id, worker, jobIds: [], evidence: {} };
   const masterKey = await call<JsonWebKey>(await openMaster(shared), "pair");
   const provision = { masterKey, allowlist: [target.origin] };
   await background(worker, `lab.provision(${JSON.stringify(provision)})`);
   shared.evidence.chrome = master.version;
   shared.evidence.workerFlags = worker.chrome.flags;
+  shared.evidence.workerHeadless = headless();
 });
 
 test.afterAll(async () => {
@@ -198,7 +201,7 @@ test("W.lifecycle 3: a worker killed between effect and ledger write reports OUT
   );
   const killedPid = c.worker.chrome.pid;
   await killWorker(c.worker);
-  c.worker = await startWorker(c.root, c.id);
+  c.worker = await startWorker(c.root, c.id, headless());
   const recovered = await ledger(c.worker, jobId);
   expect(recovered && [recovered.state, ...states(recovered)]).toEqual([
     "INTERRUPTED",
