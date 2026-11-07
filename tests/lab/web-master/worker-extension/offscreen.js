@@ -7,7 +7,8 @@ const identity = crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" 
   "sign",
   "verify",
 ]);
-const links = [];
+/** Peer connections kept alive until their ICE fails or closes. */
+const links = new Set();
 /** @type {Map<RTCDataChannel, string>} control channel → its link's id */
 const channels = new Map();
 const RELAYED = new Set(["job", "job-status"]);
@@ -53,6 +54,7 @@ const serve = (channel, fingerprints, pc) => {
   peers.set(linkId, pc);
   channel.onclose = () => {
     channels.delete(channel);
+    peers.delete(linkId);
     linkClosed();
   };
   channel.onmessage = async ({ data }) => {
@@ -79,8 +81,13 @@ const serve = (channel, fingerprints, pc) => {
 
 const answer = async (offer) => {
   const pc = new RTCPeerConnection({ iceServers: [] });
-  links.push(pc);
-  pc.oniceconnectionstatechange = () => LOST.has(pc.iceConnectionState) && linkClosed();
+  links.add(pc);
+  pc.oniceconnectionstatechange = () => {
+    if (!LOST.has(pc.iceConnectionState)) return;
+    // A disconnected link may recover; a failed or closed one is retired.
+    if (pc.iceConnectionState !== "disconnected") links.delete(pc);
+    linkClosed();
+  };
   // Frames and control never share a channel: visual.v1 gets no handler of recnrun-lab.
   pc.ondatachannel = ({ channel }) => {
     if (channel.label === "visual.v1") visual.attach(channel, pc);

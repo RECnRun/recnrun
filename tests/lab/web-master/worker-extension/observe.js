@@ -52,6 +52,7 @@ const gate = createGate({
   send: (frame) => {
     const { bootId: boot, jobId, tabId, epoch, frameSeq, width, height, capturedAtMs } = frame;
     const meta = { bootId: boot, jobId, targetId: tabId, epoch, frameSeq, width, height };
+    meta.sessionEpoch = session.sessionEpoch;
     stats.sent += 1;
     if (!session.firstFrameAt) session.firstFrameAt = Date.now();
     const validUntil = Math.min(session.leaseUntil, session.authorizedUntil);

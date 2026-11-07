@@ -5,7 +5,7 @@ import type { CheckContext } from "./worker-extension/observe-check.js";
 import { CAPS, createGate } from "./worker-extension/observe-gate.js";
 import type { Caps, GateFrame } from "./worker-extension/observe-gate.js";
 import { requestError } from "./worker-extension/observe-schema.js";
-import { encodeFrame } from "./worker-extension/visual-envelope.js";
+import { HEADER_BYTES, encodeFrame } from "./worker-extension/visual-envelope.js";
 
 /* W6 slice C: the closed observe schema, its signed check, and the worker's frame caps. */
 
@@ -197,8 +197,8 @@ describe("the worker's frame caps", () => {
 
   test("the per-frame cap fits the sender's buffer above its low mark", () => {
     // visual-sender.js sends when the buffer is at most 64 KiB and drops above 256 KiB.
-    const chunks = Math.ceil(CAPS.frameBytes / (16_384 - 82));
-    expect(CAPS.frameBytes + chunks * 82 + 65_536).toBeLessThanOrEqual(262_144);
+    const chunks = Math.ceil(CAPS.frameBytes / (16_384 - HEADER_BYTES));
+    expect(CAPS.frameBytes + chunks * HEADER_BYTES + 65_536).toBeLessThanOrEqual(262_144);
   });
 
   test("the byte budget holds a mode's rate down", () => {
@@ -264,6 +264,7 @@ describe("the master's receiver across sessions", () => {
         width: 480,
         height: 270,
         capturedAtMs,
+        sessionEpoch: 2,
       },
       jpeg(100),
     )[0];

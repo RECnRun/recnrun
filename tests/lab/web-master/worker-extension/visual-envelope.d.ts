@@ -9,6 +9,7 @@ export interface FrameMeta {
   width: number;
   height: number;
   capturedAtMs: number;
+  sessionEpoch: number;
 }
 
 export declare const HEADER_BYTES: number;

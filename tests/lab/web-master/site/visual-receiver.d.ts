@@ -22,6 +22,7 @@ export interface Head {
   width: number;
   height: number;
   capturedAtMs: number;
+  sessionEpoch: number;
 }
 
 export interface Frame extends Head {

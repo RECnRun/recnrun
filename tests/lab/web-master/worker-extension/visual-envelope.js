@@ -1,7 +1,7 @@
 // W6 slice B: the closed binary envelope of visual.v1, version 1 (layout mirrored in site/visual-receiver.js).
 const VERSION = 1;
 const CODEC_JPEG = 1;
-export const HEADER_BYTES = 82;
+export const HEADER_BYTES = 90;
 export const MESSAGE_MAX = 16_384;
 
 const hexBytes = (hex, into, offset) => {
@@ -41,6 +41,8 @@ const header = (meta, chunkIndex, chunkCount, frameBytes) => {
   view.setUint16(70, meta.width);
   view.setUint16(72, meta.height);
   view.setFloat64(74, meta.capturedAtMs);
+  // The master shows a frame only for the observe session it was sent in.
+  view.setFloat64(82, meta.sessionEpoch);
   return bytes;
 };
 

@@ -214,3 +214,18 @@ describe("the worker's observe session", () => {
     expect(observe.observeLab.stats().session).toBeNull();
   });
 });
+
+describe("the worker's visual sender", () => {
+  test("a closed visual.v1 is forgotten and no frame is sent on it", async () => {
+    const { createSender } = await import("./worker-extension/visual-sender.js");
+    const sender = createSender();
+    const pc = {} as RTCPeerConnection;
+    const channel = { readyState: "open", bufferedAmount: 0 } as RTCDataChannel;
+    sender.attach(channel, pc);
+    sender.select(pc);
+    expect(sender.stats().links).toBe(1);
+    Object.assign(channel, { readyState: "closed" });
+    channel.onclose?.(new Event("close"));
+    expect(sender.stats().links).toBe(0);
+  });
+});

@@ -126,6 +126,12 @@ export const createSender = () => {
     channel.onmessage = () => {
       stats.rejected += 1;
     };
+    // A closed link is retired: its channel never holds the next session's frames.
+    channel.onclose = () => {
+      channels.delete(pc);
+      if (state.channel === channel)
+        Object.assign(state, { channel: null, slot: null, inflight: false });
+    };
   };
 
   // Frames go only to the link whose signed start the worker accepted.
@@ -139,6 +145,10 @@ export const createSender = () => {
   };
 
   // The live buffer level, for the W6.E samples of a bounded queue under network faults.
-  const current = () => ({ ...stats, buffered: state.channel?.bufferedAmount ?? 0 });
+  const current = () => ({
+    ...stats,
+    buffered: state.channel?.bufferedAmount ?? 0,
+    links: channels.size,
+  });
   return { attach, select, clear, relayed, burst, stats: current };
 };

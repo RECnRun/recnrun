@@ -19,6 +19,7 @@ const meta = (overrides: Partial<FrameMeta> = {}): FrameMeta => ({
   width: 480,
   height: 270,
   capturedAtMs: 1_000,
+  sessionEpoch: 1_700_000_000_000,
   ...overrides,
 });
 
@@ -65,7 +66,8 @@ describe("encodeFrame", () => {
   });
 
   test("round-trips every header field", () => {
-    const [message] = encodeFrame(meta({ epoch: 3, frameSeq: 9, capturedAtMs: 1.5e12 }), jpeg(10));
+    const fields = { epoch: 3, frameSeq: 9, capturedAtMs: 1.5e12, sessionEpoch: 1.6e12 };
+    const [message] = encodeFrame(meta(fields), jpeg(10));
     const parsed = parse(message);
     if (typeof parsed === "string") throw new Error(parsed);
     expect(parsed.head).toMatchObject({
@@ -82,6 +84,7 @@ describe("encodeFrame", () => {
       width: 480,
       height: 270,
       capturedAtMs: 1.5e12,
+      sessionEpoch: 1.6e12,
     });
   });
 });

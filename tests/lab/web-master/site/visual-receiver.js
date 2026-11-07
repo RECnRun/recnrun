@@ -1,7 +1,7 @@
 // W6 slice B: reassembles visual.v1 frames; keeps nothing but the partial and last frame per worker.
 const VERSION = 1;
 const CODEC_JPEG = 1;
-const HEADER_BYTES = 82;
+const HEADER_BYTES = 90;
 
 export const LIMITS = {
   messageBytes: 16_384,
@@ -48,6 +48,7 @@ export const parse = (data, limits = LIMITS) => {
     width: view.getUint16(70),
     height: view.getUint16(72),
     capturedAtMs: view.getFloat64(74),
+    sessionEpoch: view.getFloat64(82),
   };
   const refused = checkHeader(head, limits);
   if (refused) return refused;
@@ -56,8 +57,8 @@ export const parse = (data, limits = LIMITS) => {
 
 // Every chunk of one frame repeats the same frame fields.
 const SAME = ["jobId", "targetId", "epoch", "chunkCount", "frameBytes", "width", "height"];
-const matches = (a, b) =>
-  SAME.every((key) => a[key] === b[key]) && a.capturedAtMs === b.capturedAtMs;
+const SAME_TIMES = ["capturedAtMs", "sessionEpoch"];
+const matches = (a, b) => [...SAME, ...SAME_TIMES].every((key) => a[key] === b[key]);
 
 const isJpeg = (bytes) => bytes[0] === 0xff && bytes[1] === 0xd8;
 

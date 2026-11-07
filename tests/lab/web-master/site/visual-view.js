@@ -1,4 +1,5 @@
 // W6 slice B: the master's side of visual.v1. Shows the last frame per worker; stores nothing.
+import { createAdmission } from "./admission.js";
 import { createReceiver } from "./visual-receiver.js";
 
 const SWEEP_MS = 500;
@@ -27,11 +28,13 @@ export const createVisual = ({ links, nextMessage }) => {
   const latest = new Map();
   const listeners = new Set();
   const receivers = new Map();
+  // Request-to-first-frame timing per link, for the lab's measurements.
   const sessions = new Map();
+  const admission = createAdmission();
   const image = /** @type {HTMLImageElement} */ (document.getElementById("visual"));
 
   // One object URL per link: the previous frame's URL is revoked before the next is shown.
-  const onFrame = (name, frame) => {
+  const display = (name, frame) => {
     lastBlob = new Blob([frame.bytes], { type: "image/jpeg" });
     const entry = { blob: lastBlob, capturedAtMs: frame.capturedAtMs, at: Date.now() };
     latest.set(name, entry);
@@ -55,34 +58,35 @@ export const createVisual = ({ links, nextMessage }) => {
     for (const receiver of receivers.values()) receiver.sweep();
   }, SWEEP_MS);
 
-  const plain = (uuid) => uuid.replaceAll("-", "");
-
-  // A frame is shown only on a proven link, for the worker it proved, in the session started.
+  // A frame is shown only on a proven link, for the worker it proved, in a session it accepted.
   const admitOn = (name) => (head) => {
     const proven = links.get(name)?.proven;
     if (!proven) return "unproven";
     if (head.workerId !== hexOfWorker(proven.workerId)) return "wrong-worker";
-    const session = sessions.get(name);
-    if (!session) return "unsolicited";
-    if (head.bootId !== plain(session.bootId)) return "wrong-boot";
-    return head.jobId === plain(session.jobId) ? null : "wrong-job";
+    return admission.check(name, head);
   };
 
   const attach = (channel, name) => {
     channel.binaryType = "arraybuffer";
     const admit = admitOn(name);
-    const receiver = createReceiver({ onFrame: (frame) => onFrame(name, frame) });
+    const show = (frame) => display(name, frame);
+    const receiver = createReceiver({ onFrame: (frame) => admission.offer(name, frame, show) });
     receivers.set(name, receiver);
     channel.onmessage = ({ data }) => void receiver.accept(data, admit);
   };
 
-  /** A new accepted start: the link's frame ordering starts over with this boot and job. */
+  /** A start sent: the link's frame ordering starts over; frames wait for the worker's accept. */
   const beginSession = (name, session) => {
+    admission.request(name, session);
     sessions.set(name, { ...session, sentAt: performance.now(), firstFrameMs: null });
     const workerId = links.get(name)?.proven?.workerId;
     if (workerId) receivers.get(name)?.reset(hexOfWorker(workerId));
   };
-  const endSession = (name) => void sessions.delete(name);
+  const acceptSession = (name) => admission.accept(name, (frame) => display(name, frame));
+  const endSession = (name, reason = "ended") => {
+    admission.revoke(name, reason);
+    sessions.delete(name);
+  };
 
   const control = async (name, message) => {
     const { channel } = links.get(name);
@@ -111,6 +115,7 @@ export const createVisual = ({ links, nextMessage }) => {
     ...totals([...receivers.values()].map((receiver) => receiver.stats())),
     workers: [...shown.values()],
     sessions: [...sessions.values()],
+    admission: admission.stats(),
     revoked,
     arrivals: [...arrivals],
     size: [image.naturalWidth, image.naturalHeight],
@@ -122,6 +127,8 @@ export const createVisual = ({ links, nextMessage }) => {
   return {
     attach,
     beginSession,
+    acceptSession,
+    renewed: (name) => admission.renewed(name),
     endSession,
     visualPixel,
     visualStats,

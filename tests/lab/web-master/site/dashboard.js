@@ -39,6 +39,7 @@ const createActions = (observe) => {
     const reply = await observe.observeStart(card.name, card.jobId, mode);
     if (!reply.ok) throw new Error(reply.code);
     card.errorsSeen = observe.observeEvents(card.name).errors.length;
+    card.restartsSeen = observe.observeEvents(card.name).restarts.length;
     card.epoch = observe.observeSession(card.name).sessionEpoch;
     card.error = null;
     card.observedAt = Date.now();
@@ -98,6 +99,7 @@ export const createDashboard = ({ links, visual, observe }) => {
     card.times = [...card.times.filter((at) => Date.now() - at <= 2_000), entry.at];
     card.url = show(card.image, card.url, entry.blob);
     viewer.frame(card, entry);
+    renderCard(links, card);
   });
 
   const add = (name, jobId) => {
@@ -113,8 +115,10 @@ export const createDashboard = ({ links, visual, observe }) => {
       button(card, "Pause", () => stop(card, "PAUSED")),
       button(card, "Open viewer", () => viewer.open(card)),
     );
-    // A new job on the same link replaces that link's card.
-    cards.get(name)?.item.remove();
+    // A new job on the same link replaces that link's card, and frees its image.
+    const replaced = cards.get(name);
+    replaced?.item.remove();
+    if (replaced?.url) URL.revokeObjectURL(replaced.url);
     list.append(card.item);
     cards.set(name, card);
     renderCard(links, card);
