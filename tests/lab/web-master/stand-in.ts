@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { createServer as createHttpServer } from "node:http";
 import { createServer } from "node:https";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
@@ -33,6 +34,9 @@ export interface StandIn {
   serve(directory: string): void;
   close(): Promise<void>;
 }
+
+/** RECNRUN_W7_HOST=1: plain http on 127.0.0.1, a secure context that needs no policy or CA. */
+const hostMode = () => process.env.RECNRUN_W7_HOST === "1";
 
 function requireContainer(): void {
   if (process.env.RECNRUN_TEST_CONTAINER !== "1" || !existsSync("/.dockerenv")) {
@@ -107,8 +111,42 @@ async function issueChain(
   return { caDer, key, cert };
 }
 
+type Handler = Parameters<typeof createHttpServer>[1];
+
+function siteHandler(current: () => string): Handler {
+  return (request, response) => {
+    const name = request.url === "/" ? "index.html" : (request.url ?? "").slice(1);
+    const type = TYPES[extname(name)];
+    if (!type || name.includes("/")) {
+      response.writeHead(404).end();
+      return;
+    }
+    void readFile(join(current(), name)).then(
+      (body) => response.writeHead(200, { "content-type": type }).end(body),
+      () => response.writeHead(404).end(),
+    );
+  };
+}
+
+/** The host cell's stand-in: no policy, no CA, nothing outside a plain loopback listener. */
+async function startHostStandIn(): Promise<StandIn> {
+  let site = SITE;
+  const server = createHttpServer(siteHandler(() => site));
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const { port } = server.address() as AddressInfo;
+  return {
+    origin: `http://127.0.0.1:${port}`,
+    port,
+    serve: (directory) => {
+      site = directory;
+    },
+    close: () => new Promise<void>((resolve) => server.close(() => resolve())),
+  };
+}
+
 /** Starts the stand-in; the policy must exist before any Chrome of the lab starts. */
 export async function startStandIn(): Promise<StandIn> {
+  if (hostMode()) return startHostStandIn();
   requireContainer();
   const directory = await mkdtemp(join(tmpdir(), "recnrun-lab-ca-"));
   const { caDer, key, cert } = await issueChain(directory);
@@ -117,18 +155,10 @@ export async function startStandIn(): Promise<StandIn> {
     flag: "wx",
   });
   let site = SITE;
-  const server = createServer({ key, cert }, (request, response) => {
-    const name = request.url === "/" ? "index.html" : (request.url ?? "").slice(1);
-    const type = TYPES[extname(name)];
-    if (!type || name.includes("/")) {
-      response.writeHead(404).end();
-      return;
-    }
-    void readFile(join(site, name)).then(
-      (body) => response.writeHead(200, { "content-type": type }).end(body),
-      () => response.writeHead(404).end(),
-    );
-  });
+  const server = createServer(
+    { key, cert },
+    siteHandler(() => site),
+  );
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const { port } = server.address() as AddressInfo;
   const close = async () => {
