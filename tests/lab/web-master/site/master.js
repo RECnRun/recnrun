@@ -3,6 +3,7 @@ import { createDashboard } from "./dashboard.js";
 import { createFsa } from "./fsa.js";
 import { createInput } from "./input-client.js";
 import { createInteractView } from "./interact-view.js";
+import { createLatency } from "./interact-latency.js";
 import { createJobs } from "./jobs.js";
 import { createObserve } from "./observe-client.js";
 import { plant, scan, scanText, unplant } from "./scan.js";
@@ -138,6 +139,7 @@ window.lab = {
   ...observe,
   ...input,
   ...createInteractView({ input, visual, observe }),
+  ...createLatency({ input, visual }),
   ...createDashboard({ links, visual, observe }),
   scan,
   scanText,

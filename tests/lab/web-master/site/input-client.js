@@ -34,6 +34,8 @@ export const createInput = ({ links, onRevoked = () => undefined }) => {
     const { type: _type, leaseId: _lease, ...frame } = message;
     session.frames.set(frame.frameSeq, frame);
     session.latest = frame;
+    // A screenshot carries no geometry: the latest frame a pointer can aim at is kept apart.
+    if (frame.geometry) session.aimable = frame;
     if (session.frames.size > FRAMES_KEPT)
       session.frames.delete(session.frames.keys().next().value);
   };
@@ -54,7 +56,7 @@ export const createInput = ({ links, onRevoked = () => undefined }) => {
     if (known && known.channel.readyState !== "closed") return known.ready;
     const channel = links.get(name).pc.createDataChannel("input.v1", { ordered: true });
     const session = { channel, pending: [], pushes: [], lease: null, seq: 0, timer: null };
-    Object.assign(session, { frames: new Map(), latest: null });
+    Object.assign(session, { frames: new Map(), latest: null, aimable: null });
     session.ready = new Promise((resolve) =>
       channel.addEventListener("open", () => resolve(session)),
     );
@@ -122,7 +124,7 @@ export const createInput = ({ links, onRevoked = () => undefined }) => {
     const session = await open(name);
     const reply = await sendOn(session, start);
     if (!reply.ok) return reply;
-    Object.assign(session, { lease: reply, seq: 0, latest: null });
+    Object.assign(session, { lease: reply, seq: 0, latest: null, aimable: null });
     session.frames.clear();
     const renew = () =>
       void leaseMessage(session, "INTERACT_RENEW").then((renewed) => renewed.ok || pause(session));
@@ -168,6 +170,7 @@ export const createInput = ({ links, onRevoked = () => undefined }) => {
     interactRefresh: (name) => leaseMessage(sessions.get(name), "INTERACT_REFRESH"),
     interactFrame: (name, frameSeq) => sessions.get(name)?.frames.get(frameSeq) ?? null,
     interactLatest: (name) => sessions.get(name)?.latest ?? null,
+    interactAimable: (name) => sessions.get(name)?.aimable ?? null,
     interactFingerprints: fingerprints,
     interactSession: session,
     interactDuplicate: duplicate,
