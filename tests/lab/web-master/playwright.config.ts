@@ -15,9 +15,9 @@ export default defineConfig({
   reporter: [["list"], ["html", { open: "never", outputFolder: "../../../playwright-report/lab" }]],
   // The specs start Google Chrome Stable themselves; Playwright's browser is never used.
   use: { headless: false, trace: "off" },
-  // W.lifecycle runs again with a headless worker root; the master stays headed.
+  // W.lifecycle and W6.A run again with a headless worker root; the master stays headed.
   projects: [
     { name: "headed-worker" },
-    { name: "headless-worker", testMatch: /w-lifecycle\.spec\.ts$/ },
+    { name: "headless-worker", testMatch: /w-(lifecycle|visual)\.spec\.ts$/ },
   ],
 });

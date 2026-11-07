@@ -1,4 +1,5 @@
 // The harness calls globalThis.lab through CDP; the offscreen document holds the link.
+import { visualLab } from "./capture-lab.js";
 import { labState, release, setKnob } from "./knobs.js";
 import { all, load, recover, resultFile } from "./ledger.js";
 import { statuses, submit } from "./runner.js";
@@ -55,4 +56,5 @@ globalThis.lab = {
   job: load,
   jobs: all,
   resultFile,
+  visual: visualLab,
 };

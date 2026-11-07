@@ -39,12 +39,41 @@ function textPage(search: URLSearchParams): string {
   return `<!doctype html><meta charset="utf-8"><title>Text</title><p id="t">${body}</p>`;
 }
 
+// W6 visual fixture: solid panels whose colour a probe can read back from a JPEG frame.
+const VISUAL_STYLE = `<style>body{margin:0;font:16px sans-serif}
+html{background:var(--panel)}
+.spin{position:fixed;top:8px;right:8px;width:40px;height:40px;background:#000;animation:s 1s linear infinite}
+@keyframes s{to{transform:rotate(360deg)}}#modal{position:fixed;top:8px;right:64px;background:#fff;padding:4px}</style>`;
+
+const VISUAL_SCRIPT = `<script>let n=0;document.getElementById("go").addEventListener("click",()=>{
+n+=1;document.getElementById("counter").textContent=String(n);
+document.getElementById("label").textContent="after";
+document.documentElement.style.setProperty("--panel","#e0a020");
+document.getElementById("modal").hidden=false;
+const after=document.createElement("p");after.id="after";document.body.append(after);});</script>`;
+
+const VISUAL: Record<string, string> = {
+  "/visual": `<!doctype html><meta charset="utf-8"><title>Visual</title>${VISUAL_STYLE}
+<html style="--panel:#2050c0"><body><button id="go" type="button">Go</button>
+<span id="counter">0</span> <span id="label">before</span> <a id="next" href="/visual/second">next</a>
+<div class="spin"></div><div id="modal" hidden>modal</div>${VISUAL_SCRIPT}`,
+  "/visual/second": `<!doctype html><meta charset="utf-8"><title>Second</title>${VISUAL_STYLE}
+<html style="--panel:#20a040"><body><p id="second">second</p><div class="spin"></div>`,
+  "/visual/static": `<!doctype html><meta charset="utf-8"><title>Static</title>${VISUAL_STYLE}
+<html style="--panel:#808080"><body><p id="static">static</p>`,
+};
+
 function handler(posts: Post[]) {
   return (request: IncomingMessage, response: ServerResponse) => {
     const html = { "content-type": "text/html; charset=utf-8" };
     const url = new URL(request.url ?? "/", "http://lab.invalid");
     if (request.method === "GET" && url.pathname === "/text") {
       response.writeHead(200, html).end(textPage(url.searchParams));
+      return;
+    }
+    const visual = request.method === "GET" ? VISUAL[url.pathname] : undefined;
+    if (visual) {
+      response.writeHead(200, html).end(visual);
       return;
     }
     if (request.method === "GET" && request.url === "/form") {

@@ -1,6 +1,7 @@
 // Whole-job runner of plan §6 (lab subset): accept once, run in order, keep running with no master.
 import { checkJob, digestOf } from "./job-check.js";
 import { utf8Length } from "./encoding.js";
+import { bind, unbind } from "./capture.js";
 import { barrier } from "./knobs.js";
 import { load, publish, save } from "./ledger.js";
 import { MUTATING, execute } from "./ops.js";
@@ -68,9 +69,11 @@ const run = async (job, record) => {
   await chrome.debugger.sendCommand(target, "Emulation.setFocusEmulationEnabled", {
     enabled: true,
   });
+  bind(target);
   try {
     record.state = await runOps({ job, record, target, readBytes: 0 });
   } finally {
+    unbind(target);
     await chrome.debugger.detach(target).catch(() => false);
     await chrome.tabs.remove(tab.id).catch(() => false);
   }
