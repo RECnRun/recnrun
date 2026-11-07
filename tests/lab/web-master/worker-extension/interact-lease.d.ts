@@ -24,3 +24,4 @@ export declare function createLeases(options?: { now?: () => number; leaseMs?: n
   expired(): boolean;
   current(): Lease | null;
 };
+export declare function detachReason(reason: string | undefined): string;

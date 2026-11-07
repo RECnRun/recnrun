@@ -4,11 +4,13 @@ import { createStartCheck } from "./input-check.js";
 import { INPUT_TYPES, inputError } from "./input-schema.js";
 import { createEvents } from "./interact-events.js";
 import { createFrames, geometryOf } from "./interact-frames.js";
+import { createGate } from "./interact-gate.js";
 import { createLeases } from "./interact-lease.js";
-import { closeTab, isOpen, openTab, refresh } from "./interact-tab.js";
+import { closeTab, isOpen, openTab, recover, refresh } from "./interact-tab.js";
+import { holding, insertText, key, liveDocument, mouse, releaseHeld } from "./interact-tab.js";
 import { resize, tabState } from "./interact-tab.js";
 import { setSentHook } from "./observe.js";
-import { claimInteraction, claimed, releaseInteraction } from "./runner.js";
+import { blockInteraction, claimInteraction, claimed, releaseInteraction } from "./runner.js";
 
 const TICK_MS = 250;
 const limits = { leaseMs: 3_000, renewMs: 1_000 };
@@ -28,7 +30,10 @@ const stats = {
 const QUIET_MS = 750;
 
 const provision = async () => (await chrome.storage.local.get("provision")).provision;
-const latched = async () => (await chrome.storage.local.get("interactStop")).interactStop === true;
+// The stop holds in memory at once, and in storage across service worker restarts.
+let stopping = false;
+const latched = async () =>
+  stopping || (await chrome.storage.local.get("interactStop")).interactStop === true;
 
 // Interaction is off unless provisioning turned it on, and a latched stop holds until cleared.
 const gateError = async (provisioned) => {
@@ -50,16 +55,44 @@ const push = (linkId, message) =>
     .sendMessage({ target: "offscreen", type: "input-push", linkId, message })
     .catch(() => false);
 
-// The tab is closed before the claim is freed, so a job never shares the worker with it.
-const end = async (ended) => {
-  if (!ended) return;
+// A tab whose close is not confirmed keeps the claim; the tick tries again.
+let cleanup = Promise.resolve();
+/** @type {Promise<string | null>} */
+let opening = Promise.resolve(null);
+let unclosed = null;
+const LEFTOVER = "leftover-tab";
+
+const settle = async ({ id, close }) => {
+  await opening;
+  const closed = await close().catch((error) => {
+    stats.errors.push(String(error));
+    return false;
+  });
+  unclosed = closed ? null : { id, close };
+  if (closed) releaseInteraction(id);
+};
+
+/** Ends the lease at once: no queued event acts after this. The tab closes, then the claim frees. */
+const finish = (ended) => {
+  if (!ended) return cleanup;
   count(stats.revoked, ended.reason);
   frames.clear();
-  await closeTab().catch((error) => stats.errors.push(String(error)));
-  releaseInteraction(ended.interactId);
   const { leaseId, interactId, reason } = ended;
-  push(ended.linkId, { type: "INTERACT_REVOKED", leaseId, interactId, reason });
+  const revoked = { type: "INTERACT_REVOKED", leaseId, interactId, reason };
+  cleanup = cleanup
+    .then(() => settle({ id: interactId, close: closeTab }))
+    .then(() => push(ended.linkId, revoked));
+  return cleanup;
 };
+const revoke = (reason) => finish(leases.revoke(reason));
+
+// A service worker that died left its tab: until it is gone, nothing claims the worker.
+const recovering = recover().catch(() => false);
+cleanup = recovering.then((closed) => {
+  if (closed) return;
+  blockInteraction(LEFTOVER);
+  unclosed = { id: LEFTOVER, close: recover };
+});
 
 // Every frame the master gets is announced on input.v1 with what an event must name to aim at it.
 setSentHook((frame, sessionEpoch) => {
@@ -75,14 +108,19 @@ setSentHook((frame, sessionEpoch) => {
   push(lease.linkId, { type: "INTERACT_FRAME", leaseId: lease.leaseId, ...entry });
 });
 
-let queue = Promise.resolve();
-const serial = (work) => {
-  const result = queue.then(work);
-  queue = result.catch(() => undefined);
-  return result;
+/** True while `leaseId` is the live, unexpired lease; an expired one is revoked here. */
+const authorized = (leaseId) => {
+  const lease = leases.current();
+  if (!lease || lease.leaseId !== leaseId) return false;
+  if (!leases.expired()) return true;
+  void revoke("LEASE_EXPIRED");
+  return false;
 };
-const revoke = (reason) => end(leases.revoke(reason));
-const event = createEvents({ frames, refuse, revoke, serial, stats });
+
+const gate = createGate({ onOverload: (code) => void revoke(code) });
+const serial = (work) => gate.chain(work);
+const tabOps = { holding, insertText, key, liveDocument, mouse, releaseHeld };
+const event = createEvents({ frames, refuse, revoke, serial, stats, tab: tabOps, authorized });
 
 const challenge = async (link) => {
   const refused = await gateError(await provision());
@@ -95,6 +133,7 @@ const challenge = async (link) => {
 };
 
 const start = async (message, link) => {
+  await recovering;
   const verify = async () => {
     const provisioned = await provision();
     const refused = await gateError(provisioned);
@@ -111,38 +150,39 @@ const start = async (message, link) => {
     url: message.url,
   });
   const { allowlist } = await provision();
-  const on = { offPolicy: () => revokeLater("TARGET_OFF_POLICY"), gone: revokeLater };
-  const opened = await openTab(
-    { interactId: claim.interactId, url: message.url, origins: allowlist },
-    on,
-  ).then(
-    (tabId) => ({ tabId }),
-    (error) => ({ error: String(error) }),
+  const on = { offPolicy: () => revoke("TARGET_OFF_POLICY"), gone };
+  const target = { interactId: claim.interactId, url: message.url, origins: allowlist };
+  opening = openTab(target, on).then(
+    () => null,
+    (error) => String(error),
   );
-  if (opened.error) {
-    stats.errors.push(opened.error);
-    await end(leases.revoke("TAB_FAILED"));
+  const failed = await opening;
+  if (failed) {
+    stats.errors.push(failed);
+    await revoke("TAB_FAILED");
     return refuse("TAB_FAILED");
   }
+  // A link lost or a stop while the tab opened has already ended this lease.
+  if (leases.current()?.leaseId !== lease.leaseId) return refuse("SESSION_REVOKED");
   stats.started += 1;
   return { ok: true, leaseId: lease.leaseId, interactId: lease.interactId, ...limits };
 };
 
 const failedEvent = async (error, message) => {
   if (String(error?.message) !== "INPUT_UNKNOWN") throw error;
-  await end(leases.revoke("INPUT_UNKNOWN"));
+  void revoke("INPUT_UNKNOWN");
   return refuse("INPUT_UNKNOWN", { leaseId: message.leaseId, seq: message.seq });
 };
 
 const onLease = async (message, link) => {
   const refusal = leases.admit(message, link.linkId);
   if (refusal) {
-    await end(refusal.ended);
+    void finish(refusal.ended);
     return refuse(refusal.code, refusal.reason ? { reason: refusal.reason } : {});
   }
   const { leaseId, seq } = message;
   if (message.type === "INTERACT_RENEW") leases.renew();
-  else if (message.type === "INTERACT_STOP") await end(leases.revoke("STOPPED"));
+  else if (message.type === "INTERACT_STOP") await revoke("STOPPED");
   else if (message.type === "INTERACT_REFRESH") {
     if (!observed()) return refuse("NOT_OBSERVED", { leaseId, seq });
     await refresh();
@@ -161,28 +201,61 @@ const dispatch = async (message, link) => {
 const replyType = (message) =>
   INPUT_TYPES.includes(message?.type) ? `${message.type}-reply` : "INPUT-reply";
 
+// A stop from the lease's own link acts on arrival, ahead of anything queued before it.
+const stopNow = (message, link) => {
+  if (message?.type !== "INTERACT_STOP" || inputError(message)) return null;
+  const lease = leases.current();
+  if (lease?.leaseId !== message.leaseId || lease.linkId !== link.linkId) return null;
+  const { leaseId, seq } = message;
+  return revoke("STOPPED").then(() => ({ ok: true, leaseId, seq }));
+};
+
 /** One input.v1 message from `link`; messages are handled one at a time, in arrival order. */
-export const input = (message, link) =>
-  serial(async () => {
-    // Every message gets exactly one reply, so the master's FIFO pairing never slips.
-    const reply = await dispatch(message, link).catch((error) => {
-      stats.errors.push(String(error));
-      return refuse("WORKER_ERROR");
-    });
-    return { type: replyType(message), ...reply };
+export const input = (message, link) => {
+  const stopped = stopNow(message, link);
+  // Every message gets exactly one reply, so the master's FIFO pairing never slips.
+  const reply = (body) => ({ type: replyType(message), ...body });
+  const handle = async () =>
+    reply(
+      await (stopped ??
+        dispatch(message, link).catch((error) => {
+          stats.errors.push(String(error));
+          return refuse("WORKER_ERROR");
+        })),
+    );
+  const { leaseId, seq } = message ?? {};
+  return gate.serial(handle, (code) => {
+    void revoke(code);
+    return reply(refuse(code, { leaseId, seq }));
   });
+};
 
-/** A closed input channel or link ends its lease and voids its outstanding challenges. */
-export const interactLinkClosed = (linkId) =>
-  serial(async () => {
-    starts.forget(linkId);
-    if (leases.current()?.linkId === linkId) await end(leases.revoke("LINK_CLOSED"));
-  });
+/** A closed input channel or link ends its lease at once and voids its outstanding challenges. */
+export const interactLinkClosed = (linkId) => {
+  starts.forget(linkId);
+  return leases.current()?.linkId === linkId ? revoke("LINK_CLOSED") : cleanup;
+};
 
-/** Revokes from outside a message: an off-policy commit, a closed tab, a detach. */
-function revokeLater(reason) {
-  void serial(() => end(leases.revoke(reason)));
+/** The worker-local stop: it holds across starts until `clear`. */
+const stopWorker = async () => {
+  stopping = true;
+  const done = revoke("WORKER_STOP");
+  await chrome.storage.local.set({ interactStop: true });
+  await done;
+};
+
+/** A lost tab or detach ends the lease; the owner's Cancel on the infobar stops the worker. */
+function gone(reason) {
+  if (reason === "WORKER_STOP") void stopWorker();
+  else void revoke(reason);
 }
+
+// An unconfirmed close is tried again, one attempt at a time.
+const retryClose = () => {
+  const pending = unclosed;
+  unclosed = null;
+  cleanup = cleanup.then(() => settle(pending));
+};
 
 let refreshedAt = 0;
 function observed() {
@@ -196,7 +269,8 @@ const quiet = () => {
 };
 
 setInterval(() => {
-  if (leases.expired()) void serial(() => end(leases.revoke("LEASE_EXPIRED")));
+  if (leases.expired()) void revoke("LEASE_EXPIRED");
+  else if (unclosed) retryClose();
   else if (leases.current() && quiet()) {
     refreshedAt = Date.now();
     void serial(() => refresh().catch(() => false));
@@ -204,14 +278,11 @@ setInterval(() => {
 }, TICK_MS);
 
 export const interactLab = {
-  // The worker-local stop: it holds across starts until `clear`.
-  stop: () =>
-    serial(async () => {
-      await chrome.storage.local.set({ interactStop: true });
-      await end(leases.revoke("WORKER_STOP"));
-      return true;
-    }),
-  clear: () => chrome.storage.local.remove("interactStop").then(() => true),
+  stop: () => stopWorker().then(() => true),
+  clear: () => {
+    stopping = false;
+    return chrome.storage.local.remove("interactStop").then(() => true);
+  },
   state: () => {
     const { tab, held, stats: tabStats } = tabState();
     const state = { lease: leases.current(), claim: claimed(), stats, limits };

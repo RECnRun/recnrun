@@ -151,6 +151,11 @@ export const dropTab = (tabId) => {
   if (active?.interactive && active.tabId === tabId) active = null;
 };
 
+/** W7 fixes: a tab not confirmed closed holds the claim, under `token`, until it is. */
+export const blockInteraction = (token) => {
+  if (!interacting) interacting = token;
+};
+
 // The interactive tab is closed before this is called.
 export const releaseInteraction = (interactId) => {
   if (interacting === interactId) interacting = null;

@@ -1,6 +1,10 @@
 // W7 slice A: one lease at a time, bound to the link it began on; its seq moves by exactly one.
 const KEEP_REVOKED = 32;
 
+/** Why a detach ends the lease: the owner's Cancel on the debugger infobar stops the worker. */
+export const detachReason = (reason) =>
+  reason === "canceled_by_user" ? "WORKER_STOP" : "CDP_DETACHED";
+
 export const createLeases = ({ now = Date.now, leaseMs = 3_000 } = {}) => {
   let lease = null;
   /** @type {Map<string, string>} recent revoked lease ids → reason */

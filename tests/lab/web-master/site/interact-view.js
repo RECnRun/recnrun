@@ -116,7 +116,7 @@ export const createInteractView = ({ input, visual, observe }) => {
   let lastPoint = null;
   const hold = createHold(() =>
     attached && input.interactSession(attached).renewing
-      ? input.interactEvent(attached, "hold").catch(() => null)
+      ? aim(attached, "hold", {}).catch(() => null)
       : null,
   );
 

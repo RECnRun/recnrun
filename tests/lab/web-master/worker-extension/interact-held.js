@@ -1,6 +1,7 @@
 // W7 slice C: what the worker holds pressed in its tab, and the events that let all of it go.
 const MOUSE = "Input.dispatchMouseEvent";
 const KEY = "Input.dispatchKeyEvent";
+const CANCEL = "Input.cancelDragging";
 
 export const createHeld = () => {
   /** @type {Set<string>} buttons pressed and not released */
@@ -40,11 +41,35 @@ export const createHeld = () => {
     })),
   ];
 
+  const size = () => buttons.size + keys.size;
+  const any = () => size() > 0;
+
   const clear = () => {
     buttons.clear();
     keys.clear();
   };
 
-  const size = () => buttons.size + keys.size;
-  return { track, releases, clear, size, any: () => size() > 0 };
+  /**
+   * Cancels any drag, then lets go of every key and button through `send(method, params)`; each
+   * stays tracked until its release is confirmed. False when the pressed state is not known.
+   */
+  const releaseAll = async (send) => {
+    // A drag cancelled first ends without a drop, whatever is under the pointer.
+    const cancelled = await send(CANCEL, {}).then(
+      () => true,
+      (error) => String(error?.message) !== "INPUT_UNKNOWN",
+    );
+    let sure = cancelled;
+    for (const { method, params } of releases()) {
+      const done = await send(method, params).then(
+        () => true,
+        () => false,
+      );
+      if (done) track(method, params);
+      sure &&= done;
+    }
+    return sure && !any();
+  };
+
+  return { track, releases, releaseAll, clear, size, any };
 };

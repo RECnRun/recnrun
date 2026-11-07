@@ -1,39 +1,62 @@
 // W7 slice B: the worker's own interactive tab: opened, attached, watched, and closed by it alone.
 import { MODES, bind, unbind } from "./capture.js";
+import { within } from "./interact-gate.js";
 import { createHeld } from "./interact-held.js";
+import { detachReason } from "./interact-lease.js";
 import { originOf } from "./job-schema.js";
 import { dropTab, holdTab } from "./runner.js";
 
 const KEY = "interactTab";
 const DISPATCH_MS = 1_000;
+const OP_MS = 2_000;
 const QUALITY = 50;
 /** @type {any} */
 let tab = null;
 /** @type {{ offPolicy?: (url: string) => void, gone?: (reason: string) => void }} */
 let watcher = {};
+// The input command last sent: cleanup lets go only after it has answered or timed out.
+let inflight = Promise.resolve();
 const stats = { opened: 0, closed: 0, openersClosed: 0, leftoversClosed: 0, refreshes: 0 };
 // Slice C: releases sent, by why (DEADMAN, CLEANUP), and those that failed.
 Object.assign(stats, { released: {}, releaseEvents: 0, releaseFailed: 0 });
+// W7 fixes: closes not confirmed, cleanups whose pressed state was unknown, late tabs closed.
+Object.assign(stats, { closeFailed: 0, releaseUnknown: 0, lateTabsClosed: 0 });
 const held = createHeld();
 
-const command = (method, params = {}) => chrome.debugger.sendCommand(tab.target, method, params);
-const allowed = (url) => tab.origins.includes(originOf(url));
+const command = (target, method, params = {}) =>
+  chrome.debugger.sendCommand(target, method, params);
+const allowed = (current, url) => current.origins.includes(originOf(url));
 
+// A tab, debugger, or storage call that hangs fails by its deadline, named by its step.
+const op = (name, work) =>
+  within(work, OP_MS, "TIMEOUT").catch((error) => {
+    throw new Error(`${name}: ${String(error?.message ?? error)}`);
+  });
 /** Rejects with INPUT_UNKNOWN when `work` has not answered by the deadline. */
-const deadline = (work) =>
-  Promise.race([
-    work,
-    new Promise((_, reject) => setTimeout(() => reject(new Error("INPUT_UNKNOWN")), DISPATCH_MS)),
-  ]);
+const deadline = (work) => within(work, DISPATCH_MS, "INPUT_UNKNOWN");
 
-// A tab marked by a service worker that died is closed at the next startup.
-const leftover = (async () => {
-  const { [KEY]: tabId } = await chrome.storage.session.get(KEY);
-  if (typeof tabId !== "number") return;
+/** False only when the tab is gone; a lookup that hangs counts as open. */
+export const isOpen = (tabId) =>
+  op("get", chrome.tabs.get(tabId)).then(
+    () => true,
+    (error) => String(error.message).endsWith("TIMEOUT"),
+  );
+// Closed is what the browser confirms: a refused remove counts only once the tab is gone.
+const removed = (tabId) =>
+  op("remove", chrome.tabs.remove(tabId)).then(
+    () => true,
+    async () => !(await isOpen(tabId)),
+  );
+
+/** Closes the tab a service worker that died had marked; false while it may still be open. */
+export const recover = async () => {
+  const { [KEY]: tabId } = await op("marker", chrome.storage.session.get(KEY));
+  if (typeof tabId !== "number") return true;
+  if (!(await removed(tabId))) return false;
   stats.leftoversClosed += 1;
-  await chrome.tabs.remove(tabId).catch(() => false);
-  await chrome.storage.session.remove(KEY);
-})().catch(() => false);
+  await op("unmark", chrome.storage.session.remove(KEY));
+  return true;
+};
 
 chrome.debugger.onEvent.addListener((source, method, params) => {
   if (!tab || source.tabId !== tab.target.tabId || method !== "Page.frameNavigated") return;
@@ -41,10 +64,10 @@ chrome.debugger.onEvent.addListener((source, method, params) => {
   tab.loaderId = params.frame.loaderId;
   tab.url = params.frame.url;
   // The request that led here has already left: the revoke follows the commit.
-  if (tab.url !== "about:blank" && !allowed(tab.url)) watcher.offPolicy?.(tab.url);
+  if (tab.url !== "about:blank" && !allowed(tab, tab.url)) watcher.offPolicy?.(tab.url);
 });
-chrome.debugger.onDetach.addListener((source) => {
-  if (tab && source.tabId === tab.target.tabId) watcher.gone?.("CDP_DETACHED");
+chrome.debugger.onDetach.addListener((source, reason) => {
+  if (tab && source.tabId === tab.target.tabId) watcher.gone?.(detachReason(reason));
 });
 chrome.tabs.onRemoved.addListener((tabId) => {
   if (tab?.target.tabId === tabId) watcher.gone?.("TAB_CLOSED");
@@ -56,30 +79,38 @@ chrome.webNavigation.onCreatedNavigationTarget.addListener(({ sourceTabId, tabId
   void chrome.tabs.remove(tabId).catch(() => false);
 });
 
-// A failed step names itself, so a TAB_FAILED says which call refused.
-const step = (name, work) =>
-  work.catch((error) => {
-    throw new Error(`${name}: ${String(error?.message ?? error)}`);
-  });
-
 const prepare = async (tabId, target) => {
-  await chrome.storage.session.set({ [KEY]: tabId });
-  await step("attach", chrome.debugger.attach(target, "1.3"));
-  await command("Page.enable");
+  await op("mark", chrome.storage.session.set({ [KEY]: tabId }));
+  await op("attach", chrome.debugger.attach(target, "1.3"));
+  await op("enable", command(target, "Page.enable"));
   // The zoom calls refuse a tab whose first document has not committed yet.
-  await step("blank", command("Page.navigate", { url: "about:blank" }));
+  await op("blank", command(target, "Page.navigate", { url: "about:blank" }));
   // Pinned at 100% for this tab alone: the mapping asserts it before each event.
   const settings = { mode: "automatic", scope: "per-tab" };
-  await step("setZoomSettings", chrome.tabs.setZoomSettings(tabId, settings));
-  await step("setZoom", chrome.tabs.setZoom(tabId, 1));
+  await op("setZoomSettings", chrome.tabs.setZoomSettings(tabId, settings));
+  await op("setZoom", chrome.tabs.setZoom(tabId, 1));
   // A background tab is hidden and draws no frames without it.
-  await command("Emulation.setFocusEmulationEnabled", { enabled: true });
+  const focus = { enabled: true };
+  await op("focus", command(target, "Emulation.setFocusEmulationEnabled", focus));
+};
+
+// A tab created after its deadline belongs to no one: it is closed when it appears.
+const create = () => {
+  const creating = chrome.tabs.create({ url: "about:blank", active: false });
+  return op("create", creating).catch((error) => {
+    void creating
+      .then((late) => {
+        stats.lateTabsClosed += 1;
+        return chrome.tabs.remove(late.id);
+      })
+      .catch(() => false);
+    throw error;
+  });
 };
 
 /** Opens the claimed interaction's tab at `url`; `on` hears an off-policy commit or a lost tab. */
 export const openTab = async ({ interactId, url, origins }, on) => {
-  await leftover;
-  const created = await chrome.tabs.create({ url: "about:blank", active: false });
+  const created = await create();
   const target = { tabId: created.id };
   tab = { interactId, target, origins, loaderId: null, url: "about:blank" };
   held.clear();
@@ -88,70 +119,88 @@ export const openTab = async ({ interactId, url, origins }, on) => {
   await prepare(created.id, target);
   holdTab(interactId, created.id, origins);
   bind(target, interactId);
-  await command("Page.navigate", { url });
+  await op("navigate", command(target, "Page.navigate", { url }));
   return created.id;
 };
 
-/** Detaches and closes the tab; the claim is released only after this. */
+/**
+ * Lets go, detaches, and closes the tab: true once the browser confirms it is gone. Until then
+ * the tab, its marker, and the claim stay, and a later call tries again.
+ */
 export const closeTab = async () => {
-  if (!tab) return;
-  // Held buttons and keys are let go while the debugger still holds the tab.
-  await releaseHeld("CLEANUP");
-  const { target } = tab;
-  tab = null;
+  if (!tab) return true;
+  const current = tab;
+  current.closing = true;
+  await inflight;
+  if (!current.released) {
+    // Held buttons and keys are let go while the debugger still holds the tab.
+    current.released = true;
+    if (!(await releaseHeld("CLEANUP"))) stats.releaseUnknown += 1;
+  }
   watcher = {};
+  unbind(current.target);
+  await op("detach", chrome.debugger.detach(current.target)).catch(() => false);
+  if (!(await removed(current.target.tabId))) {
+    stats.closeFailed += 1;
+    return false;
+  }
+  tab = null;
   stats.closed += 1;
-  dropTab(target.tabId);
-  unbind(target);
-  await chrome.debugger.detach(target).catch(() => false);
-  await chrome.tabs.remove(target.tabId).catch(() => false);
-  await chrome.storage.session.remove(KEY);
+  dropTab(current.target.tabId);
+  await op("unmark", chrome.storage.session.remove(KEY)).catch(() => false);
+  return true;
 };
 
-/** The document now; `fresh` re-reads the main frame's loader from the tab itself. */
+/** The document now, or null once the tab is closing; `fresh` re-reads the main frame's loader. */
 export const liveDocument = async (fresh) => {
+  const current = tab;
+  if (!current || current.closing) return null;
   if (fresh) {
-    const { frameTree } = await deadline(command("Page.getFrameTree"));
-    tab.loaderId = frameTree.frame.loaderId;
-    tab.url = frameTree.frame.url;
+    const { frameTree } = await deadline(command(current.target, "Page.getFrameTree"));
+    current.loaderId = frameTree.frame.loaderId;
+    current.url = frameTree.frame.url;
   }
-  const zoom = await chrome.tabs.getZoom(tab.target.tabId);
-  return { loaderId: tab.loaderId, url: tab.url, zoom, allowed: allowed(tab.url) };
+  const zoom = await deadline(chrome.tabs.getZoom(current.target.tabId));
+  const { loaderId, url } = current;
+  return { loaderId, url, zoom, allowed: allowed(current, url) };
 };
 
 /** One input command with a deadline, tracked first: one that times out may still have pressed. */
 const tracked = (method, params) => {
   held.track(method, params);
-  return deadline(command(method, params));
+  return sent(method, params);
+};
+const sent = (method, params) => {
+  const answer = deadline(command(tab.target, method, params));
+  inflight = answer.catch(() => false);
+  return answer;
 };
 
 export const mouse = (params) => tracked("Input.dispatchMouseEvent", params);
 export const key = (params) => tracked("Input.dispatchKeyEvent", params);
-export const insertText = (text) => deadline(command("Input.insertText", { text }));
+export const insertText = (text) => sent("Input.insertText", { text });
 export const holding = () => held.any();
 
-/** Best effort: every held key and button goes up, then any drag is cancelled. */
+/** Cancels any drag, then lets go of every held key and button; false when that is not certain. */
 export const releaseHeld = async (reason) => {
-  if (!tab) return;
-  const pending = held.releases();
-  held.clear();
-  if (pending.length > 0) stats.released[reason] = (stats.released[reason] ?? 0) + 1;
-  const cancel = { method: "Input.cancelDragging", params: {} };
-  for (const { method, params } of [...pending, cancel]) {
-    const sent = await deadline(command(method, params)).then(
-      () => true,
-      () => false,
-    );
-    if (sent) stats.releaseEvents += method === cancel.method ? 0 : 1;
-    else stats.releaseFailed += 1;
-  }
+  const current = tab;
+  if (!current) return true;
+  const before = held.size();
+  const send = (method, params) => deadline(command(current.target, method, params));
+  const sure = await held.releaseAll(send);
+  if (before > 0) stats.released[reason] = (stats.released[reason] ?? 0) + 1;
+  stats.releaseEvents += before - held.size();
+  if (!sure) stats.releaseFailed += 1;
+  return sure;
 };
 
 // A restarted screencast draws a fresh frame of an unchanged page; no screenshot is taken.
 export const refresh = async () => {
+  if (!tab || tab.closing) return;
   stats.refreshes += 1;
-  await command("Page.stopScreencast");
-  await command("Page.startScreencast", { format: "jpeg", quality: QUALITY, ...MODES.interact });
+  const params = { format: "jpeg", quality: QUALITY, ...MODES.interact };
+  await op("stopScreencast", command(tab.target, "Page.stopScreencast"));
+  await op("startScreencast", command(tab.target, "Page.startScreencast", params));
 };
 
 export const tabState = () => ({
@@ -163,16 +212,10 @@ export const tabState = () => ({
 /** Lab only: resizes the tab's view, so a frame from before it is aimed at a stale viewport. */
 export const resize = (width, height) =>
   width
-    ? command("Emulation.setDeviceMetricsOverride", {
+    ? command(tab.target, "Emulation.setDeviceMetricsOverride", {
         width,
         height,
         deviceScaleFactor: 1,
         mobile: false,
       })
-    : command("Emulation.clearDeviceMetricsOverride");
-
-export const isOpen = (tabId) =>
-  chrome.tabs.get(tabId).then(
-    () => true,
-    () => false,
-  );
+    : command(tab.target, "Emulation.clearDeviceMetricsOverride");

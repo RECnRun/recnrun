@@ -51,15 +51,15 @@ describe("the key, text, and wheel messages", () => {
 });
 
 describe("the hold keepalive", () => {
-  const HOLD = { type: "INPUT_EVENT", kind: "hold", leaseId: LEASE, seq: 4 };
+  const HOLD = { type: "INPUT_EVENT", kind: "hold", leaseId: LEASE, seq: 4, ...AIMED };
 
-  test("a hold names only its lease and seq", () => {
+  test("a hold names its lease, seq, and the frame the master shows", () => {
     expect(inputError(HOLD)).toBeNull();
   });
 
   test.each([
     ["a hold with a point", { ...HOLD, x: 0.5, y: 0.5 }],
-    ["a hold with a frame", { ...HOLD, ...AIMED }],
+    ["a hold without its frame", { type: "INPUT_EVENT", kind: "hold", leaseId: LEASE, seq: 4 }],
     ["a hold with a button", { ...HOLD, button: "left" }],
   ])("%s is refused", (_name, message) => {
     expect(inputError(message)).toBe("INVALID_REQUEST");

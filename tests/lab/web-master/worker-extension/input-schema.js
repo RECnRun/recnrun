@@ -11,7 +11,7 @@ export const INPUT_TYPES = [
   "INPUT_EVENT",
 ];
 // The kinds the worker knows; slices B and C give each its fields and its dispatch.
-// W7 slice D: a hold names nothing but its lease; it only tells the dead man the master is there.
+// W7 slice D: a hold tells the dead man the master is there; it names the frame it shows (W7 fixes).
 const EVENT_KINDS = ["pointerMove", "pointerDown", "pointerUp", "wheel", "key", "text", "hold"];
 const KEYS = {
   INTERACT_CHALLENGE: ["requestId", "type"],
@@ -52,6 +52,7 @@ const POINTER_KEYS = [
 // W7 slice C: a key, a text, and a wheel name the frame too; only a wheel names a point.
 const AIMED = ["bootId", "frameSeq", "kind", "leaseId", "loaderId", "seq", "sessionEpoch", "type"];
 const KIND_KEYS = {
+  hold: [...AIMED].sort(),
   key: [...AIMED, "code", "modifiers", "phase"].sort(),
   text: [...AIMED, "text"].sort(),
   wheel: [...AIMED, "deltaX", "deltaY", "modifiers", "x", "y"].sort(),

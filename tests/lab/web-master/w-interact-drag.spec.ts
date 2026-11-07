@@ -203,6 +203,23 @@ test("I5: an HTML5 drag with plain mouse events moves item 1 below item 3 once",
   await end(c);
 });
 
+test("I5: a stop mid-drag cancels the drag: no drop lands", async () => {
+  const c = cell();
+  const layout = await begin(c, "/interact/list");
+  const since = Date.now();
+  await pressOn(c.page, centreOf(layout, "i1"));
+  await moveOn(c.page, centreOf(layout, "i1", 30));
+  await moveOn(c.page, centreOf(layout, "i2"));
+  await expect.poll(() => reports(c.target, "dragstart", since).length).toBe(1);
+  expect(await stopInteract(c.page)).toMatchObject({ ok: true });
+  await released(c.worker);
+  await expect.poll(() => reports(c.target, "dragend", since).length).toBe(1);
+  await delay(300);
+  expect(reports(c.target, "drop", since)).toHaveLength(0);
+  expect(nth(reports(c.target, "dragend", since), 0)).toMatchObject({ dropEffect: "none" });
+  await c.page.mouse.up();
+});
+
 test("I4: link loss mid-drag lets go, ends the stroke, and closes the tab", async () => {
   const c = cell();
   const layout = await begin(c, "/interact/drag");

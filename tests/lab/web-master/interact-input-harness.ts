@@ -11,6 +11,8 @@ import { NAME } from "./trust-harness.ts";
 
 export interface Released {
   held: number;
+  claim: string | null;
+  stats: { revoked: Record<string, number> };
   tab: { tabId: number } | null;
   tabStats: { released: Record<string, number>; releaseEvents: number; releaseFailed: number };
 }
