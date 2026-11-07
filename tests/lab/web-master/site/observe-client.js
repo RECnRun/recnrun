@@ -98,10 +98,10 @@ export const createObserve = ({ links, visual }) => {
     const sessionEpoch = Math.max(Date.now(), previous + 1);
     sessions.set(name, { workerId, bootId, jobId, targetId, mode, sessionEpoch });
     // Admitted before the request leaves: the first frame may beat the reply.
-    visual.beginSession(workerId, { bootId, jobId });
+    visual.beginSession(name, { bootId, jobId });
     const reply = await send(name, await signed(name, "OBSERVE_START"));
     if (!reply.ok) {
-      visual.endSession(workerId);
+      visual.endSession(name);
       return reply;
     }
     sessions.get(name).renew = setInterval(() => void renew(name).catch(() => undefined), RENEW_MS);
@@ -116,7 +116,7 @@ export const createObserve = ({ links, visual }) => {
   const observeStop = async (name) => {
     stopRenewing(name);
     const reply = await send(name, await signed(name, "OBSERVE_STOP"));
-    visual.endSession(sessions.get(name).workerId);
+    visual.endSession(name);
     return reply;
   };
 

@@ -160,6 +160,15 @@ export async function masterShows(page: Page, want: Rgb, ms = 15_000) {
   );
 }
 
+/** Waits until the dashboard card of link `name` shows `want` at the panel point. */
+export async function cardShows(page: Page, name: string, want: Rgb, ms = 15_000) {
+  return until(
+    () => call<Rgb | null>(page, "cardPixel", name, ...PANEL),
+    (rgb) => near(rgb, want),
+    ms,
+  );
+}
+
 /** Writes the latest frame under the run's evidence directory. */
 export async function saveFrame(worker: LoadedExtension, name: string) {
   const data = await visual<string | null>(worker, "latest");

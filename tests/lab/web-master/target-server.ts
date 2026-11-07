@@ -65,6 +65,9 @@ const VISUAL: Record<string, string> = {
 
 const HTML = { "content-type": "text/html; charset=utf-8" };
 
+// W6.07's job takes long enough for its observation to change mode while it runs.
+const SLOW_MS = 300;
+
 /** The GET pages; W6.13's `/visual/away` redirects to a host the job never allowed. */
 function servedGet(request: IncomingMessage, response: ServerResponse): boolean {
   if (request.method !== "GET") return false;
@@ -72,6 +75,10 @@ function servedGet(request: IncomingMessage, response: ServerResponse): boolean 
   if (url.pathname === "/visual/away") {
     const { port } = new URL(`http://${request.headers.host ?? "127.0.0.1"}`);
     response.writeHead(302, { location: `http://localhost:${port}/visual/static` }).end();
+    return true;
+  }
+  if (url.pathname === "/visual/slow") {
+    setTimeout(() => response.writeHead(200, HTML).end(VISUAL["/visual/second"]), SLOW_MS);
     return true;
   }
   const pages: Record<string, () => string | undefined> = {

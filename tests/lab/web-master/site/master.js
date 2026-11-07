@@ -1,4 +1,5 @@
 // Throwaway master of the website-master spike: offers, pins worker identities, pings, jobs.
+import { createDashboard } from "./dashboard.js";
 import { createFsa } from "./fsa.js";
 import { createJobs } from "./jobs.js";
 import { createObserve } from "./observe-client.js";
@@ -131,6 +132,7 @@ window.lab = {
   ...createFsa(),
   ...visual,
   ...observe,
+  ...createDashboard({ links, visual, observe }),
   scan,
 };
 document.getElementById("status").textContent = "ready";

@@ -21,5 +21,21 @@
     <button id="pair" type="button" hidden>Pair again</button>
     <pre id="journal"></pre>
     <img id="visual" alt="Latest frame of the worker's job tab" />
+    <section aria-labelledby="workers-heading">
+      <h2 id="workers-heading">Workers</h2>
+      <p id="privacy">
+        Observation is off by default. Frames of a worker's job tab are sent only while you observe
+        it, are shown in this tab alone, and are never stored by the worker or this page.
+      </p>
+      <ul id="cards"></ul>
+    </section>
+    <dialog id="viewer" aria-labelledby="viewer-heading">
+      <h2 id="viewer-heading">Live view</h2>
+      <img id="viewer-image" alt="Live frame of the observed worker's job tab" />
+      <p id="viewer-readout">no frame yet</p>
+      <p id="viewer-trace">last action: none yet</p>
+      <button id="viewer-stop" type="button">Stop observing</button>
+      <button id="viewer-close" type="button">Close</button>
+    </dialog>
   </body>
 </html>
