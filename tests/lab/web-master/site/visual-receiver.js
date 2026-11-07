@@ -151,10 +151,17 @@ export const createReceiver = ({ onFrame, now = Date.now, limits = LIMITS }) => 
     return partial.received === head.chunkCount ? complete(worker, partial) : "partial";
   };
 
-  const accept = (data) => {
+  /**
+   * `admit` is the link's own check of a parsed header: a reason refuses the message.
+   * @param {unknown} data
+   * @param {(head: any) => string | null} [admit]
+   */
+  const accept = (data, admit = () => null) => {
     sweep();
     const parsed = parse(data, limits);
     if (typeof parsed === "string") return drop(parsed);
+    const unadmitted = admit(parsed.head);
+    if (unadmitted) return drop(unadmitted);
     const worker = workerOf(parsed.head);
     if (!worker) return drop("too-many-workers");
     const refused = order(worker, parsed.head);
@@ -162,5 +169,8 @@ export const createReceiver = ({ onFrame, now = Date.now, limits = LIMITS }) => 
     return add(worker, parsed.head, parsed.payload);
   };
 
-  return { accept, sweep, stats: () => ({ frames, drops: { ...drops } }) };
+  // A new session starts the worker's ordering over: its clock and sequence owe nothing to the last.
+  const reset = (workerId) => void workers.delete(workerId);
+
+  return { accept, sweep, reset, stats: () => ({ frames, drops: { ...drops } }) };
 };

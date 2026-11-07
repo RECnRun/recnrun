@@ -47,7 +47,7 @@ const masterKey = async () => {
   return stored ? crypto.subtle.exportKey("jwk", stored.publicKey) : null;
 };
 
-const sign = async (fields) => {
+export const sign = async (fields) => {
   const data = new TextEncoder().encode(canonical(fields));
   const ecdsa = { name: "ECDSA", hash: "SHA-256" };
   const stored = await storedPair();

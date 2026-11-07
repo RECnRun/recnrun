@@ -50,7 +50,11 @@ const session = {
   seq: 0,
   timers: [],
   jobId: null,
+  url: "",
 };
+// Slice C's observe session listens here; the capture itself decides nothing about policy.
+/** @type {{ navigated?: (url: string) => void, detached?: () => void, unbound?: () => void }} */
+let hooks = {};
 
 const command = (method, params = {}) =>
   chrome.debugger.sendCommand(session.target, method, params);
@@ -80,6 +84,7 @@ const keep = (data, source, capturedAtMs) => {
   session.seq += 1;
   const frame = { data, bytes, width, height, source, capturedAtMs, frameSeq: session.seq };
   frame.epoch = stats.epoch;
+  frame.url = session.url;
   Object.assign(frame, { bootId: BOOT_ID, jobId: session.jobId, tabId: session.target.tabId });
   stats.bytes += bytes.length;
   stats.decodeMs += decodeMs;
@@ -150,6 +155,8 @@ const onNavigated = (frame) => {
   if (frame.parentId) return;
   stats.epoch += 1;
   session.epochStartedAt = Date.now();
+  session.url = frame.url;
+  hooks.navigated?.(frame.url);
   stats.epochs.push({ epoch: stats.epoch, url: frame.url, at: session.epochStartedAt });
   if (session.slot) stats.drops.epoch += 1;
   session.slot = null;
@@ -187,6 +194,7 @@ chrome.debugger.onDetach.addListener((source, reason) => {
   stats.detached = { reason, at: Date.now() };
   session.target = null;
   session.slot = null;
+  hooks.detached?.();
 });
 
 const begin = async () => {
@@ -221,6 +229,7 @@ export const bind = (target, jobId) => {
   session.target = target;
   session.jobId = jobId;
   session.epochStartedAt = 0;
+  session.url = "";
   stats.detached = null;
   if (session.wanted) void run(begin());
 };
@@ -233,6 +242,7 @@ export const unbind = (target) => {
   stats.state = "ENDED";
   session.target = null;
   session.slot = null;
+  hooks.unbound?.();
 };
 
 export const start = async (options) => {
@@ -255,7 +265,12 @@ export const setSink = (sink) => {
   session.slot = null;
 };
 
+export const setHooks = (value) => {
+  hooks = value;
+};
+
 export const captureStats = () => stats;
+export const bootId = () => BOOT_ID;
 /** @returns {any} */
 export const lastFrame = () => session.last;
 /** @returns {{ tabId: number } | null} */

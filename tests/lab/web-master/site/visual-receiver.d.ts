@@ -29,7 +29,8 @@ export interface Frame extends Head {
 }
 
 export interface Receiver {
-  accept(data: unknown): string;
+  accept(data: unknown, admit?: (head: Head) => string | null): string;
+  reset(workerId: string): void;
   sweep(): void;
   stats(): { frames: number; drops: Record<string, number> };
 }

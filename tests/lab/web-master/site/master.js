@@ -1,6 +1,8 @@
 // Throwaway master of the website-master spike: offers, pins worker identities, pings, jobs.
 import { createFsa } from "./fsa.js";
 import { createJobs } from "./jobs.js";
+import { createObserve } from "./observe-client.js";
+import { scan } from "./scan.js";
 import { createVisual } from "./visual-view.js";
 
 export const links = new Map();
@@ -19,13 +21,14 @@ export const nextMessage = (channel, type) =>
   });
 
 const visual = createVisual({ links, nextMessage });
+const observe = createObserve({ links, visual });
 
 const offer = async (name) => {
   const pc = new RTCPeerConnection({ iceServers: [] });
   const channel = pc.createDataChannel("recnrun-lab");
   // Frames go unordered and unretransmitted: a lost frame is replaced, never resent.
   const frames = pc.createDataChannel("visual.v1", { ordered: false, maxRetransmits: 0 });
-  visual.attach(frames);
+  visual.attach(frames, name);
   const opened = new Promise((resolve) =>
     channel.addEventListener("open", () => resolve(performance.now())),
   );
@@ -46,7 +49,8 @@ const accept = async (name, sdp) => {
 };
 
 const authenticate = async (name, pinnedJwk) => {
-  const { pc, channel } = links.get(name);
+  const link = links.get(name);
+  const { pc, channel } = link;
   const key = await crypto.subtle.importKey(
     "jwk",
     pinnedJwk,
@@ -57,8 +61,9 @@ const authenticate = async (name, pinnedJwk) => {
   const nonce = crypto.randomUUID();
   const proof = nextMessage(channel, "proof");
   channel.send(JSON.stringify({ type: "challenge", nonce }));
-  const { signature } = await proof;
-  const signed = `${nonce}|${fingerprintOf(pc.localDescription.sdp)}|${fingerprintOf(pc.remoteDescription.sdp)}`;
+  const { signature, workerId } = await proof;
+  const fingerprints = `${fingerprintOf(pc.localDescription.sdp)}|${fingerprintOf(pc.remoteDescription.sdp)}`;
+  const signed = `${nonce}|${fingerprints}|${workerId}`;
   const data = new TextEncoder().encode(signed);
   const ok = await crypto.subtle.verify(
     { name: "ECDSA", hash: "SHA-256" },
@@ -66,6 +71,8 @@ const authenticate = async (name, pinnedJwk) => {
     fromBase64(signature),
     data,
   );
+  // Frames on this link are shown only for the worker id the verified proof names.
+  if (ok) link.proven = { workerId };
   return { ok, reason: ok ? "verified" : "proof-not-signed-by-pinned-key" };
 };
 
@@ -123,5 +130,7 @@ window.lab = {
   ...createJobs({ links, nextMessage }),
   ...createFsa(),
   ...visual,
+  ...observe,
+  scan,
 };
 document.getElementById("status").textContent = "ready";

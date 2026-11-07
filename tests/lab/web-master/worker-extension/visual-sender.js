@@ -93,24 +93,27 @@ export const createSender = () => {
     offer(state.relayed);
   };
 
-  // Lab only: `count` padded copies of the last frame offered within one task, under a boot of
-  // their own, so the buffer cap and the latest-wins slot are seen working.
+  // Lab only: `count` padded copies of the last frame offered within one task, numbered past it,
+  // so the buffer cap and the latest-wins slot are seen working.
   const burst = (count, padBytes) => {
     const base = state.relayed;
     if (!base) return { ok: false, error: "NO_FRAME" };
     const before = structuredClone(stats.drops);
     const bytes = new Uint8Array(base.bytes.length + padBytes);
     bytes.set(base.bytes);
-    const bootId = crypto.randomUUID();
+    const first = base.frameSeq + 1_000;
     for (let index = 0; index < count; index += 1) {
-      offer({ ...base, bootId, bytes, frameSeq: index + 1, capturedAtMs: Date.now() });
+      offer({ ...base, bytes, frameSeq: first + index, capturedAtMs: Date.now() });
     }
     const buffered = state.channel?.bufferedAmount ?? 0;
     return { ok: true, frameBytes: bytes.length, buffered, before, stats };
   };
 
+  const channels = new Map();
+
+  /** Registers a link's visual.v1; frames go nowhere until an accepted start selects it. */
   const attach = (channel, pc) => {
-    Object.assign(state, { channel, pc, slot: null, inflight: false });
+    channels.set(pc, channel);
     channel.binaryType = "arraybuffer";
     channel.bufferedAmountLowThreshold = BUFFER_LOW;
     channel.onbufferedamountlow = release;
@@ -120,5 +123,15 @@ export const createSender = () => {
     };
   };
 
-  return { attach, relayed, burst, stats: () => stats };
+  // Frames go only to the link whose signed start the worker accepted.
+  const select = (pc) => {
+    Object.assign(state, { channel: channels.get(pc) ?? null, pc, slot: null, inflight: false });
+  };
+
+  /** The session ended: the frame waiting to be sent is dropped, not kept for the next one. */
+  const clear = () => {
+    state.slot = null;
+  };
+
+  return { attach, select, clear, relayed, burst, stats: () => stats };
 };

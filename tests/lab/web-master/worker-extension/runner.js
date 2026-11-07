@@ -7,6 +7,8 @@ import { load, publish, save } from "./ledger.js";
 import { MUTATING, execute } from "./ops.js";
 
 let running = null;
+/** @type {{ jobId: string, tabId: number, origins: string[] } | null} */
+let active = null;
 
 const push = (message) =>
   chrome.runtime.sendMessage({ target: "offscreen", type: "push", message }).catch(() => false);
@@ -63,6 +65,7 @@ const runOps = async (context) => {
 const run = async (job, record) => {
   const tab = await chrome.tabs.create({ url: "about:blank", active: false });
   const target = { tabId: tab.id };
+  active = { jobId: job.jobId, tabId: tab.id, origins: job.origins };
   await chrome.debugger.attach(target, "1.3");
   await chrome.debugger.sendCommand(target, "Page.enable");
   // A background tab is hidden and draws no frames, so a mouseMoved is never acked without it.
@@ -73,6 +76,7 @@ const run = async (job, record) => {
   try {
     record.state = await runOps({ job, record, target, readBytes: 0 });
   } finally {
+    active = null;
     unbind(target);
     await chrome.debugger.detach(target).catch(() => false);
     await chrome.tabs.remove(tab.id).catch(() => false);
@@ -124,9 +128,15 @@ export const submit = (job, provision) => {
   return result;
 };
 
+/** The job whose tab is open now, which an observe request must name. */
+export const current = () => active;
+
 export const statuses = async (jobIds) => {
   const records = await Promise.all(jobIds.map((jobId) => load(jobId)));
-  return records.map((record, index) =>
-    record ? statusOf(record) : { jobId: jobIds[index], state: "NOT_FOUND", ops: [] },
-  );
+  return records.map((record, index) => {
+    if (!record) return { jobId: jobIds[index], state: "NOT_FOUND", ops: [] };
+    // The tab of the running job is what an observe request targets.
+    const tab = active?.jobId === record.jobId ? { targetId: active.tabId } : {};
+    return { ...statusOf(record), ...tab };
+  });
 };

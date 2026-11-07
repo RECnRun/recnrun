@@ -63,23 +63,30 @@ const VISUAL: Record<string, string> = {
 <html style="--panel:#808080"><body><p id="static">static</p>`,
 };
 
+const HTML = { "content-type": "text/html; charset=utf-8" };
+
+/** The GET pages; W6.13's `/visual/away` redirects to a host the job never allowed. */
+function servedGet(request: IncomingMessage, response: ServerResponse): boolean {
+  if (request.method !== "GET") return false;
+  const url = new URL(request.url ?? "/", "http://lab.invalid");
+  if (url.pathname === "/visual/away") {
+    const { port } = new URL(`http://${request.headers.host ?? "127.0.0.1"}`);
+    response.writeHead(302, { location: `http://localhost:${port}/visual/static` }).end();
+    return true;
+  }
+  const pages: Record<string, () => string | undefined> = {
+    "/text": () => textPage(url.searchParams),
+    "/form": () => FORM,
+  };
+  const body = pages[url.pathname]?.() ?? VISUAL[url.pathname];
+  if (body === undefined) return false;
+  response.writeHead(200, HTML).end(body);
+  return true;
+}
+
 function handler(posts: Post[]) {
   return (request: IncomingMessage, response: ServerResponse) => {
-    const html = { "content-type": "text/html; charset=utf-8" };
-    const url = new URL(request.url ?? "/", "http://lab.invalid");
-    if (request.method === "GET" && url.pathname === "/text") {
-      response.writeHead(200, html).end(textPage(url.searchParams));
-      return;
-    }
-    const visual = request.method === "GET" ? VISUAL[url.pathname] : undefined;
-    if (visual) {
-      response.writeHead(200, html).end(visual);
-      return;
-    }
-    if (request.method === "GET" && request.url === "/form") {
-      response.writeHead(200, html).end(FORM);
-      return;
-    }
+    if (servedGet(request, response)) return;
     if (request.method !== "POST" || request.url !== "/submit") {
       response.writeHead(404).end();
       return;
@@ -87,7 +94,7 @@ function handler(posts: Post[]) {
     void bodyOf(request).then((body) => {
       const text = new URLSearchParams(body).get("text") ?? "";
       posts.push({ text, at: Date.now() });
-      response.writeHead(200, html).end(page(text));
+      response.writeHead(200, HTML).end(page(text));
     });
   };
 }

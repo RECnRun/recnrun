@@ -4,9 +4,10 @@ import type { Page } from "@playwright/test";
 import { expect, launchChrome, test } from "../../browser/fixtures/chrome.ts";
 import type { LaunchedChrome } from "../../browser/fixtures/chrome.ts";
 import type { LoadedExtension } from "../../browser/fixtures/extension-loaders.ts";
-import { settle, signer } from "./admission-harness.ts";
+import { settle } from "./admission-harness.ts";
 import type { Signer } from "./admission-harness.ts";
 import { background, call, provisionWorker, startWorker, until } from "./lifecycle-harness.ts";
+import { firstFrame, observeStart, pageSigner } from "./observe-harness.ts";
 import { startStandIn } from "./stand-in.ts";
 import type { StandIn } from "./stand-in.ts";
 import { startTarget } from "./target-server.ts";
@@ -78,7 +79,7 @@ test.beforeAll(async () => {
   const { root, id } = await provisionWorker();
   const worker = await startWorker(root, id);
   const page = await openLinked(master, site.origin, worker);
-  const key = await signer();
+  const key = await pageSigner(page);
   await provision(worker, { masterKey: key.publicKey, allowlist: [target.origin] });
   const evidence = { chrome: master.version, workerFlags: worker.chrome.flags };
   shared = { site, target, master, worker, page, root, key, jobId: "", evidence };
@@ -137,7 +138,8 @@ async function control(c: Cell) {
 test("W6.B 1: the master shows the worker's frames, which change after the click", async () => {
   const c = cell();
   c.jobId = await startVisualJob(c.worker, c.key, c.target.origin, 2);
-  expect(await call(c.page, "visualStart", NAME, "live")).toMatchObject({ ok: true });
+  expect(await observeStart(c.page, c.jobId, "live")).toMatchObject({ ok: true });
+  await firstFrame(c.page);
   await masterShows(c.page, BLUE);
   const during = await control(c);
   expect(during.state).toBe("RUNNING");
@@ -186,6 +188,8 @@ test("W6.B 2: a burst keeps the buffer under 256 KiB and counts what it drops", 
   expect(after.drops.replaced - before.drops.replaced).toBeGreaterThanOrEqual(38);
   expect(after.drops.oversize - before.drops.oversize).toBeGreaterThanOrEqual(1);
   expect(pingMs).toBeLessThan(2_000);
+  // The burst numbered its copies past the capture's: a new session restarts the ordering.
+  expect(await observeStart(c.page, c.jobId, "live")).toMatchObject({ ok: true });
   await masterShows(c.page, ORANGE);
   const stats = await masterStats(c);
   c.evidence.burst = {
@@ -211,7 +215,7 @@ test("W6.B 3: visual.v1 carries no control: a ping or a job sent on it gets noth
   expect(await background<unknown[]>(c.worker, "lab.jobs()")).toHaveLength(jobs.length);
   // Nothing came back as text on visual.v1: the receiver saw no malformed message.
   expect((await masterStats(c)).drops.malformed ?? 0).toBe(masterBefore.drops.malformed ?? 0);
-  expect(await call(c.page, "visualStop", NAME)).toMatchObject({ ok: true });
+  expect(await call(c.page, "observeStop", NAME)).toMatchObject({ ok: true });
   await background(c.worker, "lab.setKnob(null)");
   await background(c.worker, "lab.release()");
   await settle(c.worker);

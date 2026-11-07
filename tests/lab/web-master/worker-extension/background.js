@@ -1,9 +1,11 @@
 // The harness calls globalThis.lab through CDP; the offscreen document holds the link.
-import { setSink, start, stop } from "./capture.js";
+import { bootId } from "./capture.js";
 import { visualLab } from "./capture-lab.js";
 import { labState, release, setKnob } from "./knobs.js";
 import { all, load, recover, resultFile } from "./ledger.js";
+import { observe, observeLab } from "./observe.js";
 import { statuses, submit } from "./runner.js";
+import { scan } from "./scan.js";
 
 // Wakes the worker at browser start, so a job cut by a restart is closed before any link.
 chrome.runtime.onStartup.addListener(() => undefined);
@@ -24,23 +26,6 @@ const ask = async (message) => {
   return chrome.runtime.sendMessage({ target: "offscreen", ...message });
 };
 
-// Frames leave over chrome.runtime as base64; the offscreen document owns visual.v1.
-const toOffscreen = (frame) => {
-  const { bootId, jobId, tabId, epoch, frameSeq, width, height, capturedAtMs, data } = frame;
-  const meta = { bootId, jobId, targetId: tabId, epoch, frameSeq, width, height, capturedAtMs };
-  return ask({ type: "visual-frame", frame: { ...meta, data, queuedAt: Date.now() } });
-};
-
-// lab: replaced by OBSERVE_START and OBSERVE_STOP in slice C.
-const visualControl = (message) => {
-  if (message.type === "visual-stop") {
-    setSink(null);
-    return stop();
-  }
-  setSink(toOffscreen);
-  return start({ mode: message.mode });
-};
-
 const provision = async () => (await chrome.storage.local.get("provision")).provision;
 
 const handle = async (message) => {
@@ -49,8 +34,10 @@ const handle = async (message) => {
     labState.linkClosedAt = null;
     return submit(message.job, await provision());
   }
-  if (message.type === "job-status") return { jobs: await statuses(message.jobIds) };
-  if (message.type.startsWith("visual-")) return visualControl(message);
+  // The boot names this service-worker life: an observe request must carry it.
+  if (message.type === "job-status")
+    return { jobs: await statuses(message.jobIds), bootId: bootId() };
+  if (message.type === "observe") return observe(message.request, message.linkId);
   if (message.type === "link-closed") labState.linkClosedAt = Date.now();
   return { ok: true };
 };
@@ -63,6 +50,7 @@ chrome.runtime.onMessage.addListener((message, _sender, respond) => {
 
 globalThis.lab = {
   identity: () => ask({ type: "identity" }),
+  id: () => chrome.runtime.id,
   answer: (offer) => ask({ type: "answer", offer }),
   ready: () => recovered,
   provisioned: provision,
@@ -80,4 +68,6 @@ globalThis.lab = {
     burst: (count, padBytes) => ask({ type: "visual-burst", count, padBytes }),
     transport: () => ask({ type: "visual-stats" }),
   },
+  observe: observeLab,
+  scan,
 };

@@ -97,14 +97,14 @@ export async function rate(worker: LoadedExtension, ms = 2_000) {
   };
 }
 
-const op = (name: string, args: Record<string, unknown>, timeoutMs = 10_000): JobOp => ({
+export const op = (name: string, args: Record<string, unknown>, timeoutMs = 10_000): JobOp => ({
   op: name,
   args,
   timeoutMs,
 });
 
 /** Ops 0–7: the fixture, its click, the second document, the static page. */
-const visualOps = (origin: string): JobOp[] => [
+export const visualOps = (origin: string): JobOp[] => [
   op("navigate", { url: `${origin}/visual` }),
   op("wait", { selector: "#go", state: "attached" }),
   op("click", { selector: "#go" }),
@@ -116,11 +116,11 @@ const visualOps = (origin: string): JobOp[] => [
 ];
 
 /** Holds the runner at `index`/`phase`, then waits until it is there. */
-async function holdAt(worker: LoadedExtension, index: number, phase = "between") {
+export async function holdAt(worker: LoadedExtension, index: number, phase = "between") {
   await background(worker, `lab.setKnob(${JSON.stringify({ index, phase })})`);
 }
 
-async function reached(worker: LoadedExtension, index: number, phase = "between") {
+export async function reached(worker: LoadedExtension, index: number, phase = "between") {
   const read = () =>
     background<{ reached: { index: number; phase: string } | null }>(worker, "lab.state()");
   await until(

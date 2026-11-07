@@ -19,7 +19,7 @@ const originsError = (job, allowlist) => {
 
 const fromBase64 = (text) => Uint8Array.from(atob(text), (c) => c.charCodeAt(0));
 
-const signatureValid = async (job, masterJwk) => {
+export const signatureValid = async (job, masterJwk) => {
   const { signature, ...fields } = job;
   const algorithm = { name: "ECDSA", namedCurve: "P-256" };
   const key = await crypto.subtle.importKey("jwk", masterJwk, algorithm, false, ["verify"]);
