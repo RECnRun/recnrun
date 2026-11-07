@@ -19,6 +19,15 @@ Record each result under its check as `Result: <date> · <machine, OS> · Chrome
   Expected: the job ends on the worker or answers `TIMEOUT`/`EXPIRED`; the page reconciles with no resubmission; the fixture POST count is at most 1.
   Result:
 
+## After Gate W7
+
+- **M-TW.16 Remote interaction on macOS.** On a throwaway root, link one headed and one headless worker with no debugging flags other than `--silent-debugger-extension-api`, then click, type `Olá ação 123`, scroll, and drag a slider in one worker's page from the master.
+  Expected: every effect lands on the shown page; no "started debugging this browser" bar on the headed worker; closing the master mid-drag releases the button within about 1 s. Repeat with the personal Default as master (orchestrator only).
+  Result:
+- **M-TW.17 Risk acceptance for remote control.** The owner reads the stated boundary of [W7-PLAN.md](W7-PLAN.md#design) (cross-origin iframes, form destinations, the request of a click that leaves the allowlist, a compromised site origin driving live input) and accepts or rejects it.
+  Expected: a recorded decision.
+  Result:
+
 ## After P1
 
 - **M-TW.1 `P1.master-fsa` on macOS.**

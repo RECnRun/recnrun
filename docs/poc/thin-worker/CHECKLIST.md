@@ -135,7 +135,7 @@ Branch `poc-w7-remote-input` from edcb5681. Plan reviewed in [PW-W7-plan.md](rev
   - n 30, ms, ack / visible p50 and p95, alone → with thumbnails: headed 9.3, 11.6 / 36.8, 40.8 → 4.6, 5.9 / 25.2, 27.6; headless 7.9, 9.7 / 23.0, 26.7 → 4.4, 6.4 / 25.0, 27.7; INTERACT 5.1–5.5 fps during presses either way; thumbnails 0.92–1.1 fps; CPU s/s interactive 0.26 → 0.15, master 0.21 → 0.17, each thumbnail worker 0.22–0.33; RSS about 1.2–1.3 GiB per worker tree, 1.6 GiB master. Verdict: thumbnails acceptable (visible p95 +1.0 ms headless, −13.2 ms headed); numbers in [w7-metrics.json](w7-metrics.json)
   - [unsure] `alone` runs first in each project and carries the warm-up; the faster loaded acks suggest busier CPUs wake sooner, not that thumbnails help
 
-Gate W7: not run
+Gate W7: full lab 123 passed, 14 skipped at 0e366c3e (run `2026-11-07T17-18-21.754Z-7a9f1349`); review in [PW-W7.md](reviews/PW-W7.md); [RESULTS.md](RESULTS.md#w7) verdict GO-LAB-ONLY; owner checks M-TW.16, M-TW.17
 
 ## P0: freeze and prune verify
 

@@ -149,3 +149,47 @@ LAB-ONLY means the cell passes in the Linux lab, where the harness installs the 
 | W6.20 | Reproducibility     | LAB-ONLY   | One full run plus the per-slice red/green runs; no flake seen, no `--repeat-each` run.                                                                                                                                          |
 
 **Verdict: GO-LAB-ONLY.** Worker-owned capture over WebRTC to the site master works in the lab within the provisional targets, without changing jobs. Not proven, carried to Phase 1: real signalling, macOS and the Default profile without flags, durable worker identity, PWA, 10 workers, and a second review of the fixes.
+
+## W7
+
+Linux Docker, Google Chrome 157.0.8103.38, head 0e366c3e. Plan and gates: [W7-PLAN.md](W7-PLAN.md); per-slice evidence: [CHECKLIST.md](CHECKLIST.md); metrics: [w7-metrics.json](w7-metrics.json); review: [reviews/PW-W7.md](reviews/PW-W7.md). Full `vp run lab:web-master`: 123 passed, 14 skipped (the `RECNRUN_W6_BENCH=1` and `RECNRUN_W7_BENCH=1` cells, run green on their own), run `2026-11-07T17-18-21.754Z-7a9f1349`.
+
+LAB-ONLY has the W6 meaning: the Linux lab installs the worker, relays SDP, and launches Chrome with debugging flags, including `--silent-debugger-extension-api` on headed workers, so no debugging infobar shows. Master and workers run on one machine, as the owner will run them.
+
+| Id  | Cell                                  | Result     | Evidence                                                                                                                                                                                  |
+| --- | ------------------------------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| I1  | Click a counter                       | LAB-ONLY   | +1 exactly, four-corner calibration within the mapped target, headed and headless (`w-interact-click`).                                                                                   |
+| I2  | Type `Olá ação 123`, Backspace, Enter | LAB-ONLY   | Final value `Olá ação 12`, one submit, headed and headless; typed text absent from every stored value scanned (`w-interact-input`).                                                       |
+| I3  | Wheel on page and inner container     | LAB-ONLY   | The container under the cursor scrolls, the other does not; deltas clamped to ±1000.                                                                                                      |
+| I4  | Slider and canvas drag                | LAB-ONLY   | Slider 70 for 70, stroke endpoints within 4 px; a disconnect mid-press releases (`w-interact-drag`).                                                                                      |
+| I5  | HTML5 reorder                         | LAB-ONLY   | Variant A (plain mouse events) gives the exact order and `dragstart/over/drop/end`; variant B not needed. A stop mid-drag drops nothing.                                                  |
+| N1  | Start during a job                    | LAB-ONLY   | BUSY, the job is untouched (shared admission queue and `running` claim).                                                                                                                  |
+| N2  | Job during interaction                | LAB-ONLY   | BUSY, no job accepted.                                                                                                                                                                    |
+| N3  | Two concurrent starts                 | LAB-ONLY   | One lease.                                                                                                                                                                                |
+| N4  | Replayed `seq`, duplicate, old link   | LAB-ONLY   | Refused; a gap revokes; the counter stays +1.                                                                                                                                             |
+| N5  | Master closes mid-press               | LAB-ONLY   | Released 0.91 s later (dead man at 1 s); link loss cleans up in 5 ms; `cancelDragging` before any release.                                                                                |
+| N6  | Navigation off the allowlist          | LAB-ONLY   | Revoked before the next event; popups (`openerTabId`) closed. The request of the click that navigates away is already sent (residual, as W4 finding 5).                                   |
+| N7  | Stale frame, epoch, viewport          | LAB-ONLY   | STALE_FRAME, UNKNOWN_FRAME, TARGET_CHANGED, VIEWPORT_CHANGED before any effect; a frame is aimable only after the master paints it.                                                       |
+| N8  | Late and lost frames                  | LAB-ONLY   | One check: input round trip stays bounded under `visual.burst`.                                                                                                                           |
+| N9  | Lease expiry                          | LAB-ONLY   | No input after 3 s without renew; a new start is needed.                                                                                                                                  |
+| N10 | Detach, crash, service worker restart | LAB-ONLY   | Detach and closed tab fail closed (W6.12, W7 fixes); service worker restart closing the tab is NOT TESTED (the lab cannot stop only the service worker).                                  |
+| N11 | Shortcuts, IME, dead keys             | NOT TESTED | Deferred. Text goes through `insertText` from the master's `beforeinput`; no `nativeKeyCode` is sent.                                                                                     |
+| N12 | Three workers, control on one         | LAB-ONLY   | One load check: one interactive worker beside two THUMBNAIL workers running jobs; only the attached worker reaches the large image (fixed in 0e366c3e).                                   |
+| N13 | Overlay and cross-origin iframe       | NOT TESTED | Deferred; cross-origin iframes are a stated residual risk.                                                                                                                                |
+| N14 | Site widens allowlist or sends CDP/JS | LAB-ONLY   | The closed `input.v1` schema refuses unknown kinds and fields; `interactEnabled` is written only by `lab.provision`.                                                                      |
+| N15 | Stop on the worker                    | LAB-ONLY   | A stop and a `canceled_by_user` detach latch; new starts are refused. The infobar Cancel exists only on a worker started without `--silent-debugger-extension-api` (unit-tested mapping). |
+
+Click latency, n 30 per run, ms, measured on one master clock to the presented frame that draws the press's own id:
+
+| Run                                    | Ack p50 / p95 | Visible p50 / p95 |
+| -------------------------------------- | ------------- | ----------------- |
+| Headed, alone (W7 fixes)               | 11.9 / 13.4   | 34.3 / 38.6       |
+| Headless, alone (W7 fixes)             | 11.7 / 13.1   | 33.4 / 38.4       |
+| Headed, alone (load cell)              | 9.3 / 11.6    | 36.8 / 40.8       |
+| Headed, beside two thumbnail workers   | 4.6 / 5.9     | 25.2 / 27.6       |
+| Headless, alone (load cell)            | 7.9 / 9.7     | 23.0 / 26.7       |
+| Headless, beside two thumbnail workers | 4.4 / 6.4     | 25.0 / 27.7       |
+
+Load: CPU seconds per second, interactive worker 0.14–0.26, master 0.16–0.21, each thumbnail worker 0.22–0.33 at about 1 fps; RSS about 1.2–1.3 GiB per worker process tree and 1.6 GiB for the master. Thumbnails do not cost the interactive worker latency, so the fallback (one interactive worker, no thumbnails) is not needed. The `alone` run goes first and carries the warm-up.
+
+**Verdict: GO-LAB-ONLY.** The owner can click, type, scroll, and drag in one worker's page from the site master over WebRTC, with link-bound leases, fail-closed frame checks, and released input on every stop, at about 40 ms visible p95 in the lab. Not proven, carried to Phase 1: macOS and the Default profile without flags (including no infobar on headed workers), real signalling, the owner's risk acceptance for remote control, N10 service worker restart, N11, N13, and a second review of the fixes.
