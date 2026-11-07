@@ -59,6 +59,10 @@ const VISUAL: Record<string, string> = {
 <div class="spin"></div><div id="modal" hidden>modal</div>${VISUAL_SCRIPT}`,
   "/visual/second": `<!doctype html><meta charset="utf-8"><title>Second</title>${VISUAL_STYLE}
 <html style="--panel:#20a040"><body><p id="second">second</p><div class="spin"></div>`,
+  // W6.16: the fixture's blue panel until `#late` appears, so an observer can join a running job.
+  "/visual/late": `<!doctype html><meta charset="utf-8"><title>Late</title>${VISUAL_STYLE}
+<html style="--panel:#2050c0"><body><p id="early">early</p><div class="spin"></div>
+<script>setTimeout(()=>{const p=document.createElement("p");p.id="late";document.body.append(p);},8000)</script>`,
   "/visual/static": `<!doctype html><meta charset="utf-8"><title>Static</title>${VISUAL_STYLE}
 <html style="--panel:#808080"><body><p id="static">static</p>`,
 };

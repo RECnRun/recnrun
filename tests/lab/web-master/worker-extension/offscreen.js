@@ -1,5 +1,6 @@
 // Throwaway worker link: one ECDSA identity, answers offers with iceServers [], signs challenges.
 import { OBSERVE_TYPES } from "./observe-schema.js";
+import { startLabSignal } from "./lab-signal.js";
 import { createSender } from "./visual-sender.js";
 
 const identity = crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, false, [
@@ -98,24 +99,28 @@ const answer = async (offer) => {
 
 const publicKey = async () => crypto.subtle.exportKey("jwk", (await identity).publicKey);
 
+// Messages answered at once; an accepted start selects its link before the capture begins.
+const IMMEDIATE = {
+  "visual-burst": (message) => visual.burst(message.count, message.padBytes),
+  "visual-stats": () => visual.stats(),
+  "visual-select": (message) => {
+    visual.select(peers.get(message.linkId));
+    return true;
+  },
+  "lab-signal": (message) => {
+    startLabSignal(message.url, { answer, identity: publicKey, metrics: () => visual.stats() });
+    return true;
+  },
+};
+
 chrome.runtime.onMessage.addListener((message, _sender, respond) => {
   if (message.target !== "offscreen") return false;
   if (message.type === "visual-frame") {
     visual.relayed(message.frame);
     return false;
   }
-  if (message.type === "visual-burst") {
-    respond(visual.burst(message.count, message.padBytes));
-    return false;
-  }
-  if (message.type === "visual-stats") {
-    respond(visual.stats());
-    return false;
-  }
-  // An accepted start selects its link before the capture begins, so no first frame is lost.
-  if (message.type === "visual-select") {
-    visual.select(peers.get(message.linkId));
-    respond(true);
+  if (Object.hasOwn(IMMEDIATE, message.type)) {
+    respond(IMMEDIATE[message.type](message));
     return false;
   }
   if (message.type === "visual-clear") {

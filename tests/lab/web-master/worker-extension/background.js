@@ -28,6 +28,13 @@ const ask = async (message) => {
 
 const provision = async () => (await chrome.storage.local.get("provision")).provision;
 
+// LAB-ONLY (W6.16): a provisioned relay replaces the harness's CDP relay of the offer.
+const labSignal = async () => {
+  const { labSignal: url } = await chrome.storage.local.get("labSignal");
+  if (url) await ask({ type: "lab-signal", url });
+};
+void recovered.then(labSignal);
+
 const handle = async (message) => {
   await recovered;
   if (message.type === "job") {
@@ -54,6 +61,8 @@ globalThis.lab = {
   answer: (offer) => ask({ type: "answer", offer }),
   ready: () => recovered,
   provisioned: provision,
+  // LAB-ONLY (W6.16): the loopback signalling relay a worker with no debugging flag polls.
+  signal: (url) => chrome.storage.local.set({ labSignal: url }).then(() => true),
   provision: (value) => chrome.storage.local.set({ provision: value }).then(() => true),
   setKnob: (knob) => setKnob(knob).then(() => true),
   state: () => ({ reached: labState.reached, linkClosedAt: labState.linkClosedAt }),
