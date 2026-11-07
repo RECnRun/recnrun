@@ -1,0 +1,706 @@
+{
+  "about": "W6 slice E lab metrics (Linux Docker, Google Chrome 157.0.8103.38); fixture data only. Evidence runs: netem 2026-11-07T11-57-47.257Z, scale 2026-11-07T12-12-15.039Z. p95 is null under 20 samples.",
+  "netem": {
+    "interface": "lo (100% UDP loss on lo cuts the link, on eth0 it does not)",
+    "senderBufferCapBytes": 262144,
+    "cases": {
+      "loss-5%": {
+        "netem": ["loss", "5%"],
+        "baseline": {
+          "samples": 4,
+          "maxBuffered": 0,
+          "shownFps": 4.38,
+          "lostFrames": 0,
+          "senderDrops": {
+            "replaced": 0,
+            "oversize": 0,
+            "closed": 0,
+            "invalid": 0
+          },
+          "masterDrops": {},
+          "rssMiB": {
+            "from": 1303,
+            "max": 1313
+          },
+          "cpuSecondsPerSecond": 0.34,
+          "pingMs": {
+            "n": 4,
+            "p50": 2,
+            "p95": null,
+            "unanswered": 0
+          },
+          "statusMs": {
+            "n": 4,
+            "p50": 3,
+            "p95": null,
+            "unanswered": 0
+          }
+        },
+        "during": {
+          "samples": 15,
+          "maxBuffered": 0,
+          "shownFps": 4.94,
+          "lostFrames": 3,
+          "senderDrops": {
+            "replaced": 0,
+            "oversize": 0,
+            "closed": 0,
+            "invalid": 0
+          },
+          "masterDrops": {},
+          "rssMiB": {
+            "from": 1313,
+            "max": 1314
+          },
+          "cpuSecondsPerSecond": 0.37,
+          "pingMs": {
+            "n": 15,
+            "p50": 2,
+            "p95": null,
+            "unanswered": 0
+          },
+          "statusMs": {
+            "n": 15,
+            "p50": 3,
+            "p95": null,
+            "unanswered": 0
+          }
+        },
+        "after": {
+          "samples": 12,
+          "maxBuffered": 0,
+          "shownFps": 5.26,
+          "lostFrames": 1,
+          "senderDrops": {
+            "replaced": 0,
+            "oversize": 0,
+            "closed": 0,
+            "invalid": 0
+          },
+          "masterDrops": {},
+          "rssMiB": {
+            "from": 1314,
+            "max": 1316
+          },
+          "cpuSecondsPerSecond": 0.35,
+          "pingMs": {
+            "n": 12,
+            "p50": 2,
+            "p95": null,
+            "unanswered": 0
+          },
+          "statusMs": {
+            "n": 12,
+            "p50": 3,
+            "p95": null,
+            "unanswered": 0
+          }
+        },
+        "captureStarts": 1,
+        "observeAccepted": 21,
+        "sessionsEnded": ["JOB_ENDED"],
+        "job": "DONE",
+        "resultPosts": 1
+      },
+      "jitter-50ms±20ms": {
+        "netem": ["delay", "50ms", "20ms"],
+        "baseline": {
+          "samples": 4,
+          "maxBuffered": 0,
+          "shownFps": 4.46,
+          "lostFrames": 0,
+          "senderDrops": {
+            "replaced": 0,
+            "oversize": 0,
+            "closed": 0,
+            "invalid": 0
+          },
+          "masterDrops": {},
+          "rssMiB": {
+            "from": 1329,
+            "max": 1334
+          },
+          "cpuSecondsPerSecond": 0.34,
+          "pingMs": {
+            "n": 4,
+            "p50": 2,
+            "p95": null,
+            "unanswered": 0
+          },
+          "statusMs": {
+            "n": 4,
+            "p50": 3,
+            "p95": null,
+            "unanswered": 0
+          }
+        },
+        "during": {
+          "samples": 12,
+          "maxBuffered": 0,
+          "shownFps": 5.27,
+          "lostFrames": 1,
+          "senderDrops": {
+            "replaced": 0,
+            "oversize": 0,
+            "closed": 0,
+            "invalid": 0
+          },
+          "masterDrops": {},
+          "rssMiB": {
+            "from": 1334,
+            "max": 1335
+          },
+          "cpuSecondsPerSecond": 0.37,
+          "pingMs": {
+            "n": 12,
+            "p50": 98,
+            "p95": null,
+            "unanswered": 0
+          },
+          "statusMs": {
+            "n": 12,
+            "p50": 105,
+            "p95": null,
+            "unanswered": 0
+          }
+        },
+        "after": {
+          "samples": 12,
+          "maxBuffered": 0,
+          "shownFps": 5.71,
+          "lostFrames": -1,
+          "senderDrops": {
+            "replaced": 0,
+            "oversize": 0,
+            "closed": 0,
+            "invalid": 0
+          },
+          "masterDrops": {},
+          "rssMiB": {
+            "from": 1331,
+            "max": 1331
+          },
+          "cpuSecondsPerSecond": 0.4,
+          "pingMs": {
+            "n": 12,
+            "p50": 2,
+            "p95": null,
+            "unanswered": 0
+          },
+          "statusMs": {
+            "n": 12,
+            "p50": 3,
+            "p95": null,
+            "unanswered": 0
+          }
+        },
+        "captureStarts": 1,
+        "observeAccepted": 20,
+        "sessionsEnded": ["JOB_ENDED"],
+        "job": "DONE",
+        "resultPosts": 1
+      },
+      "delay-200ms": {
+        "netem": ["delay", "200ms"],
+        "baseline": {
+          "samples": 4,
+          "maxBuffered": 0,
+          "shownFps": 4.42,
+          "lostFrames": 0,
+          "senderDrops": {
+            "replaced": 0,
+            "oversize": 0,
+            "closed": 0,
+            "invalid": 0
+          },
+          "masterDrops": {},
+          "rssMiB": {
+            "from": 1335,
+            "max": 1335
+          },
+          "cpuSecondsPerSecond": 0.35,
+          "pingMs": {
+            "n": 4,
+            "p50": 2,
+            "p95": null,
+            "unanswered": 0
+          },
+          "statusMs": {
+            "n": 4,
+            "p50": 3,
+            "p95": null,
+            "unanswered": 0
+          }
+        },
+        "during": {
+          "samples": 7,
+          "maxBuffered": 0,
+          "shownFps": 5.25,
+          "lostFrames": 1,
+          "senderDrops": {
+            "replaced": 0,
+            "oversize": 0,
+            "closed": 0,
+            "invalid": 0
+          },
+          "masterDrops": {},
+          "rssMiB": {
+            "from": 1333,
+            "max": 1334
+          },
+          "cpuSecondsPerSecond": 0.38,
+          "pingMs": {
+            "n": 7,
+            "p50": 406,
+            "p95": null,
+            "unanswered": 0
+          },
+          "statusMs": {
+            "n": 7,
+            "p50": 408,
+            "p95": null,
+            "unanswered": 0
+          }
+        },
+        "after": {
+          "samples": 12,
+          "maxBuffered": 0,
+          "shownFps": 6.03,
+          "lostFrames": 0,
+          "senderDrops": {
+            "replaced": 0,
+            "oversize": 0,
+            "closed": 0,
+            "invalid": 0
+          },
+          "masterDrops": {},
+          "rssMiB": {
+            "from": 1331,
+            "max": 1330
+          },
+          "cpuSecondsPerSecond": 0.42,
+          "pingMs": {
+            "n": 12,
+            "p50": 2,
+            "p95": null,
+            "unanswered": 0
+          },
+          "statusMs": {
+            "n": 12,
+            "p50": 3,
+            "p95": null,
+            "unanswered": 0
+          }
+        },
+        "captureStarts": 1,
+        "observeAccepted": 21,
+        "sessionsEnded": ["JOB_ENDED"],
+        "job": "DONE",
+        "resultPosts": 1
+      },
+      "outage-10s": {
+        "netem": ["loss", "100%"],
+        "baseline": {
+          "samples": 4,
+          "maxBuffered": 0,
+          "shownFps": 4.45,
+          "lostFrames": 0,
+          "senderDrops": {
+            "replaced": 0,
+            "oversize": 0,
+            "closed": 0,
+            "invalid": 0
+          },
+          "masterDrops": {},
+          "rssMiB": {
+            "from": 1337,
+            "max": 1338
+          },
+          "cpuSecondsPerSecond": 0.34,
+          "pingMs": {
+            "n": 4,
+            "p50": 2,
+            "p95": null,
+            "unanswered": 0
+          },
+          "statusMs": {
+            "n": 4,
+            "p50": 3,
+            "p95": null,
+            "unanswered": 0
+          }
+        },
+        "during": {
+          "samples": 3,
+          "maxBuffered": 23828,
+          "shownFps": 0.33,
+          "lostFrames": 15,
+          "senderDrops": {
+            "replaced": 0,
+            "oversize": 0,
+            "closed": 0,
+            "invalid": 0
+          },
+          "masterDrops": {},
+          "rssMiB": {
+            "from": 1338,
+            "max": 1338
+          },
+          "cpuSecondsPerSecond": 0.2,
+          "pingMs": {
+            "n": 0,
+            "p50": null,
+            "p95": null,
+            "unanswered": 3
+          },
+          "statusMs": {
+            "n": 0,
+            "p50": null,
+            "p95": null,
+            "unanswered": 3
+          }
+        },
+        "after": {
+          "samples": 9,
+          "maxBuffered": 23828,
+          "shownFps": 1.42,
+          "lostFrames": -8,
+          "senderDrops": {
+            "replaced": 0,
+            "oversize": 0,
+            "closed": 0,
+            "invalid": 0
+          },
+          "masterDrops": {},
+          "rssMiB": {
+            "from": 1328,
+            "max": 1332
+          },
+          "cpuSecondsPerSecond": 0.12,
+          "pingMs": {
+            "n": 9,
+            "p50": 3,
+            "p95": null,
+            "unanswered": 0
+          },
+          "statusMs": {
+            "n": 9,
+            "p50": 4,
+            "p95": null,
+            "unanswered": 0
+          }
+        },
+        "captureStarts": 1,
+        "observeAccepted": 3,
+        "sessionsEnded": ["LEASE_EXPIRED"],
+        "job": "DONE",
+        "resultPosts": 1
+      },
+      "saturated-receiver": {
+        "netem": "master main thread busy 90 of every 100 ms",
+        "baseline": {
+          "samples": 4,
+          "maxBuffered": 0,
+          "shownFps": 4.4,
+          "lostFrames": 0,
+          "senderDrops": {
+            "replaced": 0,
+            "oversize": 0,
+            "closed": 0,
+            "invalid": 0
+          },
+          "masterDrops": {},
+          "rssMiB": {
+            "from": 1345,
+            "max": 1346
+          },
+          "cpuSecondsPerSecond": 0.35,
+          "pingMs": {
+            "n": 4,
+            "p50": 2,
+            "p95": null,
+            "unanswered": 0
+          },
+          "statusMs": {
+            "n": 4,
+            "p50": 3,
+            "p95": null,
+            "unanswered": 0
+          }
+        },
+        "during": {
+          "samples": 15,
+          "maxBuffered": 0,
+          "shownFps": 2.97,
+          "lostFrames": 0,
+          "senderDrops": {
+            "replaced": 0,
+            "oversize": 0,
+            "closed": 0,
+            "invalid": 0
+          },
+          "masterDrops": {},
+          "rssMiB": {
+            "from": 1345,
+            "max": 1347
+          },
+          "cpuSecondsPerSecond": 0.13,
+          "pingMs": {
+            "n": 15,
+            "p50": 1,
+            "p95": null,
+            "unanswered": 0
+          },
+          "statusMs": {
+            "n": 15,
+            "p50": 2,
+            "p95": null,
+            "unanswered": 0
+          }
+        },
+        "after": {
+          "samples": 12,
+          "maxBuffered": 0,
+          "shownFps": 0,
+          "lostFrames": 0,
+          "senderDrops": {
+            "replaced": 0,
+            "oversize": 0,
+            "closed": 0,
+            "invalid": 0
+          },
+          "masterDrops": {},
+          "rssMiB": {
+            "from": 1337,
+            "max": 1336
+          },
+          "cpuSecondsPerSecond": 0.07,
+          "pingMs": {
+            "n": 12,
+            "p50": 3,
+            "p95": null,
+            "unanswered": 0
+          },
+          "statusMs": {
+            "n": 12,
+            "p50": 4,
+            "p95": null,
+            "unanswered": 0
+          }
+        },
+        "captureStarts": 1,
+        "observeAccepted": 4,
+        "sessionsEnded": ["LEASE_EXPIRED"],
+        "job": "DONE",
+        "resultPosts": 1
+      }
+    }
+  },
+  "scale": {
+    "mode": "live",
+    "windowSeconds": 6,
+    "hiddenMethod": "another tab of the same master window in front, Playwright disconnected during the window (its focus emulation keeps attached pages visible); no Emulation override, no PWA",
+    "scenarios": {
+      "1-visible": {
+        "workers": ["headed"],
+        "masterTab": "visible",
+        "visibilityDuringWindows": ["visible"],
+        "requestToFirstFrameMs": {
+          "n": 1,
+          "p50": 129,
+          "p95": null,
+          "all": [129]
+        },
+        "control": {
+          "seconds": 6,
+          "shownFpsPerWorker": 0,
+          "bytesPerSecond": 0,
+          "captureToDisplayMs": {
+            "n": 0,
+            "p50": null,
+            "p95": null
+          },
+          "senderDrops": {},
+          "masterDrops": {},
+          "workerCpuPerSecond": [0.09],
+          "workerRssMiB": [1274],
+          "masterCpuPerSecond": 0.02,
+          "masterRssMiB": 1596
+        },
+        "stream": {
+          "seconds": 6,
+          "shownFpsPerWorker": 4.99,
+          "bytesPerSecond": 9488,
+          "captureToDisplayMs": {
+            "n": 30,
+            "p50": 3,
+            "p95": 11
+          },
+          "senderDrops": {
+            "replaced": 330
+          },
+          "masterDrops": {},
+          "workerCpuPerSecond": [0.36],
+          "workerRssMiB": [1308],
+          "masterCpuPerSecond": 0.07,
+          "masterRssMiB": 1636
+        },
+        "jobMs": {
+          "control": [10383],
+          "stream": [10304]
+        },
+        "jobDeltaMs": -79
+      },
+      "1-hidden": {
+        "workers": ["headed"],
+        "masterTab": "hidden",
+        "visibilityDuringWindows": ["hidden"],
+        "requestToFirstFrameMs": {
+          "n": 1,
+          "p50": 63,
+          "p95": null,
+          "all": [63]
+        },
+        "control": {
+          "seconds": 6.1,
+          "shownFpsPerWorker": 0,
+          "bytesPerSecond": 0,
+          "captureToDisplayMs": {
+            "n": 0,
+            "p50": null,
+            "p95": null
+          },
+          "senderDrops": {},
+          "masterDrops": {},
+          "workerCpuPerSecond": [0.05],
+          "workerRssMiB": [1298],
+          "masterCpuPerSecond": 0.03,
+          "masterRssMiB": 1365
+        },
+        "stream": {
+          "seconds": 6,
+          "shownFpsPerWorker": 4.97,
+          "bytesPerSecond": 9142,
+          "captureToDisplayMs": {
+            "n": 30,
+            "p50": 4,
+            "p95": 12
+          },
+          "senderDrops": {
+            "replaced": 332
+          },
+          "masterDrops": {},
+          "workerCpuPerSecond": [0.37],
+          "workerRssMiB": [1316],
+          "masterCpuPerSecond": 0.03,
+          "masterRssMiB": 1366
+        },
+        "jobMs": {
+          "control": [10344],
+          "stream": [10342]
+        },
+        "jobDeltaMs": -2
+      },
+      "3-visible": {
+        "workers": ["headed", "headless", "headed"],
+        "masterTab": "visible",
+        "visibilityDuringWindows": ["visible"],
+        "requestToFirstFrameMs": {
+          "n": 3,
+          "p50": 79,
+          "p95": null,
+          "all": [62, 79, 96]
+        },
+        "control": {
+          "seconds": 6,
+          "shownFpsPerWorker": 0,
+          "bytesPerSecond": 0,
+          "captureToDisplayMs": {
+            "n": 0,
+            "p50": null,
+            "p95": null
+          },
+          "senderDrops": {},
+          "masterDrops": {},
+          "workerCpuPerSecond": [0.06, 0.04, 0.05],
+          "workerRssMiB": [1297, 1186, 1272],
+          "masterCpuPerSecond": 0.01,
+          "masterRssMiB": 1363
+        },
+        "stream": {
+          "seconds": 6,
+          "shownFpsPerWorker": 4.98,
+          "bytesPerSecond": 33775,
+          "captureToDisplayMs": {
+            "n": 90,
+            "p50": 4,
+            "p95": 9
+          },
+          "senderDrops": {
+            "replaced": 993
+          },
+          "masterDrops": {},
+          "workerCpuPerSecond": [0.37, 0.29, 0.36],
+          "workerRssMiB": [1318, 1216, 1313],
+          "masterCpuPerSecond": 0.21,
+          "masterRssMiB": 1473
+        },
+        "jobMs": {
+          "control": [10311, 10298, 10274],
+          "stream": [10325, 10286, 10272]
+        },
+        "jobDeltaMs": 0
+      },
+      "3-hidden": {
+        "workers": ["headed", "headless", "headed"],
+        "masterTab": "hidden",
+        "visibilityDuringWindows": ["hidden"],
+        "requestToFirstFrameMs": {
+          "n": 3,
+          "p50": 63,
+          "p95": null,
+          "all": [93, 54, 63]
+        },
+        "control": {
+          "seconds": 6.1,
+          "shownFpsPerWorker": 0,
+          "bytesPerSecond": 0,
+          "captureToDisplayMs": {
+            "n": 0,
+            "p50": null,
+            "p95": null
+          },
+          "senderDrops": {},
+          "masterDrops": {},
+          "workerCpuPerSecond": [0.05, 0.05, 0.05],
+          "workerRssMiB": [1301, 1209, 1302],
+          "masterCpuPerSecond": 0.02,
+          "masterRssMiB": 1541
+        },
+        "stream": {
+          "seconds": 6,
+          "shownFpsPerWorker": 4.96,
+          "bytesPerSecond": 33698,
+          "captureToDisplayMs": {
+            "n": 90,
+            "p50": 2,
+            "p95": 9
+          },
+          "senderDrops": {
+            "replaced": 998
+          },
+          "masterDrops": {},
+          "workerCpuPerSecond": [0.36, 0.29, 0.37],
+          "workerRssMiB": [1320, 1221, 1320],
+          "masterCpuPerSecond": 0.07,
+          "masterRssMiB": 1539
+        },
+        "jobMs": {
+          "control": [10332, 10322, 10312],
+          "stream": [10288, 10265, 10249]
+        },
+        "jobDeltaMs": -55
+      }
+    }
+  }
+}

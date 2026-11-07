@@ -44,7 +44,7 @@ export const createVisual = ({ links, nextMessage }) => {
       URL.revokeObjectURL(previous.url);
       revoked += 1;
     }
-    arrivals.push({ frameSeq: frame.frameSeq, at: Date.now() });
+    arrivals.push({ frameSeq: frame.frameSeq, at: Date.now(), capturedAtMs: frame.capturedAtMs });
     const session = sessions.get(name);
     if (session && session.firstFrameMs === null) {
       session.firstFrameMs = performance.now() - session.sentAt;
