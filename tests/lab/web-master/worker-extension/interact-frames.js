@@ -15,6 +15,12 @@ export const geometryOf = (metadata) => {
 };
 
 const sameGeometry = (a, b) => GEOMETRY.every((key) => a[key] === b[key]);
+// The view the frame was drawn from still has its size and pinch scale; sizes round to a DIP.
+const fits = (geometry, layout) =>
+  Boolean(layout) &&
+  Math.abs(geometry.deviceWidth - layout.width) <= 1 &&
+  Math.abs(geometry.deviceHeight - layout.height) <= 1 &&
+  Math.abs(geometry.pageScaleFactor - layout.scale) < 0.01;
 
 /**
  * Normalized image coordinates to CSS pixels of the main frame. Screencast sizes are DIP, and
@@ -65,6 +71,8 @@ export const createFrames = ({ now = Date.now, limits = FRAME_LIMITS } = {}) => 
     if (!sameGeometry(entry.geometry, latest.geometry) || live.zoom !== 1) {
       return "VIEWPORT_CHANGED";
     }
+    // Checked against the view now, not only the last frame sent: a resize may have no frame yet.
+    if (!fits(entry.geometry, live.layout)) return "VIEWPORT_CHANGED";
     return now() - entry.sentAt > limits.maxAgeMs ? "STALE_FRAME" : null;
   };
 

@@ -255,7 +255,8 @@ describe("the interaction lease", () => {
 
 describe("the frames an event may aim at", () => {
   const GEOMETRY = { deviceWidth: 1280, deviceHeight: 720, pageScaleFactor: 1, offsetTop: 0 };
-  const LIVE = { loaderId: POINTER.loaderId, zoom: 1 };
+  const LAYOUT = { width: 1280, height: 720, scale: 1 };
+  const LIVE = { loaderId: POINTER.loaderId, zoom: 1, layout: LAYOUT };
   let clock: number;
   let frames: ReturnType<typeof createFrames>;
   const sent = (frameSeq: number, geometry = GEOMETRY, loaderId = POINTER.loaderId) =>
@@ -279,6 +280,14 @@ describe("the frames an event may aim at", () => {
     ["another document named", { loaderId: "B".repeat(32) }, LIVE, "TARGET_CHANGED"],
     ["a navigated tab", {}, { ...LIVE, loaderId: "C".repeat(32) }, "TARGET_CHANGED"],
     ["a zoomed tab", {}, { ...LIVE, zoom: 1.25 }, "VIEWPORT_CHANGED"],
+    [
+      "a view resized before its frame",
+      {},
+      { ...LIVE, layout: { ...LAYOUT, width: 1000 } },
+      "VIEWPORT_CHANGED",
+    ],
+    ["a pinch-zoomed view", {}, { ...LIVE, layout: { ...LAYOUT, scale: 2 } }, "VIEWPORT_CHANGED"],
+    ["a view whose layout went unread", {}, { ...LIVE, layout: null }, "VIEWPORT_CHANGED"],
   ])("%s is refused", (_name, change, live, code) => {
     expect(frames.check({ ...POINTER, ...change }, live)).toBe(code);
   });

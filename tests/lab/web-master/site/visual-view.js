@@ -54,7 +54,9 @@ export const createVisual = ({ links, nextMessage }) => {
     for (const listener of listeners) listener(name, entry);
     const url = URL.createObjectURL(lastBlob);
     const previous = shown.get(name);
-    shown.set(name, { url, epoch: frame.epoch, frameSeq: frame.frameSeq });
+    // Events aim at the frame on screen: the new one counts once it is presented, not on arrival.
+    const current = { url, epoch: frame.epoch, frameSeq: previous?.frameSeq ?? null };
+    shown.set(name, current);
     image.src = url;
     if (previous) {
       URL.revokeObjectURL(previous.url);
@@ -66,6 +68,7 @@ export const createVisual = ({ links, nextMessage }) => {
     if (arrivals.length > SAMPLES) arrivals.shift();
     const session = sessions.get(name);
     presented().then(({ at, painted }) => {
+      if (painted && shown.get(name) === current) current.frameSeq = frame.frameSeq;
       if (painted) arrival.presentedAt = at;
       if (session && session.firstFrameMs === null) {
         Object.assign(session, { firstFrameMs: performance.now() - session.sentAt, painted });
@@ -153,7 +156,7 @@ export const createVisual = ({ links, nextMessage }) => {
     visualStats,
     visualSendRaw,
     jobStatus,
-    // The frame the image shows now, so a pointer names the frame it was aimed at.
+    // The frame the image presents now, so a pointer names the frame it was aimed at.
     shownFrame: (name) => shown.get(name)?.frameSeq ?? null,
     onVisualFrame: (listener) => void listeners.add(listener),
   };

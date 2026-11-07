@@ -62,7 +62,8 @@ const AIM = { type: "INPUT_EVENT", leaseId: "lease", seq: 1, frameSeq: 1, bootId
 const FRAME = { ...AIM, sessionEpoch: 1, loaderId: "L1" };
 const DOWN = { ...FRAME, kind: "pointerDown", x: 0.5, y: 0.5, button: "left", clickCount: 1 };
 const HOLD = { ...FRAME, kind: "hold" };
-const LIVE: Live = { loaderId: "L1", url: "http://a/", zoom: 1, allowed: true };
+const LAYOUT = { width: 800, height: 600, scale: 1 };
+const LIVE: Live = { loaderId: "L1", url: "http://a/", zoom: 1, allowed: true, layout: LAYOUT };
 
 const setup = (over: Partial<TabOps> = {}) => {
   const frames = createFrames();

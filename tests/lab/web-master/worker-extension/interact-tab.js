@@ -151,6 +151,25 @@ export const closeTab = async () => {
   return true;
 };
 
+// The view's size and pinch scale, read in a world of the worker's own that the page cannot patch.
+const LAYOUT = "[innerWidth, innerHeight, visualViewport.scale]";
+const worldOf = async (current) => {
+  if (current.world?.loaderId === current.loaderId) return current.world.contextId;
+  const { frameTree } = await deadline(command(current.target, "Page.getFrameTree"));
+  const params = { frameId: frameTree.frame.id, worldName: "recnrun-layout" };
+  const created = await deadline(command(current.target, "Page.createIsolatedWorld", params));
+  current.world = { loaderId: frameTree.frame.loaderId, contextId: created.executionContextId };
+  return created.executionContextId;
+};
+/** The layout now, or null when it cannot be read (a document that went away mid-read). */
+const layoutOf = async (current) => {
+  const contextId = await worldOf(current);
+  const params = { expression: LAYOUT, contextId, returnByValue: true };
+  const read = await deadline(command(current.target, "Runtime.evaluate", params));
+  const [width, height, scale] = read.result?.value ?? [];
+  return Number.isFinite(width) ? { width, height, scale } : null;
+};
+
 /** The document now, or null once the tab is closing; `fresh` re-reads the main frame's loader. */
 export const liveDocument = async (fresh) => {
   const current = tab;
@@ -161,8 +180,9 @@ export const liveDocument = async (fresh) => {
     current.url = frameTree.frame.url;
   }
   const zoom = await deadline(chrome.tabs.getZoom(current.target.tabId));
+  const layout = await layoutOf(current).catch(() => null);
   const { loaderId, url } = current;
-  return { loaderId, url, zoom, allowed: allowed(current, url) };
+  return { loaderId, url, zoom, layout, allowed: allowed(current, url) };
 };
 
 /** One input command with a deadline, tracked first: one that times out may still have pressed. */
