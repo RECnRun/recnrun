@@ -109,7 +109,10 @@ Branch `poc-w7-remote-input` from edcb5681. Plan reviewed in [PW-W7-plan.md](rev
   - red: `interact.test.ts` against stubs: 33 failed, 5 passed; `RECNRUN_TEST_QUIET=1 vp run lab:web-master -- tests/lab/web-master/w-interact-auth.spec.ts --project headed-worker` with stub checks and no claim exclusion: 8 failed, 1 passed, run `2026-11-07T15-20-41.145Z-ba7bc9a4`; negative controls (no duplicate refusal, no revoke on input close): 1 failed each, runs `2026-11-07T15-21-18.940Z-18737006`, `2026-11-07T15-21-37.004Z-52505129`
   - green: `interact.test.ts` 38 passed; `w-interact-auth.spec.ts` + `w-admission.spec.ts` + `w-observe.spec.ts`: 25 passed, run `2026-11-07T15-22-20.934Z-fbad936a`; `w-interact-auth.spec.ts` after the last edit: 9 passed, run `2026-11-07T15-24-17.316Z-56fa12af`
   - commit: 908b8cda
-- [ ] W7.B interactive tab, INTERACT capture, mapping, click (I1, N6, N7)
+- [i] W7.B interactive tab, INTERACT capture, mapping, click (I1, N6, N7)
+  - red: `interact.test.ts` 2 failed, 52 passed (schema), 13 failed, 41 passed against a stub frames module; `w-interact-click.spec.ts --project headed-worker` with checks off, x scaled by 0.9, no off-policy revoke, no opener close: I1 failed (corner `tr` hit `body`), run `2026-11-07T15-49-21.928Z-c4d3014a`; negatives (STALE_FRAME expected, ok received) `2026-11-07T15-49-47.357Z-6460041d`; N6 (openersClosed 0) `2026-11-07T15-49-53.539Z-95411521`, (no revoke alone: reason undefined) `2026-11-07T15-50-13.691Z-4b0b81f0`; N7 (TARGET_CHANGED expected, ok received) `2026-11-07T15-50-02.672Z-5381f6d2`
+  - green: `interact.test.ts` 54 passed (124 across `lab/web-master`); `w-interact-click.spec.ts` headed 4 passed, headless 4 passed (run `2026-11-07T15-48-57.157Z-1e2a0fe4`); INTERACT 24.5 fps headed, 23.0 headless; worst corner error 2.83 CSS px; headed `w-interact-auth` + `w-observe` + `w-visual` + `w-dashboard` + `w-interact-click`: 25 passed, 1 failed (N4: its `/` start URL is an empty 404, Chrome's error page is off the allowlist, so the lease was revoked), run `2026-11-07T15-50-31.258Z-4733e6ba`; after moving W7.A to `/form`: 9 passed, run `2026-11-07T15-53-19.459Z-5c1da104`
+  - commit: e579fd0e
 - [ ] W7.C keys, text, wheel, pressed-state cleanup (I2, I3, N5, N10)
 - [ ] W7.D drag, latency, congestion check (I4, I5, N8)
 
