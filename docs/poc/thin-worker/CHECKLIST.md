@@ -66,8 +66,14 @@ Gate W: lab run · verify · review · RESULTS W1–W5 · owner decision
 
 Branch `poc-w6-visual-observability`, from d51a4b81.
 
-- [ ] W6.A capture in the worker (G0, G1)
-- [ ] W6.B binary frames over `visual.v1` (G2)
+- [i] W6.A capture in the worker (G0, G1)
+  - red: stub `capture.js` that produces no frame, `RECNRUN_TEST_QUIET=1 vp run lab:web-master -- tests/lab/web-master/w-visual.spec.ts --project headed-worker`: test 1 failed, `Error: Timed out after 15000 ms: null` in `panelShows`, run `2026-11-07T10-35-05.267Z-8339fd19-bda6-4c5a-88fe-9c29fae0f257`
+  - green: `vp run lab:web-master -- tests/lab/web-master/w-visual.spec.ts`: 10 passed (5 headed, 5 headless), run `2026-11-07T10-42-25.195Z-50dc80e9-e9b0-48fe-8ed8-13ac8351baa0`
+  - commit: 01c945d4
+- [i] W6.B binary frames over `visual.v1` (G2)
+  - red: stub `encodeFrame` (no message) and `createReceiver` (drops all), `cd tests && vp test run lab/web-master/visual-envelope.test.ts`: 20 failed, 2 passed; `RECNRUN_TEST_QUIET=1 vp run lab:web-master -- tests/lab/web-master/w-visual-link.spec.ts`: test 1 failed, `Error: Timed out after 15000 ms: null` in `masterShows`, run `2026-11-07T10-50-51.819Z-b90c0fb4-a330-4288-b340-50504eba6518`
+  - green: `cd tests && vp test run lab/web-master/visual-envelope.test.ts`: 22 passed; `vp run lab:web-master -- tests/lab/web-master/w-visual-link.spec.ts`: 3 passed, run `2026-11-07T10-52-41.679Z-f2bc14e2-0edb-4b3d-95b3-3aa5c15d00e8`; `vp run lab:web-master`: 41 passed, run `2026-11-07T10-53-27.066Z-c6ebb760-63ab-41e1-aadc-72a14f6213e2`
+  - commit: e10c607c
 - [ ] W6.C observe control, trust, and policy (G3)
 - [ ] W6.D dashboard, tab and PWA (G4)
 - [ ] W6.E benchmarks, network faults, no-flags worker run (G5 in the lab)
