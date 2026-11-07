@@ -113,7 +113,11 @@ Branch `poc-w7-remote-input` from edcb5681. Plan reviewed in [PW-W7-plan.md](rev
   - red: `interact.test.ts` 2 failed, 52 passed (schema), 13 failed, 41 passed against a stub frames module; `w-interact-click.spec.ts --project headed-worker` with checks off, x scaled by 0.9, no off-policy revoke, no opener close: I1 failed (corner `tr` hit `body`), run `2026-11-07T15-49-21.928Z-c4d3014a`; negatives (STALE_FRAME expected, ok received) `2026-11-07T15-49-47.357Z-6460041d`; N6 (openersClosed 0) `2026-11-07T15-49-53.539Z-95411521`, (no revoke alone: reason undefined) `2026-11-07T15-50-13.691Z-4b0b81f0`; N7 (TARGET_CHANGED expected, ok received) `2026-11-07T15-50-02.672Z-5381f6d2`
   - green: `interact.test.ts` 54 passed (124 across `lab/web-master`); `w-interact-click.spec.ts` headed 4 passed, headless 4 passed (run `2026-11-07T15-48-57.157Z-1e2a0fe4`); INTERACT 24.5 fps headed, 23.0 headless; worst corner error 2.83 CSS px; headed `w-interact-auth` + `w-observe` + `w-visual` + `w-dashboard` + `w-interact-click`: 25 passed, 1 failed (N4: its `/` start URL is an empty 404, Chrome's error page is off the allowlist, so the lease was revoked), run `2026-11-07T15-50-31.258Z-4733e6ba`; after moving W7.A to `/form`: 9 passed, run `2026-11-07T15-53-19.459Z-5c1da104`
   - commit: e579fd0e
-- [ ] W7.C keys, text, wheel, pressed-state cleanup (I2, I3, N5, N10)
+- [i] W7.C keys, text, wheel, pressed-state cleanup (I2, I3, N5, N10)
+  - red: `interact-input.test.ts` against stubs: 17 failed, 20 passed; `w-interact-input.spec.ts --project headed-worker -g <cell>` with key/text/wheel refused: I2 (submit undefined) `2026-11-07T16-06-51.965Z-5bd871e0`, I3 (scroll 0) `2026-11-07T16-07-08.960Z-01357933`, negatives (INPUT_UNSUPPORTED instead of TEXT_TOO_LONG) `2026-11-07T16-07-17.609Z-c71c5dd6`; with no releases (no mouseup/keyup): dead man `2026-11-07T16-07-55.868Z-7b440e52`, N5 `2026-11-07T16-08-02.925Z-bea73c70`, N10 `2026-11-07T16-08-08.765Z-eef1817d`
+  - green: `lab/web-master` Node tests 161 passed; `w-interact-input.spec.ts` headed 7 passed (run `2026-11-07T16-08-25.460Z-5ef5a671`), headless 7 passed (run `2026-11-07T16-08-38.274Z-3b47f189`); release after the last event 0.92 s (dead man), master close 0.91 s, link loss 5 ms (CLEANUP); `w-interact-click` + `w-observe-life` headed 10 passed (run `2026-11-07T16-08-56.422Z-5a5ef979`)
+  - [unsure] service worker restart closes the tab: the lab has no way to stop only the service worker, so not exercised
+  - commit: c613002a
 - [ ] W7.D drag, latency, congestion check (I4, I5, N8)
 
 Gate W7: not run
