@@ -57,10 +57,22 @@ Phase 0 and later wait for Gate W. W.4 or W.9 failing stops the spike and goes s
 Gate W: lab run · verify · review · RESULTS W1–W5 · owner decision
 
 - lab run (`vp run lab:web-master`, run id, result per cell): `2026-11-07T07-57-50.325Z-13178a3d-d7c7-437c-bc36-85772e0652d9`, 28 passed (W.rtc 3, W.fsa 2, W.lifecycle 3 headed + 3 headless, W.trust 5, W.admission 9, W.friction 3)
-- verify:
+- verify: `vp run verify` exit 0 on d51a4b81 (37 of 37 tasks; marker `.artifacts/verified/d51a4b81…`)
 - review (`reviews/PW.md`): Codex, not supported; blocker 1 and majors 2–4, 6, 12 fixed, wording of 5, 7, 11 corrected, the rest carried below
 - carried into Phase 1 after a GO ([PW review](reviews/PW.md) findings 5, 9–11, 13): persistent worker identity, onboarding-bound pins, mutual HELLO, authenticated status and results; epoch floor, ledger retention, signed cancellation, resubmission and replay tests; destination, redirect, stale-document, and network-guard checks; a durable publication queue with crash tests; real folder signalling and launcher move with R4 reconciliation; focus emulation in the fixed CDP table and a worker run without lab flags; strict-CSP execution, app closure, suspend and resume; macOS and the real origin (M-TW.12–M-TW.15)
 - owner decision (adopt the website master or keep the extension master):
+
+## W6: visual observability ([W6-PLAN.md](W6-PLAN.md))
+
+Branch `poc-w6-visual-observability`, from d51a4b81.
+
+- [ ] W6.A capture in the worker (G0, G1)
+- [ ] W6.B binary frames over `visual.v1` (G2)
+- [ ] W6.C observe control, trust, and policy (G3)
+- [ ] W6.D dashboard, tab and PWA (G4)
+- [ ] W6.E benchmarks, network faults, no-flags worker run (G5 in the lab)
+
+Gate W6: lab run · verify · review · RESULTS W6.01–W6.20 · verdict (GO, GO-LAB-ONLY, NO-GO)
 
 ## P0: freeze and prune verify
 

@@ -118,3 +118,7 @@ Google Chrome 157.0.8103.38 on Linux, run `2026-11-06T23-13-04.506Z-2b85052b-c8c
 - **Conditional estimate** ([PW review](reviews/PW.md) finding 7). The Store total is a constant built from decision 3's plan, not a measured flow, and the onboarding script's pinning handoff is replaced by `lab.provision`; a genuinely cheaper Store path would not fail this spec. W5 stays a recorded estimate until a real Store comparator and provisioning handoff exist.
 - **Beyond gestures (owner, 2026-11-07).** The website path has no Store in it: no review before a release, no publishing delay, and an update reaches every master on its next visit instead of waiting for Chrome's extension update cycle. The owner counts that as the larger part of the friction gap.
 - **Not covered.** The real Store and recnrun.com (M-TW.12), macOS (M-TW.4), the base login's own gestures, and the folder signalling the harness relays.
+
+## W6
+
+Not run yet. Plan, gates, and acceptance: [W6-PLAN.md](W6-PLAN.md).
