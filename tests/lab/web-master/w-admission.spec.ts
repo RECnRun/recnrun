@@ -224,3 +224,25 @@ test("W.admission 8: the envelope is closed", async () => {
   ];
   for (const [label, entry] of cases) await refuse(c, label, entry, "INVALID_COMMAND");
 });
+
+test("W.admission 9: a click held between press and release past the deadline is unknown", async () => {
+  const c = cell();
+  const issuedAt = Date.now();
+  const deadlineAt = issuedAt + 3_000;
+  const job = await c.key.sign(fields(c.target.origin, { issuedAt, deadlineAt }));
+  const jobId = String(job.jobId);
+  await background(c.worker, `lab.setKnob(${JSON.stringify({ index: 2, phase: "pressed" })})`);
+  expect((await submitDirect(c.worker, job)).status).toBe("ACCEPTED");
+  const reached = () => background<{ reached: { index: number } | null }>(c.worker, "lab.state()");
+  await until(reached, (value) => value.reached?.index === 2, 30_000);
+  await delay(Math.max(0, deadlineAt + 500 - Date.now()));
+  await background(c.worker, "lab.release()");
+  const status = await ended(c.worker, jobId);
+  await delay(1_500);
+  await background(c.worker, "lab.setKnob(null)");
+  // The press went out, so the effect is unknown; the release never does, so no POST.
+  expect(c.target.count(jobId)).toBe(0);
+  expect(status.ops[2]).toMatchObject({ state: "OUTCOME_UNKNOWN", code: "TIMEOUT" });
+  expect(status.state).toBe("EXPIRED");
+  expect(status.ops.slice(3).map((entry) => entry.state)).toEqual(["SKIPPED", "SKIPPED"]);
+});

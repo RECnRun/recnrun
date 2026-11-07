@@ -24,13 +24,11 @@ const runFor = (context, index) => {
   const entry = context.job.ops[index];
   // The op's deadline is absolute: its own timeout, capped by the job's.
   const deadlineAt = Math.min(Date.now() + entry.timeoutMs, context.job.deadlineAt);
-  const gate = () => barrier(index, "preflight");
-  return {
-    origins: context.job.origins,
-    deadlineAt,
-    readBudget: READ_BUDGET - context.readBytes,
-    gate,
-  };
+  const gate = (phase) => barrier(index, phase);
+  // When the job's own deadline is the nearer bound, a timeout ends the job EXPIRED.
+  const jobBound = context.job.deadlineAt <= Date.now() + entry.timeoutMs;
+  const readBudget = READ_BUDGET - context.readBytes;
+  return { origins: context.job.origins, deadlineAt, readBudget, gate, jobBound };
 };
 
 /** Runs one op between its barriers; answers whether the job goes on. */
@@ -39,7 +37,9 @@ const step = async (context, index) => {
   await barrier(index, "between");
   await setOp(context, index, { state: MUTATING.has(entry.op) ? "APPLYING" : "RUNNING" });
   await barrier(index, "applying");
-  const outcome = await execute(context.target, entry, runFor(context, index));
+  const run = runFor(context, index);
+  const outcome = await execute(context.target, entry, run);
+  if (outcome.code === "TIMEOUT" && run.jobBound) context.expired = true;
   if (outcome.state === "DONE" && entry.op === "read") {
     context.readBytes += utf8Length(outcome.result.text);
   }
@@ -54,7 +54,7 @@ const runOps = async (context) => {
     for (let rest = index + 1; rest < context.job.ops.length; rest += 1) {
       context.record.ops[rest] = { op: context.job.ops[rest].op, state: "SKIPPED" };
     }
-    return Date.now() >= context.job.deadlineAt ? "EXPIRED" : "FAILED";
+    return context.expired ? "EXPIRED" : "FAILED";
   }
   return "DONE";
 };

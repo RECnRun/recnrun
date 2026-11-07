@@ -75,6 +75,7 @@ const click = async (ctx, { selector }) => {
   const point = { x: (x1 + x3) / 2, y: (y1 + y3) / 2, button: "left", clickCount: 1 };
   for (const type of ["mouseMoved", "mousePressed", "mouseReleased"]) {
     await send(ctx, "Input.dispatchMouseEvent", { type, ...point });
+    if (type === "mousePressed") await ctx.gate?.("pressed");
   }
   return { clicked: true };
 };
@@ -107,7 +108,7 @@ const checkOrigin = async (ctx, entry, origins) => {
 
 // The preflight and the op share one clock, so neither can outlive the op's deadline.
 const attempt = async (ctx, entry, run) => {
-  await run.gate?.();
+  await run.gate?.("preflight");
   await checkOrigin(ctx, entry, run.origins);
   return TABLE[entry.op](ctx, entry.args);
 };
@@ -129,7 +130,7 @@ const failure = (ctx, entry, error) => {
 
 /** Runs one op against `run.deadlineAt` (absolute) and answers its outcome; never throws. */
 export const execute = async (target, entry, run) => {
-  const ctx = { target, deadlineAt: run.deadlineAt, readBudget: run.readBudget };
+  const ctx = { target, deadlineAt: run.deadlineAt, readBudget: run.readBudget, gate: run.gate };
   try {
     const result = await Promise.race([attempt(ctx, entry, run), expiry(ctx)]);
     return { state: "DONE", result };
