@@ -27,6 +27,8 @@ export const createVisual = ({ links, nextMessage }) => {
   // Keyed by link: every root of the same build carries the same extension id.
   const latest = new Map();
   const listeners = new Set();
+  // Told of each frame at its presentation, with that frame's own Blob and the paint time.
+  const presentedListeners = new Set();
   const receivers = new Map();
   // Request-to-first-frame timing per link, for the lab's measurements.
   const sessions = new Map();
@@ -42,7 +44,9 @@ export const createVisual = ({ links, nextMessage }) => {
     await image.decode();
     if (document.hidden) return { at: Date.now(), painted: false };
     return new Promise((resolve) => {
-      requestAnimationFrame(() => resolve({ at: Date.now(), painted: true }));
+      requestAnimationFrame(() =>
+        resolve({ at: Date.now(), now: performance.now(), painted: true }),
+      );
     });
   };
 
@@ -67,9 +71,10 @@ export const createVisual = ({ links, nextMessage }) => {
     arrivals.push(arrival);
     if (arrivals.length > SAMPLES) arrivals.shift();
     const session = sessions.get(name);
-    presented().then(({ at, painted }) => {
+    presented().then(({ at, now, painted }) => {
       if (painted && shown.get(name) === current) current.frameSeq = frame.frameSeq;
       if (painted) arrival.presentedAt = at;
+      if (painted) for (const listener of presentedListeners) listener(name, entry, now);
       if (session && session.firstFrameMs === null) {
         Object.assign(session, { firstFrameMs: performance.now() - session.sentAt, painted });
       }
@@ -159,5 +164,6 @@ export const createVisual = ({ links, nextMessage }) => {
     // The frame the image presents now, so a pointer names the frame it was aimed at.
     shownFrame: (name) => shown.get(name)?.frameSeq ?? null,
     onVisualFrame: (listener) => void listeners.add(listener),
+    onPresented: (listener) => void presentedListeners.add(listener),
   };
 };

@@ -2,7 +2,8 @@ import { REPORT } from "./input-fixtures.ts";
 
 /*
  * W7 slice D fixtures: a range input and a canvas drawn by drag (I4), an HTML5 draggable list
- * (I5), and a block whose colour each press changes (latency). Each page reports its layout.
+ * (I5), and a block whose presses draw their count in binary cells (latency). Each page reports
+ * its layout.
  */
 
 const LAYOUT = `<script>const rect=(el)=>{const r=el.getBoundingClientRect();
@@ -56,10 +57,15 @@ report({type:"drop",data:id,types:[...e.dataTransfer.types],order:order()});});
 li.addEventListener("dragend",(e)=>report({type:"dragend",id:li.id,dropEffect:e.dataTransfer.dropEffect}));}
 layout(["i1","i2","i3","i4"]);</script>`;
 
-// Each press sets the block to the next colour of a cycle the master decodes from the frame.
-const LATENCY_SCRIPT = `<script>const colours=["#e01010","#10c010","#1010e0","#f0f010"];let n=0;
-addEventListener("mousedown",()=>{n+=1;document.getElementById("block").style.background=colours[n%4];
-report({type:"press",n});},true);layout(["block"]);</script>`;
+// Each press draws its count, mod 256, in eight black and white cells the master decodes.
+const CELLS = Array.from({ length: 8 }, (_, bit) => `b${bit}`);
+const LATENCY_SCRIPT = `<script>const cells=${JSON.stringify(CELLS)};let n=0;
+addEventListener("mousedown",()=>{n+=1;cells.forEach((id,bit)=>{
+document.getElementById(id).style.background=(n>>bit)&1?"#fff":"#000";});
+report({type:"press",n});},true);layout(["block",...cells]);</script>`;
+const LATENCY_CELLS = CELLS.map(
+  (id, bit) => `<div id="${id}" class="cell" style="left:${10 + bit * 10}%"></div>`,
+).join("");
 
 export const DRAG_PAGES: Record<string, string> = {
   "/interact/drag": `<!doctype html><meta charset="utf-8"><title>Drag</title>${DRAG_STYLE}${REPORT}${LAYOUT}
@@ -71,6 +77,7 @@ export const DRAG_PAGES: Record<string, string> = {
 <div class="spin"></div>${LIST_SCRIPT}`,
   "/interact/latency": `<!doctype html><meta charset="utf-8"><title>Latency</title>${REPORT}${LAYOUT}
 <style>html,body{margin:0;height:100%;background:#808080}
-#block{position:fixed;left:30%;top:30%;width:40%;height:40%;background:#e01010}</style>
-<body><div id="block"></div>${LATENCY_SCRIPT}`,
+#block{position:fixed;left:30%;top:30%;width:40%;height:40%;background:#e01010}
+.cell{position:fixed;top:6%;width:8%;height:12%;background:#000}</style>
+<body><div id="block"></div>${LATENCY_CELLS}${LATENCY_SCRIPT}`,
 };

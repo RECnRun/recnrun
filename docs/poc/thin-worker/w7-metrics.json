@@ -1,51 +1,51 @@
 {
-  "about": "W7 slice D lab metrics (Linux Docker, Google Chrome 157.0.8103.38, master and worker on one host over loopback WebRTC); fixture data only. Evidence run 2026-11-07T16-30-34.350Z-1f5230f1 with RECNRUN_W7_BENCH=1. Times are milliseconds on the master's performance.now() clock from the pointerDown send. 'visible' ends at the requestAnimationFrame after the first decoded frame whose sampled pixel shows the press's colour: a paint proxy, not the physical display.",
+  "about": "W7 slice D lab metrics (Linux Docker, Google Chrome 157.0.8103.38, master and worker on one host over loopback WebRTC); fixture data only. Latency runs 2026-11-07T17-06-44.498Z-063a147a (headed) and 2026-11-07T17-06-56.331Z-3d87bc0b (headless) with RECNRUN_W7_BENCH=1; N8 from run 2026-11-07T16-30-34.350Z-1f5230f1. Times are milliseconds on the master's performance.now() clock from the pointerDown send. 'visible' ends at the requestAnimationFrame after the decode of the first frame the master's image presents whose eight binary cells draw the press's count, decoded from that presented frame's own bytes: a paint proxy, not the physical display.",
   "latency": {
     "headed-worker": {
       "ackMs": {
         "n": 30,
-        "p50": 10.1,
-        "p95": 12,
-        "max": 12.5
+        "p50": 11.9,
+        "p95": 13.4,
+        "max": 14.4
       },
       "visibleMs": {
         "n": 30,
-        "p50": 25.8,
-        "p95": 40.3,
-        "max": 81.5
+        "p50": 34.3,
+        "p95": 38.6,
+        "max": 40
       },
       "raw": {
         "ack": [
-          4.1, 7.5, 10, 9.6, 9.1, 10.7, 11.7, 3.1, 4.2, 2.9, 5.8, 11.3, 9.4, 11.5, 10.1, 12.5, 11.4,
-          11.6, 9.2, 8.2, 10.5, 11.3, 12, 9.5, 11.3, 11.5, 9.5, 12.4, 11.6, 11.3
+          8.4, 12.2, 12.2, 3.7, 2.9, 3.5, 9, 13.8, 11.9, 9.2, 10.2, 11.4, 13.2, 12.7, 11.4, 14.4,
+          11.3, 11.6, 13, 13.4, 12.1, 12.7, 11.1, 12.6, 13, 12.1, 11.8, 11.9, 12.4, 12.7
         ],
         "visible": [
-          81.5, 25.8, 36.9, 23.8, 30, 25, 40, 11.5, 29.8, 12.3, 28, 23.1, 28, 40.4, 22.1, 31.5,
-          36.9, 24.3, 17.3, 24.7, 22.4, 37.6, 40.3, 31, 20.3, 22.3, 25.3, 22.8, 26.9, 33.3
+          18.4, 36, 30.5, 10.2, 28.2, 27.9, 38.8, 26.1, 37.7, 21.4, 27, 33.3, 31.1, 32.5, 36.1,
+          35.4, 24.9, 36.2, 36.7, 37.4, 34.5, 34.3, 38.6, 38, 34.5, 35.9, 21.3, 21.3, 40, 36.4
         ]
       }
     },
     "headless-worker": {
       "ackMs": {
         "n": 30,
-        "p50": 11,
-        "p95": 12.8,
-        "max": 13.1
+        "p50": 11.7,
+        "p95": 13.1,
+        "max": 14.9
       },
       "visibleMs": {
         "n": 30,
-        "p50": 32.3,
-        "p95": 37.2,
-        "max": 42.1
+        "p50": 33.4,
+        "p95": 38.4,
+        "max": 40.6
       },
       "raw": {
         "ack": [
-          4.2, 4.9, 7.8, 12.8, 11.8, 9.2, 12.2, 3.3, 3.2, 6.2, 12, 10.7, 11, 11.4, 10.9, 11.2, 7.1,
-          13.1, 9, 11.3, 11.3, 9.2, 12.9, 11.7, 12, 11.4, 10.9, 12.3, 11.4, 11
+          11.1, 11.4, 4, 3.5, 6.8, 12.8, 10.4, 14.9, 11.7, 10.8, 12.2, 11.6, 11.7, 10.5, 11.6, 12.9,
+          11.6, 12.8, 12.6, 12.5, 11.7, 12.2, 12.5, 11, 13.1, 13.6, 12.4, 12.4, 12, 12.1
         ],
         "visible": [
-          25.5, 30, 33.1, 39.5, 36.1, 26.8, 36.5, 28.6, 26.3, 21.4, 35.2, 37.2, 24.2, 22.9, 33.6,
-          34.8, 32.7, 30.1, 19.4, 34.8, 25.3, 34.8, 42.1, 30.4, 35, 36.2, 36.3, 30.1, 32.3, 20
+          22.8, 36.6, 25.8, 23.7, 27.6, 33.6, 29.2, 32.6, 37.4, 22.1, 40.5, 35.3, 38.4, 31.5, 33.9,
+          35.9, 34.4, 33, 33.4, 28.6, 40.6, 24.4, 28.5, 37.1, 35.8, 35.4, 29.5, 33.7, 35.8, 23.3
         ]
       }
     }

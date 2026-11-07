@@ -18,7 +18,7 @@ import { NAME, openLinked, provision } from "./trust-harness.ts";
 import { visual, writeEvidence } from "./visual-harness.ts";
 
 /*
- * Slice D of docs/poc/thin-worker/W7-PLAN.md: a press's reply and its first painted frame, timed
+ * Slice D of docs/poc/thin-worker/W7-PLAN.md: a press's reply and its first presented frame, timed
  * on the master's clock (30 samples per mode with RECNRUN_W7_BENCH=1, 3 otherwise), and N8:
  * input.v1 stays ordered, applied once, and prompt while padded frames saturate visual.v1.
  */
@@ -36,6 +36,11 @@ interface Click {
   ok: boolean;
   ackMs: number;
   visibleMs: number | null;
+}
+
+interface Strip {
+  block: Point;
+  cells: Point[];
 }
 
 interface Transport {
@@ -87,8 +92,10 @@ const summary = (values: number[]) => {
 };
 const rounded = (values: number[]) => values.map((value) => Number(value.toFixed(1)));
 
-/** A lease on the latency page, observed live; answers the block's centre. */
-async function begin(c: Cell): Promise<Point> {
+const BITS = 8;
+
+/** A lease on the latency page, observed live; answers the block's and the id cells' centres. */
+async function begin(c: Cell): Promise<Strip> {
   const since = Date.now();
   const started = await interactStart(c.page, `${c.target.origin}/interact/latency`);
   expect(started, JSON.stringify(started)).toMatchObject({ ok: true });
@@ -101,25 +108,35 @@ async function begin(c: Cell): Promise<Point> {
     (f) => Boolean(f?.geometry),
     10_000,
   );
-  return centreOf(await layoutOf(c.target, "/interact/latency", since), "block");
+  const layout = await layoutOf(c.target, "/interact/latency", since);
+  const cells = Array.from({ length: BITS }, (_, bit) => centreOf(layout, `b${bit}`));
+  return { block: centreOf(layout, "block"), cells };
 }
 
-const click = (c: Cell, point: Point, colour: number | null) =>
-  call<Click>(c.page, "latencyClick", NAME, point, colour);
+/** One press; `id`, the press count the page draws in its cells, null to time the reply only. */
+const click = (c: Cell, strip: Strip, id: number | null) =>
+  call<Click>(
+    c.page,
+    "latencyClick",
+    NAME,
+    strip.block,
+    id === null ? null : { id, cells: strip.cells },
+  );
 const presses = (c: Cell, since: number) =>
   reports(c.target, "press", since).map((report) => report.n as number);
 
 test("latency: a press's reply and its first painted frame, on the master's clock", async () => {
   const c = cell();
-  const block = await begin(c);
+  const strip = await begin(c);
   const since = Date.now();
   const ack: number[] = [];
   const visible: number[] = [];
   for (let n = 1; n <= SAMPLES; n += 1) {
-    // The page sets the next colour of a four-colour cycle on each press.
-    const sample = await click(c, block, n % 4);
+    // The page draws each press's count in binary cells; the master decodes it from the frame
+    // the image presents, and times that presentation.
+    const sample = await click(c, strip, n);
     expect(sample.ok, JSON.stringify(sample)).toBe(true);
-    expect(sample.visibleMs, `sample ${n} never showed its colour`).not.toBeNull();
+    expect(sample.visibleMs, `sample ${n} was never presented`).not.toBeNull();
     ack.push(sample.ackMs);
     visible.push(sample.visibleMs ?? 0);
     await expect.poll(() => presses(c, since).length).toBe(n);
@@ -158,7 +175,7 @@ function flood(c: Cell) {
 
 test("N8: input.v1 stays ordered, applied once, and prompt while visual.v1 is saturated", async () => {
   const c = cell();
-  const block = await begin(c);
+  const strip = await begin(c);
   const before = await visual<Transport>(c.worker, "transport");
   const { dispatched } = (await tabState(c.worker)).stats;
   const since = Date.now();
@@ -167,7 +184,7 @@ test("N8: input.v1 stays ordered, applied once, and prompt while visual.v1 is sa
   const buffered: number[] = [];
   const ack: number[] = [];
   for (let n = 1; n <= CLICKS; n += 1) {
-    const sample = await click(c, block, null);
+    const sample = await click(c, strip, null);
     expect(sample.ok, JSON.stringify(sample)).toBe(true);
     ack.push(sample.ackMs);
     buffered.push((await visual<Transport>(c.worker, "transport")).buffered);
