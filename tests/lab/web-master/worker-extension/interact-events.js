@@ -37,6 +37,10 @@ export const createEvents = ({ frames, refuse, revoke, serial, stats }) => {
 
   const dispatch = async (message) => {
     const { leaseId, seq } = message;
+    if (message.kind === "hold") {
+      stats.holds += 1;
+      return { ok: true, leaseId, seq };
+    }
     const early = unsupported(message);
     if (early) return refuse(early, { leaseId, seq });
     const live = await liveDocument(FRESH.has(message.kind));

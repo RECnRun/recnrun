@@ -11,7 +11,8 @@ export const INPUT_TYPES = [
   "INPUT_EVENT",
 ];
 // The kinds the worker knows; slices B and C give each its fields and its dispatch.
-const EVENT_KINDS = ["pointerMove", "pointerDown", "pointerUp", "wheel", "key", "text"];
+// W7 slice D: a hold names nothing but its lease; it only tells the dead man the master is there.
+const EVENT_KINDS = ["pointerMove", "pointerDown", "pointerUp", "wheel", "key", "text", "hold"];
 const KEYS = {
   INTERACT_CHALLENGE: ["requestId", "type"],
   INTERACT_START: [

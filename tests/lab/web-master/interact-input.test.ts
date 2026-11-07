@@ -50,6 +50,22 @@ describe("the key, text, and wheel messages", () => {
   });
 });
 
+describe("the hold keepalive", () => {
+  const HOLD = { type: "INPUT_EVENT", kind: "hold", leaseId: LEASE, seq: 4 };
+
+  test("a hold names only its lease and seq", () => {
+    expect(inputError(HOLD)).toBeNull();
+  });
+
+  test.each([
+    ["a hold with a point", { ...HOLD, x: 0.5, y: 0.5 }],
+    ["a hold with a frame", { ...HOLD, ...AIMED }],
+    ["a hold with a button", { ...HOLD, button: "left" }],
+  ])("%s is refused", (_name, message) => {
+    expect(inputError(message)).toBe("INVALID_REQUEST");
+  });
+});
+
 describe("the closed key table", () => {
   test("Enter types a carriage return on its down and nothing on its up", () => {
     expect(keyParams(KEY)).toEqual({

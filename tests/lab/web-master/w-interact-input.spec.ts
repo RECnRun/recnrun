@@ -210,6 +210,8 @@ test("dead man: a button and a key held with nothing sent are let go within a se
   const c = cell();
   await begin(c, "/interact/form");
   const before = (await releasedState(c.worker)).tabStats.released.DEADMAN ?? 0;
+  // A master that hangs: its hold keepalive stops while the button and the key stay down.
+  expect(await call(c.page, "interactKeepalive", false)).toBe(true);
   await holdBoth(c);
   const since = Date.now();
   const latency = await letGo(c, since);
@@ -221,6 +223,7 @@ test("dead man: a button and a key held with nothing sent are let go within a se
   expect((await session(c.page)).lease?.ok).toBe(true);
   await c.page.mouse.up();
   await c.page.keyboard.up("ArrowDown");
+  expect(await call(c.page, "interactKeepalive", true)).toBe(true);
   await end(c);
 });
 

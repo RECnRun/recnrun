@@ -15,7 +15,15 @@ const limits = { leaseMs: 3_000, renewMs: 1_000 };
 const starts = createStartCheck();
 const leases = createLeases({ leaseMs: limits.leaseMs });
 const frames = createFrames();
-const stats = { started: 0, dispatched: 0, refused: {}, revoked: {}, errors: [], framesSent: 0 };
+const stats = {
+  started: 0,
+  dispatched: 0,
+  holds: 0,
+  refused: {},
+  revoked: {},
+  errors: [],
+  framesSent: 0,
+};
 // A static page draws nothing: its screencast restarts so the newest frame stays fresh.
 const QUIET_MS = 750;
 

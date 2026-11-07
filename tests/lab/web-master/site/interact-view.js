@@ -1,4 +1,6 @@
 // W7 slices B and C: pointer, wheel, and keyboard input on the live frame become input.v1 events.
+import { createHold } from "./interact-hold.js";
+
 const BUTTONS = ["left", "middle", "right"];
 const KEPT = 200;
 // Downs and ups come from mouse events: their `detail` is the browser's own click count.
@@ -74,11 +76,12 @@ const wheelOf = (event, image, natural) => {
 };
 
 /** Table keys become key events and inserted characters text events; `send(kind, fields)`. */
-const listenKeys = (capture, send) => {
+const listenKeys = (capture, send, hold) => {
   const onKey = (event) => {
     if (!TABLE_KEYS.includes(event.key)) return;
     event.preventDefault();
     const phase = event.type === "keydown" ? "down" : "up";
+    hold.key(event.key, phase === "down");
     void send("key", { code: event.key, phase, modifiers: modifiersOf(event) });
   };
   capture.addEventListener("keydown", onKey);
@@ -110,6 +113,12 @@ export const createInteractView = ({ input, visual, observe }) => {
   const capture = keyCapture();
   /** @type {{ width: number, height: number } | null} */
   let natural = null;
+  let lastPoint = null;
+  const hold = createHold(() =>
+    attached && input.interactSession(attached).renewing
+      ? input.interactEvent(attached, "hold").catch(() => null)
+      : null,
+  );
 
   const record = (reply) => {
     replies.push(reply);
@@ -128,6 +137,7 @@ export const createInteractView = ({ input, visual, observe }) => {
     const { bootId, sessionEpoch, loaderId } = frame;
     const target = { bootId, sessionEpoch, frameSeq, loaderId, ...point };
     stats.sent += 1;
+    hold.sent();
     return input.interactEvent(name, kind, { ...target, ...fields }).then(record);
   };
 
@@ -135,28 +145,46 @@ export const createInteractView = ({ input, visual, observe }) => {
   const move = coalescer(send("pointerMove"), (_older, newer) => newer, stats);
   const wheel = coalescer(send("wheel"), sumWheel, stats);
 
-  const onPointer = (event) => {
-    if (!attached || !natural) return;
+  const buttonOf = (event) => BUTTONS[event.button] ?? "left";
+
+  // An up off the image still lets go of a press that began on it, where the pointer last was.
+  const pointOf = (event, kind) => {
     const box = image.getBoundingClientRect();
     const point = imagePoint(box, natural, { x: event.clientX, y: event.clientY });
+    if (point || kind !== "pointerUp") return point;
+    return hold.holds(buttonOf(event)) ? lastPoint : null;
+  };
+
+  const pressOrRelease = (event, kind, point, fields) => {
+    event.preventDefault();
+    if (kind === "pointerDown") hold.press(fields.button);
+    else hold.release(fields.button);
+    // The click on the frame is where the owner's keys go next.
+    if (kind === "pointerDown") capture.focus({ preventScroll: true });
+    const clickCount = Math.min(Math.max(event.detail, 1), 3);
+    void aim(attached, kind, point, { ...fields, clickCount });
+  };
+
+  const onPointer = (event) => {
+    if (!attached || !natural) return;
+    const kind = KINDS[event.type];
+    // An up is heard on the whole page; it is sent only for a press the image began.
+    if (kind === "pointerUp" && !hold.holds(buttonOf(event))) return;
+    const point = pointOf(event, kind);
     if (!point) {
       stats.letterbox += 1;
       return;
     }
-    const kind = KINDS[event.type];
-    const pressed =
-      kind === "pointerMove" && event.buttons === 0 ? "none" : (BUTTONS[event.button] ?? "left");
+    lastPoint = point;
+    const pressed = kind === "pointerMove" && event.buttons === 0 ? "none" : buttonOf(event);
     const fields = { button: pressed, clickCount: 0, modifiers: modifiersOf(event) };
-    if (kind === "pointerMove") return move({ name: attached, point, fields });
-    event.preventDefault();
-    // The click on the frame is where the owner's keys go next.
-    if (kind === "pointerDown") capture.focus({ preventScroll: true });
-    void aim(attached, kind, point, {
-      ...fields,
-      clickCount: Math.min(Math.max(event.detail, 1), 3),
-    });
+    if (kind === "pointerMove") move({ name: attached, point, fields });
+    else pressOrRelease(event, kind, point, fields);
   };
-  for (const type of Object.keys(KINDS)) image.addEventListener(type, onPointer);
+  image.addEventListener("mousedown", onPointer);
+  image.addEventListener("pointermove", onPointer);
+  window.addEventListener("mouseup", onPointer);
+  window.addEventListener("blur", hold.clear);
 
   image.addEventListener(
     "wheel",
@@ -168,7 +196,7 @@ export const createInteractView = ({ input, visual, observe }) => {
     },
     { passive: false },
   );
-  listenKeys(capture, (kind, fields) => attached && aim(attached, kind, {}, fields));
+  listenKeys(capture, (kind, fields) => attached && aim(attached, kind, {}, fields), hold);
   // The size of the last decoded frame: it reads zero while the next frame loads.
   image.addEventListener("load", () => {
     natural = { width: image.naturalWidth, height: image.naturalHeight };
@@ -189,6 +217,10 @@ export const createInteractView = ({ input, visual, observe }) => {
     interactDetach: () => {
       attached = null;
     },
-    interactView: () => ({ attached, natural, stats: { ...stats }, replies: [...replies] }),
+    interactKeepalive: hold.enable,
+    interactView: () => {
+      const view = { attached, natural, stats: { ...stats }, replies: [...replies] };
+      return { ...view, hold: hold.stats() };
+    },
   };
 };

@@ -26,7 +26,7 @@ const STYLE = `<style>html,body{margin:0;font:24px sans-serif;background:#2050c0
 #inner{position:fixed;left:55%;top:20%;width:40%;height:60%;overflow:auto;overscroll-behavior:contain;background:#fff}
 #tall{height:5000px}#inner-tall{height:3000px}</style>`;
 
-const REPORT = `<script>const report=(body)=>fetch("/interact/event",{method:"POST",keepalive:true,
+export const REPORT = `<script>const report=(body)=>fetch("/interact/event",{method:"POST",keepalive:true,
 body:JSON.stringify(body)});const keys=new Set();
 addEventListener("keydown",(e)=>{keys.add(e.key);report({type:"keydown",key:e.key,held:[...keys]});},true);
 addEventListener("keyup",(e)=>{keys.delete(e.key);report({type:"keyup",key:e.key,held:[...keys]});},true);

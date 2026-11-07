@@ -1,6 +1,7 @@
 import { createServer } from "node:http";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
+import { DRAG_PAGES } from "./drag-fixtures.ts";
 import { INPUT_PAGES, servedReport } from "./input-fixtures.ts";
 import type { InputReport } from "./input-fixtures.ts";
 
@@ -111,7 +112,7 @@ const INTERACT: Record<string, string> = {
 ${CORNERS}${INTERACT_SCRIPT}`,
 };
 
-const STATIC: Record<string, string> = { ...VISUAL, ...INTERACT, ...INPUT_PAGES };
+const STATIC: Record<string, string> = { ...VISUAL, ...INTERACT, ...INPUT_PAGES, ...DRAG_PAGES };
 
 const HTML = { "content-type": "text/html; charset=utf-8" };
 
