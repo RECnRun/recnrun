@@ -98,7 +98,14 @@ async function buildImage() {
 }
 
 function containerEnvironment() {
-  const forwarded = ["CI", "DEBUG", "FORCE_COLOR", "RECNRUN_EXPERIMENT_SAMPLES"];
+  // RECNRUN_W6_BENCH turns on the lab's W6 network-fault and cost cells.
+  const forwarded = [
+    "CI",
+    "DEBUG",
+    "FORCE_COLOR",
+    "RECNRUN_EXPERIMENT_SAMPLES",
+    "RECNRUN_W6_BENCH",
+  ];
   const environment = forwarded.flatMap((key) =>
     process.env[key] === undefined ? [] : ["--env", `${key}=${process.env[key]}`],
   );

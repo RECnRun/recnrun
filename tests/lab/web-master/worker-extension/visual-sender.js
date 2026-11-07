@@ -133,5 +133,7 @@ export const createSender = () => {
     state.slot = null;
   };
 
-  return { attach, select, clear, relayed, burst, stats: () => stats };
+  // The live buffer level, for the W6.E samples of a bounded queue under network faults.
+  const current = () => ({ ...stats, buffered: state.channel?.bufferedAmount ?? 0 });
+  return { attach, select, clear, relayed, burst, stats: current };
 };
