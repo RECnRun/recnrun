@@ -101,6 +101,17 @@ Branch `poc-w6-visual-observability`, from d51a4b81.
 
 Gate W6: full lab 70 passed, 10 bench cells skipped (run `2026-11-07T12-59-40.380Z-9bf89e87`) · verify gates the push · review [PW-W6.md](reviews/PW-W6.md), findings fixed in 579b50cb, 0ad03b8c, e2f67f14 · RESULTS W6.01–W6.20 filled · verdict **GO-LAB-ONLY** (2026-11-07)
 
+## W7: remote interaction ([W7-PLAN.md](W7-PLAN.md))
+
+Branch `poc-w7-remote-input` from edcb5681. Plan reviewed in [PW-W7-plan.md](reviews/PW-W7-plan.md).
+
+- [ ] W7.A link-bound start, lease, shared admission (N1–N4, N9, N14, N15)
+- [ ] W7.B interactive tab, INTERACT capture, mapping, click (I1, N6, N7)
+- [ ] W7.C keys, text, wheel, pressed-state cleanup (I2, I3, N5, N10)
+- [ ] W7.D drag, latency, congestion check (I4, I5, N8)
+
+Gate W7: not run
+
 ## P0: freeze and prune verify
 
 Baseline: run `2026-11-06T18-35-02Z` on `18c4ec12`, 70.8 min.
