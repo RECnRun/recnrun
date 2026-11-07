@@ -45,7 +45,10 @@ Phase 0 and later wait for Gate W. W.4 or W.9 failing stops the spike and goes s
   - red: `vp run lab:web-master -- tests/lab/web-master/w-trust.spec.ts`: test 3 failed, `text over 4096` and `read over 16 KiB` ACCEPTED (run `2026-11-06T23-00-34.692Z-26231483-e8f4-48ca-a9f6-ff28e2661210`); then test 4 failed, `Expected: "UNPINNED_MASTER" Received: "BAD_SIGNATURE"`; negative control (scratch worktree, signature check accepts any key): test 4 failed, `Received: "ACCEPTED"`
   - green: `vp run lab:web-master`: 11 passed (all cells), run `2026-11-06T23-05-22.232Z-3c627f27-b75e-4a94-97e2-5e683becead4`
   - commit: see `git log -- tests/lab/web-master/w-trust.spec.ts`
-- [ ] W.11 Cell `W.friction`
+- [i] W.11 Cell `W.friction`
+  - red: negative control (scratch worktree, Store list without the restore pair, 6), `node scripts/test-container.mjs lab:web-master:local tests/lab/web-master/w-friction.spec.ts`: test 3 failed, `Expected: < 6`, `Received: 7`
+  - green: `vp run lab:web-master -- tests/lab/web-master/w-friction.spec.ts`: 3 passed (tab 7, app 7, Store 8), run `2026-11-06T23-13-04.506Z-2b85052b-c8c2-4005-a15d-64bb0b189ba8`
+  - commit: see `git log -- tests/lab/web-master/w-friction.spec.ts`
 
 Gate W: lab run · verify · review · RESULTS W1–W5 · owner decision
 
