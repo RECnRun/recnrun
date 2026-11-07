@@ -33,7 +33,8 @@ interface Candidate {
 interface Lab {
   offer(name: string): Promise<string>;
   accept(name: string, sdp: string): Promise<number>;
-  authenticate(name: string, pinned: JsonWebKey): Promise<boolean>;
+  authenticate(name: string, pinned: JsonWebKey): Promise<{ ok: boolean; reason: string }>;
+  otherKey(): Promise<JsonWebKey>;
   ping(name: string, count: number): Promise<number>;
   selectedPair(name: string): Promise<{ state: string; local: Candidate; remote: Candidate }>;
 }
@@ -86,8 +87,10 @@ async function display(testInfo: TestInfo, name: string): Promise<string> {
   return path;
 }
 
-async function link(page: Page, worker: LoadedExtension, name: string) {
-  const pinned = await background<JsonWebKey>(worker, "lab.identity()");
+/** `wrongKey` pins a key the worker does not hold: its proof is then validly signed by another key. */
+async function link(page: Page, worker: LoadedExtension, name: string, wrongKey = false) {
+  const identity = await background<JsonWebKey>(worker, "lab.identity()");
+  const pinned = wrongKey ? await page.evaluate(() => window.lab.otherKey()) : identity;
   const offer = await page.evaluate((id) => window.lab.offer(id), name);
   const answer = await background<string>(worker, `lab.answer(${JSON.stringify(offer)})`);
   const openMs = await page.evaluate(
@@ -155,9 +158,22 @@ function assertLinks(links: Awaited<ReturnType<typeof link>>[]): void {
   for (const result of links) {
     expect(result.offerHostCandidates.length).toBeGreaterThan(0);
     for (const line of result.offerHostCandidates) expect(line).toMatch(/ [0-9a-f-]+\.local /);
-    expect(result.authenticated).toBe(true);
+    expect(result.authenticated).toEqual({ ok: true, reason: "verified" });
     expect(result.pair.state).toBe("succeeded");
   }
+}
+
+/** The classification Chrome assigned, asserted: Public only where the override says so. */
+function assertAddressSpace(variant: string, spaces: Awaited<ReturnType<typeof addressSpaces>>) {
+  const expected = variant === "public" ? "Public" : "Loopback";
+  const initiators = spaces.requests.map(
+    (state) => (state as { initiatorIPAddressSpace?: string } | null)?.initiatorIPAddressSpace,
+  );
+  expect(initiators).toContain(expected);
+  expect(spaces.responses).toContain(expected);
+  const other = variant === "public" ? "Loopback" : "Public";
+  expect(initiators).not.toContain(other);
+  expect(spaces.responses).not.toContain(other);
 }
 
 let standIn: StandIn | undefined;
@@ -206,8 +222,36 @@ for (const variant of ["default", "public"] as const) {
       testInfo.annotations.push({ type: "evidence", description: await evidence(variant, record) });
       console.log(JSON.stringify(record, null, 2));
       assertLinks(links);
+      assertAddressSpace(variant, spaces);
     } finally {
       for (const chrome of opened.reverse()) await chrome.close();
     }
   });
 }
+
+test("W.rtc wrong key: a link whose proof is not signed by the pinned key is rejected", async ({
+  headless,
+}) => {
+  expect(headless).toBe(false);
+  const site = standIn;
+  if (!site) throw new Error("The HTTPS stand-in did not start.");
+  const opened: { close(): Promise<void> }[] = [];
+  try {
+    const master = await launchChrome({ silentDebugger: false });
+    opened.push(master);
+    const worker = await loadUnpacked(WORKER);
+    opened.push(worker);
+    const { page } = await openSite(master, site);
+    const result = await link(page, worker, "wrong-key", true);
+    // SDP and DTLS are valid: the channel opened, 100 pings were answered, a pair was selected.
+    expect(result.openMs).toBeGreaterThanOrEqual(0);
+    expect(result.pingsMs).toBeGreaterThan(0);
+    expect(result.pair.state).toBe("succeeded");
+    expect(result.authenticated).toEqual({
+      ok: false,
+      reason: "proof-not-signed-by-pinned-key",
+    });
+  } finally {
+    for (const chrome of opened.reverse()) await chrome.close();
+  }
+});

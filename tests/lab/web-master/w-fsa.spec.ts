@@ -97,6 +97,23 @@ function assertKept(result: Step, onboardingThumbprint: string): void {
   expect(result.thumbprint).toBe(onboardingThumbprint);
 }
 
+/**
+ * No gesture after onboarding: every step past `boundary` opened with the grant already
+ * `granted`, answered no prompt, and has no gesture logged.
+ */
+function assertNoLaterGestures(log: FsaRun, boundary: string): void {
+  const at = log.steps.findIndex((entry) => entry.label === boundary);
+  expect(at).toBeGreaterThanOrEqual(0);
+  const later = log.steps.slice(at + 1);
+  expect(later.length).toBeGreaterThan(0);
+  for (const entry of later) {
+    expect(entry.permissionOnOpen, `${entry.label} opens granted`).toBe("granted");
+    expect(entry.prompt, `${entry.label} answers no prompt`).toBeUndefined();
+  }
+  const labels = new Set(later.map((entry) => entry.label));
+  expect(log.gestures.filter((entry) => labels.has(entry.step))).toEqual([]);
+}
+
 test("W.fsa tab: the folder grant survives a page close and two Chrome restarts", async ({
   native,
 }, testInfo) => {
@@ -118,8 +135,7 @@ test("W.fsa tab: the folder grant survives a page close and two Chrome restarts"
     page = await openPage(cell.master as LaunchedChrome, cell.site.origin);
     results.push(await step(cell, page, "reopen", false));
     page = await openPage(await restart(cell), cell.site.origin);
-    // Reading B of the brief: a restore Chrome offers only after a restart is onboarding friction.
-    results.push(await step(cell, page, "restart-1", !restoredAt(cell.log)));
+    results.push(await step(cell, page, "restart-1", false));
     page = await openPage(await restart(cell), cell.site.origin);
     results.push(await step(cell, page, "restart-2", false));
     const path = await cell.log.save({
@@ -130,6 +146,7 @@ test("W.fsa tab: the folder grant survives a page close and two Chrome restarts"
     });
     testInfo.annotations.push({ type: "evidence", description: path });
     for (const result of results) assertKept(result, identity);
+    assertNoLaterGestures(cell.log, "onboarding-reopen");
   } finally {
     await cleanUp(cell);
   }
@@ -184,6 +201,7 @@ test("W.fsa app: the installed app keeps the folder grant across two Chrome rest
     const path = await cell.log.save({ chrome: cell.master?.version, identity, ...observed });
     testInfo.annotations.push({ type: "evidence", description: path });
     for (const result of results) assertKept(result, identity);
+    assertNoLaterGestures(cell.log, "onboarding");
   } finally {
     await cleanUp(cell);
   }

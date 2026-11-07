@@ -54,8 +54,26 @@ const authenticate = async (name, pinnedJwk) => {
   const { signature } = await proof;
   const signed = `${nonce}|${fingerprintOf(pc.localDescription.sdp)}|${fingerprintOf(pc.remoteDescription.sdp)}`;
   const data = new TextEncoder().encode(signed);
-  return crypto.subtle.verify({ name: "ECDSA", hash: "SHA-256" }, key, fromBase64(signature), data);
+  const ok = await crypto.subtle.verify(
+    { name: "ECDSA", hash: "SHA-256" },
+    key,
+    fromBase64(signature),
+    data,
+  );
+  return { ok, reason: ok ? "verified" : "proof-not-signed-by-pinned-key" };
 };
+
+// A valid P-256 public key the worker does not hold, for the wrong-pinned-key control.
+const otherKey = async () =>
+  crypto.subtle.exportKey(
+    "jwk",
+    (
+      await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, [
+        "sign",
+        "verify",
+      ])
+    ).publicKey,
+  );
 
 const ping = async (name, count) => {
   const { channel } = links.get(name);
@@ -93,6 +111,7 @@ window.lab = {
   offer,
   accept,
   authenticate,
+  otherKey,
   ping,
   selectedPair,
   ...createJobs({ links, nextMessage }),
