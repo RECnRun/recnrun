@@ -60,7 +60,7 @@ Gate W: lab run · verify · review · RESULTS W1–W5 · owner decision
 - verify: `vp run verify` exit 0 on d51a4b81 (37 of 37 tasks; marker `.artifacts/verified/d51a4b81…`)
 - review (`reviews/PW.md`): Codex, not supported; blocker 1 and majors 2–4, 6, 12 fixed, wording of 5, 7, 11 corrected, the rest carried below
 - carried into Phase 1 after a GO ([PW review](reviews/PW.md) findings 5, 9–11, 13): persistent worker identity, onboarding-bound pins, mutual HELLO, authenticated status and results; epoch floor, ledger retention, signed cancellation, resubmission and replay tests; destination, redirect, stale-document, and network-guard checks; a durable publication queue with crash tests; real folder signalling and launcher move with R4 reconciliation; focus emulation in the fixed CDP table and a worker run without lab flags; strict-CSP execution, app closure, suspend and resume; macOS and the real origin (M-TW.12–M-TW.15)
-- owner decision (adopt the website master or keep the extension master):
+- owner decision (adopt the website master or keep the extension master): adopt the website master, accepting the residual trust risk of W4 and the Phase 1 carry list above (2026-11-07)
 
 ## W6: visual observability ([W6-PLAN.md](W6-PLAN.md))
 
