@@ -86,6 +86,18 @@ Branch `poc-w6-visual-observability`, from d51a4b81.
   - red: `w-no-flags.spec.ts` before the worker polled the relay: 1 failed, `Timed out after 20000 ms: null`; scratch-copy negative controls with `node scripts/test-container.mjs lab:web-master:local`: `w-netem.spec.ts -g "path|outage"` with the buffer bound at 10000, 1 failed (`Received: 25814`); `w-observe-friction.spec.ts` with Observe calling `confirm()`, 1 failed (`"dialogs": 1`); `RECNRUN_W6_BENCH=1 vp run lab:web-master -- tests/lab/web-master/w-scale.spec.ts -g "1 worker.*visible"`: 1 failed (`Received: NaN`, no capture time on arrivals)
   - green: `vp run lab:web-master -- tests/lab/web-master/w-no-flags.spec.ts`: 1 passed, run `2026-11-07T11-49-46.409Z-2bf2abfa`; `RECNRUN_W6_BENCH=1 vp run lab:web-master -- tests/lab/web-master/w-netem.spec.ts`: 6 passed, run `2026-11-07T11-57-47.257Z-aba016e9`; `RECNRUN_W6_BENCH=1 … w-scale.spec.ts`: 4 passed, run `2026-11-07T12-12-15.039Z-1e895a86`; `… w-observe-friction.spec.ts`: 1 passed, run `2026-11-07T12-15-36.409Z-4cf477b4`
   - commit: 0014bdb6, 923a7b54, 180a0c98, 5f031a75
+- [i] W6 review fixes, worker safety (findings 1, 2, 3, 5, 6 worker side, 9)
+  - red: `cd tests && npx vitest run lab/web-master/worker-safety.test.ts lab/web-master/observe.test.ts` against 9f3bcb96 in a scratch worktree: 9 failed, 28 passed
+  - green: same command: 37 passed; `node scripts/test-container.mjs lab:web-master:local` `w-visual.spec.ts w-observe.spec.ts`: 17 passed
+  - commit: 579b50cb
+- [i] W6 review fixes, master admission and bounds (findings 4, 5, 6, 10, 11a, 11c)
+  - red: `cd tests && npx vitest run lab/web-master/master-safety.test.ts` against 579b50cb with a stub admission that shows every frame: 10 failed; `worker-safety.test.ts` sender test: 1 failed (`expected 1 to be +0`)
+  - green: same commands: 10 and 7 passed; Docker `w-dashboard w-observe w-observe-life w-visual-link`: 29 passed, run `2026-11-07T12-46-20.351Z-e3269e10`
+  - commit: 0ad03b8c
+- [i] W6 review fixes, measurement and content scans (findings 7, 8, 11b, 11d)
+  - red: scratch worktree at 0ad03b8c, `RECNRUN_W6_BENCH=1 node scripts/test-container.mjs lab:web-master:local w-observe-life.spec.ts w-scale.spec.ts`: 2 failed (W6.14 scan `Received: undefined`, no content scan; W6.E 1 worker visible `captureToDisplayMs.n` 0, no paint time)
+  - green: `RECNRUN_W6_BENCH=1 … w-scale.spec.ts w-netem.spec.ts`: 10 passed, run `2026-11-07T12-54-04.522Z-754c7c1e`; `… w-observe-life.spec.ts`: 6 passed, run `2026-11-07T12-57-57.886Z-c3642c3d`
+  - commit: this commit
 
 Gate W6: lab run · verify · review · RESULTS W6.01–W6.20 · verdict (GO, GO-LAB-ONLY, NO-GO)
 

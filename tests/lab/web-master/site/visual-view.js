@@ -33,6 +33,19 @@ export const createVisual = ({ links, nextMessage }) => {
   const admission = createAdmission();
   const image = /** @type {HTMLImageElement} */ (document.getElementById("visual"));
 
+  let supersededCount = 0;
+  const superseded = () => {
+    supersededCount += 1;
+  };
+  // Shown means decoded and then painted at the next animation frame; a hidden tab paints nothing.
+  const presented = async () => {
+    await image.decode();
+    if (document.hidden) return { at: Date.now(), painted: false };
+    return new Promise((resolve) => {
+      requestAnimationFrame(() => resolve({ at: Date.now(), painted: true }));
+    });
+  };
+
   // One object URL per link: the previous frame's URL is revoked before the next is shown.
   const display = (name, frame) => {
     lastBlob = new Blob([frame.bytes], { type: "image/jpeg" });
@@ -47,12 +60,17 @@ export const createVisual = ({ links, nextMessage }) => {
       URL.revokeObjectURL(previous.url);
       revoked += 1;
     }
-    arrivals.push({ frameSeq: frame.frameSeq, at: Date.now(), capturedAtMs: frame.capturedAtMs });
-    const session = sessions.get(name);
-    if (session && session.firstFrameMs === null) {
-      session.firstFrameMs = performance.now() - session.sentAt;
-    }
+    const arrival = { frameSeq: frame.frameSeq, at: Date.now(), capturedAtMs: frame.capturedAtMs };
+    arrival.presentedAt = null;
+    arrivals.push(arrival);
     if (arrivals.length > SAMPLES) arrivals.shift();
+    const session = sessions.get(name);
+    presented().then(({ at, painted }) => {
+      if (painted) arrival.presentedAt = at;
+      if (session && session.firstFrameMs === null) {
+        Object.assign(session, { firstFrameMs: performance.now() - session.sentAt, painted });
+      }
+    }, superseded);
   };
   setInterval(() => {
     for (const receiver of receivers.values()) receiver.sweep();
@@ -117,6 +135,7 @@ export const createVisual = ({ links, nextMessage }) => {
     sessions: [...sessions.values()],
     admission: admission.stats(),
     revoked,
+    superseded: supersededCount,
     arrivals: [...arrivals],
     size: [image.naturalWidth, image.naturalHeight],
   });

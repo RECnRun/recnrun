@@ -7,6 +7,7 @@ import { call } from "./lifecycle-harness.ts";
 import { observeStats } from "./observe-harness.ts";
 import { quantiles, treeUsage } from "./proc-usage.ts";
 import type { Usage } from "./proc-usage.ts";
+import { visual } from "./visual-harness.ts";
 
 /* W6.E scale and cost readouts: one window of frames, bytes, drops, latency, and /proc cost. */
 
@@ -14,6 +15,7 @@ interface Arrival {
   frameSeq: number;
   at: number;
   capturedAtMs: number;
+  presentedAt: number | null;
 }
 
 interface Shown {
@@ -27,18 +29,27 @@ interface Snapshot {
   wall: number;
   shown: Shown;
   gates: { bytes: number; sent: number; drops: Record<string, number> }[];
+  // Screencast frames into the service worker, and frames it relayed to the offscreen document.
+  relay: { produced: number; offered: number }[];
   workers: Usage[];
   master: Usage;
 }
 
 async function snapshot(page: Page, master: LaunchedChrome, workers: LoadedExtension[]) {
   const gates = [];
-  for (const worker of workers) gates.push((await observeStats(worker)).gate);
+  const relay = [];
+  for (const worker of workers) {
+    gates.push((await observeStats(worker)).gate);
+    const { produced } = await visual<{ produced: number }>(worker, "stats");
+    const { offered } = await visual<{ offered: number }>(worker, "transport");
+    relay.push({ produced, offered });
+  }
   const snap: Snapshot = {
     at: performance.now(),
     wall: Date.now(),
     shown: await call<Shown>(page, "visualStats"),
     gates,
+    relay,
     workers: await Promise.all(workers.map((worker) => treeUsage(worker.chrome.pid))),
     master: await treeUsage(master.pid),
   };
@@ -62,6 +73,15 @@ function dropsDelta(after: Record<string, number>[], before: Record<string, numb
 const cpuPerSecond = (after: Usage, before: Usage | undefined, seconds: number) =>
   round((after.cpuSeconds - (before?.cpuSeconds ?? after.cpuSeconds)) / seconds);
 
+type Relay = Snapshot["relay"][number];
+const perWorker = (after: Relay[], before: Relay[], key: keyof Relay, seconds: number) =>
+  after.map((entry, index) => round((entry[key] - (before[index]?.[key] ?? 0)) / seconds));
+
+function maxGap(times: number[]) {
+  const sorted = [...times].sort((a, b) => a - b);
+  return sorted.slice(1).reduce((gap, at, index) => Math.max(gap, at - (sorted[index] ?? at)), 0);
+}
+
 function windowOf(before: Snapshot, after: Snapshot) {
   const seconds = (after.at - before.at) / 1_000;
   const fresh = after.shown.arrivals.filter((entry) => entry.at > before.wall);
@@ -73,8 +93,15 @@ function windowOf(before: Snapshot, after: Snapshot) {
       (sum(after.gates.map((gate) => gate.bytes)) - sum(before.gates.map((gate) => gate.bytes))) /
         seconds,
     ),
+    capturedFpsPerWorker: perWorker(after.relay, before.relay, "produced", seconds),
+    relayedFpsPerWorker: perWorker(after.relay, before.relay, "offered", seconds),
     // Wall clock on both ends: worker and master run in one container, on one clock.
-    captureToDisplayMs: quantiles(fresh.map((entry) => entry.at - entry.capturedAtMs)),
+    captureToArrivalMs: quantiles(fresh.map((entry) => entry.at - entry.capturedAtMs)),
+    captureToDisplayMs: quantiles(
+      fresh.flatMap((entry) => (entry.presentedAt ? [entry.presentedAt - entry.capturedAtMs] : [])),
+    ),
+    // The longest wait between two painted frames of the window, any worker.
+    maxPaintGapMs: maxGap(fresh.flatMap((entry) => entry.presentedAt ?? [])),
     senderDrops: dropsDelta(
       after.gates.map((gate) => gate.drops),
       before.gates.map((gate) => gate.drops),

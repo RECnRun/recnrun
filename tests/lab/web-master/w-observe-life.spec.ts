@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Page } from "@playwright/test";
@@ -143,26 +143,85 @@ test("W6.10: a reopened master reconciles, starts anew, and duplicates nothing",
   c.evidence.reopen = { reconciled: status.jobs[0]?.state, resumeMs, finished: finished.code };
 });
 
+interface WorkerScan {
+  jpegIn: string[];
+  databaseHits: string[];
+  caches: string[];
+  cacheHits: string[];
+  downloads: string[];
+}
+
+interface MasterScan {
+  jpegIn: string[];
+  databaseHits: string[];
+  caches: string[];
+  cacheHits: string[];
+  opfs: string[];
+  opfsHits: string[];
+  databases: { name: string; stores: string[] }[];
+}
+
+// A JPEG's first bytes (FF D8 FF E0) and JFIF tag: what the scans must find when it is planted.
+const PLANTED = "/9j/4AAQSkZJRgABAQ==";
+
+const JPEG_START = Buffer.from([0xff, 0xd8, 0xff]);
+
+/** The result files, read from disk, that hold JPEG start bytes, raw or base64. */
+async function resultHits(files: string[]) {
+  const hits = [];
+  for (const file of files) {
+    const bytes = await readFile(file);
+    if (bytes.includes(JPEG_START) || bytes.includes("/9j/")) hits.push(file);
+  }
+  return hits;
+}
+
+/** Both sides' scans, and the worker's result files searched on disk. */
+async function scanBoth(c: Cell) {
+  const worker = await background<WorkerScan>(c.worker, "lab.scan()");
+  const master = await call<MasterScan>(c.page, "scan");
+  return { worker, master, results: await resultHits(worker.downloads) };
+}
+
 test("W6.14: neither side keeps a frame after streaming", async () => {
   const c = cell();
-  const worker = await background<{ jpegIn: string[]; caches: string[]; downloads: string[] }>(
-    c.worker,
-    "lab.scan()",
-  );
-  const master = await call<{
-    jpegIn: string[];
-    caches: string[];
-    opfs: string[];
-    databases: { name: string; stores: string[] }[];
-  }>(c.page, "scan");
+  const { worker, master, results } = await scanBoth(c);
   expect(worker.jpegIn).toEqual([]);
+  expect(worker.databaseHits).toEqual([]);
+  expect(worker.cacheHits).toEqual([]);
   expect(worker.caches).toEqual([]);
-  expect(worker.downloads.filter((name) => /\.jpe?g$/i.test(name))).toEqual([]);
+  expect(worker.downloads.length).toBeGreaterThan(0);
+  expect(results).toEqual([]);
   expect(master.jpegIn).toEqual([]);
+  expect(master.databaseHits).toEqual([]);
+  expect(master.cacheHits).toEqual([]);
+  expect(master.opfsHits).toEqual([]);
   expect(master.caches).toEqual([]);
   expect(master.opfs).toEqual([]);
   expect(master.databases).toEqual([{ name: "recnrun-lab", stores: ["keys"] }]);
-  c.evidence.scan = { worker, master };
+  c.evidence.scan = { worker, master, results };
+});
+
+test("W6.14 control: the same scans find a planted JPEG on each side", async () => {
+  const c = cell();
+  await background(c.worker, `lab.plant(${JSON.stringify(PLANTED)})`);
+  await call(c.page, "plant", PLANTED);
+  const planted = join(c.root, "planted-result.json");
+  await writeFile(planted, JSON.stringify({ frame: PLANTED }));
+  try {
+    const { worker, master } = await scanBoth(c);
+    expect(worker.jpegIn).toEqual(["recnrun-plant"]);
+    expect(worker.databaseHits).toEqual(["recnrun-plant/frames"]);
+    expect(worker.cacheHits).toHaveLength(1);
+    expect(master.jpegIn).toEqual(["recnrun-plant"]);
+    expect(master.databaseHits).toEqual(["recnrun-plant/frames"]);
+    expect(master.cacheHits).toHaveLength(1);
+    expect(master.opfsHits).toEqual(["recnrun-plant.jpg"]);
+    expect(await resultHits([planted])).toEqual([planted]);
+  } finally {
+    await background(c.worker, "lab.unplant()");
+    await call(c.page, "unplant");
+  }
 });
 
 test("W6.13: a restarted worker refuses its old boot and sends nothing", async () => {

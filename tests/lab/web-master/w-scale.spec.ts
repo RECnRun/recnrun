@@ -181,6 +181,30 @@ async function phase(c: Cell, members: Member[], observe: boolean) {
 
 const mean = (values: number[]) => values.reduce((a, b) => a + b, 0) / Math.max(values.length, 1);
 
+// W6-PLAN.md lab targets: first frame within 2 s, LIVE frames painted within 1.5 s at p95.
+const FIRST_FRAME_MS = 2_000;
+const LIVE_P95_MS = 1_500;
+// LIVE is 5 fps: a gap of 2 s between painted frames is a stall, not sustained delivery.
+const MAX_GAP_MS = 2_000;
+const LIVE_FPS = 5;
+// No job change: the observed run ends within a second of the same run unobserved.
+const JOB_DELTA_MS = 1_000;
+
+type Phase = Awaited<ReturnType<typeof phase>>;
+
+/** The lab targets; a hidden tab paints nothing, so only the relay and the job are held to it. */
+function meetsTargets(stream: Phase, control: Phase, hidden: boolean) {
+  const { window } = stream;
+  for (const fps of window.relayedFpsPerWorker) expect(fps).toBeLessThanOrEqual(LIVE_FPS * 1.2);
+  expect(Math.abs(mean(stream.jobMs) - mean(control.jobMs))).toBeLessThanOrEqual(JOB_DELTA_MS);
+  if (hidden) return;
+  for (const ms of stream.firstFrameMs) expect(ms).toBeLessThanOrEqual(FIRST_FRAME_MS);
+  expect(window.captureToDisplayMs.n).toBeGreaterThan(0);
+  expect(window.captureToDisplayMs.p95).toBeLessThanOrEqual(LIVE_P95_MS);
+  expect(window.shownFpsPerWorker).toBeGreaterThan(0);
+  expect(window.maxPaintGapMs).toBeLessThanOrEqual(MAX_GAP_MS);
+}
+
 for (const workers of [1, 3]) {
   for (const masterTab of ["visible", "hidden"] as const) {
     test(`W6.E ${workers} worker(s), master tab ${masterTab}: cost against no stream`, async () => {
@@ -192,13 +216,10 @@ for (const workers of [1, 3]) {
       await (c.hidden ? c.cover : c.page).bringToFront();
       const control = await phase(c, members, false);
       const stream = await phase(c, members, true);
-      const latency = stream.window.captureToDisplayMs;
-      // Screencast stamps come from the compositor's clock: a few ms of skew can make one negative.
-      if (latency.n > 0) expect(Number.isFinite(latency.p50)).toBe(true);
       if (c.hidden) {
         expect(c.visibility.length).toBeGreaterThan(0);
         expect(new Set(c.visibility)).toEqual(new Set(["hidden"]));
-      } else expect(latency.n).toBeGreaterThan(0);
+      }
       c.results[`${workers}-${masterTab}`] = {
         workers: members.map((member) => (member.headless ? "headless" : "headed")),
         masterTab,
@@ -209,6 +230,7 @@ for (const workers of [1, 3]) {
         jobMs: { control: control.jobMs, stream: stream.jobMs },
         jobDeltaMs: Math.round(mean(stream.jobMs) - mean(control.jobMs)),
       };
+      meetsTargets(stream, control, c.hidden);
     });
   }
 }

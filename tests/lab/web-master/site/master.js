@@ -3,7 +3,7 @@ import { createDashboard } from "./dashboard.js";
 import { createFsa } from "./fsa.js";
 import { createJobs } from "./jobs.js";
 import { createObserve } from "./observe-client.js";
-import { scan } from "./scan.js";
+import { plant, scan, unplant } from "./scan.js";
 import { createVisual } from "./visual-view.js";
 
 export const links = new Map();
@@ -134,5 +134,7 @@ window.lab = {
   ...observe,
   ...createDashboard({ links, visual, observe }),
   scan,
+  plant,
+  unplant,
 };
 document.getElementById("status").textContent = "ready";

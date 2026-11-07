@@ -5,7 +5,7 @@ import { labState, release, setKnob } from "./knobs.js";
 import { all, load, recover, resultFile } from "./ledger.js";
 import { observe, observeLab } from "./observe.js";
 import { statuses, submit } from "./runner.js";
-import { scan } from "./scan.js";
+import { plant, scan, unplant } from "./scan.js";
 
 // Wakes the worker at browser start, so a job cut by a restart is closed before any link.
 chrome.runtime.onStartup.addListener(() => undefined);
@@ -79,4 +79,6 @@ globalThis.lab = {
   },
   observe: observeLab,
   scan,
+  plant,
+  unplant,
 };

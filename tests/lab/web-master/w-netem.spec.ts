@@ -148,7 +148,8 @@ function windowOf(samples: Sample[], previous: Sample) {
     maxBuffered: Math.max(...samples.map((s) => s.buffered)),
     shownFps: Number(((last.shown - previous.shown) / seconds).toFixed(2)),
     // Single-message frames lost on an unreliable channel leave no partial frame to count.
-    lostFrames: last.sent - previous.sent - (last.shown - previous.shown),
+    // A frame sent in the previous window may be shown in this one: the count never goes negative.
+    lostFrames: Math.max(0, last.sent - previous.sent - (last.shown - previous.shown)),
     senderDrops: delta(last.senderDrops, previous.senderDrops),
     masterDrops: delta(last.masterDrops, previous.masterDrops),
     rssMiB: { from: previous.rssMiB, max: Math.max(...samples.map((s) => s.rssMiB)) },
@@ -187,11 +188,14 @@ for (const kase of CASES) {
     expect(after.some((sample) => sample.pingMs !== null)).toBe(true);
     if (kase.name !== "outage-10s") expect(during.every((s) => s.pingMs !== null)).toBe(true);
     const baseline = before[0] as Sample;
-    c.results[kase.name] = {
-      netem: kase.netem ?? "master main thread busy 90 of every 100 ms",
+    const windows = {
       baseline: windowOf(before, baseline),
       during: windowOf(during, before.at(-1) ?? baseline),
       after: windowOf(after, during.at(-1) ?? baseline),
+    };
+    c.results[kase.name] = {
+      netem: kase.netem ?? "master main thread busy 90 of every 100 ms",
+      ...windows,
       captureStarts: (await visualStats(c.worker)).starts - startsBefore,
       observeAccepted: (await observeStats(c.worker)).accepted - acceptedBefore,
       sessionsEnded: (await observeStats(c.worker)).ended
@@ -201,6 +205,9 @@ for (const kase of CASES) {
       job: job.state,
       posts: c.target.count(jobId),
     };
+    // Delivery holds through a fault and comes back after one, by a fresh start if the lease lapsed.
+    if (kase.name !== "outage-10s") expect(windows.during.shownFps).toBeGreaterThan(0);
+    expect(windows.after.shownFps).toBeGreaterThan(0);
     await call(c.page, "observeStop", NAME).catch(() => undefined);
     await settle(c.worker);
   });

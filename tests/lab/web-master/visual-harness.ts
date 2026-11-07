@@ -171,11 +171,15 @@ export async function cardShows(page: Page, name: string, want: Rgb, ms = 15_000
   );
 }
 
-/** Writes the latest frame under the run's evidence directory. */
+/**
+ * Test-harness fixture evidence, not product storage: the harness copies the worker's in-memory
+ * latest frame to the run's evidence directory under harness-frames/. Neither side writes it.
+ */
 export async function saveFrame(worker: LoadedExtension, name: string) {
   const data = await visual<string | null>(worker, "latest");
   if (data === null) return;
-  const directory = join(".artifacts/evidence", process.env.RECNRUN_RUN_ID ?? "local");
+  const run = process.env.RECNRUN_RUN_ID ?? "local";
+  const directory = join(".artifacts/evidence", run, "harness-frames");
   await mkdir(directory, { recursive: true });
   await writeFile(join(directory, name), Buffer.from(data, "base64"));
 }
