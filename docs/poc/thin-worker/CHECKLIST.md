@@ -105,7 +105,10 @@ Gate W6: full lab 70 passed, 10 bench cells skipped (run `2026-11-07T12-59-40.38
 
 Branch `poc-w7-remote-input` from edcb5681. Plan reviewed in [PW-W7-plan.md](reviews/PW-W7-plan.md).
 
-- [ ] W7.A link-bound start, lease, shared admission (N1–N4, N9, N14, N15)
+- [i] W7.A link-bound start, lease, shared admission (N1–N4, N9, N14, N15)
+  - red: `interact.test.ts` against stubs: 33 failed, 5 passed; `RECNRUN_TEST_QUIET=1 vp run lab:web-master -- tests/lab/web-master/w-interact-auth.spec.ts --project headed-worker` with stub checks and no claim exclusion: 8 failed, 1 passed, run `2026-11-07T15-20-41.145Z-ba7bc9a4`; negative controls (no duplicate refusal, no revoke on input close): 1 failed each, runs `2026-11-07T15-21-18.940Z-18737006`, `2026-11-07T15-21-37.004Z-52505129`
+  - green: `interact.test.ts` 38 passed; `w-interact-auth.spec.ts` + `w-admission.spec.ts` + `w-observe.spec.ts`: 25 passed, run `2026-11-07T15-22-20.934Z-fbad936a`; `w-interact-auth.spec.ts` after the last edit: 9 passed, run `2026-11-07T15-24-17.316Z-56fa12af`
+  - commit: 908b8cda
 - [ ] W7.B interactive tab, INTERACT capture, mapping, click (I1, N6, N7)
 - [ ] W7.C keys, text, wheel, pressed-state cleanup (I2, I3, N5, N10)
 - [ ] W7.D drag, latency, congestion check (I4, I5, N8)
