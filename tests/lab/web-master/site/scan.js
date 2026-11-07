@@ -4,6 +4,7 @@ import {
   databaseHits,
   holdsJpeg,
   holdsText,
+  opfsFileHits,
   plantStores,
   unplantStores,
 } from "./deep-scan.js";
@@ -50,13 +51,19 @@ export const scan = async () => {
   };
 };
 
-/** W7.C: every place the master keeps that holds `marker`: localStorage, stores, and caches. */
+const areaHits = (area, marker) =>
+  Object.keys(area).filter((key) => area.getItem(key)?.includes(marker));
+
+/** W7.C: every place the master keeps that holds `marker`: Web Storage, stores, caches, OPFS. */
 export const scanText = async (marker) => {
   const matches = holdsText(marker);
-  const keys = Object.keys(localStorage).filter((key) =>
-    localStorage.getItem(key)?.includes(marker),
-  );
-  return { keys, databaseHits: await databaseHits(matches), cacheHits: await cacheHits(matches) };
+  return {
+    keys: areaHits(localStorage, marker),
+    sessionKeys: areaHits(sessionStorage, marker),
+    databaseHits: await databaseHits(matches),
+    cacheHits: await cacheHits(matches),
+    opfsHits: await opfsFileHits(matches),
+  };
 };
 
 /** The positive control: a JPEG in localStorage, IndexedDB, Cache Storage, and OPFS. */

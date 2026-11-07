@@ -183,11 +183,34 @@ test("negatives: an unknown key, an oversized text, and the typed marker leave n
   ]);
   await end(c);
   expect({ worker, master }).toEqual({
-    worker: { keys: [], databaseHits: [], cacheHits: [] },
-    master: { keys: [], databaseHits: [], cacheHits: [] },
+    worker: { keys: [], pageKeys: [], databaseHits: [], cacheHits: [], opfsHits: [] },
+    master: { keys: [], sessionKeys: [], databaseHits: [], cacheHits: [], opfsHits: [] },
   });
   expect(states).not.toContain(MARKER);
 });
+
+// A nested OPFS file on each side, and a page-side session key; null removes them.
+const plantOpfs = async (marker: string | null) => {
+  const root = await navigator.storage.getDirectory();
+  if (marker === null) return root.removeEntry("probe", { recursive: true }).then(() => true);
+  const folder = await root.getDirectoryHandle("probe", { create: true });
+  const file = await folder.getFileHandle("marker.txt", { create: true });
+  const writable = await file.createWritable();
+  await writable.write(marker);
+  await writable.close();
+  return true;
+};
+async function plantText(c: Cell, marker: string | null) {
+  const value = JSON.stringify(marker);
+  await background(c.worker, `(${plantOpfs.toString()})(${value})`);
+  const page = `chrome.runtime.sendMessage({ target: "offscreen", type: "lab-plant-text", marker: ${value} })`;
+  await background(c.worker, page);
+  await c.page.evaluate(plantOpfs, marker);
+  await c.page.evaluate((text) => {
+    if (text === null) sessionStorage.removeItem("probe");
+    else sessionStorage.setItem("probe", text);
+  }, marker);
+}
 
 test("negatives control: the same scans find a planted marker on each side", async () => {
   const c = cell();
@@ -195,14 +218,25 @@ test("negatives control: the same scans find a planted marker on each side", asy
   await background(c.worker, `chrome.storage.local.set({ probe: ${JSON.stringify(MARKER)} })`);
   await background(c.worker, `lab.plant(${planted})`);
   await call(c.page, "plant", JSON.parse(planted));
+  await plantText(c, MARKER);
   try {
-    expect((await workerText(c.worker, MARKER)).keys).toEqual(["probe"]);
-    expect((await workerText(c.worker, MARKER)).databaseHits).toEqual(["recnrun-plant/frames"]);
-    expect((await masterText(c.page, MARKER)).cacheHits).toHaveLength(1);
+    const worker = await workerText(c.worker, MARKER);
+    expect(worker).toMatchObject({
+      keys: ["probe"],
+      pageKeys: ["probe"],
+      opfsHits: ["probe/marker.txt"],
+    });
+    expect(worker.databaseHits).toEqual(["recnrun-plant/frames"]);
+    const master = await masterText(c.page, MARKER);
+    expect(master.sessionKeys).toEqual(["probe"]);
+    // The JPEG control's file holds the marker's bytes too.
+    expect(master.opfsHits?.sort()).toEqual(["probe/marker.txt", "recnrun-plant.jpg"]);
+    expect(master.cacheHits).toHaveLength(1);
   } finally {
     await background(c.worker, `chrome.storage.local.remove("probe")`);
     await background(c.worker, "lab.unplant()");
     await call(c.page, "unplant");
+    await plantText(c, null);
   }
 });
 

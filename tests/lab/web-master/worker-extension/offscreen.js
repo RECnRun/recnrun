@@ -121,6 +121,16 @@ const IMMEDIATE = {
     return true;
   },
   "input-push": (message) => inputs.push(message.linkId, message.message),
+  // W7 fixes: this document's Web Storage, scanned for a marker, and its control's plant.
+  "scan-text": ({ marker }) =>
+    [localStorage, sessionStorage].flatMap((area) =>
+      Object.keys(area).filter((key) => area.getItem(key)?.includes(marker)),
+    ),
+  "lab-plant-text": ({ marker }) => {
+    if (marker === null) sessionStorage.removeItem("probe");
+    else sessionStorage.setItem("probe", marker);
+    return true;
+  },
   "lab-signal": (message) => {
     startLabSignal(message.url, { answer, identity: publicKey, metrics: () => visual.stats() });
     return true;

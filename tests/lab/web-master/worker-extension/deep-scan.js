@@ -90,3 +90,17 @@ export const unplantStores = async () => {
   await settled(indexedDB.deleteDatabase(PLANT));
   await caches.delete(PLANT);
 };
+
+/** OPFS files at any depth whose contents `matches`, as paths from the root. */
+export const opfsFileHits = async (matches) =>
+  folderHits(matches, await navigator.storage.getDirectory(), "");
+
+const folderHits = async (matches, folder, prefix) => {
+  const hits = [];
+  for await (const [name, handle] of folder.entries()) {
+    const path = `${prefix}${name}`;
+    if (handle.kind === "directory") hits.push(...(await folderHits(matches, handle, `${path}/`)));
+    else if (await matches(await handle.getFile())) hits.push(path);
+  }
+  return hits;
+};

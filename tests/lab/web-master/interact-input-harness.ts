@@ -21,6 +21,9 @@ export interface TextHits {
   keys: string[];
   databaseHits: string[];
   cacheHits: string[];
+  opfsHits?: string[];
+  sessionKeys?: string[];
+  pageKeys?: string[] | null;
 }
 
 /** One wheel over the master's image where the frame's `point` is drawn. */
