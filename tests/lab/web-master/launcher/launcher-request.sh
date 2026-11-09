@@ -19,6 +19,9 @@ retire_request() {
   printf '%s\n' "$1" >>"$STATE/consumed"
   rm -f -- "$WS/requests/$1.req"
   [ -z "${2:-}" ] || rm -f -- "$WS/exchange/w1/offer-$2.json"
+}
+# The snapshot and the claim go only once the request is served.
+release_request() {
   rm -rf -- "$STATE/inbox/$1"
   rmdir -- "$STATE/claims/$1" 2>/dev/null || :
 }
@@ -26,6 +29,7 @@ retire_request() {
 # The status comes last, so a site that sees it finds the request already retired.
 fail_request() {
   retire_request "$1" "${3:-}"
+  release_request "$1"
   log "request $1: $2"
   publish_status "$1" refused "$2"
 }

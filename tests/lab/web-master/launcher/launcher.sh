@@ -9,9 +9,10 @@
 # ever run or expanded. <lab> defaults to ~/RECnRun-lab; the site's folder is <lab>/workspace.
 #
 # Environment: RECNRUN_LAB_TICK_S (1) and RECNRUN_LAB_HEARTBEAT_S (2) pace the loop and the heartbeat,
-# RECNRUN_LAB_STOP_S (20) bounds a worker stop, RECNRUN_LAB_INSTALL_S (90) a provisioning,
-# RECNRUN_LAB_ANSWER_S (20) the wait for an answer; RECNRUN_LAB_OPENSSL replaces the openssl binary
-# and RECNRUN_LAB_BUNDLE the extension folder (checks only).
+# RECNRUN_LAB_STOP_S (20) bounds a worker stop, RECNRUN_LAB_INSTALL_S (30) each install step and four
+# times that the whole install, RECNRUN_LAB_ANSWER_S (20) the wait for an answer; RECNRUN_LAB_OPENSSL
+# replaces the openssl binary and RECNRUN_LAB_BUNDLE the extension folder (checks only).
+# stdout: paired=<fingerprint> once a master is pinned, worker=<fingerprint> once a root is provisioned.
 # Exit: 64 wrong call, 65 a symbolic link in the lab, 70 survivors after the stop (state/stop-failed),
 # 73 the lab cannot be written, 75 another launcher holds the lab, 130 SIGINT, 143 SIGTERM.
 
@@ -96,6 +97,9 @@ start_launcher() {
   parse_start "$@"
   TICK=$(lab_seconds "${RECNRUN_LAB_TICK_S:-}" 1 RECNRUN_LAB_TICK_S)
   HEARTBEAT_S=$(lab_seconds "${RECNRUN_LAB_HEARTBEAT_S:-}" 2 RECNRUN_LAB_HEARTBEAT_S)
+  STOP_S=$(setting "${RECNRUN_LAB_STOP_S:-}" 20 RECNRUN_LAB_STOP_S)
+  INSTALL_S=$(setting "${RECNRUN_LAB_INSTALL_S:-}" 30 RECNRUN_LAB_INSTALL_S)
+  ANSWER_S=$(setting "${RECNRUN_LAB_ANSWER_S:-}" 20 RECNRUN_LAB_ANSWER_S)
   lab_release
   lab_openssl || die 70 'no openssl found'
   [ -d "$LAB" ] || mkdir -p -- "$LAB" || die 73 "cannot create $LAB"
@@ -127,6 +131,10 @@ start_launcher() {
 . "$HERE/launcher-request.sh"
 # shellcheck source=launcher-loop.sh
 . "$HERE/launcher-loop.sh"
+# shellcheck source=launcher-worker.sh
+. "$HERE/launcher-worker.sh"
+# shellcheck source=launcher-provision.sh
+. "$HERE/launcher-provision.sh"
 
 case ${1:-} in
   start) shift && start_launcher "$@" ;;

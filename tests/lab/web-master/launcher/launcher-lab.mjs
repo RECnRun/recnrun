@@ -75,10 +75,12 @@ export const ALLOW = ["--allow", "http://127.0.0.1:4600"];
 export const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
 
 /** A started launcher in a workspace the site has marked; paired with `key` when one is given. */
-export async function markedLauncher(s, { args = ALLOW, extra = {}, key } = {}) {
+export async function markedLauncher(
+  s,
+  { args = ALLOW, extra = {}, key, workspace = randomUUID() } = {},
+) {
   const run = s.start(key ? [...args, "--pair", key.fp] : args, extra);
   await waitFor(() => s.heartbeat().seq !== undefined);
-  const workspace = randomUUID();
   writeFileSync(join(s.ws, "recnrun-workspace.json"), `{\n  "workspaceId": "${workspace}"\n}\n`);
   if (key) {
     writeFileSync(join(s.ws, "pairing/master.spki"), key.spki);
@@ -87,7 +89,7 @@ export async function markedLauncher(s, { args = ALLOW, extra = {}, key } = {}) 
   return { run, key: key ?? (await masterKey()), workspace, session: s.heartbeat().session };
 }
 export const pairedLauncher = async (s, options = {}) =>
-  markedLauncher(s, { ...options, key: await masterKey() });
+  markedLauncher(s, { key: await masterKey(), ...options });
 
 /** Writes an offer and its signed request as the site does; `f` overrides fields or the text. */
 export async function submit(s, p, f = {}) {
@@ -130,19 +132,47 @@ function startRun(shell, args, env, spawned) {
   return run;
 }
 
+// The bare worker Chrome, sourced by the fake Chrome: STUB_WORKER_MODE renamed execs into another
+// program, stubborn ignores SIGINT; otherwise SIGINT ends it, as Chrome's shutdown does.
+const WORKER = `printf '%s\\n' "$@" >"$STUB_WORKER_ARGV"
+printf 'worker\\n' >>"$STUB_LOG"
+case \${STUB_WORKER_MODE:-} in
+  renamed) exec /bin/sleep 600 ;;
+  stubborn) trap '' INT ;;
+  *) trap 'printf "worker int\\n" >>"$STUB_LOG"; exit 0' INT ;;
+esac
+while :; do sleep 0.1 & wait $!; done
+`;
+
+// The worker's self-test as the extension downloads it, from the policy and identity it was given.
+const SELFTEST = `st_root=\${root%/chrome}
+st_gen=$(sed -n 's/.*"generation":\\([0-9]*\\).*/\\1/p' "$st_root/ext/policy.json")
+st_version=$(sed -n 's/.*"version": *"\\([^"]*\\)".*/\\1/p' "$st_root/ext/manifest.json" | head -n 1)
+st_digest=$(openssl dgst -sha256 -binary <"$st_root/ext/policy.json" | od -An -v -tx1 | tr -d ' \\n')
+st_spki=$(openssl pkey -inform DER -in "$st_root/ext/identity.pk8" -pubout -outform DER | openssl base64 -A)
+printf '{"generation":%s,"extensionVersion":"%s","policyDigest":"%s","workerSpki":"%s"}' \\
+  "$st_gen" "$st_version" "$st_digest" "$st_spki" >"$st_root/downloads/provisioned-$st_gen.json"
+`;
+
 /** A temporary home with the fake Chrome, its ps, and a lab folder for the launcher. */
 export function launcherScene(context, shell) {
   const s = installScene(context);
   const lab = join(s.home, "lab");
+  writeFileSync(join(s.home, "worker.sh"), WORKER);
+  writeFileSync(join(s.home, "selftest.sh"), SELFTEST);
   const env = (extra) =>
     environment(s.home, "base-v1", {
       STUB_MESSAGES: join(s.home, "messages"),
       STUB_EXTENSION: EXTENSION,
       STUB_BUILD: join(lab, "roots/w1/ext"),
+      STUB_WORKER: join(s.home, "worker.sh"),
+      STUB_WORKER_ARGV: join(s.home, "worker-argv.txt"),
+      STUB_SELFTEST_AUTO: join(s.home, "selftest.sh"),
       TMPDIR: s.home,
       RECNRUN_LAB_TICK_S: "0.2",
       RECNRUN_LAB_HEARTBEAT_S: "0.2",
       RECNRUN_LAB_STOP_S: "2",
+      RECNRUN_LAB_INSTALL_S: "3",
       ...extra,
     });
   context.after(() => {
@@ -153,6 +183,7 @@ export function launcherScene(context, shell) {
     lab,
     ws: join(lab, "workspace"),
     state: join(lab, "state"),
+    root: join(lab, "roots/w1"),
     start: (args = ["--allow", "http://127.0.0.1:4600"], extra = {}) =>
       startRun(shell, ["start", lab, ...args], env(extra), s.spawned),
     heartbeat: () => fields(join(lab, "workspace/launcher/heartbeat")),

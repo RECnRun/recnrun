@@ -25,11 +25,14 @@ export const OTHER = "a".repeat(32);
 // STUB_MESSAGES, and answers each on fd 4 as STUB_REPLY says (good; other: another id is loaded;
 // silent: no answer at all; noentry: no settings entry is written; linger: Browser.close is answered
 // but only a signal ends it, logged as int or term; STUB_SELFTEST names a file written on the load, the
-// worker's self-test). On Browser.close it writes the settings entry Chrome
+// worker's self-test, and STUB_SELFTEST_AUTO a script sourced there to write it). Started without the
+// pipe, it sources STUB_WORKER instead, the bare worker Chrome of the lab launcher. On Browser.close it writes the settings entry Chrome
 // keeps and exits. A background sh inherits SIGINT ignored and cannot trap it, while Chrome installs its own
 // handler: the stub restarts itself once through perl with SIGINT at its default action.
 const STUB = `#!/bin/sh
 [ -n "\${STUB_SIGNALS:-}" ] || exec /usr/bin/perl -e '$SIG{INT} = "DEFAULT"; $ENV{STUB_SIGNALS} = 1; exec @ARGV or die' /bin/sh "$0" "$@"
+for a in "$@"; do [ "$a" != --remote-debugging-pipe ] || piped=1; done
+[ -n "\${piped:-}" ] || [ -z "\${STUB_WORKER:-}" ] || . "$STUB_WORKER"
 printf '%s\\n' "$@" >"$STUB_ARGV"
 printf 'launch\\n' >>"$STUB_LOG"
 for a in "$@"; do case $a in --user-data-dir=*) root=\${a#*=} ;; esac; done
@@ -54,6 +57,7 @@ while :; do
         loaded=$STUB_EXTENSION
         [ "$mode" != other ] || loaded=${OTHER}
         [ -z "\${STUB_SELFTEST:-}" ] || printf '{"generation":1}' >"$STUB_SELFTEST"
+        [ -z "\${STUB_SELFTEST_AUTO:-}" ] || . "$STUB_SELFTEST_AUTO"
         reply '{"id":'$id',"result":{"id":"'$loaded'"}}' ;;
       *'"method":"Target.createTarget"'*) reply '{"id":'$id',"result":{"targetId":"${TARGET}"}}' ;;
       *'"method":"Target.attachToTarget"'*) reply '{"id":'$id',"result":{"sessionId":"${SESSION}"}}' ;;

@@ -45,6 +45,11 @@ lab_verify() {
 
 lab_worker_key() {
   "$OPENSSL" ecparam -name prime256v1 -genkey -noout -out "$1" 2>/dev/null || return 1
+  lab_worker_derive "$@"
+}
+
+# The PKCS#8 the worker imports and the SPKI the site pins, from the kept key $1.
+lab_worker_derive() {
   "$OPENSSL" pkcs8 -topk8 -nocrypt -outform DER -in "$1" -out "$2" 2>/dev/null || return 1
   "$OPENSSL" pkey -in "$1" -pubout -outform DER -out "$3" 2>/dev/null
 }

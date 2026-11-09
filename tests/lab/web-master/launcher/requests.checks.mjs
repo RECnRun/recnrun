@@ -62,7 +62,7 @@ for (const shell of shells) {
     const s = launcherScene(context, shell);
     const p = await pairedLauncher(s);
     const sent = await submit(s, p);
-    await waitFor(() => statusOf(s, sent.rid).state === "launching");
+    await waitFor(() => statusOf(s, sent.rid).state === "delivering", 30_000);
     const status = statusOf(s, sent.rid);
     assert.deepEqual([status.request, status.session, status.code], [sent.rid, p.session, "-"]);
     assert.ok(!existsSync(join(s.ws, `requests/${sent.rid}.req`)));
