@@ -6,7 +6,7 @@ import type { LinkChange } from "./worker-extension/link-state.js";
 
 /* Owner flow, task B: current.json → offer → answer download, and no file replaces a live link. */
 
-const EXCHANGE = "file:///lab/roots/w1/exchange/";
+const EXCHANGE = "chrome-extension://worker/exchange/";
 const CONTEXT = { workspace: "ws", root: "w1", masterKey: {} };
 const offerFor = (attempt: string) => ({
   attempt,

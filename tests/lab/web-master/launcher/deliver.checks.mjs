@@ -34,7 +34,7 @@ for (const shell of shells) {
     const answer = readFileSync(answerOf(s, sent.attempt), "utf8");
     assert.equal(answer, `{"type":"answer","attempt":"${sent.attempt}"}`);
     assert.deepEqual(readdirSync(join(s.ws, "exchange/w1")), [`answer-${sent.attempt}.json`]);
-    assert.deepEqual(readdirSync(join(s.root, "exchange")), []);
+    assert.deepEqual(readdirSync(join(s.root, "ext/exchange")), []);
     assert.equal(workers(s), 1);
     await stop(p.run);
   });

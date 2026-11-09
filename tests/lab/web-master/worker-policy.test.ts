@@ -20,7 +20,6 @@ const policyOf = (masterSpki: string, over: Record<string, unknown> = {}) => ({
   masterSpki,
   allow: ["http://127.0.0.1:47812"],
   interactEnabled: true,
-  exchangeUrl: "file:///Users/owner/RECnRun-lab/roots/w1/exchange/",
   viewport: { minWidth: 320, minHeight: 240, maxWidth: 1920, maxHeight: 1080 },
   ...over,
 });
@@ -56,7 +55,7 @@ describe("the policy file", () => {
     ["an empty allowlist", { allow: [] }],
     ["a path in the allowlist", { allow: ["http://a.test/x"] }],
     ["a star with origins", { allow: ["*", "http://a.test"] }],
-    ["a non-file exchange", { exchangeUrl: "http://a.test/" }],
+    ["an exchange URL", { exchangeUrl: "file:///etc/" }],
     [
       "an inverted viewport",
       { viewport: { minWidth: 900, minHeight: 240, maxWidth: 800, maxHeight: 600 } },

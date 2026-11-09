@@ -147,7 +147,7 @@ case \${STUB_WORKER_MODE:-} in
   *) trap 'printf "worker int\\n" >>"$STUB_LOG"; exit 0' INT ;;
 esac
 answer() {
-  a=$(sed -n 's/.*"attempt":"\\([0-9a-f-]*\\)".*/\\1/p' "$w/exchange/current.json" 2>/dev/null)
+  a=$(sed -n 's/.*"attempt":"\\([0-9a-f-]*\\)".*/\\1/p' "$w/ext/exchange/current.json" 2>/dev/null)
   [ -n "$a" ] && [ "$a" != "\${seen:-}" ] || return 0
   seen=$a
   f=$w/downloads/answer-$a.json
@@ -175,7 +175,7 @@ st_gen=$(sed -n 's/.*"generation":\\([0-9]*\\).*/\\1/p' "$st_root/ext/policy.jso
 st_version=$(sed -n 's/.*"version": *"\\([^"]*\\)".*/\\1/p' "$st_root/ext/manifest.json" | head -n 1)
 st_digest=$(openssl dgst -sha256 -binary <"$st_root/ext/policy.json" | od -An -v -tx1 | tr -d ' \\n')
 st_spki=$(openssl pkey -inform DER -in "$st_root/ext/identity.pk8" -pubout -outform DER | openssl base64 -A)
-printf '{"generation":%s,"extensionVersion":"%s","policyDigest":"%s","workerSpki":"%s"}' \\
+printf '{"generation":%s,"extensionVersion":"%s","policyDigest":"%s","workerSpki":"%s","fileRead":false}' \\
   "$st_gen" "$st_version" "$st_digest" "$st_spki" >"$st_root/downloads/provisioned-$st_gen.json"
 `;
 

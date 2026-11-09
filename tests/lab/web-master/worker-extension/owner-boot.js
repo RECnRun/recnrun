@@ -35,14 +35,16 @@ export const startOwner = async (ask) => {
   if (!filed || !current) return;
   const { policy, bytes } = filed;
   const context = { workspace: policy.workspace, root: policy.root, masterKey: current.masterKey };
-  await ask({ type: "file-signal", exchangeUrl: policy.exchangeUrl, context });
+  await ask({ type: "file-signal", exchangeUrl: chrome.runtime.getURL("exchange/"), context });
   if (tested) return;
   const { spki } = await ask({ type: "identity-spki" });
+  const { fileRead } = await ask({ type: "file-probe" });
   await writeSignal(`provisioned-${policy.generation}.json`, {
     generation: policy.generation,
     extensionVersion: chrome.runtime.getManifest().version,
     policyDigest: await hexDigest(bytes),
     workerSpki: spki,
+    fileRead,
   });
   tested = true;
 };

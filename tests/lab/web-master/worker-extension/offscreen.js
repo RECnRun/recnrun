@@ -1,6 +1,7 @@
 // Worker link: one ECDSA identity, answers offers with iceServers [], signs challenges.
 import { OBSERVE_TYPES } from "./observe-schema.js";
 import { startFileLink } from "./file-link.js";
+import { canReadFiles } from "./file-signal.js";
 import { loadIdentity } from "./identity.js";
 import { createInputs } from "./input-channel.js";
 import { startLabSignal } from "./lab-signal.js";
@@ -118,6 +119,10 @@ const connect = async (offer, events = {}) => {
 };
 
 const answer = (offer) => connect(offer);
+const ASYNC = {
+  answer: (message) => answer(message.offer),
+  "file-probe": async () => ({ fileRead: await canReadFiles() }),
+};
 
 const publicKey = async () => crypto.subtle.exportKey("jwk", (await identity).publicKey);
 
@@ -180,7 +185,7 @@ chrome.runtime.onMessage.addListener((message, _sender, respond) => {
     );
     return true;
   }
-  const work = message.type === "answer" ? answer(message.offer) : publicKey();
+  const work = Object.hasOwn(ASYNC, message.type) ? ASYNC[message.type](message) : publicKey();
   work.then(respond, (error) => respond({ error: String(error) }));
   return true;
 });

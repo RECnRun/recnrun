@@ -47,7 +47,16 @@ export const createFileSignal = ({ exchangeUrl, context, deps }) => {
   return { tick };
 };
 
-/** A file:// read; absent or unparsable reads as null. */
+/** The worker proves it cannot read local files; /etc/hosts exists on macOS and Linux. */
+export const canReadFiles = async () => {
+  try {
+    return (await fetch("file:///etc/hosts", { cache: "no-store" })).ok;
+  } catch {
+    return false;
+  }
+};
+
+/** A read of the extension's own exchange folder; absent or unparsable reads as null. */
 export const readFileJson = async (url) => {
   try {
     const response = await fetch(url, { cache: "no-store" });

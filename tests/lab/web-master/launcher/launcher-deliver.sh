@@ -1,5 +1,5 @@
 #!/bin/sh
-# Delivery of one offer by launcher.sh: the offer goes into roots/w1/exchange and current.json names
+# Delivery of one offer by launcher.sh: the offer goes into roots/w1/ext/exchange and current.json names
 # it; the worker's answer comes back through its downloads and is copied to
 # workspace/exchange/w1/answer-<attempt>.json. Sourced by launcher.sh.
 
@@ -8,8 +8,8 @@ BUSY_MS=30000
 
 # The offer first, then current.json, each by a rename, so the worker never reads a partial file.
 offer_in() {
-  write_atomic "$ROOT/exchange/offer-$2.json" <"$1/offer.json" || return 1
-  printf '{"attempt":"%s","file":"offer-%s.json"}' "$2" "$2" | write_atomic "$ROOT/exchange/current.json"
+  write_atomic "$ROOT/ext/exchange/offer-$2.json" <"$1/offer.json" || return 1
+  printf '{"attempt":"%s","file":"offer-%s.json"}' "$2" "$2" | write_atomic "$ROOT/ext/exchange/current.json"
 }
 
 # A complete answer: no .crdownload beside it and the same size on two looks in a row.
@@ -76,5 +76,5 @@ deliver_offer() {
 
 # The worker's copies of this attempt go once it is served, whatever the outcome.
 clear_delivery() {
-  rm -f -- "$ROOT/exchange/current.json" "$ROOT/exchange/offer-$1.json" "$ROOT/downloads/answer-$1.json"
+  rm -f -- "$ROOT/ext/exchange/current.json" "$ROOT/ext/exchange/offer-$1.json" "$ROOT/downloads/answer-$1.json"
 }

@@ -16,7 +16,7 @@ lab_bundle() {
 
 # sha256 over the sorted relative paths, each with its size and bytes; the generated files are left out.
 bundle_digest() {
-  (cd -- "$1" && find . -type f ! -path ./policy.json ! -path ./identity.pk8 | LC_ALL=C sort) |
+  (cd -- "$1" && find . -type f ! -path ./policy.json ! -path ./identity.pk8 ! -path './exchange/*' | LC_ALL=C sort) |
     while IFS= read -r bd_file; do
       printf '%s\n%s\n' "$bd_file" "$(file_size "$1/$bd_file")"
       cat -- "$1/$bd_file"
@@ -65,8 +65,8 @@ worker_identity() {
 
 write_policy() {
   wp_master=$("$OPENSSL" base64 -A <"$STATE/master.spki") || return 1
-  printf '{"v":1,"workspace":"%s","root":"w1","generation":%s,"masterSpki":"%s","allow":%s,"interactEnabled":true,"exchangeUrl":"file://%s/exchange/","viewport":{"minWidth":320,"minHeight":240,"maxWidth":1920,"maxHeight":1080}}' \
-    "$WORKSPACE_ID" "$generation" "$wp_master" "$ALLOW_JSON" "$ROOT" >"$ROOT/ext/policy.json"
+  printf '{"v":1,"workspace":"%s","root":"w1","generation":%s,"masterSpki":"%s","allow":%s,"interactEnabled":true,"viewport":{"minWidth":320,"minHeight":240,"maxWidth":1920,"maxHeight":1080}}' \
+    "$WORKSPACE_ID" "$generation" "$wp_master" "$ALLOW_JSON" >"$ROOT/ext/policy.json"
 }
 
 # The marked root, its seeded profile, and the bundle copied and proven unchanged.
@@ -74,10 +74,10 @@ build_root() {
   mkdir -- "$ROOT" || return 1
   : >"$ROOT/.recnrun-lab-root" || return 1
   sh "$LIB/base.sh" seed-root "$ROOT/chrome" "$ROOT/downloads" </dev/null >>"$STATE/install.log" 2>&1 || return 1
-  mkdir -- "$ROOT/exchange" "$ROOT/ext" || return 1
+  mkdir -- "$ROOT/ext" || return 1
   cp -R -- "$BUNDLE/." "$ROOT/ext/" || return 1
-  rm -f -- "$ROOT/ext/policy.json" "$ROOT/ext/identity.pk8"
-  [ "$(bundle_digest "$ROOT/ext")" = "$BUNDLE_DIGEST" ]
+  rm -rf -- "$ROOT/ext/policy.json" "$ROOT/ext/identity.pk8" "$ROOT/ext/exchange"
+  [ "$(bundle_digest "$ROOT/ext")" = "$BUNDLE_DIGEST" ] && mkdir -- "$ROOT/ext/exchange"
 }
 
 # The Chrome pid install.sh logs, recorded once so a stop can verify it.
@@ -118,7 +118,7 @@ run_install() {
 check_selftest() {
   cs_file=$ROOT/downloads/provisioned-$generation.json
   plain_file "$cs_file" && [ "$(file_size "$cs_file")" -le 4096 ] || return 1
-  printf '{"generation":%s,"extensionVersion":"%s","policyDigest":"%s","workerSpki":"%s"}' "$generation" \
+  printf '{"generation":%s,"extensionVersion":"%s","policyDigest":"%s","workerSpki":"%s","fileRead":false}' "$generation" \
     "$RELEASE_EXTENSION" "$(lab_sha256 "$ROOT/ext/policy.json")" "$WORKER_SPKI" | cmp -s - "$cs_file"
 }
 

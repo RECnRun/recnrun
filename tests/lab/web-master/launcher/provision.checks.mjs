@@ -68,13 +68,10 @@ for (const shell of shells) {
     const policy = JSON.parse(readFileSync(join(s.root, "ext/policy.json"), "utf8"));
     assert.deepEqual(
       [policy.workspace, policy.allow, policy.masterSpki, policy.exchangeUrl],
-      [
-        p.workspace,
-        ["http://127.0.0.1:4600"],
-        p.key.spki.toString("base64"),
-        `file://${s.root}/exchange/`,
-      ],
+      [p.workspace, ["http://127.0.0.1:4600"], p.key.spki.toString("base64"), undefined],
     );
+    const manifest = JSON.parse(readFileSync(join(s.root, "ext/manifest.json"), "utf8"));
+    assert.equal(manifest.host_permissions, undefined, "the worker gets no file:// grant");
     const argv = lines(join(s.home, "worker-argv.txt"));
     assert.ok(argv.includes(`--user-data-dir=${s.root}/chrome`) && argv.includes("--headless=new"));
     assert.ok(!argv.some((a) => /--remote-debugging|--enable-unsafe-extension-debugging/.test(a)));

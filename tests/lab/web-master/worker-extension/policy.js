@@ -1,7 +1,7 @@
 // The launcher's policy.json, falling back to the lab's storage provision when the file is absent.
 import { isWebOrigin } from "./allow.js";
 
-const KEYS = "allow,exchangeUrl,generation,interactEnabled,masterSpki,root,v,viewport,workspace";
+const KEYS = "allow,generation,interactEnabled,masterSpki,root,v,viewport,workspace";
 const VIEWPORT_KEYS = "maxHeight,maxWidth,minHeight,minWidth";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const P256_PREFIX = "3059301306072a8648ce3d020106082a8648ce3d030107034200";
@@ -45,7 +45,6 @@ const policyValid = (policy) =>
   isP256Spki(policy.masterSpki) &&
   allowValid(policy.allow) &&
   typeof policy.interactEnabled === "boolean" &&
-  /^file:\/\/\/.*\/$/.test(policy.exchangeUrl) &&
   viewportValid(policy.viewport);
 
 export const parsePolicy = (bytes) => {

@@ -14,7 +14,6 @@ export interface Policy {
   masterSpki: string;
   allow: string[];
   interactEnabled: boolean;
-  exchangeUrl: string;
   viewport: Viewport;
 }
 
