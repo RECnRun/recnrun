@@ -26,9 +26,12 @@ function shellcheck(files) {
   );
 }
 
-const launcherScripts = readdirSync(here)
-  .filter((name) => name.endsWith(".sh"))
-  .map((name) => join(here, name));
+const labLauncher = fileURLToPath(new URL("../../tests/lab/web-master/launcher/", import.meta.url));
+const launcherScripts = [here, labLauncher].flatMap((dir) =>
+  readdirSync(dir)
+    .filter((name) => name.endsWith(".sh"))
+    .map((name) => join(dir, name)),
+);
 
 await test("ShellCheck is in the test image", () => {
   assert.ok(!inContainer || available, "the container must have shellcheck");

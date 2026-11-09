@@ -14,6 +14,7 @@
         "scripts/git-hooks/*.mjs",
         "scripts/*.checks.mjs",
         "scripts/poc-cross-profile/*.checks.mjs",
+        "tests/lab/web-master/launcher/*.checks.mjs",
         "tests/container/*.checks.mjs",
         // The lab worker's manifest and the lab site's HTML load these; no module imports them.
         "tests/lab/web-master/worker-extension/{background,offscreen}.js",
