@@ -24,6 +24,7 @@
     "test:experiments:local": "vp run --no-cache extension#build:test && vp run --no-cache extension#build:poc-d0 && playwright test --config playwright.experiments.config.ts",
     "test:host": "node scripts/test-host.mjs",
     "lab:web-master": "node scripts/test-container.mjs lab:web-master:local",
+    "lab:owner": "node tests/lab/web-master/owner-serve.ts",
     "lab:web-master:local": "playwright test --config tests/lab/web-master/playwright.config.ts",
     "test:coverage": "node scripts/test-container.mjs test:coverage:local",
     "test:coverage:local": "vp test --coverage && node --test scripts/coverage.checks.mjs",

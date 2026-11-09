@@ -27,7 +27,7 @@ export const sha256Hex = async (bytes) => {
   const hash = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
   return [...hash].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 };
-export const fingerprint = sha256Hex;
+export const fingerprint = (spki) => sha256Hex(spki);
 
 export const spkiToJwk = async (spki) => {
   const key = await crypto.subtle.importKey(
