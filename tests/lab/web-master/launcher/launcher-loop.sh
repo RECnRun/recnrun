@@ -30,13 +30,16 @@ ensure_worker() {
   launch_worker
 }
 
-# A verified request with its offer snapshotted in $2/offer.json.
+# A verified request with its offer snapshotted in $2/offer.json; the answer is copied out before
+# the inbox goes, and the terminal status is published last.
 start_request() {
   retire_request "$1" "$rq_attempt"
-  if ensure_worker "$1"; then
+  if ensure_worker "$1" && deliver_offer "$1" "$2"; then
+    clear_delivery "$rq_attempt"
     release_request "$1"
-    publish_status "$1" delivering -
+    publish_status "$1" answered -
   else
+    clear_delivery "$rq_attempt"
     release_request "$1"
     log "request $1: $sr_code"
     publish_status "$1" refused "$sr_code"

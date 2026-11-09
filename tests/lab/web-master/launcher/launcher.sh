@@ -135,6 +135,8 @@ start_launcher() {
 . "$HERE/launcher-worker.sh"
 # shellcheck source=launcher-provision.sh
 . "$HERE/launcher-provision.sh"
+# shellcheck source=launcher-deliver.sh
+. "$HERE/launcher-deliver.sh"
 
 case ${1:-} in
   start) shift && start_launcher "$@" ;;

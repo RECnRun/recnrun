@@ -133,15 +133,40 @@ function startRun(shell, args, env, spawned) {
 }
 
 // The bare worker Chrome, sourced by the fake Chrome: STUB_WORKER_MODE renamed execs into another
-// program, stubborn ignores SIGINT; otherwise SIGINT ends it, as Chrome's shutdown does.
+// program, stubborn ignores SIGINT; otherwise SIGINT ends it, as Chrome's shutdown does. It answers
+// the offer current.json names as STUB_WORKER_ANSWER says: answer (through a .crdownload, renamed),
+// crdownload (partial bytes beside a .crdownload for a second), oversize, never, late (only once
+// relaunched), or linked (no answer; state.json says linked).
 const WORKER = `printf '%s\\n' "$@" >"$STUB_WORKER_ARGV"
 printf 'worker\\n' >>"$STUB_LOG"
+for a in "$@"; do case $a in --user-data-dir=*) w=\${a#*=} ;; esac; done
+w=\${w%/chrome}
 case \${STUB_WORKER_MODE:-} in
   renamed) exec /bin/sleep 600 ;;
   stubborn) trap '' INT ;;
   *) trap 'printf "worker int\\n" >>"$STUB_LOG"; exit 0' INT ;;
 esac
-while :; do sleep 0.1 & wait $!; done
+answer() {
+  a=$(sed -n 's/.*"attempt":"\\([0-9a-f-]*\\)".*/\\1/p' "$w/exchange/current.json" 2>/dev/null)
+  [ -n "$a" ] && [ "$a" != "\${seen:-}" ] || return 0
+  seen=$a
+  f=$w/downloads/answer-$a.json
+  body='{"type":"answer","attempt":"'$a'"}'
+  case \${STUB_WORKER_ANSWER:-answer} in
+    never) ;;
+    late) [ "$(grep -c '^worker$' "$STUB_LOG")" -lt 2 ] || printf '%s' "$body" >"$f" ;;
+    oversize) head -c 70000 /dev/zero | tr '\\000' x >"$f" ;;
+    linked) printf '{"state":"linked","attempt":"%s","at":%s000}' "$a" "$(date +%s)" >"$w/downloads/state.json" ;;
+    crdownload)
+      : >"$f.crdownload"
+      printf partial >"$f"
+      sleep 1
+      printf '%s' "$body" >"$f"
+      rm -f "$f.crdownload" ;;
+    *) printf '%s' "$body" >"$f.crdownload" && mv "$f.crdownload" "$f" ;;
+  esac
+}
+while :; do answer; sleep 0.1 & wait $!; done
 `;
 
 // The worker's self-test as the extension downloads it, from the policy and identity it was given.
@@ -173,6 +198,7 @@ export function launcherScene(context, shell) {
       RECNRUN_LAB_HEARTBEAT_S: "0.2",
       RECNRUN_LAB_STOP_S: "2",
       RECNRUN_LAB_INSTALL_S: "3",
+      RECNRUN_LAB_ANSWER_S: "2",
       ...extra,
     });
   context.after(() => {

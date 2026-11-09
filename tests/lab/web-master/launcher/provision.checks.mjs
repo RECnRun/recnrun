@@ -33,10 +33,10 @@ function holders(s) {
     .map((line) => Number.parseInt(line, 10));
 }
 
-/** Sends a request and waits for its last status: delivering, or refused with a code. */
+/** Sends a request and waits for its last status: answered, or refused with a code. */
 async function launch(s, p) {
   const sent = await submit(s, p);
-  await waitFor(() => ["delivering", "refused"].includes(statusOf(s, sent.rid).state), 30_000);
+  await waitFor(() => ["answered", "refused"].includes(statusOf(s, sent.rid).state), 30_000);
   return statusOf(s, sent.rid);
 }
 
@@ -55,7 +55,7 @@ for (const shell of shells) {
   await test(`${shell}: a request provisions the root and launches a bare worker`, async (context) => {
     const s = launcherScene(context, shell);
     const p = await pairedLauncher(s);
-    assert.equal((await launch(s, p)).state, "delivering", p.run.err);
+    assert.equal((await launch(s, p)).state, "answered", p.run.err);
     const record = provisioned(s);
     const spki = readFileSync(join(s.ws, "peers/w1/worker.spki"));
     assert.ok(existsSync(join(s.root, ".recnrun-lab-root")));
@@ -88,7 +88,7 @@ for (const shell of shells) {
     const s = launcherScene(context, shell);
     const p = await pairedLauncher(s);
     await launch(s, p);
-    assert.equal((await launch(s, p)).state, "delivering");
+    assert.equal((await launch(s, p)).state, "answered");
     assert.deepEqual([installs(s), workers(s), provisioned(s).generation], [1, 1, "1"]);
     await stop(p.run);
   });
@@ -101,7 +101,7 @@ for (const shell of shells) {
     await launch(s, p);
     const first = provisioned(s);
     appendFileSync(join(bundle, "background.js"), "\n");
-    assert.equal((await launch(s, p)).state, "delivering");
+    assert.equal((await launch(s, p)).state, "answered");
     const second = provisioned(s);
     assert.deepEqual([installs(s), workers(s), second.generation], [2, 2, "2"]);
     assert.notEqual(second.bundleDigest, first.bundleDigest);
@@ -172,13 +172,14 @@ for (const shell of shells) {
   await test(`${shell}: a recorded worker that became another program is never signalled`, async (context) => {
     const s = launcherScene(context, shell);
     const p = await pairedLauncher(s, { extra: { STUB_WORKER_MODE: "renamed" } });
-    await launch(s, p);
-    const [record] = pids(s);
-    const pid = Number(record.split(".")[1]);
-    context.after(() => alive(pid) && process.kill(pid, "SIGKILL"));
+    // It never answers, so delivery relaunches once and that worker becomes another program too.
+    assert.equal((await launch(s, p)).code, "NO_ANSWER");
+    const recorded = pids(s).map((record) => Number(record.split(".")[1]));
+    context.after(() => recorded.forEach((pid) => alive(pid) && process.kill(pid, "SIGKILL")));
     await stop(p.run, EX_FAILED);
-    assert.ok(alive(pid));
-    assert.equal(fields(join(s.state, "stop-failed")).pids, String(pid));
+    assert.equal(recorded.length, 2);
+    assert.ok(recorded.every(alive));
+    assert.equal(fields(join(s.state, "stop-failed")).pids, recorded.join(" "));
   });
 
   await test(`${shell}: a foreign process naming the root is LAUNCH_FAILED and never signalled`, async (context) => {
