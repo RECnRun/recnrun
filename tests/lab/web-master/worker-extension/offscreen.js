@@ -1,13 +1,12 @@
-// Throwaway worker link: one ECDSA identity, answers offers with iceServers [], signs challenges.
+// Worker link: one ECDSA identity, answers offers with iceServers [], signs challenges.
 import { OBSERVE_TYPES } from "./observe-schema.js";
+import { loadIdentity } from "./identity.js";
 import { createInputs } from "./input-channel.js";
 import { startLabSignal } from "./lab-signal.js";
+import { readPackaged } from "./packaged.js";
 import { createSender } from "./visual-sender.js";
 
-const identity = crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, false, [
-  "sign",
-  "verify",
-]);
+const identity = loadIdentity({ readPk8: () => readPackaged("identity.pk8") });
 /** Peer connections kept alive until their ICE fails or closes. */
 const links = new Set();
 /** @type {Map<RTCDataChannel, string>} control channel → its link's id */
