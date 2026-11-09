@@ -10,6 +10,7 @@ import { closeTab, isOpen, openTab, recover, refresh } from "./interact-tab.js";
 import { holding, insertText, key, liveDocument, mouse, releaseHeld } from "./interact-tab.js";
 import { resize, tabState } from "./interact-tab.js";
 import { setSentHook } from "./observe.js";
+import { provision } from "./provision.js";
 import { blockInteraction, claimInteraction, claimed, releaseInteraction } from "./runner.js";
 
 const TICK_MS = 250;
@@ -29,7 +30,6 @@ const stats = {
 // A static page draws nothing: its screencast restarts so the newest frame stays fresh.
 const QUIET_MS = 750;
 
-const provision = async () => (await chrome.storage.local.get("provision")).provision;
 // The stop holds in memory at once, and in storage across service worker restarts.
 let stopping = false;
 const latched = async () =>
@@ -123,7 +123,7 @@ const tabOps = { holding, insertText, key, liveDocument, mouse, releaseHeld };
 const event = createEvents({ frames, refuse, revoke, serial, stats, tab: tabOps, authorized });
 
 const challenge = async (link) => {
-  const refused = await gateError(await provision());
+  const refused = await gateError(await provision.current());
   if (refused) return refuse(refused);
   const nonce = starts.issue(link.linkId);
   if (!nonce) return refuse("RATE_LIMITED");
@@ -135,7 +135,7 @@ const challenge = async (link) => {
 const start = async (message, link) => {
   await recovering;
   const verify = async () => {
-    const provisioned = await provision();
+    const provisioned = await provision.current();
     const refused = await gateError(provisioned);
     if (refused) return refused;
     const { masterKey, allowlist } = provisioned;
@@ -149,7 +149,7 @@ const start = async (message, link) => {
     interactId: claim.interactId,
     url: message.url,
   });
-  const { allowlist } = await provision();
+  const { allowlist } = await provision.current();
   const on = { offPolicy: () => revoke("TARGET_OFF_POLICY"), gone };
   const target = { interactId: claim.interactId, url: message.url, origins: allowlist };
   opening = openTab(target, on).then(

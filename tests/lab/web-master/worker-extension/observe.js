@@ -1,4 +1,6 @@
 // W6 slice C: one observe session per worker, bound to the running job's tab and a lease.
+import { allows } from "./allow.js";
+import { provision } from "./provision.js";
 import { bootId, captureStats, isCurrent, setHooks, setSink, start, stop } from "./capture.js";
 import { load } from "./ledger.js";
 import { createObserveCheck } from "./observe-check.js";
@@ -25,7 +27,7 @@ const push = (message) => toOffscreen({ type: "push", linkId: session?.linkId, m
 /** Only http(s) documents of the job's own origins are ever shown. */
 const allowed = (url, origins) => {
   if (!/^https?:\/\//.test(url)) return false;
-  return origins.includes(new URL(url).origin);
+  return allows(origins, new URL(url).origin);
 };
 
 const expiry = () => {
@@ -169,9 +171,9 @@ const ACTIONS = {
 
 const contextOf = async () => {
   const job = current();
-  const { provision } = await chrome.storage.local.get("provision");
+  const provisioned = await provision.current();
   return {
-    masterKey: provision?.masterKey,
+    masterKey: provisioned?.masterKey,
     workerId: chrome.runtime.id,
     bootId: bootId(),
     job: job && { jobId: job.jobId, targetId: job.tabId },

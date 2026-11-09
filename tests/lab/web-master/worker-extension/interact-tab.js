@@ -1,4 +1,5 @@
 // W7 slice B: the worker's own interactive tab: opened, attached, watched, and closed by it alone.
+import { allows } from "./allow.js";
 import { MODES, bind, unbind } from "./capture.js";
 import { within } from "./interact-gate.js";
 import { createHeld } from "./interact-held.js";
@@ -25,7 +26,7 @@ const held = createHeld();
 
 const command = (target, method, params = {}) =>
   chrome.debugger.sendCommand(target, method, params);
-const allowed = (current, url) => current.origins.includes(originOf(url));
+const allowed = (current, url) => allows(current.origins, originOf(url));
 
 // A tab, debugger, or storage call that hangs fails by its deadline, named by its step.
 const op = (name, work) =>

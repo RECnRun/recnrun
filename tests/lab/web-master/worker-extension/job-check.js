@@ -1,4 +1,5 @@
 // Strict job check of plan §6 (lab subset): schema, clock, origins, signature.
+import { allows } from "./allow.js";
 import { canonical } from "./encoding.js";
 import { envelopeError, opError, originOf } from "./job-schema.js";
 
@@ -14,7 +15,7 @@ const clockError = (job, now) => {
 const originsError = (job, allowlist) => {
   const valid = Array.isArray(job.origins) && job.origins.length >= 1 && job.origins.length <= 8;
   if (!valid) return "INVALID_COMMAND";
-  return job.origins.every((origin) => allowlist.includes(origin)) ? null : "FORBIDDEN_ORIGIN";
+  return job.origins.every((origin) => allows(allowlist, origin)) ? null : "FORBIDDEN_ORIGIN";
 };
 
 const fromBase64 = (text) => Uint8Array.from(atob(text), (c) => c.charCodeAt(0));

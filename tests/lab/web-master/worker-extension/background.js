@@ -5,6 +5,7 @@ import { labState, release, setKnob } from "./knobs.js";
 import { input, interactLab, interactLinkClosed } from "./interact.js";
 import { all, load, recover, resultFile } from "./ledger.js";
 import { observe, observeLab } from "./observe.js";
+import { provision } from "./provision.js";
 import { statuses, submit } from "./runner.js";
 import { plant, scan, scanText, unplant } from "./scan.js";
 
@@ -27,8 +28,6 @@ const ask = async (message) => {
   return chrome.runtime.sendMessage({ target: "offscreen", ...message });
 };
 
-const provision = async () => (await chrome.storage.local.get("provision")).provision;
-
 // LAB-ONLY (W6.16): a provisioned relay replaces the harness's CDP relay of the offer.
 const labSignal = async () => {
   const { labSignal: url } = await chrome.storage.local.get("labSignal");
@@ -40,7 +39,7 @@ const handle = async (message) => {
   await recovered;
   if (message.type === "job") {
     labState.linkClosedAt = null;
-    return submit(message.job, await provision());
+    return submit(message.job, await provision.current());
   }
   // The boot names this service-worker life: an observe request must carry it.
   if (message.type === "job-status")
@@ -67,7 +66,7 @@ globalThis.lab = {
   id: () => chrome.runtime.id,
   answer: (offer) => ask({ type: "answer", offer }),
   ready: () => recovered,
-  provisioned: provision,
+  provisioned: () => provision.current(),
   // LAB-ONLY (W6.16): the loopback signalling relay a worker with no debugging flag polls.
   signal: (url) => chrome.storage.local.set({ labSignal: url }).then(() => true),
   provision: (value) => chrome.storage.local.set({ provision: value }).then(() => true),
@@ -75,7 +74,7 @@ globalThis.lab = {
   state: () => ({ reached: labState.reached, linkClosedAt: labState.linkClosedAt }),
   release,
   // The same admission path a relayed job takes, for tests that need no link.
-  submit: async (job) => submit(job, await provision()),
+  submit: async (job) => submit(job, await provision.current()),
   job: load,
   jobs: all,
   resultFile,

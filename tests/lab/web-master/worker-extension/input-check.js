@@ -1,4 +1,5 @@
 // W7 slice A: a start is the pinned master's, over a nonce this worker issued on this very link.
+import { allows } from "./allow.js";
 import { inputError } from "./input-schema.js";
 import { signatureValid } from "./job-check.js";
 import { originOf } from "./job-schema.js";
@@ -70,7 +71,7 @@ export const createStartCheck = ({ now = Date.now } = {}) => {
     if (refused) return refused;
     spent.set(message.nonce, Math.max(issued.get(message.nonce).until, message.exp));
     issued.delete(message.nonce);
-    return context.allowlist.includes(originOf(message.url)) ? null : "ORIGIN_DENIED";
+    return allows(context.allowlist, originOf(message.url)) ? null : "ORIGIN_DENIED";
   };
 
   return { issue, check, forget, sizes: () => ({ issued: issued.size, spent: spent.size }) };
