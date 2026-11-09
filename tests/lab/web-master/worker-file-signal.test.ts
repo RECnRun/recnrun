@@ -79,6 +79,22 @@ describe("the file signal", () => {
     ]);
   });
 
+  test("an offer that arrives while the link recovers is answered once it is unlinked", async () => {
+    const run = harness();
+    run.publish("a1");
+    await run.signal.tick();
+    run.link.opened("a1");
+    run.link.closed("a1");
+    run.publish("a2");
+    await run.signal.tick();
+    await run.signal.tick();
+    expect(run.connected).toEqual(["a1"]);
+    expect(run.logs).toEqual(["offer waits: recovering"]);
+    run.link.lost("a1");
+    await run.signal.tick();
+    expect(run.connected).toEqual(["a1", "a2"]);
+  });
+
   test("a refused offer is logged and never connects", async () => {
     const run = harness("BAD_SIGNATURE");
     run.publish("a1");

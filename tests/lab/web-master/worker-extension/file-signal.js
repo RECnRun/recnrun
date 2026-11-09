@@ -10,6 +10,7 @@ const pointerValid = (current) =>
 export const createFileSignal = ({ exchangeUrl, context, deps }) => {
   const { readJson, check, link, connect, bootId, identity, emit, log } = deps;
   let seen = null;
+  let waiting = null;
   const answer = async (offer) => {
     if (!link.begin(offer.attempt)) return;
     try {
@@ -29,6 +30,12 @@ export const createFileSignal = ({ exchangeUrl, context, deps }) => {
   const tick = async () => {
     const current = await readJson(`${exchangeUrl}current.json`);
     if (!pointerValid(current) || current.attempt === seen) return;
+    // A closed link holds its slot until it times out; the offer waiting for it is kept.
+    if (link.state() === "recovering") {
+      if (waiting !== current.attempt) log("offer waits: recovering");
+      waiting = current.attempt;
+      return;
+    }
     seen = current.attempt;
     // A live link is never replaced from a file; the launcher sees state.json and reports BUSY.
     if (link.state() !== "unlinked") return log("offer ignored: linked");
