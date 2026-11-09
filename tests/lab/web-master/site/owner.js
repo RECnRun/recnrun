@@ -188,13 +188,14 @@ control("Choose folder", choose);
 control("Launch", startLaunch);
 control("Reconnect", startLaunch);
 
+// The panel fills the window, so the worker's viewport follows the master's window size.
 const image = /** @type {HTMLImageElement} */ (document.getElementById("visual"));
 Object.assign(image.style, {
   position: "fixed",
   left: "8px",
   top: "120px",
-  width: "960px",
-  height: "540px",
+  width: "calc(100vw - 16px)",
+  height: "calc(100vh - 128px)",
   objectFit: "contain",
   background: "#333",
   zIndex: "9",

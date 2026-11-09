@@ -25,7 +25,7 @@ LAB-ONLY. The owner page in the person's own Chrome (the master) launches one he
    - The first launch provisions the worker root (the Docker run takes about 9 s; allow up to 2 min): the terminal prints `provisioned generation 1, worker xxxx ...` and `worker pid N on .../roots/w1/chrome`.
    - Expect "launched: interact on the image below" and the page in the panel. Click the fixture's button: its counter increments.
 5. **Worker flags:** `ps -ww -eo pid=,args= | grep RECnRun-lab/roots/ | grep -v grep`. Expect `--headless=new` and no `--remote-debugging` or `--enable-unsafe-extension-debugging`.
-6. **Viewport match:** in DevTools of the owner page, run `Object.assign(document.getElementById("visual").style, { width: "1280px", height: "720px" })`, then the same with `800px` and `600px`. Within a second the picture fills the panel with no letterbox and stays sharp; clicks still land where you aim.
+6. **Viewport match:** resize the owner page's Chrome window, larger then smaller. The panel fills the window, and within a second the picture fills the panel with no letterbox and stays sharp; clicks still land where you aim. The worker clamps its viewport to 320×240 through 1920×1080.
 7. **Internet target:** set the URL to `https://example.com/` and click **Launch**. Expect the page in the panel and its link clickable.
 8. **Reload:** reload the owner page, then click **Reconnect**. Expect "launched" again within about 15 s and no new `provisioned` line in the terminal.
 9. **Stop:** Ctrl-C in Terminal B.

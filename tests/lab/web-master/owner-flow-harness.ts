@@ -99,6 +99,24 @@ export const resizePanel = (page: Page, width: number, height: number) =>
     [width, height] as const,
   );
 
+/** Resizes the master's window through CDP, as the owner would drag its corner. */
+export async function resizeWindow(page: Page, width: number, height: number): Promise<void> {
+  const cdp = await page.context().newCDPSession(page);
+  const { windowId } = await cdp.send("Browser.getWindowForTarget");
+  await cdp.send("Browser.setWindowBounds", { windowId, bounds: { windowState: "normal" } });
+  await cdp.send("Browser.setWindowBounds", { windowId, bounds: { width, height } });
+  await cdp.detach();
+}
+
+/** The panel's laid-out size, clamped as the worker clamps its viewport. */
+export const panelSize = (page: Page) =>
+  page.evaluate(() => {
+    const box = (document.getElementById("visual") as HTMLImageElement).getBoundingClientRect();
+    const clamp = (value: number, low: number, high: number) =>
+      Math.min(high, Math.max(low, Math.round(value)));
+    return { width: clamp(box.width, 320, 1920), height: clamp(box.height, 240, 1080) };
+  });
+
 /** The natural size of the JPEG the master shows now. */
 export const naturalSize = (page: Page) =>
   page.evaluate(() => {

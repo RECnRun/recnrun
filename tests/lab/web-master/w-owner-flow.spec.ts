@@ -17,7 +17,9 @@ import {
   launcherLog,
   masterFingerprint,
   naturalSize,
+  panelSize,
   resizePanel,
+  resizeWindow,
   rootProcesses,
   startLauncher,
   waitDetail,
@@ -59,6 +61,17 @@ async function resizeTo(page: Page, target: Target, width: number, height: numbe
   await expect.poll(() => naturalSize(page), { timeout: 20_000 }).toEqual({ width, height });
   const hit = await clickRegisters(page, target);
   expect({ w: hit?.w, h: hit?.h }).toEqual({ w: width, h: height });
+}
+
+/** Resizes the master window; the panel follows it, and the worker's viewport the panel. */
+async function followWindow(page: Page, width: number, height: number) {
+  await resizeWindow(page, width, height);
+  await expect
+    .poll(() => page.evaluate(() => innerWidth), { timeout: 5_000 })
+    .toBeLessThan(width + 1);
+  const panel = await panelSize(page);
+  await expect.poll(() => naturalSize(page), { timeout: 20_000 }).toEqual(panel);
+  return panel;
 }
 
 async function launchAndConnect(page: Page, button: "Launch" | "Reconnect") {
@@ -116,6 +129,10 @@ async function launchAndResize({ page, target }: Journey) {
     expect(line).not.toContain("--remote-debugging");
     expect(line).not.toContain("--enable-unsafe-extension-debugging");
   }
+  const large = await followWindow(page, 1400, 900);
+  const small = await followWindow(page, 1000, 700);
+  expect(small).not.toEqual(large);
+  mark("followed-window");
   await resizeTo(page, target, 1280, 720);
   mark("resized-1280x720");
   await resizeTo(page, target, 800, 600);
