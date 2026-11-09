@@ -21,6 +21,18 @@ export async function waitFor(condition, ms = 15_000) {
   throw new Error(`timed out after ${ms} ms`);
 }
 
+/** A P-256 master key as the site makes it: the pair, its 91-byte SPKI, and the 64-hex fingerprint. */
+export async function masterKey() {
+  const { subtle } = globalThis.crypto;
+  const pair = await subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, [
+    "sign",
+    "verify",
+  ]);
+  const spki = Buffer.from(await subtle.exportKey("spki", pair.publicKey));
+  const fp = Buffer.from(await subtle.digest("SHA-256", spki)).toString("hex");
+  return { pair, spki, fp };
+}
+
 /** The key=value lines of a file as an object; {} when it is missing. */
 export function fields(path) {
   if (!existsSync(path)) return {};

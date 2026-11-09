@@ -5,7 +5,7 @@
 recover_launcher() { :; }
 
 # One pass over the workspace.
-lab_tick() { :; }
+lab_tick() { lab_pair; }
 
 # Stops what this launcher started; sets survivors to the pids that would not stop.
 stop_children() { :; }

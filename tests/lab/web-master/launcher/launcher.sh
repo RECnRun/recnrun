@@ -121,6 +121,8 @@ start_launcher() {
   done
 }
 
+# shellcheck source=launcher-pair.sh
+. "$HERE/launcher-pair.sh"
 # shellcheck source=launcher-loop.sh
 . "$HERE/launcher-loop.sh"
 
