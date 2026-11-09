@@ -102,6 +102,20 @@ for (const shell of shells) {
     await stop(p.run);
   });
 
+  await test(`${shell}: an empty request is one Chrome still writes`, async (context) => {
+    const s = launcherScene(context, shell);
+    const p = await pairedLauncher(s);
+    // getFileHandle({create:true}) makes the empty file before the swap file is renamed onto it.
+    const rid = randomUUID();
+    writeFileSync(join(s.ws, `requests/${rid}.req`), "");
+    const seq = Number(s.heartbeat().seq);
+    await waitFor(() => Number(s.heartbeat().seq) >= seq + 2);
+    assert.equal(statusOf(s, rid).state, undefined, "no status for a file still being written");
+    const sent = await submit(s, p, { rid });
+    await waitFor(() => statusOf(s, sent.rid).state === "answered", 30_000);
+    await stop(p.run);
+  });
+
   await test(`${shell}: a request before pairing is NOT_PAIRED`, async (context) => {
     const s = launcherScene(context, shell);
     const p = await markedLauncher(s);

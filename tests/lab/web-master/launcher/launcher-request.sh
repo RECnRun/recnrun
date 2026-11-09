@@ -133,6 +133,8 @@ lab_requests() {
   lr_count=0
   for lr_path in "$WS/requests/"*.req; do
     [ -e "$lr_path" ] || [ -L "$lr_path" ] || continue
+    # Chrome creates the file empty before it renames the written swap file onto it.
+    ! plain_file "$lr_path" || [ -s "$lr_path" ] || continue
     [ "$lr_count" -lt "$REQUEST_MAX" ] || break
     lr_count=$((lr_count + 1))
     handle_request "$lr_path"

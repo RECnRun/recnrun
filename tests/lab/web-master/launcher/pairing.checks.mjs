@@ -35,6 +35,18 @@ for (const shell of shells) {
     await stop(run);
   });
 
+  await test(`${shell}: an empty master.spki is one Chrome still writes`, async (context) => {
+    const s = launcherScene(context, shell);
+    const { spki, fp } = await masterKey();
+    const run = await started(s, [...ALLOW, "--pair", fp], Buffer.alloc(0));
+    const seq = Number(s.heartbeat().seq);
+    await waitFor(() => Number(s.heartbeat().seq) >= seq + 2);
+    assert.ok(existsSync(offered(s)), "the empty file is left for the site to fill");
+    writeFileSync(offered(s), spki);
+    await waitFor(() => s.heartbeat().paired === fp);
+    await stop(run);
+  });
+
   await test(`${shell}: --pair with another fingerprint rejects the key`, async (context) => {
     const s = launcherScene(context, shell);
     const { spki } = await masterKey();

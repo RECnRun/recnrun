@@ -42,6 +42,8 @@ paired_fp() {
 lab_pair() {
   lp_src=$WS/pairing/master.spki
   [ -e "$lp_src" ] || [ -L "$lp_src" ] || return 0
+  # Chrome creates the file empty before it renames the written swap file onto it.
+  ! plain_file "$lp_src" || [ -s "$lp_src" ] || return 0
   lp_snap=$STATE/inbox/master.spki
   rm -f -- "$lp_snap" "$lp_snap.pem"
   if ! plain_file "$lp_src" || [ "$(file_size "$lp_src")" -gt 91 ] || ! cp -- "$lp_src" "$lp_snap"; then
