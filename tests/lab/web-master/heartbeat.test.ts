@@ -101,6 +101,14 @@ describe("parseStatus", () => {
     expect(parseStatus(status({ state: "installing" }))?.state).toBe("installing");
   });
 
+  test("the launcher's code=- on a progress or answered status reads as no code", () => {
+    // launcher-request.sh publish_status writes "-" whenever the state carries no refusal.
+    const read = parseStatus(status({ state: "delivering", code: "-", at: "5", seq: "3" }));
+    expect(read?.state).toBe("delivering");
+    expect(read?.code).toBeUndefined();
+    expect(parseStatus(status({ state: "answered", code: "-" }))?.state).toBe("answered");
+  });
+
   test("a wrong header, an unknown state or an unknown code is refused", () => {
     expect(parseStatus("nope\nstate=answered\n")).toBeNull();
     expect(parseStatus(status({ state: "dancing" }))).toBeNull();

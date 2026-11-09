@@ -54,12 +54,12 @@ const readJson = async (root, path) => {
 };
 
 /** Polls the answer and the status; a refusal ends the wait with its code shown as it came. */
-const awaitAnswer = async (context, ids) => {
-  const { root, say } = context;
-  for (const deadline = Date.now() + WAIT_MS; Date.now() < deadline; await pause(POLL_MS)) {
+export const awaitAnswer = async (context, ids) => {
+  const { root, say, waitMs = WAIT_MS } = context;
+  for (const deadline = Date.now() + waitMs; Date.now() < deadline; await pause(POLL_MS)) {
     const answer = await readJson(root, `exchange/${ROOT}/answer-${ids.attempt}.json`);
     if (answer) return { ok: true, answer };
-    const read = await readFile(root, `status/${ids.request}`);
+    const read = await readFile(root, `status/${ids.request}.status`);
     const status = read.status === "ok" ? parseStatus(decode(read.bytes)) : null;
     if (status?.state === "refused") return { ok: false, code: status.code ?? "REFUSED" };
     if (status) say(`launcher: ${status.state}`);

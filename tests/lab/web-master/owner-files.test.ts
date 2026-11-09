@@ -1,5 +1,12 @@
 import { describe, expect, test } from "vite-plus/test";
-import { pickFolder, readFile, readMarker, removeFile, writeFile } from "./site/owner-files.js";
+import {
+  ensureMarker,
+  pickFolder,
+  readFile,
+  readMarker,
+  removeFile,
+  writeFile,
+} from "./site/owner-files.js";
 import type { FolderHandle } from "./site/owner-files.js";
 
 /* The FSA calls of the owner page, against an in-memory folder: absence is classified per operation. */
@@ -134,6 +141,33 @@ describe("readMarker", () => {
     const { root, state } = make();
     state.gone = true;
     expect((await readMarker(root)).marker).toBe("folder-missing");
+  });
+});
+
+describe("ensureMarker", () => {
+  const id = "0b9f7a52-3c1e-4d0a-9a55-6f2f1c7b8e10";
+  test("a picked folder without a marker gets the one the launcher reads", async () => {
+    const { root, state } = make();
+    const made = await ensureMarker(root);
+    expect(made.marker).toBe("ok");
+    const written = JSON.parse(state.files.get("recnrun-workspace.json") ?? "null");
+    expect(written).toEqual({ v: 1, workspaceId: made.workspaceId });
+    // launcher-request.sh workspace_id reads the id with this sed pattern.
+    expect(state.files.get("recnrun-workspace.json")).toMatch(/"workspaceId": *"[0-9a-f-]{36}"/);
+  });
+
+  test("an existing marker is kept, so the launcher's workspace stays the same", async () => {
+    const marker = JSON.stringify({ v: 1, workspaceId: id });
+    const { root, state } = make({ "recnrun-workspace.json": marker });
+    expect(await ensureMarker(root)).toEqual({ marker: "ok", workspaceId: id });
+    expect(state.files.get("recnrun-workspace.json")).toBe(marker);
+  });
+
+  test("a denied folder is not written", async () => {
+    const { root, state } = make();
+    state.denied = true;
+    expect((await ensureMarker(root)).marker).not.toBe("ok");
+    expect(state.files.size).toBe(0);
   });
 });
 

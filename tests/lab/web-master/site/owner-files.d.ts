@@ -22,3 +22,7 @@ export declare const readMarker: (
   root: FolderHandle,
 ) => Promise<{ marker: "ok" | "missing" | "invalid" | "folder-missing"; workspaceId?: string }>;
 export declare const pickFolder: (picker: () => Promise<unknown>) => Promise<unknown>;
+export declare const ensureMarker: (root: FolderHandle) => Promise<{
+  marker: "ok" | "folder-missing" | "denied" | "error";
+  workspaceId?: string;
+}>;

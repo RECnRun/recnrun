@@ -2,7 +2,7 @@
 import { track } from "./heartbeat.js";
 import { storedPair } from "./jobs.js";
 import { LINK, launch, pinWorker } from "./owner-launch.js";
-import { pickFolder, readFile, readMarker, writeFile } from "./owner-files.js";
+import { ensureMarker, pickFolder, readFile, readMarker, writeFile } from "./owner-files.js";
 import { fingerprint } from "./owner-pairing.js";
 import { banner, display } from "./owner-state.js";
 import { recall, remember } from "./owner-store.js";
@@ -66,6 +66,7 @@ const choose = async () => {
   if (!handle) return;
   ui.handle = handle;
   await remember("handle", handle);
+  await ensureMarker(handle);
 };
 
 const renew = async () => {

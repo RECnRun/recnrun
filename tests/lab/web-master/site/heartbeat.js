@@ -45,6 +45,8 @@ export const parseStatus = (text) => {
     lines.filter((line) => line.includes("=")).map((line) => line.split(/=(.*)/s).slice(0, 2)),
   );
   if (!STATUS_STATES.includes(fields.state)) return null;
+  // launcher-request.sh writes code=- for a status that carries no refusal.
+  if (fields.code === "-") delete fields.code;
   if (fields.code !== undefined && !CODES.includes(fields.code)) return null;
   return fields;
 };

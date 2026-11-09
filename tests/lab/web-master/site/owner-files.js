@@ -77,6 +77,16 @@ export const readMarker = async (root) => {
   return { marker: read.status === "missing" ? "missing" : "invalid" };
 };
 
+/** Gives a picked folder the marker launcher-request.sh reads; an existing valid one is kept. */
+export const ensureMarker = async (root) => {
+  const found = await readMarker(root);
+  if (found.marker !== "missing" && found.marker !== "invalid") return found;
+  const workspaceId = crypto.randomUUID();
+  const text = JSON.stringify({ v: 1, workspaceId }, null, 1);
+  const written = await writeFile(root, MARKER, new TextEncoder().encode(text));
+  return written.status === "ok" ? { marker: "ok", workspaceId } : { marker: written.status };
+};
+
 // A dismissed picker is not an error: the caller keeps its current state.
 export const pickFolder = async (picker) => {
   try {
