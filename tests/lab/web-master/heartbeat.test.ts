@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vite-plus/test";
-import { parseHeartbeat, track } from "./site/heartbeat.js";
+import { parseHeartbeat, parseStatus, track } from "./site/heartbeat.js";
 
 const NOW = 1_800_000_000_000;
 const text = (fields: Record<string, string | number> = {}) =>
@@ -74,5 +74,36 @@ describe("track", () => {
     const back = track(gone, text({ session: "fedcba9876543210", seq: 1 }), NOW + 4_000);
     expect(back.sessionChanged).toBe(true);
     expect(first.sessionChanged).toBe(false);
+  });
+});
+
+describe("parseStatus", () => {
+  const status = (fields: Record<string, string>) =>
+    [
+      "recnrun-lab-status v1",
+      ...Object.entries({
+        request: "r1",
+        session: "0123456789abcdef",
+        state: "refused",
+        ...fields,
+      }).map(([key, value]) => `${key}=${value}`),
+      "",
+    ].join("\n");
+
+  test("reads a refusal with its code verbatim", () => {
+    expect(parseStatus(status({ code: "BUSY", at: "5", seq: "2" }))).toMatchObject({
+      state: "refused",
+      code: "BUSY",
+    });
+  });
+
+  test("a progress state needs no code", () => {
+    expect(parseStatus(status({ state: "installing" }))?.state).toBe("installing");
+  });
+
+  test("a wrong header, an unknown state or an unknown code is refused", () => {
+    expect(parseStatus("nope\nstate=answered\n")).toBeNull();
+    expect(parseStatus(status({ state: "dancing" }))).toBeNull();
+    expect(parseStatus(status({ code: "FLOOD" }))).toBeNull();
   });
 });

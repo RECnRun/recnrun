@@ -23,6 +23,32 @@ export const parseHeartbeat = (text) => {
   return STATES.includes(fields.state) && pairedOk ? fields : null;
 };
 
+const STATUS_STATES = ["verifying", "installing", "launching", "delivering", "answered", "refused"];
+const CODES = [
+  "BAD_FORMAT",
+  "BAD_SIGNATURE",
+  "EXPIRED",
+  "REPLAY",
+  "NOT_PAIRED",
+  "BUSY",
+  "INSTALL_FAILED",
+  "LAUNCH_FAILED",
+  "NO_ANSWER",
+  "LAUNCHER_RESTARTED",
+];
+
+/** A request's status file (unsigned); a code outside the known list makes the file invalid. */
+export const parseStatus = (text) => {
+  const [header, ...lines] = text.split("\n");
+  if (header !== "recnrun-lab-status v1") return null;
+  const fields = Object.fromEntries(
+    lines.filter((line) => line.includes("=")).map((line) => line.split(/=(.*)/s).slice(0, 2)),
+  );
+  if (!STATUS_STATES.includes(fields.state)) return null;
+  if (fields.code !== undefined && !CODES.includes(fields.code)) return null;
+  return fields;
+};
+
 const skewed = (heartbeat, now) =>
   heartbeat.at < now / 1000 - PAST_S || heartbeat.at > now / 1000 + FUTURE_S;
 

@@ -17,4 +17,11 @@ export interface Tracker {
   sessionChanged: boolean;
 }
 export declare const parseHeartbeat: (text: string) => Heartbeat | null;
+export interface Status {
+  state: string;
+  code?: string;
+  request?: string;
+  session?: string;
+}
+export declare const parseStatus: (text: string) => Status | null;
 export declare const track: (previous: Tracker | null, text: string | null, now: number) => Tracker;
