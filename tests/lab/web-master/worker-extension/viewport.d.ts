@@ -9,7 +9,6 @@ export interface Size {
   maxWidth: number;
   maxHeight: number;
 }
-export declare const VIEWPORT_BOUNDS: ViewportBounds;
 export declare function clampViewport(
   requested: { width: unknown; height: unknown },
   bounds?: ViewportBounds,

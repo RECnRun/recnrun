@@ -8,7 +8,7 @@ import { EXTENSION, environment } from "../../../../scripts/poc-cross-profile/ba
 import { installScene } from "../../../../scripts/poc-cross-profile/install-lab.mjs";
 import { alive } from "../../../../scripts/poc-cross-profile/lifecycle-lab.mjs";
 
-export const launcher = fileURLToPath(new URL("./launcher.sh", import.meta.url));
+const launcher = fileURLToPath(new URL("./launcher.sh", import.meta.url));
 export const EX_USAGE = 64;
 export const EX_FAILED = 70;
 export const EX_LOCKED = 75;
@@ -49,7 +49,7 @@ export function p1363ToDer(signature) {
 }
 
 /** The nine body lines of a request (v2 B5), each with its newline. */
-export function requestBody(f) {
+function requestBody(f) {
   const lines = [
     "recnrun-lab-request v1",
     `workspace=${f.workspace}`,
@@ -65,13 +65,13 @@ export function requestBody(f) {
 }
 
 /** A request signed by the master's private key: the body plus `sig=<base64 DER>`. */
-export async function signedRequest(privateKey, body) {
+async function signedRequest(privateKey, body) {
   const algorithm = { name: "ECDSA", hash: "SHA-256" };
   const p1363 = await globalThis.crypto.subtle.sign(algorithm, privateKey, Buffer.from(body));
   return `${body}sig=${p1363ToDer(p1363).toString("base64")}\n`;
 }
 
-export const ALLOW = ["--allow", "http://127.0.0.1:4600"];
+const ALLOW = ["--allow", "http://127.0.0.1:4600"];
 export const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
 
 /** A started launcher in a workspace the site has marked; paired with `key` when one is given. */

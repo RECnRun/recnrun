@@ -11,7 +11,7 @@ const isObject = (value) => Boolean(value) && typeof value === "object" && !Arra
 const keysAre = (value, keys) => isObject(value) && Object.keys(value).sort().join(",") === keys;
 const isCount = (value) => Number.isSafeInteger(value) && value >= 1;
 
-export const spkiBytes = (base64) => {
+const spkiBytes = (base64) => {
   try {
     return Uint8Array.from(atob(base64), (char) => char.charCodeAt(0));
   } catch {

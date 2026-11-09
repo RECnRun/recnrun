@@ -12,7 +12,7 @@ const hexDigest = async (bytes) => {
 };
 
 // The launcher seeded the default download folder as roots/<root>/downloads.
-export const writeSignal = (name, body) =>
+const writeSignal = (name, body) =>
   chrome.downloads.download({
     url: `data:application/json;base64,${toBase64(JSON.stringify(body))}`,
     filename: name,

@@ -1,5 +1,5 @@
 // Owner flow: the interaction tab's viewport follows the master's panel, within the policy bounds.
-export const VIEWPORT_BOUNDS = { minWidth: 320, minHeight: 240, maxWidth: 1920, maxHeight: 1080 };
+const VIEWPORT_BOUNDS = { minWidth: 320, minHeight: 240, maxWidth: 1920, maxHeight: 1080 };
 // The interact screencast's size before the master names one.
 const DEFAULT = { width: 960, height: 540 };
 
