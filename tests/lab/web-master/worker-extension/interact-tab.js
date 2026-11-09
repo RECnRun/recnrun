@@ -5,13 +5,13 @@ import { within } from "./interact-gate.js";
 import { createHeld } from "./interact-held.js";
 import { detachReason } from "./interact-lease.js";
 import { originOf } from "./job-schema.js";
+import { interactQuality } from "./quality.js";
 import { dropTab, holdTab } from "./runner.js";
 import { viewport } from "./viewport.js";
 
 const KEY = "interactTab";
 const DISPATCH_MS = 1_000;
 const OP_MS = 2_000;
-const QUALITY = 50;
 /** @type {any} */
 let tab = null;
 /** @type {{ offPolicy?: (url: string) => void, gone?: (reason: string) => void }} */
@@ -217,7 +217,7 @@ export const releaseHeld = async (reason) => {
 };
 
 const restart = async (size) => {
-  const params = { format: "jpeg", quality: QUALITY, ...size };
+  const params = { format: "jpeg", quality: interactQuality.value(), ...size };
   await op("stopScreencast", command(tab.target, "Page.stopScreencast"));
   await op("startScreencast", command(tab.target, "Page.startScreencast", params));
 };

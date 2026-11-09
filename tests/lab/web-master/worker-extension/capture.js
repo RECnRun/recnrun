@@ -1,5 +1,6 @@
 // W6 slice A: the worker captures its job tab over the runner's own debuggee, never another client.
 import { decodeFrame, fit } from "./frame-bytes.js";
+import { qualityFor } from "./quality.js";
 import { viewport } from "./viewport.js";
 
 export const MODES = {
@@ -240,7 +241,8 @@ const begin = async () => {
   stats.mode = mode;
   stats.starts += 1;
   session.lastFrameAt = Date.now();
-  const params = { format: "jpeg", quality, everyNthFrame, ...viewport.size(mode, MODES[mode]) };
+  const size = viewport.size(mode, MODES[mode]);
+  const params = { format: "jpeg", quality: qualityFor(mode, quality), everyNthFrame, ...size };
   await startScreencast(params);
   stats.state = "ACTIVE";
   session.timers.push(setInterval(heartbeat, HEARTBEAT_MS));

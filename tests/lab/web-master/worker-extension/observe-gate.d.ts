@@ -9,7 +9,14 @@ export interface GateFrame {
 export interface Caps {
   thumbnail: { fps: number; maxWidth: number; maxHeight: number };
   live: { fps: number; maxWidth: number; maxHeight: number };
-  interact: { fps: number; maxWidth: number; maxHeight: number };
+  interact: {
+    fps: number;
+    maxWidth: number;
+    maxHeight: number;
+    frameBytes: number;
+    bytesPerSecond: number;
+    bufferBytes: number;
+  };
   bytesPerSecond: number;
   frameBytes: number;
 }

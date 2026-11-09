@@ -9,8 +9,9 @@ import { createLeases } from "./interact-lease.js";
 import { closeTab, isOpen, openTab, recover, refresh } from "./interact-tab.js";
 import { holding, insertText, key, liveDocument, mouse, releaseHeld } from "./interact-tab.js";
 import { fitView, resize, tabState } from "./interact-tab.js";
-import { setSentHook } from "./observe.js";
+import { setSeenHook, setSentHook } from "./observe.js";
 import { provision } from "./provision.js";
+import { interactQuality } from "./quality.js";
 import { blockInteraction, claimInteraction, claimed, releaseInteraction } from "./runner.js";
 import { clampViewport, viewport } from "./viewport.js";
 
@@ -110,6 +111,13 @@ setSentHook((frame, sessionEpoch) => {
   push(lease.linkId, { type: "INTERACT_FRAME", leaseId: lease.leaseId, ...entry, viewportSeq });
 });
 
+// A screencast frame's size steers the JPEG quality; a new quality applies on a restart.
+setSeenHook((frame) => {
+  const lease = leases.current();
+  if (!lease || frame.jobId !== lease.interactId || frame.source !== "screencast") return;
+  if (interactQuality.observe(frame.bytes.length)) void serial(() => refresh().catch(() => false));
+});
+
 /** True while `leaseId` is the live, unexpired lease; an expired one is revoked here. */
 const authorized = (leaseId) => {
   const lease = leases.current();
@@ -152,6 +160,7 @@ const start = async (message, link) => {
     url: message.url,
   });
   viewport.reset();
+  interactQuality.reset();
   const { allowlist } = await provision.current();
   const on = { offPolicy: () => revoke("TARGET_OFF_POLICY"), gone };
   const target = { interactId: claim.interactId, url: message.url, origins: allowlist };
