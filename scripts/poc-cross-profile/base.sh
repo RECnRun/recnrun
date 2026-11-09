@@ -4,6 +4,7 @@
 # base.sh quit <bases-dir> <name>
 # base.sh freeze <bases-dir> <name> <namespace> <extensionId>
 # base.sh update <bases-dir> <from> <to> <namespace>
+# base.sh seed-root <chrome-dir> <downloads-dir>
 #
 # The clean base of the clones (POC PLAN.md P5.1, decisions 10 and 11): a Chrome user data root the
 # owner prepares once and freezes, which create-clone copies whole. Layout: <bases-dir>/<name>/
@@ -16,6 +17,8 @@
 #                 launch, so the base never writes into ~/Downloads; Chrome starts headed on the
 #                 root at chrome://extensions/ and chrome://version/ (the owner loads the extension
 #                 there) and is not waited for. stderr pid=<n>, stdout root=<root>.
+#   seed-root     the same Default/Preferences pin in a new <chrome-dir> (73 when it exists), pointing at
+#                 <downloads-dir>, which is made when missing; no Chrome starts (the lab launcher's roots).
 #   template      hands chrome-extension://<id>/bootstrap.html#template=<token>&setting=<name> to the
 #                 Chrome that holds the root and waits for the ack of the token that carries
 #                 "template":true and "setting":"<name>"; stdout profileId=, token=, root=
@@ -120,15 +123,33 @@ create_base() {
   if [ -e "$root" ] || [ -L "$root" ]; then die 73 "$root exists"; fi
   finder=chrome_binary # by name: ShellCheck would read a bare call as a forgotten "$@"
   chrome=$("$finder") || die 66 'no Google Chrome found'
-  mkdir -- "$root" || die 73 "cannot create $root"
-  mkdir -- "$root/Default" || die 73 "cannot create $root/Default"
+  seed_preferences "$root" "$root/downloads"
+  open_setup_pages "$chrome"
+  printf 'root=%s\n' "$root"
+}
+
+# A new user data dir $1 whose Default pins its Downloads root to $2.
+seed_preferences() {
+  mkdir -- "$1" || die 73 "cannot create $1"
+  mkdir -- "$1/Default" || die 73 "cannot create $1/Default"
   # The pin is written before the first launch; directory_upgrade keeps Chrome from resetting it.
   (
     set -C
-    printf '{"download":{"default_directory":"%s/downloads","directory_upgrade":true,"prompt_for_download":false}}' "$root" >"$root/Default/Preferences"
+    printf '{"download":{"default_directory":"%s","directory_upgrade":true,"prompt_for_download":false}}' "$2" >"$1/Default/Preferences"
   ) || die 73 'cannot write Default/Preferences'
-  open_setup_pages "$chrome"
-  printf 'root=%s\n' "$root"
+}
+
+seed_root() {
+  [ "$#" -eq 2 ] || die 64 'usage: base.sh seed-root <chrome-dir> <downloads-dir>'
+  for sr_path in "$1" "$2"; do
+    case $sr_path in '' | *[!A-Za-z0-9._/-]*) die 64 "$sr_path is not a path of letters, digits, dot, underscore, hyphen, and slash" ;; esac
+    is_directory "$sr_path" || die 64 "$sr_path is not an absolute path"
+    is_plain_root "$(dirname -- "$sr_path")" || die 64 "the parent of $sr_path is not a plain directory"
+  done
+  if [ -e "$1" ] || [ -L "$1" ]; then die 73 "$1 exists"; fi
+  if [ ! -d "$2" ]; then mkdir -- "$2" || die 73 "cannot create $2"; fi
+  [ ! -L "$2" ] || die 64 "$2 is a symbolic link"
+  seed_preferences "$1" "$2"
 }
 
 # --- template --------------------------------------------------------------------------------
@@ -188,7 +209,7 @@ quit_base() {
 }
 
 if [ -z "$base_as_library" ]; then
-  [ "$#" -ge 1 ] || die 64 'usage: base.sh create-base|template|quit|freeze|update [argument ...]'
+  [ "$#" -ge 1 ] || die 64 'usage: base.sh create-base|template|quit|freeze|update|seed-root [argument ...]'
   entry=$1
   shift
   case $entry in
@@ -197,6 +218,7 @@ if [ -z "$base_as_library" ]; then
     quit) quit_base "$@" ;;
     freeze) freeze_base "$@" ;;
     update) update_base "$@" ;;
+    seed-root) seed_root "$@" ;;
     *) die 64 "unknown command $entry" ;;
   esac
 fi

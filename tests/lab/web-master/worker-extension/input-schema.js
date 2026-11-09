@@ -8,6 +8,7 @@ export const INPUT_TYPES = [
   "INTERACT_RENEW",
   "INTERACT_STOP",
   "INTERACT_REFRESH",
+  "INTERACT_VIEWPORT",
   "INPUT_EVENT",
 ];
 // The kinds the worker knows; slices B and C give each its fields and its dispatch.
@@ -31,6 +32,7 @@ const KEYS = {
   INTERACT_RENEW: ["leaseId", "seq", "type"],
   INTERACT_STOP: ["leaseId", "seq", "type"],
   INTERACT_REFRESH: ["leaseId", "seq", "type"],
+  INTERACT_VIEWPORT: ["height", "leaseId", "seq", "type", "width"],
   INPUT_EVENT: ["kind", "leaseId", "seq", "type"],
 };
 // W7 slice B: a pointer names the frame it was aimed at and a point over that frame's image.
@@ -99,6 +101,9 @@ const FIELD_VALID = {
   text: (value) => typeof value === "string" && value.length > 0 && !hasControl(value),
   deltaX: (value) => Number.isFinite(value) && Math.abs(value) <= MAX_DELTA,
   deltaY: (value) => Number.isFinite(value) && Math.abs(value) <= MAX_DELTA,
+  // Any number, or the null a NaN serializes to: the clamp answers INPUT_INVALID for a non-integer.
+  width: (value) => typeof value === "number" || value === null,
+  height: (value) => typeof value === "number" || value === null,
   signature: (value) => typeof value === "string" && value.length > 0 && value.length <= 256,
 };
 

@@ -42,7 +42,9 @@ export const createSender = () => {
     stats.messageMax = messageMax;
     const messages = encodeFrame(frame, frame.bytes, messageMax);
     const total = messages.reduce((sum, message) => sum + message.byteLength, 0);
-    if (channel.bufferedAmount + total > BUFFER_CAP) {
+    // An interact frame may name a larger cap of its own; no frame gets less than the default.
+    const cap = Math.max(BUFFER_CAP, frame.bufferCap ?? 0);
+    if (channel.bufferedAmount + total > cap) {
       stats.drops.oversize += 1;
       return;
     }

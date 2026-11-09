@@ -1,5 +1,7 @@
 // W6 slice A: the worker captures its job tab over the runner's own debuggee, never another client.
 import { decodeFrame, fit } from "./frame-bytes.js";
+import { qualityFor } from "./quality.js";
+import { viewport } from "./viewport.js";
 
 export const MODES = {
   thumbnail: { maxWidth: 480, maxHeight: 270 },
@@ -148,7 +150,7 @@ const screenshot = async () => {
   );
   const { data } = await Promise.race([shot, timeout]);
   const capturedAtMs = Date.now();
-  const fitted = await fit(data, MODES[stats.mode], QUALITY);
+  const fitted = await fit(data, viewport.size(stats.mode, MODES[stats.mode]), QUALITY);
   // A reply that crossed a navigation, a rebind, or a restart shows a document it cannot name.
   if (generation !== session.generation || target !== session.target) {
     stats.drops.generation += 1;
@@ -239,7 +241,8 @@ const begin = async () => {
   stats.mode = mode;
   stats.starts += 1;
   session.lastFrameAt = Date.now();
-  const params = { format: "jpeg", quality, everyNthFrame, ...MODES[mode] };
+  const size = viewport.size(mode, MODES[mode]);
+  const params = { format: "jpeg", quality: qualityFor(mode, quality), everyNthFrame, ...size };
   await startScreencast(params);
   stats.state = "ACTIVE";
   session.timers.push(setInterval(heartbeat, HEARTBEAT_MS));

@@ -8,9 +8,12 @@ import { createGate } from "./interact-gate.js";
 import { createLeases } from "./interact-lease.js";
 import { closeTab, isOpen, openTab, recover, refresh } from "./interact-tab.js";
 import { holding, insertText, key, liveDocument, mouse, releaseHeld } from "./interact-tab.js";
-import { resize, tabState } from "./interact-tab.js";
-import { setSentHook } from "./observe.js";
+import { fitView, resize, tabState } from "./interact-tab.js";
+import { setSeenHook, setSentHook } from "./observe.js";
+import { provision } from "./provision.js";
+import { interactQuality } from "./quality.js";
 import { blockInteraction, claimInteraction, claimed, releaseInteraction } from "./runner.js";
+import { clampViewport, viewport } from "./viewport.js";
 
 const TICK_MS = 250;
 const limits = { leaseMs: 3_000, renewMs: 1_000 };
@@ -29,7 +32,6 @@ const stats = {
 // A static page draws nothing: its screencast restarts so the newest frame stays fresh.
 const QUIET_MS = 750;
 
-const provision = async () => (await chrome.storage.local.get("provision")).provision;
 // The stop holds in memory at once, and in storage across service worker restarts.
 let stopping = false;
 const latched = async () =>
@@ -105,7 +107,15 @@ setSentHook((frame, sessionEpoch) => {
   // A screenshot carries no geometry, so it is never an input target.
   if (geometry && loaderId) frames.add(entry);
   stats.framesSent += 1;
-  push(lease.linkId, { type: "INTERACT_FRAME", leaseId: lease.leaseId, ...entry });
+  const { seq: viewportSeq } = viewport.current();
+  push(lease.linkId, { type: "INTERACT_FRAME", leaseId: lease.leaseId, ...entry, viewportSeq });
+});
+
+// A screencast frame's size steers the JPEG quality; a new quality applies on a restart.
+setSeenHook((frame) => {
+  const lease = leases.current();
+  if (!lease || frame.jobId !== lease.interactId || frame.source !== "screencast") return;
+  if (interactQuality.observe(frame.bytes.length)) void serial(() => refresh().catch(() => false));
 });
 
 /** True while `leaseId` is the live, unexpired lease; an expired one is revoked here. */
@@ -123,7 +133,7 @@ const tabOps = { holding, insertText, key, liveDocument, mouse, releaseHeld };
 const event = createEvents({ frames, refuse, revoke, serial, stats, tab: tabOps, authorized });
 
 const challenge = async (link) => {
-  const refused = await gateError(await provision());
+  const refused = await gateError(await provision.current());
   if (refused) return refuse(refused);
   const nonce = starts.issue(link.linkId);
   if (!nonce) return refuse("RATE_LIMITED");
@@ -135,7 +145,7 @@ const challenge = async (link) => {
 const start = async (message, link) => {
   await recovering;
   const verify = async () => {
-    const provisioned = await provision();
+    const provisioned = await provision.current();
     const refused = await gateError(provisioned);
     if (refused) return refused;
     const { masterKey, allowlist } = provisioned;
@@ -149,7 +159,9 @@ const start = async (message, link) => {
     interactId: claim.interactId,
     url: message.url,
   });
-  const { allowlist } = await provision();
+  viewport.reset();
+  interactQuality.reset();
+  const { allowlist } = await provision.current();
   const on = { offPolicy: () => revoke("TARGET_OFF_POLICY"), gone };
   const target = { interactId: claim.interactId, url: message.url, origins: allowlist };
   opening = openTab(target, on).then(
@@ -174,6 +186,16 @@ const failedEvent = async (error, message) => {
   return refuse("INPUT_UNKNOWN", { leaseId: message.leaseId, seq: message.seq });
 };
 
+// The reply names the size applied; frames from then on carry this seq as their viewportSeq.
+const fitTo = async (message) => {
+  const { leaseId, seq } = message;
+  const effective = clampViewport(message, (await provision.current())?.viewport);
+  if (effective === "INPUT_INVALID") return refuse(effective, { leaseId, seq });
+  if (!(await fitView(effective, observed()))) return refuse("TAB_GONE", { leaseId, seq });
+  viewport.apply(effective, seq);
+  return { ok: true, leaseId, seq, effective, viewportSeq: seq };
+};
+
 const onLease = async (message, link) => {
   const refusal = leases.admit(message, link.linkId);
   if (refusal) {
@@ -186,7 +208,8 @@ const onLease = async (message, link) => {
   else if (message.type === "INTERACT_REFRESH") {
     if (!observed()) return refuse("NOT_OBSERVED", { leaseId, seq });
     await refresh();
-  } else return event(message).catch((error) => failedEvent(error, message));
+  } else if (message.type === "INTERACT_VIEWPORT") return fitTo(message);
+  else return event(message).catch((error) => failedEvent(error, message));
   return { ok: true, leaseId, seq };
 };
 

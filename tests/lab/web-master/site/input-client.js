@@ -1,5 +1,6 @@
 // W7 slices A and B: the master's input.v1 client: signed start, renewals, frames, events, stop.
 import { sign } from "./jobs.js";
+import { sessionViewport, watchSize } from "./viewport.js";
 
 const fingerprintOf = (sdp) => /^a=fingerprint:sha-256 (\S+)/im.exec(sdp)?.[1]?.toUpperCase() ?? "";
 const REPLY_MS = 5_000;
@@ -32,6 +33,7 @@ export const createInput = ({ links, onRevoked = () => undefined }) => {
   // The frames the worker announced, by frameSeq; only these can be aimed at.
   const keepFrame = (session, message) => {
     const { type: _type, leaseId: _lease, ...frame } = message;
+    if (session.viewport && !session.viewport.accepts(frame)) return;
     session.frames.set(frame.frameSeq, frame);
     session.latest = frame;
     // A screenshot carries no geometry: the latest frame a pointer can aim at is kept apart.
@@ -86,6 +88,8 @@ export const createInput = ({ links, onRevoked = () => undefined }) => {
     return sendOn(session, { type, leaseId: session.lease.leaseId, seq: session.seq, ...extra });
   };
 
+  const viewportOf = (session) => sessionViewport(session, leaseMessage);
+
   const fingerprints = (name) => {
     const { pc } = links.get(name);
     const masterFingerprint = fingerprintOf(pc.localDescription.sdp);
@@ -126,6 +130,8 @@ export const createInput = ({ links, onRevoked = () => undefined }) => {
     if (!reply.ok) return reply;
     Object.assign(session, { lease: reply, seq: 0, latest: null, aimable: null });
     session.frames.clear();
+    viewportOf(session).reset();
+    void session.viewport.now();
     const renew = () =>
       void leaseMessage(session, "INTERACT_RENEW").then((renewed) => renewed.ok || pause(session));
     session.timer = setInterval(renew, RENEW_MS);
@@ -171,6 +177,8 @@ export const createInput = ({ links, onRevoked = () => undefined }) => {
     interactFrame: (name, frameSeq) => sessions.get(name)?.frames.get(frameSeq) ?? null,
     interactLatest: (name) => sessions.get(name)?.latest ?? null,
     interactAimable: (name) => sessions.get(name)?.aimable ?? null,
+    interactWatchViewport: (name, element) => watchSize(viewportOf(sessions.get(name)), element),
+    interactEffective: (name) => sessions.get(name)?.viewport?.effective() ?? null,
     interactFingerprints: fingerprints,
     interactSession: session,
     interactDuplicate: duplicate,

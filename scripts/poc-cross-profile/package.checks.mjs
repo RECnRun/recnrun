@@ -25,6 +25,7 @@ const OFFENCES = [
   ["ruby.sh", "runtime", 4],
   ["eval.sh", "runtime", 4],
   ["bash-call.sh", "runtime", 4],
+  ["shasum.sh", "runtime", 4],
   ["double-bracket.sh", "bashism", 4],
   ["array.sh", "bashism", 4],
   ["local-nameref.sh", "bashism", 4],
@@ -50,6 +51,13 @@ await test("the scanner rejects each fixture for its rule at its line", () => {
 
 await test("the scanner accepts the launcher package and skips fixtures", () => {
   assert.deepEqual(scanPackage(here), []);
+});
+
+await test("the scanner accepts the lab launcher", () => {
+  assert.deepEqual(
+    scanPackage(fileURLToPath(new URL("../../tests/lab/web-master/launcher", import.meta.url))),
+    [],
+  );
 });
 
 await test("the scanner ignores comments, single-quoted text, and words inside names", () => {

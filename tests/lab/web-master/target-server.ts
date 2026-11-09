@@ -170,12 +170,12 @@ function handler(posts: Post[], hits: Hit[], reports: InputReport[]) {
   };
 }
 
-export async function startTarget(): Promise<Target> {
+export async function startTarget(listenPort = 0): Promise<Target> {
   const posts: Post[] = [];
   const hits: Hit[] = [];
   const reports: InputReport[] = [];
   const server = createServer(handler(posts, hits, reports));
-  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  await new Promise<void>((resolve) => server.listen(listenPort, "127.0.0.1", resolve));
   const { port } = server.address() as AddressInfo;
   return {
     origin: `http://127.0.0.1:${port}`,

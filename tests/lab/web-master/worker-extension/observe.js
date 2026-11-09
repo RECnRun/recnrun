@@ -1,8 +1,10 @@
 // W6 slice C: one observe session per worker, bound to the running job's tab and a lease.
+import { allows } from "./allow.js";
+import { provision } from "./provision.js";
 import { bootId, captureStats, isCurrent, setHooks, setSink, start, stop } from "./capture.js";
 import { load } from "./ledger.js";
 import { createObserveCheck } from "./observe-check.js";
-import { createGate } from "./observe-gate.js";
+import { CAPS, createGate } from "./observe-gate.js";
 import { current } from "./runner.js";
 
 const TICK_MS = 250;
@@ -15,6 +17,7 @@ let session = null;
 let highestEpoch = 0;
 /** @type {((frame: any, sessionEpoch: number) => void) | null} */
 let sentHook = null;
+let seenHook = null;
 const stats = { accepted: 0, refused: {}, errors: [], ended: [], policyDrops: 0, sent: 0 };
 const checker = createObserveCheck();
 
@@ -25,7 +28,7 @@ const push = (message) => toOffscreen({ type: "push", linkId: session?.linkId, m
 /** Only http(s) documents of the job's own origins are ever shown. */
 const allowed = (url, origins) => {
   if (!/^https?:\/\//.test(url)) return false;
-  return origins.includes(new URL(url).origin);
+  return allows(origins, new URL(url).origin);
 };
 
 const expiry = () => {
@@ -59,9 +62,17 @@ const gate = createGate({
     sentHook?.(frame, session.sessionEpoch);
     if (!session.firstFrameAt) session.firstFrameAt = Date.now();
     const validUntil = Math.min(session.leaseUntil, session.authorizedUntil);
+    const bufferCap = CAPS[captureStats().mode]?.bufferBytes;
     void toOffscreen({
       type: "visual-frame",
-      frame: { ...meta, capturedAtMs, data: frame.data, queuedAt: Date.now(), validUntil },
+      frame: {
+        ...meta,
+        capturedAtMs,
+        data: frame.data,
+        queuedAt: Date.now(),
+        validUntil,
+        bufferCap,
+      },
     });
   },
 });
@@ -71,6 +82,7 @@ const sink = async (frame) => {
     stats.policyDrops += 1;
     return;
   }
+  seenHook?.(frame);
   gate.offer(frame);
 };
 
@@ -169,9 +181,9 @@ const ACTIONS = {
 
 const contextOf = async () => {
   const job = current();
-  const { provision } = await chrome.storage.local.get("provision");
+  const provisioned = await provision.current();
   return {
-    masterKey: provision?.masterKey,
+    masterKey: provisioned?.masterKey,
     workerId: chrome.runtime.id,
     bootId: bootId(),
     job: job && { jobId: job.jobId, targetId: job.tabId },
@@ -220,6 +232,11 @@ export const observe = (request, linkId) => {
 /** W7: the interaction records each frame it lets out, with the session that sent it. */
 export const setSentHook = (hook) => {
   sentHook = hook;
+};
+
+/** Owner flow: every live frame, before the caps, so its size can steer the JPEG quality. */
+export const setSeenHook = (hook) => {
+  seenHook = hook;
 };
 
 export const observeLab = {
