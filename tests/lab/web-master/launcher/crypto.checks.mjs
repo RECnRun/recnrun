@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
+import { masterKey as siteKey, p1363ToDer } from "./launcher-lab.mjs";
 
 const helper = fileURLToPath(new URL("./launcher-crypto.sh", import.meta.url));
 const { subtle } = globalThis.crypto;
@@ -27,25 +28,10 @@ function call(openssl, fn, ...args) {
   });
 }
 
-// WebCrypto signs P1363 (r||s); openssl verifies DER, as the site's request signer will send it.
-function derInteger(bytes) {
-  let start = 0;
-  while (start < bytes.length - 1 && bytes[start] === 0) start += 1;
-  const body = bytes.subarray(start);
-  const pad = body[0] & 0x80 ? [0] : [];
-  return [0x02, body.length + pad.length, ...pad, ...body];
-}
-function p1363ToDer(signature) {
-  const raw = new Uint8Array(signature);
-  const seq = [...derInteger(raw.subarray(0, 32)), ...derInteger(raw.subarray(32))];
-  return Buffer.from([0x30, seq.length, ...seq]);
-}
-
 async function masterKey(dir) {
-  const pair = await subtle.generateKey(EC, true, ["sign", "verify"]);
-  const spki = Buffer.from(await subtle.exportKey("spki", pair.publicKey));
-  writeFileSync(join(dir, "master.spki"), spki);
-  return { pair, spki };
+  const key = await siteKey();
+  writeFileSync(join(dir, "master.spki"), key.spki);
+  return key;
 }
 
 for (const openssl of binaries) {
