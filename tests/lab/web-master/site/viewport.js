@@ -26,11 +26,14 @@ export const createViewport = ({
       effective = reply.effective ?? size;
       seq = Math.max(seq, reply.viewportSeq ?? 0);
     }
-    flight = null;
   };
 
+  // Cleared once settled, not inside deliver: a deliver with nothing to send ends synchronously.
   const run = () => {
-    flight ??= deliver();
+    flight ??= deliver().finally(() => {
+      flight = null;
+      if (wanted && timer === null) void run();
+    });
     return flight;
   };
 

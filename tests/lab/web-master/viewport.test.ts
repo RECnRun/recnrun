@@ -57,6 +57,30 @@ describe("sender", () => {
     expect(sent).toEqual([{ width: 820, height: 610 }]);
   });
 
+  test("a lease that starts before any size still sends the first one observed", async () => {
+    // input-client.js calls now() on every lease start, before owner.js watches the panel.
+    const { viewport, sent, fire } = rig();
+    await viewport.now();
+    viewport.observe({ width: 960, height: 540 });
+    await fire();
+    expect(sent).toEqual([{ width: 960, height: 540 }]);
+  });
+
+  test("a size observed while the last reply settles is still sent", async () => {
+    const { viewport, sent, fire, holdReplies, release } = rig();
+    holdReplies();
+    viewport.observe({ width: 800, height: 600 });
+    await fire();
+    viewport.observe({ width: 1280, height: 720 });
+    await release();
+    await fire();
+    await release();
+    expect(sent).toEqual([
+      { width: 800, height: 600 },
+      { width: 1280, height: 720 },
+    ]);
+  });
+
   test("the size the worker already has is not sent again", async () => {
     const { viewport, sent, fire } = rig();
     viewport.observe({ width: 800, height: 600 });
