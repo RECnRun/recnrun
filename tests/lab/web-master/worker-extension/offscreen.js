@@ -1,5 +1,6 @@
 // Worker link: one ECDSA identity, answers offers with iceServers [], signs challenges.
 import { OBSERVE_TYPES } from "./observe-schema.js";
+import { startFileLink } from "./file-link.js";
 import { loadIdentity } from "./identity.js";
 import { createInputs } from "./input-channel.js";
 import { startLabSignal } from "./lab-signal.js";
@@ -49,14 +50,17 @@ const relayObserve = async (channel, request) => {
   channel.send(JSON.stringify({ type: `${request.type}-reply`, ...reply }));
 };
 
-const serve = (channel, fingerprints, pc, linkId) => {
+const serve = (channel, fingerprints, pc, { linkId, events }) => {
   const [offerFingerprint, answerFingerprint] = fingerprints;
   channels.set(channel, linkId);
   peers.set(linkId, pc);
+  if (channel.readyState === "open") events.opened?.();
+  else channel.addEventListener("open", () => events.opened?.());
   channel.onclose = () => {
     channels.delete(channel);
     peers.delete(linkId);
     linkClosed(linkId);
+    events.closed?.();
   };
   channel.onmessage = async ({ data }) => {
     const message = JSON.parse(data);
@@ -80,21 +84,25 @@ const serve = (channel, fingerprints, pc, linkId) => {
   };
 };
 
-const answer = async (offer) => {
+// `events` hears the control channel open and close, and the connection fail or close.
+const connect = async (offer, events = {}) => {
   const pc = new RTCPeerConnection({ iceServers: [] });
   const linkId = crypto.randomUUID();
   links.add(pc);
   pc.oniceconnectionstatechange = () => {
     if (!LOST.has(pc.iceConnectionState)) return;
     // A disconnected link may recover; a failed or closed one is retired.
-    if (pc.iceConnectionState !== "disconnected") links.delete(pc);
+    if (pc.iceConnectionState !== "disconnected") {
+      links.delete(pc);
+      events.lost?.();
+    }
     linkClosed(linkId);
   };
   // Frames and control never share a channel: visual.v1 gets no handler of recnrun-lab.
   pc.ondatachannel = ({ channel }) => {
     const fingerprints = [fingerprintOf(offer), fingerprintOf(pc.localDescription.sdp)];
     if (channel.label === "visual.v1") visual.attach(channel, pc);
-    else if (channel.label === "recnrun-lab") serve(channel, fingerprints, pc, linkId);
+    else if (channel.label === "recnrun-lab") serve(channel, fingerprints, pc, { linkId, events });
     else if (channel.label === "input.v1") {
       const [masterFingerprint, workerFingerprint] = fingerprints;
       inputs.attach(channel, { linkId, masterFingerprint, workerFingerprint });
@@ -108,6 +116,8 @@ const answer = async (offer) => {
   await complete;
   return pc.localDescription.sdp;
 };
+
+const answer = (offer) => connect(offer);
 
 const publicKey = async () => crypto.subtle.exportKey("jwk", (await identity).publicKey);
 
@@ -128,6 +138,10 @@ const IMMEDIATE = {
   "lab-plant-text": ({ marker }) => {
     if (marker === null) sessionStorage.removeItem("probe");
     else sessionStorage.setItem("probe", marker);
+    return true;
+  },
+  "file-signal": (message) => {
+    startFileLink(message, { connect, identity });
     return true;
   },
   "lab-signal": (message) => {
@@ -158,6 +172,13 @@ chrome.runtime.onMessage.addListener((message, _sender, respond) => {
     });
     for (const [channel] of open) channel.send(JSON.stringify(message.message));
     return false;
+  }
+  if (message.type === "identity-spki") {
+    identity.then(
+      ({ spki }) => respond({ spki }),
+      (error) => respond({ error: String(error) }),
+    );
+    return true;
   }
   const work = message.type === "answer" ? answer(message.offer) : publicKey();
   work.then(respond, (error) => respond({ error: String(error) }));

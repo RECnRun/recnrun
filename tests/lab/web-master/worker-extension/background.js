@@ -5,6 +5,7 @@ import { labState, release, setKnob } from "./knobs.js";
 import { input, interactLab, interactLinkClosed } from "./interact.js";
 import { all, load, recover, resultFile } from "./ledger.js";
 import { observe, observeLab } from "./observe.js";
+import { ownerMessages, startOwner } from "./owner-boot.js";
 import { provision } from "./provision.js";
 import { statuses, submit } from "./runner.js";
 import { plant, scan, scanText, unplant } from "./scan.js";
@@ -34,9 +35,14 @@ const labSignal = async () => {
   if (url) await ask({ type: "lab-signal", url });
 };
 void recovered.then(labSignal);
+// Owner flow: a launcher-provisioned worker answers file offers and reports its self-test.
+void recovered
+  .then(() => startOwner(ask))
+  .catch((error) => console.warn(`[worker] owner start: ${String(error)}`));
 
 const handle = async (message) => {
   await recovered;
+  if (Object.hasOwn(ownerMessages, message.type)) return ownerMessages[message.type](message);
   if (message.type === "job") {
     labState.linkClosedAt = null;
     return submit(message.job, await provision.current());
