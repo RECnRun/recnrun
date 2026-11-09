@@ -3,8 +3,8 @@
 export const CAPS = {
   thumbnail: { fps: 1, maxWidth: 480, maxHeight: 270 },
   live: { fps: 5, maxWidth: 960, maxHeight: 540 },
-  // W7: worker-local, only for an interaction's own tab; the byte cap still holds.
-  interact: { fps: 25, maxWidth: 960, maxHeight: 540 },
+  // W7: worker-local, only for an interaction's own tab; it follows the master's panel up to 1080p.
+  interact: { fps: 25, maxWidth: 1920, maxHeight: 1080 },
   bytesPerSecond: 1_048_576,
   frameBytes: 194_560,
 };

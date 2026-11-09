@@ -6,6 +6,7 @@ import { createHeld } from "./interact-held.js";
 import { detachReason } from "./interact-lease.js";
 import { originOf } from "./job-schema.js";
 import { dropTab, holdTab } from "./runner.js";
+import { viewport } from "./viewport.js";
 
 const KEY = "interactTab";
 const DISPATCH_MS = 1_000;
@@ -215,13 +216,27 @@ export const releaseHeld = async (reason) => {
   return sure;
 };
 
+const restart = async (size) => {
+  const params = { format: "jpeg", quality: QUALITY, ...size };
+  await op("stopScreencast", command(tab.target, "Page.stopScreencast"));
+  await op("startScreencast", command(tab.target, "Page.startScreencast", params));
+};
+
 // A restarted screencast draws a fresh frame of an unchanged page; no screenshot is taken.
 export const refresh = async () => {
   if (!tab || tab.closing) return;
   stats.refreshes += 1;
-  const params = { format: "jpeg", quality: QUALITY, ...MODES.interact };
-  await op("stopScreencast", command(tab.target, "Page.stopScreencast"));
-  await op("startScreencast", command(tab.target, "Page.startScreencast", params));
+  await restart(viewport.size("interact", MODES.interact));
+};
+
+/** Sizes the view at device scale 1; a running screencast restarts at that size. False if gone. */
+export const fitView = async ({ width, height }, observed) => {
+  if (!tab || tab.closing) return false;
+  const metrics = { width, height, deviceScaleFactor: 1, mobile: false };
+  const method = "Emulation.setDeviceMetricsOverride";
+  await op("setDeviceMetricsOverride", command(tab.target, method, metrics));
+  if (observed) await restart({ maxWidth: width, maxHeight: height });
+  return true;
 };
 
 export const tabState = () => ({

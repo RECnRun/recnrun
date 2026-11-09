@@ -8,10 +8,11 @@ import { createGate } from "./interact-gate.js";
 import { createLeases } from "./interact-lease.js";
 import { closeTab, isOpen, openTab, recover, refresh } from "./interact-tab.js";
 import { holding, insertText, key, liveDocument, mouse, releaseHeld } from "./interact-tab.js";
-import { resize, tabState } from "./interact-tab.js";
+import { fitView, resize, tabState } from "./interact-tab.js";
 import { setSentHook } from "./observe.js";
 import { provision } from "./provision.js";
 import { blockInteraction, claimInteraction, claimed, releaseInteraction } from "./runner.js";
+import { clampViewport, viewport } from "./viewport.js";
 
 const TICK_MS = 250;
 const limits = { leaseMs: 3_000, renewMs: 1_000 };
@@ -105,7 +106,8 @@ setSentHook((frame, sessionEpoch) => {
   // A screenshot carries no geometry, so it is never an input target.
   if (geometry && loaderId) frames.add(entry);
   stats.framesSent += 1;
-  push(lease.linkId, { type: "INTERACT_FRAME", leaseId: lease.leaseId, ...entry });
+  const { seq: viewportSeq } = viewport.current();
+  push(lease.linkId, { type: "INTERACT_FRAME", leaseId: lease.leaseId, ...entry, viewportSeq });
 });
 
 /** True while `leaseId` is the live, unexpired lease; an expired one is revoked here. */
@@ -149,6 +151,7 @@ const start = async (message, link) => {
     interactId: claim.interactId,
     url: message.url,
   });
+  viewport.reset();
   const { allowlist } = await provision.current();
   const on = { offPolicy: () => revoke("TARGET_OFF_POLICY"), gone };
   const target = { interactId: claim.interactId, url: message.url, origins: allowlist };
@@ -174,6 +177,16 @@ const failedEvent = async (error, message) => {
   return refuse("INPUT_UNKNOWN", { leaseId: message.leaseId, seq: message.seq });
 };
 
+// The reply names the size applied; frames from then on carry this seq as their viewportSeq.
+const fitTo = async (message) => {
+  const { leaseId, seq } = message;
+  const effective = clampViewport(message, (await provision.current())?.viewport);
+  if (effective === "INPUT_INVALID") return refuse(effective, { leaseId, seq });
+  if (!(await fitView(effective, observed()))) return refuse("TAB_GONE", { leaseId, seq });
+  viewport.apply(effective, seq);
+  return { ok: true, leaseId, seq, effective, viewportSeq: seq };
+};
+
 const onLease = async (message, link) => {
   const refusal = leases.admit(message, link.linkId);
   if (refusal) {
@@ -186,7 +199,8 @@ const onLease = async (message, link) => {
   else if (message.type === "INTERACT_REFRESH") {
     if (!observed()) return refuse("NOT_OBSERVED", { leaseId, seq });
     await refresh();
-  } else return event(message).catch((error) => failedEvent(error, message));
+  } else if (message.type === "INTERACT_VIEWPORT") return fitTo(message);
+  else return event(message).catch((error) => failedEvent(error, message));
   return { ok: true, leaseId, seq };
 };
 
