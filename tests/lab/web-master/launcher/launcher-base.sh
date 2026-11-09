@@ -81,14 +81,14 @@ lab_layout() {
 }
 
 lab_release() {
-  release_version='' release_extension=''
+  RELEASE_VERSION='' RELEASE_EXTENSION=''
   while IFS= read -r lr_line || [ -n "$lr_line" ]; do
     case $lr_line in
-      version=*) release_version=${lr_line#version=} ;;
-      extensionVersion=*) release_extension=${lr_line#extensionVersion=} ;;
+      version=*) RELEASE_VERSION=${lr_line#version=} ;;
+      extensionVersion=*) RELEASE_EXTENSION=${lr_line#extensionVersion=} ;;
     esac
   done <"$HERE/RELEASE"
-  for lr_value in "$release_version" "$release_extension"; do
+  for lr_value in "$RELEASE_VERSION" "$RELEASE_EXTENSION"; do
     case $lr_value in '' | *[!0-9.]*) die 70 "$HERE/RELEASE has no plain version and extensionVersion" ;; esac
   done
 }

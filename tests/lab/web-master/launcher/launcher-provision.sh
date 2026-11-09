@@ -27,7 +27,7 @@ bundle_digest() {
 provision_head() {
   printf '%s' "$ALLOW_JSON" >"$STATE/allow.json"
   printf 'launcherVersion=%s\nextensionVersion=%s\nbundleDigest=%s\nmasterFp=%s\nallowDigest=%s\nworkspace=%s\n' \
-    "$release_version" "$release_extension" "$BUNDLE_DIGEST" "$(paired_fp)" \
+    "$RELEASE_VERSION" "$RELEASE_EXTENSION" "$BUNDLE_DIGEST" "$(paired_fp)" \
     "$(lab_sha256 "$STATE/allow.json")" "$WORKSPACE_ID"
 }
 needs_provision() {
@@ -119,19 +119,17 @@ check_selftest() {
   cs_file=$ROOT/downloads/provisioned-$generation.json
   plain_file "$cs_file" && [ "$(file_size "$cs_file")" -le 4096 ] || return 1
   printf '{"generation":%s,"extensionVersion":"%s","policyDigest":"%s","workerSpki":"%s"}' "$generation" \
-    "$release_extension" "$(lab_sha256 "$ROOT/ext/policy.json")" "$WORKER_SPKI" | cmp -s - "$cs_file"
+    "$RELEASE_EXTENSION" "$(lab_sha256 "$ROOT/ext/policy.json")" "$WORKER_SPKI" | cmp -s - "$cs_file"
 }
 
-# Sets pr_code when it fails: LAUNCH_FAILED when the root is held or not ours, else INSTALL_FAILED.
+# 2 when the root is held or not ours (LAUNCH_FAILED), 1 when the install failed (INSTALL_FAILED).
 provision_root() {
   set_phase installing
   publish_status "$1" installing -
   stop_worker
-  pr_code=LAUNCH_FAILED
   lab_holders "$ROOT/chrome"
-  [ -z "$holders" ] || { log "pids $holders name $ROOT/chrome; not provisioned" && return 1; }
-  clear_root || { log "$ROOT is not a root this launcher made" && return 1; }
-  pr_code=INSTALL_FAILED
+  [ -z "$holders" ] || { log "pids $holders name $ROOT/chrome; not provisioned" && return 2; }
+  clear_root || { log "$ROOT is not a root this launcher made" && return 2; }
   next_generation
   build_root && worker_identity && write_policy && run_install || return 1
   check_selftest || { log "no self-test of generation $generation" && return 1; }

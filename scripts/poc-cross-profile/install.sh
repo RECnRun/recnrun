@@ -65,7 +65,7 @@ check_install_request() {
 # Sets root (the profile), build, and await_file from install-root's arguments, or refuses with 64.
 check_lab_request() {
   case $1 in '' | *[!A-Za-z0-9._/-]*) die 64 'the root is not a path of letters, digits, dot, underscore, hyphen, and slash' ;; esac
-  is_plain_root "$1" && [ ! -L "$1" ] || die 64 'the root is not a plain absolute directory'
+  { is_plain_root "$1" && [ ! -L "$1" ]; } || die 64 'the root is not a plain absolute directory'
   is_plain_file "$1/.recnrun-lab-root" || die 64 "$1 carries no .recnrun-lab-root: the lab launcher did not make it"
   root=$1/chrome build=$1/ext
   ! is_personal_default "$root" Default || die 64 'the root is the personal Chrome'

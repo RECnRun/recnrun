@@ -78,10 +78,12 @@ stop_record() {
   pid_alive "$rec_pid" || rm -f -- "$1"
 }
 
-# Stops every recorded Chrome of kind $1 (worker, install, or * for both).
+# Stops every recorded Chrome of kind $1 (worker or install), or of both when $1 is all.
 stop_records() {
-  for sw_record in "$STATE/pids/"$1.*; do
+  for sw_record in "$STATE/pids/"*.*; do
     [ -f "$sw_record" ] || continue
+    sw_kind=${sw_record##*/}
+    [ "$1" = all ] || [ "$1" = "${sw_kind%%.*}" ] || continue
     stop_record "$sw_record"
   done
 }
@@ -122,7 +124,7 @@ stop_children() {
     wait "$inst_pid" 2>/dev/null
     note_install_pid
   fi
-  stop_records '*'
+  stop_records all
   lab_holders "$ROOT/chrome"
   for sc_pid in $holders; do add_survivor "$sc_pid"; done
 }

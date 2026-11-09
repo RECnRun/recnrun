@@ -40,13 +40,13 @@ parse_start() {
   while [ "$#" -gt 0 ]; do
     case $1 in
       --allow)
-        [ "$#" -ge 2 ] && is_origin "$2" || usage "--allow takes an http or https origin"
+        { [ "$#" -ge 2 ] && is_origin "$2"; } || usage "--allow takes an http or https origin"
         allow="$allow${allow:+,}\"$2\""
         shift 2
         ;;
       --allow-any) allow_any=1 && shift ;;
       --pair)
-        [ "$#" -ge 2 ] && is_hex "$2" 64 || usage "--pair takes the 64 hex fingerprint"
+        { [ "$#" -ge 2 ] && is_hex "$2" 64; } || usage "--pair takes the 64 hex fingerprint"
         PAIR=$2
         shift 2
         ;;
@@ -114,9 +114,9 @@ start_launcher() {
   SESSION=$(lc_random)
   printf '%s\n' "$SESSION" | write_atomic "$STATE/session"
   set_phase idle
-  log "lab $LAB, session $SESSION, launcher $release_version, extension $release_extension, $("$OPENSSL" version 2>&1)"
+  log "lab $LAB, session $SESSION, launcher $RELEASE_VERSION, extension $RELEASE_EXTENSION, $("$OPENSSL" version 2>&1)"
   recover_launcher
-  sh "$HERE/launcher-heartbeat.sh" "$LAB" "$SESSION" "$$" "$HEARTBEAT_S" "$release_version" "$release_extension" \
+  sh "$HERE/launcher-heartbeat.sh" "$LAB" "$SESSION" "$$" "$HEARTBEAT_S" "$RELEASE_VERSION" "$RELEASE_EXTENSION" \
     </dev/null >/dev/null 2>&1 &
   hb_pid=$!
   while :; do

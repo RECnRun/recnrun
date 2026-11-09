@@ -52,25 +52,22 @@ worker_busy() {
 }
 
 # One relaunch when the worker gave no answer; never while it is linked to a master.
+# 0 answered, 1 no answer (NO_ANSWER), 2 the worker is linked or connecting (BUSY).
 deliver_offer() {
   set_phase delivering
   publish_status "$1" delivering -
-  sr_code=NO_ANSWER
-  offer_in "$2" "$rq_attempt" || return 1
+  offer_in "$2" "$3" || return 1
   do_relaunched=''
   while :; do
-    await_answer "$rq_attempt" "$2"
+    await_answer "$3" "$2"
     case $? in
       0) return 0 ;;
-      2) log "the answer to $rq_attempt is larger than $ANSWER_MAX bytes" && return 1 ;;
+      2) log "the answer to $3 is larger than $ANSWER_MAX bytes" && return 1 ;;
     esac
-    if worker_busy; then
-      sr_code=BUSY
-      return 1
-    fi
+    ! worker_busy || return 2
     [ -z "$do_relaunched" ] || return 1
     do_relaunched=1
-    log "no answer to $rq_attempt within $ANSWER_S s: relaunching the worker"
+    log "no answer to $3 within $ANSWER_S s: relaunching the worker"
     stop_worker
     lab_holders "$ROOT/chrome"
     [ -z "$holders" ] && launch_worker || return 1

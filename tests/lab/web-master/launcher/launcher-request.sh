@@ -124,7 +124,7 @@ handle_request() {
   if [ -n "$rq_code" ]; then
     fail_request "$hr_rid" "$rq_code" "$rq_signed"
   else
-    start_request "$hr_rid" "$hr_box"
+    start_request "$hr_rid" "$hr_box" "$rq_attempt"
   fi
 }
 
