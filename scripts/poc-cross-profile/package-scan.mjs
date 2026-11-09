@@ -1,8 +1,9 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join, relative } from "node:path";
 
-// PLAN.md R3: the launcher package is POSIX sh and runs no other interpreter.
-const RUNTIME = /(?:^|[\s;&|(`{]|\$\()(jq|node|python3?|perl|ruby|eval|bash)(?=[\s;&|)`}]|$)/;
+// PLAN.md R3: the launcher package is POSIX sh and runs no other interpreter; hashing goes through openssl.
+const RUNTIME =
+  /(?:^|[\s;&|(`{]|\$\()(jq|node|python3?|perl|ruby|eval|bash|shasum)(?=[\s;&|)`}]|$)/;
 const BASHISMS = [
   // [[:class:]] inside a pattern is POSIX.
   [/\[\[(?!:)/, "[["],

@@ -22,11 +22,17 @@ export const createVisual = ({ links, nextMessage }) => {
   const shown = new Map();
   const arrivals = [];
   let revoked = 0;
+  // Frames each link put into the large image.
+  const shownBy = {};
+  // The link the owner interacts with; while set, the large image shows that link alone.
+  let focus = null;
   /** @type {Blob | null} */
   let lastBlob = null;
   // Keyed by link: every root of the same build carries the same extension id.
   const latest = new Map();
   const listeners = new Set();
+  // Told of each frame at its presentation, with that frame's own Blob and the paint time.
+  const presentedListeners = new Set();
   const receivers = new Map();
   // Request-to-first-frame timing per link, for the lab's measurements.
   const sessions = new Map();
@@ -42,19 +48,27 @@ export const createVisual = ({ links, nextMessage }) => {
     await image.decode();
     if (document.hidden) return { at: Date.now(), painted: false };
     return new Promise((resolve) => {
-      requestAnimationFrame(() => resolve({ at: Date.now(), painted: true }));
+      requestAnimationFrame(() =>
+        resolve({ at: Date.now(), now: performance.now(), painted: true }),
+      );
     });
   };
 
   // One object URL per link: the previous frame's URL is revoked before the next is shown.
   const display = (name, frame) => {
-    lastBlob = new Blob([frame.bytes], { type: "image/jpeg" });
-    const entry = { blob: lastBlob, capturedAtMs: frame.capturedAtMs, at: Date.now() };
+    const blob = new Blob([frame.bytes], { type: "image/jpeg" });
+    const entry = { blob, capturedAtMs: frame.capturedAtMs, at: Date.now() };
     latest.set(name, entry);
     for (const listener of listeners) listener(name, entry);
+    // Other links' frames stay in their cards, never in the view the owner aims at.
+    if (focus !== null && name !== focus) return;
+    lastBlob = blob;
+    shownBy[name] = (shownBy[name] ?? 0) + 1;
     const url = URL.createObjectURL(lastBlob);
     const previous = shown.get(name);
-    shown.set(name, { url, epoch: frame.epoch, frameSeq: frame.frameSeq });
+    // Events aim at the frame on screen: the new one counts once it is presented, not on arrival.
+    const current = { url, epoch: frame.epoch, frameSeq: previous?.frameSeq ?? null };
+    shown.set(name, current);
     image.src = url;
     if (previous) {
       URL.revokeObjectURL(previous.url);
@@ -65,8 +79,10 @@ export const createVisual = ({ links, nextMessage }) => {
     arrivals.push(arrival);
     if (arrivals.length > SAMPLES) arrivals.shift();
     const session = sessions.get(name);
-    presented().then(({ at, painted }) => {
+    presented().then(({ at, now, painted }) => {
+      if (painted && shown.get(name) === current) current.frameSeq = frame.frameSeq;
       if (painted) arrival.presentedAt = at;
+      if (painted) for (const listener of presentedListeners) listener(name, entry, now);
       if (session && session.firstFrameMs === null) {
         Object.assign(session, { firstFrameMs: performance.now() - session.sentAt, painted });
       }
@@ -135,6 +151,7 @@ export const createVisual = ({ links, nextMessage }) => {
     sessions: [...sessions.values()],
     admission: admission.stats(),
     revoked,
+    shownBy: { ...shownBy },
     superseded: supersededCount,
     arrivals: [...arrivals],
     size: [image.naturalWidth, image.naturalHeight],
@@ -153,6 +170,12 @@ export const createVisual = ({ links, nextMessage }) => {
     visualStats,
     visualSendRaw,
     jobStatus,
+    // The frame the image presents now, so a pointer names the frame it was aimed at.
+    shownFrame: (name) => shown.get(name)?.frameSeq ?? null,
     onVisualFrame: (listener) => void listeners.add(listener),
+    onPresented: (listener) => void presentedListeners.add(listener),
+    visualFocus: (name) => {
+      focus = name;
+    },
   };
 };

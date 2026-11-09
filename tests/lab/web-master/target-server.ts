@@ -1,6 +1,9 @@
 import { createServer } from "node:http";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
+import { DRAG_PAGES } from "./drag-fixtures.ts";
+import { INPUT_PAGES, servedReport } from "./input-fixtures.ts";
+import type { InputReport } from "./input-fixtures.ts";
 
 /*
  * The second loopback origin of W.lifecycle: a script-free form whose submit is the job's
@@ -12,9 +15,21 @@ interface Post {
   at: number;
 }
 
+/** A click the W7 fixture saw: the element id it landed on and where, in CSS pixels. */
+interface Hit {
+  id: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  path: string;
+}
+
 export interface Target {
   origin: string;
   posts: Post[];
+  hits: Hit[];
+  reports: InputReport[];
   count(text: string): number;
   close(): Promise<void>;
 }
@@ -68,6 +83,37 @@ setTimeout(()=>{const p=document.createElement("p");p.id="late";document.body.ap
 <html style="--panel:#808080"><body><p id="static">static</p>`,
 };
 
+// W7 slice B: targets laid out in fractions of the viewport, so a frame's geometry locates them.
+const INTERACT_STYLE = `<style>html,body{margin:0;height:100%;font:20px sans-serif;background:var(--panel)}
+.t{position:fixed;display:flex;align-items:center;justify-content:center;background:#fff;border:0;margin:0}
+.c{width:40px;height:40px;background:#000}
+#count{left:40%;top:40%;width:20%;height:20%}#next{left:5%;top:45%;width:20%;height:10%}
+#away{left:75%;top:45%;width:20%;height:10%}#popup{left:40%;top:75%;width:20%;height:10%}
+#tl{left:0;top:0}#tr{right:0;top:0}#bl{left:0;bottom:0}#br{right:0;bottom:0}
+.spin{position:fixed;left:48%;top:10%;width:4%;height:6%;background:#000;animation:s 1s linear infinite}
+@keyframes s{to{transform:rotate(360deg)}}</style>`;
+
+const INTERACT_SCRIPT = `<script>let n=0;document.getElementById("count")?.addEventListener("click",()=>{
+n+=1;document.getElementById("count").textContent=String(n);});
+document.addEventListener("click",(e)=>{const id=e.target.closest("[id]")?.id??"body";
+fetch("/interact/hit",{method:"POST",keepalive:true,body:JSON.stringify({id,x:e.clientX,y:e.clientY,
+w:innerWidth,h:innerHeight,path:location.pathname})});});</script>`;
+
+const CORNERS = `<div id="tl" class="t c"></div><div id="tr" class="t c"></div>
+<div id="bl" class="t c"></div><div id="br" class="t c"></div><div class="spin"></div>`;
+
+const INTERACT: Record<string, string> = {
+  "/interact": `<!doctype html><meta charset="utf-8"><title>Interact</title>${INTERACT_STYLE}
+<html style="--panel:#2050c0"><body><button id="count" class="t" type="button">0</button>
+<a id="next" class="t" href="/interact/next">next</a><a id="away" class="t" href="/visual/away">away</a>
+<a id="popup" class="t" href="/interact/next" target="_blank" rel="opener">popup</a>${CORNERS}${INTERACT_SCRIPT}`,
+  "/interact/next": `<!doctype html><meta charset="utf-8"><title>Next</title>${INTERACT_STYLE}
+<html style="--panel:#20a040"><body><button id="count" class="t" type="button">0</button>
+${CORNERS}${INTERACT_SCRIPT}`,
+};
+
+const STATIC: Record<string, string> = { ...VISUAL, ...INTERACT, ...INPUT_PAGES, ...DRAG_PAGES };
+
 const HTML = { "content-type": "text/html; charset=utf-8" };
 
 // W6.07's job takes long enough for its observation to change mode while it runs.
@@ -90,15 +136,28 @@ function servedGet(request: IncomingMessage, response: ServerResponse): boolean 
     "/text": () => textPage(url.searchParams),
     "/form": () => FORM,
   };
-  const body = pages[url.pathname]?.() ?? VISUAL[url.pathname];
+  const body = pages[url.pathname]?.() ?? STATIC[url.pathname];
   if (body === undefined) return false;
   response.writeHead(200, HTML).end(body);
   return true;
 }
 
-function handler(posts: Post[]) {
+/** The W7 fixture's click reports; anything malformed is dropped. */
+function servedHit(request: IncomingMessage, response: ServerResponse, hits: Hit[]): boolean {
+  if (request.method !== "POST" || request.url !== "/interact/hit") return false;
+  void bodyOf(request)
+    .then((body) => {
+      hits.push(JSON.parse(body) as Hit);
+      response.writeHead(204).end();
+    })
+    .catch(() => response.writeHead(400).end());
+  return true;
+}
+
+function handler(posts: Post[], hits: Hit[], reports: InputReport[]) {
   return (request: IncomingMessage, response: ServerResponse) => {
-    if (servedGet(request, response)) return;
+    if (servedGet(request, response) || servedHit(request, response, hits)) return;
+    if (servedReport(request, response, reports)) return;
     if (request.method !== "POST" || request.url !== "/submit") {
       response.writeHead(404).end();
       return;
@@ -111,14 +170,18 @@ function handler(posts: Post[]) {
   };
 }
 
-export async function startTarget(): Promise<Target> {
+export async function startTarget(listenPort = 0): Promise<Target> {
   const posts: Post[] = [];
-  const server = createServer(handler(posts));
-  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const hits: Hit[] = [];
+  const reports: InputReport[] = [];
+  const server = createServer(handler(posts, hits, reports));
+  await new Promise<void>((resolve) => server.listen(listenPort, "127.0.0.1", resolve));
   const { port } = server.address() as AddressInfo;
   return {
     origin: `http://127.0.0.1:${port}`,
     posts,
+    hits,
+    reports,
     count: (text) => posts.filter((post) => post.text === text).length,
     close: () => new Promise<void>((resolve) => server.close(() => resolve())),
   };

@@ -18,6 +18,12 @@
 #                 --profile-directory=Default --no-first-run --no-default-browser-check
 #                 --remote-debugging-pipe --enable-unsafe-extension-debugging, the pipe on fds 3 and 4
 #                 (NUL-terminated JSON). stderr pid=<n>; stdout extensionId=, installS=.
+#   install-root  the same steps on a lab launcher root <root> [<await-name>]: <root> carries the owner
+#                 marker .recnrun-lab-root, <root>/chrome is a profile base.sh seed-root made pinning
+#                 <root>/downloads, and <root>/ext is the build; any loaded id is accepted. Chrome adds
+#                 --headless=new, and --no-sandbox when RECNRUN_TEST_CONTAINER=1. With <await-name>, Chrome
+#                 is closed only once <root>/downloads/<await-name> is complete (the worker's self-test),
+#                 70 when it is not within RECNRUN_OPEN_TIMEOUT_S. A bad root or name exits 64.
 #
 # Environment: RECNRUN_OPEN_TIMEOUT_S (60) bounds each reply and the exit of Chrome, RECNRUN_OPEN_POLL_S
 # (1) the poll; TMPDIR holds the two fifos; RECNRUN_DISCOVERY_PREFIX and RECNRUN_DISCOVERY_UNAME as in
@@ -56,6 +62,26 @@ check_install_request() {
   [ -z "$holders" ] || die 75 "a process holds the root: pids $holders"
 }
 
+# Sets root (the profile), build, and await_file from install-root's arguments, or refuses with 64.
+check_lab_request() {
+  case $1 in '' | *[!A-Za-z0-9._/-]*) die 64 'the root is not a path of letters, digits, dot, underscore, hyphen, and slash' ;; esac
+  { is_plain_root "$1" && [ ! -L "$1" ]; } || die 64 'the root is not a plain absolute directory'
+  is_plain_file "$1/.recnrun-lab-root" || die 64 "$1 carries no .recnrun-lab-root: the lab launcher did not make it"
+  root=$1/chrome build=$1/ext
+  ! is_personal_default "$root" Default || die 64 'the root is the personal Chrome'
+  is_plain_file "$build/manifest.json" || die 64 "$build has no manifest.json"
+  grep -q -F -e "\"default_directory\":\"$1/downloads\"" "$root/Default/Preferences" 2>/dev/null ||
+    die 64 "$root/Default/Preferences does not pin the Downloads root to $1/downloads: base.sh seed-root writes it"
+  await_file=
+  if [ -n "${2:-}" ]; then
+    case $2 in .* | *[!A-Za-z0-9._-]*) die 64 'the await name is not a plain file name' ;; esac
+    await_file=$1/downloads/$2
+  fi
+  want=
+  holders_of "$root"
+  [ -z "$holders" ] || die 75 "a process holds the root: pids $holders"
+}
+
 # --- The pipe --------------------------------------------------------------------------------
 
 pipe_cleanup() {
@@ -80,9 +106,14 @@ pipe_open() {
 start_pipe_chrome() {
   finder=chrome_binary # by name: ShellCheck would read a bare call as a forgotten "$@"
   chrome=$("$finder") || die 66 'no Google Chrome found'
-  "$chrome" "--user-data-dir=$root" --profile-directory=Default --no-first-run --no-default-browser-check \
-    --remote-debugging-pipe --enable-unsafe-extension-debugging \
-    3<"$pp_dir/in" 4>"$pp_dir/out" 5<&- >/dev/null 2>&1 &
+  set -- "--user-data-dir=$root" --profile-directory=Default --no-first-run --no-default-browser-check \
+    --remote-debugging-pipe --enable-unsafe-extension-debugging
+  if [ -n "${pipe_headless:-}" ]; then
+    set -- "$@" --headless=new
+    # The test image runs Chrome as root, which the sandbox refuses.
+    [ "${RECNRUN_TEST_CONTAINER:-}" != 1 ] || set -- "$@" --no-sandbox
+  fi
+  "$chrome" "$@" 3<"$pp_dir/in" 4>"$pp_dir/out" 5<&- >/dev/null 2>&1 &
   chrome_pid=$!
   log "pid=$chrome_pid"
 }
@@ -129,7 +160,19 @@ load_build() {
   send Extensions.loadUnpacked "{\"path\":\"$build\"}"
   await_reply Extensions.loadUnpacked
   loaded=$(reply_field id '*[!a-p]*') || close_and_die "Extensions.loadUnpacked answered $(printable)"
+  [ -n "$want" ] || want=$loaded # install-root: a keyless lab build takes whatever id Chrome gives it
   [ "$loaded" = "$want" ] || close_and_die "Extensions.loadUnpacked loaded $loaded, not $want: the build's key gives another id"
+}
+# Waits until the await file is complete: Chrome writes <name>.crdownload first and renames it.
+await_selftest() {
+  [ -n "${await_file:-}" ] || return 0
+  as_waited=0
+  until [ -s "$await_file" ] && [ ! -L "$await_file" ] && [ ! -e "$await_file.crdownload" ]; do
+    pid_alive "$chrome_pid" || close_and_die "Chrome exited before $await_file was written"
+    [ "$as_waited" -lt "$limit" ] || close_and_die "no $await_file within $limit s"
+    sleep "$step"
+    as_waited=$((as_waited + step))
+  done
 }
 # Evaluates the expression $1 on chrome://extensions until it gives true; the page may still be loading.
 until_true() {
@@ -186,6 +229,15 @@ close_and_die() {
 install_base() {
   [ "$#" -eq 4 ] || die 64 'usage: install.sh install-base <bases-dir> <name> <namespace> <build-dir>'
   check_install_request "$@"
+  run_install
+}
+install_root() {
+  [ "$#" -eq 1 ] || [ "$#" -eq 2 ] || die 64 'usage: install.sh install-root <root> [<await-name>]'
+  check_lab_request "$@"
+  pipe_headless=1
+  run_install
+}
+run_install() {
   check_timing
   started=$(date +%s)
   sent=
@@ -193,17 +245,19 @@ install_base() {
   start_pipe_chrome
   load_build
   keep_build
+  await_selftest
   close_chrome || die 70 "Chrome still names $root after Browser.close and SIGINT: pids ${holders:-$chrome_pid}"
   extension_in_profile "$root" Default "$want" >/dev/null || die 70 "Chrome kept no settings entry of $want in $root/Default"
   printf 'extensionId=%s\ninstallS=%s\n' "$want" $(($(date +%s) - started))
 }
 
 if [ -z "$install_as_library" ]; then
-  [ "$#" -ge 1 ] || die 64 'usage: install.sh install-base <bases-dir> <name> <namespace> <build-dir>'
+  [ "$#" -ge 1 ] || die 64 'usage: install.sh install-base|install-root [argument ...]'
   entry=$1
   shift
   case $entry in
     install-base) install_base "$@" ;;
+    install-root) install_root "$@" ;;
     *) die 64 "unknown command $entry" ;;
   esac
 fi

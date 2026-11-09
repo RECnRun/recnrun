@@ -1,9 +1,12 @@
 // W6 slice A: the worker captures its job tab over the runner's own debuggee, never another client.
 import { decodeFrame, fit } from "./frame-bytes.js";
+import { qualityFor } from "./quality.js";
+import { viewport } from "./viewport.js";
 
 export const MODES = {
   thumbnail: { maxWidth: 480, maxHeight: 270 },
   live: { maxWidth: 960, maxHeight: 540 },
+  interact: { maxWidth: 960, maxHeight: 540 },
 };
 const QUALITY = 50;
 const HEARTBEAT_MS = 1_000;
@@ -24,6 +27,7 @@ const fresh = () => ({
   bytes: 0,
   decodeMs: 0,
   starts: 0,
+  startRetries: 0,
   drops: { epoch: 0, replaced: 0, stopped: 0, generation: 0 },
   visibility: [],
   detached: null,
@@ -85,13 +89,15 @@ const renew = () => {
   session.generation += 1;
 };
 
-const keep = (data, source, capturedAtMs) => {
+// W7: a screencast frame keeps its metadata, the geometry an input event maps through.
+const keep = (data, source, capturedAtMs, metadata = null) => {
   const { bytes, width, height, decodeMs } = decodeFrame(data);
   session.seq += 1;
   const frame = { data, bytes, width, height, source, capturedAtMs, frameSeq: session.seq };
   frame.epoch = stats.epoch;
   frame.generation = session.generation;
   frame.url = session.url;
+  frame.metadata = metadata;
   Object.assign(frame, { bootId: BOOT_ID, jobId: session.jobId, tabId: session.target.tabId });
   stats.bytes += bytes.length;
   stats.decodeMs += decodeMs;
@@ -132,7 +138,7 @@ const onFrame = ({ data, metadata, sessionId }) => {
     stats.drops.epoch += 1;
     return;
   }
-  keep(data, "screencast", capturedAtMs);
+  keep(data, "screencast", capturedAtMs, metadata);
 };
 
 // No clip and no scale: either would resize the page's view while Chrome takes the shot.
@@ -144,7 +150,7 @@ const screenshot = async () => {
   );
   const { data } = await Promise.race([shot, timeout]);
   const capturedAtMs = Date.now();
-  const fitted = await fit(data, MODES[stats.mode], QUALITY);
+  const fitted = await fit(data, viewport.size(stats.mode, MODES[stats.mode]), QUALITY);
   // A reply that crossed a navigation, a rebind, or a restart shows a document it cannot name.
   if (generation !== session.generation || target !== session.target) {
     stats.drops.generation += 1;
@@ -211,14 +217,33 @@ chrome.debugger.onDetach.addListener((source, reason) => {
   hooks.detached?.();
 });
 
+// Page.navigate answers before DevTools moves to the committed frame; on macOS the old,
+// inactive frame can still answer startScreencast, so that one error is retried briefly.
+const INACTIVE = "Not attached to an active page";
+const START_TRIES = 20;
+const START_RETRY_MS = 100;
+
+const startScreencast = async (params) => {
+  for (let tries = 1; ; tries += 1) {
+    try {
+      return await command("Page.startScreencast", params);
+    } catch (error) {
+      if (!String(error?.message).includes(INACTIVE) || tries >= START_TRIES) throw error;
+      stats.startRetries += 1;
+      await new Promise((resolve) => setTimeout(resolve, START_RETRY_MS));
+    }
+  }
+};
+
 const begin = async () => {
   const { mode, everyNthFrame = 1, quality = QUALITY } = session.wanted;
   stats.state = "STARTING";
   stats.mode = mode;
   stats.starts += 1;
   session.lastFrameAt = Date.now();
-  const params = { format: "jpeg", quality, everyNthFrame, ...MODES[mode] };
-  await command("Page.startScreencast", params);
+  const size = viewport.size(mode, MODES[mode]);
+  const params = { format: "jpeg", quality: qualityFor(mode, quality), everyNthFrame, ...size };
+  await startScreencast(params);
   stats.state = "ACTIVE";
   session.timers.push(setInterval(heartbeat, HEARTBEAT_MS));
   // After the screencast starts: a hidden tab with no capturer draws nothing to screenshot.

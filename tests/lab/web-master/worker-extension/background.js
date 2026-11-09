@@ -2,10 +2,13 @@
 import { bootId } from "./capture.js";
 import { visualLab } from "./capture-lab.js";
 import { labState, release, setKnob } from "./knobs.js";
+import { input, interactLab, interactLinkClosed } from "./interact.js";
 import { all, load, recover, resultFile } from "./ledger.js";
 import { observe, observeLab } from "./observe.js";
+import { ownerMessages, startOwner } from "./owner-boot.js";
+import { provision } from "./provision.js";
 import { statuses, submit } from "./runner.js";
-import { plant, scan, unplant } from "./scan.js";
+import { plant, scan, scanText, unplant } from "./scan.js";
 
 // Wakes the worker at browser start, so a job cut by a restart is closed before any link.
 chrome.runtime.onStartup.addListener(() => undefined);
@@ -26,32 +29,41 @@ const ask = async (message) => {
   return chrome.runtime.sendMessage({ target: "offscreen", ...message });
 };
 
-const provision = async () => (await chrome.storage.local.get("provision")).provision;
-
 // LAB-ONLY (W6.16): a provisioned relay replaces the harness's CDP relay of the offer.
 const labSignal = async () => {
   const { labSignal: url } = await chrome.storage.local.get("labSignal");
   if (url) await ask({ type: "lab-signal", url });
 };
 void recovered.then(labSignal);
+// Owner flow: a launcher-provisioned worker answers file offers and reports its self-test.
+void recovered
+  .then(() => startOwner(ask))
+  .catch((error) => console.warn(`[worker] owner start: ${String(error)}`));
 
 const handle = async (message) => {
   await recovered;
+  if (Object.hasOwn(ownerMessages, message.type)) return ownerMessages[message.type](message);
   if (message.type === "job") {
     labState.linkClosedAt = null;
-    return submit(message.job, await provision());
+    return submit(message.job, await provision.current());
   }
   // The boot names this service-worker life: an observe request must carry it.
   if (message.type === "job-status")
     return { jobs: await statuses(message.jobIds), bootId: bootId() };
   if (message.type === "observe") return observe(message.request, message.linkId);
-  if (message.type === "link-closed") labState.linkClosedAt = Date.now();
+  if (message.type === "input-closed") void interactLinkClosed(message.linkId);
+  if (message.type === "link-closed") {
+    labState.linkClosedAt = Date.now();
+    void interactLinkClosed(message.linkId);
+  }
   return { ok: true };
 };
 
 chrome.runtime.onMessage.addListener((message, _sender, respond) => {
   if (message.target !== "runner") return false;
-  handle(message).then(respond, (error) => respond({ error: String(error) }));
+  // Input is queued on receipt, before any await, so its order is the channel's.
+  const work = message.type === "input" ? input(message.message, message.link) : handle(message);
+  work.then(respond, (error) => respond({ error: String(error) }));
   return true;
 });
 
@@ -60,7 +72,7 @@ globalThis.lab = {
   id: () => chrome.runtime.id,
   answer: (offer) => ask({ type: "answer", offer }),
   ready: () => recovered,
-  provisioned: provision,
+  provisioned: () => provision.current(),
   // LAB-ONLY (W6.16): the loopback signalling relay a worker with no debugging flag polls.
   signal: (url) => chrome.storage.local.set({ labSignal: url }).then(() => true),
   provision: (value) => chrome.storage.local.set({ provision: value }).then(() => true),
@@ -68,7 +80,7 @@ globalThis.lab = {
   state: () => ({ reached: labState.reached, linkClosedAt: labState.linkClosedAt }),
   release,
   // The same admission path a relayed job takes, for tests that need no link.
-  submit: async (job) => submit(job, await provision()),
+  submit: async (job) => submit(job, await provision.current()),
   job: load,
   jobs: all,
   resultFile,
@@ -78,7 +90,9 @@ globalThis.lab = {
     transport: () => ask({ type: "visual-stats" }),
   },
   observe: observeLab,
+  interact: interactLab,
   scan,
+  scanText,
   plant,
   unplant,
 };

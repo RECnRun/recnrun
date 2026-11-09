@@ -1,5 +1,13 @@
 // W6.14 readout: what the master keeps, searched by content after streaming.
-import { cacheHits, databaseHits, holdsJpeg, plantStores, unplantStores } from "./deep-scan.js";
+import {
+  cacheHits,
+  databaseHits,
+  holdsJpeg,
+  holdsText,
+  opfsFileHits,
+  plantStores,
+  unplantStores,
+} from "./deep-scan.js";
 
 const PLANT = "recnrun-plant";
 
@@ -40,6 +48,21 @@ export const scan = async () => {
     cacheHits: await cacheHits(),
     opfs: files,
     opfsHits: await opfsHits(root),
+  };
+};
+
+const areaHits = (area, marker) =>
+  Object.keys(area).filter((key) => area.getItem(key)?.includes(marker));
+
+/** W7.C: every place the master keeps that holds `marker`: Web Storage, stores, caches, OPFS. */
+export const scanText = async (marker) => {
+  const matches = holdsText(marker);
+  return {
+    keys: areaHits(localStorage, marker),
+    sessionKeys: areaHits(sessionStorage, marker),
+    databaseHits: await databaseHits(matches),
+    cacheHits: await cacheHits(matches),
+    opfsHits: await opfsFileHits(matches),
   };
 };
 

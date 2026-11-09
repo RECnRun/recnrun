@@ -3,6 +3,16 @@
 export const CAPS = {
   thumbnail: { fps: 1, maxWidth: 480, maxHeight: 270 },
   live: { fps: 5, maxWidth: 960, maxHeight: 540 },
+  // W7: worker-local, only for an interaction's own tab; it follows the master's panel up to 1080p.
+  // Its own byte caps: 512 KiB plus 33 chunk headers fits a 640 KiB buffer above the 64 KiB mark.
+  interact: {
+    fps: 25,
+    maxWidth: 1920,
+    maxHeight: 1080,
+    frameBytes: 524_288,
+    bytesPerSecond: 6_291_456,
+    bufferBytes: 655_360,
+  },
   bytesPerSecond: 1_048_576,
   frameBytes: 194_560,
 };
@@ -16,6 +26,9 @@ export const createGate = ({ send, now = Date.now, caps = CAPS, valid = () => tr
     stats.drops[reason] = (stats.drops[reason] ?? 0) + 1;
   };
 
+  // A mode may carry byte caps of its own; the shared ones hold otherwise.
+  const capOf = (name) => caps[state.mode][name] ?? caps[name];
+
   // Milliseconds until the pending frame fits both the mode's interval and the byte budget.
   const waitFor = (frame) => {
     const at = now();
@@ -24,7 +37,7 @@ export const createGate = ({ send, now = Date.now, caps = CAPS, valid = () => tr
     let used = state.sentLog.reduce((sum, entry) => sum + entry.bytes, 0);
     let budget = 0;
     for (const entry of state.sentLog) {
-      if (used + frame.bytes.length <= caps.bytesPerSecond) break;
+      if (used + frame.bytes.length <= capOf("bytesPerSecond")) break;
       used -= entry.bytes;
       budget = entry.at + WINDOW_MS - at;
     }
@@ -56,7 +69,7 @@ export const createGate = ({ send, now = Date.now, caps = CAPS, valid = () => tr
   const capError = (frame) => {
     const cap = caps[state.mode];
     if (frame.width > cap.maxWidth || frame.height > cap.maxHeight) return "dimensions";
-    return frame.bytes.length > caps.frameBytes ? "frame-cap" : null;
+    return frame.bytes.length > capOf("frameBytes") ? "frame-cap" : null;
   };
 
   const clear = () => {

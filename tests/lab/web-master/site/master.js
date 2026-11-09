@@ -1,9 +1,12 @@
 // Throwaway master of the website-master spike: offers, pins worker identities, pings, jobs.
 import { createDashboard } from "./dashboard.js";
 import { createFsa } from "./fsa.js";
+import { createInput } from "./input-client.js";
+import { createInteractView } from "./interact-view.js";
+import { createLatency } from "./interact-latency.js";
 import { createJobs } from "./jobs.js";
 import { createObserve } from "./observe-client.js";
-import { plant, scan, unplant } from "./scan.js";
+import { plant, scan, scanText, unplant } from "./scan.js";
 import { createVisual } from "./visual-view.js";
 
 export const links = new Map();
@@ -23,6 +26,8 @@ export const nextMessage = (channel, type) =>
 
 const visual = createVisual({ links, nextMessage });
 const observe = createObserve({ links, visual });
+// A revoked lease ends the view of its tab: no later frame of it is shown.
+const input = createInput({ links, onRevoked: (name) => visual.endSession(name, "revoked") });
 
 const offer = async (name) => {
   const pc = new RTCPeerConnection({ iceServers: [] });
@@ -132,8 +137,12 @@ window.lab = {
   ...createFsa(),
   ...visual,
   ...observe,
+  ...input,
+  ...createInteractView({ input, visual, observe }),
+  ...createLatency({ input, visual }),
   ...createDashboard({ links, visual, observe }),
   scan,
+  scanText,
   plant,
   unplant,
 };

@@ -1,12 +1,14 @@
-// Throwaway worker link: one ECDSA identity, answers offers with iceServers [], signs challenges.
+// Worker link: one ECDSA identity, answers offers with iceServers [], signs challenges.
 import { OBSERVE_TYPES } from "./observe-schema.js";
+import { startFileLink } from "./file-link.js";
+import { canReadFiles } from "./file-signal.js";
+import { loadIdentity } from "./identity.js";
+import { createInputs } from "./input-channel.js";
 import { startLabSignal } from "./lab-signal.js";
+import { readPackaged } from "./packaged.js";
 import { createSender } from "./visual-sender.js";
 
-const identity = crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, false, [
-  "sign",
-  "verify",
-]);
+const identity = loadIdentity({ readPk8: () => readPackaged("identity.pk8") });
 /** Peer connections kept alive until their ICE fails or closes. */
 const links = new Set();
 /** @type {Map<RTCDataChannel, string>} control channel → its link's id */
@@ -16,6 +18,7 @@ const RELAYED = new Set(["job", "job-status"]);
 const peers = new Map();
 const OBSERVE = new Set(OBSERVE_TYPES);
 const visual = createSender();
+const inputs = createInputs();
 
 const fingerprintOf = (sdp) => /^a=fingerprint:sha-256 (\S+)/im.exec(sdp)?.[1]?.toUpperCase() ?? "";
 const toBase64 = (buffer) => btoa(String.fromCharCode(...new Uint8Array(buffer)));
@@ -28,7 +31,8 @@ const sign = async (text) => {
 
 // A closed page may send no SCTP abort; ICE consent loss is then the first sign.
 const LOST = new Set(["disconnected", "failed", "closed"]);
-const linkClosed = () => void chrome.runtime.sendMessage({ target: "runner", type: "link-closed" });
+const linkClosed = (linkId) =>
+  void chrome.runtime.sendMessage({ target: "runner", type: "link-closed", linkId });
 
 const relay = async (channel, message) => {
   const reply = await chrome.runtime.sendMessage({ target: "runner", ...message });
@@ -47,15 +51,17 @@ const relayObserve = async (channel, request) => {
   channel.send(JSON.stringify({ type: `${request.type}-reply`, ...reply }));
 };
 
-const serve = (channel, fingerprints, pc) => {
+const serve = (channel, fingerprints, pc, { linkId, events }) => {
   const [offerFingerprint, answerFingerprint] = fingerprints;
-  const linkId = crypto.randomUUID();
   channels.set(channel, linkId);
   peers.set(linkId, pc);
+  if (channel.readyState === "open") events.opened?.();
+  else channel.addEventListener("open", () => events.opened?.());
   channel.onclose = () => {
     channels.delete(channel);
     peers.delete(linkId);
-    linkClosed();
+    linkClosed(linkId);
+    events.closed?.();
   };
   channel.onmessage = async ({ data }) => {
     const message = JSON.parse(data);
@@ -79,20 +85,28 @@ const serve = (channel, fingerprints, pc) => {
   };
 };
 
-const answer = async (offer) => {
+// `events` hears the control channel open and close, and the connection fail or close.
+const connect = async (offer, events = {}) => {
   const pc = new RTCPeerConnection({ iceServers: [] });
+  const linkId = crypto.randomUUID();
   links.add(pc);
   pc.oniceconnectionstatechange = () => {
     if (!LOST.has(pc.iceConnectionState)) return;
     // A disconnected link may recover; a failed or closed one is retired.
-    if (pc.iceConnectionState !== "disconnected") links.delete(pc);
-    linkClosed();
+    if (pc.iceConnectionState !== "disconnected") {
+      links.delete(pc);
+      events.lost?.();
+    }
+    linkClosed(linkId);
   };
   // Frames and control never share a channel: visual.v1 gets no handler of recnrun-lab.
   pc.ondatachannel = ({ channel }) => {
+    const fingerprints = [fingerprintOf(offer), fingerprintOf(pc.localDescription.sdp)];
     if (channel.label === "visual.v1") visual.attach(channel, pc);
-    else if (channel.label === "recnrun-lab") {
-      serve(channel, [fingerprintOf(offer), fingerprintOf(pc.localDescription.sdp)], pc);
+    else if (channel.label === "recnrun-lab") serve(channel, fingerprints, pc, { linkId, events });
+    else if (channel.label === "input.v1") {
+      const [masterFingerprint, workerFingerprint] = fingerprints;
+      inputs.attach(channel, { linkId, masterFingerprint, workerFingerprint });
     } else channel.close();
   };
   const complete = new Promise((resolve) => {
@@ -104,6 +118,12 @@ const answer = async (offer) => {
   return pc.localDescription.sdp;
 };
 
+const answer = (offer) => connect(offer);
+const ASYNC = {
+  answer: (message) => answer(message.offer),
+  "file-probe": async () => ({ fileRead: await canReadFiles() }),
+};
+
 const publicKey = async () => crypto.subtle.exportKey("jwk", (await identity).publicKey);
 
 // Messages answered at once; an accepted start selects its link before the capture begins.
@@ -112,6 +132,21 @@ const IMMEDIATE = {
   "visual-stats": () => visual.stats(),
   "visual-select": (message) => {
     visual.select(peers.get(message.linkId));
+    return true;
+  },
+  "input-push": (message) => inputs.push(message.linkId, message.message),
+  // W7 fixes: this document's Web Storage, scanned for a marker, and its control's plant.
+  "scan-text": ({ marker }) =>
+    [localStorage, sessionStorage].flatMap((area) =>
+      Object.keys(area).filter((key) => area.getItem(key)?.includes(marker)),
+    ),
+  "lab-plant-text": ({ marker }) => {
+    if (marker === null) sessionStorage.removeItem("probe");
+    else sessionStorage.setItem("probe", marker);
+    return true;
+  },
+  "file-signal": (message) => {
+    startFileLink(message, { connect, identity });
     return true;
   },
   "lab-signal": (message) => {
@@ -143,7 +178,14 @@ chrome.runtime.onMessage.addListener((message, _sender, respond) => {
     for (const [channel] of open) channel.send(JSON.stringify(message.message));
     return false;
   }
-  const work = message.type === "answer" ? answer(message.offer) : publicKey();
+  if (message.type === "identity-spki") {
+    identity.then(
+      ({ spki }) => respond({ spki }),
+      (error) => respond({ error: String(error) }),
+    );
+    return true;
+  }
+  const work = Object.hasOwn(ASYNC, message.type) ? ASYNC[message.type](message) : publicKey();
   work.then(respond, (error) => respond({ error: String(error) }));
   return true;
 });

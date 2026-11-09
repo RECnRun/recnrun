@@ -24,7 +24,7 @@ const keyStore = async (mode) => {
   return (await request(open)).transaction("keys", mode).objectStore("keys");
 };
 
-const storedPair = async () => request((await keyStore("readonly")).get("master"));
+export const storedPair = async () => request((await keyStore("readonly")).get("master"));
 
 const showIdentity = (paired) => {
   document.getElementById("identity").textContent = paired ? "paired" : "Pair again";

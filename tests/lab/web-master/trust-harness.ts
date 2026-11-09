@@ -23,6 +23,8 @@ export interface Reply {
 export interface Provision {
   masterKey: JsonWebKey;
   allowlist: string[];
+  // W7: interaction stays off unless provisioning turns it on.
+  interactEnabled?: boolean;
 }
 
 async function copySite(): Promise<string> {
