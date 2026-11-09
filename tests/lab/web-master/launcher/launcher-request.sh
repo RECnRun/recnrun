@@ -7,7 +7,7 @@ REQUEST_MAX=8
 REQUEST_HEADER='recnrun-lab-request v1'
 status_seq=0
 
-# state is accepted, a later step, or failed; code is one of the ten status codes, or none.
+# state is verifying, installing, launching, delivering, answered, or refused; code is one of the ten status codes, or -.
 publish_status() {
   status_seq=$((status_seq + 1))
   printf 'recnrun-lab-status v1\nrequest=%s\nsession=%s\nstate=%s\ncode=%s\nat=%s\nseq=%s\n' \
@@ -27,7 +27,7 @@ retire_request() {
 fail_request() {
   retire_request "$1" "${3:-}"
   log "request $1: $2"
-  publish_status "$1" failed "$2"
+  publish_status "$1" refused "$2"
 }
 
 # The workspace id the site wrote into recnrun-workspace.json; empty when there is none.

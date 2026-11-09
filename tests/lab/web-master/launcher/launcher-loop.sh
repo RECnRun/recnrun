@@ -13,7 +13,7 @@ lab_tick() {
 # A verified request with its offer snapshotted in $2/offer.json.
 start_request() {
   retire_request "$1" "$rq_attempt"
-  publish_status "$1" accepted none
+  publish_status "$1" launching -
 }
 
 # Stops what this launcher started; sets survivors to the pids that would not stop.

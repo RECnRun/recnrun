@@ -58,20 +58,20 @@ async function refusals(s) {
 }
 
 for (const shell of shells) {
-  await test(`${shell}: a valid request is accepted once and its replay refused`, async (context) => {
+  await test(`${shell}: a valid request is taken once and its replay refused`, async (context) => {
     const s = launcherScene(context, shell);
     const p = await pairedLauncher(s);
     const sent = await submit(s, p);
-    await waitFor(() => statusOf(s, sent.rid).state === "accepted");
+    await waitFor(() => statusOf(s, sent.rid).state === "launching");
     const status = statusOf(s, sent.rid);
-    assert.deepEqual([status.request, status.session, status.code], [sent.rid, p.session, "none"]);
+    assert.deepEqual([status.request, status.session, status.code], [sent.rid, p.session, "-"]);
     assert.ok(!existsSync(join(s.ws, `requests/${sent.rid}.req`)));
     assert.ok(!existsSync(join(s.ws, `exchange/w1/offer-${sent.attempt}.json`)));
     assert.ok(consumed(s).includes(sent.rid));
     writeFileSync(join(s.ws, `exchange/w1/offer-${sent.attempt}.json`), sent.offerBytes);
     writeFileSync(join(s.ws, `requests/${sent.rid}.req`), sent.text);
     await waitFor(() => codeOf(s, sent.rid) === "REPLAY");
-    assert.equal(statusOf(s, sent.rid).state, "failed");
+    assert.equal(statusOf(s, sent.rid).state, "refused");
     await stop(p.run);
   });
 
@@ -92,7 +92,7 @@ for (const shell of shells) {
     for (const c of cases) {
       await waitFor(() => codeOf(s, c.rid) !== undefined);
       assert.equal(codeOf(s, c.rid), c.code, c.name);
-      assert.equal(statusOf(s, c.rid).state, "failed", c.name);
+      assert.equal(statusOf(s, c.rid).state, "refused", c.name);
     }
     await waitFor(() => !existsSync(join(s.ws, "requests/not-a-request.req")));
     assert.ok(existsSync(target), "the link is removed, not its target");
