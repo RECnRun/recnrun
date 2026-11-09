@@ -1,4 +1,6 @@
 // LAB-ONLY manual mode of M-TW.16 (w-manual.spec.ts): the owner drives this page by hand.
+import { retrying } from "./retry.js";
+
 const NAME = "worker";
 const PAGES = [
   ["Counter", "/interact"],
@@ -6,7 +8,6 @@ const PAGES = [
   ["Scroll", "/interact/scroll"],
   ["Slider", "/interact/drag"],
 ];
-const START_MS = 8_000;
 
 /** @type {Record<string, (...args: unknown[]) => Promise<any>>} */
 const lab = /** @type {any} */ (window).lab;
@@ -47,13 +48,9 @@ const showImage = () => {
 };
 
 const startLease = async (url) => {
-  const deadline = performance.now() + START_MS;
-  for (;;) {
-    const reply = await lab.interactStart(NAME, url);
-    if (!reply.ok) say(`start refused: ${JSON.stringify(reply)}`);
-    if (reply.ok || performance.now() > deadline) return reply;
-    await new Promise((resolve) => setTimeout(resolve, 250));
-  }
+  const reply = await retrying(() => lab.interactStart(NAME, url));
+  if (!reply.ok) say(`start refused: ${JSON.stringify(reply)}`);
+  return reply;
 };
 
 const open = async (label, path) => {
