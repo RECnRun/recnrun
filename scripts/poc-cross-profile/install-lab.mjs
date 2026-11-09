@@ -24,7 +24,8 @@ export const OTHER = "a".repeat(32);
 // A Chrome on the DevTools pipe: records its argv, copies every NUL-terminated command of fd 3 to
 // STUB_MESSAGES, and answers each on fd 4 as STUB_REPLY says (good; other: another id is loaded;
 // silent: no answer at all; noentry: no settings entry is written; linger: Browser.close is answered
-// but only a signal ends it, logged as int or term). On Browser.close it writes the settings entry Chrome
+// but only a signal ends it, logged as int or term; STUB_SELFTEST names a file written on the load, the
+// worker's self-test). On Browser.close it writes the settings entry Chrome
 // keeps and exits. A background sh inherits SIGINT ignored and cannot trap it, while Chrome installs its own
 // handler: the stub restarts itself once through perl with SIGINT at its default action.
 const STUB = `#!/bin/sh
@@ -52,6 +53,7 @@ while :; do
       *'"method":"Extensions.loadUnpacked"'*)
         loaded=$STUB_EXTENSION
         [ "$mode" != other ] || loaded=${OTHER}
+        [ -z "\${STUB_SELFTEST:-}" ] || printf '{"generation":1}' >"$STUB_SELFTEST"
         reply '{"id":'$id',"result":{"id":"'$loaded'"}}' ;;
       *'"method":"Target.createTarget"'*) reply '{"id":'$id',"result":{"targetId":"${TARGET}"}}' ;;
       *'"method":"Target.attachToTarget"'*) reply '{"id":'$id',"result":{"sessionId":"${SESSION}"}}' ;;
