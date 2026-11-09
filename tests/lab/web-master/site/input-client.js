@@ -55,9 +55,12 @@ export const createInput = ({ links, onRevoked = () => undefined }) => {
 
   const open = (name) => {
     const known = sessions.get(name);
-    if (known && known.channel.readyState !== "closed") return known.ready;
-    const channel = links.get(name).pc.createDataChannel("input.v1", { ordered: true });
-    const session = { channel, pending: [], pushes: [], lease: null, seq: 0, timer: null };
+    const { pc } = links.get(name);
+    // A new offer replaces the link while the old channel may still be closing.
+    if (known && known.pc === pc && known.channel.readyState !== "closed") return known.ready;
+    if (known) pause(known);
+    const channel = pc.createDataChannel("input.v1", { ordered: true });
+    const session = { pc, channel, pending: [], pushes: [], lease: null, seq: 0, timer: null };
     Object.assign(session, { frames: new Map(), latest: null, aimable: null });
     session.ready = new Promise((resolve) =>
       channel.addEventListener("open", () => resolve(session)),
